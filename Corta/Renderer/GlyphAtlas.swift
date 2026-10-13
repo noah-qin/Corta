@@ -369,10 +369,10 @@ nonisolated final class GlyphAtlas {
         generation += 1
         clearRectangleTable()
         if texturesInUse() || texture.height > min(128, atlasPixelSize) {
-            if !replaceTexture(.grayscale, copying: false, height: min(128, atlasPixelSize)) { blockedTextureWrites.insert(.grayscale) }
+            replaceTexture(.grayscale, copying: false, height: min(128, atlasPixelSize))
         }
         if colorTexture.width != 1 {
-            if !replaceTexture(.color, copying: false, height: 1, width: 1) { blockedTextureWrites.insert(.color) }
+            replaceTexture(.color, copying: false, height: 1, width: 1)
         }
         var white: UInt8 = 255
         texture.replace(
@@ -731,7 +731,7 @@ nonisolated final class GlyphAtlas {
             // The page's texels are about to be overwritten. The other
             // grayscale page shares the texture, so its texels come along.
             let kind: TextureKind = page === colorPage ? .color : .grayscale
-            if !replaceTexture(kind, copying: true) { blockedTextureWrites.insert(kind) }
+            replaceTexture(kind, copying: true)
         }
     }
 
@@ -764,7 +764,12 @@ nonisolated final class GlyphAtlas {
             pixelFormat: old.pixelFormat, width: width ?? old.width, height: height ?? old.height, mipmapped: false)
         descriptor.usage = [.shaderRead]
         descriptor.storageMode = storageMode
-        guard let fresh = allocateTexture(descriptor) else { return false }
+        guard let fresh = allocateTexture(descriptor) else {
+            // The old texture stays, possibly still in flight: no texel
+            // write until a later replacement succeeds (`ensureHeight`).
+            blockedTextureWrites.insert(kind)
+            return false
+        }
         if copying {
             let bytesPerRow = old.width * (old.pixelFormat == .bgra8Unorm ? 4 : 1)
             let region = MTLRegionMake2D(0, 0, old.width, old.height)

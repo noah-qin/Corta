@@ -325,10 +325,6 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         var installed = false
         if stillRelevant, let texture {
             releaseTextureLocked(id)
-            objc_setAssociatedObject(
-                texture,
-                Unmanaged.passUnretained(Self.textureLeaseKey).toOpaque(), lease,
-                .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
             textures[id] = texture
             textureBytes[id] = lease.bytes
             textureGenerations[id] = generation
@@ -605,6 +601,15 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         return DecodedImage(width: decoded.width, height: decoded.height, pixels: decoded.pixels)
     }
 
+    /// A texture is born carrying its lease: MTL4 retains textures past cache
+    /// eviction (and a timed-out blit past this call), so whoever holds it
+    /// last returns the quota.
+    private func attach(_ lease: TextureLease, to texture: MTLTexture) {
+        objc_setAssociatedObject(
+            texture, Unmanaged.passUnretained(Self.textureLeaseKey).toOpaque(), lease,
+            .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
+
     private func uploadCommandQueue() -> MTLCommandQueue? {
         lock.lock()
         defer { lock.unlock() }
@@ -629,10 +634,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
                 let command = uploadCommandQueue()?.makeCommandBuffer(),
                 let blit = command.makeBlitCommandEncoder()
             else { return nil }
-            objc_setAssociatedObject(
-                texture,
-                Unmanaged.passUnretained(Self.textureLeaseKey).toOpaque(), lease,
-                .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            attach(lease, to: texture)
             blit.copy(
                 from: linear, sourceSlice: 0, sourceLevel: 0,
                 sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
@@ -657,6 +659,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         descriptor.usage = [.shaderRead]
         descriptor.storageMode = .shared
         guard let texture = makeTextureImpl(descriptor) else { return nil }
+        attach(lease, to: texture)
         decoded.bgra.withUnsafeBytes { raw in
             // Non-empty (`decode` rejects zero), but never trap.
             guard let baseAddress = raw.baseAddress else { return }

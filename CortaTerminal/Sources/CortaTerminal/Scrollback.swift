@@ -52,8 +52,6 @@ public struct Scrollback: Sendable {
         var compressed: (bytes: ContiguousArray<UInt8>, cellCount: Int)?
         var rows: ContiguousArray<RowSpan> = []
         var attempted = false
-        var hyperlinks: Set<HyperlinkID> = []
-        var graphemes: Set<GraphemeID> = []
         var rowHyperlinks: [Int: Set<HyperlinkID>] = [:]
         var rowGraphemes: [Int: Set<GraphemeID>] = [:]
     }
@@ -79,10 +77,14 @@ public struct Scrollback: Sendable {
         struct State: Sendable {
             var valid = true
             var entries: [(id: Int, cells: ContiguousArray<Cell>)] = []
+            var entryBytes = 0
             var planes: [Int: ASCIIPlane] = [:]
             var planeOrder: [Int] = []
             var planeBytes = 0
         }
+        static let entryLimit = 4
+        static let cellByteLimit = 8 << 20
+        static let planeByteLimit = 32 << 20
         let identity = UUID()
         let state = Mutex(State())
         func cells(id: Int, decode: () -> ContiguousArray<Cell>) -> ContiguousArray<Cell> {
@@ -95,11 +97,13 @@ public struct Scrollback: Sendable {
             // Decode outside the cache lock; racing immutable misses are safe.
             let cells = decode()
             state.withLock { s in
-                guard s.valid, cells.count * MemoryLayout<Cell>.stride <= 8 * 1_048_576 else { return }
+                let bytes = cells.count * MemoryLayout<Cell>.stride
+                guard s.valid, bytes <= Self.cellByteLimit else { return }
                 if s.entries.contains(where: { $0.id == id }) { return }
                 s.entries.append((id, cells))
-                while s.entries.count > 4 || s.entries.reduce(0, { $0 + $1.cells.count * MemoryLayout<Cell>.stride }) > 8 * 1_048_576 {
-                    s.entries.removeFirst()
+                s.entryBytes += bytes
+                while s.entries.count > Self.entryLimit || s.entryBytes > Self.cellByteLimit {
+                    s.entryBytes -= s.entries.removeFirst().cells.count * MemoryLayout<Cell>.stride
                 }
             }
             return cells
@@ -110,7 +114,7 @@ public struct Scrollback: Sendable {
             state.withLock { s in
                 guard s.valid, s.planes[id] == nil else { return }
                 s.planes[id] = plane; s.planeOrder.append(id); s.planeBytes += plane.byteCost
-                while s.planeBytes > 32 * 1_048_576 {
+                while s.planeBytes > Self.planeByteLimit {
                     let id = s.planeOrder.removeFirst()
                     if let removed = s.planes.removeValue(forKey: id) { s.planeBytes -= removed.byteCost }
                 }
@@ -139,22 +143,17 @@ public struct Scrollback: Sendable {
         fileprivate let rows: ContiguousArray<RowSpan>
         public func compress() -> CompressionResult {
             let rawCount = cells.count * MemoryLayout<Cell>.stride
-            var bytes = ContiguousArray<UInt8>(repeating: 0, count: max(1, rawCount))
-            let size = cells.withUnsafeBytes { src in bytes.withUnsafeMutableBufferPointer { dst in
-                guard let base = src.baseAddress, !src.isEmpty else { return 0 }
-                return compression_encode_buffer(dst.baseAddress!, dst.count,
-                    base.assumingMemoryBound(to: UInt8.self), src.count, nil, COMPRESSION_LZ4)
-            } }
-            if size > 0, size < rawCount / 2 {
-                bytes = bytes.withUnsafeBufferPointer { source in
-                    ContiguousArray<UInt8>(unsafeUninitializedCapacity: size) { target, initialized in
-                        target.baseAddress!.initialize(from: source.baseAddress!, count: size)
-                        initialized = size
-                    }
+            // Kept only under half the raw size, so the encoder gets no more
+            // room than that: past it LZ4 returns 0, the same refusal, and
+            // nothing is zero-filled or copied twice.
+            let capacity = max(0, rawCount / 2 - 1)
+            let bytes = ContiguousArray<UInt8>(unsafeUninitializedCapacity: capacity) { dst, initialized in
+                initialized = cells.withUnsafeBytes { src in
+                    guard let base = src.baseAddress, !src.isEmpty, let out = dst.baseAddress else { return 0 }
+                    return compression_encode_buffer(out, dst.count,
+                        base.assumingMemoryBound(to: UInt8.self), src.count, nil, COMPRESSION_LZ4)
                 }
             }
-            else { bytes.removeAll() }
-            var hyperlinks: Set<HyperlinkID> = [], graphemes: Set<GraphemeID> = []
             var rowHyperlinks: [Int: Set<HyperlinkID>] = [:], rowGraphemes: [Int: Set<GraphemeID>] = [:]
             if !bytes.isEmpty {
                 for (index, row) in rows.enumerated() {
@@ -163,12 +162,12 @@ public struct Scrollback: Sendable {
                         if !cell.hyperlink.isNone { links.insert(cell.hyperlink) }
                         if !cell.grapheme.isNone { clusters.insert(cell.grapheme) }
                     }
-                    if !links.isEmpty { hyperlinks.formUnion(links); rowHyperlinks[index] = links }
-                    if !clusters.isEmpty { graphemes.formUnion(clusters); rowGraphemes[index] = clusters }
+                    if !links.isEmpty { rowHyperlinks[index] = links }
+                    if !clusters.isEmpty { rowGraphemes[index] = clusters }
                 }
             }
             return CompressionResult(id: id, namespace: namespace, bytes: bytes, cellCount: cells.count,
-                hyperlinks: hyperlinks, graphemes: graphemes, rowHyperlinks: rowHyperlinks, rowGraphemes: rowGraphemes)
+                rowHyperlinks: rowHyperlinks, rowGraphemes: rowGraphemes)
         }
     }
     public struct CompressionResult: Sendable {
@@ -176,15 +175,19 @@ public struct Scrollback: Sendable {
         fileprivate let namespace: UUID
         fileprivate let bytes: ContiguousArray<UInt8>
         fileprivate let cellCount: Int
-        fileprivate let hyperlinks: Set<HyperlinkID>
-        fileprivate let graphemes: Set<GraphemeID>
         fileprivate let rowHyperlinks: [Int: Set<HyperlinkID>]
         fileprivate let rowGraphemes: [Int: Set<GraphemeID>]
     }
 
     /// Four sealed batches plus the mutable tail remain hot.
+    static let hotBatchCount = 5
+
+    /// An integer compare, for asking under the session lock whether a
+    /// compression pass is owed at all.
+    var hasCompressionWork: Bool { compressionCursor < batches.count - Self.hotBatchCount }
+
     public func nextCompressionWork() -> CompressionWork? {
-        guard compressionCursor < batches.count - 5 else { return nil }
+        guard hasCompressionWork else { return nil }
         let batch = batches[compressionCursor]
         return CompressionWork(id: batch.id, namespace: cache.identity, cells: batch.arena, rows: batch.rows)
     }
@@ -193,7 +196,7 @@ public struct Scrollback: Sendable {
     public mutating func installCompression(_ result: CompressionResult) -> Bool {
         guard result.namespace == cache.identity,
               let index = batches.firstIndex(where: { $0.id == result.id }),
-              index < batches.count - 5, !batches[index].attempted,
+              index < batches.count - Self.hotBatchCount, !batches[index].attempted,
               batches[index].compressed == nil else { return false }
         batches[index].attempted = true
         while compressionCursor < batches.count, batches[compressionCursor].attempted {
@@ -202,8 +205,6 @@ public struct Scrollback: Sendable {
         if !result.bytes.isEmpty {
             batches[index].compressed = (result.bytes, result.cellCount)
             batches[index].arena = []
-            batches[index].hyperlinks = result.hyperlinks
-            batches[index].graphemes = result.graphemes
             batches[index].rowHyperlinks = result.rowHyperlinks
             batches[index].rowGraphemes = result.rowGraphemes
         }
@@ -223,9 +224,11 @@ public struct Scrollback: Sendable {
         for batch in batches { arena(batch).withUnsafeBufferPointer(body) }
     }
     public var compressedBatchCount: Int { batches.filter { $0.compressed != nil }.count }
-    private func arena(_ batch: Batch) -> ContiguousArray<Cell> {
+    /// `cached: false` for a one-pass sweep (reflow), which would only push
+    /// the hot batches out of the shared cache.
+    private func arena(_ batch: Batch, cached: Bool = true) -> ContiguousArray<Cell> {
         guard let compressed = batch.compressed else { return batch.arena }
-        return cache.cells(id: batch.id) {
+        let decode = {
             var cells = ContiguousArray<Cell>(repeating: .blank, count: compressed.cellCount)
             let decoded = cells.withUnsafeMutableBytes { dst in compressed.bytes.withUnsafeBufferPointer { src in
                 compression_decode_buffer(dst.baseAddress!.assumingMemoryBound(to: UInt8.self),
@@ -234,6 +237,7 @@ public struct Scrollback: Sendable {
             precondition(decoded == compressed.cellCount * MemoryLayout<Cell>.stride, "invalid internal scrollback block")
             return cells
         }
+        return cached ? cache.cells(id: batch.id, decode: decode) : decode()
     }
 
     /// One byte per stored cell, with distinct Unicode/spacer sentinels.
@@ -283,28 +287,29 @@ public struct Scrollback: Sendable {
     }
 
     func liveHyperlinkIDs() -> Set<HyperlinkID> {
-        var ids: Set<HyperlinkID> = []
-        for (index, batch) in batches.enumerated() {
-            if batch.compressed == nil {
-                for row in batch.rows.dropFirst(index == 0 ? headSkip : 0) {
-                    for cell in batch.arena[Int(row.start)..<(Int(row.start) + Int(row.length))] where !cell.hyperlink.isNone { ids.insert(cell.hyperlink) }
-                }
-            } else if index == 0, headSkip > 0 {
-                for (row, live) in batch.rowHyperlinks where row >= headSkip { ids.formUnion(live) }
-            } else { ids.formUnion(batch.hyperlinks) }
-        }
-        return ids
+        liveIDs(rows: \.rowHyperlinks) { $0.hyperlink.isNone ? nil : $0.hyperlink }
     }
     func liveGraphemeIDs() -> Set<GraphemeID> {
-        var ids: Set<GraphemeID> = []
+        liveIDs(rows: \.rowGraphemes) { $0.grapheme.isNone ? nil : $0.grapheme }
+    }
+
+    /// Ids still referenced by retained rows: scanned in an arena, read
+    /// from the per-row index a compressed batch kept, skipping evicted rows.
+    private func liveIDs<ID: Hashable>(
+        rows perRow: KeyPath<Batch, [Int: Set<ID>]>, cell id: (Cell) -> ID?
+    ) -> Set<ID> {
+        var ids: Set<ID> = []
         for (index, batch) in batches.enumerated() {
+            let first = index == 0 ? headSkip : 0
             if batch.compressed == nil {
-                for row in batch.rows.dropFirst(index == 0 ? headSkip : 0) {
-                    for cell in batch.arena[Int(row.start)..<(Int(row.start) + Int(row.length))] where !cell.grapheme.isNone { ids.insert(cell.grapheme) }
+                for row in batch.rows.dropFirst(first) {
+                    for cell in batch.arena[Int(row.start)..<(Int(row.start) + Int(row.length))] {
+                        if let live = id(cell) { ids.insert(live) }
+                    }
                 }
-            } else if index == 0, headSkip > 0 {
-                for (row, live) in batch.rowGraphemes where row >= headSkip { ids.formUnion(live) }
-            } else { ids.formUnion(batch.graphemes) }
+            } else {
+                for (row, live) in batch[keyPath: perRow] where row >= first { ids.formUnion(live) }
+            }
         }
         return ids
     }
@@ -363,7 +368,7 @@ public struct Scrollback: Sendable {
     }
     func appendCells(at index: Int, reader: inout LineReader, into cells: inout [Cell]) -> (wrapped: Bool, mark: LineMark) {
         let global = index + headSkip, batch = batches[global / batchSize]
-        if reader.id != batch.id { reader.cells = arena(batch); reader.id = batch.id }
+        if reader.id != batch.id { reader.cells = arena(batch, cached: false); reader.id = batch.id }
         let span = batch.rows[global % batchSize]
         cells.append(contentsOf: reader.cells[Int(span.start)..<(Int(span.start) + Int(span.length))])
         return (span.wrapped, span.mark)

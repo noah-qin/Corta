@@ -683,6 +683,9 @@ public struct Grid: Sendable {
         pendingWrap = false
     }
 
+    var hasCompressionWork: Bool {
+        scrollback.hasCompressionWork || suspendedMain?.grid.scrollback.hasCompressionWork == true
+    }
     func nextCompressionWork() -> Scrollback.CompressionWork? {
         scrollback.nextCompressionWork() ?? suspendedMain?.grid.scrollback.nextCompressionWork()
     }
@@ -1006,11 +1009,16 @@ public struct Grid: Sendable {
     public mutating func scrollUp(_ count: Int) {
         let count = min(max(0, count), marginBottom - marginTop + 1)
         guard count > 0 else { return }
-        // With no history (including the alternate screen), totalPushed
-        // cannot advance the image anchors. Move and clip them explicitly.
-        let saveToHistory = marginTop == 0 && marginBottom == rows - 1 && scrollback.limit > 0
-        if saveToHistory {
-            for row in 0..<count { scrollback.push(lines[row]) }
+        if marginTop == 0 && marginBottom == rows - 1 {
+            if scrollback.limit > 0 {
+                for row in 0..<count { scrollback.push(lines[row]) }
+            } else {
+                // No history (the alternate screen, `scrollback = 0`): no push
+                // advances the image anchors, so move and clip them here.
+                imagePlacements.scrollRegion(top: 0, bottom: rows - 1, delta: count,
+                    scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
+            }
+            // The ring's O(count) rotation either way, not the region's O(rows).
             lines.rotateUp(count)
             return
         }

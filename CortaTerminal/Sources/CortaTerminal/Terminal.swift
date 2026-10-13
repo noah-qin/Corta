@@ -44,6 +44,7 @@ public struct Terminal: Sendable {
         while let work = performer.grid.nextCompressionWork() { performer.grid.installCompression(work.compress()) }
     }
 
+    var hasCompressionWork: Bool { performer.grid.hasCompressionWork }
     func nextCompressionWork() -> Scrollback.CompressionWork? {
         performer.grid.nextCompressionWork()
     }

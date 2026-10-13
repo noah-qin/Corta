@@ -181,12 +181,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
                 resume()
                 return true
             }
-            let drawn: Bool
-            if let onRenderFrame { drawn = onRenderFrame(metalLayer.drawableSize, drawable) }
-            else { drawable.present(); drawn = true }
-            lastPresent = CACurrentMediaTime()
-            owesDraw = !drawn
-            if !drawn { resume() }
+            drawAcquired(drawable)
             return true
         }
     }
@@ -227,23 +222,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     @objc private func pacingTick(_ pacing: CADisplayLink) {
         RenderMetrics.measure(.cpuFrame) {
             let now = CACurrentMediaTime()
-            if RenderMetrics.isEnabled {
-                RenderMetrics.noteConditions(minimum: desiredFrameRateRange.minimum,
-                    maximum: desiredFrameRateRange.maximum, preferred: desiredFrameRateRange.preferred,
-                    lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled)
-                let lead = (pacing.targetTimestamp - now) * 1000
-                RenderMetrics.record(.callbackLead, milliseconds: lead)
-                if let resumedAt {
-                    RenderMetrics.record(.firstAfterResume, milliseconds: lead)
-                    RenderMetrics.record(.resumeToCallback, milliseconds: (now - resumedAt) * 1000)
-                    self.resumedAt = nil
-                }
-                if let previousPresentationTimestamp {
-                    RenderMetrics.record(.frameInterval, milliseconds:
-                        (pacing.targetTimestamp - previousPresentationTimestamp) * 1000)
-                }
-                previousPresentationTimestamp = pacing.targetTimestamp
-            }
+            if RenderMetrics.isEnabled { recordTick(target: pacing.targetTimestamp, now: now) }
             let pending = shouldRenderFrame?() == true
             guard pending || owesDraw else { isPaused = true; return }
             guard let drawable = RenderMetrics.measure(.drawableWait, { metalLayer.nextDrawable() })
@@ -251,13 +230,44 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
             if RenderMetrics.isEnabled {
                 RenderMetrics.notePresentationTarget(of: drawable, at: pacing.targetTimestamp)
             }
-            let drawn: Bool
-            if let onRenderFrame { drawn = onRenderFrame(metalLayer.drawableSize, drawable) }
-            else { drawable.present(); drawn = true }
-            lastPresent = CACurrentMediaTime()
-            owesDraw = !drawn
-            if !drawn { resume() }
+            drawAcquired(drawable)
         }
+    }
+
+    /// The pacing drivers' draw of a drawable they acquired themselves.
+    private func drawAcquired(_ drawable: CAMetalDrawable) {
+        let drawn = draw(drawable, size: metalLayer.drawableSize)
+        lastPresent = CACurrentMediaTime()
+        owesDraw = !drawn
+        if !drawn { resume() }
+    }
+
+    /// Render, or with no renderer present as is: a drawable is never held.
+    private func draw(_ drawable: CAMetalDrawable, size: CGSize) -> Bool {
+        guard let onRenderFrame else {
+            drawable.present()
+            return true
+        }
+        return onRenderFrame(size, drawable)
+    }
+
+    /// One tick's rate conditions, callback lead, resume latency and
+    /// interval, the same for every driver.
+    private func recordTick(target: CFTimeInterval, now: CFTimeInterval) {
+        RenderMetrics.noteConditions(minimum: desiredFrameRateRange.minimum,
+            maximum: desiredFrameRateRange.maximum, preferred: desiredFrameRateRange.preferred,
+            lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled)
+        let lead = (target - now) * 1000
+        RenderMetrics.record(.callbackLead, milliseconds: lead)
+        if let resumedAt {
+            RenderMetrics.record(.firstAfterResume, milliseconds: lead)
+            RenderMetrics.record(.resumeToCallback, milliseconds: (now - resumedAt) * 1000)
+            self.resumedAt = nil
+        }
+        if let previousPresentationTimestamp {
+            RenderMetrics.record(.frameInterval, milliseconds: (target - previousPresentationTimestamp) * 1000)
+        }
+        previousPresentationTimestamp = target
     }
 
     func metalDisplayLink(
@@ -278,34 +288,15 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         // stall signal (`PERFORMANCE.md` §5.3/§5.4).
         if RenderMetrics.isEnabled {
             RenderMetrics.notePresentationTarget(of: update.drawable, at: update.targetPresentationTimestamp)
-            RenderMetrics.noteConditions(minimum: desiredFrameRateRange.minimum,
-                maximum: desiredFrameRateRange.maximum, preferred: desiredFrameRateRange.preferred,
-                lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled)
-            let now = CACurrentMediaTime()
-            let leadMS = (update.targetPresentationTimestamp - now) * 1000
-            RenderMetrics.record(.callbackLead, milliseconds: leadMS)
-            if let resumedAt {
-                RenderMetrics.record(.firstAfterResume, milliseconds: leadMS)
-                RenderMetrics.record(.resumeToCallback, milliseconds: (now - resumedAt) * 1000)
-                self.resumedAt = nil
-            }
-            if let previousPresentationTimestamp {
-                RenderMetrics.record(.frameInterval, milliseconds:
-                    (update.targetPresentationTimestamp - previousPresentationTimestamp) * 1000)
-            }
-            previousPresentationTimestamp = update.targetPresentationTimestamp
+            recordTick(target: update.targetPresentationTimestamp, now: CACurrentMediaTime())
             let latenessMS = (CACurrentMediaTime() - update.targetTimestamp) * 1000
             RenderMetrics.record(.drawableWait, milliseconds: max(0, latenessMS))
         }
         let stillPending = shouldRenderFrame?() ?? true
-        let drawn: Bool
-        if let onRenderFrame { drawn = onRenderFrame(
-                CGSize(
-                    width: update.drawable.texture.width, height: update.drawable.texture.height),
-                update.drawable)
-        } else {
-            update.drawable.present()
-            drawn = true }
+        // The drawable's own size: the layer's can already be a resize ahead.
+        let drawn = draw(
+            update.drawable,
+            size: CGSize(width: update.drawable.texture.width, height: update.drawable.texture.height))
         if Self.mayPause(stillPending: stillPending, drawn: drawn) {
             link.isPaused = true
             previousPresentationTimestamp = nil

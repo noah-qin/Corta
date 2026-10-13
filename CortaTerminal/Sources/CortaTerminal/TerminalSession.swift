@@ -262,7 +262,7 @@ public final class TerminalSession: @unchecked Sendable {
             }
             self.compressionScheduled.withLock { $0 = false }
             // Close the final feed / drain race without keeping an idle timer.
-            if !self.stopped.withLock({ $0 }), self.state.withLock({ $0.terminal.nextCompressionWork() != nil }) {
+            if !self.stopped.withLock({ $0 }), self.state.withLock({ $0.terminal.hasCompressionWork }) {
                 self.scheduleCompression()
             }
         }
@@ -489,7 +489,7 @@ public final class TerminalSession: @unchecked Sendable {
                 while offset < batch.count {
                     let end = min(offset + Self.feedLockSliceSize, batch.count)
                     let slice = batch[offset..<end]
-                    let applied = state.withLock { current -> (responses: [UInt8], episode: Int?) in
+                    let applied = state.withLock { current -> (responses: [UInt8], episode: Int?, compress: Bool) in
                         let episodeBefore = current.terminal.synchronizedOutputEpisode
                         current.terminal.feed(slice)
                         reportImageBytes(current.terminal)
@@ -498,16 +498,18 @@ public final class TerminalSession: @unchecked Sendable {
                         // A repeated BSU does not extend it, or a child that never sends
                         // ESU could stall presentation forever.
                         let episodeAfter = current.terminal.synchronizedOutputEpisode
-                        guard episodeAfter != episodeBefore else { return (sliceResponses, nil) }
+                        // An integer compare: a pass is queued only once a batch seals.
+                        let compress = current.terminal.hasCompressionWork
+                        guard episodeAfter != episodeBefore else { return (sliceResponses, nil, compress) }
                         current.synchronizedOutputEpisode = episodeAfter
-                        return (sliceResponses, episodeAfter)
+                        return (sliceResponses, episodeAfter, compress)
                     }
                     if responses.count + applied.responses.count <= Self.maxResponseBytesPerBatch {
                         responses.append(contentsOf: applied.responses)
                     }
                     if let newEpisode = applied.episode { episode = newEpisode }
                     offset = end
-                    scheduleCompression()
+                    if applied.compress { scheduleCompression() }
                     // After the last slice too: the next batch's first slice is
                     // one `read(2)` away, sooner than a waiter's wake, so a flood
                     // of one-slice batches would never leave a gap.
