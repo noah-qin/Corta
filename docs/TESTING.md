@@ -28,8 +28,9 @@ what you could not verify; an unchecked item is not a passing result.
 PRs validate source changes; metadata edits run only the title checker in
 `pr-title.yml`. Reopen a PR or push a commit after changing its base branch
 to validate the new merge base. Main pushes update CodeQL baselines without
-repeating app/core tests or dependency review. Scheduled CodeQL and Nightly
-remain full scans. CI uses the complete merge-base diff for PRs and all
+repeating app/core tests or dependency review, and rescan only the languages
+whose analysed inputs changed (below). Scheduled CodeQL and Nightly remain
+full scans. CI uses the complete merge-base diff for PRs and all
 commits in a main push, selecting the union of affected checks:
 
 | Changes | CI checks beyond the common checks |
@@ -44,9 +45,7 @@ commits in a main push, selecting the union of affected checks:
 | Build settings, dependencies, workflows, routing/extraction helpers or unknown paths | All checks |
 
 Local Markdown links, Python helper tests and repository license headers
-remain common checks. A lightweight Actions CodeQL analysis runs for every
-diff to provide a real result for the independent scanning rule; other languages
-are selected by the affected source files. The license checker builds only its small SwiftPM
+remain common checks. The license checker builds only its small SwiftPM
 product on macOS when the full core suite is unnecessary. PR title and
 dependency review retain their existing check names. Run the link check with
 `python3 -B scripts/check-doc-links.py`. Empty or unavailable diffs, manual
@@ -55,8 +54,22 @@ CodeQL scans always run in full. The feed bot explicitly selects `scope=changed`
 which compares its branch against actual `origin/main`, so it validates the feed
 without recompiling the app. Empty/missing diffs still fall back to full checks.
 
-CodeQL retains all four required matrix check names; an unaffected language
-uses a lightweight Linux job. Extraction results for affected languages use
+CodeQL retains all four required matrix check names. Each language is
+compared with main's latest successful analysis of it: if none of its analysed
+inputs changed between that analysis's commit and the commit under test, the
+language is unaffected. Analysed inputs are production Swift (not tests),
+C/C++/Objective-C sources and headers, Python, workflow and action YAML;
+package manifests, `project.pbxproj` and `.xcconfig` count for Swift and
+C/C++, and `codeql.yml` or `scripts/codeql-extract.py` for every language.
+On a PR an unaffected language uploads main's analysis under its own category
+from a lightweight Linux job: the inputs are the same, so the results are
+too, and the scanning rule sees every main configuration. A PR still scans
+every language its routing selects (the table above). A main push scans only
+the changed languages, so a docs or workflow merge does not repeat the Swift
+extraction. Comparing against the analysis rather than the push means a
+cancelled or failed main scan is retried by the next push, and a language
+with no usable main analysis — unreadable, failed, or not an ancestor — is
+always scanned. Extraction results for affected languages use
 the existing categories. The C shim is compiled directly with the project's
 GNU17/debug/arm64/macOS 26 settings. A changed native source inventory falls
 back to the Xcode build. Swift extraction builds the app and embedded helpers

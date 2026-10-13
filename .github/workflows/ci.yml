@@ -17,7 +17,9 @@
 name: CI
 
 # PRs validate source; main pushes update CodeQL baselines without repeating
-# app/core tests. Metadata edits have a separate, read-only title workflow.
+# app/core tests, and only for languages whose analysed inputs changed since
+# main's last analysis of them. A PR uploads that analysis for a language it
+# leaves unchanged. Metadata edits have a separate, read-only title workflow.
 
 # Verified 2026-09-05: both the macos-26 runner label and ad-hoc signing of
 # the test host work on a hosted runner (workflow_dispatch run 33895022048,
@@ -58,6 +60,10 @@ jobs:
     name: Classify changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Reads main's CodeQL analyses to decide which languages can reuse one.
+    permissions:
+      contents: read
+      security-events: read
     outputs:
       docs_only: ${{ steps.changes.outputs.docs_only }}
       core: ${{ steps.changes.outputs.core }}
@@ -66,6 +72,7 @@ jobs:
       ssh: ${{ steps.changes.outputs.ssh }}
       fuzz: ${{ steps.changes.outputs.fuzz }}
       languages: ${{ steps.changes.outputs.languages }}
+      codeql_baselines: ${{ steps.changes.outputs.codeql_baselines }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -74,6 +81,8 @@ jobs:
           fetch-depth: 0
       - name: Select checks for the complete diff
         id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: python3 -B scripts/ci-docs-only.py
       - name: Check local documentation links
         if: github.event_name != 'push'
@@ -87,6 +96,7 @@ jobs:
     needs: changes
     with:
       languages: ${{ needs.changes.outputs.languages || '["swift","c-cpp","python","actions"]' }}
+      baselines: ${{ needs.changes.outputs.codeql_baselines || '{}' }}
     uses: ./.github/workflows/codeql.yml
     permissions:
       contents: read

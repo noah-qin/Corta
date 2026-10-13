@@ -153,19 +153,19 @@ class ScopeTests(unittest.TestCase):
         self.assertFalse(scope["core"])
         self.assertFalse(scope["ssh"])
         self.assertFalse(scope["fuzz"])
-        self.assertEqual(scope["languages"], ["actions", "swift"])
+        self.assertEqual(scope["languages"], ["swift"])
 
     def test_core_change_also_checks_the_app(self):
         scope = ci.scope_for_paths(["CortaTerminal/Sources/CortaTerminal/Parser.swift"])
         self.assertTrue(all(scope[name] for name in ("core", "app", "ssh", "fuzz")))
-        self.assertEqual(scope["languages"], ["actions", "swift"])
+        self.assertEqual(scope["languages"], ["swift"])
 
     def test_script_only_and_feed_only(self):
         script = ci.scope_for_paths(["scripts/prepare-release.py"])
         self.assertTrue(script["script_tests"])
         self.assertFalse(script["core"])
         self.assertFalse(script["app"])
-        self.assertEqual(script["languages"], ["actions", "python"])
+        self.assertEqual(script["languages"], ["python"])
         feed = ci.scope_for_paths(["appcast.xml"])
         self.assertTrue(feed["feed"])
         self.assertFalse(feed["app"])
@@ -176,7 +176,7 @@ class ScopeTests(unittest.TestCase):
         self.assertTrue(scope["app"])
         self.assertTrue(scope["script_tests"])
         self.assertFalse(scope["core"])
-        self.assertEqual(scope["languages"], ["actions", "python", "swift"])
+        self.assertEqual(scope["languages"], ["python", "swift"])
 
     def test_unknown_build_config_and_routing_changes_run_everything(self):
         for path in ("Corta.xcodeproj/project.pbxproj", "CortaTerminal/Package.swift",
@@ -187,10 +187,91 @@ class ScopeTests(unittest.TestCase):
     def test_docs_and_configuration_reference(self):
         docs = ci.scope_for_paths(["README.md", "docs/TESTING.md"])
         self.assertFalse(any(docs[name] for name in ci.CHECKS))
-        self.assertEqual(docs["languages"], ["actions"])
+        self.assertEqual(docs["languages"], [])
         reference = ci.scope_for_paths(["docs/CONFIGURATION.md"])
         self.assertTrue(reference["app"])
         self.assertFalse(reference["core"])
+
+
+class CodeQLBaselineTests(DiffTests):
+    def baseline(self, language="swift"):
+        return {language: (7, self.base)}
+
+    def test_analysed_inputs_by_language(self):
+        cases = {
+            "Corta/App.swift": {"swift"},
+            "CortaTerminal/Sources/CortaTerminal/Parser.swift": {"swift"},
+            "CortaTerminal/Tests/CortaTerminalTests/ParserTests.swift": set(),
+            "CortaTests/AppTests.swift": set(),
+            "Corta/Shim/shim.c": {"c-cpp"},
+            "Corta/Shim/shim.h": {"c-cpp"},
+            "scripts/prepare-release.py": {"python"},
+            ".github/workflows/ci.yml": {"actions"},
+            ".github/workflows/codeql.yml": set(ci.LANGUAGES),
+            "scripts/codeql-extract.py": set(ci.LANGUAGES),
+            "Corta.xcodeproj/project.pbxproj": {"swift", "c-cpp"},
+            "CortaTerminal/Package.resolved": {"swift", "c-cpp"},
+            "docs/TESTING.md": set(),
+            "appcast.xml": set(),
+        }
+        for path, languages in cases.items():
+            with self.subTest(path=path):
+                self.assertEqual(ci.analysed_languages(path), languages)
+
+    def test_latest_successful_main_analysis_per_language(self):
+        analyses = [
+            {"id": 5, "category": "/language:swift", "commit_sha": "b", "error": "failed"},
+            {"id": 4, "category": "/language:swift", "commit_sha": "a", "error": ""},
+            {"id": 3, "category": "/language:python", "commit_sha": "a", "error": ""},
+            {"id": 2, "category": "/language:swift", "commit_sha": "old", "error": ""},
+            {"id": 1, "category": "custom", "commit_sha": "a", "error": ""},
+        ]
+        requested = []
+        with patch.dict(os.environ, GITHUB_REPOSITORY="owner/repo"):
+            baselines = ci.main_baselines(lambda path: requested.append(path) or analyses)
+        self.assertEqual(baselines, {"swift": (4, "a"), "python": (3, "a")})
+        self.assertIn("ref=refs/heads/main", requested[0])
+
+    def test_unchanged_inputs_reuse_and_changed_inputs_rescan(self):
+        self.write("docs/TESTING.md", "docs")
+        self.write("CortaTests/AppTests.swift", "test")
+        docs = self.commit()
+        self.assertEqual(ci.reusable_baselines(self.baseline(), docs, self.git), {"swift": 7})
+        self.write("Corta/code.swift", "changed")
+        code = self.commit()
+        self.assertEqual(ci.reusable_baselines(self.baseline(), code, self.git), {})
+
+    def test_change_since_baseline_counts_even_when_the_event_diff_is_docs(self):
+        # A main scan that was cancelled or skipped must not leave a stale baseline.
+        self.write("Corta/code.swift", "changed in an earlier push")
+        self.commit()
+        self.write("README.md", "docs")
+        head = self.commit()
+        self.assertEqual(ci.reusable_baselines(self.baseline(), head, self.git), {})
+
+    def test_unknown_or_unrelated_baseline_commit_rescans(self):
+        self.assertEqual(ci.reusable_baselines({"swift": (7, "1" * 40)}, self.base, self.git), {})
+        tree = self.git(["rev-parse", "HEAD^{tree}"]).decode().strip()
+        unrelated = self.git(["commit-tree", tree, "-m", "unrelated"]).decode().strip()
+        self.assertEqual(ci.reusable_baselines({"swift": (7, unrelated)}, self.base, self.git), {})
+
+    def test_pull_request_selection(self):
+        reusable = {"swift": 1, "c-cpp": 2, "python": 3, "actions": 4}
+        self.assertEqual(ci.select_languages("pull_request", [], reusable), ([], reusable))
+        analyse, reused = ci.select_languages("pull_request", ["python"], reusable)
+        self.assertEqual(analyse, ["python"])
+        self.assertEqual(reused, {"swift": 1, "c-cpp": 2, "actions": 4})
+        # Routing changes still validate every lane, and a missing baseline is scanned.
+        self.assertEqual(ci.select_languages("pull_request", list(ci.LANGUAGES), reusable),
+                         (list(ci.LANGUAGES), {}))
+        self.assertEqual(ci.select_languages("pull_request", [], {"python": 3}),
+                         (["swift", "c-cpp", "actions"], {"python": 3}))
+
+    def test_main_push_rescans_changed_inputs_only(self):
+        reusable = {"swift": 1, "c-cpp": 2, "python": 3}
+        self.assertEqual(ci.select_languages("push", list(ci.LANGUAGES), reusable),
+                         (["actions"], reusable))
+        self.assertEqual(ci.select_languages("push", list(ci.LANGUAGES), {}), (list(ci.LANGUAGES), {}))
 
 
 class LinkTests(unittest.TestCase):

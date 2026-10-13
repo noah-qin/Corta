@@ -25,6 +25,10 @@ on:
         description: JSON array of affected languages; standalone scans always cover all languages
         type: string
         default: '["swift","c-cpp","python","actions"]'
+      baselines:
+        description: JSON object of main analysis ids a PR uploads for its unaffected languages
+        type: string
+        default: '{}'
   workflow_dispatch:
   schedule:
     - cron: '43 21 * * *'
@@ -68,7 +72,37 @@ jobs:
     steps:
       - name: Unaffected language
         if: ${{ !contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) }}
-        run: echo "This language is unaffected by the complete diff; scheduled and manual scans remain full."
+        run: echo "This language's analysed inputs are unchanged since main's last analysis; scheduled and manual scans remain full."
+
+      # The scanning rule needs every main configuration on a PR. Unchanged
+      # inputs give main's results, so upload that analysis; the classifier
+      # selects a language for a fresh scan whenever no such analysis exists.
+      - name: Fetch main's analysis for unchanged inputs
+        if: ${{ !contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && github.event_name != 'push' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANGUAGE: ${{ matrix.language }}
+          ANALYSIS_ID: ${{ fromJSON(inputs.baselines || '{}')[matrix.language] }}
+        run: |
+          test -n "$ANALYSIS_ID" || { echo "::error::No main $LANGUAGE analysis to reuse; the classifier should have selected a scan."; exit 1; }
+          gh api -H 'Accept: application/sarif+json' "repos/$GITHUB_REPOSITORY/code-scanning/analyses/$ANALYSIS_ID" \
+            | jq 'del(.runs[].versionControlProvenance)' > "$RUNNER_TEMP/main-$LANGUAGE.sarif"
+          jq -e --arg category "/language:$LANGUAGE/" '.runs | length > 0 and all(.automationDetails.id == $category and .tool.driver.name == "CodeQL")' \
+            "$RUNNER_TEMP/main-$LANGUAGE.sarif" > /dev/null || { echo "::error::Analysis $ANALYSIS_ID is not main's CodeQL $LANGUAGE analysis."; exit 1; }
+
+      # Upload resolves the commit and any missing fingerprints from a checkout.
+      - name: Checkout for the upload
+        if: ${{ !contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && github.event_name != 'push' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Upload main's analysis for unchanged inputs
+        if: ${{ !contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && github.event_name != 'push' }}
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          sarif_file: ${{ runner.temp }}/main-${{ matrix.language }}.sarif
+          category: /language:${{ matrix.language }}
 
       - name: Checkout
         if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) }}
