@@ -605,12 +605,20 @@ approach is used. Metal presentation remains independent of CA transactions.
 **Decision.** Starting with the next release after 1.1.8, publish only
 `Corta-<version>.dmg` and `Corta-<version>.dmg.sha256`. Sparkle installs
 from the same disk image. Already published ZIPs, including Intel's 1.0.1,
-remain unchanged. The image contains only `Corta.app` and an `Applications`
-symlink to `/Applications`, with no license agreement.
+remain unchanged. The image contains only `Corta.app`, an `Applications`
+symlink to `/Applications` and the Finder window layout (`.DS_Store` and
+`.background/background.tiff`), with no license agreement.
 
 **Why.** The maintainer chose this on 2026-10-08. A disk image is familiar
-on macOS: open it, drag the app into Applications, then eject it. UDZO
-provides a compressed read-only image supported by macOS and Sparkle.
+on macOS: open it, drag the app into Applications, then eject it. On
+2026-10-13 the image moved from an HFS+ volume in UDZO (zlib) to an APFS
+volume in ULMO (lzma, macOS 10.15+): the same contents were 15% smaller,
+and Sparkle mounts either through `hdiutil`. The same day it gained a
+fixed Finder window: Corta on the left, Applications on the right and an
+arrow between them on the background. The background carries no text,
+because Finder cannot localise it and the app ships nine languages.
+`scripts/disk-image/` holds the background, its renderer and the layout
+Finder wrote; Release copies them and never runs Finder.
 
 **What it costs.** Every release notarises twice: the app first (using a
 throwaway ZIP submitted only to Apple), then the Developer ID signed DMG.

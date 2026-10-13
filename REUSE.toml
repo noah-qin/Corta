@@ -40,6 +40,8 @@ path = [
   "Sparkle-Info.plist",
   "Corta/PrivacyInfo.xcprivacy",
   "appcast.xml",
+  "scripts/disk-image/background.tiff",
+  "scripts/disk-image/DS_Store",
 ]
 SPDX-FileCopyrightText = "2026 Noah Qin"
 SPDX-License-Identifier = "Apache-2.0"

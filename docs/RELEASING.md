@@ -61,13 +61,29 @@ are added when measured; the automation does not invent evidence.
 
 Release notarises the Developer ID signed app using a temporary ZIP sent
 only to Apple, deletes that ZIP and staples the app. It then copies the
-app and an Applications symlink into an isolated staging folder, creates
-an UDZO read-only image named Corta, signs it with a Developer ID timestamp,
+app, an Applications symlink and the committed Finder layout into an
+isolated staging folder, creates a read-only APFS image named Corta,
+lzma-compressed (ULMO), signs it with a Developer ID timestamp,
 notarises it and staples the image. `corta-release-check package
 --require-notarized` checks the finished image and its mounted app and writes
 the SHA-256 sidecar. No ZIP is uploaded. Rehearsal package artifacts contain
 only `Corta-<version>.dmg` and its `.sha256` sidecar; the source patch and
 signed-feed evidence remain separate artifacts.
+
+The Finder layout lives in `scripts/disk-image/`. To change it, edit
+`render-background.swift` (the arrow) or `make-layout.sh` (window size and
+icon positions; keep the two in step), then regenerate both files locally
+and commit them:
+
+```sh
+swift scripts/disk-image/render-background.swift scripts/disk-image/background.tiff
+scripts/disk-image/make-layout.sh path/to/Corta.app
+```
+
+`make-layout.sh` mounts a scratch image as `/Volumes/Corta` and has Finder
+write the layout, so it needs a logged-in session and permission to control
+Finder; it detaches and deletes the scratch image when it exits. The volume
+name must stay `Corta`, because the layout locates the background through it.
 
 The feed workflow checks the checksum, mounts read-only with cleanup on
 success or failure, and generates/signs from the same DMG with the key on

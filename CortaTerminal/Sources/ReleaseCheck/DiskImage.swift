@@ -17,12 +17,18 @@
 import Foundation
 
 extension ReleaseCheck {
-    /// Root contents are an installable app and the drag-to-install link only.
-    public static func diskImageLayoutProblems(entries: [String], appIsDirectory: Bool,
-                                                applicationsTarget: String?, readOnly: Bool) -> [String] {
+    /// Root contents are an installable app, the drag-to-install link and
+    /// the Finder window layout: `.DS_Store` and `.background` holding only
+    /// `background.tiff` (D26).
+    public static func diskImageLayoutProblems(entries: [String], backgroundEntries: [String]?,
+                                                appIsDirectory: Bool, applicationsTarget: String?,
+                                                readOnly: Bool) -> [String] {
         var problems: [String] = []
-        if entries.sorted() != ["Applications", "Corta.app"] {
-            problems.append("disk image root must contain only Corta.app and Applications")
+        if entries.sorted() != [".DS_Store", ".background", "Applications", "Corta.app"] {
+            problems.append("disk image root must contain only Corta.app, Applications, .DS_Store and .background")
+        }
+        if backgroundEntries != ["background.tiff"] {
+            problems.append(".background must be a directory holding only background.tiff")
         }
         if !appIsDirectory { problems.append("Corta.app must be a directory, not a symlink") }
         if applicationsTarget != "/Applications" {
@@ -179,7 +185,12 @@ extension ReleaseCheck {
         let appType = (try? FileManager.default.attributesOfItem(atPath: app.path))?[.type] as? FileAttributeType
         let link = try? FileManager.default.destinationOfSymbolicLink(atPath: mount.root.appendingPathComponent("Applications").path)
         let readOnly = (try? mount.root.resourceValues(forKeys: [.volumeIsReadOnlyKey]).volumeIsReadOnly) == true
-        let layout = diskImageLayoutProblems(entries: entries ?? [], appIsDirectory: appType == .typeDirectory,
+        let background = mount.root.appendingPathComponent(".background")
+        let backgroundType = (try? FileManager.default.attributesOfItem(atPath: background.path))?[.type] as? FileAttributeType
+        let backgroundEntries = backgroundType == .typeDirectory
+            ? try? FileManager.default.contentsOfDirectory(atPath: background.path) : nil
+        let layout = diskImageLayoutProblems(entries: entries ?? [], backgroundEntries: backgroundEntries,
+                                              appIsDirectory: appType == .typeDirectory,
                                               applicationsTarget: link, readOnly: readOnly)
         if !layout.isEmpty {
             let cleanup = mount.close() ? [] : ["could not detach disk image at " + mount.root.path]

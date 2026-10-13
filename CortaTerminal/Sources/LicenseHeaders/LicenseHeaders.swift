@@ -82,6 +82,8 @@ public enum LicenseHeaders {
         ("Sparkle-Info.plist", .reuse),
         ("Corta/PrivacyInfo.xcprivacy", .reuse),
         ("appcast.xml", .reuse),
+        ("scripts/disk-image/background.tiff", .reuse),
+        ("scripts/disk-image/DS_Store", .reuse),
         ("**/*.md", .reuse),
         ("NOTICE", .reuse),
 

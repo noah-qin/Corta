@@ -37,9 +37,10 @@ import ReleaseCheck
 /// corta-exec are arm64 only (D21); the code signature verifies.
 ///
 ///     --version V          V (a tag with its `v` stripped) must be the version.
-///     --archive DMG        DMG is named Corta-V.dmg, holds Corta.app and Applications, its
-///                          DMG.sha256 sidecar matches it, and the feed and
-///                          V's signature verify (scripts/verify-appcast.swift).
+///     --archive DMG        DMG is named Corta-V.dmg, holds Corta.app, Applications
+///                          and its Finder layout, its DMG.sha256 sidecar matches
+///                          it, and the feed and V's signature verify
+///                          (scripts/verify-appcast.swift).
 ///     --appcast            appcast.xml has an item for this version and build
 ///                          whose enclosure length, with --archive, is the
 ///                          archive's; for an arm64-only app the item
@@ -199,7 +200,7 @@ if let archivePath {
         let mount = try ReleaseCheck.inspectDiskImage(URL(fileURLWithPath: absolute(archivePath)))
         diskImageMount = mount
         app = mount.root.appendingPathComponent("Corta.app").path
-        pass("Developer ID disk image is notarised, accepted, has no license agreement and contains only Corta.app and Applications")
+        pass("Developer ID disk image is notarised, accepted, has no license agreement and contains only Corta.app, Applications and its Finder layout")
     } catch {
         fail(error.localizedDescription)
         finish()
