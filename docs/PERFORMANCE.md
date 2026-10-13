@@ -120,7 +120,9 @@ idiomatic Swift.
 | Rebuild the instance buffer only on damage                | Idle CPU must be ~0%; a static screen rebuilds nothing      |
 
 Instances occupy 24 bytes: two `Float2` geometry fields, RGBA8 and a
-rectangle index. The 8-byte atlas rectangle table uploads alongside instances.
+rectangle index. The 8-byte-per-glyph atlas rectangle table has a buffer of its
+own, uploaded when the atlas changes rather than with every draw: a frame over
+glyphs already in the atlas uploads only its instances.
 Glyph UVs normalize integer pixel rectangles using the actual texture size;
 Kitty draws retain fractional source UVs in a per-draw uniform. Cell stays
 16 bytes. Negative bearings and fractional geometry are retained.

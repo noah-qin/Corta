@@ -79,6 +79,16 @@ Versioning for compatibility changes.
 - Kitty images contained in scroll regions move with the text and retain only
   their visible source pixels when clipped by a margin. This also applies to
   full-screen scrolling in the alternate screen or with scrollback disabled.
+- A Kitty image near the 16-million-pixel cap whose width needed row padding
+  for the GPU was refused; it now shows. Narrow images and many small ones no
+  longer fill the image texture budget early, and an image that did wait for
+  room no longer started a new decoder process each time any image was freed.
+- The image decoder no longer logs a sandbox violation for every image shown.
+- With `CORTA_RENDER_THREAD=1`, a GPU that stopped answering no longer
+  crashes the app when a pane closes or the font changes.
+- Typing no longer schedules and cancels a timer per keystroke, and an idle
+  blinking cursor no longer creates a GPU queue each time it parks; glyph
+  draws stop copying the atlas's rectangle table into every frame.
 - With View ▸ Show Tab Bar on, a new window opens at the configured `rows`
   instead of two or three rows short: the tab bar is now counted in the
   window's height before the window appears.

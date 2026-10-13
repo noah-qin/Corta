@@ -211,7 +211,7 @@ These features arrived in 1.1.5. macOS 26+ and Apple silicon are required.
 ## When a session ends
 
 A pane keeps its output after the shell exits and displays a **Session ended**
-bar with its exit code or terminating signal. The cursor disappears, but
+card with its exit code or terminating signal. The cursor disappears, but
 scrolling, selection, copying and ⌘F search still work. **New Session** asks
 for confirmation before replacing the retained output; **Close Pane** closes
 that pane. A directly connected SSH session offers **Reconnect** to start a
@@ -430,7 +430,10 @@ kitten icat picture.png
 ```
 
 Images scroll with the text, stay in the scrollback, and are removed by
-Clear Screen or Clear History along with the text around them. Other tools
+Clear Screen or Clear History along with the text around them. Inside a
+program's scroll region — a full-screen program's pane, say — an image moves
+with the region's text and is cropped where it scrolls past the region's edge.
+An image may be up to 8192 pixels on a side and 16 million pixels in all. Other tools
 that support the protocol, such as `timg` or `chafa`, can use it too, as
 long as they send the image itself: Corta refuses by design to read a file
 path a program names, and animation is not supported. A picture larger than the

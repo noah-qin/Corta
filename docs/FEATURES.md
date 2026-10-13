@@ -21,7 +21,9 @@ the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
   scales to fit). Erasing
   the screen (`clear`, ⌃L, Clear Screen) removes the images on it; erasing the
   scrollback (`clear`'s `ED 3`, Clear History) removes the ones in history — as
-  kitty does.
+  kitty does. An image wholly inside a scroll region moves with it and is
+  cropped at its margins; one straddling a margin stays put, as kitty's page
+  rule says. Up to 8192 pixels a side and 16 million pixels an image.
 
 Protocol coverage and dated verification results are in [Conformance](CONFORMANCE.md).
 Rendering measurements and their conditions are in [Performance](PERFORMANCE.md).
