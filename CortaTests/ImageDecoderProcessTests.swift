@@ -62,6 +62,19 @@ struct ImageDecoderProcessTests {
         #expect(released.value == nil)
     }
 
+    /// Raw pixels are converted in process: no shared-memory object, no
+    /// descriptor, the same page-aligned no-copy texture.
+    @Test("in-process pixels map privately, with no descriptor")
+    func inProcessPixelsNeedNoSharedObject() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let pixels = try #require(ImageDecoderProcess.SharedPixels(
+            width: 4, height: 3,
+            alignment: device.minimumLinearTextureAlignment(for: .bgra8Unorm), shared: false))
+        #expect(pixels.descriptor == -1)
+        #expect(Int(bitPattern: pixels.address) % Int(getpagesize()) == 0)
+        #expect(pixels.texture(device: device, width: 4, height: 3) != nil)
+    }
+
     @Test("the decoder is embedded beside corta-exec")
     func helperIsEmbedded() throws {
         let helper = try #require(ImageDecoderProcess.bundledHelper)

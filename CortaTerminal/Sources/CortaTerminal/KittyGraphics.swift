@@ -80,25 +80,34 @@ public enum KittyGraphics {
         /// PNG is too short or not one — the app's decoder rejects it anyway.
         var pixelHeight: Int? {
             if height > 0 { return height }
-            return pngHeaderValue(at: 20)
+            return format == .png ? KittyGraphics.pngDimensions(bytes)?.height : nil
         }
 
         /// Width in pixels without decoding: `s=`, or the `IHDR` width
         /// (bytes 16–19), as for `pixelHeight`.
         var pixelWidth: Int? {
             if width > 0 { return width }
-            return pngHeaderValue(at: 16)
+            return format == .png ? KittyGraphics.pngDimensions(bytes)?.width : nil
         }
+    }
 
-        private func pngHeaderValue(at offset: Int) -> Int? {
-            guard format == .png, bytes.count >= 24,
-                bytes[12] == 0x49, bytes[13] == 0x48, bytes[14] == 0x44, bytes[15] == 0x52
-            else { return nil }
-            let value =
-                Int(bytes[offset]) << 24 | Int(bytes[offset + 1]) << 16
-                | Int(bytes[offset + 2]) << 8 | Int(bytes[offset + 3])
-            return value > 0 ? value : nil
+    /// A PNG's size from its header, without decoding: the signature, then
+    /// an `IHDR` chunk of length 13 whose first two big-endian words are the
+    /// width and height (RFC 2083 §4.1.1). Nil for anything else or a zero
+    /// side. The one IHDR reader: the core's placement sizes and the app's
+    /// pre-decode check both come here; caps are the caller's to apply.
+    public static func pngDimensions(_ bytes: [UInt8]) -> (width: Int, height: Int)? {
+        guard bytes.count >= 24,
+            bytes.prefix(16).elementsEqual([
+                0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+                0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52,
+            ])
+        else { return nil }
+        func word(_ at: Int) -> Int {
+            Int(bytes[at]) << 24 | Int(bytes[at + 1]) << 16 | Int(bytes[at + 2]) << 8 | Int(bytes[at + 3])
         }
+        let width = word(16), height = word(20)
+        return width > 0 && height > 0 ? (width, height) : nil
     }
 
     /// One placement at a document position: `row` is relative to

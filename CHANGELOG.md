@@ -84,6 +84,12 @@ Versioning for compatibility changes.
   longer fill the image texture budget early, and an image that did wait for
   room no longer started a new decoder process each time any image was freed.
 - The image decoder no longer logs a sandbox violation for every image shown.
+- An image whose upload met a busy GPU stayed blank until the program sent it
+  again; it is now retried. In full screen, a frame whose rendering failed is
+  redrawn instead of being presented as drawn.
+- Inserting or deleting lines (`CSI L` / `CSI M`, as vim, less and tmux do)
+  moves images inside the affected rows with their text, as scrolling does,
+  and redraws only the rows that changed.
 - With `CORTA_RENDER_THREAD=1`, a GPU that stopped answering no longer
   crashes the app when a pane closes or the font changes.
 - Typing no longer schedules and cancels a timer per keystroke, and an idle

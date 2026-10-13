@@ -1045,15 +1045,7 @@ public struct Grid: Sendable {
         guard cursor.row >= marginTop, cursor.row <= marginBottom else { return }
         let count = min(max(0, count), marginBottom - cursor.row + 1)
         guard count > 0 else { return }
-        var row = marginBottom
-        while row >= cursor.row + count {
-            lines[row] = lines[row - count]
-            row -= 1
-        }
-        while row >= cursor.row {
-            lines[row] = erasedLine()
-            row -= 1
-        }
+        shiftBand(by: -count)
         pendingWrap = false
     }
 
@@ -1062,16 +1054,22 @@ public struct Grid: Sendable {
         guard cursor.row >= marginTop, cursor.row <= marginBottom else { return }
         let count = min(max(0, count), marginBottom - cursor.row + 1)
         guard count > 0 else { return }
-        var row = cursor.row
-        while row + count <= marginBottom {
-            lines[row] = lines[row + count]
-            row += 1
-        }
-        while row <= marginBottom {
-            lines[row] = erasedLine()
-            row += 1
-        }
+        shiftBand(by: count)
         pendingWrap = false
+    }
+
+    /// IL and DL are scrolls of the band from the cursor to the bottom margin:
+    /// the same journaled rotation as SU/SD — the renderer shifts its cache
+    /// instead of rebuilding every row below the cursor — and images wholly
+    /// inside the band move with it. Exposed rows take the pen's background.
+    private mutating func shiftBand(by delta: Int) {
+        let top = cursor.row
+        imagePlacements.scrollRegion(top: top, bottom: marginBottom, delta: delta,
+            scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
+        lines.rotate(top: top, bottom: marginBottom, by: delta)
+        let exposed = delta > 0 ? (marginBottom - delta + 1)...marginBottom : top...(top - delta - 1)
+        let erased = erasedLine()
+        for row in exposed { lines[row] = erased }
     }
 
     public mutating func insertCharacters(_ count: Int) {

@@ -33,6 +33,23 @@ struct ScrollJournalTests {
         #expect(lines[1].isEmpty && lines[2].isEmpty)
     }
 
+    /// IL and DL scroll the band from the cursor to the bottom margin: one
+    /// journaled event the renderer can shift by, not a re-stamp of every row.
+    @Test func insertAndDeleteLinesJournalTheirBand() {
+        var terminal = Terminal(rows: 6, columns: 10)
+        terminal.feed(Array("a\r\nb\r\nc\r\nd\r\ne\r\nf".utf8))
+        let before = terminal.grid.scrollEventsTotal
+        terminal.feed(Array("\u{1B}[3;1H\u{1B}[2L".utf8))
+        #expect(terminal.grid.scrollEventsTotal == before + 1)
+        #expect(terminal.grid.scrollEvent(at: before) == ScrollEvent(top: 2, bottom: 5, delta: -2))
+        #expect((0..<6).map { terminal.grid.lines[$0].cells.first.map { Character(Unicode.Scalar($0.scalar)!) } ?? " " }
+            == ["a", "b", " ", " ", "c", "d"])
+        terminal.feed(Array("\u{1B}[1M".utf8))
+        #expect(terminal.grid.scrollEvent(at: before + 1) == ScrollEvent(top: 2, bottom: 5, delta: 1))
+        #expect((0..<6).map { terminal.grid.lines[$0].cells.first.map { Character(Unicode.Scalar($0.scalar)!) } ?? " " }
+            == ["a", "b", " ", "c", "d", " "])
+    }
+
     @Test func journalOrdersEventsAndRejectsOverflow() {
         var lines = ScreenLines(repeating: Line(), count: 6)
         lines.rotateUp(1)

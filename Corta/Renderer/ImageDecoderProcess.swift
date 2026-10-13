@@ -54,11 +54,16 @@ nonisolated enum ImageDecoderProcess {
         /// image's, and an image at the cap with an unaligned width must fit.
         static let maximumLength =
             KittyGraphics.maximumImagePixels * 4 + KittyGraphics.maximumImageDimension * 4096
+        /// The shared-memory object a decoder child maps; -1 for pixels
+        /// written in process, which need no object of their own.
         let descriptor: Int32
         let address: UnsafeMutableRawPointer
         let length: Int
         let bytesPerRow: Int
-        init?(width: Int, height: Int, alignment: Int) {
+        /// `shared: false` for raw pixels converted in process: a private
+        /// anonymous mapping, page-aligned for Metal the same way, with no
+        /// system-wide object or descriptor. Only a child needs those.
+        init?(width: Int, height: Int, alignment: Int, shared: Bool = true) {
             guard KittyGraphics.dimensionsFit(width: width, height: height), alignment <= 4096
             else { return nil }
             let alignment = max(4, alignment)
@@ -72,6 +77,15 @@ nonisolated enum ImageDecoderProcess {
             let allocationLength = length
             var allocated = false
             defer { if !allocated { Self.mappingBudget.release(allocationLength) } }
+            guard shared else {
+                guard let mapping = mmap(nil, length, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0),
+                    mapping != MAP_FAILED
+                else { return nil }
+                descriptor = -1
+                address = mapping
+                allocated = true
+                return
+            }
             let name = "/corta-" + UUID().uuidString.prefix(20)
             let opened = name.withCString {
                 sharedMemoryOpen($0, O_RDWR | O_CREAT | O_EXCL, mode_t(0o600))
@@ -97,7 +111,7 @@ nonisolated enum ImageDecoderProcess {
         }
         deinit {
             munmap(address, length)
-            close(descriptor)
+            if descriptor >= 0 { close(descriptor) }
             Self.mappingBudget.release(length)
         }
         func texture(device: MTLDevice, width: Int, height: Int) -> MTLTexture? {
@@ -134,22 +148,12 @@ nonisolated enum ImageDecoderProcess {
         var bgra: [UInt8] { pixels.packedBytes(width: width, height: height) }
     }
 
+    /// The header's size, held to the caps before anything is allocated.
     static func pngDimensions(_ bytes: [UInt8]) -> (width: Int, height: Int)? {
-        guard bytes.count >= 24,
-            bytes.prefix(16).elementsEqual([
-                0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10,
-                0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52,
-            ])
+        guard let size = KittyGraphics.pngDimensions(bytes),
+            KittyGraphics.dimensionsFit(width: size.width, height: size.height)
         else { return nil }
-        func word(_ at: Int) -> Int {
-            Int(
-                UInt32(bytes[at]) << 24 | UInt32(bytes[at + 1]) << 16
-                    | UInt32(bytes[at + 2]) << 8 | UInt32(bytes[at + 3]))
-        }
-        let width = word(16)
-        let height = word(20)
-        guard KittyGraphics.dimensionsFit(width: width, height: height) else { return nil }
-        return (width, height)
+        return size
     }
 
     /// The helper in the running app's `Contents/MacOS`.
@@ -230,19 +234,46 @@ nonisolated enum ImageDecoderProcess {
             input: input, writeTo: toChild[1], readFrom: fromChild[0],
             limit: 8, deadline: deadline)
         if output == nil { kill(pid, SIGKILL) }
-        var status: Int32 = 0
-        while true {
-            let waited = waitpid(pid, &status, WNOHANG)
-            if waited == pid { break }
-            if waited < 0, errno != EINTR { return nil }
-            if ContinuousClock.now >= deadline { kill(pid, SIGKILL) }
-            usleep(1000)
-        }
-        guard let output, status == 0 else { return nil }
+        guard let status = reap(pid, deadline: deadline), let output, status == 0 else { return nil }
         guard let reported = parse(output), reported.width == dimensions.width,
             reported.height == dimensions.height
         else { return nil }
         return Decoded(width: reported.width, height: reported.height, pixels: pixels)
+    }
+
+    /// Sleeps in the kernel until `pid` exits or `deadline` passes, then
+    /// reaps it — one SIGKILL at the deadline, which it cannot ignore, so the
+    /// blocking `waitpid` that follows always returns. Not a polling loop:
+    /// that woke the decode thread every millisecond for every image.
+    private static func reap(_ pid: pid_t, deadline: ContinuousClock.Instant) -> Int32? {
+        let queue = kqueue()
+        if queue < 0 {
+            kill(pid, SIGKILL)
+        } else {
+            defer { close(queue) }
+            // `kevent64`: plain `kevent` names both the call and its struct.
+            var change = kevent64_s(
+                ident: UInt64(pid), filter: Int16(EVFILT_PROC), flags: UInt16(EV_ADD | EV_ONESHOT),
+                fflags: NOTE_EXIT, data: 0, udata: 0, ext: (0, 0))
+            var event = kevent64_s()
+            while true {
+                let remaining = max(.zero, ContinuousClock.now.duration(to: deadline))
+                var timeout = timespec(
+                    tv_sec: Int(remaining.components.seconds),
+                    tv_nsec: Int(remaining.components.attoseconds / 1_000_000_000))
+                let ready = kevent64(queue, &change, 1, &event, 1, 0, &timeout)
+                if ready < 0, errno == EINTR { continue }
+                // 0: the deadline passed with the child still running. Below
+                // zero (ESRCH): it already exited, and waitpid collects it.
+                if ready == 0 { kill(pid, SIGKILL) }
+                break
+            }
+        }
+        var status: Int32 = 0
+        while waitpid(pid, &status, 0) < 0 {
+            guard errno == EINTR else { return nil }
+        }
+        return status
     }
 
     /// Keep all spawn sources away from stdin/stdout/stderr and the pixel destination.

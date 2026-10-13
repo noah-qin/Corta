@@ -106,9 +106,11 @@ final class PanePointer: NSObject {
             self?.session?.write(bytes)
         }
         view.cursorRectProvider = { [weak self] in
-            guard let self, session != nil else { return nil }
-            let cursor = session.snapshot().cursor
-            return cellRect(row: cursor.row, column: cursor.column)
+            guard let self, let session else { return nil }
+            // One snapshot for both the cursor and the grid height: each takes
+            // the session lock, against the reader, on the IME's caret query.
+            let grid = session.snapshot()
+            return cellRect(row: grid.cursor.row, column: grid.cursor.column, rows: grid.rows)
         }
         view.accessibilitySnapshotProvider = { [weak self] in
             guard let self, let session else { return nil }
@@ -119,7 +121,8 @@ final class PanePointer: NSObject {
                 scrollOffset: scrollOffset)
         }
         view.accessibilityCellFrameProvider = { [weak self] row, column in
-            self?.cellRect(row: row, column: column) ?? .zero
+            guard let self, let session else { return .zero }
+            return cellRect(row: row, column: column, rows: session.snapshot().rows) ?? .zero
         }
         view.cellAtPoint = { [weak self] point in
             guard let self, let terminalRenderer, session != nil, let terminalView
@@ -133,10 +136,10 @@ final class PanePointer: NSObject {
     }
 
     /// A screen cell's rect in the terminal view's coordinates.
-    private func cellRect(row: Int, column: Int) -> CGRect? {
-        guard let terminalRenderer, let terminalView, let session else { return nil }
+    private func cellRect(row: Int, column: Int, rows: Int) -> CGRect? {
+        guard let terminalRenderer, let terminalView else { return nil }
         return Self.cellFrame(row: row, column: column, viewHeight: terminalView.bounds.height,
-            metrics: terminalRenderer.pointMetrics, rows: session.snapshot().rows, topInset: topInset)
+            metrics: terminalRenderer.pointMetrics, rows: rows, topInset: topInset)
     }
 
     /// IME, accessibility and pointer hit testing share the renderer's anchor,

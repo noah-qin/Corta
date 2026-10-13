@@ -535,8 +535,10 @@ public nonisolated final class Metal4Backend {
         let frame = frameNumber
         let completion = completion
         let slotReleased = slotSemaphores[currentSlot]
-        // A copied frame is complete when its copy is.
-        let completesHere = copyTarget == nil
+        // A copied frame completes when both its render and its copy have,
+        // with the first error of either: a faulted render under a clean
+        // copy must not report the frame as drawn.
+        let join = copyTarget == nil ? nil : onCompleted.map(FrameCompletionJoin.init)
         options.addFeedbackHandler { feedback in
             if let error = feedback.error {
                 completion.failed.store(true, ordering: .releasing)
@@ -544,7 +546,7 @@ public nonisolated final class Metal4Backend {
             }
             completion.note(frame)
             slotReleased.signal()
-            if completesHere { onCompleted?(feedback.error) }
+            if let join { join.complete(feedback.error) } else { onCompleted?(feedback.error) }
             // Keep the existing submission-to-callback metric intact. Native
             // timestamps distinguish execution from a delayed feedback thread.
             if RenderMetrics.isEnabled, feedback.gpuStartTime > 0,
@@ -557,9 +559,11 @@ public nonisolated final class Metal4Backend {
         }
         queue.commit([commandBuffer], options: options)
         if let copyTarget {
+            var copyCompleted: (@Sendable ((any Error)?) -> Void)?
+            if let join { copyCompleted = { error in join.complete(error) } }
             copyStaging(
                 into: copyTarget, presenting: drawable, echoSnapshotAt: echoSnapshotAt,
-                onCompleted: onCompleted)
+                onCompleted: copyCompleted)
         } else if let drawable {
             // After the commits targeting it, before presenting (MTL4 contract).
             queue.signalDrawable(drawable)
@@ -742,5 +746,25 @@ public nonisolated final class Metal4Backend {
             removedAny = true
         }
         if removedAny { residencySet.commit() }
+    }
+}
+
+/// A frame presented by copy finishes on two queues, in either order. Its
+/// handler runs once, after both, with the first error either reported.
+nonisolated private final class FrameCompletionJoin: Sendable {
+    private struct State {
+        var remaining = 2
+        var error: (any Error)?
+    }
+    private let state = Mutex(State())
+    private let onCompleted: @Sendable ((any Error)?) -> Void
+    init(_ onCompleted: @escaping @Sendable ((any Error)?) -> Void) { self.onCompleted = onCompleted }
+    func complete(_ error: (any Error)?) {
+        let finished = state.withLock { state -> (done: Bool, error: (any Error)?) in
+            if state.error == nil { state.error = error }
+            state.remaining -= 1
+            return (state.remaining == 0, state.error)
+        }
+        if finished.done { onCompleted(finished.error) }
     }
 }
