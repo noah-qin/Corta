@@ -23,6 +23,47 @@ The [conformance guide](CONFORMANCE.md) defines manual checks and protocol
 coverage. [Performance](PERFORMANCE.md) defines benchmark workloads. Record
 what you could not verify; an unchecked item is not a passing result.
 
+## CI scope and extraction
+
+CI uses the complete Git diff: a merge-base diff for a PR and all commits in
+a push to `main`. It selects the union of the checks affected by each path:
+
+| Changes | CI checks beyond the common checks |
+| :--- | :--- |
+| Root contributor Markdown or Markdown under `docs/` and `.github/` | No app/core test build or CodeQL extraction |
+| `docs/CONFIGURATION.md` | App tests, including the compiled configuration/command/default checks |
+| App sources, resources, icons or app tests | App tests; CodeQL for affected production languages |
+| `CortaTerminal/` | Core and app tests, SSH integration and fuzz; CodeQL for affected production languages |
+| Python helpers under `scripts/` | Python tests and Python CodeQL |
+| SSH integration fixture | Core tests and real-SSH integration, plus Python CodeQL |
+| `appcast.xml` or its verifier/fixtures | Offline feed validation and signed ZIP/DMG fixtures, without app tests |
+| Build settings, dependencies, workflows, routing/extraction helpers or unknown paths | All checks |
+
+Local Markdown links, Python helper tests and repository license headers
+remain common checks. The license checker builds only its small SwiftPM
+product on macOS when the full core suite is unnecessary. PR title and
+dependency review retain their existing check names. Run the link check with
+`python3 -B scripts/check-doc-links.py`. Empty or unavailable diffs, manual
+CI dispatches (including release/feed bots), and standalone scheduled/manual
+CodeQL scans always run in full.
+
+CodeQL retains all four required matrix check names; an unaffected language
+uses a lightweight Linux job. Extraction results for affected languages use
+the existing categories. The C shim is compiled directly with the project's
+GNU17/debug/arm64/macOS 26 settings. A changed native source inventory falls
+back to the Xcode build. Swift extraction builds the app and embedded helpers
+once, then compiles the remaining SwiftPM targets using those freshly built
+modules. New supported Swift targets are included automatically; unfamiliar
+package settings or missing modules fall back to the full SwiftPM build.
+Compiled-source archives are checked against every production Swift and C/C++
+source, so an optimization cannot silently remove extraction coverage.
+The app extraction build prints a timing summary and keeps compiler caching
+disabled. Ordinary app tests still compile Metal shaders.
+
+The repository also requires CodeQL scanning results separately from job
+status checks. Verify both the PR's checks and merge eligibility when changing
+language routing; successful placeholder jobs alone do not prove eligibility.
+
 ## Terminal core
 
 ```sh

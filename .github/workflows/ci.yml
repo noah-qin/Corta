@@ -45,8 +45,37 @@ env:
 
 
 jobs:
+  changes:
+    name: Classify changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.changes.outputs.docs_only }}
+      core: ${{ steps.changes.outputs.core }}
+      app: ${{ steps.changes.outputs.app }}
+      feed: ${{ steps.changes.outputs.feed }}
+      ssh: ${{ steps.changes.outputs.ssh }}
+      fuzz: ${{ steps.changes.outputs.fuzz }}
+      languages: ${{ steps.changes.outputs.languages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Full history avoids truncated file lists and supports PR merge bases.
+          fetch-depth: 0
+      - name: Select checks for the complete diff
+        id: changes
+        run: python3 -B scripts/ci-docs-only.py
+      - name: Check local documentation links
+        run: python3 -B scripts/check-doc-links.py
+      - name: Check change detection and documentation checker
+        run: python3 -B -m unittest discover -s scripts/tests -v
+
   codeql:
     name: Code scanning
+    needs: changes
+    with:
+      languages: ${{ needs.changes.outputs.languages || '["swift","c-cpp","python","actions"]' }}
     uses: ./.github/workflows/codeql.yml
     permissions:
       contents: read
@@ -88,16 +117,21 @@ jobs:
 
   core:
     name: Terminal core (SwiftPM)
+    needs: changes
+    # Always retain the repository license check; compile/test the core only when affected.
+    if: ${{ !cancelled() }}
     runs-on: macos-26
     # A hung test otherwise holds a runner for the six-hour default.
     timeout-minutes: 30
     steps:
+      - name: Require successful lightweight checks
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+        run: test "$CHANGES_RESULT" = success
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Check automatic release preparation
-        run: python3 -B -m unittest discover -s scripts/tests -v
 
       - name: Select the pinned Xcode
         run: |
@@ -112,7 +146,11 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Check repository license headers
+        run: swift run --package-path CortaTerminal corta-license check
+
       - name: Build
+        if: needs.changes.outputs.core == 'true'
         run: swift build --package-path CortaTerminal -c release
 
       # #129 taught the SFTP rig's deadlines to scale with this, for the
@@ -123,6 +161,7 @@ jobs:
       # reaches the tests directly; the app job needs the TEST_RUNNER_
       # prefix because its tests live inside a separate host.
       - name: Test
+        if: needs.changes.outputs.core == 'true'
         env:
           CORTA_TEST_TIMEOUT_SCALE: "3"
         # Swift Testing runs suites concurrently by default. On a hosted VM,
@@ -138,11 +177,13 @@ jobs:
       # and removes all of it. Nothing else exercised authentication and
       # host-key failure against real ssh on every change.
       - name: Real SSH and SFTP against an isolated sshd
+        if: needs.changes.outputs.ssh == 'true'
         run: python3 -B script/verify_ssh_integration.py
 
       # One corpus per target: the raw feed, OSC and Kitty payloads framed
       # as their sequences, and SFTP frames from a hostile server.
       - name: Replay the fuzz corpus
+        if: needs.changes.outputs.fuzz == 'true'
         run: |
           fuzz=CortaTerminal/.build/release/corta-fuzz
           $fuzz CortaTerminal/Tests/Fuzz/corpus/*
@@ -154,6 +195,7 @@ jobs:
       # check, and a different seed every run means a failure a reviewer
       # cannot reproduce. Rotating seeds are the nightly lane's job.
       - name: Short mutation fuzz run
+        if: needs.changes.outputs.fuzz == 'true'
         run: |
           fuzz=CortaTerminal/.build/release/corta-fuzz
           $fuzz --fuzz 200000 --seed 1 CortaTerminal/Tests/Fuzz/corpus
@@ -182,9 +224,16 @@ jobs:
     # ruleset has to be updated in the same sitting or every pull request
     # waits for a check that will never report again.
     name: App, tests and the update feed
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.app == 'true' || needs.changes.outputs.feed == 'true') }}
     runs-on: macos-26
     timeout-minutes: 45
     steps:
+      - name: Require successful lightweight checks
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+        run: test "$CHANGES_RESULT" = success
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -208,6 +257,7 @@ jobs:
       # pane is skipped (docs/TESTING.md). Printed before the build, so
       # the value is in the log even when the tests fail.
       - name: Report the runner's Metal capability
+        if: needs.changes.outputs.app == 'true'
         run: swift scripts/metal-capability.swift
 
       # `appcast.xml` on `main` *is* the live update feed — `SUFeedURL`
@@ -234,7 +284,12 @@ jobs:
       # one means something is wrong, which stops being true on a saturated
       # runner. A ceiling only costs time when it is reached, so a healthy
       # run is no slower, and a local run keeps the written number.
+      - name: Check signed update-feed fixtures
+        run: python3 -B -m unittest discover -s scripts/tests -p test_appcast_formats.py -v
+
       - name: Build and test
+        id: tests
+        if: needs.changes.outputs.app == 'true'
         env:
           TEST_RUNNER_CORTA_TEST_TIMEOUT_SCALE: "3"
         run: |
@@ -256,7 +311,7 @@ jobs:
       # Printing the counts is what keeps "passed" and "never ran" apart in
       # a log nobody downloads the result bundle for.
       - name: Summarise the test run
-        if: always()
+        if: ${{ !cancelled() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
         run: |
           # Without pipefail the step's status is jq's: xcresulttool failing
           # (no bundle, a renamed key, a future Xcode) would leave the step

@@ -20,6 +20,11 @@ name: CodeQL
 # Keep scheduled scanning: new queries can find problems in unchanged code.
 on:
   workflow_call:
+    inputs:
+      languages:
+        description: JSON array of affected languages; standalone scans always cover all languages
+        type: string
+        default: '["swift","c-cpp","python","actions"]'
   workflow_dispatch:
   schedule:
     - cron: '43 21 * * *'
@@ -34,7 +39,9 @@ concurrency:
 jobs:
   analyze:
     name: CodeQL (${{ matrix.language }})
-    runs-on: ${{ matrix.runner }}
+    # Keep required matrix check names; unaffected languages use Linux.
+    # Standalone manual and scheduled scans always analyze the full tree.
+    runs-on: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && matrix.runner || 'ubuntu-latest' }}
     timeout-minutes: 60
     permissions:
       contents: read
@@ -59,66 +66,70 @@ jobs:
       # Keep aligned with ci.yml, nightly.yml, release.yml and render.yml.
       XCODE_PIN: "26.6.0"
     steps:
+      - name: Unaffected language
+        if: ${{ !contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) }}
+        run: echo "This language is unaffected by the complete diff; scheduled and manual scans remain full."
+
       - name: Checkout
+        if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       # C sources are being introduced separately; older refs may have none.
       - name: Report absent C/C++ sources
-        if: matrix.language == 'c-cpp' && hashFiles('**/*.c', '**/*.cpp', '**/*.cc') == ''
+        if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && (matrix.language == 'c-cpp' && hashFiles('**/*.c', '**/*.cpp', '**/*.cc', '**/*.cxx', '**/*.m', '**/*.mm') == '') }}
         run: echo "No C/C++ sources in this ref; this language has no database to upload."
 
       - name: Select the pinned Xcode
-        if: matrix.build-mode == 'manual' && (matrix.language != 'c-cpp' || hashFiles('**/*.c', '**/*.cpp', '**/*.cc') != '')
+        if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && (matrix.build-mode == 'manual' && (matrix.language != 'c-cpp' || hashFiles('**/*.c', '**/*.cpp', '**/*.cc', '**/*.cxx', '**/*.m', '**/*.mm') != '')) }}
         run: |
           pinned="/Applications/Xcode_${XCODE_PIN}.app"
           test -d "$pinned" || { echo "::error::$pinned is missing; update the toolchain pins together."; exit 1; }
           echo "DEVELOPER_DIR=$pinned/Contents/Developer" >> "$GITHUB_ENV"
 
       - name: Initialize CodeQL
-        if: matrix.language != 'c-cpp' || hashFiles('**/*.c', '**/*.cpp', '**/*.cc') != ''
+        if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && (matrix.language != 'c-cpp' || hashFiles('**/*.c', '**/*.cpp', '**/*.cc', '**/*.cxx', '**/*.m', '**/*.mm') != '') }}
         uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
 
-      # A fresh DerivedData directory and disabled compiler caching prevent
-      # an incremental build from producing an incomplete CodeQL database.
-      # A generic destination compiles without resolving a runnable host:
-      # the CodeQL tracer can make Xcode see an x86_64 host for an arm64 app.
-      # CodeQL does not analyze Metal. Its macOS tracer cannot reliably
-      # find the Metal toolchain (codeql-action#3978), so only this extraction
-      # build excludes shaders; the ordinary app CI still compiles them.
-      # No signing identity, release environment or repository secrets.
-      - name: Build the app and embedded helpers for extraction
-        if: matrix.build-mode == 'manual' && (matrix.language != 'c-cpp' || hashFiles('**/*.c', '**/*.cpp', '**/*.cc') != '')
-        run: |
-          xcodebuild clean build \
-            -project Corta.xcodeproj \
-            -scheme Corta \
-            -configuration Debug \
-            -destination 'generic/platform=macOS' \
-            -derivedDataPath "$RUNNER_TEMP/codeql-app" \
-            -disableAutomaticPackageResolution \
-            -onlyUsePackageVersionsFromResolvedFile \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            DEVELOPMENT_TEAM="" \
-            EXCLUDED_SOURCE_FILE_NAMES="*.metal" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            COMPILATION_CACHE_ENABLE_CACHING=NO \
-            -quiet
+      # Extract the C shim independently; compiling the entire Swift app for
+      # one C file used to take fourteen minutes. Unknown native layouts fall
+      # back to the project build instead of silently omitting new sources.
+      - name: Compile native sources for extraction
+        if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && matrix.language == 'c-cpp' && hashFiles('**/*.c', '**/*.cpp', '**/*.cc', '**/*.cxx', '**/*.m', '**/*.mm') != '' }}
+        run: python3 -B scripts/codeql-extract.py c --derived-data "$RUNNER_TEMP/codeql-native"
 
-      # The Xcode scheme does not build every SwiftPM executable (fuzzer,
-      # release checker, license checker, benchmarks); extract them too.
-      - name: Build every SwiftPM product for extraction
-        if: matrix.language == 'swift'
-        run: swift build --package-path CortaTerminal --scratch-path "$RUNNER_TEMP/codeql-core" --disable-build-manifest-caching
+      # Fresh products, no compiler caching, one architecture, and a timing
+      # summary. CodeQL's tracer cannot resolve the Metal toolchain, so only
+      # this extraction build excludes shaders; ordinary app CI compiles them.
+      - name: Build the app and embedded helpers for extraction
+        if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && matrix.language == 'swift' }}
+        run: python3 -B scripts/codeql-extract.py app --derived-data "$RUNNER_TEMP/codeql-app"
+
+      # Reuse the newly extracted Xcode modules, then compile only the tools
+      # and libraries absent from its scheme. No cached CodeQL database or
+      # stale objects; an unfamiliar package layout falls back to SwiftPM.
+      - name: Compile supplemental SwiftPM sources for extraction
+        if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && matrix.language == 'swift' }}
+        run: python3 -B scripts/codeql-extract.py swift-tools --derived-data "$RUNNER_TEMP/codeql-app"
 
       - name: Analyze and upload
-        if: matrix.language != 'c-cpp' || hashFiles('**/*.c', '**/*.cpp', '**/*.cc') != ''
+        if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && (matrix.language != 'c-cpp' || hashFiles('**/*.c', '**/*.cpp', '**/*.cc', '**/*.cxx', '**/*.m', '**/*.mm') != '') }}
         uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           category: /language:${{ matrix.language }}
+
+      - name: Require complete compiled-source coverage
+        if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && (matrix.language == 'swift' || (matrix.language == 'c-cpp' && hashFiles('**/*.c', '**/*.cpp', '**/*.cc', '**/*.cxx', '**/*.m', '**/*.mm') != '')) }}
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          if [ "$LANGUAGE" = swift ]; then
+            python3 -B scripts/codeql-extract.py verify-swift --derived-data "$RUNNER_TEMP/codeql_databases/swift"
+          else
+            python3 -B scripts/codeql-extract.py verify-c --derived-data "$RUNNER_TEMP/codeql_databases/cpp"
+          fi
