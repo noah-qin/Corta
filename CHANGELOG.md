@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-13
+
 Corta 1.2 is a performance release: faster from the byte a program writes
 to the pixel on the panel, lighter in memory, and quieter when nothing is
 happening. Figures are from one Apple M5 MacBook Air, before and after on
@@ -1797,7 +1799,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.1.9...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.2.0...main
+[1.2.0]: https://github.com/noah-qin/Corta/releases/tag/v1.2.0
 [1.1.9]: https://github.com/noah-qin/Corta/releases/tag/v1.1.9
 [1.1.8]: https://github.com/noah-qin/Corta/releases/tag/v1.1.8
 [1.1.7]: https://github.com/noah-qin/Corta/releases/tag/v1.1.7
