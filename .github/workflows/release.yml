@@ -72,6 +72,8 @@ jobs:
       tag: ${{ steps.prepare.outputs.tag }}
       commit: ${{ steps.prepare.outputs.commit }}
       published: ${{ steps.prepare.outputs.published }}
+      ci_run: ${{ steps.prepare.outputs.ci_run }}
+      tested_head: ${{ steps.prepare.outputs.tested_head }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -101,6 +103,7 @@ jobs:
     environment: release
     permissions:
       contents: write
+      actions: read
     outputs:
       tag: ${{ steps.version.outputs.tag }}
 
@@ -200,8 +203,19 @@ jobs:
           # guard of their own; only the always() keychain cleanup reads this.
           echo "available=true" >> "$GITHUB_OUTPUT"
 
-      - name: Run the tests before shipping anything
+      - name: Verify preparation CI evidence
         if: steps.published.outputs.exists != 'true'
+        id: ci_evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RUN: ${{ needs.prepare.outputs.ci_run }}
+          TESTED_HEAD: ${{ needs.prepare.outputs.tested_head }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: python3 -B scripts/release-ci-evidence.py
+
+      - name: Run the tests before shipping anything
+        id: tests
+        if: steps.published.outputs.exists != 'true' && steps.ci_evidence.outputs.reuse != 'true'
         env:
           # The core suite reads this directly (`swift test` is in-process);
           # the app suite needs the prefix, which xcodebuild strips on the
@@ -209,7 +223,7 @@ jobs:
           CORTA_TEST_TIMEOUT_SCALE: "3"
           TEST_RUNNER_CORTA_TEST_TIMEOUT_SCALE: "3"
         run: |
-          swift test --package-path CortaTerminal
+          swift test --package-path CortaTerminal --no-parallel
           xcodebuild test \
             -project Corta.xcodeproj \
             -scheme Corta \
@@ -224,7 +238,7 @@ jobs:
 
       # Preserve the evidence on both success and failure.
       - name: Keep the test results
-        if: ${{ steps.published.outputs.exists != 'true' && (always()) }}
+        if: ${{ !cancelled() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: xcresult-release-${{ steps.version.outputs.tag }}
@@ -240,7 +254,7 @@ jobs:
       # MenuShortcutTests.noKeystrokeIsClaimedByTwoMenuItems on this
       # runner; a dozen local attempts across two machines have not).
       - name: Print test failure details
-        if: ${{ steps.published.outputs.exists != 'true' && (failure()) }}
+        if: ${{ !cancelled() && steps.tests.outcome == 'failure' }}
         run: |
           # 'Failure Message' is a *child node type* here, not a field on
           # the failing test — confirmed against this schema locally

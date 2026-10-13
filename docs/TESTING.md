@@ -25,8 +25,12 @@ what you could not verify; an unchecked item is not a passing result.
 
 ## CI scope and extraction
 
-CI uses the complete Git diff: a merge-base diff for a PR and all commits in
-a push to `main`. It selects the union of the checks affected by each path:
+PRs validate source changes; metadata edits run only the title checker in
+`pr-title.yml`. Reopen a PR or push a commit after changing its base branch
+to validate the new merge base. Main pushes update CodeQL baselines without
+repeating app/core tests or dependency review. Scheduled CodeQL and Nightly
+remain full scans. CI uses the complete merge-base diff for PRs and all
+commits in a main push, selecting the union of affected checks:
 
 | Changes | CI checks beyond the common checks |
 | :--- | :--- |
@@ -44,8 +48,10 @@ remain common checks. The license checker builds only its small SwiftPM
 product on macOS when the full core suite is unnecessary. PR title and
 dependency review retain their existing check names. Run the link check with
 `python3 -B scripts/check-doc-links.py`. Empty or unavailable diffs, manual
-CI dispatches (including release/feed bots), and standalone scheduled/manual
-CodeQL scans always run in full.
+CI dispatches (including release preparation), and standalone scheduled/manual
+CodeQL scans always run in full. The feed bot explicitly selects `scope=changed`,
+which compares its branch against actual `origin/main`, so it validates the feed
+without recompiling the app. Empty/missing diffs still fall back to full checks.
 
 CodeQL retains all four required matrix check names; an unaffected language
 uses a lightweight Linux job. Extraction results for affected languages use
@@ -53,12 +59,19 @@ the existing categories. The C shim is compiled directly with the project's
 GNU17/debug/arm64/macOS 26 settings. A changed native source inventory falls
 back to the Xcode build. Swift extraction builds the app and embedded helpers
 once, then compiles the remaining SwiftPM targets using those freshly built
-modules. New supported Swift targets are included automatically; unfamiliar
-package settings or missing modules fall back to the full SwiftPM build.
+modules. New production targets, unfamiliar package settings or missing modules
+fall back to the full SwiftPM build. SwiftPM handles the license/release
+tools; the three core-dependent tools reuse the newly compiled Xcode modules.
 Compiled-source archives are checked against every production Swift and C/C++
 source, so an optimization cannot silently remove extraction coverage.
 The app extraction build prints a timing summary and keeps compiler caching
 disabled. Ordinary app tests still compile Metal shaders.
+
+Release reuses preparation tests only when that CI run succeeded and both
+core/app test steps actually ran, the tested source tree equals the release
+commit's tree, the working tree is clean, and the Xcode pins match. Rehearsals
+and missing/mismatched evidence run the tests. Signed Release builds,
+notarization, packaging and archive/feed checks always remain required.
 
 The repository also requires CodeQL scanning results separately from job
 status checks. Verify both the PR's checks and merge eligibility when changing

@@ -19,7 +19,6 @@
 import argparse
 import json
 from pathlib import Path
-import re
 import subprocess
 import time
 import zipfile
@@ -67,73 +66,47 @@ def build_c(derived_data):
         print("No native sources to extract.", flush=True)
 
 
-def supplemental_targets(manifest, products):
-    if manifest.get("dependencies"):
-        return None
-    targets = {t["name"]: t for t in manifest["targets"] if t["type"] != "test"}
-    if not XCODE_TARGETS.issubset(targets):
-        return None
-    for module in ("CortaTerminal", "CortaSFTP"):
-        if not (products / (module + ".swiftmodule")).exists():
-            return None
-    ordered = []
-    built = set(XCODE_TARGETS)
-    pending = [t for name, t in targets.items() if name not in built]
-    isolation = {"kind": {"defaultIsolation": {"_0": "nonisolated"}}, "tool": "swift"}
-    while pending:
-        progress = False
-        for target in pending[:]:
-            if (target["type"] not in ("regular", "executable") or
-                any(target.get(key) for key in ("path", "sources", "exclude", "resources", "pluginUsages")) or
-                any(setting != isolation for setting in target.get("settings", []))):
-                return None
-            dependencies = []
-            for dependency in target.get("dependencies", []):
-                name = dependency.get("byName", [None, None])
-                if len(name) != 2 or name[0] not in targets or name[1] is not None:
-                    return None
-                dependencies.append(name[0])
-            if all(name in built for name in dependencies):
-                ordered.append(target)
-                built.add(target["name"])
-                pending.remove(target)
-                progress = True
-        if not progress:
-            return None
-    return ordered
+def supplemental_layout_supported(manifest, products):
+    expected = XCODE_TARGETS | {"LicenseHeaders", "ReleaseCheck", "corta-license", "corta-release-check",
+                                "corta-dump", "corta-bench", "corta-fuzz"}
+    actual = {t["name"] for t in manifest["targets"] if t["type"] != "test"}
+    return (actual == expected and not manifest.get("dependencies") and
+            all((products / (name + ".swiftmodule")).exists() for name in ("CortaTerminal", "CortaSFTP")))
 
 
 def build_swift_tools(derived_data):
     products = derived_data / "Build/Products/Debug"
     manifest = json.loads(subprocess.check_output(
         ["swift", "package", "--disable-sandbox", "--package-path", str(PACKAGE), "dump-package"], cwd=ROOT))
-    targets = supplemental_targets(manifest, products)
-    if targets is None:
-        print("Package layout changed or Xcode modules unavailable; extracting all SwiftPM products.", flush=True)
-        run(["swift", "build", "--package-path", PACKAGE, "--scratch-path", derived_data / "swiftpm",
+    scratch = derived_data / "supplemental"
+    if not supplemental_layout_supported(manifest, products):
+        print("Package layout changed; extracting all SwiftPM products.", flush=True)
+        run(["swift", "build", "--package-path", PACKAGE, "--scratch-path", scratch,
              "--arch", "arm64", "--disable-build-manifest-caching"])
         return
-    output = derived_data / "supplemental"
-    output.mkdir(parents=True, exist_ok=True)
+    # SwiftPM builds these tools with their own settings and without the core.
+    for product in ("corta-license", "corta-release-check"):
+        run(["swift", "build", "--package-path", PACKAGE, "--scratch-path", scratch,
+             "--product", product, "--arch", "arm64", "--disable-build-manifest-caching"])
     sdk = subprocess.check_output(["xcrun", "--sdk", "macosx", "--show-sdk-path"], text=True).strip()
     version = next(p["version"] for p in manifest["platforms"] if p["platformName"] == "macos")
-    for target in targets:
-        name = target["name"]
-        module = re.sub(r"[^A-Za-z0-9_]", "_", name)
-        sources = sorted((PACKAGE / "Sources" / name).rglob("*.swift"))
+    for product in ("corta-dump", "corta-bench", "corta-fuzz"):
+        target = next(t for t in manifest["targets"] if t["name"] == product)
+        isolation = {"kind": {"defaultIsolation": {"_0": "nonisolated"}}, "tool": "swift"}
+        if (any(target.get(k) for k in ("path", "sources", "exclude", "resources", "pluginUsages")) or
+            any(s != isolation for s in target.get("settings", [])) or
+            any(d.get("byName", [None])[0] not in XCODE_TARGETS for d in target.get("dependencies", []))):
+            run(["swift", "build", "--package-path", PACKAGE, "--scratch-path", scratch,
+                 "--product", product, "--arch", "arm64", "--disable-build-manifest-caching"])
+            continue
+        sources = sorted((PACKAGE / "Sources" / product).rglob("*.swift"))
         if not sources:
-            raise RuntimeError(f"No Swift sources found for {name}")
-        command = ["xcrun", "swiftc", "-c", "-whole-module-optimization", "-Onone",
-                   "-swift-version", "6", "-D", "SWIFT_PACKAGE", "-D", "DEBUG",
-                   "-package-name", "cortaterminal", "-module-name", module,
-                   "-target", f"arm64-apple-macosx{version}", "-sdk", sdk,
-                   "-I", products, "-I", output, "-F", products / "PackageFrameworks",
-                   "-o", output / (module + ".o")]
-        if target["type"] == "regular":
-            command += ["-parse-as-library", "-emit-module", "-emit-module-path", output / (module + ".swiftmodule")]
-        # A single source executable is called main.swift. Future multi-file tools
-        # use the same whole-module driver invocation, without relinking the app.
-        run(command + sources)
+            raise RuntimeError(f"No sources for {product}")
+        run(["xcrun", "swiftc", "-c", "-whole-module-optimization", "-Onone", "-swift-version", "6",
+             "-D", "SWIFT_PACKAGE", "-D", "DEBUG", "-package-name", "cortaterminal",
+             "-module-name", product.replace("-", "_"), "-target", f"arm64-apple-macosx{version}",
+             "-sdk", sdk, "-I", products, "-F", products / "PackageFrameworks",
+             "-o", scratch / (product + ".o"), *sources])
 
 
 def verify_coverage(language, database):

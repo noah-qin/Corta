@@ -243,7 +243,7 @@ jobs:
           branch="${{ steps.pr.outputs.branch }}"
           started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           expected="${{ steps.pr.outputs.head }}"
-          gh workflow run ci.yml --ref "$branch"
+          gh workflow run ci.yml --ref "$branch" -f scope=changed
           # The dispatch is asynchronous; give the run a moment to exist.
           for _ in $(seq 1 12); do
             run_id=$(gh run list --workflow ci.yml --branch "$branch" --event workflow_dispatch \

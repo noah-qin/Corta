@@ -38,37 +38,23 @@ class SupplementalTargetsTests(unittest.TestCase):
         self.targets = [{"name": name, "type": "regular", "dependencies": []}
                         for name in sorted(extract.XCODE_TARGETS)]
 
-    def plan(self, extra, **fields):
-        return extract.supplemental_targets({"targets": self.targets + extra, **fields}, self.products)
+    def manifest(self):
+        extras = ("LicenseHeaders", "ReleaseCheck", "corta-license", "corta-release-check",
+                  "corta-dump", "corta-bench", "corta-fuzz")
+        return {"targets": self.targets + [{"name": name, "type": "regular"} for name in extras]}
 
-    def test_only_missing_targets_and_dependency_order(self):
-        executable = {"name": "tool", "type": "executable", "dependencies": [{"byName": ["Library", None]}]}
-        library = {"name": "Library", "type": "regular", "dependencies": []}
-        test = {"name": "LibraryTests", "type": "test", "dependencies": []}
-        self.assertEqual([t["name"] for t in self.plan([executable, library, test])], ["Library", "tool"])
+    def test_existing_layout_reuses_fresh_xcode_modules(self):
+        self.assertTrue(extract.supplemental_layout_supported(self.manifest(), self.products))
 
-    def test_new_target_is_included(self):
-        self.assertEqual([t["name"] for t in self.plan([
-            {"name": "NewTool", "type": "executable", "dependencies": [{"byName": ["CortaTerminal", None]}]}
-        ])], ["NewTool"])
-
-    def test_unknown_settings_resources_or_external_dependencies_fall_back(self):
-        for fields in ({"settings": [{"tool": "swift", "kind": {"define": {"_0": "CUSTOM"}}}]},
-                       {"resources": ["asset"]}, {"path": "custom"}, {"exclude": ["file.swift"]},
-                       {"dependencies": [{"product": ["External", "package", None, None]}]}):
-            target = {"name": "Tool", "type": "executable", "dependencies": [], **fields}
-            self.assertIsNone(self.plan([target]), fields)
-        self.assertIsNone(self.plan([], dependencies=[{"package": "external"}]))
-
-    def test_missing_xcode_module_falls_back(self):
+    def test_new_target_external_package_or_missing_module_falls_back(self):
+        manifest = self.manifest()
+        manifest["targets"].append({"name": "NewTool", "type": "executable"})
+        self.assertFalse(extract.supplemental_layout_supported(manifest, self.products))
+        manifest = self.manifest()
+        manifest["dependencies"] = [{"package": "external"}]
+        self.assertFalse(extract.supplemental_layout_supported(manifest, self.products))
         (self.products / "CortaSFTP.swiftmodule").rmdir()
-        self.assertIsNone(self.plan([]))
-
-    def test_dependency_cycle_falls_back(self):
-        self.assertIsNone(self.plan([
-            {"name": "A", "type": "regular", "dependencies": [{"byName": ["B", None]}]},
-            {"name": "B", "type": "regular", "dependencies": [{"byName": ["A", None]}]},
-        ]))
+        self.assertFalse(extract.supplemental_layout_supported(self.manifest(), self.products))
 
 
 class CoverageTests(unittest.TestCase):

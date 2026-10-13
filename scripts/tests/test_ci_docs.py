@@ -24,6 +24,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 def load(name, filename):
@@ -129,6 +130,16 @@ class DiffTests(unittest.TestCase):
                 self.assertEqual(values["docs_only"], "false")
                 self.assertTrue(all(values[name] == "true" for name in ci.CHECKS))
                 self.assertEqual(json.loads(values["languages"]), list(ci.LANGUAGES))
+
+    def test_opt_in_dispatch_compares_against_real_main(self):
+        self.git(["update-ref", "refs/remotes/origin/main", self.base])
+        self.write("appcast.xml", "feed")
+        head = self.commit()
+        with patch.dict(os.environ, GITHUB_SHA=head):
+            self.assertEqual(ci.changed_paths("workflow_dispatch", {"inputs": {"scope": "changed"}}, self.git),
+                             ["appcast.xml"])
+        self.assertEqual(ci.changed_paths("workflow_dispatch", {"inputs": {"scope": "full"}}, self.git), [])
+        self.assertEqual(ci.scope_for_paths([]), ci.full_scope())
 
     def test_deleting_docs_is_docs_only(self):
         (self.root / "README.md").unlink()

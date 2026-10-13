@@ -1,0 +1,44 @@
+# Copyright 2026 Noah Qin
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: Pull request metadata
+
+on:
+  pull_request:
+    types: [edited]
+permissions:
+  contents: read
+concurrency:
+  group: pr-metadata-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  pr-title:
+    name: Pull request title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the squash-merge subject
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: python3 -B scripts/check-pr-title.py
+      - name: Require source validation when the PR base changes
+        if: github.event.changes.base
+        run: |
+          echo "::error::The PR base changed. Reopen the PR or push a commit to run source CI against its new merge base."
+          exit 1

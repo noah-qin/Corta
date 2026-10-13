@@ -95,13 +95,16 @@ def changed_paths(event_name, event, git=None):
         base = event["pull_request"]["base"]["sha"]
         head = event["pull_request"]["head"]["sha"]
         separator = "..."
+    elif event_name == "workflow_dispatch" and event.get("inputs", {}).get("scope") == "changed":
+        base, head = "origin/main", os.environ["GITHUB_SHA"]
+        separator = "..."
     elif event_name == "push":
         base, head = event["before"], event["after"]
         separator = ".."
     else:
         return []  # Manual release/feed CI runs all checks.
     if any(not re.fullmatch(r"[0-9a-fA-F]{40}", sha) or set(sha) == {"0"}
-           for sha in (base, head)):
+           for sha in (base, head) if sha != "origin/main"):
         return []
     if git is None:
         def git(args):

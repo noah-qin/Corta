@@ -64,6 +64,8 @@ BODY
   pr=$(gh pr view "$url" --json number --jq .number)
 fi
 
+run_id=""
+expected=""
 state=$(gh pr view "$pr" --json state --jq .state)
 if [ "$state" = CLOSED ]; then
   echo "::error::Release PR #$pr was closed without merging. Inspect it before retrying."
@@ -127,4 +129,6 @@ fi
   echo "tag=$tag"
   echo "commit=$commit"
   echo "published=$published"
+  echo "ci_run=$run_id"
+  echo "tested_head=$expected"
 } >> "$GITHUB_OUTPUT"

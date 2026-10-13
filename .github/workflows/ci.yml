@@ -16,6 +16,9 @@
 
 name: CI
 
+# PRs validate source; main pushes update CodeQL baselines without repeating
+# app/core tests. Metadata edits have a separate, read-only title workflow.
+
 # Verified 2026-09-05: both the macos-26 runner label and ad-hoc signing of
 # the test host work on a hosted runner (workflow_dispatch run 33895022048,
 # noah-qin/Corta#8) — both jobs passed clean on the first try. The branch
@@ -23,10 +26,16 @@ name: CI
 # now so a PR's checks actually populate instead of sitting unfulfilled.
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Full checks, or affected checks against current main (update-feed PR)
+        type: choice
+        options: [full, changed]
+        default: full
   push:
     branches: [main]
   pull_request:
-    types: [opened, edited, synchronize, reopened]
+    types: [opened, synchronize, reopened]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -67,8 +76,10 @@ jobs:
         id: changes
         run: python3 -B scripts/ci-docs-only.py
       - name: Check local documentation links
+        if: github.event_name != 'push'
         run: python3 -B scripts/check-doc-links.py
       - name: Check change detection and documentation checker
+        if: github.event_name != 'push'
         run: python3 -B -m unittest discover -s scripts/tests -v
 
   codeql:
@@ -83,6 +94,7 @@ jobs:
 
   dependency-review:
     name: Dependency review
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -119,7 +131,7 @@ jobs:
     name: Terminal core (SwiftPM)
     needs: changes
     # Always retain the repository license check; compile/test the core only when affected.
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && github.event_name != 'push' }}
     runs-on: macos-26
     # A hung test otherwise holds a runner for the six-hour default.
     timeout-minutes: 30
@@ -225,7 +237,7 @@ jobs:
     # waits for a check that will never report again.
     name: App, tests and the update feed
     needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.app == 'true' || needs.changes.outputs.feed == 'true') }}
+    if: ${{ !cancelled() && github.event_name != 'push' && (needs.changes.result != 'success' || needs.changes.outputs.app == 'true' || needs.changes.outputs.feed == 'true') }}
     runs-on: macos-26
     timeout-minutes: 45
     steps:
