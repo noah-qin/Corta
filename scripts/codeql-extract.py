@@ -18,6 +18,7 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import time
@@ -76,8 +77,10 @@ def supplemental_layout_supported(manifest, products):
 
 def build_swift_tools(derived_data):
     products = derived_data / "Build/Products/Debug"
-    manifest = json.loads(subprocess.check_output(
-        ["swift", "package", "--disable-sandbox", "--package-path", str(PACKAGE), "dump-package"], cwd=ROOT))
+    prepared_manifest = Path(os.environ.get("RUNNER_TEMP", str(derived_data))) / "codeql-package.json"
+    manifest = (json.loads(prepared_manifest.read_text()) if prepared_manifest.is_file() else
+                json.loads(subprocess.check_output(
+                    ["swift", "package", "--disable-sandbox", "--package-path", str(PACKAGE), "dump-package"], cwd=ROOT)))
     scratch = derived_data / "supplemental"
     if not supplemental_layout_supported(manifest, products):
         print("Package layout changed; extracting all SwiftPM products.", flush=True)

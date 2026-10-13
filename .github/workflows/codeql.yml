@@ -88,6 +88,13 @@ jobs:
           test -d "$pinned" || { echo "::error::$pinned is missing; update the toolchain pins together."; exit 1; }
           echo "DEVELOPER_DIR=$pinned/Contents/Developer" >> "$GITHUB_ENV"
 
+      # Resolve packages before tracing; this does not compile production sources.
+      - name: Resolve Swift dependencies before extraction
+        if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && matrix.language == 'swift' }}
+        run: |
+          xcodebuild -resolvePackageDependencies -project Corta.xcodeproj -scheme Corta -derivedDataPath "$RUNNER_TEMP/codeql-app" -onlyUsePackageVersionsFromResolvedFile
+          swift package --disable-sandbox --package-path CortaTerminal dump-package > "$RUNNER_TEMP/codeql-package.json"
+
       - name: Initialize CodeQL
         if: ${{ contains(fromJSON(inputs.languages || '["swift","c-cpp","python","actions"]'), matrix.language) && (matrix.language != 'c-cpp' || hashFiles('**/*.c', '**/*.cpp', '**/*.cc', '**/*.cxx', '**/*.m', '**/*.mm') != '') }}
         uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
