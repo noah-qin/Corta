@@ -54,6 +54,14 @@ public enum ReleaseCheck {
     /// release all name it this way.
     public static func archiveName(version: String) -> String { "Corta-\(version).dmg" }
 
+    /// README may name this release explicitly or direct readers to the
+    /// latest published release with a version-independent checksum example.
+    public static func readmeDocumentsDownload(_ readme: String, version: String) -> Bool {
+        readme.contains(archiveName(version: version))
+            || (readme.contains("Corta-x.y.z.dmg.sha256")
+                && readme.contains("https://github.com/noah-qin/Corta/releases/latest"))
+    }
+
     public static func isDiskImageDownloadURL(_ url: String, version: String) -> Bool {
         url == diskImageDownloadURL(version: version)
     }

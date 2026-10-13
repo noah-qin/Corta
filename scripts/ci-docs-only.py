@@ -49,7 +49,8 @@ def scope_for_paths(paths):
     if not paths:
         return full_scope()
     scope = {**{name: False for name in CHECKS}, "languages": []}
-    languages = set()
+    # The independent scanning rule needs a real analysis on every PR.
+    languages = {"actions"}
     for path in paths:
         if is_documentation(path):
             continue

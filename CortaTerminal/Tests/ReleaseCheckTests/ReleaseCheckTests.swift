@@ -20,6 +20,16 @@ import Testing
 
 @Suite("Release rules")
 struct ReleaseCheckTests {
+    @Test("README downloads can be pinned or point to the latest release with a checksum example")
+    func readmeDownloadInstructions() {
+        #expect(ReleaseCheck.readmeDocumentsDownload("Download Corta-1.2.0.dmg", version: "1.2.0"))
+        #expect(!ReleaseCheck.readmeDocumentsDownload("Download Corta-1.1.9.dmg", version: "1.2.0"))
+        let latest = "https://github.com/noah-qin/Corta/releases/latest"
+        #expect(ReleaseCheck.readmeDocumentsDownload(latest + "\nCorta-x.y.z.dmg.sha256", version: "1.2.0"))
+        #expect(!ReleaseCheck.readmeDocumentsDownload(latest, version: "1.2.0"))
+        #expect(!ReleaseCheck.readmeDocumentsDownload("Corta-x.y.z.dmg.sha256", version: "1.2.0"))
+    }
+
     @Test("a build setting's values are collected across configurations, quoted or not")
     func projectSettings() {
         let pbxproj = """

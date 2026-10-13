@@ -12,7 +12,7 @@ release, render and CodeQL pin the same stable release; update all five
 
 | Change | Automated verification | Additional evidence |
 | :--- | :--- | :--- |
-| Documentation or GitHub templates | `DocumentationDriftTests` (local links, and `CONFIGURATION.md` against the code) | Review rendered Markdown and examples |
+| Documentation or GitHub templates | `python3 -B scripts/check-doc-links.py`; for configuration-reference changes, also `DocumentationDriftTests` | Review rendered Markdown, heading fragments and examples |
 | Parser, grid, search or session | Core suite, focused regression test, fuzz replay for PTY input changes | Specification or minimal reproducer |
 | AppKit, input, settings or windows | Relevant `CortaTests`, then app suite | Launch the app; record the five-point manual check |
 | Rendering or hot path | Relevant rendering tests and app suite | Before/after frame CPU under Release (`-testPlan Release`), same machine |
@@ -34,7 +34,7 @@ commits in a main push, selecting the union of affected checks:
 
 | Changes | CI checks beyond the common checks |
 | :--- | :--- |
-| Root contributor Markdown or Markdown under `docs/` and `.github/` | No app/core test build or CodeQL extraction |
+| Root contributor Markdown or Markdown under `docs/` and `.github/` | No app/core test build or compiled CodeQL extraction |
 | `docs/CONFIGURATION.md` | App tests, including the compiled configuration/command/default checks |
 | App sources, resources, icons or app tests | App tests; CodeQL for affected production languages |
 | `CortaTerminal/` | Core and app tests, SSH integration and fuzz; CodeQL for affected production languages |
@@ -44,7 +44,9 @@ commits in a main push, selecting the union of affected checks:
 | Build settings, dependencies, workflows, routing/extraction helpers or unknown paths | All checks |
 
 Local Markdown links, Python helper tests and repository license headers
-remain common checks. The license checker builds only its small SwiftPM
+remain common checks. A lightweight Actions CodeQL analysis runs for every
+diff to provide a real result for the independent scanning rule; other languages
+are selected by the affected source files. The license checker builds only its small SwiftPM
 product on macOS when the full core suite is unnecessary. PR title and
 dependency review retain their existing check names. Run the link check with
 `python3 -B scripts/check-doc-links.py`. Empty or unavailable diffs, manual
@@ -151,13 +153,26 @@ a few cores, all busy. Pin the CPU with `yes` and loop the suite under the
 thread sanitizer:
 
 ```sh
-for i in $(seq 1 14); do (yes > /dev/null &); done
-swift build --package-path CortaTerminal --build-tests --sanitize=thread
+# Run in a disposable bash shell; cleanup owns only the processes it starts.
+bash <<'SH'
+load_pids=()
+cleanup() {
+  for load_pid in "${load_pids[@]}"; do kill "$load_pid" 2>/dev/null || true; done
+  wait 2>/dev/null || true
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+for i in $(seq 1 14); do
+  yes > /dev/null &
+  load_pids+=("$!")
+done
+swift build --package-path CortaTerminal --build-tests --sanitize=thread || exit
 for i in $(seq 1 30); do
   CORTA_TEST_TIMEOUT_SCALE=10 swift test --package-path CortaTerminal \
     --skip-build --sanitize=thread --filter SFTP 2>&1 | grep '✘ Test'
 done | sort | uniq -c
-pkill -x yes
+SH
 ```
 
 This is how the two `SFTPSession` bugs behind the 2026-09-15 → 09-21
@@ -626,7 +641,9 @@ and passes Developer ID, stapler and Gatekeeper checks. The feed verifier accept
 
 `corta-release-check` is the one implementation of the release rules
 (`RELEASING.md`): versions and build number against `project.pbxproj`,
-license headers, the CHANGELOG and README naming the version, arm64-only
+license headers, the CHANGELOG naming the version and README providing
+current download instructions (a versioned archive or a latest-release link
+with a `Corta-x.y.z.dmg.sha256` example), arm64-only
 executables (D21), the code signature, every Mach-O in the bundle (the app,
 `corta-exec`, Sparkle and its helpers) signed with the hardened runtime, under
 one team identifier, carrying none of the entitlements that undo it
@@ -641,6 +658,14 @@ that need a signed, notarised app only run against one.
 
 ## Documentation
 
+All Markdown changes first run the lightweight file-target check:
+
+```sh
+python3 -B scripts/check-doc-links.py
+```
+
+Configuration-reference changes also need the compiled consistency tests:
+
 ```sh
 xcodebuild test -project Corta.xcodeproj -scheme Corta \
   -only-testing:CortaTests/DocumentationDriftTests
@@ -651,7 +676,11 @@ repository's Markdown, including files not yet staged. It does not follow remote
 those, and the rendered result, on GitHub or in a Markdown preview.
 The same suite, part of the app suite, pins `docs/CONFIGURATION.md` to
 the code: every key the config file is written with, and every `bind.`
-command with its default, must have a matching row.
+command with its default, must have a matching row. Scalar defaults and the
+complete INI example are also checked against a fresh `Configuration`,
+including its documented nondefault values. Link existence alone cannot
+verify these contracts. For release-tool changes, also run Python helper
+tests and `swift test --package-path CortaTerminal --filter ReleaseCheckTests`.
 
 ## Report a result
 

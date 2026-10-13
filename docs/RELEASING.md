@@ -16,8 +16,9 @@ signatures, notarisation and archive/feed checks still gate delivery.
    number past both the project and the existing feed. Stable ancestor tags
    are compared numerically; prerelease tags do not set the next version.
 2. It synchronizes every `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`
-   in the Xcode project, `CortaVersion.string`, the README download/status
-   block and CHANGELOG. Unreleased notes move under the new dated version;
+   in the Xcode project, `CortaVersion.string`, any version-specific README
+   download/status block and CHANGELOG. Version-independent instructions
+   that link to the latest release keep their `x.y.z` checksum example. Unreleased notes move under the new dated version;
    commit subjects since the previous release are included automatically only
    when Unreleased has no notes.
    Historical installation instructions and older changelog entries stay intact.

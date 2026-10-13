@@ -5,9 +5,10 @@ From the child's write to the cell the renderer reads, in five hand-offs.
 ## Overview
 
 The hot path is `PTY read → parse → grid write → instance-buffer build`
-(`docs/PERFORMANCE.md` §3). Everything on it is a `struct` or a
-`ContiguousArray` over raw integers; nothing on it allocates per byte.
-Outside it, the package is ordinary Swift.
+(`docs/PERFORMANCE.md` §3). Parser and grid operations favour value types
+and raw integer buffers, with batched row storage and no per-cell objects.
+The session owns the threads and synchronization around that work.
+Outside the hot path, the package is ordinary Swift.
 
 ### 1. The PTY reader
 
@@ -15,8 +16,11 @@ Outside it, the package is ordinary Swift.
 executable so `posix_spawn` can launch it; `Spawn.swift` explains why
 this replaced `fork()`) and owns a ``PTY``. A dedicated reader thread
 blocks in `read(2)` and hands each chunk to the session's ``Terminal``.
-Backpressure is explicit: the reader stops when the app has not drained
-the grid, rather than buffering without bound.
+Reading is independent of presentation: the reader continues to drain and
+parse PTY output while the app displays the latest grid at the panel's pace.
+Batches are capped and fed under short lock slices; an output-wake gate
+coalesces app notifications to at most one outstanding frame wake. Input
+writes have their own bounded queue and backpressure.
 
 ### 2. The parser
 
@@ -48,8 +52,10 @@ per line so the renderer redraws only what changed.
 
 ### 5. Reading it back
 
-The app reads the grid on the main thread under the session's lock, and
-builds the instance buffer the renderer draws. The document-anchored
+The app takes a grid snapshot under the session's lock, releases that lock,
+and builds the instance buffer from the snapshot. The default frame driver
+runs on the main thread; an experimental per-window render thread can own
+rendering instead. Presentation never gates the PTY reader. The document-anchored
 readers live here too so they can be tested without a window:
 ``Selection`` (rows counted from the screen boundary backwards into
 scrollback), ``Search`` (budgeted, so a pattern that would never finish is

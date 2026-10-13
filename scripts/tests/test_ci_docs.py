@@ -153,19 +153,19 @@ class ScopeTests(unittest.TestCase):
         self.assertFalse(scope["core"])
         self.assertFalse(scope["ssh"])
         self.assertFalse(scope["fuzz"])
-        self.assertEqual(scope["languages"], ["swift"])
+        self.assertEqual(scope["languages"], ["actions", "swift"])
 
     def test_core_change_also_checks_the_app(self):
         scope = ci.scope_for_paths(["CortaTerminal/Sources/CortaTerminal/Parser.swift"])
         self.assertTrue(all(scope[name] for name in ("core", "app", "ssh", "fuzz")))
-        self.assertEqual(scope["languages"], ["swift"])
+        self.assertEqual(scope["languages"], ["actions", "swift"])
 
     def test_script_only_and_feed_only(self):
         script = ci.scope_for_paths(["scripts/prepare-release.py"])
         self.assertTrue(script["script_tests"])
         self.assertFalse(script["core"])
         self.assertFalse(script["app"])
-        self.assertEqual(script["languages"], ["python"])
+        self.assertEqual(script["languages"], ["actions", "python"])
         feed = ci.scope_for_paths(["appcast.xml"])
         self.assertTrue(feed["feed"])
         self.assertFalse(feed["app"])
@@ -176,7 +176,7 @@ class ScopeTests(unittest.TestCase):
         self.assertTrue(scope["app"])
         self.assertTrue(scope["script_tests"])
         self.assertFalse(scope["core"])
-        self.assertEqual(scope["languages"], ["python", "swift"])
+        self.assertEqual(scope["languages"], ["actions", "python", "swift"])
 
     def test_unknown_build_config_and_routing_changes_run_everything(self):
         for path in ("Corta.xcodeproj/project.pbxproj", "CortaTerminal/Package.swift",
@@ -187,7 +187,7 @@ class ScopeTests(unittest.TestCase):
     def test_docs_and_configuration_reference(self):
         docs = ci.scope_for_paths(["README.md", "docs/TESTING.md"])
         self.assertFalse(any(docs[name] for name in ci.CHECKS))
-        self.assertEqual(docs["languages"], [])
+        self.assertEqual(docs["languages"], ["actions"])
         reference = ci.scope_for_paths(["docs/CONFIGURATION.md"])
         self.assertTrue(reference["app"])
         self.assertFalse(reference["core"])

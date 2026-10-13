@@ -10,6 +10,16 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Configuration and user guides now include every scalar setting in the
+  complete example and distinguish automatic zsh hooks, remote editing and
+  protocol queries from older behaviour; documented defaults are checked
+  against the implementation.
+- Release preparation and packaging checks accept version-independent README
+  download instructions, so editing installation prose no longer breaks the
+  release pipeline.
+
 ## [1.2.0] - 2026-10-13
 
 Corta 1.2 is a performance release: faster from the byte a program writes

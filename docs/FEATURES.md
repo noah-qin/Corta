@@ -2,8 +2,8 @@
 
 [Documentation index](README.md) · [Project overview](../README.md)
 
-This reference describes **1.2.0** and the development tree on `main` since
-it; a feature added after the release is listed under `[Unreleased]` in the
+This reference describes the development tree on `main`. Published releases
+may trail it; changes not yet released are listed under `[Unreleased]` in the
 [changelog](../CHANGELOG.md).
 Configuration keys and defaults are maintained in [Configuration](CONFIGURATION.md);
 the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
@@ -19,12 +19,16 @@ the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
 
 ## Speed and efficiency
 
-- Output parsed at over 300 MiB/s end to end, printable runs classified 16
-  bytes at a time with NEON; the screen follows at the display's pace.
+- Measured core-feed throughput of 317.3 MiB/s, with printable runs
+  classified 16 bytes at a time with NEON. This benchmark excludes PTY I/O,
+  rendering and display; it is not an end-to-end application throughput.
+  The screen follows at the display's pace.
 - Scroll regions, history scrolling and inserted or deleted lines shift the
   rendered rows instead of rebuilding them; scrolling allocates no screen rows.
 - Cold scrollback compressed in memory as it arrives: 100,000 lines of 120
-  columns in about 11 MiB. Search, reflow and copy read it in place.
+  columns added about 11 MiB of resident memory in the measured workload.
+  Search, reflow and copy read history in place; other text and workloads
+  can compress differently.
 - Typing, paste and input-method text request the panel's maximum frame rate
   (120 Hz on ProMotion); Low Power Mode, an inactive window and thermal
   pressure lower it otherwise.
@@ -71,8 +75,9 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 - OSC 133 shell integration: prompt marks (empty Return has no result mark
   since 1.1.1), command history, command-output
   copy/export, navigation between commands and long-task notifications.
-  Install or remove the bundled zsh, bash or fish hooks in **Settings ▸
-  Terminal**; they go into the login shell's startup file.
+  Standard local zsh sessions load the bundled hooks automatically with
+  `directory-completion = true`. For explicit startup-file installation in
+  zsh, bash or fish, use **Settings ▸ Terminal ▸ Shell Integration**.
 - Built-in directory suggestions for standard local zsh sessions, with
   faint alternatives and inline previews, Left/Right selection and Tab
   acceptance. Up/Down keep command history navigation; Shift+Tab passes
@@ -136,13 +141,15 @@ files, remote connections and child-process input.
 
 ## Known limits
 
-- **VT conformance is incomplete.** The 2026-09-17 esctest2 run recorded
-  126 passed, 334 known bugs and 107 failed out of 567. The historical 81.1%
+- **VT conformance is incomplete.** The 2026-10-07 esctest2 run recorded
+  131 passed, 334 known bugs and 102 failed out of 567. The historical 82.0%
   figure combines passes and known bugs; it is not a pass rate.
-  [Raw results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-09-17-results.txt) retain the failing names.
+  [Raw results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-10-07-results.txt) retain the failing names.
 - **Windowed input latency is above target.** Full screen with one pane
   measured 49.1–50.8 ms p50 and 82.9–84.2 ms p99 for a person typing
-  (2026-10-13); a window goes through the compositor and is a frame slower.
+  on one M5 MacBook Air with a 60 Hz panel (2026-10-13). Windowed panes
+  use the compositor; the full-screen improvement is a measured comparison
+  on that setup, not a guaranteed difference on every Mac.
   See [Performance](PERFORMANCE.md) §5.17 for the method and hardware.
 - **Bundled shell integration covers zsh, bash and fish.** Other shells need
   their own OSC 133 hooks for command boundaries; without them notifications

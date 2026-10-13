@@ -103,6 +103,22 @@ class PrepareReleaseTests(unittest.TestCase):
     def test_explicit_minor(self):
         self.assertEqual(self.prepare("minor")["version"], "1.3.0")
 
+    def test_current_readme_layout_has_no_release_prose_dependency(self):
+        readme = (Path(__file__).resolve().parents[2] / "README.md").read_text()
+        path = self.root / "README.md"
+        path.write_text(readme)
+        self.prepare()
+        self.assertEqual(path.read_text(), readme)
+        self.assertIn("Corta-x.y.z.dmg.sha256", path.read_text())
+
+    def test_generic_readme_requires_a_latest_release_link(self):
+        path = self.root / "README.md"
+        path.write_text("## Install\n\nCorta-x.y.z.dmg.sha256\n\n## First steps\n")
+        before = {name: (self.root / name).read_text() for name in release.FILES}
+        with self.assertRaisesRegex(ValueError, "release status"):
+            self.prepare()
+        self.assertEqual({name: (self.root / name).read_text() for name in release.FILES}, before)
+
     def test_explicit_major(self):
         self.assertEqual(self.prepare("major")["version"], "2.0.0")
 

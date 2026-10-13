@@ -84,6 +84,63 @@ struct DocumentationDriftTests {
         #expect(missing.isEmpty, "keys without a row: \(missing)")
     }
 
+    private static func scalarValues(in text: String) -> [String: String] {
+        var values: [String: String] = [:]
+        for line in text.split(separator: "\n") {
+            guard !line.trimmingCharacters(in: .whitespaces).hasPrefix("#"),
+                let equals = line.firstIndex(of: "=") else { continue }
+            let key = line[..<equals].trimmingCharacters(in: .whitespaces)
+            guard !key.contains(".") else { continue }
+            let value = line[line.index(after: equals)...].split(separator: "#", maxSplits: 1)
+                .first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+            values[key] = value
+        }
+        return values
+    }
+
+    @Test("every documented scalar default agrees with a fresh configuration")
+    func scalarDefaultsMatchTheCode() throws {
+        let text = try String(contentsOf: Self.configurationReference, encoding: .utf8)
+        let defaults = Self.scalarValues(in: Configuration().serialized())
+        var checked: Set<String> = []
+        for line in text.split(separator: "\n") where line.hasPrefix("| `") {
+            let cells = line.split(separator: "|", omittingEmptySubsequences: false)
+            guard cells.count >= 6 else { continue }
+            let key = cells[1].trimmingCharacters(in: CharacterSet(charactersIn: " `"))
+            guard let expected = defaults[key] else { continue }
+            let raw = cells[3].trimmingCharacters(in: .whitespaces)
+            let documented = raw == "*(empty)*" ? "" : raw.trimmingCharacters(in: CharacterSet(charactersIn: "`"))
+            if key == "status-items" {
+                #expect(documented == "all six")
+                #expect(Set(expected.split(separator: ",").map(String.init))
+                    == Set(SystemMetrics.Item.allCases.map(\.rawValue)))
+            } else {
+                #expect(documented == expected, "\(key): documented \(documented), code \(expected)")
+            }
+            #expect(checked.insert(key).inserted, "duplicate scalar row: \(key)")
+        }
+        #expect(checked == Set(defaults.keys))
+    }
+
+    @Test("the complete example includes every scalar key and parses to the documented values")
+    func completeExampleMatchesTheCode() throws {
+        let text = try String(contentsOf: Self.configurationReference, encoding: .utf8)
+        let section = try #require(text.range(of: "## 3. A complete example"))
+        let start = try #require(text.range(of: "```ini\n", range: section.upperBound..<text.endIndex))
+        let end = try #require(text.range(of: "```", range: start.upperBound..<text.endIndex))
+        let example = String(text[start.upperBound..<end.lowerBound])
+        #expect(Set(Self.scalarValues(in: example).keys)
+            == Set(Self.scalarValues(in: Configuration().serialized()).keys))
+        let (parsed, unknown) = Configuration.parse(example)
+        #expect(unknown.isEmpty)
+        var expected = Configuration()
+        expected.fontSize = 13
+        expected.scrollbackLines = 50_000
+        expected.notifyOnLongTask = true
+        expected.notificationThreshold = 60
+        #expect(parsed == expected)
+    }
+
     @Test("every command has a row in the shortcut table, and every row is a command")
     func theShortcutTableMatchesTheCommandTable() throws {
         let text = try String(contentsOf: Self.configurationReference, encoding: .utf8)

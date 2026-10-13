@@ -122,7 +122,10 @@ def prepare(root, bump="patch", date=None):
     # Historical compatibility and shell-integration instructions retain
     # their old versions; only the current download/status changes.
     start = readme.index("## Install")
-    end = readme.index("For updates,", start)
+    # The installation section ends at the next heading, not at a particular
+    # sentence: user-facing prose can change without breaking a release.
+    next_section = re.search(r"^## ", readme[start + len("## Install"):], re.M)
+    end = start + len("## Install") + next_section.start() if next_section else len(readme)
     install = readme[start:end]
     install = re.sub(r"Corta-(?:[0-9]+\.[0-9]+\.[0-9]+|<version>)\.dmg", f"Corta-{version}.dmg", install)
     install, count = re.subn(r"> \*\*Release status:\*\*.*?(?=\n\n|\Z)",
@@ -132,7 +135,13 @@ def prepare(root, bump="patch", date=None):
                             "> the signed update feed. See [GitHub Releases](https://github.com/noah-qin/Corta/releases/latest)\n"
                             "> for the latest successfully published build.",
                             install, count=1, flags=re.S)
-    if count != 1:
+    # Version-independent instructions point to the latest published build.
+    # Keep their x.y.z example unchanged; older READMEs still update in place.
+    generic_download = (
+        "Corta-x.y.z.dmg.sha256" in install
+        and f"{repository}/releases/latest" in install
+    )
+    if count != 1 and not generic_download:
         raise ValueError("README is missing its release status block")
     texts["README.md"] = readme[:start] + install + readme[end:]
     # Validate all input before writing any file.

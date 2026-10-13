@@ -5,10 +5,9 @@
 A native macOS terminal emulator written in Swift, with an AppKit shell,
 Metal rendering and an independent terminal core.
 
-This document describes 1.1.6 and the development tree on `main` since it.
-The B01–B16 implementation batches shipped in 1.0.0, the 1.1.0
-milestone's work in 1.1.0, and the 1.2.0 milestone's work in 1.1.5; the download is linked
-from [the README](../README.md#install). Historical milestone plans live in
+This document describes the development tree on `main`; published releases
+may trail it. [The changelog](../CHANGELOG.md) separates released work from
+`[Unreleased]`, and [the README](../README.md#install) links the download. Historical milestone plans live in
 [history/](https://github.com/noah-qin/Corta/tree/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history), and current limitations are listed in
 [Features](FEATURES.md#known-limits).
 
@@ -198,7 +197,7 @@ four reasons and what it would have bought.
 | `Parser`            | `CortaTerminal`                      | nonisolated | UTF-8 decode + VT500 state machine, no screen knowledge |
 | `Performer`         | `CortaTerminal`                      | nonisolated | Applies parsed actions to the grid; decides every reply |
 | `Grid`              | `CortaTerminal`                      | nonisolated | Cells, cursor, attributes, scroll region, alt screen |
-| `Scrollback`        | `CortaTerminal`                      | nonisolated | Ring buffer of variable-length lines                 |
+| `Scrollback`        | `CortaTerminal`                      | nonisolated | Bounded history in 256-row arenas; cold arenas compressed in memory |
 | `TerminalSession`   | `CortaTerminal`                      | nonisolated | Owns PTY + Parser + Grid; the unit a split renders   |
 | `PTY`, `corta-exec` | `CortaTerminal`                      | nonisolated | Spawn, read/write, winsize, child lifecycle          |
 | `corta-image-decoder` | `CortaTerminal/Sources/corta-image-decoder/` | own process | Decodes a Kitty PNG under the `pure-computation` sandbox; spawned by `ImageDecoderProcess` |
@@ -231,6 +230,7 @@ host rather than a `ViewController`.
 
 | Collaborator      | Owns                                                                 |
 | ----------------- | -------------------------------------------------------------------- |
+| `PaneRenderEngine` | Render inputs, renderer ownership, frame encoding and submission; driven on the main thread by default or an opt-in per-window render thread |
 | `PaneFrameLoop`   | When a frame is owed (the output wake, forced redraws, `?2026`), the diff into the renderer and the draw. The pane supplies the frame's content and an `onOutputBatch` stage — title, notifications, accessibility, history — run once per frame that saw output |
 | `PaneWindowTitle` | The window title and proxy icon: their composition and sanitising, the interval-cached process facts behind them, the off-main directory probe |
 | `PaneSearch`      | Scrollback search: the bar and its placement, key routing (Esc, ⌘G), the debounced off-main sweeps and their generations, the matches the renderer highlights, the pre-search viewport it restores. Reaches the pane only through `PaneSearchHost` |
@@ -385,7 +385,12 @@ simplification that the cursor row disables ligatures.
 
 ### 7.4 Glyph atlas eviction
 
-A 2048×2048 atlas holds roughly 2,000 glyphs
+The atlas has a 2048×2048 virtual ceiling at its normal allocation size
+and separate ASCII, shaped-text and colour pages. Physical textures grow
+on demand; an empty colour atlas starts at one pixel, so each pane need
+not reserve its maximum GPU storage at a prompt. Integer atlas rectangles
+and an index table let growth retain placement identities. A full-size
+atlas holds roughly 2,000 glyphs
 at typical sizes. A CJK session exceeds that easily. Resolved at M3 with
 the strategy Alacritty uses: shelf packing cannot reclaim individual
 slots without fragmenting, so a full page is *reset* — caches cleared,
@@ -424,8 +429,10 @@ checks two things:
 that the controller is still alive (`[weak self]`) and that it is still
 the controller *for this session* (`sessionGeneration`, bumped by every
 `setUpPane()`), so a callback from a replaced session is a no-op.
-`onChildExit` is installed, so a child that exits on its own gets the
-same reaction as a close; `didTeardown` tells the two apart.
+`onChildExit` is installed: an exited shell leaves its output readable and
+selectable with a session-ended card and explicit New Session/Reconnect
+and Close Pane actions. Closing a pane tears it down; a child exit alone
+does not discard its terminal contents.
 
 The record of the audit that established this table is
 [history/2026-09-10-B03-OWNERSHIP-AUDIT.md](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-09-10-B03-OWNERSHIP-AUDIT.md).
@@ -574,8 +581,12 @@ and HEX colors and detects concurrent changes. ThemeEditorView previews that
 draft; Save persists through ConfigurationStore and Cancel discards it. The
 primary font is System Monospaced; fallback shaping remains Core Text’s job.
 Cursor preference supplies block/bar/underline and blinking; explicit DECSCUSR
-styles override it until reset. Idle blinking invalidates cursor drawing and
-pauses outside visible active panes rather than polling terminal output.
+styles override it until reset. Once a blinking cursor is idle, `PaneFocus`
+hands its presentation to a Core Animation opacity animation through the
+`CursorHandoffMailbox`. New output or input retires that overlay before
+the Metal cursor is drawn again. Blinking pauses outside visible active
+panes and at a scrolled-back viewport; idle blinking does not require a
+new application-rendered Metal frame every half second.
 
 The input-source badge observes macOS input-source metadata, never typed text.
 The default fixed toolbar slot hosts the focused pane's existing accessible
@@ -584,3 +595,28 @@ it or selecting prompt placement removes both the slot and its spacer. The
 optional right-edge prompt placement avoids live command content without
 changing the grid or sending bytes to the child. Unknown private IME modes use
 neutral styling; enabled non-Latin layouts and IMEs determine automatic display.
+
+## Current memory and rendering paths
+
+History rows are collected into 256-row arenas. The newest arenas remain
+mutable; sealed cold arenas can be compressed off the terminal lock and
+installed only if their identity and generation still match. Snapshot readers
+share immutable storage, with bounded decoded caches for search, reflow and
+copy. The history line cap still discards the oldest rows; compression is not
+on-disk persistence. See [Performance](PERFORMANCE.md) for measured resident
+memory, compression limits and the cost of first access.
+
+The renderer uses 24-byte quad instances, integer atlas rectangles and a
+rectangle table uploaded when it changes. A scroll journal shifts retained
+rendered rows for region/history scrolling and line insertion/deletion;
+missing or incompatible damage history falls back to rebuilding rows.
+
+`PaneRenderEngine` owns renderer mutation. The default display-link path runs
+on the main thread; `CORTA_RENDER_THREAD=1` opts into a per-window run loop
+with ordered render inputs, teardown and GPU feedback. It remains experimental
+and off by default. A full-screen window with exactly one pane uses the
+present-by-copy path and drops the canvas corner mask; windowed and split
+panes retain the ordinary Metal 4 presentation path. Overlays can still make
+the window server composite a frame. See [Testing](TESTING.md#environment-switches)
+for experiment switches and [Performance](PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13)
+for the measured 60 Hz result and unverified environments.

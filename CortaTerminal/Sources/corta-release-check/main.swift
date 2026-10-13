@@ -32,8 +32,8 @@ import ReleaseCheck
 /// `check`, always: the app's Info.plist agrees with project.pbxproj on the
 /// marketing version, the build number and the deployment target; the
 /// build number is an integer; every file carries its license header;
-/// CHANGELOG.md has a heading for the version; README.md names the release
-/// archive and the minimum macOS for it; the app's executable and
+/// CHANGELOG.md has a heading for the version; README.md documents the release
+/// download and the minimum macOS for it; the app's executable and
 /// corta-exec are arm64 only (D21); the code signature verifies.
 ///
 ///     --version V          V (a tag with its `v` stripped) must be the version.
@@ -285,10 +285,10 @@ if ReleaseCheck.changelogHasSection(changelog, version: bundleVersion) {
 } else {
     fail("CHANGELOG.md has no '## [\(bundleVersion)]' heading")
 }
-if readme.contains(archiveName) {
-    pass("README.md names \(archiveName)")
+if ReleaseCheck.readmeDocumentsDownload(readme, version: bundleVersion) {
+    pass("README.md documents the release download")
 } else {
-    fail("README.md does not name \(archiveName) — its download instructions are stale")
+    fail("README.md needs \(archiveName) or latest-release instructions with a Corta-x.y.z.dmg.sha256 example")
 }
 if readme.contains("macOS \(bundleTarget)") {
     pass("README.md states the macOS \(bundleTarget) minimum")

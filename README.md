@@ -4,11 +4,11 @@
 
 # Corta
 
-**A native macOS terminal, built in Swift.**
+**A fast, focused terminal. Made for Mac. Built in Swift.**
 
-Metal rendering · AppKit input · A dependency-free terminal core
+Metal 4 rendering · Native CJK / IME · SSH, SFTP and remote editing
 
-> Built for people who live in the terminal on Mac — real CJK / IME, Metal-smooth text, and a VT engine with **zero** third-party dependencies.
+> For people who live in the terminal: crisp text, native input, powerful remote workflows, and a Swift terminal core with **zero** third-party dependencies. Fast enough for demanding output. Thoughtful enough for everyday work.
 
 [![CI](https://github.com/noah-qin/Corta/actions/workflows/ci.yml/badge.svg)](https://github.com/noah-qin/Corta/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/noah-qin/Corta?style=flat-square)](https://github.com/noah-qin/Corta/releases/latest)
@@ -26,46 +26,80 @@ Metal rendering · AppKit input · A dependency-free terminal core
 
 </div>
 
+## Install
+
+Requires **macOS 26.0 or later**, **Apple silicon** (M1 or later), and a
+**Metal 4-capable GPU**. Virtual machines with a paravirtual GPU are not
+supported. Intel Macs can use the older
+[1.0.1 release](https://github.com/noah-qin/Corta/releases/tag/v1.0.1).
+
+Download the `.dmg` and matching `.dmg.sha256` file from
+[GitHub Releases](https://github.com/noah-qin/Corta/releases/latest).
+Keep both files in the same folder and verify the checksum there:
+
+```sh
+# Replace x.y.z with the version you downloaded.
+shasum -a 256 -c Corta-x.y.z.dmg.sha256
+```
+
+Open the disk image, drag **Corta** into **Applications**, then eject the
+image. Releases are Developer ID-signed and notarised. For later updates,
+use **Corta ▸ Check for Updates…** or download a newer release.
+Installation help and uninstall instructions are in
+[Troubleshooting](docs/TROUBLESHOOTING.md).
+
+## First steps
+
+| To… | Use |
+| :--- | :--- |
+| Split right / down | ⌘D / ⇧⌘D |
+| Search terminal output | ⌘F |
+| Open the command palette | ⇧⌘P |
+| Open Settings | ⌘, |
+
+Standard local zsh sessions load the bundled shell-integration hooks
+automatically with Directory suggestions enabled (the default). For
+startup-file installation in zsh, bash or fish, use
+**Settings ▸ Terminal ▸ Shell Integration**; this edits your shell's startup
+files only when you choose Install. If an installed integration is outdated,
+choose Update and open a new shell. See the
+[shell-integration guide](docs/USER-GUIDE.md#shell-integration) for details.
+
 ## 1.2: built for speed
 
-Corta 1.2 is a performance release, from the byte the shell writes to the
-pixel on the panel. Measured on one Apple M5 MacBook Air, before and after,
-same toolchain:
+Corta 1.2 makes a big leap in speed and efficiency: more than double the
+core throughput, a frame less of full-screen input latency, and a fraction
+of the memory for long histories. Measured on one Apple M5 MacBook Air,
+before and after, with the same toolchain:
 
-- **2.3× the throughput.** The parser and grid take **356 MiB/s**, up
-  from 158; output arriving from a shell, end to end, **317 MiB/s**, up from
-  137. `yes` runs 70% faster, and CJK text 23% faster.
-- **A frame less while you type.** A full-screen pane is presented straight
-  to the display instead of through the window server: keypress to glass
-  drops from 64–68 ms to **49–51 ms** at the median, and the worst cases are
-  **halved**.
-- **ProMotion when your fingers are on the keys.** Typing, paste and input
-  methods ask for the panel's maximum frame rate — 120 Hz on ProMotion —
-  then let it settle.
-- **Scrolling that costs almost nothing.** A scroll region (vim, less,
-  tmux, a status line) shifts what is already drawn: **5×** less CPU a frame,
-  and output arriving while you read history back **10×** less.
-- **Scrollback in a fraction of the memory.** Cold history is compressed as
-  you go: 100,000 lines of 120 columns now take about **11 MiB, not 185**.
-  Glyph atlases grow on demand: four panes at a prompt went from 81 MiB to
-  about 1 MiB.
-- **Quiet when it should be.** An idle blinking cursor is animated by the
-  system instead of redrawn, an idle shell no longer wakes Corta four times
-  a second, and a pane you cannot see drops to background priority after
-  two seconds — and back the moment you type.
-- **Images straight to the GPU.** Inline images are decoded in a sandbox
-  into memory the GPU reads directly, with no copy through the app, and
-  move with the text in vim, less and tmux.
+- **2.3× the core throughput.** The parser and grid take **356 MiB/s**,
+  up from 158; the terminal core with scrollback takes **317 MiB/s**, up
+  from 137. These feed benchmarks exclude PTY I/O, rendering and display.
+- **A frame less while you type in full screen.** With a full-screen
+  window and exactly one pane, frames can be presented directly to the
+  display. On the measured 60 Hz panel, median keypress-to-glass latency
+  drops from 64–68 ms to **49–51 ms**, and p99 drops from 154–180 ms to
+  **83–84 ms**. Windowed and split panes keep the regular presentation path.
+- **Long histories. Small footprint.** A one-line region
+  scroll takes **5×** less CPU per frame; output arriving while you read
+  history takes **10×** less. Compressing cold history reduces the measured
+  memory increment for 100,000 lines of 120 columns from 185 to **11 MiB**.
+- **Responsive input and quieter idle sessions.** Typing, paste and input
+  methods request the panel's maximum frame rate — 120 Hz on ProMotion.
+  An idle blinking cursor is animated by the system, and an idle shell no
+  longer wakes its reader four times a second.
 
 Every figure is in [Performance](docs/PERFORMANCE.md), with its method and
 what it does not show. The [changelog](CHANGELOG.md) has the full list.
 
 ## Made for macOS
 
-Corta brings together a hand-written VT engine, Metal rendering, Core Text
-shaping and native AppKit input. The terminal core is a separate Swift package
-with no third-party dependencies. The app uses [Sparkle](https://sparkle-project.org)
-for updates.
+Corta puts serious terminal engineering behind a familiar Mac experience:
+a hand-written Swift VT engine, Metal 4 rendering, Core Text shaping and
+native AppKit input. Split your workspace, search long histories, compose
+Chinese, Japanese or Korean text, and edit remote files from the same app.
+The terminal core is a separate Swift package with no third-party
+dependencies. The app uses [Sparkle](https://sparkle-project.org) for updates.
 
 | Native interaction | Terminal fundamentals | Everyday workflow |
 | :--- | :--- | :--- |
@@ -75,89 +109,79 @@ for updates.
 | Secure Keyboard Entry | Kitty keyboard and direct graphics protocols | OpenSSH, SFTP and remote editing |
 | A System Settings–style Settings window | Kitty images in the scrollback | A Finder-like SFTP browser with drag and drop |
 
-The table describes `main`; a release may trail it by a row or two. The
-[feature reference](docs/FEATURES.md) has the details, requirements and
+Restoration keeps layouts and directory metadata, starts fresh processes,
+and does not restore terminal text.
+
+The table describes `main`; published releases may not include every feature.
+The [feature reference](docs/FEATURES.md) has the details, requirements and
 limitations, and the [design decisions](docs/DECISIONS.md) explain what
 Corta deliberately leaves out.
 
 ## How is Corta different?
 
-iTerm2 and Ghostty are both excellent terminals, and Corta borrows the
-standards they helped set. It makes a different set of bets.
+All three offer native macOS interfaces and GPU rendering. Corta combines
+a Swift terminal core, one shared configuration for text and GUI editing,
+and an integrated SSH, SFTP and remote-editing workflow. Here is how their
+implementation and integration choices compare.
 
 | | Corta | iTerm2 | Ghostty |
 | :--- | :--- | :--- | :--- |
-| Written in | Swift, end to end | Objective-C and Swift | Zig core, Swift and GTK front ends |
-| Platforms | macOS only, by decision | macOS | macOS and Linux |
-| Terminal core | A separate Swift package with **zero** third-party dependencies | In the app | `libghostty`, shared across platforms |
-| Rendering | Metal, with Core Text shaping and font fallback | Metal | Metal on macOS, OpenGL on Linux |
-| Settings | One text file, edited by a native Settings window too | Preferences UI and profiles | One text file |
-| Scope | Terminal correctness; no multiplexer, no AI, no scripting engine | Everything, including tmux integration and a Python API | Terminal plus a cross-platform library |
+| Main implementation | Swift | Objective-C and Swift | Zig core; Swift on macOS, GTK on Linux |
+| App platforms | macOS | macOS | macOS and Linux |
+| Native UI | AppKit, with SwiftUI settings | Native macOS app | SwiftUI on macOS; GTK on Linux |
+| Rendering | Metal 4, with Core Text shaping and font fallback | Metal GPU renderer, configurable | Metal on macOS; OpenGL on Linux |
+| Settings | One text file, also edited by the native Settings window | Settings UI and profiles; dynamic profiles | Text configuration, with support for multiple files |
+| Integration examples | Shortcuts, OpenSSH, SFTP browser and managed remote editing | tmux control-mode integration, Python API and triggers | macOS Shortcuts and AppleScript; embeddable `libghostty` libraries |
+
+Competitor information checked on **2026-10-13** against the official
+[iTerm2 repository](https://github.com/gnachman/iTerm2),
+[settings documentation](https://iterm2.com/documentation-preferences-general.html),
+[dynamic profiles](https://iterm2.com/documentation-dynamic-profiles.html),
+[tmux integration](https://iterm2.com/documentation-tmux-integration.html),
+[Python API](https://iterm2.com/python-api/) and
+[features](https://iterm2.com/features.html), and the official
+[Ghostty repository](https://github.com/ghostty-org/ghostty),
+[features](https://ghostty.org/docs/features),
+[configuration](https://ghostty.org/docs/config) and
+[AppleScript guide](https://ghostty.org/docs/features/applescript).
 
 **Why pick Corta.**
 
-- **It is a Mac app first, not a port.** CJK input and IME composition,
-  Secure Keyboard Entry, VoiceOver, Shortcuts, the Quick Terminal and the
-  Services menu are built on the native AppKit paths, so they behave the
-  way the rest of your Mac does — not the way a cross-platform toolkit
-  approximates it.
-- **Every byte from the PTY is treated as hostile.** The VT engine is
-  hand-written in Swift with resource caps on every unbounded input, and
-  the capabilities that let a program read your clipboard or window title
-  back are deliberately absent. The [security model](docs/SECURITY.md)
-  spells out the three trust boundaries.
-- **One config file is the whole settings store.** `~/.config/corta/config`
-  is what the Settings window edits, what a preset loads and what
-  [the reference](docs/CONFIGURATION.md) documents key by key; a test fails
-  when the documentation drifts from the code.
-- **Remote work stays in the terminal.** SSH sessions use the system
-  OpenSSH and carry their host and directory context. The toolbar's connect
-  sheet suggests your recent hosts and the `Host` names in `~/.ssh/config`;
-  the SFTP browser works the way Finder does — Back and Forward, a
-  breadcrumb path, sortable columns, drag and drop both ways, transfers with
-  speed and time left — and a remote file opens in your local editor as a
-  managed copy that uploads only when you say so, with a conflict check
-  against the remote first.
-- **The numbers are published, including the bad ones.** Frame CPU, idle
-  CPU, throughput, keypress-to-glass latency and the esctest2 result are
-  measured, dated and recorded [below](#quality-with-evidence), with the
-  method for each — including where a figure is still short of its target,
-  as windowed keypress-to-glass latency is.
+- **A Mac workspace built around your hands.** Compose CJK text through
+  native IME input, summon the Quick Terminal, move between split panes,
+  and find commands from the palette. AppKit powers input, VoiceOver,
+  Secure Keyboard Entry and Services; App Intents connects your workspace
+  to Shortcuts.
+- **Small core, serious safeguards.** An independent Swift terminal core
+  has zero third-party dependencies and resource limits for untrusted
+  terminal output. Inline image decoding runs in a sandboxed helper;
+  clipboard-read and window-title queries are deliberately absent. The
+  [security model](docs/SECURITY.md) documents the trust boundaries.
+- **Point-and-click comfort. Text-file control.** Change themes and
+  shortcuts in the native Settings window or edit `~/.config/corta/config`
+  directly: both use the same settings store. Presets load from it too,
+  and automated checks keep documented keys and shortcut defaults aligned
+  with the code. See the [configuration reference](docs/CONFIGURATION.md).
+- **From SSH to a local editor, in one workflow.** Connect with system
+  OpenSSH using recent hosts or your `~/.ssh/config` aliases. Browse remote
+  files with breadcrumbs, sortable columns and drag and drop; track
+  transfers with speed and time remaining. Open a remote file in your local
+  editor, then approve its upload with a check for remote conflicts first.
+- **Performance you can inspect.** More than double the measured core
+  throughput, about 94% less memory for the measured 100,000-line history,
+  and lower full-screen input latency. The [evidence below](#quality-with-evidence)
+  publishes hardware, methods and results alongside the remaining gaps,
+  including windowed latency and incomplete VT conformance.
 
-If you need tmux control mode, a Linux build or a scripting API, iTerm2 or
-Ghostty is the better choice today; those are
-[settled decisions](docs/DECISIONS.md), not gaps waiting to be filled.
-
-## Install
-
-Requires **macOS 26.0 or later** on a Mac with **Apple silicon** (M1 or
-later) from 1.1.0 on. Intel Macs are not supported after
-[1.0.1](https://github.com/noah-qin/Corta/releases/tag/v1.0.1), which stays
-available for them. Releases after 1.1.8 use disk images. Download
-`Corta-1.2.0.dmg` and `Corta-1.2.0.dmg.sha256` from
-[GitHub Releases](https://github.com/noah-qin/Corta/releases/latest).
-Version 1.1.8 and earlier retain their original ZIP downloads.
-
-```sh
-# Replace <version> with the chosen DMG release; keep both files together.
-shasum -a 256 -c Corta-1.2.0.dmg.sha256
-```
-
-Open the disk image, drag **Corta** into **Applications**, then eject the
-image. For later updates, use **Corta ▸ Check for Updates…**.
-
-> [!NOTE]
-> **Release status:** [1.2.0](https://github.com/noah-qin/Corta/releases/tag/v1.2.0),
-> prepared on 2026-10-13. Manually running Release on `main` starts tests,
-> build, sign and notarise the app, publish a release, and update
-> the signed update feed. See [GitHub Releases](https://github.com/noah-qin/Corta/releases/latest)
-> for the latest successfully published build.
-
-For updates, use **Corta ▸ Check for Updates…** or download a newer release.
-If Settings reports that the shell integration is outdated, choose Update
-and open a new shell.
-Installation help and uninstall instructions are in
-[Troubleshooting](docs/TROUBLESHOOTING.md).
+For native `tmux -CC` integration or a Python scripting API, consider
+[iTerm2](https://iterm2.com/documentation-tmux-integration.html). For a
+terminal app that also runs on Linux, consider
+[Ghostty](https://ghostty.org/docs/features); its macOS app also offers
+[AppleScript automation](https://ghostty.org/docs/features/applescript)
+from 1.3.0. Corta's macOS-only scope and exclusion of tmux control mode,
+built-in AI and a scripting engine are
+[settled decisions](docs/DECISIONS.md). Ordinary tmux sessions run inside
+Corta as terminal programs.
 
 ## Make it yours
 
@@ -173,19 +197,19 @@ bind.equalize-panes = ctrl+cmd+e
 bind.command-palette = cmd+shift+p
 ```
 
-Since 1.1.5, **View ▸ Theme editor…** opens
+**View ▸ Theme editor…** opens
 color pickers and separate light/dark previews. **Settings ▸ Appearance ▸
 Cursor** selects block, bar or underline and an independent blink switch; the
-default is a nonblinking block. The primary font is System Monospaced.
+default is a nonblinking block. System Monospaced is the only supported
+primary font, with adjustable size and system fallback for missing characters.
 **Settings ▸ Terminal ▸ Bottom status bar** enables selectable local metrics
 (default off); click it for host details, or use **View ▸ Local host details…**.
 See the [personalization tutorial](docs/USER-GUIDE.md#personalizing-the-terminal)
 for the steps, network-interface selection and thermal-state limitations.
 
 The [configuration reference](docs/CONFIGURATION.md) lists every key, default
-and when changes take effect. Shell integration for zsh, bash and fish can be
-installed from **Settings ▸ Terminal**. The [user guide](docs/USER-GUIDE.md)
-walks through every feature and where to find it.
+and when changes take effect. The [user guide](docs/USER-GUIDE.md) walks
+through every feature and where to find it.
 
 ## Build and test
 
@@ -224,7 +248,7 @@ are snapshots, not guarantees for every machine or workload.
 | Scrollback memory, 100k × 120 lines | **11.4 MiB** (185 MiB before 1.2) | [Performance §5.6](docs/PERFORMANCE.md#56-numbers-by-release) |
 | Region scroll, CPU a frame, p50 | **0.026 ms** (0.130 ms before 1.2) | [Performance §5.14](docs/PERFORMANCE.md#514-scrolling-without-per-line-screen-allocation-281-283) |
 | Frame CPU, 120 × 40 full rebuild, Release | **0.37–0.39 ms** | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
-| Keypress to glass, full screen, a person typing | **49.1–50.8 ms** p50, 82.9–84.2 ms p99 | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
+| Keypress to glass, full screen, one pane, 60 Hz, a person typing | **49.1–50.8 ms** p50, 82.9–84.2 ms p99 | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
 | Idle CPU, Release, 20 seconds | 0.05% | [Performance](docs/PERFORMANCE.md) |
 | esctest2 | 131 passed, 334 known bugs, 102 failed; 567 total | [Raw results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-10-07-results.txt) |
 

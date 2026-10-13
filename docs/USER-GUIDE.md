@@ -11,6 +11,7 @@ and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 - [Windows, tabs and panes](#windows-tabs-and-panes)
 - [Text, fonts and themes](#text-fonts-and-themes)
 - [Personalizing the terminal](#personalizing-the-terminal)
+- [When a session ends](#when-a-session-ends)
 - [Scrollback, search and selection](#scrollback-search-and-selection)
 - [Links and file references](#links-and-file-references)
 - [Shell integration](#shell-integration)
@@ -28,10 +29,14 @@ and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 
 ## Install and update
 
-Corta needs **macOS 26.0 or later** on a Mac with **Apple silicon**.
+Corta needs **macOS 26.0 or later**, **Apple silicon** and a **Metal 4-capable
+GPU**. A virtual machine with a paravirtual GPU cannot render the terminal.
 For releases after 1.1.8, download the `.dmg` and its `.sha256` file from
 [GitHub Releases](https://github.com/noah-qin/Corta/releases/latest), check
 the checksum, then open the image and drag Corta into Applications:
+
+Keep both files in the same folder and replace `x.y.z` with the downloaded
+version before running these commands there:
 
 ```sh
 shasum -a 256 -c Corta-x.y.z.dmg.sha256
@@ -40,8 +45,8 @@ open Corta-x.y.z.dmg
 
 Eject the image after copying. Versions through 1.1.8 keep their original ZIPs.
 
-Every release is signed with a Developer ID and notarised, so it opens
-without a Gatekeeper warning. Launched from anywhere else, Corta offers to
+Official releases are Developer ID-signed and notarised. If macOS rejects
+a download, follow [Troubleshooting](TROUBLESHOOTING.md#installing). Launched from anywhere else, Corta offers to
 move itself into `/Applications` (`suggest-applications-folder`).
 
 **Updates.** **Corta ▸ Check for Updates…** checks now; a background check
@@ -75,8 +80,9 @@ installed when you say so.
 - Closing a pane with a command still running asks first
   (`confirm-close`).
 - **Restoring windows.** Quit and relaunch, and every window comes back
-  with its splits, divider positions and each pane's working directory
-  (`restore-windows`).
+  with its tabs, splits, divider positions and each pane's working directory
+  (`restore-windows`, on by default). Each pane starts a fresh process;
+  terminal text and running jobs are not restored. The Quick Terminal is excluded.
 - **Presets.** A preset is a named shell, directory and environment,
   defined in the config file. **Shell ▸ New Pane with Preset** opens one;
   hold ⌥ to open it in a window of its own
@@ -140,8 +146,10 @@ layout keeps a quiet gray `A` on a faint gray background. Non-Latin layouts
 and built-in IME modes use a soft indigo tint; unknown IME modes use gray. In the
 toolbar the badge stays while a program runs — Claude Code, an editor — since
 it covers no output. At the right edge of the command line, shell integration
-hides it during command execution, and scrollback and alternate-screen programs
-hide it.
+hides it during command execution in **Automatically** mode. **Always**
+can keep it during command output. Both prompt modes hide it while reading
+scrollback or using an alternate-screen program.
+
 The **Position** setting chooses **Window toolbar** (default) or **Right edge
 of command line**. The toolbar badge sits independently of the network and
 file buttons and stays fixed as commands grow or wrap. Turning it off or
@@ -187,9 +195,12 @@ and blink state. Terminal programs can still temporarily override cursor style.
 
 ### Compact Tab indentation (zsh)
 
-In Settings → Terminal, install or update Shell Integration, then open a new
-shell. With Corta's zsh shell integration installed or updated, Tab on a whitespace-only
-command line inserts four spaces. Tab after command text retains the existing
+Standard local zsh sessions load the bundled hooks automatically when
+Directory suggestions is enabled (the default). You do not need to modify
+your startup files. If you use custom zsh arguments or have turned off that
+automatic bootstrap, install or update Shell Integration in Settings →
+Terminal, then open a new shell. With those hooks loaded, Tab on a
+whitespace-only command line inserts four spaces. Tab after command text retains the existing
 completion binding. This is a ZLE widget; terminal output tab stops remain eight
 columns, and full-screen programs continue receiving the Tab key. Without the
 integration, the shell retains its own input-tab behavior.
@@ -286,14 +297,17 @@ to your shell's startup file — `~/.zshrc`; for bash both `~/.bashrc` and
 `~/.config/fish/config.fish` — and **Remove** takes out exactly that block.
 The startup-file block is only installed when you press the button. Standard
 local zsh sessions also load Corta's bundled hooks automatically, without
-editing your startup files, including the directory suggestions described below.
+editing your startup files, when **Directory suggestions (zsh)** is enabled
+(the default). Custom zsh arguments, bash, fish and remote shells do not
+use this automatic bootstrap. Install compatible hooks in those shells to
+enable command boundaries there.
 
 When Settings reports an outdated integration, choose **Update** and open a
 new shell. Updating the app alone does not replace a previously installed
 startup-file block. In 1.1.1 this loads the corrected command hooks: an empty
 Return has no command result and draws no green or red rule.
 
-With it installed:
+With the hooks loaded, automatically or through startup-file installation:
 
 - **Prompt marks.** A thin rule at the left of each prompt, green when the
   command succeeded and red when it failed. An empty Return draws no rule
@@ -312,7 +326,10 @@ With it installed:
   and runs on your Return.
 - **Long-task notifications.** With `notify-on-long-task = true`, a command
   that ran longer than `notification-threshold` seconds (30) posts a
-  notification when it finishes; click it to jump to the command.
+  notification when it finishes **while its window is not key**, provided
+  macOS has granted Corta notification permission. Enable it in Settings ▸
+  General and check the permission status there. Click the notification to
+  jump to the command.
 
 Without shell integration these commands are disabled rather than silently
 doing nothing, and notifications fall back to a guess based on typing and
@@ -408,8 +425,11 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   the toolbar's arrows button, with speed, time left and Show in Finder.
 - **Editing a remote file.** **Edit** in the browser — or ⌘-clicking a
   `path:line` in a remote pane — downloads a copy and opens it in your
-  editor. Uploading your changes is a separate, explicit step, and Corta
-  checks first whether the remote file changed meanwhile. Files over 64 MB
+  editor. Set **Settings ▸ Terminal ▸ Open File Command** first, using an
+  absolute editor executable and `{file}`, `{line}`, `{column}` placeholders
+  ([examples](CONFIGURATION.md#following-a-file-reference)). Uploading your
+  changes is a separate, explicit step, and Corta
+  checks first whether the remote file changed meanwhile. Files over 64 MiB
   are not copied this way; download them from the browser, which shows
   progress and can cancel. A copy nobody has opened or changed for 30 days is
   removed the next time remote editing is used; one with changes you have not
@@ -418,16 +438,24 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   characters shows them as `�`, and a download saves them as `_`, so a name
   cannot pass for another one.
 
-The browser's connection has no terminal, so it cannot ask for a password:
-use a key loaded in `ssh-agent`, and connect once in the terminal before
-browsing a new host.
+The browser's connection has no terminal, so it cannot ask for a password,
+key passphrase or unknown host-key confirmation. Use a key available to
+OpenSSH through `ssh-agent` or the keychain, or an existing `ControlMaster`
+connection. Connect once in the terminal to confirm a new host's key; this
+alone does not make a password-only host usable in the browser.
+
+Remote-edit uploads compare remote content as well as size and modification
+time and send the private snapshot you approved. If you save another local
+edit after the approval prompt, Corta asks for a new decision; saves during
+an upload remain pending. Preserve undecided local edits before deleting
+application data. See [data-at-rest policy](SECURITY.md#5-data-at-rest).
 
 ## Images in the terminal
 
 Programs that speak the **kitty graphics protocol** can show images inline:
 
 ```sh
-kitten icat picture.png
+kitten icat --transfer-mode=stream picture.png
 ```
 
 Images scroll with the text, stay in the scrollback, and are removed by
@@ -497,13 +525,16 @@ what it does, so you know what to expect.
   bar or anything else drawn over the text brings the compositor back while
   it shows. (`CORTA_DIRECT_FULLSCREEN=0` in the launch environment turns this
   off, to compare.)
-- **Floods do not hold up the window.** A build log or `yes` is read and
-  parsed as fast as it arrives — over 300 MiB/s — and the screen shows the
-  latest state at the display's pace instead of every intermediate one.
+- **Output reading and display have separate paces.** The PTY reader
+  continues parsing while the screen presents the latest state at the
+  display's pace. A measured core-feed benchmark reached 317.3 MiB/s;
+  that figure excludes PTY I/O, rendering and display and is not a promised
+  speed for a real build log or `yes`.
 - **Scrolling and full-screen programs redraw only what changed.** vim, less,
   tmux and a status line scroll by shifting what is already drawn.
 - **Long scrollback stays small.** History is compressed in memory as it
-  scrolls away — 100,000 lines of 120 columns take about 11 MiB — and
+  scrolls away — the measured memory increment for 100,000 lines of
+  120 columns was about 11 MiB — and
   search, copy and resizing work on it directly.
 - **Idle means idle.** A blinking cursor is animated by macOS rather than
   redrawn by Corta, an idle shell causes no periodic wakeups, and a window
@@ -627,12 +658,3 @@ view with read-only fixtures and example transfer rows. Navigate `/home/demo`,
 `src`, `docs`, and `empty` to inspect connected and empty listings. No server,
 credentials, or local file staging is used. The preview menu and fixture
 client are excluded from Release builds.
-
-Remote-edit uploads check the remote content as well as size and modification
-time. Each upload sends the version approved in the prompt. If the local copy
-changes after that prompt, Corta asks for a new decision; further saves during
-an upload remain pending edits. Managed copies remain on disk with private
-file modes for 30 days after their last use, unless they hold an undecided
-edit. Restored sessions retain arrangement and directory metadata,
-with `restore-windows = true` by default, and start fresh processes without
-restoring terminal text. See [data-at-rest policy](SECURITY.md#5-data-at-rest).

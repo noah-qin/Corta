@@ -10,12 +10,14 @@ document covers. The Settings page (⌘,) edits it and reads the result
 back; there is no second *settings* store. An edit made in `$EDITOR` while
 Corta is running is picked up within a moment — the file and its directory
 are both watched, because most editors write a temporary file and rename
-it over the target rather than writing in place. (Two other files hold
-data that is not a setting at all — §8 explains the distinction.)
+it over the target rather than writing in place. App-owned history, window
+arrangements and remote-edit copies are separate from settings (§8).
 
 The file is created with the current values the first time the Settings
 page is opened, so opening it once and then reading the file is the
-fastest way to see the current defaults.
+fastest way to see the current defaults. For the separate development app,
+the file is `~/Library/Application Support/Corta Dev/config`; an explicit
+`CORTA_STAGE_DIR` uses `<stage>/config`. See [Testing](TESTING.md#the-test-host-cannot-reach-your-own-configuration).
 
 ---
 
@@ -40,8 +42,10 @@ key = value        # comment to end of line
 - A file that exists but is not UTF-8 text, or cannot be read, is never
   written: Corta keeps its current settings and Settings says why changes
   are not being saved, until the file reads again.
-- An out-of-range value for a known key is **clamped**, not rejected, and
-  rewritten in its clamped form.
+- Numeric values outside the documented range are **clamped** and written
+  back in their clamped form. Invalid numbers, unsupported enum values and
+  malformed shortcuts keep the default for that key when loading the file;
+  their original lines are preserved on a settings round trip.
 
 Three families of key are structured rather than scalar, and all use a
 dotted prefix so the flat format needs no nesting: `theme.<name>.…`
@@ -71,7 +75,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | --- | --- | --- | --- |
 | `columns` | 20–500 | `120` | The grid a **new** window opens with, in cells. |
 | `rows` | 5–300 | `30` | As above. The window's size in pixels is this grid times the font's cell metrics plus the pane insets — so two terminals showing the same `columns × rows` are still different sizes on screen if their fonts differ. |
-| `restore-windows` | boolean | `true` | Reopen the last run's windows, splits, divider proportions and each pane's working directory. |
+| `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. The Quick Terminal is excluded. |
 | `confirm-close` | boolean | `true` | Ask before closing a pane, window or the app while a shell still has a foreground job. |
 
 #### Quick Terminal
@@ -114,7 +118,15 @@ into another application hides it without moving focus again.
 
 #### Shell integration
 
-Not a config-file key — the login shell's startup files, which only
+Two paths provide the same bundled hooks. Standard local zsh sessions load
+them automatically when `directory-completion = true` (the default), without
+editing startup files. Custom zsh arguments, bash, fish and remote shells
+need explicit installation or their own compatible OSC 133 hooks. Disabling
+directory suggestions in a live shell does not unload hooks already sourced;
+new sessions with the setting off do not use the automatic zsh bootstrap.
+
+Startup-file installation is not a config-file key — it edits the login
+shell's startup files, which only
 Settings ▸ Terminal ▸ Shell Integration touches, and only inside one
 marked block each. The shell is the one `$SHELL` names: `~/.zshrc` for
 zsh, `~/.config/fish/config.fish` for fish, and zsh's for anything else.
@@ -159,9 +171,10 @@ directory from the shell's own hooks — zsh's `preexec`/`precmd`, bash's
 `fish_preexec` (fish 4 sends most marks itself, and the script then adds
 only the one it lacks) — the same
 two sequences `Performer+ShellIntegration.swift` and this document's
-command-jump entries already describe. Nothing is installed automatically;
-a user who never opens this row keeps the keystroke-and-idle heuristic
-`TaskNotifier` falls back to, same as before B07.
+command-jump entries already describe. Startup-file blocks are installed
+only on request. Automatically bootstrapped local zsh sessions have the
+same command boundaries without such a block. A session with neither kind
+of integration uses `TaskNotifier`'s typing-and-idle heuristic.
 
 ### Notifications
 
@@ -245,6 +258,11 @@ theme = corta
 appearance = auto
 font-family = system
 font-size = 13                     # default 12
+cursor-shape = block
+cursor-blink = false
+status-bar = false
+status-items = cpu,load,memory,network,disk,thermal
+status-network-interface = auto
 
 # Window
 columns = 120
@@ -262,6 +280,10 @@ quick-terminal-screen = mouse
 scrollback-lines = 50000           # default 10000
 command-history-limit = 512
 bell = visual
+input-source-indicator = auto
+input-source-indicator-position = toolbar
+input-source-direct-color =
+input-source-ime-color =
 option-as-meta = false
 open-file-command =
 search-regex = false
@@ -278,6 +300,8 @@ notification-threshold = 60        # default 30
 
 # History
 directory-history = true
+directory-completion = true
+command-status-marks = true
 
 # Updates
 update-auto-check = true
@@ -352,25 +376,43 @@ theme.midnight.dark.ansi1 = #ff5f56
 line where `open-file-command` can express one. A URL wins where both could
 match.
 
-Two rules bound it, and neither is negotiable:
+Start with the editor's installed command-line executable. Run `command -v
+code` (or your editor's CLI name) in a shell and use its absolute path:
+
+```ini
+open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}
+```
+
+Replace `/usr/local/bin/code` with the actual executable on your Mac. The
+template is split on whitespace before placeholders are substituted; quoted
+paths, `~`, `$HOME`, pipes and other shell syntax are not interpreted. For an
+executable in a path containing spaces, use a command-line launcher or symlink
+whose path contains no whitespace. Referenced file paths containing spaces
+remain one argument after substitution. Empty disables both local and remote
+file opening.
+
+Local and remote references share this editor template, but resolve in
+different places:
 
 - **A bare path is not a reference.** Only `path:line` — the shape a tool
   emits — is detected. Ordinary output is full of things that look like paths
   (`and/or`, `n/a`, `TODO/FIXME`), and underlining a third of every line
   teaches you to ignore underlines.
-- **Only files on this machine.** The path is resolved against the pane's
-  working directory and must name a regular file that exists locally. A pane
-  inside `ssh` has no local working directory — OSC 7 reports naming a remote
-  host are recorded as the pane's remote context (they drive the title badge
-  and command-history host filter), never its local working directory — so
-  nothing resolves there, absolute paths included: an absolute path on
-  another machine is no more this machine's than a relative one.
+- **Local references:** resolve against the pane's confirmed local working
+  directory and must name an existing regular file. A remote OSC 7 report
+  never becomes a local working directory.
+- **Remote references:** use the pane's known remote host and directory.
+  After host confirmation and SFTP authentication, Corta downloads a managed
+  local copy and opens it with the configured editor. It never treats the
+  remote path as a path on your Mac. The copy is limited to 64 MiB; uploading
+  edits requires an explicit decision and a remote-content conflict check.
+  See [Remote work](USER-GUIDE.md#remote-work-ssh-and-sftp).
 
 This does **not** widen the URL scheme allowlist (`SECURITY.md` §2.4). A
 `file://` string in output is still plain text and still cannot be detected as
-a link; the `file:` URL that gets opened is built by Corta from a path it has
-already resolved and confirmed. The program chooses the path, never the
-scheme, and never whether the thing is a file at all.
+a link. Output-derived files are opened only through your configured editor,
+never through a system default handler. Paths are substituted as arguments
+and the command runs directly, without a shell.
 
 ---
 
@@ -542,11 +584,11 @@ the key against both rows, which is how you spot it.
 `export-command-output` and `open-file-reference-in-command` all need
 shell integration (OSC 133) to have anything to work with; without it their
 menu items are disabled rather than silent, and `search-command-history`
-opens a window with nothing in it. `copy-last-command-output` takes
-the rows between the last command's prompt and the next one — which is right
-for a one-line prompt with the command typed on it, and takes one row too
-much for a two-line prompt or a command continued across lines, because Corta
-marks `OSC 133 ; A` but not `OSC 133 ; C`.
+opens a window with nothing in it. `copy-last-command-output` uses the
+`OSC 133 ; C` output-start mark and the next prompt boundary, so a multiline
+prompt or continued command is excluded from the output. Integration that
+emits no `C` mark falls back to one row after the prompt; only that fallback
+can include part of a multiline prompt or command.
 
 `snapshot-running-command-output` is `copy-last-command-output`'s answer for
 a command that has not finished yet: `copy-last-command-output` needs the
@@ -567,7 +609,10 @@ else the one whose prompt is nearest the top of the viewport, else the
 last one that finished. `search-command-history` opens the Command History window for the
 pane — every recorded command with its time, exit status and directory,
 searchable, with **Fill** and **Run** for a command whose text is still in
-the scrollback (`command-history-limit` bounds how many are kept).
+the scrollback (`command-history-limit` bounds how many are kept). Run only
+executes a complete visible single-line command of at most 80 characters
+without tabs; other commands are filled at the prompt for you to inspect
+and submit with Return.
 
 The six working-directory commands act on the directory the pane's shell
 last reported through `OSC 7`, and are disabled until it has reported one.
@@ -621,10 +666,10 @@ a message saying so rather than asking. Use a key held by `ssh-agent` or
 the keychain, and connect once in the terminal first for a new host.
 (`CORTA_SFTP_SSH`, an environment variable and never a config key, names
 an absolute path to run instead of `/usr/bin/ssh` with the same argv — a
-verification hook for driving the channel against a local
-`sftp-server`, in the same class as `CORTA_MAX_DRAWABLES`.) Transfers are
-atomic (a
-`.corta-part` partial renamed over the destination), resumable with both
+verification hook for driving a **Debug build only** against a local
+`sftp-server`; Release and Benchmark ignore it. See
+[environment switches](TESTING.md#environment-switches).) Transfers use a
+`.corta-part` partial committed to the destination on completion, resumable with both
 endpoints re-validated, and every overwrite is a decision you make in a
 sheet, not a default. A remote file's **Edit** action — or ⌘-clicking a
 `path:line` reference in a remote pane — downloads a managed copy, opens it
@@ -669,9 +714,10 @@ search away.
 - **`TERM`.** Always `xterm-256color` (`DECISIONS.md` D08).
 - **Reading the clipboard from the terminal.** The OSC 52 read form is
   not implemented and will not be (`SECURITY.md` §6).
-- **Title and colour *queries*.** Corta answers what it is; it does not
-  report back things a program could use to read the screen or the
-  clipboard.
+- **Title queries.** Terminal programs cannot read back the window title.
+  Colour queries are supported: OSC 4/5 report indexed/special colours, and
+  OSC 10/11/12 report foreground, background and cursor colours. These are
+  protocol responses, not settings switches.
 - **Transparency, ligatures, and per-profile settings.** Not shipped; each needs a
   decision in [DECISIONS.md](DECISIONS.md) before it is a feature — propose
   one in [Discussions → Ideas](https://github.com/noah-qin/Corta/discussions/categories/ideas).
@@ -680,9 +726,12 @@ search away.
 
 | Change | Takes effect |
 | --- | --- |
-| `theme`, `appearance`, `font-family`, `font-size`, `cursor-shape`, `cursor-blink` | Immediately, in every open pane. |
+| `theme`, `appearance`, `font-family`, `cursor-shape`, `cursor-blink` | Immediately, in every open pane. |
+| `font-size` | Immediately in panes without temporary font zoom; zoomed windows keep their temporary size until Actual Size (⌘0). New windows use the configured size. |
 | `bell`, `option-as-meta`, `search-case-sensitive`, `search-regex`, `open-file-command`, `copy-on-select`, `mouse-override-modifier`, `link-activation`, `allow-clipboard-write`, `confirm-close`, `directory-history`, notification keys | Immediately — they are read when the behaviour happens. |
 | `status-bar`, `status-items`, `status-network-interface`, input-source indicator keys | Immediately; polling follows visible enabled bars. |
+| `command-status-marks` | Immediately; changes the command-outcome overlay without changing terminal text. |
+| `directory-completion` | Disabling immediately hides suggestions and restores native key handling. Enabling requires a new shell to load automatic local zsh hooks; a live shell keeps hooks it already loaded. |
 | `bind.*` | Immediately: the menu key equivalents are re-applied on every file change. |
 | `theme.*` | Immediately, if the live theme is the one you edited. |
 | `columns`, `rows` | The next window opened. |
@@ -698,10 +747,9 @@ search away.
 ## 8. Config file vs. app-owned state
 
 This file holds **settings**: values a person chose and might reasonably
-hand-edit, review in version control, or copy to another machine. Two more
-files, in `~/Library/Application Support/Corta/`, hold **state**: data
-Corta itself produces by being used, which nobody edits by hand and which
-would only look like noise in a diff.
+hand-edit, review in version control, or copy to another machine. Files under
+`~/Library/Application Support/Corta/` hold app-owned state, history and
+managed remote-edit copies. Their contents are not configuration keys.
 
 | Store | File | What it holds | Category |
 | --- | --- | --- | --- |
@@ -709,9 +757,11 @@ would only look like noise in a diff.
 | `Configuration.columns`/`.rows` | same file | The grid a *new* window opens with | **Window-launch default** — read once, at the moment a window is created; changing it does nothing to windows already open |
 | `Configuration.presets` | same file | Named shell/directory/environment combinations | **Pane-launch configuration** — read once, at the moment a pane spawns from that preset; never re-applied afterwards (`docs/CONFIGURATION.md` §4a) |
 | `SessionRestore` | `state.json` | Window frames and split arrangement, restored on the next launch | **Window/session state** — describes *this run's* windows, not a preference about future ones |
-| `DirectoryHistoryStore` | `directory-history.json` | Ranked recent/favourite directories | **Temporary interaction history** — a record of use, gated on/off by the `directory-history` *preference* but not itself a preference |
+| `DirectoryHistoryStore` | `directory-history.json` | Ranked recent/favourite directories | **Temporary interaction history** — gated by `directory-history`; clear it in Privacy & Security ▸ History |
+| `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent Hosts |
+| `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — preserve undecided edits before deleting app data; used copies are pruned after 30 days unless edits are pending |
 
-Why three files rather than one: `Configuration` is line-oriented text
+Why separate stores: `Configuration` is line-oriented text
 specifically so a person can open it in `$EDITOR`, diff it, and understand
 every line; `state.json` and `directory-history.json` are JSON blobs a
 person never opens, rewritten wholesale on every change, with no comments
@@ -737,8 +787,8 @@ file modes. Restored sessions retain arrangement and directory metadata,
 with `restore-windows = true` by default, and start fresh processes without
 restoring terminal text. See [data-at-rest policy](SECURITY.md#5-data-at-rest).
 
-With Corta zsh integration installed or updated, Tab on a whitespace-only
-command line inserts four spaces; normal command completion bindings remain
+With Corta zsh integration loaded automatically or installed explicitly,
+Tab on a whitespace-only command line inserts four spaces; normal command completion bindings remain
 intact. Output tab stops remain eight columns. The shell keeps its original
 input behavior without integration.
 

@@ -26,20 +26,22 @@ and app checks below, then report the exact message with the version.
 
 The disk image may be incomplete, altered or rejected by macOS signature
 validation. First check it against the
-`.sha256` file published beside it:
+`.sha256` file published beside it. Keep both files in the download folder
+and replace `x.y.z` with the version you downloaded:
 
 ```sh
-shasum -a 256 -c Corta-<version>.dmg.sha256
+shasum -a 256 -c Corta-x.y.z.dmg.sha256
 ```
 
 A mismatch means download again. Every release package is checked against
 its sidecar before it is published (`corta-release-check`), so a
 mismatch is a reason to stop and download again. If the checksum matches,
-check the image and copied app:
+check the image and copied app. Replace `x.y.z` with the downloaded
+version in all commands, and run them from the download folder:
 
 ```sh
-spctl -a -t open --context context:primary-signature -v Corta-<version>.dmg
-xcrun stapler validate Corta-<version>.dmg
+spctl -a -t open --context context:primary-signature -v Corta-x.y.z.dmg
+xcrun stapler validate Corta-x.y.z.dmg
 spctl --assess --type exec /Applications/Corta.app
 xcrun stapler validate /Applications/Corta.app
 ```
@@ -159,18 +161,20 @@ keys (arrows, function keys) carry ⌥ as the xterm modifier either way.
 ### Colours or `TERM` look wrong over ssh
 
 Corta announces `TERM=xterm-256color` deliberately (`docs/DECISIONS.md`
-D08). If a remote program misbehaves, it misbehaves the same way in
-xterm; `CONFORMANCE.md` §4.2 has the esctest pass rate and the list of
-sequences that are not implemented yet.
+D08). Sharing that TERM value does not imply full xterm compatibility. Check
+the remote environment with `printf '%s\n' "$TERM"` and compare a minimal
+reproducer; [Conformance](CONFORMANCE.md#42-external-suites) records supported
+sequences and the remaining failures.
 
 ### A glyph is drawn smaller than its neighbours
 
-A font whose bold or italic face advances wider than its regular face
-would otherwise paint into the next cell. Corta measures every ASCII
-printable across all four faces before using a family, and scales an
-overwide glyph into its cell rather than letting it overlap. Settings ▸
-Appearance ▸ Font status says whether the configured family passed. The
-system monospaced font (`font-family = system`) always does.
+Corta uses System Monospaced as its only primary font, with Core Text
+fallback for missing characters. A fallback glyph can be scaled to stay
+inside its terminal cells, so its visible size can differ from neighbouring
+glyphs. Adjust the font size in **Settings ▸ Appearance** and compare the
+preview. Legacy `font-family` values migrate to `system`; there is no font
+family picker or Font status row. If a glyph is clipped or misaligned,
+report its text, font size, display scale and a screenshot.
 
 ### Images from `kitten icat` do not show, or show in the wrong place
 
@@ -179,7 +183,9 @@ transmission in RGB, RGBA and PNG. File-based transmission (`t=f`, `t=t`,
 `t=s`), animation frames and Unicode-placeholder placement are not
 implemented, and the file-based ones will not be: a remote stream naming
 a local file to read is exactly what the threat model rejects
-(`SECURITY.md` §1).
+(`SECURITY.md` §1). Try `kitten icat --transfer-mode=stream picture.png`
+to request direct transmission explicitly. An image must fit the 8192-pixel
+per-side and 16-million-pixel limits; invalid or oversized images are refused.
 
 ---
 
@@ -246,7 +252,11 @@ not offered for it. Raise `scrollback-lines` if that happens often.
 *physical* rows — a 200-column line wrapped at 100 columns is two. Output
 older than the cap is discarded as it arrives; the pill at the top says
 how far back the viewport is. Raise the cap (up to 1,000,000; memory is
-about 16 bytes per stored cell) or export as you go.
+compressed cold history depends on the text and workload). A stored cell
+is 16 bytes before compression, not a resident-memory estimate. A measured
+100,000-line, 120-column workload added about 11 MiB of resident memory;
+see [Performance](PERFORMANCE.md#56-numbers-by-release). Export output you
+need to keep beyond the configured cap.
 
 ### Secure Keyboard Entry is on but my macro tool still works
 
@@ -265,8 +275,9 @@ engaged state rather than the setting.
 Corta compares **build numbers**, not version strings, against
 `appcast.xml` on the `main` branch. A release that is tagged and drafted
 but not yet published is not in the feed; once it is published, the
-update-feed workflow signs it in through a pull request that the
-maintainer approves, so allow a little while after the release appears
+release pipeline signs and verifies the feed, opens a pull request, waits
+for CI and squash-merges it or enables auto-merge. A failed or blocked feed
+check can delay delivery, so allow a little while after the release appears
 on GitHub. `update-auto-check = false` disables only the daily background
 check; the menu item always works.
 
@@ -279,7 +290,9 @@ zsh, bash and legacy fish integration. If it still happens after updating,
 open **Settings ▸ Terminal ▸ Shell Integration**, choose **Update**, then
 open a new shell. Existing shells keep the old functions until restarted;
 old markers already drawn are not removed. Only the marked Corta block in
-the startup file is updated.
+the startup file is updated. Standard local zsh sessions using automatic
+hooks get the bundled version when a new shell starts, without needing a
+startup-file installation.
 
 ## Going back to your old terminal
 
