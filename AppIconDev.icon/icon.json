@@ -2,13 +2,13 @@
   "fill-specializations": [
     {
       "value": {
-        "solid": "srgb:0.80000,0.43922,0.12157,1.00000"
+        "solid": "srgb:0.96078,0.55686,0.12941,1.00000"
       }
     },
     {
       "appearance": "dark",
       "value": {
-        "solid": "srgb:0.80000,0.43922,0.12157,1.00000"
+        "solid": "srgb:0.47059,0.25098,0.03922,1.00000"
       }
     },
     {
@@ -18,168 +18,88 @@
   ],
   "groups": [
     {
-      "name": "03 · Crown and terminal",
       "layers": [
         {
-          "name": "Cursor",
-          "image-name": "Cursor.svg",
           "glass": false,
           "hidden": false,
-          "opacity": 1,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "name": "Prompt",
-          "image-name": "Prompt.svg",
-          "glass": false,
-          "hidden": false,
-          "opacity": 1,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "name": "Eye",
-          "image-name": "Eye.svg",
-          "glass": false,
-          "hidden": false,
-          "opacity": 1,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "name": "Head",
-          "image-name": "Head.svg",
-          "glass": true,
-          "hidden": false,
-          "opacity": 1,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "name": "Crown",
-          "image-name": "Crown.svg",
-          "glass": true,
-          "hidden": false,
-          "opacity": 1,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        }
-      ],
-      "shadow": {
-        "kind": "neutral",
-        "opacity": 0.12
-      },
-      "specular": true,
-      "translucency": {
-        "enabled": false,
-        "value": 0
-      }
-    },
-    {
-      "name": "02 · Middle shell",
-      "layers": [
-        {
-          "name": "MiddleShell",
-          "image-name": "MiddleShell.svg",
-          "glass": true,
-          "hidden": false,
-          "opacity": 1,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        }
-      ],
-      "shadow": {
-        "kind": "neutral",
-        "opacity": 0.12
-      },
-      "specular": true,
-      "translucency": {
-        "enabled": false,
-        "value": 0
-      }
-    },
-    {
-      "name": "01 · Lower shell",
-      "layers": [
-        {
-          "name": "LowerShell",
-          "image-name": "LowerShell.svg",
-          "glass": true,
-          "hidden": false,
-          "opacity": 1,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
-        }
-      ],
-      "shadow": {
-        "kind": "neutral",
-        "opacity": 0.12
-      },
-      "specular": true,
-      "translucency": {
-        "enabled": false,
-        "value": 0
-      }
-    },
-    {
-      "name": "00 · Background",
-      "layers": [
-        {
-          "name": "Background",
           "image-name": "Background.svg",
-          "glass": false,
-          "hidden": false,
-          "opacity": 1,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [
-              0,
-              0
-            ]
-          }
+          "image-name-specializations": [
+            {
+              "value": "Background.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "BackgroundDark.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "Background.svg"
+            }
+          ],
+          "name": "Dot Grid",
+          "opacity": 1
         }
       ],
+      "name": "Background",
       "shadow": {
         "kind": "neutral",
-        "opacity": 0
+        "opacity": 0.5
       },
       "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "layers": [
+        {
+          "glass": false,
+          "hidden": false,
+          "image-name": "Pangolin.png",
+          "image-name-specializations": [
+            {
+              "value": "Pangolin.png"
+            },
+            {
+              "appearance": "dark",
+              "value": "Pangolin.png"
+            },
+            {
+              "appearance": "tinted",
+              "value": "Pangolin.png"
+            }
+          ],
+          "name": "Original Pangolin",
+          "hidden-specializations": [
+            {
+              "value": false
+            },
+            {
+              "appearance": "dark",
+              "value": false
+            },
+            {
+              "appearance": "tinted",
+              "value": false
+            }
+          ],
+          "opacity": 1,
+          "position": {
+            "scale": 0.72,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "name": "Pangolin",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "specular": true,
       "translucency": {
         "enabled": false,
         "value": 0

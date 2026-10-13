@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/brand/app-icon.png" width="160" alt="Corta's vector pangolin icon with a command prompt and cyan cursor">
+<img src="docs/brand/corta-pangolin-mascot.png" width="160" alt="Corta's pangolin mascot, curled into a C with a cyan cursor on its tail">
 
 # Corta
 
@@ -248,6 +248,5 @@ If you would like to support maintenance, [sponsor the project](https://github.c
 
 Source code is licensed under [Apache 2.0](LICENSE). The Corta name,
 pangolin mascot and app icon have separate terms in [NOTICE](NOTICE).
-The simplified pangolin sits above a command prompt with a cyan cursor.
-The orange development icon uses the same vector artwork and layout.
+The pangolin's curled body forms a C; its cyan tail is a terminal cursor.
 [Brand assets](docs/brand/README.md) include the mascot and social preview.

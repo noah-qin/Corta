@@ -17,8 +17,8 @@ and remain the property of the copyright holder:
 
   - The name "Corta" and any associated word or design marks.
   - The pangolin mascot and every derivative of it, including
-    the layered SVG artwork in `AppIcon.icon/` and `AppIconDev.icon/`
-    and its rendered previews under `docs/brand/`.
+    `docs/brand/corta-pangolin-mascot.png` and
+    `docs/brand/corta-pangolin-loop.gif`.
   - The application icon bundle `AppIcon.icon/` and its assets, and the
     development build's derivative of it, `AppIconDev.icon/`.
   - The screenshot and social preview images under `docs/brand/`
