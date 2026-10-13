@@ -120,8 +120,6 @@ final class PaneAppearance: NSObject {
 
     /// A new backing scale needs a new atlas, or text goes soft; the cell box
     /// snaps to device pixels, so this uses the `setFont` path and refits.
-    /// The window is not fitted: moving between displays is not a font
-    /// change, and a frame that changed under a drag would fight it.
     func rebuildAtlas(forBackingScale scale: CGFloat) {
         guard let terminalRenderer, scale > 0, scale != terminalRenderer.scale else { return }
         terminalRenderer.setFont(
@@ -129,17 +127,17 @@ final class PaneAppearance: NSObject {
                 ofSize: fontSize,
                 family: fontFamily),
             scale: scale)
-        applyCellMetrics(settle: true, fitsWindow: false)
+        applyCellMetrics(settle: true)
     }
 
-    /// Re-points the renderer while keeping the window where it is: a lone
-    /// pane's window moves its bottom and right edges to whole cells
-    /// (`SplitViewController.fitWindowToWholeCells`). All font changes refit
-    /// the grid, including settings and temporary zoom.
+    /// Re-points the renderer and refits the grid; the window keeps its
+    /// frame, and the remainder of a cell shows as background under the
+    /// last row and past the last column. All font changes take this path,
+    /// including settings and temporary zoom.
     ///
     /// `settle: false` is a step of a gesture still in progress — a pinch
     /// steps a point at a time, several a second — so the grid refits through
-    /// the drag debounce and the window waits for `settleFontChange()`.
+    /// the drag debounce until `settleFontChange()`.
     func setFontSize(_ newSize: CGFloat, settle: Bool = true) {
         let clamped = min(64, max(8, newSize))
         guard clamped != fontSize else { return }
@@ -149,7 +147,7 @@ final class PaneAppearance: NSObject {
     /// The end of a gesture's run of `setFontSize(_:settle: false)`.
     func settleFontChange() {
         guard terminalRenderer != nil else { return }
-        applyCellMetrics(settle: true, fitsWindow: true)
+        applyCellMetrics(settle: true)
     }
 
     /// Re-points the renderer at `size` in the current family — rather than
@@ -163,15 +161,14 @@ final class PaneAppearance: NSObject {
         guard let terminalRenderer else { return }
         let scale = host?.view.window?.backingScaleFactor ?? terminalRenderer.scale
         terminalRenderer.setFont(TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
-        applyCellMetrics(settle: settle, fitsWindow: true)
+        applyCellMetrics(settle: settle)
     }
 
     /// After the renderer's metrics changed — size, family or backing scale —
     /// everything measured in cells follows: the view's cell box, the
-    /// window's resize increments and minimum, the window fitted to whole
-    /// cells (`fitsWindow`, and only once a change settles), then the grid.
+    /// window's resize increments and minimum, then the grid.
     /// One path, so no source of a metrics change skips a step.
-    private func applyCellMetrics(settle: Bool, fitsWindow: Bool) {
+    private func applyCellMetrics(settle: Bool) {
         guard let host, let terminalRenderer else { return }
         let metrics = terminalRenderer.pointMetrics
         terminalView?.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
@@ -182,7 +179,6 @@ final class PaneAppearance: NSObject {
         }
         window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
         host.splitController?.updateWindowMinSize()
-        if settle, fitsWindow { host.splitController?.fitWindowToWholeCells(metrics: metrics) }
         host.resizeSessionToFitView(coalesce: !settle)
         invalidateDisplay()
     }

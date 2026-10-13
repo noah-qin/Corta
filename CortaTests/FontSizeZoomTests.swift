@@ -44,20 +44,9 @@ struct FontSizeZoomTests {
         return (split, window)
     }
 
-    /// The usable height left over under the last row: zero when the grid
-    /// fills the pane exactly.
-    private func remainder(_ pane: ViewController) throws -> CGFloat {
-        let cell = try #require(pane.terminalRenderer).pointMetrics.cellHeight
-        let usable = pane.view.bounds.height - pane.verticalInsets
-        let rows = (usable / cell + 0.001).rounded(.down)
-        return usable - rows * cell
-    }
-
-    /// A lone pane's window keeps its place: the top edge stays, the size
-    /// moves by less than a cell so the new font's grid fills it exactly —
-    /// the same gap under the last row at every size — and a run of steps
-    /// does not walk the window.
-    @Test func changingFontSizeFitsTheWindowToWholeCellsInPlace() throws {
+    /// A font change never moves or resizes the window: the grid refits to
+    /// the frame it has, and a run of steps ending at ⌘0 is where it began.
+    @Test func changingFontSizeKeepsTheWindowFrame() throws {
         let (split, window) = makeSplit()
         defer { split.teardown() }
         let pane = try #require(split.focusedPane)
@@ -66,34 +55,38 @@ struct FontSizeZoomTests {
         let frame = window.frame
         let oldColumns = pane.gridSize(fitting: pane.view.bounds.size).columns
         pane.commands.increaseFontSize(nil)
-        let zoomedCell = try #require(pane.terminalRenderer).pointMetrics
-        #expect(window.frame.maxY == frame.maxY)
-        #expect(abs(window.frame.height - frame.height) < zoomedCell.cellHeight)
-        #expect(abs(window.frame.width - frame.width) < zoomedCell.cellWidth)
-        #expect(try remainder(pane) < 0.01)
+        #expect(window.frame == frame)
         #expect(!pane.windowTitle.composed.contains("×"))
         #expect(pane.gridSize(fitting: pane.view.bounds.size).columns < oldColumns)
 
-        pane.commands.resetFontSize(nil)
-        let reset = window.frame
-        #expect(reset.maxY == frame.maxY)
-        #expect(try remainder(pane) < 0.01)
-        // The same run again lands on the same frames: rounded from where
-        // the run began, not from the step before.
-        pane.commands.increaseFontSize(nil)
         pane.commands.increaseFontSize(nil)
         pane.commands.decreaseFontSize(nil)
         pane.commands.resetFontSize(nil)
-        #expect(window.frame == reset)
+        #expect(window.frame == frame)
+        #expect(pane.gridSize(fitting: pane.view.bounds.size).columns == oldColumns)
 
         pane.commands.increaseFontSize(nil)
         split.splitRight(nil)
         #expect(split.panes.allSatisfy { $0.fontSize == pane.fontSize && $0.isFontSizeZoomed })
-        // With splits no window size fits every grid: the frame stays.
         let splitFrame = window.frame
         pane.commands.increaseFontSize(nil)
         #expect(window.frame == splitFrame)
         #expect(split.panes.allSatisfy { $0.fontSize == pane.fontSize })
+    }
+
+    /// A pinch steps a point at a time and settles at its end; neither the
+    /// steps nor the settle touch the frame.
+    @Test func aPinchKeepsTheWindowFrame() throws {
+        let (split, window) = makeSplit()
+        defer { split.teardown() }
+        let pane = try #require(split.focusedPane)
+        split.viewWillAppear()
+        split.viewDidAppear()
+        let frame = window.frame
+        pane.commands.magnify(by: 0.5)
+        pane.commands.endMagnification()
+        #expect(pane.fontSize > CGFloat(ConfigurationStore.shared.configuration.fontSize))
+        #expect(window.frame == frame)
     }
 
     /// The Quick Terminal's panel is docked to its screen's edge; a zoom

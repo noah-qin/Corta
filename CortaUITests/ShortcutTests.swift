@@ -118,13 +118,9 @@ final class ShortcutTests: XCTestCase {
         item.click()
     }
 
-    /// A font change keeps the window where it is: the top edge stays and
-    /// the size moves by less than a cell, so the new grid fills it
-    /// (`SplitViewController.fitWindowToWholeCells`). Smaller and Actual
-    /// Size land on the frame the window opened at, whole cells of the
-    /// configured font.
+    /// A font change keeps the window frame exactly; only the grid refits.
     @MainActor
-    func testFontSizeShortcutsFitTheWindowInPlace() throws {
+    func testFontSizeShortcutsKeepTheWindowFrame() throws {
         let app = XCUIApplication()
         // Session restore would otherwise carry the previous
         // test's windows into this one; the suite asserts window counts.
@@ -137,40 +133,13 @@ final class ShortcutTests: XCTestCase {
 
         app.typeKey("=", modifierFlags: .command)
         RunLoop.current.run(until: Date().addingTimeInterval(1))
-        let zoomed = window.frame
-        assertFittedInPlace(zoomed, from: original, "⌘=")
+        XCTAssertEqual(window.frame, original, "⌘= changed the window frame")
 
         clickViewMenuItem(app, "Smaller")
-        waitForFrame(app, original, "Smaller should land on the frame the window opened at")
-
+        clickViewMenuItem(app, "Smaller")
         clickViewMenuItem(app, "Bigger")
-        waitForFrame(app, zoomed, "Bigger should land on the same frame as ⌘= did")
         clickViewMenuItem(app, "Actual Size")
-        waitForFrame(app, original, "Actual Size should land on the frame the window opened at")
-    }
-
-    /// Less than a cell either way, top edge fixed. A cell at the sizes
-    /// these tests use is under 20pt in both directions.
-    @MainActor
-    private func assertFittedInPlace(
-        _ frame: CGRect, from original: CGRect, _ what: String,
-        file: StaticString = #filePath, line: UInt = #line
-    ) {
-        XCTAssertEqual(frame.minY, original.minY, accuracy: 0.5, "\(what) moved the top edge", file: file, line: line)
-        XCTAssertEqual(frame.minX, original.minX, accuracy: 0.5, "\(what) moved the left edge", file: file, line: line)
-        XCTAssertLessThan(abs(frame.width - original.width), 20, "\(what): \(frame) vs \(original)", file: file, line: line)
-        XCTAssertLessThan(abs(frame.height - original.height), 20, "\(what): \(frame) vs \(original)", file: file, line: line)
-    }
-
-    /// Polls: `NSPredicate` expectations evaluate against a cached snapshot
-    /// and never see the resize.
-    @MainActor
-    private func waitForFrame(_ app: XCUIApplication, _ expected: CGRect, _ what: String) {
-        let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline {
-            if app.windows.firstMatch.frame == expected { return }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        }
-        XCTFail("\(what): now \(app.windows.firstMatch.frame), expected \(expected)")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        XCTAssertEqual(window.frame, original, "the View menu's font sizes changed the window frame")
     }
 }

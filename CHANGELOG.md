@@ -18,6 +18,10 @@ Versioning for compatibility changes.
   typing. Nothing visible changes. `CORTA_DIRECT_FULLSCREEN=0` turns it off
   for a comparison.
 
+- Changing the font size (⌘= / ⌘− / ⌘0, a pinch or Settings) no longer
+  nudges a single-pane window to whole cells; the window keeps its frame
+  and only the rows and columns refit, as in full screen and with splits.
+
 - App icons use the simplified vector pangolin and terminal prompt, with
   system-rendered shell lighting. The development app uses the same artwork
   on an orange background. Retired raster icons and mascot animation are removed.

@@ -143,7 +143,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
 
     /// Pinch zoom, spent one whole point at a time so it lands on ⌘+/⌘−'s
     /// steps: each size is an atlas rebuild. The grid follows through the
-    /// drag debounce and the window is fitted once, when the pinch ends.
+    /// drag debounce and settles once, when the pinch ends.
     func magnify(by magnification: CGFloat) {
         guard let host else { return }
         let sizes = Self.fontSizes(
@@ -182,7 +182,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         return sizes
     }
 
-    /// The next pinch starts from zero; this one's size settles.
+    /// The next pinch starts from zero; this one's grid settles.
     func endMagnification() {
         pinchAccumulator = 0
         guard pinchChangedSize, let host else { return }
