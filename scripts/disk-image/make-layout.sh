@@ -46,7 +46,10 @@ cp "$here/background.tiff" "$work/stage/.background/background.tiff"
 hdiutil create -quiet -volname Corta -srcfolder "$work/stage" -fs APFS -format UDRW -size 64m "$work/layout.dmg"
 hdiutil attach "$work/layout.dmg" -noautoopen -quiet
 
-# Icon centres match the arrow drawn by render-background.swift.
+# Icon centres match the arrow drawn by render-background.swift. The
+# bounds are the outer frame: 400 pt of content under macOS 26's 32 pt
+# title bar. A shorter frame leaves the content smaller than the
+# background, and the window scrolls to show Finder's own colour.
 osascript <<'EOF'
 tell application "Finder"
     tell disk "Corta"
@@ -54,7 +57,7 @@ tell application "Finder"
         set current view of container window to icon view
         set toolbar visible of container window to false
         set statusbar visible of container window to false
-        set the bounds of container window to {200, 120, 860, 548}
+        set the bounds of container window to {200, 120, 860, 552}
         set viewOptions to the icon view options of container window
         set arrangement of viewOptions to not arranged
         set icon size of viewOptions to 128
