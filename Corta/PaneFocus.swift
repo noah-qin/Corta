@@ -62,10 +62,6 @@ final class PaneFocus: NSObject {
     private var lastCursorGrid: Grid?
     private var blinkIsInvalidating = false
     private var cursorOffAt: CFTimeInterval?
-    var presentationToken: UInt64 { handoff.token }
-    var presentationPending: Bool {
-        handoff.phase == .awaitingLayer || handoff.phase == .awaitingMetal
-    }
 
     /// Retire the independent CA cursor before submitting a replacement Metal
     /// frame. Its graph removal still waits for a positive presented callback.

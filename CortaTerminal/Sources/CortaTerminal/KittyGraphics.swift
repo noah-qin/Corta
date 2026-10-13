@@ -185,6 +185,13 @@ public enum KittyGraphics {
     /// header, in the app's `KittyImageRenderer`.
     public static let maximumImagePixels = 16 * 1024 * 1024
 
+    /// Positive and within every pixel cap: the one test the core's store,
+    /// the app's decoders and its shared pixel mapping all apply.
+    public static func dimensionsFit(width: Int, height: Int) -> Bool {
+        width > 0 && height > 0 && width <= maximumImageDimension
+            && height <= maximumImageDimension && width <= maximumImagePixels / height
+    }
+
     /// Stored (encoded) bytes per pane, both screens together, an unfinished
     /// transmission counted at its decoded size — kitty's own quota. Past it a new
     /// transmission gets `ENOSPC`; a visible image is never evicted for it.

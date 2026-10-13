@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Metal
 import Synchronization
 import QuartzCore
 
@@ -99,6 +100,12 @@ nonisolated final class CursorHandoffMailbox: Sendable {
         var token: UInt64
         var outputRevision: UInt64
         var pending: Bool { phase == .awaitingLayer || phase == .awaitingMetal }
+        /// Whether a frame drawing the cursor or not (`cursorDrawn`) is the
+        /// one the pending hand-off waits for: cursorless for the layer, with
+        /// the cursor for Metal. Both render paths ask this, and only this.
+        func awaits(cursorDrawn: Bool) -> Bool {
+            pending && cursorDrawn == (phase == .awaitingMetal)
+        }
     }
     private struct State {
         var handoff = CursorHandoff()
@@ -119,14 +126,38 @@ nonisolated final class CursorHandoffMailbox: Sendable {
     func setSessionGeneration(_ generation: Int) {
         state.withLock { $0.sessionGeneration = generation }
     }
+    /// Per output batch: one lock unless a layer must be retired first.
     func noteOutput(generation: Int) {
-        let current = state.withLock {
-            guard generation == $0.sessionGeneration else { return false }
-            $0.outputRevision &+= 1
+        retireThenPublish { state in
+            guard generation == state.sessionGeneration else { return false }
+            state.outputRevision &+= 1
             return true
-        }
-        if current { takeBack() }
+        } publish: { $0.takeBack() }
     }
+    /// Arms `drawable` to settle hand-off `token` when it reaches glass. A
+    /// frame dropped before glass asks again (`retry`) while that hand-off
+    /// is still the pending one. Both render paths go through here; the
+    /// marker gates it on the frame actually having been encoded.
+    func trackPresentation(
+        of drawable: any MTLDrawable, token: UInt64,
+        retry: @escaping @MainActor @Sendable () -> Void,
+        presented: @escaping @MainActor @Sendable (UInt64) -> Void
+    ) -> FrameAcceptanceMarker {
+        let accepted = FrameAcceptanceMarker()
+        drawable.addPresentedHandler { [self] drawable in
+            let reachedGlass = drawable.presentedTime > 0
+            Task { @MainActor in
+                guard accepted.isAccepted else { return }
+                if reachedGlass {
+                    presented(token)
+                } else if case let current = snapshot, current.pending, current.token == token {
+                    retry()
+                }
+            }
+        }
+        return accepted
+    }
+
     func handOff(expectedOutputRevision: UInt64, presentation: CursorLayerPresentation? = nil) -> UInt64? {
         state.withLock {
             guard $0.outputRevision == expectedOutputRevision, $0.handoff.phase == .metal else {
@@ -136,22 +167,8 @@ nonisolated final class CursorHandoffMailbox: Sendable {
             return $0.handoff.handOff()
         }
     }
-    /// Retires the layer, then publishes the takeback, so no frame draws a
-    /// Metal cursor beside a still-blinking layer. The retire — a Core
-    /// Animation flush — runs outside the lock: main's per-frame snapshot
-    /// must not wait on the render server. Meanwhile the phase still says
-    /// layer, so no second hand-off can start.
     func takeBack() {
-        // Main keeps the layer until the replacement frame is presented;
-        // only this mailbox's reference goes, so later output batches do
-        // not reach the retired presentation again.
-        let presentation = state.withLock { state -> CursorLayerPresentation? in
-            let presentation = state.presentation
-            state.presentation = nil
-            return presentation
-        }
-        presentation?.retire()
-        state.withLock { $0.handoff.takeBack() }
+        retireThenPublish { _ in true } publish: { $0.takeBack() }
     }
     func presented(_ token: UInt64) -> Bool {
         state.withLock {
@@ -161,12 +178,31 @@ nonisolated final class CursorHandoffMailbox: Sendable {
         }
     }
     func stop() {
+        retireThenPublish { _ in true } publish: { $0.stop() }
+    }
+
+    /// Retires the layer, then publishes the phase change, so no frame
+    /// draws a Metal cursor beside a still-blinking layer. The retire — a
+    /// Core Animation flush — runs outside the lock: main's per-frame
+    /// snapshot must not wait on the render server. Meanwhile the phase
+    /// still says layer, so no second hand-off can start. With no layer to
+    /// retire, everything happens under the one lock. Main keeps the layer
+    /// itself until the replacement frame is presented; only this mailbox's
+    /// reference goes, so later output batches do not reach it again.
+    private func retireThenPublish(
+        _ prepare: (inout State) -> Bool, publish: (inout CursorHandoff) -> Void
+    ) {
         let presentation = state.withLock { state -> CursorLayerPresentation? in
-            let presentation = state.presentation
+            guard prepare(&state) else { return nil }
+            guard let presentation = state.presentation else {
+                publish(&state.handoff)
+                return nil
+            }
             state.presentation = nil
             return presentation
         }
-        presentation?.retire()
-        state.withLock { $0.handoff.stop() }
+        guard let presentation else { return }
+        presentation.retire()
+        state.withLock { publish(&$0.handoff) }
     }
 }

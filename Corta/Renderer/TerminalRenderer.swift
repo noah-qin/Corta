@@ -241,7 +241,6 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         [cachedBackground, cachedGlyphs, cachedColorGlyphs]
     }
 
-    private var pointMetricsValue: CellMetrics
     private var scaleValue: CGFloat
 
     public var metrics: CellMetrics { geometry.withLock { $0.metrics } }
@@ -268,11 +267,11 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         self.glyphAtlas = try GlyphAtlas(
             device: device, font: atlasFont, atlasPixelSize: atlasPixelSize ?? GlyphAtlas.atlasSize, storageMode: atlasStorageMode)
         self.kittyImageRenderer = KittyImageRenderer(device: device)
-        self.pointMetricsValue = CellMetrics(font: font, scale: scaleValue)
-        self.metricsValue = self.pointMetricsValue.scaled(by: scaleValue)
+        let points = CellMetrics(font: font, scale: scaleValue)
+        self.metricsValue = points.scaled(by: scaleValue)
         self.scaleValue = scaleValue
         self.geometry = Mutex(
-            Geometry(metrics: metricsValue, points: pointMetricsValue, scale: scaleValue))
+            Geometry(metrics: metricsValue, points: points, scale: scaleValue))
         // A reset or eviction while a frame is queued moves the atlas to
         // fresh textures; the old ones go when those frames complete.
         glyphAtlas.texturesInUse = { [weak self] in
@@ -403,11 +402,11 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * newScale, nil, nil)
         glyphAtlas.reset(font: atlasFont)
-        pointMetricsValue = CellMetrics(font: font, scale: newScale)
-        metricsValue = pointMetricsValue.scaled(by: newScale)
+        let points = CellMetrics(font: font, scale: newScale)
+        metricsValue = points.scaled(by: newScale)
         scaleValue = newScale
         geometry.withLock {
-            $0 = Geometry(metrics: metricsValue, points: pointMetricsValue, scale: scaleValue)
+            $0 = Geometry(metrics: metricsValue, points: points, scale: scaleValue)
         }
         invalidate()
     }
@@ -691,12 +690,23 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         }
         if liveScreen && cachedOffset == 0 {
             if grid.scrollEventsTotal >= cachedScrollEventsTotal,
-                grid.scrollEventsTotal - cachedScrollEventsTotal <= 64 {
+                grid.scrollEventsTotal - cachedScrollEventsTotal <= UInt64(Grid.scrollEventCapacity) {
+                // A region flood logs a line per event: same region, same
+                // direction, the shifts add up, so each run moves once.
+                var run: (top: Int, bottom: Int, delta: Int)?
                 for sequence in cachedScrollEventsTotal..<grid.scrollEventsTotal {
-                    if let event = grid.scrollEvent(at: sequence) {
-                        shift(top: Int(event.top), bottom: Int(event.bottom), delta: Int(event.delta))
+                    guard let event = grid.scrollEvent(at: sequence) else { continue }
+                    let next = (top: Int(event.top), bottom: Int(event.bottom), delta: Int(event.delta))
+                    if let pending = run, pending.top == next.top, pending.bottom == next.bottom,
+                        (pending.delta > 0) == (next.delta > 0)
+                    {
+                        run?.delta += next.delta
+                        continue
                     }
+                    if let pending = run { shift(top: pending.top, bottom: pending.bottom, delta: pending.delta) }
+                    run = next
                 }
+                if let pending = run { shift(top: pending.top, bottom: pending.bottom, delta: pending.delta) }
             }
             // Overflow: ordinary revision comparison remains correct; old cached
             // rows have not moved, so the old cursor also remains in its old row.

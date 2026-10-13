@@ -209,6 +209,8 @@ public struct Grid: Sendable {
 
     public var linesRotated: UInt64 { lines.totalRotated }
     public var scrollEventsTotal: UInt64 { lines.scrollEventsTotal }
+    /// Events kept for replay; a consumer further behind rebuilds.
+    public static var scrollEventCapacity: Int { ScreenLines.scrollEventCapacity }
     public func scrollEvent(at sequence: UInt64) -> ScrollEvent? { lines.scrollEvent(at: sequence) }
 
     /// Test-only access without retaining a `Line` and sharing its buffer.

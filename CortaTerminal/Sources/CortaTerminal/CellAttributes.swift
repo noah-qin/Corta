@@ -37,6 +37,8 @@ public struct CellAttributes: OptionSet, Hashable, Sendable {
     public static let wide = CellAttributes(rawValue: 1 << 8)
     /// Distinct from a real blank so edits can keep pairs whole.
     public static let wideSpacer = CellAttributes(rawValue: 1 << 9)
+    /// Either half of a wide pair.
+    public static let widePair: CellAttributes = [.wide, .wideSpacer]
 
     /// Bits 10–15 remain reserved.
 }

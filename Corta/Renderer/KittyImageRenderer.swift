@@ -445,7 +445,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
                 origin: .init(Float(placement.column) * cellWidth, Float(viewportRow) * cellHeight),
                 size: .init(Float(columns) * cellWidth, Float(placementRows) * cellHeight),
                 color: .one, atlasIndex: .max)
-            body(instance, texture, Self.sourceUVRect(for: placement), table.image(placement.imageID)?.receivedAt)
+            // The arrival time is a metric only: no image lookup per frame without it.
+            let receivedAt = RenderMetrics.isEnabled ? table.image(placement.imageID)?.receivedAt : nil
+            body(instance, texture, Self.sourceUVRect(for: placement), receivedAt)
         }
     }
 
@@ -561,9 +563,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     ) -> DecodedImage? {
         let width = data.width
         let height = data.height
-        guard width > 0, height > 0, width <= KittyGraphics.maximumImageDimension,
-            height <= KittyGraphics.maximumImageDimension,
-            width <= KittyGraphics.maximumImagePixels / height,
+        guard KittyGraphics.dimensionsFit(width: width, height: height),
             data.bytes.count == width * height * bytesPerPixel,
             let pixels = ImageDecoderProcess.SharedPixels(
                 width: width, height: height, alignment: alignment)

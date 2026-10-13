@@ -157,9 +157,7 @@ public struct ImagePlacementTable: Sendable {
 
     private static func dimensionsFit(_ data: KittyGraphics.ImageData) -> Bool {
         guard data.format != .png, data.width > 0, data.height > 0 else { return true }
-        return data.width <= KittyGraphics.maximumImageDimension
-            && data.height <= KittyGraphics.maximumImageDimension
-            && data.width <= KittyGraphics.maximumImagePixels / data.height
+        return KittyGraphics.dimensionsFit(width: data.width, height: data.height)
     }
 
     /// Public: the app decodes it; the core has no ImageIO.

@@ -24,8 +24,6 @@ nonisolated struct RenderInputs: Sendable, Equatable {
     var generation: UInt64 = 0
     var scrollOffset = 0
     var scrollAnchorTotalPushed: Int?
-    var cursorPresentationPending = false
-    var cursorPresentationToken: UInt64 = 0
     var cursorVisible = true
     var cursorStyle: CursorStyle = .block
     var cursorBlinkVisible = true

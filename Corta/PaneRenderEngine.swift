@@ -27,7 +27,7 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
     let inputs = RenderInputMailbox()
     let session: TerminalSession
     let renderer: TerminalRenderer
-    private let cursorSignal: CursorHandoffMailbox?
+    private let cursorSignal: CursorHandoffMailbox
     private var lastCursorToken: UInt64 = 0
     private var cachedCursorVisible = false
     private var pendingBell = false
@@ -55,9 +55,12 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
         @MainActor @Sendable (Grid, Bool, Bool, UInt64, RenderInputSourceMetadata?) -> Void
     private let presented: @MainActor @Sendable (UInt64) -> Void
     private let failure: @MainActor @Sendable (any Error) -> Void
+    /// Built once: an interpolated label was a string allocation per frame.
+    private let frameLabel = "Corta.frame.thread.\(PaneRenderEngine.nextLabel.wrappingAdd(1, ordering: .relaxed).newValue)"
+    private static let nextLabel = Atomic<Int>(0)
     init(
         session: TerminalSession, renderer: TerminalRenderer, wake: OutputWakeGate,
-        cursorSignal: CursorHandoffMailbox?,
+        cursorSignal: CursorHandoffMailbox,
         afterFrame:
             @escaping @MainActor @Sendable (Grid, Bool, Bool, UInt64, RenderInputSourceMetadata?) ->
             Void,
@@ -156,13 +159,13 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
         return renderer.withExclusiveAccess {
             let inputs = inputs.read()
             let hasOutput = wake.takePending()
-            let cursor = cursorSignal?.snapshot
+            let cursor = cursorSignal.snapshot
             let bell = session.takeBell()
             pendingBell = pendingBell || bell
             let redraw =
                 forced.exchange(false, ordering: .acquiringAndReleasing)
                 || lastInputGeneration != inputs.generation
-                || (cursor?.token ?? 0) != lastCursorToken
+                || cursor.token != lastCursorToken
             if hasOutput || redraw || synchronized {
                 if session.isSynchronizedOutputEnabled {
                     synchronized = true
@@ -188,7 +191,7 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
                     cachedCursorVisible =
                         inputs.cursorVisible && grid.isCursorVisible && offset == 0
                         && (hasOutput || inputs.cursorBlinkVisible
-                            || cursor?.phase == .awaitingMetal)
+                            || cursor.phase == .awaitingMetal)
                     _ = renderer.updateInstances(
                         grid: grid, scrollOffset: offset,
                         cursorVisible: cachedCursorVisible, selection: inputs.selection,
@@ -199,10 +202,10 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
                         indexedOverridesGeneration: palette.overridesGeneration, cursorStyle: style)
                     synchronized = false
                     lastInputGeneration = inputs.generation
-                    lastCursorToken = cursor?.token ?? 0
+                    lastCursorToken = cursor.token
                     sendToMain(
                         grid: grid, output: hasOutput, bell: pendingBell,
-                        cursorRevision: cursor?.outputRevision ?? 0, inputMetadata: metadata)
+                        cursorRevision: cursor.outputRevision, inputMetadata: metadata)
                     pendingBell = false
                 }
             }
@@ -222,34 +225,17 @@ nonisolated final class PaneRenderEngine: @unchecked Sendable {
                 in: size, scale: renderer.scale,
                 gridHeight: CGFloat(renderer.cachedRowCount) * renderer.metrics.cellHeight,
                 topInset: inputs.topInset)
-            let expectsVisibleCursor = cursor?.phase == .awaitingMetal
-            let tracksCursor = (cursor?.pending ?? inputs.cursorPresentationPending)
-                && !synchronized && cachedCursorVisible == expectsVisibleCursor
-            let accepted = tracksCursor ? FrameAcceptanceMarker() : nil
-            if let accepted {
-                drawable.addPresentedHandler { [weak self, presented] drawable in
-                    let reachedGlass = drawable.presentedTime > 0
-                    Task { @MainActor in
-                        guard accepted.isAccepted else { return }
-                        let token = cursor?.token ?? inputs.cursorPresentationToken
-                        guard reachedGlass else {
-                            if let snapshot = self?.cursorSignal?.snapshot, snapshot.pending,
-                                snapshot.token == token
-                            {
-                                self?.invalidate()
-                            }
-                            return
-                        }
-                        presented(token)
-                    }
-                }
-            }
+            let accepted = !synchronized && cursor.awaits(cursorDrawn: cachedCursorVisible)
+                ? cursorSignal.trackPresentation(
+                    of: drawable, token: cursor.token,
+                    retry: { [weak self] in self?.invalidate() }, presented: presented)
+                : nil
             let drawn = renderer.draw(
                 rect: rect, drawableSize: size, target: drawable.texture,
                 clearColor: MTLClearColorMake(
                     Double(background.x), Double(background.y),
                     Double(background.z), Double(background.w)), drawable: drawable,
-                label: "Corta.frame.thread.\(ObjectIdentifier(self).hashValue)"
+                label: frameLabel
             ) { [weak self] error in
                 feedback.complete(submission)
                 InputLatencySignposts.end(.gpu, gpu)

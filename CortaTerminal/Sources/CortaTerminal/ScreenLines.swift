@@ -119,15 +119,6 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
         if clamped > 0 { recordScroll(top: 0, bottom: storage.count - 1, delta: clamped) }
     }
 
-    /// Explicit swaps stamp both logical rows, including when the ring wraps.
-    mutating func swapAt(_ i: Int, _ j: Int) {
-        guard i != j else { return }
-        let a = physicalIndex(i), b = physicalIndex(j)
-        storage.swapAt(a, b)
-        stamp(a)
-        stamp(b)
-    }
-
     /// Rotate storage and revisions together; only exposed rows are stamped.
     /// Three reversals cost O(region height), independent of scroll count.
     mutating func rotate(top: Int, bottom: Int, by delta: Int) {

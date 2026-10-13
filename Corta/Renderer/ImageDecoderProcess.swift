@@ -59,10 +59,7 @@ nonisolated enum ImageDecoderProcess {
         let length: Int
         let bytesPerRow: Int
         init?(width: Int, height: Int, alignment: Int) {
-            guard width > 0, height > 0, width <= KittyGraphics.maximumImageDimension,
-                height <= KittyGraphics.maximumImageDimension,
-                width <= KittyGraphics.maximumImagePixels / height,
-                alignment <= 4096
+            guard KittyGraphics.dimensionsFit(width: width, height: height), alignment <= 4096
             else { return nil }
             let alignment = max(4, alignment)
             bytesPerRow = ((width * 4 + alignment - 1) / alignment) * alignment
@@ -151,10 +148,7 @@ nonisolated enum ImageDecoderProcess {
         }
         let width = word(16)
         let height = word(20)
-        guard width > 0, height > 0, width <= KittyGraphics.maximumImageDimension,
-            height <= KittyGraphics.maximumImageDimension,
-            width <= KittyGraphics.maximumImagePixels / height
-        else { return nil }
+        guard KittyGraphics.dimensionsFit(width: width, height: height) else { return nil }
         return (width, height)
     }
 
@@ -337,10 +331,7 @@ nonisolated enum ImageDecoderProcess {
         }
         let width = word(0)
         let height = word(4)
-        guard width > 0, height > 0, width <= KittyGraphics.maximumImageDimension,
-            height <= KittyGraphics.maximumImageDimension,
-            width <= KittyGraphics.maximumImagePixels / height
-        else { return nil }
+        guard KittyGraphics.dimensionsFit(width: width, height: height) else { return nil }
         return (width, height)
     }
 }

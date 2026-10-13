@@ -279,7 +279,7 @@ extension Grid {
             // Most logical lines contain no wide pairs. Copy their cells in
             // row-sized runs, preserving every colour/attribute, instead of
             // growing and assigning the row once for each cell.
-            if cells[i].attributes.rawValue & 0x0300 == 0 {
+            if cells[i].attributes.rawValue & CellAttributes.widePair.rawValue == 0 {
                 if column >= newColumns {
                     current.wrapped = true; rows.append(current)
                     current = Line(); current.reserveCapacity(min(newColumns, cells.count - i))
@@ -287,7 +287,7 @@ extension Grid {
                 }
                 var end = i + 1
                 let limit = min(cells.count, i + newColumns - column)
-                while end < limit, cells[end].attributes.rawValue & 0x0300 == 0 { end += 1 }
+                while end < limit, cells[end].attributes.rawValue & CellAttributes.widePair.rawValue == 0 { end += 1 }
                 while rowOfStart.count < rowStarts.count, rowStarts[rowOfStart.count] < end {
                     rowOfStart.append((rows.count, column + max(0, rowStarts[rowOfStart.count] - i)))
                 }

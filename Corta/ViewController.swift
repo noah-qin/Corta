@@ -552,8 +552,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 canRetry: !reconnect, canReconnect: reconnect, takesFocus: self.isFocusedPane)
         }
         loop.cursorHandoffSignal = focus.handoffSignal
-        loop.presentationPending = { [weak self] in self?.focus.presentationPending ?? false }
-        loop.presentationToken = { [weak self] in self?.focus.presentationToken ?? 0 }
         loop.onPresented = { [weak self] in
             self?.focus.framePresented(token: $0)
             self?.publishRenderInputs()
@@ -665,8 +663,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         return RenderInputs(
             readsInputSourceMetadata: config.inputSourceIndicator != .off,
             scrollOffset: scrollOffset, scrollAnchorTotalPushed: scrollAnchorTotalPushed,
-            cursorPresentationPending: focus.presentationPending,
-            cursorPresentationToken: focus.presentationToken,
             cursorVisible: scrollOffset == 0 && isFocusedPane
                 && terminalView?.hasMarkedText() != true
                 && sessionEndedBar == nil,

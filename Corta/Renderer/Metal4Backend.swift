@@ -157,7 +157,7 @@ public nonisolated final class Metal4Backend {
         guard let fresh = device.makeTexture(descriptor: descriptor) else { return nil }
         // A queued frame may still render into the old one: it leaves the
         // residency set when that frame completes, like a retired buffer.
-        if let copyStaging { retiredTextures.append((frame: frameNumber, texture: copyStaging)) }
+        if let copyStaging { retired.append((frame: frameNumber, allocation: copyStaging)) }
         residencySet.addAllocation(fresh)
         residencySet.commit()
         copyStaging = fresh
@@ -228,11 +228,11 @@ public nonisolated final class Metal4Backend {
     /// an atlas bound every frame.
     private static let textureRetentionFrames: UInt64 = 60
 
-    /// Ring buffers outgrown mid-frame, tagged with the frame that last read
-    /// them; dropped once the GPU completes it.
-    private var retiredBuffers: [(frame: UInt64, buffer: MTLBuffer)] = []
-    /// Replaced present-by-copy staging textures, on the same terms.
-    private var retiredTextures: [(frame: UInt64, texture: MTLTexture)] = []
+    /// Replaced allocations — outgrown ring buffers, a superseded rectangle
+    /// table, a resized present-by-copy staging texture — tagged with the
+    /// frame that last used them; they leave the residency set once the GPU
+    /// completes it.
+    private var retired: [(frame: UInt64, allocation: any MTLAllocation)] = []
 
     /// Instance storage for one pipeline kind, one buffer per slot. Draws
     /// append (instances plus uniforms) to the frame's slot. A buffer grows
@@ -317,7 +317,7 @@ public nonisolated final class Metal4Backend {
             if let base = raw.baseAddress { buffer.contents().copyMemory(from: base, byteCount: raw.count) }
         }
         if let old = rectangleTable?.buffer {
-            retiredBuffers.append((frame: frameNumber, buffer: old))
+            retired.append((frame: frameNumber, allocation: old))
         }
         residencySet.addAllocation(buffer)
         residencySet.commit()
@@ -653,7 +653,7 @@ public nonisolated final class Metal4Backend {
                     instances: base, instanceByteCount: instanceByteCount, uniforms: uniforms, atlasRects: copiedRects,
                     slot: currentSlot, device: device, residencySet: residencySet
                 ) { [self] buffer in
-                    retiredBuffers.append((frame: frameNumber, buffer: buffer))
+                    retired.append((frame: frameNumber, allocation: buffer))
                 }
             })
         else { return }
@@ -726,19 +726,10 @@ public nonisolated final class Metal4Backend {
 
     /// Releases retired resources whose retiring frame has completed.
     private func dropRetired(through completed: UInt64) {
-        var keptBuffers: [(frame: UInt64, buffer: MTLBuffer)] = []
         var removedAny = false
-        for entry in retiredBuffers {
-            if entry.frame <= completed {
-                residencySet.removeAllocation(entry.buffer)
-                removedAny = true
-            } else {
-                keptBuffers.append(entry)
-            }
-        }
-        retiredTextures.removeAll { entry in
+        retired.removeAll { entry in
             guard entry.frame <= completed else { return false }
-            residencySet.removeAllocation(entry.texture)
+            residencySet.removeAllocation(entry.allocation)
             removedAny = true
             return true
         }
@@ -751,6 +742,5 @@ public nonisolated final class Metal4Backend {
             removedAny = true
         }
         if removedAny { residencySet.commit() }
-        retiredBuffers = keptBuffers
     }
 }
