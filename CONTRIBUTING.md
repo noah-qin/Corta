@@ -31,8 +31,9 @@ first so contributors do not duplicate effort.
 | :--- | :--- |
 | `Corta/` | AppKit shell, input, configuration, fonts and Metal renderer |
 | `CortaTerminal/Sources/CortaTerminal/` | Parser, grid, PTY, search and terminal protocols |
-| `CortaTerminal/Tests/` | Core tests, golden fixtures and fuzz corpus |
-| `CortaTerminal/Sources/corta-*` | `corta-exec`, the helper the app embeds, and the repository's tools: `corta-release-check` (the one packaging check), `corta-license`, `corta-fuzz`, `corta-bench`, `corta-dump` |
+| `CortaTerminal/Sources/CortaSFTP/` | SFTP protocol, transport and transfer engine; an independent sibling of the terminal core |
+| `CortaTerminal/Tests/` | Core, SFTP and release-rule tests, golden fixtures and fuzz corpus |
+| `CortaTerminal/Sources/corta-*` | `corta-exec` and `corta-image-decoder`, the helpers the app embeds, and the repository's tools: `corta-release-check` (the one packaging check), `corta-license`, `corta-fuzz`, `corta-bench`, `corta-dump` |
 | `CortaTests/`, `CortaUITests/`, `CortaPerformanceTests/` | App-hosted tests, interactive UI tests, and the Release measurements |
 | `docs/` | User guides, architecture and verification evidence |
 | `TestPlans/` | `Unit` (the default), `UI` (interactive sessions only) and `Release` (the Release measurements) |
@@ -63,7 +64,14 @@ reason or invariant. Avoid narrating the code or using a milestone number as
 the only explanation. Test names should describe observable behaviour and
 fixture comments should identify the rule being checked.
 
-Before opening a documentation pull request, run the link check:
+Before opening any documentation pull request, run the lightweight link check:
+
+```sh
+python3 -B scripts/check-doc-links.py
+```
+
+For `docs/CONFIGURATION.md` changes, also run the compiled checks for scalar
+keys/defaults, the complete example, and command names/default shortcuts:
 
 ```sh
 xcodebuild test -project Corta.xcodeproj -scheme Corta \

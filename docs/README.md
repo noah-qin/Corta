@@ -43,15 +43,20 @@ Product ▸ Build Documentation in Xcode) renders it with the symbol
 documentation. Generated documentation is not a goal in itself; the
 catalog exists so that a contributor can find where a byte goes.
 
-The scripts a document tells you to run live in [`scripts/`](../scripts/):
-the Metal 4 capability probe CI runs (`metal-capability.swift`) and the
-update feed's check (`verify-appcast.swift`); each one's header comment
-says what it reads and what it never touches. Everything else is Swift
-code or a test plan: the release check is `corta-release-check` in
-`CortaTerminal` ([testing](TESTING.md#packaging)), and the app's
-measurements are `MeasurementUITests` in the `Release` test plan, with
-the two `xctrace` recordings beside them
-([testing](TESTING.md#measuring-the-app)).
+Tools are split between [`scripts/`](../scripts/) and [`script/`](../script/):
+
+| Task | Tool |
+| :--- | :--- |
+| Check local Markdown links without building the app | `python3 -B scripts/check-doc-links.py` |
+| Select CI checks and extract CodeQL sources | `scripts/ci-docs-only.py`, `scripts/codeql-extract.py` |
+| Prepare a release and report automation checks | `scripts/prepare-release.py`, `scripts/prepare-release.sh`, `scripts/report-ci-statuses.sh` |
+| Check GPU capability and the signed update feed | `scripts/metal-capability.swift`, `scripts/verify-appcast.swift` |
+| Build the development app or verify real SSH/SFTP | `script/build_and_run.sh`, `script/verify_ssh_integration.py` |
+
+Python helper tests live in `scripts/tests/`. The release artifact check is
+`corta-release-check` in `CortaTerminal` ([packaging](TESTING.md#packaging));
+app measurements use `MeasurementUITests` in the `Release` test plan and
+`xctrace` ([measuring the app](TESTING.md#measuring-the-app)).
 
 ## Earlier records
 
