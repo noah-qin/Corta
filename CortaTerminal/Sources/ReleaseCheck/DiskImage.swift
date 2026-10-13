@@ -17,18 +17,28 @@
 import Foundation
 
 extension ReleaseCheck {
+    /// The volume name the committed Finder layout finds its background by.
+    public static let diskImageVolumeName = "Corta"
+
     /// Root contents are an installable app, the drag-to-install link and
     /// the Finder window layout: `.DS_Store` and `.background` holding only
-    /// `background.tiff` (D26).
+    /// `background.tiff`, both regular files, on a volume named Corta (D26).
     public static func diskImageLayoutProblems(entries: [String], backgroundEntries: [String]?,
+                                                layoutFilesAreRegular: Bool, volumeName: String?,
                                                 appIsDirectory: Bool, applicationsTarget: String?,
                                                 readOnly: Bool) -> [String] {
         var problems: [String] = []
+        if volumeName != diskImageVolumeName {
+            problems.append("disk image volume must be named \(diskImageVolumeName), which its Finder layout depends on")
+        }
         if entries.sorted() != [".DS_Store", ".background", "Applications", "Corta.app"] {
             problems.append("disk image root must contain only Corta.app, Applications, .DS_Store and .background")
         }
         if backgroundEntries != ["background.tiff"] {
             problems.append(".background must be a directory holding only background.tiff")
+        }
+        if !layoutFilesAreRegular {
+            problems.append(".DS_Store and .background/background.tiff must be regular files")
         }
         if !appIsDirectory { problems.append("Corta.app must be a directory, not a symlink") }
         if applicationsTarget != "/Applications" {
@@ -189,7 +199,13 @@ extension ReleaseCheck {
         let backgroundType = (try? FileManager.default.attributesOfItem(atPath: background.path))?[.type] as? FileAttributeType
         let backgroundEntries = backgroundType == .typeDirectory
             ? try? FileManager.default.contentsOfDirectory(atPath: background.path) : nil
+        let layoutFilesAreRegular = [".DS_Store", ".background/background.tiff"].allSatisfy {
+            (try? FileManager.default.attributesOfItem(atPath: mount.root.appendingPathComponent($0).path))?[.type]
+                as? FileAttributeType == .typeRegular
+        }
+        let volumeName = try? mount.root.resourceValues(forKeys: [.volumeNameKey]).volumeName
         let layout = diskImageLayoutProblems(entries: entries ?? [], backgroundEntries: backgroundEntries,
+                                              layoutFilesAreRegular: layoutFilesAreRegular, volumeName: volumeName,
                                               appIsDirectory: appType == .typeDirectory,
                                               applicationsTarget: link, readOnly: readOnly)
         if !layout.isEmpty {

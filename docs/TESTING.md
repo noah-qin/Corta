@@ -602,8 +602,9 @@ Create, sign, notarise and staple the DMG through Release before using
 `package`; it validates the finished image and writes its checksum, and
 never rebuilds notarised bytes. It mounts read-only and checks the app
 inside the image. The root is only Corta.app, an Applications symlink and
-the Finder layout (`.DS_Store`, `.background/background.tiff`); the image has no license agreement and passes Developer ID, stapler and
-Gatekeeper checks. The feed verifier accepts immutable ZIP entries through
+the Finder layout (`.DS_Store`, `.background/background.tiff`, both
+regular files) on a volume named Corta; the image has no license agreement
+and passes Developer ID, stapler and Gatekeeper checks. The feed verifier accepts immutable ZIP entries through
 1.1.8 and requires DMG for later versions; nightly verifies both formats.
 
 `corta-release-check` is the one implementation of the release rules

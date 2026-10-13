@@ -82,8 +82,20 @@ scripts/disk-image/make-layout.sh path/to/Corta.app
 
 `make-layout.sh` mounts a scratch image as `/Volumes/Corta` and has Finder
 write the layout, so it needs a logged-in session and permission to control
-Finder; it detaches and deletes the scratch image when it exits. The volume
-name must stay `Corta`, because the layout locates the background through it.
+Finder; it detaches and deletes the scratch image when it exits. It measures
+the window's title bar on the running macOS instead of assuming one, so
+rerun it if a macOS release changes that height. Finder records the
+background as a bookmark naming the volume and the scratch image's path,
+and that bookmark ships in every release: the script always builds the
+scratch image at `/private/tmp/corta-dmg-layout/Corta.dmg` and refuses a
+layout that names anything else on the machine. The volume name must stay
+`Corta`; `corta-release-check` fails an image named otherwise. If a viewer
+already has a volume named Corta mounted, the new one mounts as
+`Corta 1` and Finder shows the window without its background. Installing
+still works.
+
+`release.yml`'s staging step and `make-layout.sh` build the same root, so a
+change to one belongs in the other.
 
 The feed workflow checks the checksum, mounts read-only with cleanup on
 success or failure, and generates/signs from the same DMG with the key on
