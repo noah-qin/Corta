@@ -1,6 +1,8 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- sparkle-sign-warning:
 IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
---><!--
+-->
+<!--
   Corta's Sparkle update feed. Read by every launched Corta at the interval
   the `SUScheduledCheckInterval` key in `Sparkle-Info.plist` sets, and on
   demand from Check for Updates… (`Corta/UpdateController.swift`).
@@ -16,12 +18,22 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
   archive it describes, produced by Sparkle's own `generate_appcast` against
   the private half of `Sparkle-Info.plist`'s `SUPublicEDKey`. A hand-typed
   entry is a hand-typed signature, which defeats the point of having one.
---><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+-->
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>Corta</title>
         <link>https://raw.githubusercontent.com/noah-qin/Corta/main/appcast.xml</link>
         <description>Corta release updates.</description>
         <language>en</language>
+        <item>
+            <title>1.2.0</title>
+            <pubDate>Tue, 13 Oct 2026 14:20:51 +0000</pubDate>
+            <sparkle:version>12</sparkle:version>
+            <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.2.0/Corta-1.2.0.dmg" length="6401666" type="application/octet-stream" sparkle:edSignature="mdaibKyuaiOsyPI2TPzlGcqmAyg8L+YSEqI3s4sbP+xSIHLEnK/y/I54qUpj92JrUrweSF+Z5eEmnOKrrJhqCA=="/>
+        </item>
         <item>
             <title>1.1.9</title>
             <pubDate>Fri, 09 Oct 2026 04:58:25 +0000</pubDate>
@@ -29,7 +41,7 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
             <sparkle:shortVersionString>1.1.9</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.1.9/Corta-1.1.9.dmg" length="7436222" type="application/octet-stream" sparkle:edSignature="rfWguQXE2ZhfQM8L6khYcyDpOrTScFCBQCBXUmKFMmV/xY608X99mV31b+UhWW/FxtJSOloHYtZ1gXf4QsorBA=="></enclosure>
+            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.1.9/Corta-1.1.9.dmg" length="7436222" type="application/octet-stream" sparkle:edSignature="rfWguQXE2ZhfQM8L6khYcyDpOrTScFCBQCBXUmKFMmV/xY608X99mV31b+UhWW/FxtJSOloHYtZ1gXf4QsorBA=="/>
         </item>
         <item>
             <title>1.1.8</title>
@@ -38,16 +50,7 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
             <sparkle:shortVersionString>1.1.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.1.8/Corta-1.1.8.zip" length="6986054" type="application/octet-stream" sparkle:edSignature="j+XANweck2HwxyavYYXIPVgeXXbmgg9uGPBVzVPvHM9CO419hFWMdeI0UZcny6jEgMH3TVIymWUdgKql2yKlAg=="></enclosure>
-        </item>
-        <item>
-            <title>1.1.7</title>
-            <pubDate>Wed, 07 Oct 2026 14:20:08 +0000</pubDate>
-            <sparkle:version>9</sparkle:version>
-            <sparkle:shortVersionString>1.1.7</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.1.7/Corta-1.1.7.zip" length="6986137" type="application/octet-stream" sparkle:edSignature="wQOm5rv864g0gM+nmU65P0KzqLREUdhlHrpoFl9yAr23d0KfdkENw4UwuG14QIVls6RhXIC0LAroyQt0dtXxDw=="></enclosure>
+            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.1.8/Corta-1.1.8.zip" length="6986054" type="application/octet-stream" sparkle:edSignature="j+XANweck2HwxyavYYXIPVgeXXbmgg9uGPBVzVPvHM9CO419hFWMdeI0UZcny6jEgMH3TVIymWUdgKql2yKlAg=="/>
         </item>
         <item>
             <title>1.0.1</title>
@@ -55,7 +58,7 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
             <sparkle:version>4</sparkle:version>
             <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.0.1/Corta-1.0.1.zip" length="7704071" type="application/octet-stream" sparkle:edSignature="z7i/BORL743Dcs7JnqveaLkHTAp0UPqEuqy9qJkta7/j3Kr+QaivI68NJdWDGpx8nQYEOliRZt2KmFs+45W8Ag=="></enclosure>
+            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.0.1/Corta-1.0.1.zip" length="7704071" type="application/octet-stream" sparkle:edSignature="z7i/BORL743Dcs7JnqveaLkHTAp0UPqEuqy9qJkta7/j3Kr+QaivI68NJdWDGpx8nQYEOliRZt2KmFs+45W8Ag=="/>
         </item>
         <item>
             <title>1.0.0</title>
@@ -63,7 +66,7 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
             <sparkle:version>3</sparkle:version>
             <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.0.0/Corta-1.0.0.zip" length="7679741" type="application/octet-stream" sparkle:edSignature="TQAy2W4Obj0OObdh1Uw3S3RTyJ/JgL2BDkzJpKyoOBmHVmwEZ/5DQT9+mpjzyATOoP/xLfT4MUG6ygDz6o2WCg=="></enclosure>
+            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.0.0/Corta-1.0.0.zip" length="7679741" type="application/octet-stream" sparkle:edSignature="TQAy2W4Obj0OObdh1Uw3S3RTyJ/JgL2BDkzJpKyoOBmHVmwEZ/5DQT9+mpjzyATOoP/xLfT4MUG6ygDz6o2WCg=="/>
         </item>
         <item>
             <title>0.1.1</title>
@@ -71,10 +74,11 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
             <sparkle:version>2</sparkle:version>
             <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v0.1.1/Corta-0.1.1.zip" length="6507124" type="application/octet-stream" sparkle:edSignature="/mk1CaXQGQ0j0uCOJxl0yXmQRWmJbzcpqiZqg6jtq9cC1rV1NIBRfYPZNjhBgJ0VdqE6oT8nAP7+llYqMITlDg=="></enclosure>
+            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v0.1.1/Corta-0.1.1.zip" length="6507124" type="application/octet-stream" sparkle:edSignature="/mk1CaXQGQ0j0uCOJxl0yXmQRWmJbzcpqiZqg6jtq9cC1rV1NIBRfYPZNjhBgJ0VdqE6oT8nAP7+llYqMITlDg=="/>
         </item>
     </channel>
-</rss><!-- sparkle-signatures:
-edSignature: +4sSTUy9yeKD+2AEU2o7dl4A8zRgpUSjV19kdj2LHyKM6XiApJWCy5cQwDk4KNeDnVnXCp6pt0R4A3UurvrJAw==
-length: 5432
+</rss>
+<!-- sparkle-signatures:
+edSignature: wOXfRKMeMJG47beOJujq4r/KIpbKHiTJIgl7Axe7YGoEmJxR0uMEq7MlC6GD2Xp/eiU8d9yG+MHuEQNfMcdVDA==
+length: 5371
 -->
