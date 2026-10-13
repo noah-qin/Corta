@@ -235,10 +235,14 @@ struct RenderReferenceTests {
     }
 
     /// Renders the overlay scene with `cursorStyle` (a DECSCUSR parameter),
-    /// in the dark theme, after the Kitty image has decoded.
-    static func renderOverlays(device: MTLDevice, cursorStyle: Int) throws -> MTLTexture {
+    /// in the dark theme, after the Kitty image has decoded. `presentsByCopy`
+    /// renders it the way a full-screen pane does (#285).
+    static func renderOverlays(
+        device: MTLDevice, cursorStyle: Int, presentsByCopy: Bool = false
+    ) throws -> MTLTexture {
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
+        renderer.presentsByCopy = presentsByCopy
         var terminal = overlayTerminal()
         terminal.feed(Array("\u{1B}[\(cursorStyle) q".utf8))
         let grid = terminal.grid
@@ -282,5 +286,14 @@ struct RenderReferenceTests {
     func overlaysMatchTheReference(cursorStyle: Int, name: String) throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         try Self.check(try Self.renderOverlays(device: device, cursorStyle: cursorStyle), named: name)
+    }
+
+    /// A full-screen pane's frames go through a staging texture and a copy
+    /// (`Metal4Backend.presentsByCopy`); what lands is the same frame.
+    @Test func aFramePresentedByCopyMatchesTheReference() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        try Self.check(
+            try Self.renderOverlays(device: device, cursorStyle: 2, presentsByCopy: true),
+            named: "overlays-block-cursor")
     }
 }

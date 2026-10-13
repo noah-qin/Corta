@@ -250,8 +250,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         secureInputIndicator?.view.isHidden = hidden
     }
 
-    /// The #285 spike: with `toolbar` requested and one pane, nothing of the
-    /// window's chrome stays over the canvas in full screen.
+    /// Experimental (`DirectFullScreen.toolbar`): the chrome auto-hides in
+    /// full screen with one pane. Not shipped — a visible toolbar does not
+    /// stop direct presentation.
     func window(
         _ window: NSWindow,
         willUseFullScreenPresentationOptions proposedOptions: NSApplication.PresentationOptions

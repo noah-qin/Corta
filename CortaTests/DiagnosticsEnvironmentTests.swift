@@ -37,21 +37,29 @@ struct DiagnosticsEnvironmentTests {
     }
 
     @Test func releaseWithholdsProgramSubstitutionAndStallInjection() {
-        #expect(
-            Switch.allCases.filter { !$0.isHonouredInRelease }
-                == [.mainStall, .sftpSSH, .directFullScreen])
+        #expect(Switch.allCases.filter { !$0.isHonouredInRelease } == [.mainStall, .sftpSSH])
     }
 
-    @Test func directFullScreenParsesBlockersOnlyWhereEnabled() {
+    @Test func directFullScreenShipsAndOnlyTurnsOffInRelease() {
         let name = "CORTA_DIRECT_FULLSCREEN"
-        #expect(DiagnosticsEnvironment.directFullScreen(in: [:], enabled: true).isEmpty)
-        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "1"], enabled: true) == .all)
-        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "1"], enabled: false).isEmpty)
+        for experimental in [true, false] {
+            #expect(DiagnosticsEnvironment.directFullScreen(in: [:], experimental: experimental) == .shipped)
+            #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "0"], experimental: experimental).isEmpty)
+        }
+        // A Release build never takes an experimental change.
+        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "1"], experimental: false) == .shipped)
+        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "toolbar"], experimental: false) == .shipped)
+        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "1"], experimental: true) == .all)
         #expect(
-            DiagnosticsEnvironment.directFullScreen(in: [name: "mask, overlays,bogus"], enabled: true)
+            DiagnosticsEnvironment.directFullScreen(in: [name: "mask, overlays,bogus"], experimental: true)
                 == [.mask, .overlays])
-        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "present"], enabled: true) == .present)
-        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "0"], enabled: true).isEmpty)
+        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "present"], experimental: true) == .present)
+    }
+
+    /// Shipped direct presentation changes nothing visible: no chrome,
+    /// overlay or colour change, only the corner mask full screen lacks.
+    @Test func shippedDirectPresentationIsInvisible() {
+        #expect(DirectFullScreen.shipped == [.mask, .present])
     }
 
     @Test func directFullScreenAppliesOnlyToOneFullScreenPane() {

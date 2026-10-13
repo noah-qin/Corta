@@ -12,6 +12,12 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- A full-screen window with one pane presents its frames directly to the
+  display instead of through the window server's compositor: about one frame
+  less from keypress to glass, and roughly half the worst-case delay, while
+  typing. Nothing visible changes. `CORTA_DIRECT_FULLSCREEN=0` turns it off
+  for a comparison.
+
 - App icons use the simplified vector pangolin and terminal prompt, with
   system-rendered shell lighting. The development app uses the same artwork
   on an orange background. Retired raster icons and mascot animation are removed.

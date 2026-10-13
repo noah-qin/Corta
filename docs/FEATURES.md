@@ -31,6 +31,10 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 - Split panes, pane zoom, font zoom and restoration of window arrangements
   and working directories. Reopening a closed pane restores its arrangement,
   not the terminated process.
+- A full-screen window with one pane is presented directly to the display,
+  not through the window server's compositor: about a frame less from
+  keypress to glass. A split, or anything AppKit draws over the text, brings
+  the compositor back while it shows.
 - Scrollback search with case-sensitive and regular-expression modes, in a
   find bar that narrows with a split pane and moves to the bottom while the
   cursor or the current match is under it; text selection, copy and export. Clear Screen, Clear History and Reset Terminal

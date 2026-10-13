@@ -124,36 +124,41 @@ public nonisolated final class Metal4Backend {
     /// Created once and re-pointed each frame: no per-frame allocation.
     private let renderPassDescriptor = MTL4RenderPassDescriptor()
 
-    /// The #285 spike (`CORTA_DIRECT_FULLSCREEN`, `present`): a drawable a
-    /// Metal 4 command buffer wrote is never presented directly to the
-    /// display (measured on macOS 27, `PERFORMANCE.md` §5.17). While set, a
-    /// frame renders into `legacyStaging`, and a classic `MTLCommandQueue`
-    /// copies it into the drawable and presents that — which is. The layer
-    /// must not be `framebufferOnly` meanwhile.
-    var presentsThroughLegacyQueue = false
-    private lazy var legacyQueue: MTLCommandQueue? = device.makeCommandQueue()
-    private lazy var legacyRendered: MTLSharedEvent? = device.makeSharedEvent()
-    private lazy var legacyCopied: MTLSharedEvent? = device.makeSharedEvent()
-    private var legacyFrame: UInt64 = 0
-    private var legacyStaging: MTLTexture?
-    /// The drawable texture the current frame was redirected from.
-    private var legacyTarget: MTLTexture?
+    /// A drawable a Metal 4 command buffer wrote is never presented
+    /// directly to the display; the window server composites it, which
+    /// costs a frame (measured on macOS 27, `PERFORMANCE.md` §5.17). While
+    /// set — a full-screen window with one pane, `SplitViewController` —
+    /// a frame renders into `copyStaging` instead, and a classic
+    /// `MTLCommandQueue` copies it to the target and presents that, which
+    /// the display may take directly. A target that is framebuffer-only
+    /// cannot be copied into and is rendered as before.
+    var presentsByCopy = false
+    private lazy var copyQueue: MTLCommandQueue? = device.makeCommandQueue()
+    /// Metal 4 → copy: the frame is rendered.
+    private lazy var copyRendered: MTLSharedEvent? = device.makeSharedEvent()
+    /// Copy → Metal 4: the staging texture may be rendered into again.
+    private lazy var copyCompleted: MTLSharedEvent? = device.makeSharedEvent()
+    /// Frames copied so far; also the copy events' latest value.
+    private(set) var copyFrame: UInt64 = 0
+    private var copyStaging: MTLTexture?
+    /// The current frame's real target, when it was redirected.
+    private var copyTarget: MTLTexture?
 
-    private func legacyStagingTexture(like target: MTLTexture) -> MTLTexture? {
-        if let legacyStaging, legacyStaging.width == target.width,
-            legacyStaging.height == target.height, legacyStaging.pixelFormat == target.pixelFormat
+    private func copyStagingTexture(like target: MTLTexture) -> MTLTexture? {
+        if let copyStaging, copyStaging.width == target.width,
+            copyStaging.height == target.height, copyStaging.pixelFormat == target.pixelFormat
         {
-            return legacyStaging
+            return copyStaging
         }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: target.pixelFormat, width: target.width, height: target.height, mipmapped: false)
         descriptor.usage = [.renderTarget]
         descriptor.storageMode = .private
         guard let fresh = device.makeTexture(descriptor: descriptor) else { return nil }
-        if let legacyStaging { residencySet.removeAllocation(legacyStaging) }
+        if let copyStaging { residencySet.removeAllocation(copyStaging) }
         residencySet.addAllocation(fresh)
         residencySet.commit()
-        legacyStaging = fresh
+        copyStaging = fresh
         return fresh
     }
 
@@ -403,10 +408,10 @@ public nonisolated final class Metal4Backend {
         let commandBuffer = commandBuffers[slot]
         commandBuffer.label = label
         commandBuffer.beginCommandBuffer(allocator: allocator)
-        legacyTarget = nil
+        copyTarget = nil
         var target = target
-        if presentsThroughLegacyQueue, let staging = legacyStagingTexture(like: target) {
-            legacyTarget = target
+        if presentsByCopy, !target.isFramebufferOnly, let staging = copyStagingTexture(like: target) {
+            copyTarget = target
             target = staging
         }
         renderPassDescriptor.colorAttachments[0].texture = target
@@ -481,12 +486,11 @@ public nonisolated final class Metal4Backend {
         let commandBuffer = commandBuffers[currentSlot]
         commandBuffer.endCommandBuffer()
 
-        // The redirected frame's drawable texture, when it is presented by copy.
-        let legacy = legacyTarget.flatMap { target in drawable.map { (target, $0) } }
-        legacyTarget = nil
-        if legacy != nil, let legacyCopied {
+        let copyTarget = self.copyTarget
+        self.copyTarget = nil
+        if copyTarget != nil, let copyCompleted {
             // The staging texture is free once the previous copy finished.
-            queue.waitForEvent(legacyCopied, value: legacyFrame)
+            queue.waitForEvent(copyCompleted, value: copyFrame)
         } else if let drawable {
             // `MTL4CommandQueue`'s contract; a queue-side ordering, not a CPU block.
             queue.waitForDrawable(drawable)
@@ -495,6 +499,8 @@ public nonisolated final class Metal4Backend {
         let frame = frameNumber
         let completion = completion
         let slotReleased = slotSemaphores[currentSlot]
+        // A copied frame is complete when its copy is.
+        let completesHere = copyTarget == nil
         options.addFeedbackHandler { feedback in
             if let error = feedback.error {
                 completion.failed.store(true, ordering: .releasing)
@@ -502,7 +508,7 @@ public nonisolated final class Metal4Backend {
             }
             completion.note(frame)
             slotReleased.signal()
-            onCompleted?(feedback.error)
+            if completesHere { onCompleted?(feedback.error) }
             // Keep the existing submission-to-callback metric intact. Native
             // timestamps distinguish execution from a delayed feedback thread.
             if RenderMetrics.isEnabled, feedback.gpuStartTime > 0,
@@ -514,27 +520,47 @@ public nonisolated final class Metal4Backend {
             }
         }
         queue.commit([commandBuffer], options: options)
-        if let (target, drawable) = legacy, let legacyQueue, let legacyRendered, let legacyCopied,
-            let staging = legacyStaging, let copy = legacyQueue.makeCommandBuffer()
-        {
-            legacyFrame += 1
-            queue.signalEvent(legacyRendered, value: legacyFrame)
-            copy.label = "Corta.legacyPresent"
-            // Before any encoder: a wait cannot be encoded while one is open.
-            copy.encodeWaitForEvent(legacyRendered, value: legacyFrame)
-            let blit = copy.makeBlitCommandEncoder()
-            blit?.copy(from: staging, to: target)
-            blit?.endEncoding()
-            copy.encodeSignalEvent(legacyCopied, value: legacyFrame)
-            RenderMetrics.notePresent(of: drawable, snapshotAt: echoSnapshotAt)
-            copy.present(drawable)
-            copy.commit()
+        if let copyTarget {
+            copyStaging(
+                into: copyTarget, presenting: drawable, echoSnapshotAt: echoSnapshotAt,
+                onCompleted: onCompleted)
         } else if let drawable {
             // After the commits targeting it, before presenting (MTL4 contract).
             queue.signalDrawable(drawable)
             RenderMetrics.notePresent(of: drawable, snapshotAt: echoSnapshotAt)
             drawable.present()
         }
+    }
+
+    /// The classic queue's half of `presentsByCopy`: waits for the Metal 4
+    /// commit, copies the staging texture to `target`, and presents.
+    private func copyStaging(
+        into target: MTLTexture, presenting drawable: (any MTLDrawable)?,
+        echoSnapshotAt: TimeInterval?, onCompleted: (@Sendable ((any Error)?) -> Void)?
+    ) {
+        guard let copyQueue, let copyRendered, let copyCompleted, let staging = copyStaging,
+            let copy = copyQueue.makeCommandBuffer()
+        else {
+            // As a dropped frame: the drawable still presents, stale.
+            drawable?.present()
+            onCompleted?(Metal4BackendError.commandBufferUnavailable)
+            return
+        }
+        copyFrame += 1
+        queue.signalEvent(copyRendered, value: copyFrame)
+        copy.label = "Corta.presentByCopy"
+        // Before any encoder: a wait cannot be encoded while one is open.
+        copy.encodeWaitForEvent(copyRendered, value: copyFrame)
+        let blit = copy.makeBlitCommandEncoder()
+        blit?.copy(from: staging, to: target)
+        blit?.endEncoding()
+        copy.encodeSignalEvent(copyCompleted, value: copyFrame)
+        if let drawable {
+            RenderMetrics.notePresent(of: drawable, snapshotAt: echoSnapshotAt)
+            copy.present(drawable)
+        }
+        if let onCompleted { copy.addCompletedHandler { onCompleted($0.error) } }
+        copy.commit()
     }
 
     /// Test seam: the GPU runs no later commit until `event` reaches `value`

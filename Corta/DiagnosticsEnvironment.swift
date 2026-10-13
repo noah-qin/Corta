@@ -42,11 +42,9 @@ nonisolated enum DiagnosticsEnvironment {
         case stageDirectory = "CORTA_STAGE_DIR"
         case directFullScreen = "CORTA_DIRECT_FULLSCREEN"
 
-        /// Whether a Release build reads it. Program substitution, deliberate main-thread stalls and
-        /// the direct-presentation spike are withheld; the remaining switches measure or stage a build.
-        var isHonouredInRelease: Bool {
-            self != .sftpSSH && self != .mainStall && self != .directFullScreen
-        }
+        /// Whether a Release build reads it. Program substitution and deliberate main-thread stalls are
+        /// withheld; the remaining switches measure or stage a build.
+        var isHonouredInRelease: Bool { self != .sftpSSH && self != .mainStall }
     }
 
     typealias Environment = [String: String]
@@ -77,16 +75,19 @@ nonisolated enum DiagnosticsEnvironment {
         return MainStall(milliseconds: ms, periodMilliseconds: period)
     }
 
-    /// `CORTA_DIRECT_FULLSCREEN=1`, or a comma-separated subset of
-    /// `toolbar,mask,overlays,colorspace,present`: the #285 spike, which removes
-    /// those compositing blockers while a window is full screen with one
-    /// pane, so a Metal System Trace can show which of them matter. Debug /
-    /// Benchmark only; unknown names are ignored.
+    /// What a full-screen window with one pane changes for direct
+    /// presentation (#285). Unset, `DirectFullScreen.shipped`; `0` turns it
+    /// off, in every build, for an A/B. In Debug / Benchmark, `1` or a
+    /// comma-separated subset of `toolbar,mask,overlays,colorspace,present`
+    /// picks the changes, so a Metal System Trace can re-check each one;
+    /// unknown names are ignored.
     static func directFullScreen(
         in environment: Environment = ProcessInfo.processInfo.environment,
-        enabled: Bool = DiagnosticsEnvironment.supportsStallInjection
+        experimental: Bool = DiagnosticsEnvironment.supportsStallInjection
     ) -> DirectFullScreen {
-        guard enabled, let raw = value(.directFullScreen, in: environment) else { return [] }
+        guard let raw = value(.directFullScreen, in: environment) else { return .shipped }
+        if raw == "0" { return [] }
+        guard experimental else { return .shipped }
         if raw == "1" { return .all }
         return raw.split(separator: ",").reduce(into: DirectFullScreen()) { set, name in
             if let blocker = DirectFullScreen(name: name.trimmingCharacters(in: .whitespaces)) {

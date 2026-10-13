@@ -1287,3 +1287,34 @@ anonymous mapping and emits only an eight-byte header. The
 [follow-up measurements](test-results/2026-10-11-followup.md) record actual
 Kitty payload-to-glass latency/footprint and real Swift-build/find CPU/wakeup
 proxies. Those proxies do not establish a power saving.
+
+### 5.17 Full screen without the compositor (#285, 2026-10-13)
+
+A drawable a Metal 4 command buffer wrote is never presented directly to the
+display, on macOS 27, whichever queue presents it: the window server
+composites it, a frame later. Copying the Metal 4 frame into the drawable on
+a classic `MTLCommandQueue` lifts that. So a full-screen window with one pane
+renders into a staging texture and presents by copy
+(`Metal4Backend.presentsByCopy`), and drops its canvas corner mask; nothing
+visible changes. Windowed and split panes keep the plain Metal 4 path.
+
+Measured on the M5 Air's built-in 60 Hz panel, Benchmark `-O`, full screen,
+one pane:
+
+| Method | today p50 / p99 | by copy, direct p50 / p99 |
+| --- | --- | --- |
+| a person typing, in-app `keypressToPresent` (3 runs each) | 64.3–67.6 / 153.6–179.7 ms | 49.1–50.8 / 82.9–84.2 ms |
+| Typometer, 600 samples each | 57.0 / 73.6 ms | 50.5 / 67.2 ms |
+
+A person typing gets a frame back at the median and half the tail: the
+display link's lead drops from three frames to two once the surface is
+presented directly. While Typometer captures the screen the lead stays at
+three frames, so its gain, ≈ 6.5 ms at every percentile, is the compositor
+pass alone. Under XCUITest the frames are rejected for direct presentation,
+so an XCUI run cannot measure this. The copy costs ≈ 0.8 ms of GPU round
+trip a presented full-screen frame (`measurePresentByCopyCost`); D17's
+windowed figure did not move (0.37–0.39 ms against main's 0.40–0.57 ms,
+battery, alternated). The
+[record](test-results/2026-10-13-direct-fullscreen.md) has the method (Metal
+System Trace's *Direct to Display* column), the probe that isolated the
+Metal 4 blocker, every run and what was not verified.

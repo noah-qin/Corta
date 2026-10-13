@@ -74,6 +74,54 @@ extension PerformanceSuites {
             try report.write(toFile: "/tmp/corta-large-grid-gate.txt", atomically: true, encoding: .utf8)
         }
 
+        /// What presenting by copy costs a full-screen frame (#285): the same
+        /// full rebuild into a 2940×1846 target — a 1470×923-point full-screen
+        /// window at 2x — rendered directly and through the staging copy,
+        /// alternated, to GPU completion. Not part of D17's figure.
+        @Test func measurePresentByCopyCost() throws {
+            let device = try #require(MTLCreateSystemDefaultDevice())
+            let font = CTFontCreateWithName("Menlo" as CFString, 28, nil)
+            let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
+            let width = 2940, height = 1846
+            let columns = Int(CGFloat(width) / renderer.metrics.cellWidth)
+            let rows = Int(CGFloat(height) / renderer.metrics.cellHeight)
+            var terminal = Terminal(rows: rows, columns: columns)
+            for row in 0..<rows {
+                terminal.feed(Array("\u{1B}[\(31 + row % 7)m\(String(repeating: "x", count: columns - 1))\u{1B}[0m\r\n".utf8))
+            }
+            let texture = try BenchmarkBuild.renderTarget(device: device, width: width, height: height)
+            let rect = CGRect(x: 0, y: 0, width: width, height: height)
+            let completed = DispatchSemaphore(value: 0)
+            var durations: [Bool: [Double]] = [false: [], true: []]
+            for iteration in 0..<130 {
+                let byCopy = iteration % 2 == 1
+                renderer.presentsByCopy = byCopy
+                renderer.invalidate()
+                let start = DispatchTime.now().uptimeNanoseconds
+                renderer.render(
+                    grid: terminal.grid, rect: rect, drawableSize: rect.size, cursorVisible: true,
+                    selection: nil, target: texture, clearColor: MTLClearColorMake(0, 0, 0, 1)
+                ) { _ in completed.signal() }
+                completed.wait()
+                if iteration >= 10 {
+                    durations[byCopy]!.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)
+                }
+            }
+            var report = "present by copy, \(columns)x\(rows) into \(width)x\(height), full rebuild to GPU completion, \(BenchmarkBuild.configuration)\n"
+            for byCopy in [false, true] {
+                let sorted = durations[byCopy]!.sorted()
+                let average = sorted.reduce(0, +) / Double(sorted.count)
+                report += String(
+                    format: "%@: avg %.3f ms, p50 %.3f ms, p95 %.3f ms, max %.3f ms, n %d\n",
+                    byCopy ? "by copy" : "direct ", average, sorted[sorted.count / 2],
+                    sorted[Int(Double(sorted.count) * 0.95)], sorted.last!, sorted.count)
+            }
+            let outputPath =
+                ProcessInfo.processInfo.environment["CORTA_PRESENT_BY_COPY_OUTPUT"]
+                ?? "/tmp/corta-present-by-copy.txt"
+            try report.write(toFile: outputPath, atomically: true, encoding: .utf8)
+        }
+
         @Test func measureFrameCPUTime() throws {
             guard let device = MTLCreateSystemDefaultDevice() else {
                 Issue.record("No Metal device available in this environment")

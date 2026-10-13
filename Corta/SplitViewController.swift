@@ -31,7 +31,7 @@ final class SplitViewController: NSViewController {
         ConfigurationStore.shared.configuration.statusBar && !directPresentation.contains(.overlays)
             ? SystemStatusBar.height : 0
     }
-    /// The #285 spike's blockers removed right now (`+DirectFullScreen`).
+    /// What direct presentation changes right now (`updateDirectPresentation`).
     var directPresentation: DirectFullScreen = []
     /// The pane that receives input. Set by `noteFocus` from
     /// `TerminalView.becomeFirstResponder`, so every route to focus funnels
@@ -218,30 +218,35 @@ final class SplitViewController: NSViewController {
         window.setFrame(frame, display: true)
     }
 
-    /// Applies the #285 spike (`CORTA_DIRECT_FULLSCREEN`): with the window
-    /// full screen and one pane, removes the requested compositing blockers
-    /// so a Metal System Trace can show whether frames reach the display
-    /// directly. A launch without the switch returns at the first guard.
-    /// Called on entering and leaving full screen and when the root changes,
-    /// which is when the pane count crosses one.
+    /// With the window full screen and one pane, lets the window server
+    /// present the canvas directly (`DirectFullScreen`, #285): no corner mask,
+    /// frames presented by copy. Called on entering and leaving full screen
+    /// and when the root changes, which is when the pane count crosses one.
+    /// Anything AppKit draws over the canvas — the search bar, a split's
+    /// divider — brings composition back for as long as it shows; that is
+    /// the system's per-frame decision, not this one.
     func updateDirectPresentation() {
         let requested = DirectFullScreen.requested
         guard !requested.isEmpty else { return }
         let active = requested.active(
             isFullScreen: view.window?.styleMask.contains(.fullScreen) ?? false,
             paneCount: panes.count)
-        let changed = active != directPresentation
+        let previous = directPresentation
         directPresentation = active
-        let hidesOverlays = active.contains(.overlays)
         for pane in panes {
             guard let terminalView = pane.terminalView else { continue }
             terminalView.directPresentation = active
-            pane.terminalRenderer?.presentsThroughLegacyQueue = active.contains(.present)
-            terminalView.shellOverlay.isHidden = hidesOverlays
+            pane.terminalRenderer?.presentsByCopy = active.contains(.present)
+        }
+        // Experimental only (Debug / Benchmark): hiding what draws over the canvas.
+        guard requested.contains(.overlays) else { return }
+        let hidesOverlays = active.contains(.overlays)
+        for pane in panes {
+            pane.terminalView?.shellOverlay.isHidden = hidesOverlays
             if hidesOverlays { pane.inputSourceIndicator.view.isHidden = true }
         }
         systemStatusBar.isHidden = hidesOverlays || !ConfigurationStore.shared.configuration.statusBar
-        if changed { updateStatusBarLayout() }
+        if active != previous { updateStatusBarLayout() }
     }
 
     /// The chrome changed under a window that must keep its frame: a restored

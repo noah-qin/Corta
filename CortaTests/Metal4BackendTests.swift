@@ -119,6 +119,28 @@ struct Metal4BackendTests {
         #expect(Self.pixel(of: texture, x: 25, y: 10).g == 255)
     }
 
+    /// `presentsByCopy` renders into a staging texture and copies it to the
+    /// target; the target ends up with the frame, and each frame copies once.
+    @Test func aFramePresentedByCopyLandsInTheTarget() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let backend = try Metal4Backend(device: device)
+        backend.presentsByCopy = true
+        let texture = MetalRenderTarget.make(device: device, width: Self.width, height: Self.height)
+        let red = QuadInstance(origin: .init(0, 0), size: .init(20, 20), color: .init(1, 0, 0, 1))
+        for _ in 0..<2 {
+            #expect(
+                backend.renderFrameAndWait(into: texture) {
+                    $0.drawSolidQuads(
+                        [red], rect: CGRect(origin: .zero, size: Self.drawableSize),
+                        drawableSize: Self.drawableSize)
+                })
+        }
+        #expect(backend.copyFrame == 2)
+        let centre = Self.pixel(of: texture, x: 10, y: 10)
+        #expect(centre.r == 255 && centre.g == 0 && centre.b == 0)
+        #expect(Self.pixel(of: texture, x: 30, y: 10).r == 0)
+    }
+
     @Test func aQuadNeverPaintsOutsideItsRect() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let backend = try Metal4Backend(device: device)

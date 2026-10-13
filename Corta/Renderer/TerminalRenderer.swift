@@ -417,11 +417,11 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     }
 
     /// Reconstructs a faulted/stalled queue, preserving the session and caches.
-    /// The #285 spike: present each frame by copy through a classic queue
-    /// (`Metal4Backend.presentsThroughLegacyQueue`).
-    var presentsThroughLegacyQueue: Bool {
-        get { access.withLock { backend.presentsThroughLegacyQueue } }
-        set { access.withLock { backend.presentsThroughLegacyQueue = newValue } }
+    /// Present each frame by copy through a classic queue, so a full-screen
+    /// pane can reach the display directly (`Metal4Backend.presentsByCopy`).
+    public var presentsByCopy: Bool {
+        get { access.withLock { backend.presentsByCopy } }
+        set { access.withLock { backend.presentsByCopy = newValue } }
     }
 
     /// An unusable device cannot cause an unlimited reconstruction loop.
@@ -434,7 +434,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         guard recoveryAttempts < 3 else { throw Metal4BackendError.recoveryExhausted }
         recoveryAttempts += 1
         let replacement = try Metal4Backend(device: backend.device)
-        replacement.presentsThroughLegacyQueue = backend.presentsThroughLegacyQueue
+        replacement.presentsByCopy = backend.presentsByCopy
         retiredBackends.append(backend)
         backend = replacement
         backendGeneration += 1
