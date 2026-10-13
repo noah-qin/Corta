@@ -39,7 +39,8 @@ import Testing
     }
     /// The rectangle table goes to the GPU when it changes, not with every
     /// draw: a frame over glyphs already in the atlas uploads none of it.
-    @Test func anUnchangedAtlasDoesNotReuploadItsRectangleTable() throws {
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func anUnchangedAtlasDoesNotReuploadItsRectangleTable() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let renderer = try TerminalRenderer(
             device: device, font: CTFontCreateWithName("Menlo" as CFString, 12, nil), scale: 2)
