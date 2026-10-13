@@ -115,6 +115,15 @@ func testTimeoutInterval(_ seconds: TimeInterval) -> TimeInterval {
 }
 
 /// `CORTA_TEST_TIMEOUT_SCALE`, or 1 when unset or not a positive integer.
+/// Whether this test process runs under the thread or address sanitizer
+/// (the nightly lane), found by the runtime it loaded: a test whose point is
+/// a workload's shape, not its size, can shrink the workload there.
+let isRunningUnderSanitizer: Bool = (0..<_dyld_image_count()).contains { index in
+    guard let name = _dyld_get_image_name(index) else { return false }
+    let image = String(cString: name)
+    return image.contains("clang_rt.tsan") || image.contains("clang_rt.asan")
+}
+
 var testTimeoutScale: Int {
     let scale = ProcessInfo.processInfo.environment["CORTA_TEST_TIMEOUT_SCALE"]
         .flatMap(Int.init) ?? 1

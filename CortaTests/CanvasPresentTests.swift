@@ -143,7 +143,7 @@ struct CanvasPresentTests {
             styleMask: .borderless, backing: .buffered, defer: false)
         window.contentView = NSView(frame: window.contentLayoutRect)
         var scheduler: FrameScheduler? = FrameScheduler(metalLayer: CAMetalLayer(), driver: .ondemand)
-        weak var released = scheduler
+        weak let released = scheduler
         scheduler?.attach(to: window)
         #expect(scheduler?.isAttached == true)
         scheduler = nil

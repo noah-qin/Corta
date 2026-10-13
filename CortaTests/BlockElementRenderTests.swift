@@ -198,9 +198,12 @@ struct BlockElementRenderTests {
         for scalar: UInt32 in 0x256D...0x2570 {
             for (width, height, scale): (Float, Float, Float) in
                 [(7, 15, 1), (17, 33, 2), (60, 120, 2), (115, 230, 3), (2, 4, 1)] {
-                let pieces = try? #require(BoxDrawing.pieces(for: scalar, width: width,
-                    height: height, scale: scale))
-                guard let pieces else { continue }
+                guard let pieces = BoxDrawing.pieces(for: scalar, width: width,
+                    height: height, scale: scale)
+                else {
+                    Issue.record("no pieces for U+\(String(scalar, radix: 16, uppercase: true))")
+                    continue
+                }
                 #expect(pieces.count <= BoxDrawing.capacity)
                 for rect in pieces {
                     #expect(rect.x >= 0 && rect.y >= 0 && rect.z > 0 && rect.w > 0)

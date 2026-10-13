@@ -219,7 +219,7 @@ struct SFTPTransferTests {
                 }
                 return try await rig.engine.download(remotePath: "/file", to: destination, policy: .overwrite)
             }
-            let deadline = ContinuousClock.now + .seconds(3)
+            let deadline = ContinuousClock.now + .seconds(testTimeoutInterval(3))
             while !observedRequest.withLock({ $0 }), ContinuousClock.now < deadline {
                 try await Task.sleep(for: .milliseconds(1))
             }
@@ -827,15 +827,23 @@ struct SFTPTransferTests {
         let first = try localFile(rig, "a", contents: [UInt8](repeating: 0x41, count: 2048))
         let second = try localFile(rig, "b", contents: [UInt8](repeating: 0x42, count: 512))
 
+        // The first upload is held at its first WRITE by the fake server,
+        // on the server's own thread. Blocking in the client's progress
+        // callback instead parked a cooperative-pool thread: under the
+        // nightly sanitizers the pool starved, this test's own 200 ms sleep
+        // could not run until the pause timed out, and both checks failed.
         let firstPaused = Mutex(false)
         let releaseFirst = DispatchSemaphore(value: 0)
+        let pauseLimit = testTimeoutInterval(5)
+        rig.server.interceptor = { message in
+            guard case .write = message.payload,
+                firstPaused.withLock({ paused in defer { paused = true }; return !paused })
+            else { return .proceed }
+            _ = releaseFirst.wait(timeout: .now() + pauseLimit)
+            return .proceed
+        }
         let firstTask = Task {
-            try await rig.engine.upload(from: first, to: "/target", policy: .overwrite) { _ in
-                if !firstPaused.withLock({ $0 }) {
-                    firstPaused.withLock { $0 = true }
-                    _ = releaseFirst.wait(timeout: .now() + 5)
-                }
-            }
+            try await rig.engine.upload(from: first, to: "/target", policy: .overwrite)
         }
         #expect(try await waitForFlag(firstPaused))
         let secondFinished = Mutex(false)
@@ -948,7 +956,7 @@ struct SFTPTransferTests {
                 from: source, to: "/remote", policy: .resume, partialDisposition: .keepForResume
             ) { _ in
                 wrote.withLock { $0 = true }
-                _ = release.wait(timeout: .now() + 5)
+                _ = release.wait(timeout: .now() + testTimeoutInterval(5))
             }
         }
         #expect(try await waitForFlag(wrote))
@@ -991,7 +999,7 @@ struct SFTPTransferTests {
                         modificationTime: 99_999)
                 }
                 wrote.withLock { $0 = true }
-                _ = release.wait(timeout: .now() + 5)
+                _ = release.wait(timeout: .now() + testTimeoutInterval(5))
             }
         }
         #expect(try await waitForFlag(wrote))
@@ -1283,13 +1291,13 @@ struct SFTPTransferTests {
             let releaseSecond = DispatchSemaphore(value: 0)
             rig.engine.transferAdmissionGate = {
                 secondAtAdmission.withLock { $0 = true }
-                _ = releaseSecond.wait(timeout: .now() + 5)
+                _ = releaseSecond.wait(timeout: .now() + testTimeoutInterval(5))
             }
             let first = Task {
                 try await rig.engine.download(
                     remotePath: "/file", to: rig.directory.appendingPathComponent("first")) { _ in
                     firstAtProgress.withLock { $0 = true }
-                    _ = releaseFirst.wait(timeout: .now() + 5)
+                    _ = releaseFirst.wait(timeout: .now() + testTimeoutInterval(5))
                 }
             }
             #expect(try await waitForFlag(firstAtProgress))
@@ -1326,7 +1334,7 @@ struct SFTPTransferTests {
     }
 
     private func waitForFlag(_ flag: borrowing Mutex<Bool>) async throws -> Bool {
-        let deadline = ContinuousClock.now + .seconds(3)
+        let deadline = ContinuousClock.now + .seconds(testTimeoutInterval(3))
         while !flag.withLock({ $0 }), ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(1))
         }

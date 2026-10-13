@@ -69,7 +69,10 @@ import Testing
 
         let line = String(repeating: "x", count: 199) + "\n"
         let lineBytes = Array(line.utf8)
-        let targetBytes = 100 * 1024 * 1024
+        // 10 MB under a sanitizer, which parses an order of magnitude more
+        // slowly: still five times the scrollback, so the reader is still
+        // draining what it then evicts; 100 MB alone took 108 s under TSan.
+        let targetBytes = (isRunningUnderSanitizer ? 10 : 100) * 1024 * 1024
         let lineCount = targetBytes / lineBytes.count
         FileManager.default.createFile(atPath: path.path, contents: nil)
         let handle = try FileHandle(forWritingTo: path)
@@ -81,7 +84,7 @@ import Testing
         session.start()
 
         let exit = session.pty.waitForExit(timeout: testTimeout(30))
-        #expect(exit != nil, "cat of a 100 MB file should finish well within 30s if the reader never stalls it")
+        #expect(exit != nil, "cat of a large file should finish well within 30s if the reader never stalls it")
     }
 
     @Test func controlCStopsAFloodingChild() throws {
