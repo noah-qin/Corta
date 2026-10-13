@@ -428,7 +428,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         view.onCompletionKey = { [weak self] event in self?.shell.handleDirectoryCompletionKey(event) ?? false }
         view.onKeyBytes = { [weak self, weak view] bytes in
             guard let self, self.isOperable else { return }
-            updateReaderPriority(input: true)
+            // Reader priority was raised by the view's `noteUserInput`, and
+            // by the session's own write.
             if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view?.window) }
             pointer.returnToBottomOnInput()
             // Ctrl-C under a large paste: queued behind it, the interrupt
@@ -688,7 +689,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         guard let session, let terminalRenderer else { return nil }
         let revision = focus.handoffSignal.snapshot.outputRevision
         let inputSnapshot =
-            renderInputs().readsInputSourceMetadata ? session.inputLineSnapshot() : nil
+            ConfigurationStore.shared.configuration.inputSourceIndicator != .off
+            ? session.inputLineSnapshot() : nil
         let grid = inputSnapshot?.grid ?? session.snapshot()
         let metadata = inputSnapshot.map {
             RenderInputSourceMetadata(
@@ -981,6 +983,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         guard isOperable, let terminalView else { return }
         // The window settled long ago; this pane needs a real winsize now.
         didSizeWindow = true
+        // A new view and renderer start composited; a full-screen window's
+        // direct presentation (#285) applies to them as to the old ones.
+        splitController?.updateDirectPresentation()
         view.window?.makeFirstResponder(terminalView)
         resizeSessionToFitView()
         invalidateDisplay()

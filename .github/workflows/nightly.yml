@@ -60,7 +60,7 @@ jobs:
           pinned="/Applications/Xcode_${XCODE_PIN}.app"
           if [ ! -d "$pinned" ]; then
             echo "::error::$pinned is not on this runner image."
-            echo "Update the stable XCODE_PIN in ci.yml and nightly.yml together."
+            echo "Update the stable XCODE_PIN in all five workflows together."
             exit 1
           fi
           echo "DEVELOPER_DIR=$pinned/Contents/Developer" >> "$GITHUB_ENV"
@@ -92,7 +92,7 @@ jobs:
           pinned="/Applications/Xcode_${XCODE_PIN}.app"
           if [ ! -d "$pinned" ]; then
             echo "::error::$pinned is not on this runner image."
-            echo "Update the stable XCODE_PIN in ci.yml and nightly.yml together."
+            echo "Update the stable XCODE_PIN in all five workflows together."
             exit 1
           fi
           echo "DEVELOPER_DIR=$pinned/Contents/Developer" >> "$GITHUB_ENV"
@@ -160,7 +160,7 @@ jobs:
           pinned="/Applications/Xcode_${XCODE_PIN}.app"
           if [ ! -d "$pinned" ]; then
             echo "::error::$pinned is not on this runner image."
-            echo "Update the stable XCODE_PIN in ci.yml and nightly.yml together."
+            echo "Update the stable XCODE_PIN in all five workflows together."
             exit 1
           fi
           sudo xcode-select -s "$pinned"

@@ -83,7 +83,7 @@ jobs:
           if [ "$selected" != "$pinned" ] && [ "$selected" != "$XCODE_PIN" ]; then
             echo "::warning::Xcode $selected, not the pinned $XCODE_PIN. These"\
                  "results were produced by a toolchain CI does not use. Bump"\
-                 "XCODE_PIN in ci.yml, nightly.yml and render.yml together, or"\
+                 "XCODE_PIN in all five workflows together, or"\
                  "xcode-select the pinned release before trusting a comparison."
           fi
 

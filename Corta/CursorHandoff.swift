@@ -105,15 +105,6 @@ nonisolated final class CursorHandoffMailbox: Sendable {
         var sessionGeneration = 0
         var outputRevision: UInt64 = 0
         var presentation: CursorLayerPresentation?
-
-        mutating func takeBack() {
-            presentation?.retire()
-            // Main keeps the layer until the replacement frame is presented.
-            // Drop only this mailbox's reference so subsequent output batches
-            // do not reacquire the retired presentation's mutex.
-            presentation = nil
-            handoff.takeBack()
-        }
     }
     private let state = Mutex(State())
     var snapshot: Snapshot {
@@ -129,11 +120,12 @@ nonisolated final class CursorHandoffMailbox: Sendable {
         state.withLock { $0.sessionGeneration = generation }
     }
     func noteOutput(generation: Int) {
-        state.withLock {
-            guard generation == $0.sessionGeneration else { return }
+        let current = state.withLock {
+            guard generation == $0.sessionGeneration else { return false }
             $0.outputRevision &+= 1
-            $0.takeBack()
+            return true
         }
+        if current { takeBack() }
     }
     func handOff(expectedOutputRevision: UInt64, presentation: CursorLayerPresentation? = nil) -> UInt64? {
         state.withLock {
@@ -144,10 +136,22 @@ nonisolated final class CursorHandoffMailbox: Sendable {
             return $0.handoff.handOff()
         }
     }
+    /// Retires the layer, then publishes the takeback, so no frame draws a
+    /// Metal cursor beside a still-blinking layer. The retire — a Core
+    /// Animation flush — runs outside the lock: main's per-frame snapshot
+    /// must not wait on the render server. Meanwhile the phase still says
+    /// layer, so no second hand-off can start.
     func takeBack() {
-        state.withLock {
-            $0.takeBack()
+        // Main keeps the layer until the replacement frame is presented;
+        // only this mailbox's reference goes, so later output batches do
+        // not reach the retired presentation again.
+        let presentation = state.withLock { state -> CursorLayerPresentation? in
+            let presentation = state.presentation
+            state.presentation = nil
+            return presentation
         }
+        presentation?.retire()
+        state.withLock { $0.handoff.takeBack() }
     }
     func presented(_ token: UInt64) -> Bool {
         state.withLock {
@@ -157,10 +161,12 @@ nonisolated final class CursorHandoffMailbox: Sendable {
         }
     }
     func stop() {
-        state.withLock {
-            $0.presentation?.retire()
-            $0.handoff.stop()
-            $0.presentation = nil
+        let presentation = state.withLock { state -> CursorLayerPresentation? in
+            let presentation = state.presentation
+            state.presentation = nil
+            return presentation
         }
+        presentation?.retire()
+        state.withLock { $0.handoff.stop() }
     }
 }

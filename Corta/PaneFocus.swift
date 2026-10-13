@@ -373,7 +373,11 @@ final class PaneFocus: NSObject {
                 guard self.handoff.phase == .metal else { return }
                 self.cursorBlinkVisible.toggle()
                 if !self.cursorBlinkVisible { self.cursorOffAt = CACurrentMediaTime() }
-                if !self.cursorBlinkVisible, let layer = self.makeIdleCursorLayer(),
+                // Capturing the cell waits on the GPU: only when a hand-off
+                // can still succeed, not for output that already superseded it.
+                if !self.cursorBlinkVisible,
+                    self.handoff.snapshot.outputRevision == self.lastCursorOutputRevision,
+                    let layer = self.makeIdleCursorLayer(),
                     self.handoff.handOff(expectedOutputRevision: self.lastCursorOutputRevision,
                         presentation: layer)
                         != nil

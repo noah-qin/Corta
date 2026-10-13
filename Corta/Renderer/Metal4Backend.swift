@@ -155,7 +155,9 @@ public nonisolated final class Metal4Backend {
         descriptor.usage = [.renderTarget]
         descriptor.storageMode = .private
         guard let fresh = device.makeTexture(descriptor: descriptor) else { return nil }
-        if let copyStaging { residencySet.removeAllocation(copyStaging) }
+        // A queued frame may still render into the old one: it leaves the
+        // residency set when that frame completes, like a retired buffer.
+        if let copyStaging { retiredTextures.append((frame: frameNumber, texture: copyStaging)) }
         residencySet.addAllocation(fresh)
         residencySet.commit()
         copyStaging = fresh
@@ -229,6 +231,8 @@ public nonisolated final class Metal4Backend {
     /// Ring buffers outgrown mid-frame, tagged with the frame that last read
     /// them; dropped once the GPU completes it.
     private var retiredBuffers: [(frame: UInt64, buffer: MTLBuffer)] = []
+    /// Replaced present-by-copy staging textures, on the same terms.
+    private var retiredTextures: [(frame: UInt64, texture: MTLTexture)] = []
 
     /// Instance storage for one pipeline kind, one buffer per slot. Draws
     /// append (instances plus uniforms) to the frame's slot. A buffer grows
@@ -731,6 +735,12 @@ public nonisolated final class Metal4Backend {
             } else {
                 keptBuffers.append(entry)
             }
+        }
+        retiredTextures.removeAll { entry in
+            guard entry.frame <= completed else { return false }
+            residencySet.removeAllocation(entry.texture)
+            removedAny = true
+            return true
         }
         let expiredTextures = boundTextures.filter {
             $0.value.lastFrame + $0.value.retentionFrames <= completed

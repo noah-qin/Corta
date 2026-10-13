@@ -212,8 +212,8 @@ can never be deleted from. `CONTRIBUTING.md` rule 6.
 ## Build and Test
 
 Only stable, released Xcode toolchains are supported. `XCODE_PIN` is set
-in four workflows — `ci.yml`, `nightly.yml`, `release.yml` and
-`render.yml` — and they move together or not at all.
+in five workflows — `ci.yml`, `nightly.yml`, `release.yml`, `render.yml`
+and `codeql.yml` — and they move together or not at all.
 
 **The pin governs the artifact; it does not govern the numbers.** The pin
 is what compiles the binary users run. Every measurement in

@@ -103,7 +103,34 @@ final class PaneFrameLoop {
         self.session = session
         self.renderer = renderer
         threadedEngine?.suspend()
-        let engine = PaneRenderEngine(
+        threadedEngine = nil
+        // Only for the opt-in render thread (`CORTA_RENDER_THREAD=1`): on the
+        // default main-thread path an engine would never draw, yet wrap the
+        // renderer's callbacks and sit on every output batch.
+        if DiagnosticsEnvironment.usesRenderThread() {
+            threadedEngine = makeEngine(session: session, renderer: renderer, wake: wake, generation: generation)
+        }
+        needsRedraw = true
+        wasSynchronizedOutputActive = false
+        renderingStopped = false
+        watchdog?.cancel()
+        watchdog = nil
+        feedback = GPUFrameFeedback()
+        let cursorSignal = cursorHandoffSignal
+        cursorSignal?.setSessionGeneration(generation)
+        let engine = threadedEngine
+        session.onOutput = { [weak self, weak engine, cursorSignal] in
+            cursorSignal?.noteOutput(generation: generation)
+            if engine?.noteOutput() == true { return }
+            self?.noteOutput(generation: generation, wake: wake)
+        }
+        return generation
+    }
+
+    private func makeEngine(
+        session: TerminalSession, renderer: TerminalRenderer, wake: OutputWakeGate, generation: Int
+    ) -> PaneRenderEngine {
+        PaneRenderEngine(
             session: session, renderer: renderer, wake: wake, cursorSignal: cursorHandoffSignal,
             afterFrame: { [weak self] grid, output, bell, revision, metadata in
                 guard let self, self.isCurrent(generation) else { return }
@@ -117,21 +144,6 @@ final class PaneFrameLoop {
                 guard let self, self.isCurrent(generation) else { return }
                 self.onRenderingFailure?(error)
             })
-        threadedEngine = engine
-        needsRedraw = true
-        wasSynchronizedOutputActive = false
-        renderingStopped = false
-        watchdog?.cancel()
-        watchdog = nil
-        feedback = GPUFrameFeedback()
-        let cursorSignal = cursorHandoffSignal
-        cursorSignal?.setSessionGeneration(generation)
-        session.onOutput = { [weak self, weak engine, cursorSignal] in
-            cursorSignal?.noteOutput(generation: generation)
-            if engine?.noteOutput() == true { return }
-            self?.noteOutput(generation: generation, wake: wake)
-        }
-        return generation
     }
 
     /// Makes `view`'s display link drive this loop.
