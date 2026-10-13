@@ -32,7 +32,12 @@ nonisolated struct DirectFullScreen: OptionSet, Sendable {
     /// convert colours, so they render off while this is set.
     static let colorspace = DirectFullScreen(rawValue: 1 << 3)
 
-    static let all: DirectFullScreen = [.toolbar, .mask, .overlays, .colorspace]
+    /// Frames render off-screen through Metal 4 and are copied into the
+    /// drawable and presented by a classic queue: a drawable a Metal 4
+    /// command buffer wrote is never presented directly.
+    static let present = DirectFullScreen(rawValue: 1 << 4)
+
+    static let all: DirectFullScreen = [.toolbar, .mask, .overlays, .colorspace, .present]
 
     init(rawValue: Int) { self.rawValue = rawValue }
 
@@ -42,6 +47,7 @@ nonisolated struct DirectFullScreen: OptionSet, Sendable {
         case "mask": self = .mask
         case "overlays": self = .overlays
         case "colorspace": self = .colorspace
+        case "present": self = .present
         default: return nil
         }
     }

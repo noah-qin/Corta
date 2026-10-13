@@ -78,7 +78,7 @@ nonisolated enum DiagnosticsEnvironment {
     }
 
     /// `CORTA_DIRECT_FULLSCREEN=1`, or a comma-separated subset of
-    /// `toolbar,mask,overlays,colorspace`: the #285 spike, which removes
+    /// `toolbar,mask,overlays,colorspace,present`: the #285 spike, which removes
     /// those compositing blockers while a window is full screen with one
     /// pane, so a Metal System Trace can show which of them matter. Debug /
     /// Benchmark only; unknown names are ignored.

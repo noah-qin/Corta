@@ -359,6 +359,8 @@ final class TerminalView: NSView, CALayerDelegate {
     var directPresentation: DirectFullScreen = [] {
         didSet {
             guard directPresentation != oldValue else { return }
+            // A copy into the drawable needs a texture that is not framebuffer-only.
+            metalLayer.framebufferOnly = !directPresentation.contains(.present)
             applyDirectColorSpace()
             updateExteriorCornerMask()
         }

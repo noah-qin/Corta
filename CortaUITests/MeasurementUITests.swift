@@ -295,12 +295,56 @@ final class MeasurementUITests: XCTestCase {
     /// elsewhere.
     @MainActor
     func testKeypressToGlass() throws {
+        try typeAndReport(try launchSettled(), label: "scripted keypress→glass")
+    }
+
+    /// The same in full screen, one pane (#285). With
+    /// `TEST_RUNNER_CORTA_DIRECT_FULLSCREEN` under Benchmark, the spike's
+    /// blockers are removed too, so the three-way comparison is this test
+    /// with and without it, alternated with `testKeypressToGlass`.
+    @MainActor
+    func testKeypressToGlassFullScreen() throws {
         let app = try launchSettled()
+        try enterFullScreen(app)
+        let blockers = ProcessInfo.processInfo.environment["CORTA_DIRECT_FULLSCREEN"] ?? "none"
+        try typeAndReport(app, label: "full-screen (direct: \(blockers)) keypress→glass")
+    }
+
+    /// ⌃⌘F, then waits for the window to cover the screen; keeps a
+    /// screenshot of what full screen looks like.
+    @MainActor
+    private func enterFullScreen(_ app: XCUIApplication) throws {
+        let window = app.windows.firstMatch
+        app.typeKey("f", modifierFlags: [.command, .control])
+        // On a notched panel full screen stops below the camera band (a
+        // point more than `safeAreaInsets.top` on the M5 Air).
+        let screen = NSScreen.main?.frame.size ?? .zero
+        let band = (NSScreen.main?.safeAreaInsets.top ?? 0) + 2
+        func covers() -> Bool {
+            window.frame.width == screen.width && window.frame.height >= screen.height - band
+        }
+        let deadline = Date().addingTimeInterval(10)
+        while !covers(), Date() < deadline { pause(0.5) }
+        XCTAssertTrue(covers(), "the window \(window.frame.size) never covered the screen \(screen)")
+        pause(2)  // the Space transition finishes after the frame does
+        // The runner takes the foreground back across the Space switch.
+        app.activate()
+        pause(1)
+        let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "none"
+        XCTAssertEqual(app.state, .runningForeground, "frontmost after full screen: \(front)")
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = "full-screen"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    @MainActor
+    private func typeAndReport(_ app: XCUIApplication, label: String) throws {
         let count = ProcessInfo.processInfo.environment["CORTA_MEASUREMENT_KEY_COUNT"].flatMap(Int.init) ?? 320
         guard (32...2000).contains(count) else { return XCTFail("keypress count must be 32...2000") }
         for index in 0..<count {
             guard app.state == .runningForeground else {
-                return XCTFail("Corta left the foreground after \(index) keystrokes; typing stopped")
+                return XCTFail("Corta left the foreground (state \(app.state.rawValue)) after \(index) keystrokes; typing stopped")
             }
             // A digit: what earlier runs typed, and what a CJK input
             // method passes straight through if one is still selected.
@@ -308,7 +352,7 @@ final class MeasurementUITests: XCTestCase {
             pause(0.15)
         }
         let lines = try waitForMetrics(["keypressToPresent"], timeout: 30)
-        report(lines.map { "scripted keypress→glass \($0)" })
+        report(lines.map { "\(label) \($0)" })
         app.typeKey("u", modifierFlags: .control)  // clear the line of digits
         removeMetricsFile(through: app)
         app.terminate()

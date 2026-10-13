@@ -236,6 +236,7 @@ final class SplitViewController: NSViewController {
         for pane in panes {
             guard let terminalView = pane.terminalView else { continue }
             terminalView.directPresentation = active
+            pane.terminalRenderer?.presentsThroughLegacyQueue = active.contains(.present)
             terminalView.shellOverlay.isHidden = hidesOverlays
             if hidesOverlays { pane.inputSourceIndicator.view.isHidden = true }
         }

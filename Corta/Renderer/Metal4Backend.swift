@@ -124,6 +124,39 @@ public nonisolated final class Metal4Backend {
     /// Created once and re-pointed each frame: no per-frame allocation.
     private let renderPassDescriptor = MTL4RenderPassDescriptor()
 
+    /// The #285 spike (`CORTA_DIRECT_FULLSCREEN`, `present`): a drawable a
+    /// Metal 4 command buffer wrote is never presented directly to the
+    /// display (measured on macOS 27, `PERFORMANCE.md` §5.17). While set, a
+    /// frame renders into `legacyStaging`, and a classic `MTLCommandQueue`
+    /// copies it into the drawable and presents that — which is. The layer
+    /// must not be `framebufferOnly` meanwhile.
+    var presentsThroughLegacyQueue = false
+    private lazy var legacyQueue: MTLCommandQueue? = device.makeCommandQueue()
+    private lazy var legacyRendered: MTLSharedEvent? = device.makeSharedEvent()
+    private lazy var legacyCopied: MTLSharedEvent? = device.makeSharedEvent()
+    private var legacyFrame: UInt64 = 0
+    private var legacyStaging: MTLTexture?
+    /// The drawable texture the current frame was redirected from.
+    private var legacyTarget: MTLTexture?
+
+    private func legacyStagingTexture(like target: MTLTexture) -> MTLTexture? {
+        if let legacyStaging, legacyStaging.width == target.width,
+            legacyStaging.height == target.height, legacyStaging.pixelFormat == target.pixelFormat
+        {
+            return legacyStaging
+        }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: target.pixelFormat, width: target.width, height: target.height, mipmapped: false)
+        descriptor.usage = [.renderTarget]
+        descriptor.storageMode = .private
+        guard let fresh = device.makeTexture(descriptor: descriptor) else { return nil }
+        if let legacyStaging { residencySet.removeAllocation(legacyStaging) }
+        residencySet.addAllocation(fresh)
+        residencySet.commit()
+        legacyStaging = fresh
+        return fresh
+    }
+
     /// Frames in flight: the depth of every per-slot ring.
     static let frameSlotCount = 3
 
@@ -370,6 +403,12 @@ public nonisolated final class Metal4Backend {
         let commandBuffer = commandBuffers[slot]
         commandBuffer.label = label
         commandBuffer.beginCommandBuffer(allocator: allocator)
+        legacyTarget = nil
+        var target = target
+        if presentsThroughLegacyQueue, let staging = legacyStagingTexture(like: target) {
+            legacyTarget = target
+            target = staging
+        }
         renderPassDescriptor.colorAttachments[0].texture = target
         renderPassDescriptor.colorAttachments[0].loadAction = .clear
         renderPassDescriptor.colorAttachments[0].clearColor = clearColor
@@ -442,8 +481,14 @@ public nonisolated final class Metal4Backend {
         let commandBuffer = commandBuffers[currentSlot]
         commandBuffer.endCommandBuffer()
 
-        // `MTL4CommandQueue`'s contract; a queue-side ordering, not a CPU block.
-        if let drawable {
+        // The redirected frame's drawable texture, when it is presented by copy.
+        let legacy = legacyTarget.flatMap { target in drawable.map { (target, $0) } }
+        legacyTarget = nil
+        if legacy != nil, let legacyCopied {
+            // The staging texture is free once the previous copy finished.
+            queue.waitForEvent(legacyCopied, value: legacyFrame)
+        } else if let drawable {
+            // `MTL4CommandQueue`'s contract; a queue-side ordering, not a CPU block.
             queue.waitForDrawable(drawable)
         }
         let options = MTL4CommitOptions()
@@ -469,7 +514,22 @@ public nonisolated final class Metal4Backend {
             }
         }
         queue.commit([commandBuffer], options: options)
-        if let drawable {
+        if let (target, drawable) = legacy, let legacyQueue, let legacyRendered, let legacyCopied,
+            let staging = legacyStaging, let copy = legacyQueue.makeCommandBuffer()
+        {
+            legacyFrame += 1
+            queue.signalEvent(legacyRendered, value: legacyFrame)
+            copy.label = "Corta.legacyPresent"
+            // Before any encoder: a wait cannot be encoded while one is open.
+            copy.encodeWaitForEvent(legacyRendered, value: legacyFrame)
+            let blit = copy.makeBlitCommandEncoder()
+            blit?.copy(from: staging, to: target)
+            blit?.endEncoding()
+            copy.encodeSignalEvent(legacyCopied, value: legacyFrame)
+            RenderMetrics.notePresent(of: drawable, snapshotAt: echoSnapshotAt)
+            copy.present(drawable)
+            copy.commit()
+        } else if let drawable {
             // After the commits targeting it, before presenting (MTL4 contract).
             queue.signalDrawable(drawable)
             RenderMetrics.notePresent(of: drawable, snapshotAt: echoSnapshotAt)

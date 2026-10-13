@@ -50,6 +50,7 @@ struct DiagnosticsEnvironmentTests {
         #expect(
             DiagnosticsEnvironment.directFullScreen(in: [name: "mask, overlays,bogus"], enabled: true)
                 == [.mask, .overlays])
+        #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "present"], enabled: true) == .present)
         #expect(DiagnosticsEnvironment.directFullScreen(in: [name: "0"], enabled: true).isEmpty)
     }
 
