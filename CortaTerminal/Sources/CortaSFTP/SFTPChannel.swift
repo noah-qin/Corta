@@ -96,8 +96,10 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
 
     public static let subsystemName = "sftp"
 
-    /// `--` keeps a hostile `host` from becoming an option; user, port, keys and
-    /// jump hosts come from `~/.ssh/config`.
+    /// `--` keeps a hostile `host` from becoming an option. User, port, keys
+    /// and jump hosts come from `~/.ssh/config`, unless `options` — which the
+    /// caller has validated, since they are passed as they are — name a user
+    /// (`-l`), a port (`-p`) or a key (`-i`) of their own.
     ///
     /// What a file channel never needs is switched off, as `sftp(1)` itself
     /// does: a `ForwardAgent yes` meant for interactive logins would hand the
@@ -108,8 +110,8 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         "-oPermitLocalCommand=no",
     ]
 
-    public static func arguments(host: String) -> [String] {
-        channelOptions + ["-s", "--", host, subsystemName]
+    public static func arguments(host: String, options: [String] = []) -> [String] {
+        channelOptions + options + ["-s", "--", host, subsystemName]
     }
 
     public let processIdentifier: pid_t

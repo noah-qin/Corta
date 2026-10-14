@@ -230,8 +230,40 @@ struct SFTPBrowserModelTests {
         model.connect()
         await Task.yield()
         #expect(fake.connectedHosts.isEmpty)
-        #expect(model.connectionState == .failed(message: L10n.text("ui.connect.invalidHost")))
+        #expect(model.connectionState == .failed(message: RemoteConnectForm.message(.host)))
         #expect(model.hostField == "evil;touch x", "left in the field to correct")
+    }
+
+    @Test("a typed user, port and key name the connection and reach ssh with it")
+    func typedFieldsNameTheConnection() async throws {
+        let fake = FakeSFTPClient()
+        let model = SFTPBrowserModel(host: nil, startDirectory: nil) { host in
+            fake.connectedHosts.append(host)
+            return fake
+        }
+        let host = "fields-\(UUID().uuidString.prefix(8).lowercased())"
+        model.fields = SSHTargetFields(host: host, user: "deploy", port: "2222")
+        model.connect()
+        await Task.yield()
+        #expect(fake.connectedHosts == ["deploy@\(host):2222"])
+        #expect(model.host == "deploy@\(host):2222")
+        // How `SFTPConnection.forApp` spawns it, and remote editing after it.
+        #expect(SSHTarget.resolve("deploy@\(host):2222")?.sshOptions == ["-l", "deploy", "-p", "2222"])
+    }
+
+    @Test("a form problem is said in its own words, and nothing is spawned")
+    func formProblemIsShown() async {
+        let fake = FakeSFTPClient()
+        let model = SFTPBrowserModel(host: nil, startDirectory: nil) { host in
+            fake.connectedHosts.append(host)
+            return fake
+        }
+        model.fields = SSHTargetFields(host: "deploy@box", user: "other")
+        model.connect()
+        await Task.yield()
+        #expect(fake.connectedHosts.isEmpty)
+        #expect(model.connectionState == .failed(message: RemoteConnectForm.message(.userTwice)))
+        #expect(model.fields.user == "other", "left in the fields to correct")
     }
 
     /// A host the pane *reported* is a suggestion: the window opens on the

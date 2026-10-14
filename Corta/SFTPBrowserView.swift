@@ -106,7 +106,7 @@ struct SFTPBrowserView: View {
     private func hostEntry(error: String?) -> some View {
         ScrollView {
             RemoteConnectForm(
-                mode: .sftp, host: $model.hostField,
+                mode: .sftp, fields: $model.fields,
                 notice: model.suggestedHost.map { L10n.format("sftp.host.suggestedMessage", $0) },
                 error: error,
                 onConnect: { model.isFailed ? model.retry() : model.connect() })

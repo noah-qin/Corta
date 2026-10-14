@@ -99,20 +99,40 @@ struct RecentHostsStoreTests {
             .appendingPathComponent("recent-hosts.json")
     }
 
+    private func target(_ host: String, user: String = "", port: String = "") throws -> SSHTarget {
+        try SSHTarget.parse(host: host, user: user, port: port).get()
+    }
+
     @Test("newest first, no duplicates, trimmed to the limit, persisted owner-only")
     func recordAndPersist() throws {
         let url = temporaryStoreURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let store = RecentHostsStore(fileURL: url)
-        for index in 0..<10 { store.record("host-\(index)") }
-        store.record("host-3")
-        #expect(store.hosts.count == RecentHostsStore.limit)
-        #expect(store.hosts.first == "host-3")
-        #expect(store.hosts.filter { $0 == "host-3" }.count == 1)
+        for index in 0..<10 { store.record(try target("host-\(index)")) }
+        store.record(try target("host-3"))
+        #expect(store.targets.count == RecentHostsStore.limit)
+        #expect(store.targets.first?.displayName == "host-3")
+        #expect(store.targets.filter { $0.displayName == "host-3" }.count == 1)
 
         let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
         #expect(mode == 0o600)
-        #expect(RecentHostsStore(fileURL: url).hosts == store.hosts, "read back after a relaunch")
+        #expect(RecentHostsStore(fileURL: url).targets == store.targets, "read back after a relaunch")
+    }
+
+    @Test("a connection is remembered with the user, port and key it was made with")
+    func recordsTheFields() throws {
+        let url = temporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let store = RecentHostsStore(fileURL: url)
+        var made = try target("box", user: "deploy", port: "2222")
+        // A key that has moved since is kept: connecting says it is missing.
+        made.identityFile = "/nonexistent/id_ed25519"
+        store.record(made)
+        #expect(RecentHostsStore(fileURL: url).targets == [made])
+        // Again with another key: one entry, the newer key.
+        made.identityFile = "/nonexistent/id_rsa"
+        store.record(made)
+        #expect(store.targets == [made])
     }
 
     @Test("a name no one could type is refused, from a call or from the file")
@@ -120,33 +140,51 @@ struct RecentHostsStoreTests {
         let url = temporaryStoreURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let store = RecentHostsStore(fileURL: url)
-        store.record("-oProxyCommand=evil")
-        store.record("box; rm -rf /")
-        #expect(store.hosts.isEmpty)
+        store.record(SSHTarget(host: "-oProxyCommand=evil"))
+        store.record(SSHTarget(host: "box; rm -rf /"))
+        store.record(SSHTarget(host: "box", user: "-oEvil"))
+        store.record(SSHTarget(host: "box", identityFile: "relative/key"))
+        #expect(store.targets.isEmpty)
 
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(#"{"version":1,"hosts":["ok-box","-oEvil","a b"]}"#.utf8).write(to: url)
-        #expect(RecentHostsStore(fileURL: url).hosts == ["ok-box"])
+        try Data(#"{"version":2,"targets":[{"host":"ok-box"},{"host":"-oEvil"},{"host":"b","port":70000}]}"#.utf8)
+            .write(to: url)
+        #expect(RecentHostsStore(fileURL: url).targets.map(\.displayName) == ["ok-box"])
+    }
+
+    @Test("a version-1 file of names reads back as targets")
+    func readsVersionOne() throws {
+        let url = temporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(#"{"version":1,"hosts":["ok-box","deploy@web","-oEvil","a b"]}"#.utf8).write(to: url)
+        let targets = RecentHostsStore(fileURL: url).targets
+        #expect(targets.map(\.displayName) == ["ok-box", "deploy@web"])
+        #expect(targets.last?.user == "deploy")
     }
 
     @Test("remove forgets one; clear forgets all and deletes the file")
-    func removeAndClear() {
+    func removeAndClear() throws {
         let url = temporaryStoreURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let store = RecentHostsStore(fileURL: url)
-        store.record("a-box")
-        store.record("b-box")
-        store.remove("a-box")
-        #expect(store.hosts == ["b-box"])
+        store.record(try target("a-box"))
+        store.record(try target("b-box"))
+        store.remove(try target("a-box"))
+        #expect(store.targets.map(\.displayName) == ["b-box"])
         store.clear()
-        #expect(store.hosts.isEmpty)
+        #expect(store.targets.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: url.path))
     }
 
     @Test("typing narrows the suggestions, case-insensitively")
     func filtering() {
-        #expect(RemoteConnectForm.matching(["Build-Box", "web"], "box") == ["Build-Box"])
-        #expect(RemoteConnectForm.matching(["a", "b"], "") == ["a", "b"])
+        let names: [RemoteConnectForm.Suggestion] = [.alias("Build-Box"), .alias("web")]
+        #expect(RemoteConnectForm.matching(names, "box") == [.alias("Build-Box")])
+        #expect(RemoteConnectForm.matching(names, "") == names)
+        let recent = RemoteConnectForm.Suggestion.recent(SSHTarget(host: "box", user: "deploy", port: 2222))
+        #expect(RemoteConnectForm.matching([recent], "deploy@") == [recent], "a recent matches on its whole name")
     }
 }

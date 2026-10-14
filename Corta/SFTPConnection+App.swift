@@ -38,11 +38,14 @@ extension SFTPConnection {
         // same scope, so a browser upload and a remote-edit save to one file
         // take turns instead of sharing its partial.
         engine.destinationScope = host
-        if let override = DiagnosticsEnvironment.sftpSSHExecutable() {
-            return SFTPConnection(
-                host: host, sshExecutable: override, environment: environment,
-                engineConfiguration: engine)
-        }
-        return SFTPConnection(host: host, environment: environment, engineConfiguration: engine)
+        // `host` names the destination as the browser and remote editing do;
+        // one the connect form made with a user, port or key is spawned with
+        // them (`SSHTarget.resolve`). Callers have already checked the name.
+        let target = SSHTarget.resolve(host) ?? SSHTarget(host: host)
+        let arguments = SFTPSubprocessChannel.arguments(host: target.host, options: target.sshOptions)
+        return SFTPConnection(
+            host: host,
+            sshExecutable: DiagnosticsEnvironment.sftpSSHExecutable() ?? SFTPSubprocessChannel.defaultSSHPath,
+            arguments: arguments, environment: environment, engineConfiguration: engine)
     }
 }

@@ -51,6 +51,24 @@ struct SFTPSSHIntegrationTests {
         await #expect(throws: SFTPError.self) { try await connection.listDirectory(path: "/") }
     }
 
+    /// The connect sheet's fields, not the config, name the user, port and
+    /// key: the argv `SFTPSubprocessChannel.arguments(host:options:)` builds
+    /// for them reaches a real sshd.
+    @Test("a user, port and key given as options sign in")
+    func optionsSignIn() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        let port = try #require(environment["CORTA_SSH_TEST_PORT"])
+        let options = ["-F", root.appendingPathComponent("bare.conf").path,
+            "-l", NSUserName(), "-p", port,
+            "-i", root.appendingPathComponent("client").path, "-oIdentitiesOnly=yes"]
+        let connection = SFTPConnection(
+            host: "127.0.0.1",
+            arguments: SFTPSubprocessChannel.arguments(host: "127.0.0.1", options: options),
+            environment: environment)
+        defer { connection.close() }
+        #expect(try await connection.connect().version == 3)
+    }
+
     @Test("wrong client key cannot establish an SFTP session")
     func authenticationFails() async {
         let connection = client(config: "auth-failure.conf")

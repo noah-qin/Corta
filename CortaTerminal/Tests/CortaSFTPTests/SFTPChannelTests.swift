@@ -37,7 +37,11 @@ struct SFTPChannelTests {
                 == options + ["-s", "--", "example.com", "sftp"])
         #expect(
             SFTPSubprocessChannel.arguments(host: "-oProxyCommand=evil")
-                == options + ["-s", "--", "-oProxyCommand=evil", "sftp"])
+                == options + ["-s", "--", "-oProxyCommand=evil", "sftp"])        // A destination's own user, port and key go ahead of `-s` and `--`,
+        // after the forwarding switches a file channel never needs.
+        #expect(
+            SFTPSubprocessChannel.arguments(host: "box", options: ["-l", "deploy", "-p", "2222"])
+                == options + ["-l", "deploy", "-p", "2222", "-s", "--", "box", "sftp"])
     }
 
     @Test("exit 255 with a permission refusal is an authentication failure")

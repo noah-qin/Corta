@@ -138,9 +138,9 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
     private let state = Mutex(State())
 
     /// `arguments`, when given, replaces the `ssh -s -- <host> sftp` argv
-    /// outright — the seam that lets `/usr/libexec/sftp-server -d <dir>`
-    /// stand in for ssh in `SFTPRealServerTests`. Production passes
-    /// neither.
+    /// outright. The app passes `SFTPSubprocessChannel.arguments(host:options:)`
+    /// with a destination's user, port and key; `SFTPRealServerTests` passes
+    /// `/usr/libexec/sftp-server -d <dir>`'s, to stand it in for ssh.
     private let arguments: [String]?
     /// The ssh child's environment — see `SFTPSubprocessChannel.spawn`.
     private let environment: [String: String]

@@ -19,15 +19,11 @@ import SwiftUI
 
 /// A user-entered destination becomes argv for system OpenSSH, never shell text.
 nonisolated enum SSHDestination {
-    static func preset(host: String, port: Int? = nil) -> Preset? {
-        let host = host.trimmingCharacters(in: .whitespacesAndNewlines)
-        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-@:[]")
-        guard !host.isEmpty, !host.hasPrefix("-"), host.unicodeScalars.allSatisfy(allowed.contains),
-              (port == nil || (1...65535).contains(port!)), host.filter({ $0 == "@" }).count <= 1,
-              !host.hasPrefix("@"), !host.hasSuffix("@") else { return nil }
-        var preset = Preset(name: host)
+    static func preset(for target: SSHTarget) -> Preset {
+        var preset = Preset(name: target.displayName)
         preset.shell = "/usr/bin/ssh"
-        preset.arguments = (port.map { ["-p", String($0)] } ?? []) + ["--", host]
+        preset.arguments = target.sshArguments
+        preset.connectTarget = target
         return preset
     }
 }
@@ -72,8 +68,8 @@ final class RemoteConnectController: NSWindowController {
         window.isReleasedWhenClosed = false
         super.init(window: window)
         let hosting = NSHostingController(
-            rootView: RemoteConnectSheet(draft: draft) { [weak self] mode, host, port in
-                self?.connect(mode: mode, host: host, port: port) ?? false
+            rootView: RemoteConnectSheet(draft: draft) { [weak self] mode, fields in
+                self?.connect(mode: mode, fields: fields)
             })
         hosting.sizingOptions = .preferredContentSize
         window.contentViewController = hosting
@@ -113,24 +109,26 @@ final class RemoteConnectController: NSWindowController {
         }
     }
 
-    /// Validated again here — the form's check is for the message, this one
-    /// is the boundary. Returns whether the dialog may close.
-    private func connect(mode: RemoteConnectMode, host: String, port: Int?) -> Bool {
+    /// Validated here, at the boundary: a problem keeps the dialog open and
+    /// is what it shows. Nil once the dialog may close.
+    private func connect(mode: RemoteConnectMode, fields: SSHTargetFields) -> SSHTarget.Problem? {
+        let target: SSHTarget
+        switch fields.target {
+        case .success(let value): target = value
+        case .failure(let problem): return problem
+        }
+        close()
+        SSHTarget.remember(target)
         switch mode {
         case .ssh:
-            guard let preset = SSHDestination.preset(host: host, port: port) else { return false }
-            close()
-            // Recent hosts are names, and picking one connects on port 22 or
-            // the alias's own: a connection on a typed port is not offered
-            // again, where it would quietly reach a different port.
-            if port == nil { RecentHostsStore.shared.record(host) }
-            (NSApp.delegate as? AppDelegate)?.launchPreset(preset, inNewWindow: true)
+            RecentHostsStore.shared.record(target)
+            (NSApp.delegate as? AppDelegate)?.launchPreset(
+                SSHDestination.preset(for: target), inNewWindow: true)
         case .sftp:
-            guard SSHDestination.preset(host: host) != nil else { return false }
-            close()
-            SFTPBrowserController.open(host: host.trimmingCharacters(in: .whitespacesAndNewlines))
+            // Recorded once connected, by the browser.
+            SFTPBrowserController.open(host: target.displayName)
         }
-        return true
+        return nil
     }
 }
 
@@ -139,17 +137,15 @@ final class RemoteConnectController: NSWindowController {
 @MainActor @Observable
 final class RemoteConnectDraft {
     var mode: RemoteConnectMode = .ssh
-    var host = ""
-    var port = ""
-    var invalid = false
+    var fields = SSHTargetFields()
+    var problem: SSHTarget.Problem?
     /// Bumped on reset, so the host field takes focus again.
     var generation = 0
 
     func reset(mode: RemoteConnectMode) {
         self.mode = mode
-        host = ""
-        port = ""
-        invalid = false
+        fields = SSHTargetFields()
+        problem = nil
         generation += 1
     }
 }
@@ -157,43 +153,29 @@ final class RemoteConnectDraft {
 /// The dialog's content: the shared form, with Cancel.
 private struct RemoteConnectSheet: View {
     @Bindable var draft: RemoteConnectDraft
-    let connect: (RemoteConnectMode, String, Int?) -> Bool
+    let connect: (RemoteConnectMode, SSHTargetFields) -> SSHTarget.Problem?
 
     var body: some View {
         RemoteConnectForm(
-            mode: draft.mode, host: $draft.host,
-            port: draft.mode == .ssh ? $draft.port : nil,
-            error: draft.invalid ? L10n.text(draft.mode == .ssh ? "ui.ssh.invalid" : "ui.connect.invalidHost") : nil,
+            mode: draft.mode, fields: $draft.fields,
+            error: draft.problem.map(RemoteConnectForm.message),
             focusGeneration: draft.generation,
             onCancel: { RemoteConnectController.shared.close() },
-            onConnect: submit)
-            .onChange(of: draft.host) { draft.invalid = false }
-            .onChange(of: draft.port) { draft.invalid = false }
+            onConnect: { draft.problem = connect(draft.mode, draft.fields) })
+            .onChange(of: draft.fields) { draft.problem = nil }
             .padding(20)
             .frame(width: 460)
     }
-
-    private func submit() {
-        let value = draft.port.trimmingCharacters(in: .whitespaces)
-        let port = Int(value)
-        guard value.isEmpty || port != nil, connect(draft.mode, draft.host, port) else {
-            draft.invalid = true
-            return
-        }
-        draft.invalid = false
-    }
 }
 
+
 /// The connect form both dialogs and the file browser's own host step use:
-/// a heading, the host (and for SSH the port), the hosts it can suggest,
-/// what went wrong if anything did, and what the connection relies on.
+/// a heading, the host, user, port and key, the hosts it can suggest, what
+/// went wrong if anything did, and what the connection relies on.
 struct RemoteConnectForm: View {
     let mode: RemoteConnectMode
-    @Binding var host: String
-    /// SSH only: SFTP's channel is `ssh -s`, which takes its port from the
-    /// SSH configuration.
-    var port: Binding<String>?
-    /// A line above the field — where a prefilled name came from.
+    @Binding var fields: SSHTargetFields
+    /// A line above the fields — where a prefilled name came from.
     var notice: String?
     var error: String?
     var focusGeneration = 0
@@ -202,8 +184,42 @@ struct RemoteConnectForm: View {
 
     @FocusState private var hostFocused: Bool
     @State private var aliases: [String] = []
-    @State private var recents: [String] = []
-    @State private var picked: String?
+    @State private var recents: [SSHTarget] = []
+    @State private var picked: Suggestion?
+
+    /// A row in the suggestion well: a recent connection fills every
+    /// field it was made with; an alias only the host, leaving the rest to
+    /// its `~/.ssh/config` entry.
+    enum Suggestion: Hashable {
+        case recent(SSHTarget)
+        case alias(String)
+
+        var name: String {
+            switch self {
+            case .recent(let target): target.displayName
+            case .alias(let name): name
+            }
+        }
+
+        var fields: SSHTargetFields {
+            switch self {
+            case .recent(let target): SSHTargetFields(target)
+            case .alias(let name): SSHTargetFields(host: name)
+            }
+        }
+    }
+
+    /// The text a problem is shown as.
+    static func message(_ problem: SSHTarget.Problem) -> String {
+        switch problem {
+        case .host: L10n.text("ui.connect.problem.host")
+        case .user: L10n.text("ui.connect.problem.user")
+        case .userTwice: L10n.text("ui.connect.problem.userTwice")
+        case .port: L10n.text("ui.connect.problem.port")
+        case .identityFile: L10n.text("ui.connect.problem.identityFile")
+        case .identityFileMissing: L10n.text("ui.connect.problem.identityFileMissing")
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -220,23 +236,28 @@ struct RemoteConnectForm: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Form {
-                TextField(L10n.text("ui.ssh.host"), text: $host, prompt: Text(verbatim: "user@hostname"))
+                TextField(L10n.text("ui.ssh.host"), text: $fields.host, prompt: Text(verbatim: "hostname"))
                     .focused($hostFocused)
                     .onSubmit(onConnect)
                     // ↓ and ↑ walk the suggestions from the field, the way an
                     // address bar's do; Return then connects to the one picked.
                     .onKeyPress(.downArrow) { stepSuggestion(by: 1) }
                     .onKeyPress(.upArrow) { stepSuggestion(by: -1) }
-                if let port {
-                    TextField(L10n.text("ui.ssh.port"), text: port, prompt: Text(verbatim: "22"))
-                        .frame(width: 90)
-                        .onSubmit(onConnect)
-                        .help(L10n.text("ui.ssh.portDefault"))
-                }
+                    .accessibilityIdentifier("connect-host")
+                TextField(L10n.text("ui.connect.user"), text: $fields.user,
+                          prompt: Text(L10n.text("ui.connect.fromConfig")))
+                    .onSubmit(onConnect)
+                    .accessibilityIdentifier("connect-user")
+                TextField(L10n.text("ui.ssh.port"), text: $fields.port, prompt: Text(verbatim: "22"))
+                    .frame(width: 90)
+                    .onSubmit(onConnect)
+                    .help(L10n.text("ui.ssh.portDefault"))
+                    .accessibilityIdentifier("connect-port")
+                LabeledContent(L10n.text("ui.connect.identity")) { identityRow }
             }
             .formStyle(.columns)
             .textFieldStyle(.roundedBorder)
-            if !visibleRecents.isEmpty || !visibleAliases.isEmpty {
+            if !visibleSuggestions.isEmpty {
                 suggestions
             }
             if let error {
@@ -259,57 +280,118 @@ struct RemoteConnectForm: View {
                 }
                 Button(L10n.text("sftp.host.connect"), action: onConnect)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(host.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(fields.isEmpty)
             }
             .controlSize(.large)
         }
         .onAppear { hostFocused = true }
         .onChange(of: focusGeneration) { hostFocused = true }
         .task(id: focusGeneration) {
-            recents = RecentHostsStore.shared.hosts
+            recents = RecentHostsStore.shared.targets
             // A file read, off the main actor; small, bounded, read-only.
             aliases = await Task.detached(priority: .userInitiated) { SSHConfigHosts.aliases() }.value
         }
     }
 
+    /// The chosen key's path, or what applies without one, with Choose… and
+    /// a way back to the default.
+    private var identityRow: some View {
+        HStack(spacing: 6) {
+            Text(fields.identityFile.isEmpty
+                 ? L10n.text("ui.connect.identityDefault")
+                 : (fields.identityFile as NSString).abbreviatingWithTildeInPath)
+                .foregroundStyle(fields.identityFile.isEmpty ? .secondary : .primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(fields.identityFile)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if !fields.identityFile.isEmpty {
+                Button {
+                    fields.identityFile = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help(L10n.text("ui.connect.identityClear"))
+                .accessibilityLabel(L10n.text("ui.connect.identityClear"))
+            }
+            Button(L10n.text("ui.connect.identityChoose"), action: chooseIdentity)
+                .accessibilityIdentifier("connect-identity-choose")
+        }
+    }
+
+    /// An open panel in `~/.ssh`, hidden files shown. A `.pub` chosen by
+    /// mistake becomes its private half when that file is there — ssh
+    /// signs with the private key, never the public one.
+    private func chooseIdentity() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.showsHiddenFiles = true
+        panel.message = L10n.text("ui.connect.identityPanel")
+        // The real home: the `ssh` this spawns reads the real `~/.ssh`.
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".ssh", isDirectory: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        var path = url.path
+        if url.pathExtension == "pub" {
+            let privateHalf = url.deletingPathExtension().path
+            if FileManager.default.isReadableFile(atPath: privateHalf) { path = privateHalf }
+        }
+        fields.identityFile = path
+    }
+
     private var help: String {
         switch mode {
         case .ssh: L10n.text("ui.ssh.help")
-        case .sftp: L10n.text("ui.sftp.authHelp") + " " + L10n.text("ui.connect.portHint")
+        case .sftp: L10n.text("ui.sftp.authHelp")
         }
     }
 
     /// What has been typed narrows the list, the way an address field's
-    /// suggestions do; a picked name shows every suggestion again.
+    /// suggestions do; a picked suggestion shows every one again.
     private var filter: String {
-        let typed = host.trimmingCharacters(in: .whitespaces)
-        return typed == picked ? "" : typed
+        if let picked, picked.fields == fields { return "" }
+        return fields.host.trimmingCharacters(in: .whitespaces)
     }
 
-    private var visibleRecents: [String] { Self.matching(recents, filter) }
-    private var visibleAliases: [String] {
-        Self.matching(aliases.filter { !recents.contains($0) }, filter)
+    private var visibleRecents: [Suggestion] {
+        Self.matching(recents.map(Suggestion.recent), filter)
+    }
+
+    private var visibleAliases: [Suggestion] {
+        let recentHosts = Set(recents.map(\.displayName))
+        return Self.matching(
+            aliases.filter { !recentHosts.contains($0) }.map(Suggestion.alias), filter)
+    }
+
+    private var visibleSuggestions: [Suggestion] { visibleRecents + visibleAliases }
+
+    private func pick(_ suggestion: Suggestion) {
+        picked = suggestion
+        fields = suggestion.fields
     }
 
     /// Moves the pick through the visible suggestions, recents first.
     private func stepSuggestion(by delta: Int) -> KeyPress.Result {
-        let names = visibleRecents + visibleAliases
-        guard !names.isEmpty else { return .ignored }
-        let current = picked.flatMap { names.firstIndex(of: $0) }
-        let next = current.map { min(max($0 + delta, 0), names.count - 1) }
-            ?? (delta > 0 ? 0 : names.count - 1)
-        picked = names[next]
-        host = names[next]
+        let suggestions = visibleSuggestions
+        guard !suggestions.isEmpty else { return .ignored }
+        let current = picked.flatMap { suggestions.firstIndex(of: $0) }
+        let next = current.map { min(max($0 + delta, 0), suggestions.count - 1) }
+            ?? (delta > 0 ? 0 : suggestions.count - 1)
+        pick(suggestions[next])
         return .handled
     }
 
-    static func matching(_ names: [String], _ filter: String) -> [String] {
-        guard !filter.isEmpty else { return names }
-        return names.filter { $0.localizedCaseInsensitiveContains(filter) }
+    static func matching(_ suggestions: [Suggestion], _ filter: String) -> [Suggestion] {
+        guard !filter.isEmpty else { return suggestions }
+        return suggestions.filter { $0.name.localizedCaseInsensitiveContains(filter) }
     }
 
     /// The suggestions, in a rounded well like the fields above: a click
-    /// fills the field, a double-click connects, the menu forgets a recent
+    /// fills the fields, a double-click connects, the menu forgets a recent
     /// host. Drawn as plain rows — a `List` brought a square frame or its
     /// own insets, and either sat badly in a rounded sheet.
     private var suggestions: some View {
@@ -327,26 +409,25 @@ struct RemoteConnectForm: View {
     }
 
     @ViewBuilder
-    private func suggestionSection(_ title: String, _ names: [String], symbol: String) -> some View {
-        if !names.isEmpty {
+    private func suggestionSection(_ title: String, _ suggestions: [Suggestion], symbol: String) -> some View {
+        if !suggestions.isEmpty {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8)
                 .frame(height: Self.headerHeight, alignment: .bottomLeading)
-            ForEach(names, id: \.self) { name in
-                suggestionRow(name, symbol: symbol)
+            ForEach(suggestions, id: \.self) { suggestion in
+                suggestionRow(suggestion, symbol: symbol)
             }
         }
     }
 
-    private func suggestionRow(_ name: String, symbol: String) -> some View {
-        let isPicked = picked == name && host == name
+    private func suggestionRow(_ suggestion: Suggestion, symbol: String) -> some View {
+        let isPicked = picked == suggestion && suggestion.fields == fields
         return Button {
-            picked = name
-            host = name
+            pick(suggestion)
         } label: {
-            Label(name, systemImage: symbol)
+            Label(suggestion.name, systemImage: symbol)
                 .labelStyle(SuggestionLabelStyle(isPicked: isPicked))
                 .foregroundStyle(isPicked ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
                 .padding(.horizontal, 8)
@@ -359,15 +440,14 @@ struct RemoteConnectForm: View {
         .buttonStyle(.plain)
         .accessibilityAddTraits(isPicked ? .isSelected : [])
         .simultaneousGesture(TapGesture(count: 2).onEnded {
-            picked = name
-            host = name
+            pick(suggestion)
             onConnect()
         })
         .contextMenu {
-            if recents.contains(name) {
+            if case .recent(let target) = suggestion {
                 Button(L10n.text("ui.connect.removeRecent")) {
-                    RecentHostsStore.shared.remove(name)
-                    recents = RecentHostsStore.shared.hosts
+                    RecentHostsStore.shared.remove(target)
+                    recents = RecentHostsStore.shared.targets
                 }
             }
         }
@@ -392,7 +472,7 @@ struct RemoteConnectForm: View {
 
     /// Exactly what there is, up to about six rows; then it scrolls.
     private var suggestionHeight: CGFloat {
-        let rows = visibleRecents.count + visibleAliases.count
+        let rows = visibleSuggestions.count
         let headers = (visibleRecents.isEmpty ? 0 : 1) + (visibleAliases.isEmpty ? 0 : 1)
         let content = CGFloat(rows) * (Self.rowHeight + 1) + CGFloat(headers) * (Self.headerHeight + 1) + 12
         return min(190, content)

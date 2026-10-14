@@ -39,6 +39,10 @@ nonisolated struct Preset: Equatable, Sendable {
     /// Added over the sanitised environment (`SECURITY.md` §4.3); a preset
     /// can add and override, never remove.
     var environment: [String: String] = [:]
+    /// Set only when the connect sheet built this preset: the destination
+    /// the user typed, which a title may name where a pane's own report is
+    /// missing (`PaneRemoteState`). Never read from or written to the file.
+    var connectTarget: SSHTarget?
 
     init(name: String) {
         self.name = name

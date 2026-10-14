@@ -19296,55 +19296,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Authentication failed connecting to %1$@:\n%2$@\n\nThe SFTP connection has no terminal, so ssh cannot ask for a password or a key passphrase here. Use a key held by ssh-agent or the keychain, or connect once in the terminal first."
+            "value": "Authentication failed connecting to %1$@:\n%2$@\n\nThe SFTP connection has no terminal, so ssh cannot ask for a password or a key passphrase here. Use a key held by ssh-agent or the keychain, or choose a private key when connecting."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连接 %1$@ 时认证失败：\n%2$@\n\nSFTP 连接没有终端，ssh 在这里无法询问密码或密钥口令。请使用 ssh-agent 或钥匙串持有的密钥，或先在终端里连接一次。"
+            "value": "连接 %1$@ 时认证失败：\n%2$@\n\nSFTP 连接没有终端，ssh 在这里无法询问密码或密钥口令。请使用 ssh-agent 或钥匙串持有的密钥，或在连接时选择私钥。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "連線 %1$@ 時驗證失敗：\n%2$@\n\nSFTP 連線沒有終端機，ssh 在這裡無法詢問密碼或金鑰密語。請使用 ssh-agent 或鑰匙圈持有的金鑰，或先在終端機裡連線一次。"
+            "value": "連線 %1$@ 時驗證失敗：\n%2$@\n\nSFTP 連線沒有終端機，ssh 在這裡無法詢問密碼或金鑰密語。請使用 ssh-agent 或鑰匙圈持有的金鑰，或在連線時選擇私密金鑰。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$@ への接続で認証に失敗しました:\n%2$@\n\nSFTP 接続には端末がないため、ssh はここでパスワードや鍵のパスフレーズを尋ねられません。ssh-agent かキーチェーンが保持する鍵を使うか、先に端末で一度接続してください。"
+            "value": "%1$@ への接続で認証に失敗しました:\n%2$@\n\nSFTP 接続には端末がないため、ssh はここでパスワードや鍵のパスフレーズを尋ねられません。ssh-agent かキーチェーンが保持する鍵を使うか、接続時に秘密鍵を選択してください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$@에 연결하는 중 인증에 실패했습니다:\n%2$@\n\nSFTP 연결에는 터미널이 없어 ssh가 여기서 암호나 키 암호 구문을 물을 수 없습니다. ssh-agent나 키체인이 보유한 키를 사용하거나, 먼저 터미널에서 한 번 연결하세요."
+            "value": "%1$@에 연결하는 중 인증에 실패했습니다:\n%2$@\n\nSFTP 연결에는 터미널이 없어 ssh가 여기서 암호나 키 암호 구문을 물을 수 없습니다. ssh-agent나 키체인이 보유한 키를 사용하거나, 연결할 때 개인 키를 선택하세요."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Authentifizierung bei %1$@ fehlgeschlagen:\n%2$@\n\nDie SFTP-Verbindung hat kein Terminal, daher kann ssh hier weder nach einem Passwort noch nach einer Schlüssel-Passphrase fragen. Verwenden Sie einen Schlüssel aus ssh-agent oder dem Schlüsselbund, oder verbinden Sie sich zuerst einmal im Terminal."
+            "value": "Authentifizierung bei %1$@ fehlgeschlagen:\n%2$@\n\nDie SFTP-Verbindung hat kein Terminal, daher kann ssh hier weder nach einem Passwort noch nach einer Schlüssel-Passphrase fragen. Verwenden Sie einen Schlüssel aus ssh-agent oder dem Schlüsselbund, oder wählen Sie beim Verbinden einen privaten Schlüssel."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Échec de l'authentification auprès de %1$@ :\n%2$@\n\nLa connexion SFTP n'a pas de terminal : ssh ne peut donc demander ici ni mot de passe ni phrase secrète de clé. Utilisez une clé détenue par ssh-agent ou le trousseau, ou connectez-vous d'abord une fois dans le terminal."
+            "value": "Échec de l'authentification auprès de %1$@ :\n%2$@\n\nLa connexion SFTP n'a pas de terminal : ssh ne peut donc demander ici ni mot de passe ni phrase secrète de clé. Utilisez une clé détenue par ssh-agent ou le trousseau, ou choisissez une clé privée lors de la connexion."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Falló la autenticación al conectar con %1$@:\n%2$@\n\nLa conexión SFTP no tiene terminal, así que ssh no puede pedir aquí una contraseña ni la frase de una clave. Usa una clave que tenga ssh-agent o el llavero, o conecta primero una vez en el terminal."
+            "value": "Falló la autenticación al conectar con %1$@:\n%2$@\n\nLa conexión SFTP no tiene terminal, así que ssh no puede pedir aquí una contraseña ni la frase de una clave. Usa una clave que tenga ssh-agent o el llavero, o elige una clave privada al conectar."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Falha na autenticação ao conectar a %1$@:\n%2$@\n\nA conexão SFTP não tem terminal, então o ssh não pode pedir senha nem a frase-secreta de uma chave aqui. Use uma chave mantida pelo ssh-agent ou pelas chaves do sistema, ou conecte uma vez no terminal primeiro."
+            "value": "Falha na autenticação ao conectar a %1$@:\n%2$@\n\nA conexão SFTP não tem terminal, então o ssh não pode pedir senha nem a frase-secreta de uma chave aqui. Use uma chave mantida pelo ssh-agent ou pelas chaves do sistema, ou escolha uma chave privada ao conectar."
           }
         }
       }
@@ -26470,55 +26470,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "SFTP uses system OpenSSH. Load a key in ssh-agent and connect in the terminal first; SFTP cannot ask for passwords."
+            "value": "SFTP uses system OpenSSH and cannot ask for a password here: use a key held by ssh-agent or the keychain, or choose one above."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "SFTP 使用系统 OpenSSH。请先在 ssh-agent 中加载密钥并通过终端连接；SFTP 无法弹出密码提示。"
+            "value": "SFTP 使用系统 OpenSSH，在这里无法询问密码：请使用 ssh-agent 或钥匙串持有的密钥，或在上方选择私钥。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
-            "state": "translated",
-            "value": "SFTP 使用系統 OpenSSH。請先在 ssh-agent 中載入金鑰並透過終端機連線；SFTP 無法顯示密碼提示。"
+            "state": "needs_review",
+            "value": "SFTP 使用系統 OpenSSH，在這裡無法詢問密碼：請使用 ssh-agent 或鑰匙圈持有的金鑰，或在上方選擇私密金鑰。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTPはシステムのOpenSSHを使用します。ssh-agentに鍵を読み込み、先にターミナルで接続してください。SFTPはパスワードを要求できません。"
+            "value": "SFTP はシステムの OpenSSH を使い、ここではパスワードを尋ねられません。ssh-agent かキーチェーンが保持する鍵を使うか、上で鍵を選択してください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP는 시스템 OpenSSH를 사용합니다. ssh-agent에 키를 추가하고 터미널에서 먼저 연결하세요. SFTP는 암호를 요청할 수 없습니다."
+            "value": "SFTP는 시스템 OpenSSH를 사용하며 여기서는 암호를 물을 수 없습니다. ssh-agent나 키체인이 보유한 키를 사용하거나 위에서 키를 선택하세요."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP verwendet System-OpenSSH. Lade einen Schlüssel in ssh-agent und verbinde dich zuerst im Terminal. SFTP kann nicht nach Passwörtern fragen."
+            "value": "SFTP verwendet das System-OpenSSH und kann hier nicht nach einem Passwort fragen: Verwenden Sie einen Schlüssel aus ssh-agent oder dem Schlüsselbund, oder wählen Sie oben einen aus."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP utilise OpenSSH. Chargez une clé dans ssh-agent et connectez-vous d’abord dans le terminal. SFTP ne peut pas demander de mot de passe."
+            "value": "SFTP utilise l'OpenSSH du système et ne peut pas demander de mot de passe ici : utilisez une clé détenue par ssh-agent ou le trousseau, ou choisissez-en une ci-dessus."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP usa OpenSSH del sistema. Carga una clave en ssh-agent y conecta primero en el terminal. SFTP no puede pedir contraseñas."
+            "value": "SFTP usa el OpenSSH del sistema y no puede pedir una contraseña aquí: usa una clave que tenga ssh-agent o el llavero, o elige una arriba."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "O SFTP usa o OpenSSH do sistema. Carregue uma chave no ssh-agent e conecte primeiro no terminal. O SFTP não pode solicitar senhas."
+            "value": "O SFTP usa o OpenSSH do sistema e não pode pedir senha aqui: use uma chave mantida pelo ssh-agent ou pelas chaves do sistema, ou escolha uma acima."
           }
         }
       }
@@ -27168,65 +27168,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Host ou alias SSH"
-          }
-        }
-      }
-    },
-    "ui.ssh.invalid": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enter a host or user@host and a port from 1 to 65535."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请输入主机或 user@host，端口范围为 1–65535。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "請輸入主機或 user@host，連接埠範圍為 1–65535。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "ホストまたはuser@hostと、1〜65535のポートを入力してください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "호스트 또는 user@host와 1~65535 범위의 포트를 입력하세요."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Gib Host oder user@host und einen Port von 1 bis 65535 ein."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Entrez un hôte ou user@host et un port de 1 à 65535."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Introduce un host o user@host y un puerto entre 1 y 65535."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Digite um host ou user@host e uma porta entre 1 e 65535."
           }
         }
       }
@@ -29860,65 +29801,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Remover dos Recentes"
-          }
-        }
-      }
-    },
-    "ui.connect.portHint": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "For a port other than 22, use a Host alias from your SSH config."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "如需使用 22 以外的端口，请在 SSH 配置中设置 Host 别名。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "如需使用 22 以外的連接埠，請在 SSH 設定中設定 Host 別名。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "22 以外のポートには、SSH 設定の Host エイリアスを使用してください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "22번 이외의 포트를 사용하려면 SSH 설정의 Host 별칭을 사용하세요."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Für einen anderen Port als 22 einen Host-Alias aus der SSH-Konfiguration verwenden."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Pour un port autre que 22, utilisez un alias Host de votre configuration SSH."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Para un puerto distinto de 22, usa un alias Host de tu configuración SSH."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Para uma porta diferente de 22, use um alias Host da sua configuração SSH."
           }
         }
       }
@@ -36698,6 +36580,773 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Iniciar"
+          }
+        }
+      }
+    },
+    "ui.connect.user": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "User"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用者"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ユーザ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "사용자"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Benutzer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Utilisateur"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Usuario"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Usuário"
+          }
+        }
+      }
+    },
+    "ui.connect.fromConfig": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From SSH config"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 SSH 配置"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用 SSH 設定"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "SSH 設定を使用"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "SSH 설정 사용"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Aus SSH-Konfiguration"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Configuration SSH"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Configuración SSH"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Configuração SSH"
+          }
+        }
+      }
+    },
+    "ui.connect.identity": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Private key"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "私钥"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "私密金鑰"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "秘密鍵"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "개인 키"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Privater Schlüssel"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Clé privée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Clave privada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Chave privada"
+          }
+        }
+      }
+    },
+    "ui.connect.identityDefault": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default keys"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认密钥"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "預設金鑰"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "既定の鍵"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "기본 키"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Standardschlüssel"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Clés par défaut"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Claves predeterminadas"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Chaves padrão"
+          }
+        }
+      }
+    },
+    "ui.connect.identityChoose": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "選擇⋯"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "選択…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "선택…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Auswählen …"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Choisir…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Elegir…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Escolher…"
+          }
+        }
+      }
+    },
+    "ui.connect.identityClear": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the default key"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改用默认密钥"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "改用預設金鑰"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "既定の鍵を使用"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "기본 키 사용"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Standardschlüssel verwenden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Utiliser la clé par défaut"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Usar la clave predeterminada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Usar a chave padrão"
+          }
+        }
+      }
+    },
+    "ui.connect.identityPanel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a private key, such as ~/.ssh/id_ed25519."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择一个私钥，例如 ~/.ssh/id_ed25519。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "選擇一個私密金鑰，例如 ~/.ssh/id_ed25519。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "秘密鍵を選択してください（例: ~/.ssh/id_ed25519）。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "개인 키를 선택하세요(예: ~/.ssh/id_ed25519)."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Wählen Sie einen privaten Schlüssel, etwa ~/.ssh/id_ed25519."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Choisissez une clé privée, par exemple ~/.ssh/id_ed25519."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Elige una clave privada, como ~/.ssh/id_ed25519."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Escolha uma chave privada, como ~/.ssh/id_ed25519."
+          }
+        }
+      }
+    },
+    "ui.connect.problem.host": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a host name, an IP address or an SSH alias."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入主机名、IP 地址或 SSH 别名。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "請輸入主機名稱、IP 位址或 SSH 別名。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ホスト名、IP アドレス、または SSH エイリアスを入力してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "호스트 이름, IP 주소 또는 SSH 별칭을 입력하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Geben Sie einen Hostnamen, eine IP-Adresse oder einen SSH-Alias ein."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Saisissez un nom d'hôte, une adresse IP ou un alias SSH."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Introduce un nombre de host, una dirección IP o un alias SSH."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Digite um nome de host, um endereço IP ou um alias SSH."
+          }
+        }
+      }
+    },
+    "ui.connect.problem.user": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A user name may use letters, digits, “.”, “_” and “-”, and cannot start with “-”."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户名只能包含字母、数字、“.”、“_”和“-”，且不能以“-”开头。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用者名稱只能包含字母、數字、「.」、「_」和「-」，且不能以「-」開頭。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ユーザ名に使えるのは英字、数字、「.」「_」「-」で、「-」で始めることはできません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "사용자 이름에는 문자, 숫자, “.”, “_”, “-”만 쓸 수 있으며 “-”로 시작할 수 없습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ein Benutzername darf Buchstaben, Ziffern, „.“, „_“ und „-“ enthalten und nicht mit „-“ beginnen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Un nom d'utilisateur peut contenir des lettres, des chiffres, « . », « _ » et « - », sans commencer par « - »."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Un nombre de usuario puede usar letras, dígitos, «.», «_» y «-», y no puede empezar por «-»."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Um nome de usuário pode usar letras, dígitos, “.”, “_” e “-”, e não pode começar com “-”."
+          }
+        }
+      }
+    },
+    "ui.connect.problem.userTwice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give the user in the User field or as user@host, not both."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户名请只在“用户”栏或 user@host 中填写一处。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用者名稱請只在「使用者」欄或 user@host 中填寫一處。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ユーザは「ユーザ」欄か user@host のどちらか一方で指定してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "사용자는 사용자 필드나 user@host 중 한 곳에만 입력하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Geben Sie den Benutzer im Feld „Benutzer“ oder als user@host an, nicht beides."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Indiquez l'utilisateur dans le champ Utilisateur ou sous la forme user@host, pas les deux."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Indica el usuario en el campo Usuario o como user@host, no en ambos."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Informe o usuário no campo Usuário ou como user@host, não nos dois."
+          }
+        }
+      }
+    },
+    "ui.connect.problem.port": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a port from 1 to 65535, or leave it empty."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "端口请填写 1–65535，或留空。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連接埠請填寫 1–65535，或留空。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ポートは 1〜65535 を入力するか、空欄のままにしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "포트는 1–65535 사이로 입력하거나 비워 두세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Geben Sie einen Port von 1 bis 65535 ein oder lassen Sie das Feld leer."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Saisissez un port de 1 à 65535, ou laissez le champ vide."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Introduce un puerto de 1 a 65535 o déjalo vacío."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Digite uma porta de 1 a 65535 ou deixe em branco."
+          }
+        }
+      }
+    },
+    "ui.connect.problem.identityFile": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A private key's path cannot contain “%” or “$”."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "私钥路径不能包含“%”或“$”。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "私密金鑰路徑不能包含「%」或「$」。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "秘密鍵のパスに「%」や「$」は使えません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "개인 키 경로에는 “%”나 “$”를 쓸 수 없습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Der Pfad eines privaten Schlüssels darf kein „%“ oder „$“ enthalten."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le chemin d'une clé privée ne peut pas contenir « % » ni « $ »."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La ruta de una clave privada no puede contener «%» ni «$»."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O caminho de uma chave privada não pode conter “%” nem “$”."
+          }
+        }
+      }
+    },
+    "ui.connect.problem.identityFileMissing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The private key file cannot be read. Choose it again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取私钥文件，请重新选择。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "無法讀取私密金鑰檔案，請重新選擇。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "秘密鍵ファイルを読み込めません。もう一度選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "개인 키 파일을 읽을 수 없습니다. 다시 선택하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Datei des privaten Schlüssels ist nicht lesbar. Wählen Sie sie erneut aus."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le fichier de clé privée est illisible. Choisissez-le à nouveau."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se puede leer el archivo de la clave privada. Elígelo de nuevo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não é possível ler o arquivo da chave privada. Escolha-o novamente."
           }
         }
       }

@@ -89,9 +89,10 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 - Remote context reported by shell integration, a host indicator and reconnect
   action. SSH connections use system OpenSSH, including its configuration,
   agent and `ProxyJump`; Corta does not provide its own SSH implementation.
-- A connect sheet for SSH and SFTP that suggests recently connected hosts and
-  the `Host` names in `~/.ssh/config` (read, never executed). SFTP's port comes
-  from a `Host` alias; the sheet has no port field for it.
+- A connect sheet for SSH and SFTP with host, user, port and private-key
+  fields, each passed to OpenSSH as its own argument; empty ones fall to
+  `~/.ssh/config`. It suggests recent connections, with the fields they used,
+  and the `Host` names in `~/.ssh/config` (read, never executed).
 - An SFTP browser for listing, transferring, renaming and deleting remote files
   and directories, with managed local copies for editing: Back and Forward, a
   breadcrumb path, sortable columns, hidden files on request, a row menu, drag

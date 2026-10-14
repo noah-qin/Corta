@@ -22,9 +22,11 @@ import Foundation
 /// character check a typed host does (`SSHDestination`), so neither file can
 /// put anything into the argv a person could not have typed.
 nonisolated enum RemoteHostName {
-    /// What `SSHDestination` accepts: a host, `user@host`, an IPv6 literal.
+    /// What the connect form accepts for a destination named as one string:
+    /// a host, `user@host`, an IPv6 literal — or one the user connected to
+    /// this run with a port or a key (`SSHTarget.resolve`).
     static func isAcceptable(_ name: String) -> Bool {
-        SSHDestination.preset(host: name) != nil
+        SSHTarget.resolve(name) != nil
     }
 }
 
@@ -174,10 +176,11 @@ nonisolated enum SSHConfigHosts {
 
 // MARK: - Recent hosts
 
-/// Hosts connected to recently, newest first — app state in Application
-/// Support, like the directory history, not a setting. Only a host the user
-/// typed or picked and then connected to is recorded; a host a remote shell
-/// merely reported is not. Cleared from Settings ▸ Privacy & Security.
+/// Connections made recently, newest first — app state in Application
+/// Support, like the directory history, not a setting. Only a destination
+/// the user typed or picked and then connected to is recorded, with the
+/// user, port and key it was made with; a host a remote shell merely
+/// reported is not. Cleared from Settings ▸ Privacy & Security.
 @MainActor
 final class RecentHostsStore {
     static let shared = RecentHostsStore(fileURL: RecentHostsStore.defaultFileURL)
@@ -190,38 +193,58 @@ final class RecentHostsStore {
 
     /// Injected so tests use a temporary file.
     let fileURL: URL
-    private(set) var hosts: [String] = []
+    private(set) var targets: [SSHTarget] = []
 
     init(fileURL: URL) {
         self.fileURL = fileURL
         load()
     }
 
-    /// Moves `host` to the front, trimmed to `limit`.
-    func record(_ host: String) {
-        let host = host.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard RemoteHostName.isAcceptable(host) else { return }
-        hosts.removeAll { $0 == host }
-        hosts.insert(host, at: 0)
-        if hosts.count > Self.limit { hosts.removeLast(hosts.count - Self.limit) }
+    /// Moves `target` to the front, trimmed to `limit`. One entry per
+    /// destination (`displayName`): connecting again with another key
+    /// replaces the key remembered.
+    func record(_ target: SSHTarget) {
+        guard let target = Self.checked(target) else { return }
+        targets.removeAll { $0.displayName == target.displayName }
+        targets.insert(target, at: 0)
+        if targets.count > Self.limit { targets.removeLast(targets.count - Self.limit) }
         save()
     }
 
-    func remove(_ host: String) {
-        hosts.removeAll { $0 == host }
+    /// A destination named as one string — the SFTP browser's — with the
+    /// fields this run connected to it with (`SSHTarget.resolve`).
+    func record(_ name: String) {
+        if let target = SSHTarget.resolve(name) { record(target) }
+    }
+
+    func remove(_ target: SSHTarget) {
+        targets.removeAll { $0.displayName == target.displayName }
         save()
     }
 
     /// Forgets every host and deletes the file.
     func clear() {
-        hosts.removeAll()
+        targets.removeAll()
         try? FileManager.default.removeItem(at: fileURL)
     }
 
+    /// The rules a typed connection passes, re-applied to a stored one: an
+    /// edited or damaged file offers nothing a person could not have typed.
+    /// A key that has since moved is kept — connecting says it is missing.
+    private static func checked(_ target: SSHTarget) -> SSHTarget? {
+        try? SSHTarget.parse(
+            host: target.host, user: target.user ?? "",
+            port: target.port.map(String.init) ?? "",
+            identityFile: target.identityFile ?? "", checkingFiles: false
+        ).get()
+    }
+
+    /// Version 1 held `host` or `user@host` strings; version 2 the fields.
     private nonisolated struct Persisted: Codable {
-        static let currentVersion = 1
+        static let currentVersion = 2
         var version: Int
-        var hosts: [String]
+        var hosts: [String]?
+        var targets: [SSHTarget]?
     }
 
     private func load() {
@@ -229,17 +252,20 @@ final class RecentHostsStore {
             let persisted = try? JSONDecoder().decode(Persisted.self, from: data),
             persisted.version <= Persisted.currentVersion
         else { return }
-        // The file is re-checked on the way in: an edited or damaged one
-        // offers nothing a person could not have typed.
-        hosts = Array(persisted.hosts.filter(RemoteHostName.isAcceptable).prefix(Self.limit))
+        let stored = persisted.targets ?? (persisted.hosts ?? []).compactMap(SSHTarget.named)
+        var seen = Set<String>()
+        targets = Array(
+            stored.compactMap(Self.checked).filter { seen.insert($0.displayName).inserted }
+                .prefix(Self.limit))
     }
 
-    /// A handful of names, written at most once per connection: small enough
-    /// to write in place. Owner-only, since host names say where you work.
+    /// A handful of entries, written at most once per connection: small
+    /// enough to write in place. Owner-only, since host names and key paths
+    /// say where you work.
     private func save() {
         guard
             let data = try? JSONEncoder().encode(
-                Persisted(version: Persisted.currentVersion, hosts: hosts))
+                Persisted(version: Persisted.currentVersion, hosts: nil, targets: targets))
         else { return }
         try? PrivateFile.write(data, to: fileURL)
     }

@@ -152,7 +152,13 @@ final class SFTPBrowserModel {
     /// `nil` until a host is known — either from the pane (`.remote`) or
     /// typed in (`.needsHost`).
     private(set) var host: String?
-    var hostField = ""
+    /// The host step's form: host, user, port and key, as typed.
+    var fields = SSHTargetFields()
+    /// The form's host field alone.
+    var hostField: String {
+        get { fields.host }
+        set { fields.host = newValue }
+    }
     private var connectionGeneration = 0
     private var directoryGeneration = 0
 
@@ -240,7 +246,7 @@ final class SFTPBrowserModel {
         self.host = host
         self.startDirectory = startDirectory
         self.suggestedHost = host == nil ? suggestedHost : nil
-        if host == nil, let suggestedHost { hostField = suggestedHost }
+        if host == nil, let suggestedHost { fields = SSHTargetFields(host: suggestedHost) }
         self.makeClient = makeClient ?? { SFTPConnection.forApp(host: $0) }
         connectionState = host == nil ? .needsHost : .connecting
     }
@@ -289,10 +295,20 @@ final class SFTPBrowserModel {
         if let host {
             name = host
         } else {
-            let trimmed = hostField.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty else { return }
-            host = trimmed
-            name = trimmed
+            guard !fields.isEmpty else { return }
+            switch fields.target {
+            case .success(let target):
+                // Named by its display name from here on; how to reach it
+                // with the user, port and key typed is remembered for the
+                // connection, remote editing and the recents.
+                SSHTarget.remember(target)
+                host = target.displayName
+                name = target.displayName
+            case .failure(let problem):
+                connectionState = .failed(message: RemoteConnectForm.message(problem))
+                updateTitle()
+                return
+            }
         }
         // The check every other way to name a host passes (`SSHDestination`):
         // this field and a pane's OSC 7 report reached ssh's argv without it,
@@ -302,7 +318,7 @@ final class SFTPBrowserModel {
             // longer showing it.
             onHostAbandoned?(name)
             host = nil
-            hostField = name
+            fill(from: name)
             connectionState = .failed(message: L10n.text("ui.connect.invalidHost"))
             updateTitle()
             return
@@ -350,8 +366,9 @@ final class SFTPBrowserModel {
             guard generation == connectionGeneration else { return }
             let error = Self.sftpError(error)
             connectionState = .failed(message: Self.errorMessage(error, host: name))
-            // Left in the field, so the name that failed can be corrected.
-            hostField = name
+            // Left in the fields, so the destination that failed can be
+            // corrected.
+            fill(from: name)
             client.close()
             self.client = nil
         }
@@ -373,8 +390,10 @@ final class SFTPBrowserModel {
         disconnect()
         backStack.removeAll()
         forwardStack.removeAll()
-        hostField = host ?? hostField
-        if let host { onHostAbandoned?(host) }
+        if let host {
+            fill(from: host)
+            onHostAbandoned?(host)
+        }
         host = nil
         connectionState = .needsHost
         updateTitle()
@@ -384,10 +403,10 @@ final class SFTPBrowserModel {
     /// which the user may have corrected.
     func retry() {
         guard isFailed else { return }
-        let typed = hostField.trimmingCharacters(in: .whitespaces)
-        if !typed.isEmpty, typed != host {
+        let typed = fields
+        if !typed.isEmpty, (try? typed.target.get())?.displayName != host {
             changeHost()
-            hostField = typed
+            fields = typed
         }
         connect()
     }
@@ -398,6 +417,12 @@ final class SFTPBrowserModel {
     func cancelConnect() {
         guard connectionState == .connecting || isFailed else { return }
         changeHost()
+    }
+
+    /// The form's fields for a destination named as one string: those it
+    /// was made with when the form made it this run, else the name itself.
+    private func fill(from name: String) {
+        fields = SSHTarget.resolve(name).map(SSHTargetFields.init) ?? SSHTargetFields(host: name)
     }
 
     var isFailed: Bool {

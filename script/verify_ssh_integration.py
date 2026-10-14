@@ -62,7 +62,10 @@ def run_fixture(root):
         (root/'ssh.conf').write_text(base);(root/'auth-failure.conf').write_text(base.replace(f'{root}/client',f'{root}/wrong'))
         (root/'key-failure.conf').write_text(base.replace(f'{root}/known_hosts',f'{root}/wrong_known_hosts'))
         wrong=(root/'wrong.pub').read_text().split();(root/'wrong_known_hosts').write_text(f'[127.0.0.1]:{port} {wrong[0]} {wrong[1]}\n')
-        env = dict(os.environ, CORTA_SSH_TEST_ROOT=str(root), SSH_AUTH_SOCK='', CORTA_TEST_TIMEOUT_SCALE='3')
+        # No user, port or key: the connect sheet's -l, -p and -i supply them.
+        (root/'bare.conf').write_text(f'Host *\n IdentityAgent none\n ForwardAgent no\n BatchMode yes\n StrictHostKeyChecking yes\n UserKnownHostsFile {root}/known_hosts\n GlobalKnownHostsFile /dev/null\n ConnectTimeout 3\n')
+        env = dict(os.environ, CORTA_SSH_TEST_ROOT=str(root), CORTA_SSH_TEST_PORT=str(port),
+                   SSH_AUTH_SOCK='', CORTA_TEST_TIMEOUT_SCALE='3')
         result = subprocess.run(['swift', 'test', '--package-path', 'CortaTerminal', '--filter', 'SFTPSSHIntegrationTests'], env=env)
         if result.returncode:
             log.flush()

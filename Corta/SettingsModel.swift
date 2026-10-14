@@ -726,7 +726,7 @@ final class SettingsModel {
     /// How many hosts the connect dialogs remember, with a Clear action —
     /// app state like the directory history, re-read on every refresh.
     private func refreshRecentHostsStatus() {
-        let count = RecentHostsStore.shared.hosts.count
+        let count = RecentHostsStore.shared.targets.count
         recentHostsStatus = RowStatus(
             kind: .adjusted, message: L10n.format("settings.recentHosts.count", count),
             actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)

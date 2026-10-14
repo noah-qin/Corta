@@ -235,9 +235,10 @@ and nothing here can tell — it is uncertainty, not an accusation.
 
 The SFTP channel has no terminal, so `ssh` cannot ask for a password or a
 passphrase there. It works when a key is held by `ssh-agent` or the
-keychain, or when `ControlMaster` in `~/.ssh/config` lets it reuse the
-connection the pane already opened. A host that only takes a password
-cannot be browsed; the error says so rather than hanging.
+keychain, when you choose a private key in the connect form, or when
+`ControlMaster` in `~/.ssh/config` lets it reuse the connection the pane
+already opened. A host that only takes a password cannot be browsed; the
+error says so rather than hanging.
 
 ### Command History shows "(command text no longer in scrollback)"
 

@@ -10,6 +10,13 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- The SSH and SFTP connect sheet has user, port and private-key fields
+  beside the host, the same for both: SFTP can now reach a non-default port
+  without a `~/.ssh/config` alias, and a chosen key is the only one offered
+  to the server. Recent connections remember the fields they were made with.
+
 ### Fixed
 
 - Configuration and user guides now include every scalar setting in the
@@ -22,6 +29,9 @@ Versioning for compatibility changes.
 - Renaming a tab and then clicking or switching to another tab, closing a
   tab or entering full screen saves the name, instead of leaving the tab
   blank and its editor stranded where the tab used to be.
+- The SFTP sign-in failure message no longer suggests connecting in the
+  terminal first, which does not let SFTP sign in; it points at a key held
+  by `ssh-agent` or the keychain, or one chosen in the connect sheet.
 
 ## [1.2.0] - 2026-10-13
 
