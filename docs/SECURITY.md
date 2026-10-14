@@ -336,23 +336,32 @@ all of these hold:
 - The socket sits in a fresh `0700` directory in the user's temporary
   folder (`mkdtemp`), mode `0600`, removed at quit.
 - The request carries the token of a live connection — 32 random bytes,
-  compared in constant time. The token lives in that ssh's environment
-  only; `ChildEnvironment` strips every `CORTA_` name from a shell's.
-- The sender (`LOCAL_PEERPID`) is the child of an ssh that connection
-  spawned, recorded as `posix_spawn` returns. The token alone is not
-  enough: the same user's processes can read ssh's environment.
-- A closed connection's token is dead: the broker holds it weakly.
+  compared in constant time. The token is in that ssh's environment, and
+  so in the environment of everything ssh itself runs: a `ProxyJump`'s
+  inner ssh, a `ProxyCommand`, a `KnownHostsCommand`. Those are programs
+  the user's own `~/.ssh/config` chose to run; `ChildEnvironment` keeps
+  the token out of every shell Corta spawns.
+- The sender (`LOCAL_PEERPID`) descends, within four generations, from an
+  ssh that connection spawned — so a jump host's inner ssh may ask. The
+  ssh is spawned suspended and recorded with its start time before it
+  runs; a later process given the same pid after it exits has another
+  start time and is refused. The token alone is not enough: the same
+  user's processes can read ssh's environment.
+- A closed connection's token is dead: the broker holds it weakly, and
+  nothing listens again once the app has stopped the broker at quit.
 
 The request is one line of at most 16 KiB, read under a five-second
-timeout. A keyboard-interactive prompt is the *server's* text: the dialog
-shows it with controls and concealing scalars as U+FFFD, at most 24 lines
-and 2,000 characters, and says it comes from OpenSSH or the server. A
-host-key dialog defaults to Cancel. The answer is written to that socket
-and nowhere else — not stored, not logged — and the dialog closes,
-answering nothing, the moment the asking process goes away. Within §1's
-threat model a process already running as the user is out of scope; the
-parent check exists so that one *reading* ssh's environment cannot use the
-token on its own.
+timeout on a queue of its own, so a silent client holds up no other. A
+keyboard-interactive prompt is the *server's* text: the dialog shows it
+with controls and concealing scalars as U+FFFD, at most 24 lines and 2,000
+characters, and says it comes from OpenSSH or the server. A host-key
+dialog defaults to Cancel. In the background Corta bounces in the Dock
+rather than taking focus; with no window open, the question gets a window
+of its own. The answer is written to that socket and nowhere else — not
+stored, not logged — and the dialog closes, answering nothing, the moment
+the asking process goes away. Within §1's threat model a process already
+running as the user is out of scope; the ancestry check exists so that one
+*reading* ssh's environment cannot use the token on its own.
 
 ## 5. Data at Rest
 

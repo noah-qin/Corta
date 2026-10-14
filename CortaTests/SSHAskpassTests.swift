@@ -243,6 +243,55 @@ struct SSHAskpassBrokerTests {
         #expect(recorder.cancelled.withLock { $0 })
     }
 
+    /// A pid is reused once its process is gone. Admission is of that
+    /// process — its start time — so a later one on the same number, which
+    /// may have read the token while the first ran, is never answered.
+    @Test func aRecycledPidIsNotTheSSHThatWasAdmitted() async throws {
+        let recorder = Recorder(answer: "s3cret")
+        let restarted = Mutex(false)
+        let broker = SSHAskpassBroker(
+            executable: Self.executable, prompter: recorder.prompter,
+            record: { pid in
+                guard var record = SSHAskpassBroker.processRecord(of: pid) else { return nil }
+                if pid == getpid(), restarted.withLock({ $0 }) { record.started += 1 }
+                return record
+            })
+        defer { broker.stop() }
+        let grant = try #require(broker.grant(host: "box"))
+        grant.admit(getpid())
+        restarted.withLock { $0 = true }
+        let result = await finish(try run(grant, prompt: "Password: "))
+        #expect(result.status == 1)
+        #expect(recorder.asked.withLock { $0.isEmpty })
+    }
+
+    /// A `ProxyJump`'s inner ssh asks for the jump host: the asker is a
+    /// grandchild of the ssh the connection spawned, and is answered.
+    @Test func aJumpHostsSSHMayAsk() async throws {
+        let recorder = Recorder(answer: "jump-secret")
+        let broker = SSHAskpassBroker(executable: Self.executable, prompter: recorder.prompter)
+        defer { broker.stop() }
+        let grant = try #require(broker.grant(host: "box"))
+        grant.admit(getpid())
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        // Not `exec`: the shell stays between, as the inner ssh would.
+        process.arguments = ["-c", "\"$0\" \"$1\"; exit $?", Self.executable, "bastion's password: "]
+        process.environment = grant.environment
+        process.standardOutput = Pipe()
+        try process.run()
+        let result = await finish(process)
+        #expect(result.status == 0)
+        #expect(result.output == "jump-secret\n")
+    }
+
+    @Test func nothingListensAgainAfterStop() {
+        let broker = SSHAskpassBroker(executable: Self.executable, prompter: { _, _, _ in nil })
+        #expect(broker.grant(host: "box") != nil)
+        broker.stop()
+        #expect(broker.grant(host: "box") == nil, "a quit's late connection leaves no socket behind")
+    }
+
     @Test func theSocketIsTheUsersAlone() throws {
         let broker = SSHAskpassBroker(executable: Self.executable, prompter: { _, _, _ in nil })
         let grant = try #require(broker.grant(host: "box"))

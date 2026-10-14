@@ -26,7 +26,16 @@ enum SSHAskpassPrompter {
     /// Nil is a refusal. Task cancellation — ssh no longer waiting — takes
     /// the sheet down and refuses.
     static func ask(_ question: SSHAskpass.Question, host: String, prompt: String) async -> String? {
-        guard let window = window(for: host) else { return nil }
+        // With every window closed — a remote-edit save reconnecting — the
+        // question gets a window of its own rather than a silent refusal.
+        let found = window(for: host)
+        let standalone = found == nil ? makeStandaloneWindow() : nil
+        guard let window = found ?? standalone else { return nil }
+        defer { standalone?.close() }
+        // In the background the sheet is out of sight: bounce until the
+        // user comes, and stop once the question is gone.
+        let attention = NSApp.isActive ? nil : NSApp.requestUserAttention(.criticalRequest)
+        defer { if let attention { NSApp.cancelUserAttentionRequest(attention) } }
         let alert = makeAlert(question, host: host, prompt: prompt)
         let field = alert.accessoryView as? NSSecureTextField
         return await withTaskCancellationHandler {
@@ -56,8 +65,20 @@ enum SSHAskpassPrompter {
         }
     }
 
+    /// A small titled window to hang the sheet on, when Corta has none open.
+    private static func makeStandaloneWindow() -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 1),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.title = "Corta"
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        return window
+    }
+
     /// The browser window for `host` when there is one, else the window in
-    /// front. With no window at all there is nowhere to ask.
+    /// front.
     private static func window(for host: String) -> NSWindow? {
         if let browser = NSApp.windows.first(where: {
             $0.identifier?.rawValue == "Corta.SFTPBrowser" && $0.title == host && $0.isVisible

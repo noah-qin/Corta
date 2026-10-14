@@ -174,7 +174,8 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         host: String,
         executable: String = SFTPSubprocessChannel.defaultSSHPath,
         arguments: [String]? = nil,
-        environment: [String: String]
+        environment: [String: String],
+        beforeStart: (@Sendable (pid_t) -> Void)? = nil
     ) throws(SFTPTransportError) -> SFTPSubprocessChannel {
         guard executable.hasPrefix("/") else { throw .executablePathNotAbsolute }
 
@@ -208,10 +209,13 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         defer { posix_spawnattr_destroy(&attributes) }
         // `SETSID`: otherwise a Corta launched from a terminal hands ssh that tty,
         // and a prompt hangs in a window nobody is looking at.
+        // `START_SUSPENDED` when someone must know the pid before the child
+        // runs a single instruction (`beforeStart`); resumed just below.
         posix_spawnattr_setflags(
             &attributes,
             Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF
-                | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSID))
+                | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSID
+                | (beforeStart == nil ? 0 : POSIX_SPAWN_START_SUSPENDED)))
         var allSignals = sigset_t()
         sigfillset(&allSignals)
         posix_spawnattr_setsigdefault(&attributes, &allSignals)
@@ -245,6 +249,10 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
             throw .spawnFailed(code: spawnResult)
         }
 
+        if let beforeStart {
+            beforeStart(pid)
+            kill(pid, SIGCONT)
+        }
         let channel = SFTPSubprocessChannel(
             pid: pid, host: host,
             stdinWrite: stdinPipe[1], stdoutRead: stdoutPipe[0],

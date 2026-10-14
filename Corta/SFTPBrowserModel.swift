@@ -579,12 +579,19 @@ final class SFTPBrowserModel {
         replacingConcealedScalars(in: name, with: "_")
     }
 
-    private nonisolated static func replacingConcealedScalars(
-        in name: String, with replacement: Unicode.Scalar
+    /// Server text with controls and concealing scalars replaced — names
+    /// here, sign-in prompts in `SSHAskpass.displayPrompt`, one rule for
+    /// both. `keepingNewlines` leaves line feeds for text shown as lines.
+    nonisolated static func replacingConcealedScalars(
+        in name: String, with replacement: Unicode.Scalar, keepingNewlines: Bool = false
     ) -> String {
         var scalars = String.UnicodeScalarView()
         for scalar in name.unicodeScalars {
             let value = scalar.value
+            if keepingNewlines, scalar == "\n" {
+                scalars.append(scalar)
+                continue
+            }
             let concealing =
                 value < 0x20 || (0x7F...0x9F).contains(value) || ConcealingScalars.contains(value)
             scalars.append(concealing ? replacement : scalar)
