@@ -314,7 +314,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         lock.unlock()
         guard let decoded, let lease else { return }
         // Allocation and GPU completion must never hold the cache lock: a
-        // hung upload cannot stall a window's render thread or bounded teardown.
+        // hung upload cannot stall the main thread or bounded teardown.
         let made = makeTexture(from: decoded, lease: lease)
         lock.lock()
         let stillRelevant = isRelevantLocked(id: id, generation: generation)

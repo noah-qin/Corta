@@ -36,6 +36,24 @@ struct DiagnosticsEnvironmentTests {
         #expect(child["PATH"] == "/usr/bin:/bin")
     }
 
+    /// Both directions: a switch the code reads has a row, and a row names a
+    /// switch the code still reads.
+    @Test func theTestingGuideListsExactlyTheSwitches() throws {
+        let guide = URL(fileURLWithPath: #filePath)  // CortaTests/DiagnosticsEnvironmentTests.swift
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("docs/TESTING.md")
+        let text = try String(contentsOf: guide, encoding: .utf8)
+        let section = try #require(text.range(of: "### Environment switches"))
+        var documented: Set<String> = []
+        for line in text[section.upperBound...].split(separator: "\n") {
+            if line.hasPrefix("#") { break }
+            guard line.hasPrefix("| `CORTA_"), let end = line.dropFirst(3).firstIndex(of: "`") else { continue }
+            documented.insert(String(line.dropFirst(3)[..<end]))
+        }
+        #expect(documented == Set(Switch.allCases.map(\.rawValue)))
+    }
+
     @Test func releaseWithholdsProgramSubstitutionAndStallInjection() {
         #expect(Switch.allCases.filter { !$0.isHonouredInRelease } == [.mainStall, .sftpSSH])
     }

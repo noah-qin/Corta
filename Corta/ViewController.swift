@@ -411,7 +411,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     }
 
     private func installTerminalCallbacks(on view: TerminalView) {
-        publishRenderInputs()
         frameLoop.install(on: view)
         pointer.install(on: view)
         // `view` weakly too: the closure is stored on it, and a strong capture
@@ -554,15 +553,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         loop.cursorHandoffSignal = focus.handoffSignal
         loop.onPresented = { [weak self] in
             self?.focus.framePresented(token: $0)
-            self?.publishRenderInputs()
-        }
-        loop.afterThreadedFrame = { [weak self] grid, output, bell, revision, metadata in
-            guard let self, !self.didTeardown else { return }
-            if output { self.noteOutputBatch() }
-            if bell { self.handleBell() }
-            self.afterFrame(
-                grid: grid, hasOutput: output, cursorRevision: revision, inputMetadata: metadata)
-            self.publishRenderInputs()
         }
         loop.topInset = { [weak self] in self?.topInset ?? 0 }
         return loop
@@ -661,24 +651,15 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     private func renderInputs() -> RenderInputs {
         let config = ConfigurationStore.shared.configuration
         return RenderInputs(
-            readsInputSourceMetadata: config.inputSourceIndicator != .off,
-            scrollOffset: scrollOffset, scrollAnchorTotalPushed: scrollAnchorTotalPushed,
+            scrollOffset: scrollOffset,
             cursorVisible: scrollOffset == 0 && isFocusedPane
                 && terminalView?.hasMarkedText() != true
                 && sessionEndedBar == nil,
-            cursorStyle: config.cursorShape.style(blinking: config.cursorBlink),
             cursorBlinkVisible: focus.cursorBlinkVisible,
             selection: selection,
             searchMatches: search.highlights,
             currentSearchMatchIndex: search.currentMatchIndex, hoveredLink: pointer.hoveredLink,
-            drawsCommandMarks: config.commandStatusMarks, topInset: topInset,
-            theme: TerminalColorPalette.activeVariant)
-    }
-    private func publishRenderInputs() {
-        guard let engine = frameLoop.threadedEngine else { return }
-        if engine.inputs.publish(renderInputs()), terminalView?.threadDriver != nil {
-            engine.invalidate()
-        }
+            drawsCommandMarks: config.commandStatusMarks)
     }
 
     private func frameContent(hasOutput: Bool) -> PaneFrameLoop.Content? {
@@ -786,7 +767,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     func invalidateDisplay() {
         focus.noteCursorActivity()
         updateReaderPriority()
-        publishRenderInputs()
         frameLoop.invalidate()
     }
 

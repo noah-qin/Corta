@@ -55,25 +55,6 @@ public nonisolated struct TerminalSelection: Equatable, Sendable {
 /// imports the app without `@testable`, because `-enable-testing` inhibits
 /// the optimisation its Release figure exists to measure (#110).
 public nonisolated final class TerminalRenderer: @unchecked Sendable {
-    // Frames own renderer mutations on the window render thread. Main-thread
-    // font commands serialize with complete frames; geometry reads use a mailbox.
-    // Main constructs an immutable font command; the window render thread
-    // consumes it between complete frames. CTFont exposes no mutable state.
-    // The window render thread produces an immutable CGImage; main consumes
-    // it as a Core Animation layer's contents after the presented callback.
-    private struct CursorCapture: @unchecked Sendable {
-        let image: CGImage
-        let column: Int
-        let columns: Int
-    }
-    private struct FontCommand: @unchecked Sendable {
-        let font: CTFont
-        let scale: CGFloat
-    }
-    private struct Owner: Sendable { weak var thread: RenderThread? }
-    private let renderOwner = Mutex(Owner())
-    func setRenderOwner(_ thread: RenderThread?) { renderOwner.withLock { $0.thread = thread } }
-
     private let access = NSRecursiveLock()
     func withExclusiveAccess<T>(_ body: () throws -> T) rethrows -> T {
         access.lock()
@@ -288,18 +269,6 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// block cursor, including wide glyphs, emoji, rules and box drawing.
     /// The small offscreen target is read only after GPU completion.
     func cursorImage(grid: Grid) -> (image: CGImage, column: Int, columns: Int)? {
-        if let owner = renderOwner.withLock({ $0.thread }), !owner.isCurrent {
-            let result = Mutex<CursorCapture?>(nil)
-            owner.barrier { [self] in
-                if let capture = cursorImage(grid: grid) {
-                    result.withLock {
-                        $0 = CursorCapture(
-                            image: capture.image, column: capture.column, columns: capture.columns)
-                    }
-                }
-            }
-            return result.withLock { $0.map { ($0.image, $0.column, $0.columns) } }
-        }
         return withExclusiveAccess {
             let row = grid.cursor.row
             var column = grid.cursor.column
@@ -392,11 +361,6 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// Reuses pipelines and texture; a new renderer per keystroke stuttered
     /// under key repeat.
     func setFont(_ font: CTFont, scale newScale: CGFloat) {
-        if let owner = renderOwner.withLock({ $0.thread }), !owner.isCurrent {
-            let command = FontCommand(font: font, scale: newScale)
-            owner.barrier { [self] in setFont(command.font, scale: command.scale) }
-            return
-        }
         access.lock()
         defer { access.unlock() }
         let atlasFont = CTFontCreateCopyWithAttributes(
@@ -413,10 +377,6 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
 
     /// For the frame-CPU baseline's worst case.
     public func invalidate() {
-        if let owner = renderOwner.withLock({ $0.thread }), !owner.isCurrent {
-            owner.post { [self] in invalidate() }
-            return
-        }
         access.lock()
         defer { access.unlock() }
         needsFullRebuild = true

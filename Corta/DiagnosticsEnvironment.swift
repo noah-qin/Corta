@@ -29,7 +29,6 @@ import OSLog
 nonisolated enum DiagnosticsEnvironment {
     /// The variable names, for documentation and the stripping test.
     enum Switch: String, CaseIterable {
-        case renderThread = "CORTA_RENDER_THREAD"
         case mainStall = "CORTA_MAIN_STALL"
         case frameDriver = "CORTA_FRAME_DRIVER"
         case frameLatency = "CORTA_FRAME_LATENCY"
@@ -53,12 +52,6 @@ nonisolated enum DiagnosticsEnvironment {
         environment[name.rawValue]
     }
 
-    // The experimental path stays opt-in until the interactive acceptance matrix passes.
-    static func usesRenderThread(in environment: Environment = ProcessInfo.processInfo.environment)
-        -> Bool
-    {
-        value(.renderThread, in: environment) == "1"
-    }
     struct MainStall: Equatable, Sendable {
         var milliseconds: Double
         var periodMilliseconds: Double

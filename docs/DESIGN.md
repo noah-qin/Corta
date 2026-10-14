@@ -230,7 +230,6 @@ host rather than a `ViewController`.
 
 | Collaborator      | Owns                                                                 |
 | ----------------- | -------------------------------------------------------------------- |
-| `PaneRenderEngine` | Render inputs, renderer ownership, frame encoding and submission; driven on the main thread by default or an opt-in per-window render thread |
 | `PaneFrameLoop`   | When a frame is owed (the output wake, forced redraws, `?2026`), the diff into the renderer and the draw. The pane supplies the frame's content and an `onOutputBatch` stage — title, notifications, accessibility, history — run once per frame that saw output |
 | `PaneWindowTitle` | The window title and proxy icon: their composition and sanitising, the interval-cached process facts behind them, the off-main directory probe |
 | `PaneSearch`      | Scrollback search: the bar and its placement, key routing (Esc, ⌘G), the debounced off-main sweeps and their generations, the matches the renderer highlights, the pre-search viewport it restores. Reaches the pane only through `PaneSearchHost` |
@@ -613,10 +612,8 @@ rectangle table uploaded when it changes. A scroll journal shifts retained
 rendered rows for region/history scrolling and line insertion/deletion;
 missing or incompatible damage history falls back to rebuilding rows.
 
-`PaneRenderEngine` owns renderer mutation. The default display-link path runs
-on the main thread; `CORTA_RENDER_THREAD=1` opts into a per-window run loop
-with ordered render inputs, teardown and GPU feedback. It remains experimental
-and off by default. A full-screen window with exactly one pane uses the
+Renderer mutation, frame encoding and submission run on the main thread,
+paced by the pane's display link. A full-screen window with exactly one pane uses the
 present-by-copy path and drops the canvas corner mask; windowed and split
 panes retain the ordinary Metal 4 presentation path. Overlays can still make
 the window server composite a frame. See [Testing](TESTING.md#environment-switches)

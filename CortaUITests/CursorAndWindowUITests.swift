@@ -90,8 +90,6 @@ final class CursorAndWindowUITests: XCTestCase {
         let metrics = stage.appendingPathComponent("cursor-idle-\(UUID().uuidString).log")
         app.launchEnvironment["CORTA_RENDER_METRICS"] = metrics.path
         app.launchEnvironment["CORTA_RENDER_METRICS_FRAMES"] = "1"
-        app.launchEnvironment["CORTA_RENDER_THREAD"] =
-            ProcessInfo.processInfo.environment["CORTA_RENDER_THREAD"] ?? "0"
         app.launch()
         defer { app.terminate() }
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
@@ -131,8 +129,6 @@ final class CursorAndWindowUITests: XCTestCase {
         app.launchEnvironment["CORTA_STAGE_DIR"] = stage.path
         app.launchEnvironment["ZDOTDIR"] = stage.path
         app.launchEnvironment["SHELL"] = "/bin/zsh"
-        app.launchEnvironment["CORTA_RENDER_THREAD"] =
-            ProcessInfo.processInfo.environment["CORTA_RENDER_THREAD"] ?? "0"
         return app
     }
 

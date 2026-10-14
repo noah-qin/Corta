@@ -78,12 +78,14 @@ without launching an app.
 **Consequence.** Types in the core are `Sendable` by construction or
 explicitly not shared. The app owns every main-thread hand-off.
 
-**Render experiment (2026-10-11, #284).** `CORTA_RENDER_THREAD=1` confines
-renderer mutation and display links to one serial run loop per window. Main
-publishes immutable inputs through a mutex mailbox and consumes coalesced
-feedback; the reader directly wakes the owner. The default stays on main
-while the measured keypress latency gate fails. See the linked performance
-record before enabling the experiment by default.
+**Render experiment, removed (2026-10-14).** #284 built an opt-in
+per-window render thread (`CORTA_RENDER_THREAD=1`): renderer mutation and
+display links on one serial run loop per window, inputs published through a
+mailbox. It closed with its power saving unproven and its frame timing
+mixed, stayed off by default, and kept a second ownership model in every
+frame, font and cursor path; #337's latency work does not need it. It was
+removed rather than carried. Its record is #284 and the commits that close
+it; a second attempt starts from them, not from a dormant switch.
 
 ## D05 — Cells are fixed-size; complex graphemes spill to a side table
 

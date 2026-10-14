@@ -70,17 +70,9 @@ final class TerminalView: NSView, CALayerDelegate {
         set { frameScheduler.shouldRenderFrame = newValue }
     }
 
-    var threadedRender: (@Sendable (CGSize, CAMetalDrawable) -> (pending: Bool, drawn: Bool))? {
-        get { frameScheduler.threadedRender }
-        set { frameScheduler.threadedRender = newValue }
-    }
-    var threadedMetricsRedraw: (@Sendable () -> Bool)?
-    var onThreadDriverChange: ((ThreadFrameDriver?) -> Void)?
     func refreshFrameDriver() {
         frameScheduler.attach(to: window)
-        onThreadDriverChange?(frameScheduler.threadDriver)
     }
-    var threadDriver: ThreadFrameDriver? { frameScheduler.threadDriver }
 
     var onKeyBytes: (([UInt8]) -> Void)?
     /// The key event the input context is handling right now: set around
@@ -280,7 +272,6 @@ final class TerminalView: NSView, CALayerDelegate {
         }
         renderPolicy = nil
         frameScheduler.attach(to: nil)
-        onThreadDriverChange?(nil)
     }
 
     override func viewDidMoveToWindow() {
@@ -431,9 +422,7 @@ final class TerminalView: NSView, CALayerDelegate {
     /// never reached the glass wakes this pane for another.
     func noteKeystrokeForMetrics(at timestamp: TimeInterval) {
         guard RenderMetrics.isEnabled else { return }
-        let threadedRedraw = threadedMetricsRedraw
-        RenderMetrics.noteKeystroke(at: timestamp) { [weak self, threadedRedraw] in
-            if threadedRedraw?() == true { return }
+        RenderMetrics.noteKeystroke(at: timestamp) { [weak self] in
             DispatchQueue.main.async { self?.setNeedsRedraw() }
         }
     }

@@ -16,40 +16,17 @@
 
 import CortaTerminal
 import Foundation
-import Synchronization
 
-/// Published by main on UI changes, read once by the frame. No views or stores.
+/// What a frame draws besides the grid, read from the pane once per frame.
 nonisolated struct RenderInputs: Sendable, Equatable {
-    var readsInputSourceMetadata = false
-    var generation: UInt64 = 0
     var scrollOffset = 0
-    var scrollAnchorTotalPushed: Int?
     var cursorVisible = true
-    var cursorStyle: CursorStyle = .block
     var cursorBlinkVisible = true
     var selection: TerminalSelection?
     var searchMatches: [TerminalSelection] = []
     var currentSearchMatchIndex: Int?
     var hoveredLink: TerminalSelection?
     var drawsCommandMarks = true
-    var topInset: CGFloat = 0
-    var theme = Theme.corta.dark
-}
-
-nonisolated final class RenderInputMailbox: Sendable {
-    private let value = Mutex(RenderInputs())
-    @discardableResult
-    func publish(_ inputs: RenderInputs) -> Bool {
-        return value.withLock { previous in
-            var inputs = inputs
-            inputs.generation = previous.generation
-            guard inputs != previous else { return false }
-            inputs.generation &+= 1
-            previous = inputs
-            return true
-        }
-    }
-    func read() -> RenderInputs { value.withLock { $0 } }
 }
 
 /// Captured under the same core lock as the grid it describes.

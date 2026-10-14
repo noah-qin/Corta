@@ -98,7 +98,7 @@ nonisolated enum Metal4Diagnostics {
 /// retained by the command buffer either, so `deinit` waits, bounded, for
 /// the frames in flight (`metal4BackendDeallocatesWithFramesInFlight`).
 ///
-/// Every method runs on the render thread; only the commit feedback
+/// Every method runs on the main thread; only the commit feedback
 /// handler runs elsewhere, and it touches only `completion` and the slot
 /// semaphores.
 public nonisolated final class Metal4Backend {
@@ -202,7 +202,7 @@ public nonisolated final class Metal4Backend {
     private static let stalledQueueReportThreshold = 3
     private(set) var droppedFrameCount = 0
 
-    /// A few slow frames are not a failed queue. Read on the render thread.
+    /// A few slow frames are not a failed queue. Read on the main thread.
     var requiresRecovery: Bool {
         completion.failed.load(ordering: .acquiring)
             || stallStarted.map { $0.duration(to: .now) >= .seconds(1) } == true

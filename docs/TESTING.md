@@ -566,8 +566,7 @@ single reader to the code.
 
 | Variable | Values | Builds | Effect |
 | --- | --- | --- | --- |
-| `CORTA_RENDER_THREAD` | `0` (default), `1` | all | Experimental per-window render run loop; `ondemand` keeps its main-thread driver; default changes only after the #284 acceptance matrix |
-| `CORTA_MAIN_STALL` | `<ms>/<period-ms>`, e.g. `8/33` | Debug / Benchmark only | Repeated bounded main-thread stall for the render-thread A/B; ignored in Release |
+| `CORTA_MAIN_STALL` | `<ms>/<period-ms>`, e.g. `8/33` | Debug / Benchmark only | Repeated bounded main-thread stall, to measure what a busy main thread costs a frame; ignored in Release |
 | `CORTA_DIRECT_FULLSCREEN` | unset (default), `0`; in Debug / Benchmark also `1` or a comma-separated subset of `toolbar,mask,overlays,colorspace,present` | all; experimental values Debug / Benchmark only | Direct presentation for a full-screen window with one pane (#285): unset, presents by copy and drops the corner mask; `0` turns it off for an A/B. The experimental values re-check #285's measured non-blockers — auto-hidden chrome, hidden overlays, the screen's colour space (colours then render unconverted) |
 | `CORTA_FRAME_DRIVER` | `displaylink` (default), `ondemand` | all | Experimental echo presentation with separate CADisplayLink pacing; immediate acquisition only while paused; the unaccepted no-sync experiment was removed, so both retained drivers use display synchronization |
 | `CORTA_FRAME_LATENCY` | number ≥ 1 | all | The display link's `preferredFrameLatency` (default 2; `PERFORMANCE.md` §5.7) |

@@ -46,11 +46,9 @@ final class PaneFrameLoop {
         var cursorStyle: CursorStyle?
     }
 
-    private(set) var threadedEngine: PaneRenderEngine?
     var onPresented: ((UInt64) -> Void)?
     /// The pane's own (`PaneFocus.handoffSignal`), set before `attach`.
     var cursorHandoffSignal = CursorHandoffMailbox()
-    var afterThreadedFrame: ((Grid, Bool, Bool, UInt64, RenderInputSourceMetadata?) -> Void)?
     private(set) var session: TerminalSession?
     private(set) var renderer: TerminalRenderer?
 
@@ -101,14 +99,6 @@ final class PaneFrameLoop {
         outputWake = wake
         self.session = session
         self.renderer = renderer
-        threadedEngine?.suspend()
-        threadedEngine = nil
-        // Only for the opt-in render thread (`CORTA_RENDER_THREAD=1`): on the
-        // default main-thread path an engine would never draw, yet wrap the
-        // renderer's callbacks and sit on every output batch.
-        if DiagnosticsEnvironment.usesRenderThread() {
-            threadedEngine = makeEngine(session: session, renderer: renderer, wake: wake, generation: generation)
-        }
         needsRedraw = true
         wasSynchronizedOutputActive = false
         renderingStopped = false
@@ -117,46 +107,15 @@ final class PaneFrameLoop {
         feedback = GPUFrameFeedback()
         let cursorSignal = cursorHandoffSignal
         cursorSignal.setSessionGeneration(generation)
-        let engine = threadedEngine
-        session.onOutput = { [weak self, weak engine, cursorSignal] in
+        session.onOutput = { [weak self, cursorSignal] in
             cursorSignal.noteOutput(generation: generation)
-            if engine?.noteOutput() == true { return }
             self?.noteOutput(generation: generation, wake: wake)
         }
         return generation
     }
 
-    private func makeEngine(
-        session: TerminalSession, renderer: TerminalRenderer, wake: OutputWakeGate, generation: Int
-    ) -> PaneRenderEngine {
-        PaneRenderEngine(
-            session: session, renderer: renderer, wake: wake, cursorSignal: cursorHandoffSignal,
-            afterFrame: { [weak self] grid, output, bell, revision, metadata in
-                guard let self, self.isCurrent(generation) else { return }
-                self.afterThreadedFrame?(grid, output, bell, revision, metadata)
-            },
-            presented: { [weak self] token in
-                guard let self, self.isCurrent(generation) else { return }
-                self.onPresented?(token)
-            },
-            failure: { [weak self] error in
-                guard let self, self.isCurrent(generation) else { return }
-                self.onRenderingFailure?(error)
-            })
-    }
-
     /// Makes `view`'s display link drive this loop.
     func install(on view: TerminalView) {
-        let engine = threadedEngine
-        view.threadedRender = { [weak engine] size, drawable in
-            guard let engine else {
-                drawable.present()
-                return (false, true)
-            }
-            return engine.frame(size: size, drawable: drawable)
-        }
-        view.threadedMetricsRedraw = { [weak engine] in engine?.requestFrameIfThreaded() ?? false }
-        view.onThreadDriverChange = { [weak engine] in engine?.setDriver($0) }
         view.refreshFrameDriver()
         renderEchoOnDemand = { [weak view] in view?.renderEchoOnDemand() ?? false }
         view.onRenderFrame = { [weak self] drawableSize, drawable in
@@ -179,7 +138,6 @@ final class PaneFrameLoop {
 
     func detach() {
         suspendRendering()
-        threadedEngine = nil
         generation += 1
         session = nil
         renderer = nil
@@ -188,7 +146,6 @@ final class PaneFrameLoop {
 
     func suspendRendering() {
         renderingStopped = true
-        threadedEngine?.suspend()
         watchdog?.cancel()
         watchdog = nil
     }
@@ -217,7 +174,6 @@ final class PaneFrameLoop {
 
     /// For local changes that produce no output.
     func invalidate() {
-        threadedEngine?.invalidate()
         needsRedraw = true
         onNeedsDisplay?()
     }

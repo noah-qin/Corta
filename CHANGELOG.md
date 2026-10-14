@@ -10,6 +10,12 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Removed
+
+- The experimental per-window render thread (`CORTA_RENDER_THREAD=1`), which
+  was off by default and never shown to save power. Every window renders on
+  the main thread, as it always has by default.
+
 ### Fixed
 
 - The `cd` directory-completion hint takes its colour from the theme —

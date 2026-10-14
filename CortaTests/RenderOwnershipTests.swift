@@ -25,9 +25,15 @@ import Testing
 
 @Suite("Render ownership and energy policies")
 struct RenderOwnershipTests {
-    private final class WeakRenderThread {
-        weak var value: RenderThread?
-        init(_ value: RenderThread?) { self.value = value }
+    /// Runs `body` on a thread of its own and waits for it: the reader's and
+    /// the GPU's completion threads are never main.
+    private static func onAnotherThread(_ body: @escaping @Sendable () -> Void) {
+        let done = DispatchSemaphore(value: 0)
+        Thread {
+            body()
+            done.signal()
+        }.start()
+        done.wait()
     }
     @Test func cursorCallbacksCannotReviveAnObsoleteHandoff() {
         var state = CursorHandoff()
@@ -77,8 +83,7 @@ struct RenderOwnershipTests {
         // An unattached test layer need not retain a committed animation;
         // stale output must leave its presentation eligible to start.
         #expect(presentation.startBlink(beginTime: CACurrentMediaTime()))
-        let owner = RenderThread()
-        owner.barrier { signal.noteOutput(generation: 3) }
+        Self.onAnotherThread { signal.noteOutput(generation: 3) }
         #expect(signal.phase == .awaitingMetal)
         #expect(layer.opacity == 0)
         #expect(layer.animationKeys() == nil)
@@ -88,9 +93,8 @@ struct RenderOwnershipTests {
     @Test func encodingAcceptanceCrossesTheOwnerBoundary() {
         let accepted = FrameAcceptanceMarker()
         let dropped = FrameAcceptanceMarker()
-        let owner = RenderThread()
         #expect(!accepted.isAccepted)
-        owner.barrier {
+        Self.onAnotherThread {
             accepted.finishEncoding(true)
             dropped.finishEncoding(false)
         }
@@ -120,39 +124,8 @@ struct RenderOwnershipTests {
                 visible: false, selected: true,
                 hiddenSince: 0, lastInput: 7, now: 10) == .background)
     }
-    @Test func mailboxOnlyPublishesChanges() {
-        let mailbox = RenderInputMailbox()
-        #expect(!mailbox.publish(RenderInputs()))
-        var inputs = RenderInputs()
-        inputs.scrollOffset = 3
-        #expect(mailbox.publish(inputs))
-        let published = mailbox.read()
-        #expect(published.generation == 1)
-        #expect(!mailbox.publish(inputs))
-        #expect(mailbox.read().generation == 1)
-    }
-    @Test func renderCommandsAreSerialAndTeardownReleasesTheThread() {
-        var owner: RenderThread? = RenderThread()
-        let released = WeakRenderThread(owner)
-        let seen = Mutex<[Int]>([])
-        for index in 0..<32 { owner?.post { seen.withLock { $0.append(index) } } }
-        owner?.barrier { #expect(!Thread.isMainThread) }
-        #expect(seen.withLock { $0 } == Array(0..<32))
-        owner = nil
-        #expect(released.value == nil)
-    }
-    @Test func quietPresentationWaitNeverRaisesThePolicyCeiling() {
-        let normal = ThreadFrameDriver.waitingRange(for: CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60))
-        #expect(normal.maximum == 15)
-        #expect(normal.preferred == 15)
-        let limited = ThreadFrameDriver.waitingRange(for: CAFrameRateRange(minimum: 5, maximum: 10, preferred: 10))
-        #expect(limited.maximum == 10)
-        #expect(limited.preferred == 10)
-    }
 
     @Test func stallSeamIsBoundedAndAbsentFromRelease() {
-        #expect(!DiagnosticsEnvironment.usesRenderThread(in: [:]))
-        #expect(DiagnosticsEnvironment.usesRenderThread(in: ["CORTA_RENDER_THREAD": "1"]))
         #expect(
             DiagnosticsEnvironment.mainStall(in: ["CORTA_MAIN_STALL": "8/33"], enabled: true)
                 == .init(milliseconds: 8, periodMilliseconds: 33))
