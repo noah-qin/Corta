@@ -171,6 +171,37 @@ struct GraphemeTableTests {
         #expect(table.scalars(for: first ?? .none) == [0x65, 0x0301])
     }
 
+    @Test("extending a cluster finds the one interned from its scalars")
+    func extendingMatchesInterning() throws {
+        var table = GraphemeTable()
+        let accentedInterned = table.intern(extending: .none, base: 0x65, with: 0x0301)
+        let accented = try #require(accentedInterned)
+        let reinterned = table.intern([0x65, 0x0301])
+        #expect(reinterned == accented)
+        let twiceInterned = table.intern(extending: accented, base: 0x65, with: 0x0302)
+        let twice = try #require(twiceInterned)
+        #expect(table.scalars(for: twice) == [0x65, 0x0301, 0x0302])
+        let found = table.intern(extending: accented, base: 0x65, with: 0x0302)
+        #expect(found == twice)
+        #expect(table.count == 2)
+    }
+
+    @Test("a reclaimed slot does not answer for the cluster it held")
+    func extensionForgetsReclaimedSlots() throws {
+        var table = GraphemeTable()
+        let oldInterned = table.intern(extending: .none, base: 0x65, with: 0x0301)
+        let old = try #require(oldInterned)
+        table.reclaim(keeping: [])
+        // The freed slot now holds a different cluster.
+        let otherInterned = table.intern([0x61, 0x0308])
+        let other = try #require(otherInterned)
+        #expect(other == old)
+        let againInterned = table.intern(extending: .none, base: 0x65, with: 0x0301)
+        let again = try #require(againInterned)
+        #expect(table.scalars(for: again) == [0x65, 0x0301])
+        #expect(table.scalars(for: other) == [0x61, 0x0308])
+    }
+
     @Test("distinct clusters get distinct non-zero ids")
     func distinctClustersGetDistinctIDs() {
         var table = GraphemeTable()

@@ -479,11 +479,11 @@ public struct Grid: Sendable {
 
     private mutating func combine(_ scalar: UInt32, row: Int, column: Int) {
         let cell = lines[row][column]
-        var cluster = graphemes.scalars(for: cell.grapheme) ?? [cell.scalar]
         // Past the cap the mark is dropped, as when the table is full.
-        guard cluster.count < GraphemeTable.maximumClusterScalars else { return }
-        cluster.append(scalar)
-        var id = graphemes.intern(cluster)
+        if let cluster = graphemes.scalars(for: cell.grapheme),
+            cluster.count >= GraphemeTable.maximumClusterScalars
+        { return }
+        var id = graphemes.intern(extending: cell.grapheme, base: cell.scalar, with: scalar)
         if id == nil, graphemes.count >= GraphemeTable.capacity,
             Self.sideTableSweepAllowed(&graphemeSweepDeferral)
         {
@@ -491,7 +491,7 @@ public struct Grid: Sendable {
             sideTableSweeps += 1
             let freed = graphemes.reclaim(keeping: liveGraphemeIDs())
             Self.deferSideTableSweep(&graphemeSweepDeferral, freed: freed, capacity: GraphemeTable.capacity)
-            id = graphemes.intern(cluster)
+            id = graphemes.intern(extending: cell.grapheme, base: cell.scalar, with: scalar)
         }
         guard let id else { return }
         var updated = cell

@@ -44,6 +44,17 @@ public struct GraphemeTable: Sendable {
     private var clusters: ContiguousArray<[UInt32]?> = []
     private var ids: [[UInt32]: GraphemeID] = [:]
     private var freeSlots: [Int] = []
+    /// A cluster plus one more scalar, keyed by what it extends: per
+    /// combining mark, output already seen finds its cluster without
+    /// building an array. At most one entry per live cluster.
+    private var extensions: [Extension: GraphemeID] = [:]
+
+    private struct Extension: Hashable {
+        /// `0` when `base` is a lone scalar not yet in the table.
+        var parent: UInt16
+        var base: UInt32
+        var scalar: UInt32
+    }
 
     public init() {}
 
@@ -62,6 +73,18 @@ public struct GraphemeTable: Sendable {
         clusters.append(scalars)
         let id = GraphemeID(rawValue: UInt16(clusters.count))
         ids[scalars] = id
+        return id
+    }
+
+    /// `parent`'s cluster — or the lone `base` scalar when `parent` is
+    /// `.none` — followed by `scalar`. `nil` when full.
+    public mutating func intern(extending parent: GraphemeID, base: UInt32, with scalar: UInt32) -> GraphemeID? {
+        let key = Extension(parent: parent.rawValue, base: parent.isNone ? base : 0, scalar: scalar)
+        if let known = extensions[key] { return known }
+        var cluster = scalars(for: parent) ?? [base]
+        cluster.append(scalar)
+        guard let id = intern(cluster) else { return nil }
+        extensions[key] = id
         return id
     }
 
@@ -86,6 +109,13 @@ public struct GraphemeTable: Sendable {
             freeSlots.append(index)
             freed += 1
         }
+        if freed > 0 {
+            // A reused slot must not answer for the cluster it used to hold.
+            extensions = extensions.filter { key, child in
+                clusters[Int(child.rawValue) - 1] != nil
+                    && (key.parent == 0 || clusters[Int(key.parent) - 1] != nil)
+            }
+        }
         return freed
     }
 
@@ -93,5 +123,6 @@ public struct GraphemeTable: Sendable {
         clusters.removeAll(keepingCapacity: true)
         ids.removeAll(keepingCapacity: true)
         freeSlots.removeAll(keepingCapacity: true)
+        extensions.removeAll(keepingCapacity: true)
     }
 }
