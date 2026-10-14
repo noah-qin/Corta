@@ -471,31 +471,14 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             throw .localIOFailed(operation: "download size limit", code: EFBIG)
         }
         let partialPath = Self.partialPath(for: destinationPath)
-        let destinationExists = FileManager.default.fileExists(atPath: destinationPath)
         let partialInfo = localFileInfo(partialPath)
-
-        var conflict = SFTPConflict(
-            destinationExists: destinationExists,
-            partialSize: partialInfo?.size,
-            sourceSize: sourceAttributes.size,
-            sourceModificationTime: sourceAttributes.modificationTime)
-        var partialStat = Darwin.stat()
-        if let identity = ownedPartial.withLock({ $0 }), Darwin.lstat(partialPath, &partialStat) == 0 {
-            conflict.partialIsOwned = identity == LocalPartialIdentity(
-                device: partialStat.st_dev, inode: partialStat.st_ino)
-        }
+        let conflict = downloadConflict(
+            destinationPath: destinationPath, partialPath: partialPath, partial: partialInfo,
+            source: sourceAttributes, ownedPartial: ownedPartial.withLock { $0 })
         let resolution = try resolve(policy: policy, conflict: conflict, destinationPath: destinationPath)
-
-        // Resume validation: the partial is trustworthy only if the source
-        // still has the size and mtime the partial recorded in its own
-        // mtime when the interrupted transfer started. Otherwise it is a
-        // fragment of a different file and the transfer restarts at zero.
-        var offset: UInt64 = 0
-        if resolution == .resume, let partial = partialInfo {
-            let sourceUnchanged = sourceAttributes.modificationTime == partial.modificationSeconds
-                && (sourceAttributes.size.map { $0 >= partial.size } ?? true)
-            if sourceUnchanged { offset = partial.size }
-        }
+        let offset =
+            resolution == .resume
+            ? Self.downloadResumeOffset(partial: partialInfo, source: sourceAttributes) : 0
 
         // Remote first: a refused OPEN must leave no local partial behind,
         // and nothing open to leak.
@@ -554,6 +537,37 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             if let sftpError = error as? SFTPError, !abort.isSet { throw sftpError }
             throw .cancelled
         }
+    }
+
+    /// What already stands where a download would land: the destination,
+    /// a partial, and whether that partial is the one this download made.
+    private func downloadConflict(
+        destinationPath: String, partialPath: String, partial: LocalFileInfo?,
+        source: SFTPAttributes, ownedPartial: LocalPartialIdentity?
+    ) -> SFTPConflict {
+        var conflict = SFTPConflict(
+            destinationExists: FileManager.default.fileExists(atPath: destinationPath),
+            partialSize: partial?.size,
+            sourceSize: source.size,
+            sourceModificationTime: source.modificationTime)
+        var partialStat = Darwin.stat()
+        if let ownedPartial, Darwin.lstat(partialPath, &partialStat) == 0 {
+            conflict.partialIsOwned = ownedPartial == LocalPartialIdentity(
+                device: partialStat.st_dev, inode: partialStat.st_ino)
+        }
+        return conflict
+    }
+
+    /// Where a download the user chose to resume picks up. The partial is
+    /// trustworthy only if the source still has the size and mtime the
+    /// partial recorded in its own mtime when the interrupted transfer
+    /// started. Otherwise it is a fragment of a different file and the
+    /// transfer restarts at zero.
+    private static func downloadResumeOffset(partial: LocalFileInfo?, source: SFTPAttributes) -> UInt64 {
+        guard let partial else { return 0 }
+        let sourceUnchanged = source.modificationTime == partial.modificationSeconds
+            && (source.size.map { $0 >= partial.size } ?? true)
+        return sourceUnchanged ? partial.size : 0
     }
 
     /// A download's partial, opened for writing and made private: created
@@ -629,7 +643,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         var completed = offset
         var moved: UInt64 = 0
         var endOfFile = false
-        var pending: [(offset: UInt64, length: Int, task: Task<[UInt8], any Error>)] = []
+        var pending: [PendingRead] = []
         pending.reserveCapacity(configuration.pipelineDepth)
         defer { for item in pending { item.task.cancel() } }
 
@@ -638,18 +652,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 for item in pending { item.task.cancel() }
                 throw SFTPError.cancelled
             }
-            while pending.count < configuration.pipelineDepth {
-                if let total, nextOffset >= total { break }
-                let remaining = total.map { $0 - nextOffset }
-                let length = UInt32(min(UInt64(configuration.blockSize), remaining ?? UInt64.max))
-                if length == 0 { break }
-                let requestOffset = nextOffset
-                let task = Task<[UInt8], any Error> {
-                    try await session.read(handle: handle, offset: requestOffset, length: length)
-                }
-                pending.append((offset: requestOffset, length: Int(length), task: task))
-                nextOffset += UInt64(length)
-            }
+            fillReadWindow(&pending, from: &nextOffset, total: total, session: session, handle: handle)
             guard !pending.isEmpty else { break }
             let first = pending.removeFirst()
             let data = try await taskValue(first.task)
@@ -665,23 +668,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 for item in pending { item.task.cancel() }
                 break
             }
-            // More than was asked is no reply to the READ: written, it ran
-            // past the stated size and under the next block.
-            guard data.count <= first.length else {
-                throw SFTPError.protocolViolation("READ reply longer than requested")
-            }
-            if let limit = configuration.maximumDownloadBytes,
-                first.offset + UInt64(data.count) > limit
-            {
-                throw SFTPError.localIOFailed(operation: "download size limit", code: EFBIG)
-            }
-            try writeAll(descriptor: descriptor, bytes: data, at: first.offset)
-            // The partial's mtime is the resume-validation record, but
-            // every pwrite bumps it — restamp after each block so an
-            // interruption at any point leaves a self-validating partial.
-            if let seconds = sourceModificationSeconds {
-                stampModificationTime(descriptor, seconds: seconds)
-            }
+            try writeBlock(data, for: first, to: descriptor, sourceModificationSeconds: sourceModificationSeconds)
             moved += UInt64(data.count)
             completed = first.offset + UInt64(data.count)
             progress?(SFTPTransferProgress(completedBytes: completed, totalBytes: total))
@@ -699,6 +686,50 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             }
         }
         return moved
+    }
+
+    private typealias PendingRead = (offset: UInt64, length: Int, task: Task<[UInt8], any Error>)
+
+    /// Asks for blocks from `nextOffset` until `pipelineDepth` READs are in
+    /// flight or the known size is reached.
+    private func fillReadWindow(
+        _ pending: inout [PendingRead], from nextOffset: inout UInt64, total: UInt64?,
+        session: SFTPSession, handle: SFTPHandle
+    ) {
+        while pending.count < configuration.pipelineDepth {
+            if let total, nextOffset >= total { return }
+            let remaining = total.map { $0 - nextOffset }
+            let length = UInt32(min(UInt64(configuration.blockSize), remaining ?? UInt64.max))
+            if length == 0 { return }
+            let requestOffset = nextOffset
+            let task = Task<[UInt8], any Error> {
+                try await session.read(handle: handle, offset: requestOffset, length: length)
+            }
+            pending.append((offset: requestOffset, length: Int(length), task: task))
+            nextOffset += UInt64(length)
+        }
+    }
+
+    /// Writes one READ's reply at its offset, after checking it is a reply
+    /// to that READ and within the size limit.
+    private func writeBlock(
+        _ data: [UInt8], for read: PendingRead, to descriptor: Int32, sourceModificationSeconds: UInt32?
+    ) throws(SFTPError) {
+        // More than was asked is no reply to the READ: written, it ran
+        // past the stated size and under the next block.
+        guard data.count <= read.length else {
+            throw .protocolViolation("READ reply longer than requested")
+        }
+        if let limit = configuration.maximumDownloadBytes, read.offset + UInt64(data.count) > limit {
+            throw .localIOFailed(operation: "download size limit", code: EFBIG)
+        }
+        try writeAll(descriptor: descriptor, bytes: data, at: read.offset)
+        // The partial's mtime is the resume-validation record, but every
+        // pwrite bumps it — restamp after each block so an interruption at
+        // any point leaves a self-validating partial.
+        if let seconds = sourceModificationSeconds {
+            stampModificationTime(descriptor, seconds: seconds)
+        }
     }
 
     // MARK: - Upload
@@ -746,19 +777,8 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         progress: ProgressHandler?,
         session: SFTPSession
     ) async throws(SFTPError) -> SFTPTransferReceipt {
-        // The descriptor, not the name, is what is uploaded: its size and
-        // mtime at open are the ones the transfer is checked against.
-        let descriptor = Darwin.open(sourcePath, O_RDONLY | O_CLOEXEC)
-        guard descriptor >= 0 else {
-            let code = errno
-            throw SFTPError.localIOFailed(operation: code == ENOENT ? "stat" : "open", code: code)
-        }
+        let (descriptor, source) = try Self.openUploadSource(sourcePath)
         defer { Darwin.close(descriptor) }
-        var openedStat = Darwin.stat()
-        guard Darwin.fstat(descriptor, &openedStat) == 0 else {
-            throw SFTPError.localIOFailed(operation: "fstat", code: errno)
-        }
-        let source = LocalSourceIdentity(openedStat)
         let sourceSize = source.size
         let sourceMTime = source.sftpModificationTime
 
@@ -832,6 +852,26 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             if let failure, !abort.isSet { throw failure }
             throw .cancelled
         }
+    }
+
+    /// The upload's source, opened. The descriptor, not the name, is what is
+    /// uploaded: its size and mtime at open are the ones the transfer is
+    /// checked against.
+    private static func openUploadSource(
+        _ path: String
+    ) throws(SFTPError) -> (descriptor: Int32, identity: LocalSourceIdentity) {
+        let descriptor = Darwin.open(path, O_RDONLY | O_CLOEXEC)
+        guard descriptor >= 0 else {
+            let code = errno
+            throw .localIOFailed(operation: code == ENOENT ? "stat" : "open", code: code)
+        }
+        var openedStat = Darwin.stat()
+        guard Darwin.fstat(descriptor, &openedStat) == 0 else {
+            let code = errno
+            Darwin.close(descriptor)
+            throw .localIOFailed(operation: "fstat", code: code)
+        }
+        return (descriptor, LocalSourceIdentity(openedStat))
     }
 
     /// Where an upload the user chose to resume picks up: the remote partial
@@ -1110,7 +1150,9 @@ public final class SFTPTransferEngine: @unchecked Sendable {
     /// (`stat(2)` by hand is awkward in Swift — the `Darwin.stat` struct
     /// shadows the function — and `FileManager` answers both questions at
     /// once; the real I/O errors still surface from `open`/`pread`.)
-    private func localFileInfo(_ path: String) -> (size: UInt64, modificationSeconds: UInt32)? {
+    private typealias LocalFileInfo = (size: UInt64, modificationSeconds: UInt32)
+
+    private func localFileInfo(_ path: String) -> LocalFileInfo? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
             let size = attributes[.size] as? NSNumber
         else { return nil }

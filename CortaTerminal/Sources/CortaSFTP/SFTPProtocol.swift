@@ -555,28 +555,7 @@ public enum SFTPPayload: Equatable, Sendable {
         case SFTPCodec.MessageType.data:
             return .data(try reader.readString(field: "data"))
         case SFTPCodec.MessageType.name:
-            let count = try reader.readUInt32()
-            // One entry minimally encodes as two empty strings and an empty
-            // ATTRS (4 + 4 + 4 bytes). A count that exceeds what the
-            // remaining bytes could minimally hold is rejected up front, so
-            // the count never sizes an allocation the frame cannot fill.
-            let minimumEntryBytes = 12
-            if UInt64(count) > UInt64(reader.remaining / minimumEntryBytes) {
-                throw .truncated(
-                    field: "name.entries",
-                    needed: Int(count) * minimumEntryBytes,
-                    available: reader.remaining)
-            }
-            var entries: [SFTPEntry] = []
-            entries.reserveCapacity(Int(count))
-            for _ in 0..<count {
-                let filename = try reader.readString(field: "name.filename")
-                let longname = try reader.readString(field: "name.longname")
-                let attributes = try reader.readAttributes()
-                entries.append(
-                    SFTPEntry(filename: filename, longname: longname, attributes: attributes))
-            }
-            return .name(entries)
+            return .name(try decodeEntries(from: &reader))
         case SFTPCodec.MessageType.attrs:
             return .attrs(try reader.readAttributes())
         case SFTPCodec.MessageType.extendedReply:
@@ -584,6 +563,32 @@ public enum SFTPPayload: Equatable, Sendable {
         default:
             throw SFTPCodecError.unknownMessageType(type)
         }
+    }
+
+    /// A NAME reply's entries.
+    private static func decodeEntries(from reader: inout SFTPReader) throws(SFTPCodecError) -> [SFTPEntry] {
+        let count = try reader.readUInt32()
+        // One entry minimally encodes as two empty strings and an empty
+        // ATTRS (4 + 4 + 4 bytes). A count that exceeds what the
+        // remaining bytes could minimally hold is rejected up front, so
+        // the count never sizes an allocation the frame cannot fill.
+        let minimumEntryBytes = 12
+        if UInt64(count) > UInt64(reader.remaining / minimumEntryBytes) {
+            throw .truncated(
+                field: "name.entries",
+                needed: Int(count) * minimumEntryBytes,
+                available: reader.remaining)
+        }
+        var entries: [SFTPEntry] = []
+        entries.reserveCapacity(Int(count))
+        for _ in 0..<count {
+            let filename = try reader.readString(field: "name.filename")
+            let longname = try reader.readString(field: "name.longname")
+            let attributes = try reader.readAttributes()
+            entries.append(
+                SFTPEntry(filename: filename, longname: longname, attributes: attributes))
+        }
+        return entries
     }
 }
 
