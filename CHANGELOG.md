@@ -10,6 +10,13 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Changed
+
+- Building a frame's instances takes a third or more less CPU when the whole
+  screen changes: the per-cell reads of the terminal core and the glyph
+  cache's ASCII hits are inlined. Text joined by combining marks, emoji
+  modifiers or flag pairs no longer allocates per character as it arrives.
+
 ### Removed
 
 - The experimental per-window render thread (`CORTA_RENDER_THREAD=1`), which
