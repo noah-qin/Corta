@@ -19,7 +19,7 @@ import Foundation
 /// Hosts the user agreed to reach over SFTP this run.
 ///
 /// A remote pane's host comes from OSC 7, which is child output and can
-/// name any host. `SECURITY.md` §7: displayed, never connected to without
+/// name any host. `SECURITY.md` §2.8: displayed, never connected to without
 /// the user's own command. So the first connection to a reported host asks,
 /// with the name shown and editable; a typed host is consent already.
 /// In memory only, or one approval becomes a standing permission for a

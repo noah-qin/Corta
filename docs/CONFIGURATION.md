@@ -631,7 +631,7 @@ split the pane with a new local one rooted there instead. In a remote pane
 only `change-directory-to-parent` works — the `cd` goes to the remote shell,
 where the path lives — while the Finder, clipboard, project-root and
 new-pane commands stay disabled, because none of them may act on a path
-that belongs to another machine (`SECURITY.md` §7, S09).
+that belongs to another machine (`SECURITY.md` §2.8).
 
 `reopen-closed-pane` puts a closed pane back where it was — same split, same
 side, same divider, same working directory. It restores the *arrangement*,

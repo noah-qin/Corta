@@ -167,6 +167,40 @@ clipboard — and genuinely dangerous.
   and every control but tab, LF and CR. Corta's paste strips controls again,
   but the pasteboard reaches other applications.
 
+### 2.7 Directory completion reports (OSC 134)
+
+The bundled zsh line editor reports a revision, selection index, typed basename prefix, and up to
+20 percent-encoded folder labels, bounded by the parser's 4096-byte OSC limit.
+Labels reject control characters and are display-only. Corta never echoes
+a label into stdin. A user selection sends only fixed widget key sequences;
+the shell retrieves and quotes its own candidate and edits BUFFER, without
+eval or accept-line. Reports are ignored during commands and alternate-screen
+applications. Startup wrappers are private temporary files, restore ZDOTDIR,
+and source the user's existing startup files without modifying them.
+
+### 2.8 Working-directory reports name a host, never a spawn target
+
+OSC 7's payload is a `file://host/path` URL, and a shell reached over `ssh`
+reports a directory on *that* host. `Terminal.workingDirectory` accepts only
+a local host — empty, `localhost` or this machine's own names, compared
+case-insensitively and ignoring a trailing FQDN dot — so every local
+consumer (new tabs, splits, session restore, file references) is
+unreachable by a remote path by construction. Restore also drops a saved
+directory that does not exist locally.
+
+A remote report is recorded separately as the pane's `RemoteContext`, for
+the title badge, the history's host filter and the SFTP browser. Its host is
+attacker-influenced text: displayed, never parsed for credentials, paths to
+run or hosts to connect to without the user's own command. The first SFTP
+connection to a reported host in a run shows the name, prefilled and
+editable with its provenance stated, and connects only on the user's
+Connect (`RemoteHostConsent`, in memory, never persisted); a recent host is
+only one the user typed or picked and then connected to. SSH config aliases
+are only the names after `Host` in `~/.ssh/config` and its `Include`s —
+patterns left out, no other value read, nothing executed; at most 32 files
+of 256 KiB, four levels and 200 names. Both lists pass the character check
+a typed host does (`SSHDestination`), and picking one only fills the field.
+
 ---
 
 ## 3. Resource Exhaustion
@@ -363,6 +397,20 @@ the asking process goes away. Within §1's threat model a process already
 running as the user is out of scope; the ancestry check exists so that one
 *reading* ssh's environment cannot use the token on its own.
 
+### 4.9 Local status and themes cross no boundary
+
+The optional status bar reads local public OS counters and metadata. It neither
+runs shell commands for polling nor connects to remote hosts, and sends no
+metrics or host details over the network. All windows share one sampler, which
+stops when no enabled bar is visible. The privacy manifest declares required
+API reasons; it does not grant additional permissions or claim telemetry.
+
+Custom themes are settings stored through the existing configuration store.
+The graphical editor validates draft names/colors and checks for concurrent
+edits before saving. Input-source badges use OS metadata, not keystroke contents;
+private IME modes are deliberately left unknown. Neither feature changes the
+execution or clipboard trust boundaries described above.
+
 ## 5. Data at Rest
 
 **Terminal contents are not automatically persisted.** Scrollback routinely
@@ -421,6 +469,12 @@ HOME and SSH_AUTH_SOCK. Tests needing isolated authentication use temporary
 keys, an explicit SSH configuration, `IdentityAgent none`, no forwarding,
 and a separate known_hosts; never alter the user's SSH files.
 
+Remote editing requires an explicit `open-file-command`. Managed downloads,
+including reused copies, never use LaunchServices' default file handler:
+`.command`, `.terminal` and similar handlers can execute remote bytes locally.
+The configured command remains the user's trusted editor choice and receives
+separate arguments, never shell interpolation.
+
 ## 6. Rules Summary
 
 For quick reference during implementation and review:
@@ -437,246 +491,7 @@ For quick reference during implementation and review:
 
 ---
 
-## 7. Change Log
-
-Every security-relevant change, newest first. The numbering continues
-the 0.1.1 quality plan's `S` series ([quality plan](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/V0.1.1-QUALITY-PLAN.md),
-which records S01–S04 and S07 in full); the entries below are the ones
-whose write-up belongs with the design rather than with the release that
-made them.
-
-- **S21 — 2026-10-14: SFTP asks through askpass; the channel's login-only
-  settings.** SFTP and remote editing ask for passwords, passphrases and new
-  host keys through `SSH_ASKPASS` answered by the app (D27, §4.8). Reviewing
-  the channel for it found that a `RemoteCommand` in the user's
-  `~/.ssh/config` made ssh refuse the SFTP subsystem, and that
-  `RequestTTY force` would have put a remote terminal between the binary
-  frames: the channel now passes `RemoteCommand=none`, `RequestTTY=no` and,
-  as `sftp(1)` does, `ControlMaster=no`. The connect sheet's user, port and
-  key fields reach ssh as separate argv elements, with nothing ssh would
-  expand (`%`, `${}`) accepted in them.
-- **S20 — 2026-10-13: the 1.2.0 review.** A review of the release's work
-  (#326) found no exploitable defect, and tightened the image path. The
-  decoder receives one anonymous shared mapping, unlinked before spawn and
-  bounded to the pixel cap plus row padding, and writes nothing but an
-  8-byte header to stdout; its sandbox is proved by a `--check-sandbox` mode
-  the test suite runs, which must be refused a file read. Raw RGB/RGBA
-  images, converted in process, use a private mapping and never create a
-  system-wide object. The decoder is reaped through a kqueue exit event with
-  one SIGKILL at the deadline, so a stalled child cannot keep a thread
-  polling. Every pull request is scanned by CodeQL (Swift, C, Python,
-  workflows) and dependency review (#313).
-- **S19 — 2026-10-08: a crash, concurrency, signing and supply-chain
-  audit** ([record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-08-crash-concurrency-supply-chain-audit.md)).
-  No byte sequence was found that stably crashes or hangs a pane; the fuzz
-  harness now reaches what a mutation of raw output rarely did —
-  `corta-fuzz --target osc|kitty|sftp` frames each input as one OSC
-  sequence, one Kitty command (mostly an `o=z` transmission, so the inflate
-  ceiling) or one SFTP frame, which must fail as a typed error or decode to
-  a message that survives re-encoding. `ci.yml` and `nightly.yml` named
-  their actions by tag and left the job token in `.git/config`; they pin by
-  commit, as the release workflows do, and keep no token. The release check
-  verified that the app was signed but not what the signature allows: it
-  now fails any Mach-O in the bundle that carries `get-task-allow` or
-  another entitlement that undoes the hardened runtime, lacks the runtime
-  flag, disagrees on the team, or searches outside the bundle and the
-  system for libraries (1.1.8 passes every rule). The feed is unsigned and
-  only its enclosures carry signatures, while Sparkle acts on release notes,
-  links and flags too; `verify-appcast.swift` now refuses any item field the
-  feed has never published. Sparkle 2.10.0 is past every published
-  advisory. In the follow-up: a frame shapes at most 1,024 non-ASCII
-  glyphs, so a screen of distinct clusters cannot re-shape itself on the
-  main thread every frame; Kitty PNGs are decoded by `corta-image-decoder`
-  under the `pure-computation` sandbox; the feed must be signed
-  (`SURequireSignedFeed`, no grace period) and archives are verified
-  before extraction (D20 amended); one read batch queues at most 64 KiB of
-  query replies; the Open Window intent checks its folder off the main
-  thread.
-- **S18 — 2026-10-08: a local-data and hostile-remote audit.** The SFTP
-  channel spawned `ssh -s -- <host> sftp` with whatever forwarding the
-  user's configuration gave that host; a `Host *` with `ForwardAgent yes`
-  handed the agent to a host named by a remote shell's OSC 7 the moment the
-  user accepted the connection. It now passes what `sftp(1)` passes:
-  `ForwardAgent=no`, `ForwardX11=no`, `ClearAllForwardings=yes`,
-  `PermitLocalCommand=no`. A failed transfer kept its plan through Change
-  Host, and Retry ran it on the new connection — a local file queued for one
-  host was uploaded to another; a job now runs only on the host its row
-  names. Command-history Run wrote a multi-line record and Return although
-  the row shows one line, and records are OSC 133 marks any output can forge;
-  such a record is filled, not run, as is one longer than the row shows.
-  S05/S09's isolation assumed a remote names its own host; an OSC 7 with an
-  empty or `localhost` host, from a remote shell or `cat` of a file, became
-  the local working directory that new tabs, splits, restore and directory
-  history use. `TerminalSession.workingDirectory` now returns a report only
-  where the kernel puts the shell or the foreground job
-  (`PTY.confirmedWorkingDirectory`, string comparison with `/private`
-  folded, no `stat` of a path output named), else the shell's kernel
-  directory. Remote-edit downloads stop at 64 MB, and any download refuses a
-  READ reply longer than asked. SFTP names show controls and
-  `ConcealingScalars` as U+FFFD and are saved with them as `_`. Remote-edit
-  copies untouched for 30 days and matching their approved digest are
-  removed. Exports are written `0600`.
-- **S17 — 2026-10-07: the audit's application-layer findings.** Link
-  tooltips show the URL that opens (§2.4). SFTP downloads are quarantined
-  through LaunchServices — not `LSFileQuarantineEnabled`, which would mark
-  every file the shells Corta spawns create — so Gatekeeper checks a remote
-  app, script or installer opened from Finder. `open-file-command`
-  substitutes its placeholders in one pass; a path naming `{line}` was
-  rewritten into a different file than the one checked. Every host that
-  reaches `ssh` passes `SSHDestination`'s character check: the SFTP browser's
-  field and a remote pane's OSC 7 host had relied on OpenSSH's own hostname
-  rules (9.6+) alone. Directory history and session state are `0600`. A
-  remote-edit "save copy elsewhere" failure is reported instead of dropped.
-- **S16 — 2026-10-07: a whole-repository audit's terminal-core findings.**
-  The `path:line` detector's pattern, `[\w.+\-/]*[\w.+\-]+:`, had two
-  overlapping quantifiers; a 100,000-character token with no colon took 54 s
-  on the main thread, run twice per ⌘ press over it, and the menu validation
-  of Open File Reference ran it with no length cap at all — hours, for a
-  long enough line. It is possessive now, and linear. Kitty images on the
-  alternate screen had a 320 MB table of their own beside the parked main
-  screen's, an unfinished transmission held ~89 MB of base64 outside every
-  budget, and nothing bounded all panes together: under a megabyte of
-  compressed output reached 0.9 GB in one pane. One budget per pane now
-  spans both screens and the pending text, and `ImageMemoryBudget` bounds the
-  app. §2.5's visible-replacement rule was not implemented — bidi and
-  zero-width characters were folded invisibly into the previous cell — and
-  now is; OSC 52 writes lose control characters as well.
-- **S15 — 2026-10-05: the SFTP `ssh` override is Debug-only.** Seven
-  `CORTA_*` switches were read in six files; they are now one type,
-  `DiagnosticsEnvironment`. `CORTA_SFTP_SSH`, which picks the program
-  that holds the SSH session, was honoured by a Release build for any
-  absolute path; it is now read only by a Debug build, must name an
-  existing executable, and is logged (§4.3).
-- **S14 — 2026-10-03: compressed Kitty images inflate under a ceiling.**
-  `kitten icat` sends an image it scaled to fit as zlib-compressed pixels
-  (`o=z`); the key was ignored, the compressed bytes failed the size check,
-  and the image never showed. The payload is inflated now, and a few
-  kilobytes that claim gigabytes are the reason it is bounded: output stops
-  at the declared `s × v × bytes-per-pixel` (or the 64 MB per-image cap for
-  PNG), checked in 64 KiB slices of input, and the header and checksum must
-  be zlib's. DEFLATE is Apple's Compression framework, a system library
-  like Darwin, not a bound C dependency (D02). Fuzz seeds cover a valid
-  stream and a bomb.
-- **S13 — 2026-09-30: release signing secrets moved behind the approval
-  (#134).** The Developer ID `.p12`, its password and the notary key
-  were repository secrets that any workflow on any branch could read.
-  They are now secrets of the `release` environment — `v*` tags only,
-  maintainer approval on every run — and notarisation uses a new App
-  Store Connect API key. Signing with the key alone, through a
-  cloud-managed certificate, was tried and is refused to API keys, so the
-  certificate still reaches the runner in a throwaway keychain (§4.7).
-- **S12 — 2026-09-30: an APC chunk may be 132 KiB, not 6 KiB.** The
-  cap was sized to the graphics protocol's text, which asks for 4096-byte
-  chunks; kitty's own `kitten icat` has written 128 KiB chunks since kitty
-  0.31, so every image it sent above about 4 KB was discarded. The cap is
-  still a hard one per sequence, the parser's buffer is the only thing it
-  sizes, and the per-image (64 MB) and per-pane (320 MB) caps behind it
-  are unchanged.
-- **S11 — 2026-09-20: the update feed is signed from CI (D20).** The
-  Sparkle EdDSA key moved from the maintainer's login keychain to the
-  `release` GitHub environment — `v*` tags only, maintainer approval on
-  every run — and `appcast.yml` signs a published release into
-  `appcast.xml` through a pull request, holding the item to
-  `check-release.sh --appcast --require-notarized` first (§4.7). The key
-  is piped, never written; actions and Sparkle's tools are pinned by hash.
-  `scripts/release.sh` remained the manual route until 1.1.0 removed it
-  (#133); the workflow is now the only one.
-- **S10 — 2026-09-16: system entry points added without a command path
-  (B16).** Three App Intents (open a window, focus a window by identity,
-  toggle the Quick Terminal), one Carbon hotkey and Secure Keyboard Entry
-  shipped. None of them carries text toward a child's stdin, and §4.6 says
-  that none ever will; the one intent parameter is a directory checked to
-  exist. The hotkey uses `RegisterEventHotKey` rather than an `NSEvent`
-  global monitor precisely so that Corta never asks for Accessibility
-  access (rule 7). `SecureInput` is the sole caller of the secure-input
-  counter and releases it at quit; a titlebar lock shows the engaged state
-  rather than the setting.
-- **S09 — 2026-09-13: remote OSC 7 reports are recorded, still isolated.**
-  B13 changed the disposition of a remote-host report from *dropped* to
-  *recorded as `RemoteContext`* — the pane's title badge, the command
-  history's host filter and (in B14) remote file operations all need to know
-  which host a pane is on. The isolation rule itself is unchanged and is the
-  security property: `Terminal.workingDirectory` remains local-only by
-  construction, so every consumer that existed before this change — the
-  spawn fallback ladder, split-pane inheritance, session restore, file
-  reference resolution — is unreachable by a remote path without a single
-  edit to those consumers. The recorded context is informational; nothing in
-  the core hands it to a local spawn, and the app tests stage that refusal
-  end to end. A remote host is also *attacker-influenced* text: it is
-  displayed, never parsed for credentials, paths to execute, or hosts to
-  connect to without the user's own command doing the connecting. B14's
-  SFTP browser and remote editing are the one place Corta itself spawns
-  `ssh` toward a host a pane named, and the rule holds there by asking:
-  the first connection to a host in a run shows the name (prefilled,
-  editable, provenance stated) and connects only on the user's Connect —
-  `RemoteHostConsent`, in memory for the run, never persisted. Without
-  that step, any bytes the far end printed could have pointed the next
-  ⌘-click's download — and the agent's keys — at a host of their choosing.
-  The connect sheets' suggestions keep to the same rule. *Recent hosts* are
-  only names the user typed or picked and then connected to — never one a
-  pane reported — kept newest first, at most eight, in
-  `recent-hosts.json` in Application Support (owner-only, `0600`), and
-  cleared from Settings ▸ Privacy & Security. *SSH config aliases* are read
-  from `~/.ssh/config` and its `Include`s: only the names after `Host`,
-  patterns left out, never a `Match exec`, `ProxyCommand` or any other value,
-  nothing executed; at most 32 files of 256 KiB, four levels of `Include`
-  and 200 names. Both lists pass the same character check a typed host does
-  (`SSHDestination`), so neither file can put anything into `ssh`'s argv that
-  could not have been typed, and picking one only fills the field. A file
-  dragged from the SFTP browser to Finder is downloaded first into a fresh
-  `0700` folder under the temporary directory, which the browser removes
-  when its window closes.
-- **S08 — 2026-09-06: PTY operations refuse a closed descriptor, and a
-  reaped child's group is never signalled.** A descriptor number is the
-  kernel's to recycle the instant `close()` runs, but `PTY` kept using its
-  stored number after `close()`: a write, resize or `tcgetpgrp` issued late
-  (keyboard input or the coalesced-resize queue racing a tab close) would
-  silently hit whatever unrelated file the number had been dealt to —
-  demonstrated in tests by recycling the number onto a fresh file and
-  watching a `PTY.write` land in it. `read`, `write`, `resize` and `size`
-  now throw `PTYError.closed`, and `foregroundProcessGroup` reports `nil`,
-  once the descriptor is closed; `signalProcessGroup`/`terminate` refuse to
-  run once the child has been reaped, because a dead child's group id can
-  equally be recycled onto a stranger. The audit otherwise confirmed: close
-  is idempotent under concurrency and never double-closes a recycled number,
-  the master/replica close order at spawn is exact (no gap, no leak — the
-  replica goes the instant `corta-exec` holds its own reference), failed
-  spawns and repeated spawn/close cycles leak no descriptors, and
-  foreground/background job tracking follows real job control (`tcgetpgrp`)
-  through run, suspend and background transitions.
-- **S06 — 2026-09-06: OSC 52 clipboard payloads are sanitised, and stricter
-  base64.** The write half of OSC 52 is text a *stream* chose, sight unseen —
-  unlike a user drag-selection there is no "copy what I saw" contract — so the
-  decoded text is now stripped of bidi embeddings/overrides/isolates
-  (U+202A–U+202E, U+2066–U+2069) and zero-width format characters (ZWSP,
-  word joiner, ZWNBSP/BOM) before it is recorded for the pasteboard: these
-  are what let pasted content display as something other than what it is
-  (§2.5, Trojan Source). ZWJ, ZWNJ and LRM/RLM are kept — emoji sequences
-  and real bidi text break without them. The base64 decoder now also rejects
-  data trailing the `=` padding rather than silently decoding the prefix.
-  The audit otherwise confirmed the existing boundaries stand: write is off
-  by default behind `allow-clipboard-write`, the read form is parsed only
-  far enough to be discarded and answers nothing, payloads are capped by
-  `Parser.maxStringLength` with whole-sequence discard on overflow, and no
-  reply path carries stream-supplied text back to the child (§2.1–2.2).
-- **S05 — 2026-09-06: OSC 7 working-directory reports are host-checked.**
-  The payload of OSC 7 is a `file://host/path` URL, and a shell reached over
-  `ssh` (or a pane inside `tmux` on one) reports a directory on *that* host.
-  The report feeds local spawns — new tabs, splits, session restore — so the
-  parser now accepts only a local host (empty, `localhost`, or this machine's
-  own names, compared case-insensitively and ignoring a trailing FQDN dot)
-  and drops remote reports, leaving the app its kernel-side
-  `currentWorkingDirectory` fallback. Session state saved before this filter
-  can still carry a remote path with the host already lost, so restore drops
-  any saved directory that does not exist as a local directory.
-
-Remote editing requires an explicit `open-file-command`. Managed downloads,
-including reused copies, never use LaunchServices' default file handler:
-`.command`, `.terminal` and similar handlers can execute remote bytes locally.
-The configured command remains the user's trusted editor choice and receives
-separate arguments, never shell interpolation.
-
-## 8. Resource accounting and validation boundaries
+## 7. Resource accounting and validation boundaries
 
 For every resource influenced by PTY or peer data, reviews must identify:
 input and decoded limits, retained bytes/entries, ownership lifetime,
@@ -718,27 +533,12 @@ The dated [follow-up verification record](https://github.com/noah-qin/Corta/blob
 separates repairs from available runtime evidence and environment limits.
 It is not a claim that every supported machine or dependency path was tested.
 
-### Directory completion reports (OSC 134)
+---
 
-The bundled zsh line editor reports a revision, selection index, typed basename prefix, and up to
-20 percent-encoded folder labels, bounded by the parser's 4096-byte OSC limit.
-Labels reject control characters and are display-only. Corta never echoes
-a label into stdin. A user selection sends only fixed widget key sequences;
-the shell retrieves and quotes its own candidate and edits BUFFER, without
-eval or accept-line. Reports are ignored during commands and alternate-screen
-applications. Startup wrappers are private temporary files, restore ZDOTDIR,
-and source the user's existing startup files without modifying them.
+## 8. History
 
-## Local system status and graphical themes
-
-The optional status bar reads local public OS counters and metadata. It neither
-runs shell commands for polling nor connects to remote hosts, and sends no
-metrics or host details over the network. All windows share one sampler, which
-stops when no enabled bar is visible. The privacy manifest declares required
-API reasons; it does not grant additional permissions or claim telemetry.
-
-Custom themes are settings stored through the existing configuration store.
-The graphical editor validates draft names/colors and checks for concurrent
-edits before saving. Input-source badges use OS metadata, not keystroke contents;
-private IME modes are deliberately left unknown. Neither feature changes the
-execution or clipboard trust boundaries described above.
+Every security-relevant change up to 2026-10-14 was written up here as the
+`S` series, S05–S21; that record is preserved at
+[commit `ed9ea86`](https://github.com/noah-qin/Corta/blob/ed9ea86f793e20b211f6a79f886de389fadd7a3a/docs/SECURITY.md#7-change-log).
+Since then a change's security reasoning lives in its pull request and
+`CHANGELOG.md`, and this document records only the rule it leaves behind.
