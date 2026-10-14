@@ -19,26 +19,26 @@
 public struct CellAttributes: OptionSet, Hashable, Sendable {
     public var rawValue: UInt16
 
-    @inline(__always)
+    @inlinable
     public init(rawValue: UInt16) {
         self.rawValue = rawValue
     }
 
-    public static let bold = CellAttributes(rawValue: 1 << 0)
-    public static let dim = CellAttributes(rawValue: 1 << 1)
-    public static let italic = CellAttributes(rawValue: 1 << 2)
-    public static let underline = CellAttributes(rawValue: 1 << 3)
-    public static let blink = CellAttributes(rawValue: 1 << 4)
-    public static let reverse = CellAttributes(rawValue: 1 << 5)
-    public static let invisible = CellAttributes(rawValue: 1 << 6)
-    public static let strikethrough = CellAttributes(rawValue: 1 << 7)
+    @inlinable public static var bold: CellAttributes { CellAttributes(rawValue: 1 << 0) }
+    @inlinable public static var dim: CellAttributes { CellAttributes(rawValue: 1 << 1) }
+    @inlinable public static var italic: CellAttributes { CellAttributes(rawValue: 1 << 2) }
+    @inlinable public static var underline: CellAttributes { CellAttributes(rawValue: 1 << 3) }
+    @inlinable public static var blink: CellAttributes { CellAttributes(rawValue: 1 << 4) }
+    @inlinable public static var reverse: CellAttributes { CellAttributes(rawValue: 1 << 5) }
+    @inlinable public static var invisible: CellAttributes { CellAttributes(rawValue: 1 << 6) }
+    @inlinable public static var strikethrough: CellAttributes { CellAttributes(rawValue: 1 << 7) }
 
     /// Structural, not rendition: set by the grid, masked out of dumps.
-    public static let wide = CellAttributes(rawValue: 1 << 8)
+    @inlinable public static var wide: CellAttributes { CellAttributes(rawValue: 1 << 8) }
     /// Distinct from a real blank so edits can keep pairs whole.
-    public static let wideSpacer = CellAttributes(rawValue: 1 << 9)
+    @inlinable public static var wideSpacer: CellAttributes { CellAttributes(rawValue: 1 << 9) }
     /// Either half of a wide pair.
-    public static let widePair: CellAttributes = [.wide, .wideSpacer]
+    @inlinable public static var widePair: CellAttributes { [.wide, .wideSpacer] }
 
     /// Bits 10–15 remain reserved.
 }

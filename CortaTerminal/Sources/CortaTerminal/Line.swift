@@ -75,14 +75,13 @@ public struct Line: Equatable, Sendable {
 
     mutating func reserveCapacity(_ capacity: Int) { cells.reserveCapacity(capacity) }
 
-    public var count: Int { cells.count }
+    @inlinable public var count: Int { cells.count }
 
-    public var isEmpty: Bool { cells.isEmpty }
+    @inlinable public var isEmpty: Bool { cells.isEmpty }
 
     /// Reads past the end are blank; writes past it pad with blanks.
     public subscript(column: Int) -> Cell {
-        @inline(__always)
-        get {
+        @inlinable get {
             guard column >= 0, column < cells.count else { return .blank }
             return cells[column]
         }
