@@ -193,6 +193,12 @@ jobs:
         # readers/transfers, and the nightly sanitizer lane remains parallel.
         run: swift test --package-path CortaTerminal --no-parallel
 
+      # The allocation counts only mean something optimised: in Debug every
+      # unspecialised generic allocates, so the suite disables itself there.
+      - name: Hot-path allocations
+        if: needs.changes.outputs.core == 'true'
+        run: swift test --package-path CortaTerminal -c release --filter HotPathAllocationTests
+
       # The step above skips the real-OpenSSH suite: it needs an sshd. This
       # one starts a throwaway sshd on 127.0.0.1 with its own keys and config
       # in a temporary directory, runs `SFTPSSHIntegrationTests` against it,
