@@ -657,12 +657,3 @@ refused, a shortcut that does nothing. [Features and limitations](FEATURES.md)
 lists what Corta does not do yet. Report anything else on
 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose).
 For usage questions, go to [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a).
-
-### Development preview
-
-Debug builds offer **Help ▸ SFTP Development Preview**, or launch with
-`./scripts/build-and-run.sh --sftp-preview`. It opens the real file-browser
-view with read-only fixtures and example transfer rows. Navigate `/home/demo`,
-`src`, `docs`, and `empty` to inspect connected and empty listings. No server,
-credentials, or local file staging is used. The preview menu and fixture
-client are excluded from Release builds.

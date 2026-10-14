@@ -193,6 +193,59 @@ nightly failures were found: both were real races (window admission
 counted from registration rather than from acquisition; a cancelled id
 recycled before its marker was consumed), not slow-runner noise.
 
+### Real SSH and SFTP
+
+`scripts/verify-ssh-integration.py` runs `SFTPSSHIntegrationTests` through
+real OpenSSH on encrypted localhost TCP. It creates temporary host and
+client keys (one with a passphrase), `known_hosts` and client and server
+configs, disables agent use and forwarding, and reaps the test sshd and
+deletes the credentials afterwards; the installed SSH service and your SSH
+configuration are never touched. Besides sign-in and its refusals it covers
+a user, port and key given as options, a passphrase and a new host key asked
+through a forced `SSH_ASKPASS`, and a config's `RemoteCommand` and
+`RequestTTY force` not reaching the channel. Run it from the repository
+root; `ci.yml`'s core job runs it after `swift test`:
+
+```sh
+python3 scripts/verify-ssh-integration.py
+```
+
+Without the fixture the suite skips itself; a failed fixture set-up is
+never counted as a refused sign-in. The SFTP protocol fake and the real
+`sftp-server` tests cover hostile replies, silent-peer cancellation, request
+admission, list and tree budgets, atomic transfer and local destination
+symlinks, not every server, proxy or authentication method. The app's own
+askpass, `SSHAskpassBrokerTests`, runs the real executable against the
+broker with the test process standing where ssh would. A development stage
+isolates Corta's own storage only, not `HOME`, `SSH_AUTH_SOCK` or
+credentials: use the fixture, or another account, for anything that signs in.
+
+### Hot-path allocations
+
+`HotPathAllocationTests` holds parse → grid to zero heap allocations once
+warm, counted through libmalloc's `malloc_logger`. Unoptimised generics
+allocate everywhere, so the suite disables itself in Debug; run it the way
+CI does:
+
+```sh
+swift test --package-path CortaTerminal -c release --filter HotPathAllocationTests
+```
+
+For a profile rather than a count, record Allocations in Instruments while
+the release `corta-bench --scroll-allocations` runs: it warms 100k × 120
+rows of history and scrolls for 30 seconds. Select a range after the
+printed `STEADY` marker. History arenas and row indices allocate once per
+256 rows; any per-line allocation is the regression.
+
+### Parser and scrollback checks
+
+`CORTA_DIFFERENTIAL_CASES=1000000 swift test --package-path CortaTerminal
+--filter ParserSIMDTests` compares the vector parser with scalar dispatch
+over random slices; the default case count is smaller. `ScrollbackCompressionTests`
+covers compression, snapshots, concurrent cache reads, id reclamation and
+clear. The real-PTY 100 MB drain test wants a quiet machine: its 30-second
+ceiling is a hang guard, not a throughput figure.
+
 ## App tests
 
 The tests are hosted inside the app. A local ad-hoc signature lets a contributor
@@ -248,6 +301,30 @@ Remove both printed directories once the development app has exited.
 setup failure when the root or their config is missing, or the fixture
 prompt did not load. Their shared launcher also isolates `HOME` and
 `ZDOTDIR`; a missing fixture must never be counted as feature coverage.
+
+### Running app suites without a window
+
+For the pure-policy and offscreen Metal suites, a test host built with
+`CORTA_HEADLESS_TESTS` starts no window, shell, menus, hotkeys or
+secure-input monitoring and never activates. It is a compile-time flag,
+never set for a shipping build:
+
+```sh
+xcodebuild build-for-testing -project Corta.xcodeproj -scheme Corta \
+  -testPlan Unit -destination 'platform=macOS' -derivedDataPath /tmp/corta-headless \
+  SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG CORTA_HEADLESS_TESTS'
+xcodebuild test-without-building -project Corta.xcodeproj -scheme Corta \
+  -testPlan Unit -destination 'platform=macOS' -derivedDataPath /tmp/corta-headless \
+  -only-testing:CortaTests/DamageTrackingTests \
+  -only-testing:CortaTests/RenderReferenceTests
+```
+
+Under `Benchmark` the flag is `BENCHMARK CORTA_HEADLESS_TESTS`, and the
+Release plan's offscreen suites (`FrameCPUBaselineTests`,
+`InstanceUploadBenchmarkTests`, `RenderAllocationTests`) run the same way.
+Without menus, the checks that read `NSApp.mainMenu` fail; window, focus
+and UI tests are not made safe to run unattended, and nothing here
+satisfies D14.
 
 ### Terminal feedback regression (#213)
 
@@ -340,6 +417,33 @@ in front of it; the test passes the variable to the app.
 Machine-wide power in watts needs `powermetrics`, which needs root: `sudo
 powermetrics --samplers cpu_power,gpu_power -i 1000` beside command 1, when
 the person running it chooses to. Nothing here asks for it.
+
+With `CORTA_RENDER_METRICS` set, the frame rings also report `wakeHop`,
+`callbackLead`, `firstAfterResume`, `resumeToCallback` and `frameInterval`.
+`firstAfterResume` is a presentation lead and `resumeToCallback` the wait
+since resume: do not add `firstAfterResume` and `callbackLead` as separate
+stages. Only uninterrupted ticks count towards `frameInterval`.
+`gpuExecution` comes from Metal 4's own start and end timestamps and
+`gpuFeedbackDelay` from GPU end to the completion callback; the `gpu`
+submission-to-feedback figure stays the one quoted.
+
+Three narrower measurements:
+
+- **A Kitty image to glass.** Place a 4096 × 4096 PNG at
+  `/tmp/corta-4096.png` (`sips -z 4096 4096 docs/brand/about.png --out
+  /tmp/corta-4096.png`), install `kitten`, and run Release-plan
+  `MeasurementUITests/testKitty4096PNGToGlass` under Benchmark with the
+  stage `stage-ui-fixtures.sh` prepares. `imageToPresent` runs from the
+  final payload being stored to a drawable with the image on it.
+- **Reader priority under real producers.** `corta-bench --reader-qos`
+  compares reader scheduling, with `--utility` for the background side;
+  `--real-producers` runs three cold Swift builds and ten-pass `find`s
+  through PTYs instead (`--repository <package>`, `--root-find` or
+  `--bounded-root-find` choose what they build and walk). Its figures are
+  CPU and wall-time proxies, not watts.
+- **GPU resource lifetimes.** `TEST_RUNNER_CORTA_STRESS_SECONDS=300` with
+  the whole `CortaTests/ImageMemoryAndTextureTests` suite; check the printed
+  cycle count, since a method-only filter can select no Swift Testing case.
 
 ### Against other terminals
 
@@ -552,6 +656,15 @@ Never change global hotkeys, secure-input state, shell startup files or
 dependencies and per-process environments. Use temporary directories for
 fixtures and clean up the resources you create.
 
+### The SFTP browser without a server
+
+Debug builds offer **Help ▸ SFTP Development Preview**, or launch with
+`./scripts/build-and-run.sh --sftp-preview`. It opens the real file-browser
+view with read-only fixtures and example transfer rows. Navigate `/home/demo`,
+`src`, `docs`, and `empty` to inspect connected and empty listings. No server,
+credentials, or local file staging is used. The preview menu and fixture
+client are excluded from Release builds.
+
 ### Environment switches
 
 The app reads these from its own launch environment, and only through
@@ -706,213 +819,3 @@ verifies, not as a file in the tree.
 The historical esctest2 number that includes “known bugs” is a compatibility
 classification, not an automated-test pass rate. Always report all three
 counts: passed, known bugs and failed.
-
-## Security follow-up fixtures
-
-`scripts/verify-ssh-integration.py` runs `SFTPSSHIntegrationTests` through
-real OpenSSH on encrypted localhost TCP. It creates temporary host/client
-keys (one with a passphrase), known_hosts and client/server configs,
-disables agent use and forwarding, and reaps the test sshd and deletes
-credentials afterwards. Besides sign-in and its refusals it covers a user,
-port and key given as options, a passphrase and a new host key asked
-through a forced `SSH_ASKPASS`, and a config's `RemoteCommand` and
-`RequestTTY force` not reaching the channel. The app's own askpass —
-`SSHAskpassBrokerTests` — runs the real executable against the broker,
-with the test process standing where ssh would.
-Run it from the repository root with `python3 scripts/verify-ssh-integration.py`;
-`ci.yml`'s core job runs it on every change, after `swift test`.
-It does not alter the installed SSH service or the user's SSH configuration.
-The suite is explicitly skipped without the fixture environment. A failed
-fixture setup must not be counted as a successful authentication rejection.
-
-The SFTP protocol fake and real `sftp-server` tests complement that fixture:
-they cover hostile replies, silent-peer cancellation, request admission,
-list/tree budgets, atomic transfer and local destination symlinks. They do
-not reproduce every external server, proxy, authentication method or network.
-
-Run both full core sanitizers and the full application Unit plan for lifecycle
-changes. The October 2 TSAN investigation found an unsynchronized mutable
-interceptor in the test server; its storage is now a Mutex. New tests pin stale
-search status, a blocked directory probe, private copy modes, approval snapshots,
-same-metadata remote replacement and rejected glyphs without atlas thrashing.
-See the [dated results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-02-follow-up.md) for actual evidence.
-
-Development builds isolate Corta-owned storage only. A stage path does not
-isolate HOME, SSH_AUTH_SOCK, credentials or external editors. Use the fixture
-configuration or an independent account for credential-sensitive checks.
-
-For extended GPU lifetime checks set `TEST_RUNNER_CORTA_STRESS_SECONDS=300`
-and run the entire `CortaTests/ImageMemoryAndTextureTests` suite. Verify the
-printed cycle count; a method-only filter can select zero Swift Testing cases.
-For stable mixed-history/reflow comparisons, use `corta-bench --history`
-without simultaneous builds or sanitizer workloads.
-
-## System status, cursor and theme follow-up
-
-The feature suites are CursorAndWindowSettingsTests, SystemStatusAndThemeEditorTests,
-InputSourceIndicatorTests, SettingsModelTests, ConfigurationTests and
-ShellIntegrationSessionTests. Their UI counterparts use disposable CORTA_STAGE_DIR
-and ZDOTDIR directories and process-only AppleLanguages overrides. They must not
-edit production preferences, global language settings or user startup files.
-
-SystemStatusAndThemeEditorUITests exercises status selection, independent menu
-entrances, theme save/cancel and immediate appearance preview. Its localization
-case launches all nine shipped languages and opens the translated theme and
-host-detail interfaces. CursorAndWindowUITests checks actual idle blinking and
-window constraints. The catalog tests check coverage and format arguments;
-coverage alone does not establish native-speaker quality or VoiceOver usability.
-
-See the [dated feature record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-04-system-status-theme-editor.md)
-for focused suites, screenshots, benchmark scope and unverified environments.
-macOS 26+ Apple silicon is the target; a newer local test host does not by itself
-prove runtime behavior on every supported macOS release or physical display setup.
-
-On Xcode 27, the generated UI runner is sandboxed. The new feature UI fixtures
-use `/private/tmp/corta-ui-stages/` so the app and runner can share disposable
-configuration files without accessing each other’s protected containers. Create
-that directory before the run. For local ad-hoc `build-for-testing`, preserve
-the generated runner entitlements and add only a temporary absolute-path
-read/write exception for this directory when signing the runner; then run
-`test-without-building`. This changes the local runner artifact only, not Corta’s
-shipping entitlements. An inaccessible fixture is a setup failure, not evidence
-that settings or translations work.
-
-The input-source indicator and directory-completion UI fixtures come from
-`CortaUITests/stage-ui-fixtures.sh` too, through `TEST_RUNNER_CORTA_UI_FIXTURES`,
-like the system-status ones. They once wrote their stages into the runner’s own
-`FileManager.default.temporaryDirectory`, which the sandboxed runner can write
-and the app cannot read: the app started with the user’s prompt and an 80×24
-grid, and the tests failed on what they then saw. Each now checks that the
-fixture’s `demo ❯` prompt loaded and reports a setup failure when it did not,
-before any feature assertion. Toolbar and optional prompt placement are covered
-in [the input-source placement record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-04-input-source-toolbar.md).
-
-## Mac closeout evidence, October 2026
-
-The [dated Mac closeout](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-mac-audit-closeout.md) records
-actual Metal 4 Unit and PNG-helper tests, TSan, Release measurements, signed
-release/feed rehearsals and native UI checks. It also records the UI plan's
-pre-test automation-mode timeout, exact Swift 6.2 unavailability and the
-remote/TCC/VoiceOver limits; none is counted as a pass. For temporary adhoc
-Benchmark/TSan hosts, `ENABLE_HARDENED_RUNTIME=NO` was passed only on the build
-command to avoid unsigned-team library validation against Sparkle. Production
-signing retains hardened runtime. Native launches used an explicit minimal
-child environment as well as scratch HOME/stage/ZDOTDIR, rather than inheriting
-unrelated test-runner or desktop-launch metadata.
-
-## Background verification for #280–#283
-
-For selected pure-policy and offscreen Metal suites, build a dedicated test
-host with `SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG CORTA_HEADLESS_TESTS'`
-(or just `CORTA_HEADLESS_TESTS` under Benchmark). This compile-time flag prevents
-AppDelegate from starting a window, shell, menus, hotkeys or secure-input
-monitoring and gives the host a prohibited activation policy. It is not an
-environment/config switch and is never set for shipping builds. It does not
-make window/focus/UI tests safe to run unattended; select only the suites below.
-It also does not satisfy D14.
-
-```sh
-xcodebuild build-for-testing -project Corta.xcodeproj -scheme Corta \
-  -testPlan Unit -destination 'platform=macOS' -derivedDataPath /tmp/corta-headless \
-  SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG CORTA_HEADLESS_TESTS'
-xcodebuild test-without-building -project Corta.xcodeproj -scheme Corta \
-  -testPlan Unit -destination 'platform=macOS' -derivedDataPath /tmp/corta-headless \
-  -only-testing:CortaTests/DamageTrackingTests \
-  -only-testing:CortaTests/RenderPolicyTests \
-  -only-testing:CortaTests/CanvasPresentTests \
-  -only-testing:CortaTests/DiagnosticsEnvironmentTests \
-  -only-testing:CortaTests/ImagePlacementScrollTests \
-  -only-testing:CortaTests/DocumentationDriftTests
-```
-
-Use the existing local signing overrides from the contributor guide as needed.
-The Release plan's FrameCPUBaselineTests and InstanceUploadBenchmarkTests can
-also run with this host: they render to textures, without a display link or
-window. Their figures cannot establish glass latency, idle energy, 120 Hz
-cadence or compositor behavior. `testRegionAndHistoryScrolling` drives the
-frontmost window and is reserved for an interactive session.
-
-`CORTA_RENDER_METRICS` additionally emits wakeHop, callbackLead,
-firstAfterResume, resumeToCallback and frameInterval. The first-after-resume
-metric is presentation lead, while resumeToCallback measures the wait since
-resume; do not add firstAfterResume and callbackLead as independent stages.
-Only uninterrupted ticks contribute frameInterval. Summary suffixes include
-requested rate bounds/preference and Low Power Mode, and keep the existing
-metric-name prefix for test readers.
-`gpuExecution` uses Metal 4 native start/end timestamps; `gpuFeedbackDelay`
-measures GPU end to observation after the completion callback. The existing
-`gpu` submission-to-feedback metric stays the acceptance metric; the native
-diagnostics must not be substituted for its recorded tails.
-
-### Steady scrolling allocation profile
-
-Build `corta-bench` in Release, then record Allocations while launching it with
-`--scroll-allocations`. This uses the existing `yes` corpus, warms 100k×120
-history and runs the steady phase for 30 seconds without a snapshotter. Select
-a range after the printed STEADY-begins marker, include All Allocations and
-inspect the complete call tree. The reserved history arena and row-index arrays
-allocate per 256-row batch; a missing per-line Line path is the criterion, not
-zero total allocations. The [October 9 follow-up](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-input-followup.md)
-records the successful profile and temporary signing method.
-
-## Memory/core optimization verification (#286–#289)
-
-Run `swift test --package-path CortaTerminal --filter ScrollbackCompressionTests`
-for compression, snapshots, concurrent cache reads, ID reclamation and clear.
-`CORTA_DIFFERENTIAL_CASES=1000000 swift test --package-path CortaTerminal
---filter ParserSIMDTests` compares vector parsing to scalar dispatch with
-random slices. The regular fuzz corpus and two 500k seeded mutation runs
-remain required. Use a quiet machine for the real-PTY 100 MB drain test;
-its 30-second ceiling is not a throughput benchmark.
-
-`CompactAtlasTests` checks the 24-byte ABI, Float geometry, fractional image
-UV sampling, growth/retirement and failed allocations. The Release performance
-plan writes upload bytes, D17, four-pane 400×120 CPU and atlas storage reports.
-The interactive measurement suite checks live producers in each pane and
-reverses keyboard history navigation every 100 events so the 600-frame ring fills before
-the scroll limit clamps. `testFourPanePromptMemory` measures the actual window
-in addition to the offscreen texture-resource figures. Results and hardware
-limitations are in [the dated record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-memory-core-optimization.md).
-
-
-### Shared-image and render-owner verification
-
-The #291/#284/#290 [measurement record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-render-image-energy.md)
-names passing automated checks and outstanding acceptance gates. Use
-`swift run -c release --package-path CortaTerminal corta-bench --reader-qos`
-and add `--utility` for the reader scheduling comparison.
-`CursorAndWindowUITests` propagates `TEST_RUNNER_CORTA_RENDER_THREAD`; its quiet
-cursor test lowers the render-metric flush capacity to one so a continued
-2 Hz application blink cannot hide below the default 600-frame summary.
-Measurement tests belong to the **Release** test plan, not the UI plan.
-
-### Follow-up image and producer measurements (#291/#290)
-
-Place any 4096×4096 PNG at `/tmp/corta-4096.png` — for example
-`sips -z 4096 4096 docs/brand/about.png --out /tmp/corta-4096.png`. (The
-generator the recorded run used is
-[at a commit](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/script/fixtures/kitty4096.swift).)
-`stage-ui-fixtures.sh` supplies the measurement stage's executable
-`kitty-shell`. With `/opt/homebrew/bin/kitten` installed, run Release-plan
-`MeasurementUITests/testKitty4096PNGToGlass` under Benchmark. The staged shell
-uses icat stream transfer and a declared window size to prevent source resizing.
-`imageToPresent` starts when the final validated payload is stored and ends
-on a positive drawable timestamp with a ready image quad. This includes
-decode, GPU upload and compositor presentation, and excludes earlier payload
-transmission. `outputToFrame` separates output arrival from frame encoding;
-`frameToGlass` remains independent of a main-thread feedback stamp.
-
-Prepare an isolated small Swift package and a directory of 5,000 files
-([the script the recorded run used](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/script/prepare_reader_qos_fixtures.py)). Build the Release `corta-bench`, then use
-`--reader-qos --real-producers` with and without `--utility`. Each launches
-three actual cold-scratch Swift builds and ten-pass find processes through
-PTYs, reporting completion, requested reader priority, wall time and parent
-CPU. These are throughput/CPU proxies, not watts. The
-[follow-up record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-followup.md) preserves the results
-and UI automation limits.
-
-The real-producer benchmark also accepts `--repository <package-path>` for
-an actual repository’s Swift package, `--root-find` for full same-filesystem
-root traversal, or `--bounded-root-find` for depth4. These ranges are distinct
-and must be named in a result. A timed-out or interrupted full traversal is
-not a passing completed root-find run. Each producer has a180-second deadline.
