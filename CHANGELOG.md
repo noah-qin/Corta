@@ -19,6 +19,9 @@ Versioning for compatibility changes.
 - Release preparation and packaging checks accept version-independent README
   download instructions, so editing installation prose no longer breaks the
   release pipeline.
+- Renaming a tab and then clicking or switching to another tab, closing a
+  tab or entering full screen saves the name, instead of leaving the tab
+  blank and its editor stranded where the tab used to be.
 
 ## [1.2.0] - 2026-10-13
 

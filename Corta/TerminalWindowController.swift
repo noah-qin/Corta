@@ -111,8 +111,19 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         return find(window, depth: 0)
     }
 
+    /// Commits an in-progress rename. The editor is an overlay placed over
+    /// the selected tab once, with the native title blanked beneath it:
+    /// anything that deselects or moves that tab would otherwise strand it,
+    /// leaving the tab empty and the name unsaved.
+    func commitTabRename() {
+        tabTitleField?.commitIfEditing()
+    }
+
     func beginTabRename() {
         guard let window else { return }
+        for other in window.tabGroup?.windows ?? [] where other !== window {
+            (other.windowController as? TerminalWindowController)?.commitTabRename()
+        }
         if window.tabGroup?.isTabBarVisible != true { window.toggleTabBar(nil) }
         window.tabGroup?.selectedWindow = window
         window.makeKeyAndOrderFront(nil)
@@ -141,6 +152,25 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     isolated deinit {
         if let secureInputObserver { NotificationCenter.default.removeObserver(secureInputObserver) }
         if let tabEventMonitor { NSEvent.removeMonitor(tabEventMonitor) }
+        if let tabCloseObserver { NotificationCenter.default.removeObserver(tabCloseObserver) }
+    }
+
+    private var tabCloseObserver: NSObjectProtocol?
+
+    /// Keyboard tab switching and ⌘T deselect this tab without a click in
+    /// it. Checked after the switch settles: losing key to another app keeps
+    /// the tab selected, and the rename open.
+    func windowDidResignKey(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.window else { return }
+            if !window.isVisible || window.tabGroup.map({ $0.selectedWindow !== window }) == true {
+                self.commitTabRename()
+            }
+        }
+    }
+
+    func windowWillEnterFullScreen(_ notification: Notification) {
+        commitTabRename()
     }
 
     /// A local monitor sees clicks before AppKit's native tab cell starts its
@@ -148,9 +178,24 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// classes, selectors or replacement tab bar are required.
     private func installTabInteractions() {
         guard tabEventMonitor == nil else { return }
+        // Another tab closing — its close button, or its shell exiting —
+        // shifts this tab under the rename overlay.
+        tabCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            let closing = notification.object as? NSWindow
+            MainActor.assumeIsolated {
+                guard let self, let window = self.window, let closing, closing !== window,
+                      window.tabGroup?.windows.contains(closing) == true else { return }
+                self.commitTabRename()
+            }
+        }
         tabEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            guard let self, let eventWindow = event.window, eventWindow === self.window,
-                  event.type == .rightMouseDown || event.modifierFlags.contains(.control) || event.clickCount == 2
+            guard let self, let eventWindow = event.window, eventWindow === self.window else { return event }
+            // A click anywhere but the editor ends the rename, as in Finder:
+            // another tab, a close button, a tab drag, the window edge.
+            self.tabTitleField?.commitIfEditing(unlessHitBy: event)
+            guard event.type == .rightMouseDown || event.modifierFlags.contains(.control) || event.clickCount == 2
             else { return event }
             let point = eventWindow.convertPoint(toScreen: event.locationInWindow)
             guard let target = self.tabController(at: point, in: eventWindow),
@@ -368,6 +413,12 @@ private final class TabTitleField: NSTextField, NSTextFieldDelegate {
         drawsBackground = false
         invalidateIntrinsicContentSize()
         selectText(nil)
+    }
+
+    func commitIfEditing(unlessHitBy event: NSEvent? = nil) {
+        guard editingTitle else { return }
+        if let event, superview != nil, bounds.contains(convert(event.locationInWindow, from: nil)) { return }
+        finishEditing(save: true)
     }
 
     private func finishEditing(save: Bool) {

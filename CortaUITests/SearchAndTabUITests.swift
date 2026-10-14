@@ -182,6 +182,18 @@ final class SearchAndTabUITests: XCTestCase {
         app.textFields["tab-title-editor"].typeText("CanceledName")
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(app.windows["TableFixture"].exists)
+        // A rename left open while another tab is clicked commits, rather
+        // than stranding its editor and leaving the tab blank.
+        app.typeKey("[", modifierFlags: [.command, .shift])
+        file.click()
+        file.menuItems["Rename Tab…"].click()
+        XCTAssertTrue(app.textFields["tab-title-editor"].waitForExistence(timeout: 3))
+        app.textFields["tab-title-editor"].typeText("Pending")
+        namedTab.click()
+        XCTAssertTrue(app.windows["TableFixture"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.textFields["tab-title-editor"].exists)
+        XCTAssertTrue(app.windows.firstMatch.tabGroups.firstMatch.descendants(matching: .tab)
+            .matching(identifier: "Pending").firstMatch.exists)
         namedTab.rightClick()
         let newTab = try XCTUnwrap(app.menuItems.matching(identifier: "New Tab")
             .allElementsBoundByIndex.first(where: { $0.isHittable }))
