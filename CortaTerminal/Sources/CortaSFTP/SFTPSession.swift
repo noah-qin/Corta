@@ -188,17 +188,11 @@ public struct SFTPVolumeInfo: Equatable, Sendable {
             let nameMaximum = try? reader.readUInt64(),
             !reader.hasRemaining
         else { return nil }
-        self.blockSize = blockSize
-        self.fragmentSize = fragmentSize
-        self.blocks = blocks
-        self.blocksFree = blocksFree
-        self.blocksAvailable = blocksAvailable
-        self.files = files
-        self.filesFree = filesFree
-        self.filesAvailable = filesAvailable
-        self.filesystemID = filesystemID
-        self.flags = flags
-        self.nameMaximum = nameMaximum
+        self.init(
+            blockSize: blockSize, fragmentSize: fragmentSize, blocks: blocks, blocksFree: blocksFree,
+            blocksAvailable: blocksAvailable, files: files, filesFree: filesFree,
+            filesAvailable: filesAvailable, filesystemID: filesystemID, flags: flags,
+            nameMaximum: nameMaximum)
     }
 }
 

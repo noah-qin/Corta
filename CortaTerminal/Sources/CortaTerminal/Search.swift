@@ -67,18 +67,7 @@ public enum Search {
         var index = 0
         while index < characters.count {
             let character = characters[index]
-            if character == "\\" {
-                index += 2
-                continue
-            }
-            if character == "[" {
-                index += 1
-                while index < characters.count, characters[index] != "]" {
-                    index += characters[index] == "\\" ? 2 : 1
-                }
-                index += 1
-                continue
-            }
+            if skipLiteral(characters, at: &index) { continue }
             guard character == "(", let close = groupEnd(characters, from: index) else {
                 index += 1
                 continue
@@ -94,23 +83,30 @@ public enum Search {
         return false
     }
 
+    /// Steps over an escape (`\\x`) or a whole character class (`[...]`) at
+    /// `index`, which hold no group to find; `false` leaves `index` alone.
+    private static func skipLiteral(_ characters: [Character], at index: inout Int) -> Bool {
+        switch characters[index] {
+        case "\\":
+            index += 2
+        case "[":
+            index += 1
+            while index < characters.count, characters[index] != "]" {
+                index += characters[index] == "\\" ? 2 : 1
+            }
+            index += 1
+        default:
+            return false
+        }
+        return true
+    }
+
     private static func groupEnd(_ characters: [Character], from start: Int) -> Int? {
         var depth = 0
         var index = start
         while index < characters.count {
             let character = characters[index]
-            if character == "\\" {
-                index += 2
-                continue
-            }
-            if character == "[" {
-                index += 1
-                while index < characters.count, characters[index] != "]" {
-                    index += characters[index] == "\\" ? 2 : 1
-                }
-                index += 1
-                continue
-            }
+            if skipLiteral(characters, at: &index) { continue }
             if character == "(" { depth += 1 }
             if character == ")" {
                 depth -= 1
