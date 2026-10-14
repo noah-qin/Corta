@@ -661,7 +661,7 @@ For usage questions, go to [Discussions → Q&A](https://github.com/noah-qin/Cor
 ### Development preview
 
 Debug builds offer **Help ▸ SFTP Development Preview**, or launch with
-`./script/build_and_run.sh --sftp-preview`. It opens the real file-browser
+`./scripts/build-and-run.sh --sftp-preview`. It opens the real file-browser
 view with read-only fixtures and example transfer rows. Navigate `/home/demo`,
 `src`, `docs`, and `empty` to inspect connected and empty listings. No server,
 credentials, or local file staging is used. The preview menu and fixture

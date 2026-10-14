@@ -107,7 +107,7 @@ class DiffTests(unittest.TestCase):
         self.assertFalse(self.classify(self.base, base="0" * 40))
 
     def test_scripts_assets_workflows_and_unknown_paths_run_full_ci(self):
-        for path in ("docs/brand/compose-screenshot.swift", "docs/brand/image.png",
+        for path in ("scripts/brand/compose-screenshot.swift", "docs/brand/image.png",
                      ".github/workflows/ci.yml", "appcast.xml", "Package.resolved",
                      "Corta/README.md", "unknown.md"):
             with self.subTest(path=path):

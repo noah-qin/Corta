@@ -43,7 +43,7 @@ Product ▸ Build Documentation in Xcode) renders it with the symbol
 documentation. Generated documentation is not a goal in itself; the
 catalog exists so that a contributor can find where a byte goes.
 
-Tools are split between [`scripts/`](../scripts/) and [`script/`](../script/):
+Tools live in [`scripts/`](../scripts/):
 
 | Task | Tool |
 | :--- | :--- |
@@ -51,7 +51,8 @@ Tools are split between [`scripts/`](../scripts/) and [`script/`](../script/):
 | Select CI checks and extract CodeQL sources | `scripts/ci-docs-only.py`, `scripts/codeql-extract.py` |
 | Prepare a release and report automation checks | `scripts/prepare-release.py`, `scripts/prepare-release.sh`, `scripts/report-ci-statuses.sh` |
 | Check GPU capability and the signed update feed | `scripts/metal-capability.swift`, `scripts/verify-appcast.swift` |
-| Build the development app or verify real SSH/SFTP | `script/build_and_run.sh`, `script/verify_ssh_integration.py` |
+| Build the development app or verify real SSH/SFTP | `scripts/build-and-run.sh`, `scripts/verify-ssh-integration.py` |
+| Render the brand images | `scripts/brand/compose-screenshot.swift`, `scripts/brand/social-preview.swift` |
 
 Python helper tests live in `scripts/tests/`. The release artifact check is
 `corta-release-check` in `CortaTerminal` ([packaging](TESTING.md#packaging));

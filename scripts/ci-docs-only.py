@@ -82,7 +82,7 @@ def scope_for_paths(paths):
             scope["feed"] = True
             scope["script_tests"] = True
             languages.add("python" if path.endswith(".py") else "swift")
-        elif path == "script/verify_ssh_integration.py":
+        elif path == "scripts/verify-ssh-integration.py":
             scope.update(core=True, ssh=True)
             languages.add("python")
         elif path in ("scripts/ci-docs-only.py", "scripts/codeql-extract.py"):

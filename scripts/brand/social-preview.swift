@@ -16,7 +16,7 @@
 
 // Renders the GitHub social preview card (1280 x 640).
 //
-//   swift docs/brand/social-preview.swift docs/brand/social-preview.png [dark|light]
+//   swift scripts/brand/social-preview.swift docs/brand/social-preview.png [dark|light]
 //
 // Pure AppKit and Core Text, so it needs nothing installed. Run it from the
 // repository root — the mascot is loaded by a relative path.

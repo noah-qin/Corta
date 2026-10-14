@@ -19,7 +19,7 @@
 // margin and type. Pure AppKit; compile it (the interpreter has crashed on
 // long runs) and run it from anywhere:
 //
-//   swiftc -O docs/brand/compose-screenshot.swift -o /tmp/compose
+//   swiftc -O scripts/brand/compose-screenshot.swift -o /tmp/compose
 //   /tmp/compose plain   window.png out.png
 //   /tmp/compose poster  window.png out.png "Title" "Subtitle"
 //   /tmp/compose overlay window.png floating.png dx dy out.png

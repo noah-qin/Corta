@@ -709,7 +709,7 @@ counts: passed, known bugs and failed.
 
 ## Security follow-up fixtures
 
-`script/verify_ssh_integration.py` runs `SFTPSSHIntegrationTests` through
+`scripts/verify-ssh-integration.py` runs `SFTPSSHIntegrationTests` through
 real OpenSSH on encrypted localhost TCP. It creates temporary host/client
 keys (one with a passphrase), known_hosts and client/server configs,
 disables agent use and forwarding, and reaps the test sshd and deletes
@@ -719,7 +719,7 @@ through a forced `SSH_ASKPASS`, and a config's `RemoteCommand` and
 `RequestTTY force` not reaching the channel. The app's own askpass —
 `SSHAskpassBrokerTests` — runs the real executable against the broker,
 with the test process standing where ssh would.
-Run it from the repository root with `python3 script/verify_ssh_integration.py`;
+Run it from the repository root with `python3 scripts/verify-ssh-integration.py`;
 `ci.yml`'s core job runs it on every change, after `swift test`.
 It does not alter the installed SSH service or the user's SSH configuration.
 The suite is explicitly skipped without the fixture environment. A failed

@@ -23,7 +23,7 @@ import Testing
 /// and an unprivileged localhost sshd; no personal SSH policy is consulted.
 @Suite("SSH/SFTP encrypted localhost integration", .serialized,
     .enabled(if: ProcessInfo.processInfo.environment["CORTA_SSH_TEST_ROOT"] != nil,
-        "Run script/verify_ssh_integration.py to provide the isolated sshd fixture"))
+        "Run scripts/verify-ssh-integration.py to provide the isolated sshd fixture"))
 struct SFTPSSHIntegrationTests {
     private var root: URL {
         URL(fileURLWithPath: ProcessInfo.processInfo.environment["CORTA_SSH_TEST_ROOT"]!)

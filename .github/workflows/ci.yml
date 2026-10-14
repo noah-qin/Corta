@@ -193,7 +193,7 @@ jobs:
       # host-key failure against real ssh on every change.
       - name: Real SSH and SFTP against an isolated sshd
         if: needs.changes.outputs.ssh == 'true'
-        run: python3 -B script/verify_ssh_integration.py
+        run: python3 -B scripts/verify-ssh-integration.py
 
       # One corpus per target: the raw feed, OSC and Kitty payloads framed
       # as their sequences, and SFTP frames from a hostile server.
