@@ -231,8 +231,20 @@ elif args[:2] == ['pr', 'view']:
            'mergeCommit': state.get('head')}[field])
 elif args[:2] == ['workflow', 'run']:
     state['ci'] += 1
+elif args[:2] == ['run', 'list'] and '--status' in args:
+    if state.get('list_error'):
+        sys.exit(1)
+    print('\\n'.join(str(run) for run in state.get('held', [])))
 elif args[:2] == ['run', 'list']:
     print('11')
+elif args[:2] == ['run', 'cancel']:
+    if args[2] in [str(run) for run in state.get('uncancellable', [])]:
+        sys.exit(1)
+    state.setdefault('cancelled', []).append(args[2])
+elif args[:3] == ['api', '--method', 'DELETE']:
+    if state.get('undeletable'):
+        sys.exit(1)
+    state.setdefault('deleted', []).append(args[3])
 elif args[:2] == ['run', 'watch']:
     pass
 elif args[:2] == ['run', 'view']:
@@ -292,6 +304,42 @@ path.write_text(json.dumps(state))
             [f"repos/noah-qin/Corta/statuses/{head}", "Terminal core (SwiftPM)", "success"],
             [f"repos/noah-qin/Corta/statuses/{head}", "App, tests and the update feed", "success"],
         ])
+
+    def test_held_bot_pr_runs_are_cancelled_before_the_merge(self):
+        environment = self.automatic_fixture()
+        (self.root / "github-state.json").write_text(json.dumps({}))
+        first = self.run_automatic(environment)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        state = json.loads((self.root / "github-state.json").read_text())
+        self.assertNotIn("cancelled", state)
+        # A second preparation of an open PR, with two runs held for approval.
+        state.update(state="OPEN", held=[71, 72])
+        (self.root / "github-state.json").write_text(json.dumps(state))
+        second = self.run_automatic(environment)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        state = json.loads((self.root / "github-state.json").read_text())
+        self.assertEqual(state["cancelled"], ["71", "72"])
+        self.assertEqual(state["state"], "MERGED")
+
+    def test_a_held_run_that_will_not_cancel_is_deleted(self):
+        environment = self.automatic_fixture()
+        (self.root / "github-state.json").write_text(json.dumps({"held": [71], "uncancellable": [71]}))
+        result = subprocess.run(["bash", str(SCRIPTS / "cancel-held-pr-runs.sh"), "chore/release-42"],
+                                env=environment, capture_output=True, text=True, cwd=self.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        state = json.loads((self.root / "github-state.json").read_text())
+        self.assertEqual(state["deleted"], ["repos/noah-qin/Corta/actions/runs/71"])
+
+    def test_tidying_held_runs_never_fails_a_release(self):
+        environment = self.automatic_fixture()
+        for state in ({"list_error": True},
+                      {"held": [71], "uncancellable": [71], "undeletable": True}):
+            with self.subTest(state=state):
+                (self.root / "github-state.json").write_text(json.dumps(state))
+                result = subprocess.run(["bash", str(SCRIPTS / "cancel-held-pr-runs.sh"), "chore/release-42"],
+                                        env=environment, capture_output=True, text=True, cwd=self.root)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("::warning::", result.stdout)
 
     def test_a_job_that_did_not_succeed_is_never_reported_as_passed(self):
         environment = self.automatic_fixture()
