@@ -319,10 +319,8 @@ queue.
 **libFuzzer is not available on macOS with the current toolchain.**
 Xcode 26 ships no `libclang_rt.fuzzer_osx.a`, and
 `swiftc -sanitize=fuzzer` is rejected outright for
-`arm64-apple-macosx` — verified, not assumed. The
-`LLVMFuzzerTestOneInput` entry point is present and correct for a
-toolchain that has one; what runs today is a deterministic mutation
-driver over a checked-in corpus:
+`arm64-apple-macosx` — verified, not assumed. What runs instead is a
+deterministic mutation driver over a checked-in corpus:
 
 ```sh
 swift build --package-path CortaTerminal -c release --product corta-fuzz

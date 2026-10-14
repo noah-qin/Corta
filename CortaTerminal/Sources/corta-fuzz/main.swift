@@ -31,9 +31,8 @@ import Foundation
 /// surviving a re-encode. Each target has its own corpus directory under
 /// `Tests/Fuzz` (`corpus`, `osc`, `kitty`, `sftp`).
 ///
-/// libFuzzer does not link on macOS (no `libclang_rt.fuzzer_osx.a`), so the
-/// `LLVMFuzzerTestOneInput` entry point waits for a toolchain that has it,
-/// and a seeded mutation driver is what runs — less exploration, but every
+/// libFuzzer does not link on macOS (no `libclang_rt.fuzzer_osx.a`), so a
+/// seeded mutation driver is what runs — less exploration, but every
 /// failure reproduces from its command line.
 ///
 /// ```sh
@@ -50,8 +49,7 @@ private let initialColumns = 80
 private let scrollbackLimit = 64
 
 /// A violated cap traps, which is what the fuzzer reports.
-@discardableResult
-func fuzzOne(_ bytes: [UInt8]) -> Int32 {
+func fuzzOne(_ bytes: [UInt8]) {
     var terminal = Terminal(
         rows: initialRows, columns: initialColumns, scrollbackLimit: scrollbackLimit)
     var rows = initialRows
@@ -102,7 +100,6 @@ func fuzzOne(_ bytes: [UInt8]) -> Int32 {
     precondition(
         terminal.takeOutput().count <= 64 * 1024,
         "one input queued an unreasonable amount of response")
-    return 0
 }
 
 /// What the mutated bytes stand for; see the file's doc comment.
@@ -180,11 +177,6 @@ func fuzz(_ bytes: [UInt8], target: FuzzTarget) {
     case .kitty: fuzzOne(kittyStream(bytes))
     case .sftp: fuzzSFTP(bytes)
     }
-}
-
-@_cdecl("LLVMFuzzerTestOneInput")
-public func fuzzerTestOneInput(_ start: UnsafePointer<UInt8>, _ count: Int) -> Int32 {
-    fuzzOne(Array(UnsafeBufferPointer(start: start, count: count)))
 }
 
 /// Deterministic: a fuzz failure must reproduce.

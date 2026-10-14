@@ -22,9 +22,8 @@ import Testing
 /// The checked-in fuzz corpus, run on every test pass.
 ///
 /// The long runs live in the `corta-fuzz` executable (millions of mutated
-/// inputs, and the `LLVMFuzzerTestOneInput` entry point for a toolchain that
-/// has libFuzzer — Xcode 26 does not ship one for macOS, see that target's
-/// comment). What belongs here is the part that must never regress silently:
+/// inputs; macOS has no libFuzzer, see that target's comment). What belongs
+/// here is the part that must never regress silently:
 /// every input the fuzzer has already found interesting, replayed, with the
 /// `SECURITY.md` §3 caps asserted.
 ///
