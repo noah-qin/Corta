@@ -59,7 +59,7 @@ struct SharedImageSamplingTests {
         let backend = try Metal4Backend(device: device)
         let target = MetalRenderTarget.make(device: device, width: 1024, height: 768)
         let rect = CGRect(x: 0, y: 0, width: 1024, height: 768)
-        let quads = [
+        let quads: ContiguousArray = [
             QuadInstance(origin: .zero, size: .init(1024, 768), color: .one, atlasIndex: .max)
         ]
         var report =

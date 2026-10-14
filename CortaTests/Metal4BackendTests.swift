@@ -105,7 +105,7 @@ struct Metal4BackendTests {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let backend = try Metal4Backend(device: device)
         let texture = MetalRenderTarget.make(device: device, width: Self.width, height: Self.height)
-        let green = [QuadInstance(origin: .init(0, 0), size: .init(20, 20), color: .init(0, 1, 0, 1))]
+        let green: ContiguousArray = [QuadInstance(origin: .init(0, 0), size: .init(20, 20), color: .init(0, 1, 0, 1))]
         #expect(
             backend.renderFrameAndWait(into: texture) {
                 $0.drawSolidQuads(
@@ -146,7 +146,7 @@ struct Metal4BackendTests {
         let backend = try Metal4Backend(device: device)
         let texture = MetalRenderTarget.make(device: device, width: Self.width, height: Self.height)
         // Geometry past the rect: the scissor, not the instance data, clips it.
-        let overflowing = [
+        let overflowing: ContiguousArray = [
             QuadInstance(origin: .init(0, 0), size: .init(100, 100), color: .init(0, 0, 1, 1))
         ]
         #expect(
@@ -201,9 +201,9 @@ struct Metal4BackendTests {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let backend = try Metal4Backend(device: device)
         let texture = MetalRenderTarget.make(device: device, width: Self.width, height: Self.height)
-        let left = [QuadInstance(origin: .init(0, 0), size: .init(10, 20), color: .init(1, 0, 0, 1))]
+        let left: ContiguousArray = [QuadInstance(origin: .init(0, 0), size: .init(10, 20), color: .init(1, 0, 0, 1))]
         // Thousands of instances force the second draw past the first's buffer.
-        let many = Array(
+        let many = ContiguousArray(
             repeating: QuadInstance(origin: .init(20, 0), size: .init(20, 20), color: .init(0, 0, 1, 1)),
             count: 5000)
         #expect(

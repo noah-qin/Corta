@@ -60,7 +60,7 @@ import Testing
         }
         var generator = Generator(state: 0x113)
         let pieces = ["x", "y", "█", "▚", "░", "\u{1B}[41m \u{1B}[0m", "\u{1B}[7mr\u{1B}[0m", "\u{1B}[4mu\u{1B}[0m"]
-        func flatten(_ arrays: [[QuadInstance]]) -> [[Float]] {
+        func flatten(_ arrays: [ContiguousArray<QuadInstance>]) -> [[Float]] {
             arrays.map { array in
                 array.flatMap { instance in
                     [instance.origin.x, instance.origin.y, instance.size.x, instance.size.y,
@@ -341,7 +341,7 @@ import Testing
             seed = seed &* 6364136223846793005 &+ 1
             return Int((seed >> 32) % UInt64(limit))
         }
-        func flattened(_ arrays: [[QuadInstance]]) -> [[Float]] {
+        func flattened(_ arrays: [ContiguousArray<QuadInstance>]) -> [[Float]] {
             arrays.map { $0.flatMap { q in
                 [q.origin.x, q.origin.y, q.size.x, q.size.y,
                  q.color.x, q.color.y, q.color.z, q.color.w,

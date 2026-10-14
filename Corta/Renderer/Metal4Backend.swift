@@ -470,7 +470,7 @@ public nonisolated final class Metal4Backend {
         return true
     }
 
-    func drawSolidQuads(_ instances: [QuadInstance], rect: CGRect, drawableSize: CGSize) {
+    func drawSolidQuads(_ instances: ContiguousArray<QuadInstance>, rect: CGRect, drawableSize: CGSize) {
         draw(
             instances, ring: solidRing, pipeline: solidPipeline, atlas: nil,
             rect: rect, drawableSize: drawableSize, label: "Corta.solid")
@@ -480,7 +480,7 @@ public nonisolated final class Metal4Backend {
     /// version (`GlyphAtlas.atlasRectsVersion`), kept resident between
     /// changes. Without it the table is copied with the draw.
     func drawGlyphQuads(
-        _ instances: [QuadInstance], atlas: MTLTexture, atlasRects: [SIMD4<UInt16>] = [],
+        _ instances: ContiguousArray<QuadInstance>, atlas: MTLTexture, atlasRects: [SIMD4<UInt16>] = [],
         atlasRectsVersion: UInt64? = nil, rect: CGRect, drawableSize: CGSize
     ) {
         draw(
@@ -491,7 +491,7 @@ public nonisolated final class Metal4Backend {
 
     /// Untinted premultiplied sampling: colour glyphs and Kitty images.
     func drawColorQuads(
-        _ instances: [QuadInstance], atlas: MTLTexture, atlasRects: [SIMD4<UInt16>] = [],
+        _ instances: ContiguousArray<QuadInstance>, atlas: MTLTexture, atlasRects: [SIMD4<UInt16>] = [],
         atlasRectsVersion: UInt64? = nil, rect: CGRect, drawableSize: CGSize,
         imageUVRect: SIMD4<Float> = .zero, transient: Bool = false
     ) {
@@ -612,7 +612,7 @@ public nonisolated final class Metal4Backend {
     // MARK: - Encoding
 
     private func draw(
-        _ instances: [QuadInstance],
+        _ instances: ContiguousArray<QuadInstance>,
         ring: InstanceBufferRing,
         pipeline: MTLRenderPipelineState,
         atlas: MTLTexture?,

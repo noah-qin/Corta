@@ -81,12 +81,12 @@ struct RenderReferenceTests {
     /// Opaque plus overlapping translucent solids (the blend path), glyph
     /// instances sampling coverage, and colour instances sampling the
     /// premultiplied texture.
-    static let solidInstances: [QuadInstance] = [
+    static let solidInstances: ContiguousArray<QuadInstance> = [
         QuadInstance(origin: .init(0, 0), size: .init(24, 24), color: .init(1, 0, 0, 1)),
         QuadInstance(origin: .init(12, 12), size: .init(24, 24), color: .init(0, 1, 0, 0.5)),
         QuadInstance(origin: .init(32, 4), size: .init(16, 32), color: .init(0, 0, 1, 0.75)),
     ]
-    static let glyphInstances: [QuadInstance] = [
+    static let glyphInstances: ContiguousArray<QuadInstance> = [
         QuadInstance(
             origin: .init(2, 2), size: .init(32, 32), color: .init(1, 1, 0, 0.9),
             atlasIndex: 1),
@@ -94,7 +94,7 @@ struct RenderReferenceTests {
             origin: .init(30, 10), size: .init(16, 16), color: .init(0, 1, 1, 1),
             atlasIndex: 2),
     ]
-    static let colorInstances: [QuadInstance] = [
+    static let colorInstances: ContiguousArray<QuadInstance> = [
         QuadInstance(origin: .init(20, 8), size: .init(24, 24), color: .one, atlasIndex: 1)
     ]
 

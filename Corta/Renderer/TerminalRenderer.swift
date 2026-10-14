@@ -113,10 +113,10 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     private var backgroundCounts: [Int] = []
     private var glyphCounts: [Int] = []
     private var colorGlyphCounts: [Int] = []
-    private var cachedBackground: [QuadInstance] = []
-    private var cachedGlyphs: [QuadInstance] = []
+    private var cachedBackground: ContiguousArray<QuadInstance> = []
+    private var cachedGlyphs: ContiguousArray<QuadInstance> = []
     /// Their own pass: the coverage pipeline reduces emoji to a silhouette.
-    private var cachedColorGlyphs: [QuadInstance] = []
+    private var cachedColorGlyphs: ContiguousArray<QuadInstance> = []
     private var overlayCount = 0
     private var cachedColumns = 0
     private var cachedOffset = -1
@@ -171,12 +171,12 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
 
     /// Reused, so a damaged row allocates nothing: every damaged row's new
     /// instances, back to back, with where each row's are.
-    private var rowBackground: [QuadInstance] = []
-    private var rowGlyphs: [QuadInstance] = []
-    private var rowColorGlyphs: [QuadInstance] = []
+    private var rowBackground: ContiguousArray<QuadInstance> = []
+    private var rowGlyphs: ContiguousArray<QuadInstance> = []
+    private var rowColorGlyphs: ContiguousArray<QuadInstance> = []
     private var rebuiltRows: [RebuiltRow] = []
     /// The next cache while a splice builds it, then the old one's storage.
-    private var spliceBuffer: [QuadInstance] = []
+    private var spliceBuffer: ContiguousArray<QuadInstance> = []
 
     /// One damaged row: its instances in the row scratch arrays, and where
     /// its old ones start in the cache.
@@ -189,7 +189,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         var cachedGlyphStart: Int
         var cachedColorGlyphStart: Int
     }
-    private var overlayScratch: [QuadInstance] = []
+    private var overlayScratch: ContiguousArray<QuadInstance> = []
 
     /// One test rejects nearly every cell.
     private static let ruleAttributes: CellAttributes = [.underline, .strikethrough, .invisible]
@@ -220,7 +220,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     }
     /// The rules, in the margin rect's space (`markRect`); rebuilt when the
     /// rows are, or when `drawsCommandMarks` changes.
-    private var cachedMarks: [QuadInstance] = []
+    private var cachedMarks: ContiguousArray<QuadInstance> = []
     private var marksAreStale = true
 
     /// Resource counters used by Release measurement drivers.
@@ -237,7 +237,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
 
     /// The cached instances — background, glyphs, colour glyphs — so an
     /// incremental build can be compared with a full one.
-    var cachedInstances: [[QuadInstance]] {
+    var cachedInstances: [ContiguousArray<QuadInstance>] {
         [cachedBackground, cachedGlyphs, cachedColorGlyphs]
     }
 
@@ -330,9 +330,9 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
                 blockCursor = previousCursor
                 framePalette = previousPalette
             }
-            var backgrounds: [QuadInstance] = []
-            var glyphs: [QuadInstance] = []
-            var colors: [QuadInstance] = []
+            var backgrounds: ContiguousArray<QuadInstance> = []
+            var glyphs: ContiguousArray<QuadInstance> = []
+            var colors: ContiguousArray<QuadInstance> = []
             appendRowInstances(
                 line: line, row: row, graphemes: grid.graphemes,
                 background: &backgrounds, glyphs: &glyphs, colorGlyphs: &colors)
@@ -789,7 +789,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// follows the rows (the background's overlay). `counts` becomes the
     /// new per-row counts either way.
     private func place(
-        into cached: inout [QuadInstance], counts: inout [Int], from scratch: [QuadInstance],
+        into cached: inout ContiguousArray<QuadInstance>, counts: inout [Int], from scratch: ContiguousArray<QuadInstance>,
         ranges: KeyPath<RebuiltRow, Range<Int>>, starts: KeyPath<RebuiltRow, Int>
     ) {
         var moves = 0
@@ -835,7 +835,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         let count = min(abs(delta), height)
         let retained = delta > 0 ? (top + count)..<(bottom + 1) : top..<(bottom - count + 1)
         let shiftY = Float(delta) * cellHeight
-        func moveInstances(_ instances: inout [QuadInstance], counts: inout [Int]) {
+        func moveInstances(_ instances: inout ContiguousArray<QuadInstance>, counts: inout [Int]) {
             let regionStart = counts[..<top].reduce(0, +)
             let regionEnd = regionStart + counts[top...bottom].reduce(0, +)
             let keptStart = counts[..<retained.lowerBound].reduce(0, +)
@@ -946,8 +946,8 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// wide; a side-table cluster is shaped as one run into the same box.
     private func appendRowInstances(
         line: Line, row: Int, graphemes: GraphemeTable,
-        background: inout [QuadInstance], glyphs: inout [QuadInstance],
-        colorGlyphs: inout [QuadInstance]
+        background: inout ContiguousArray<QuadInstance>, glyphs: inout ContiguousArray<QuadInstance>,
+        colorGlyphs: inout ContiguousArray<QuadInstance>
     ) {
         let cellWidth = Float(metricsValue.cellWidth)
         let cellHeight = Float(metricsValue.cellHeight)
@@ -1160,7 +1160,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// Inset so a run of them reads as boxes, not a grid.
     private func appendMissingGlyphBox(
         at origin: SIMD2<Float>, cellWidth: Float, cellHeight: Float, color: SIMD4<Float>,
-        into background: inout [QuadInstance]
+        into background: inout ContiguousArray<QuadInstance>
     ) {
         let thickness = max(1, Float(scaleValue).rounded(.down))
         let inset = max(thickness, (cellWidth * 0.12).rounded())
@@ -1256,7 +1256,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     private func selectionQuads(
         _ selection: TerminalSelection, grid: Grid, offset: Int, cellWidth: Float, cellHeight: Float,
         color: SIMD4<Float>
-    ) -> [QuadInstance] {
+    ) -> ContiguousArray<QuadInstance> {
         guard selection.start.row <= selection.end.row else { return [] }
         // `totalPushed`, as the copy path uses — `.count` let the highlight and
         // the copied text disagree once the ring filled.
@@ -1269,7 +1269,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
                 selection.end.row, from: selection.baseScrollbackTotal,
                 to: grid.scrollback.totalPushed) + offset
         guard lastRow >= 0, firstRow < grid.rows else { return [] }
-        var quads: [QuadInstance] = []
+        var quads: ContiguousArray<QuadInstance> = []
         for row in max(0, firstRow)...min(grid.rows - 1, lastRow) {
             let startColumn =
                 row == firstRow ? min(max(0, selection.start.column), grid.columns) : 0
