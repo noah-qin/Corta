@@ -556,16 +556,7 @@ nonisolated final class GlyphAtlas {
             isSyntheticBold[Int(style.rawValue)]
             ? CTFontGetSize(fonts[Int(style.rawValue)]) * 0.04
             : 0
-        // A cluster's glyphs don't share an origin.
-        var bounds = CGRect.null
-        for run in runs {
-            var glyphs = run.glyphs
-            var rects = [CGRect](repeating: .zero, count: glyphs.count)
-            CTFontGetBoundingRectsForGlyphs(run.font, .horizontal, &glyphs, &rects, glyphs.count)
-            for (rect, position) in zip(rects, run.positions) {
-                bounds = bounds.union(rect.offsetBy(dx: position.x, dy: position.y))
-            }
-        }
+        let bounds = runs.reduce(CGRect.null) { $0.union(Self.outlineBounds(of: $1)) }
         guard !bounds.isNull, !bounds.isEmpty else {
             return GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero)
         }
@@ -579,21 +570,13 @@ nonisolated final class GlyphAtlas {
         else { return GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero, isMissing: true) }
         let width = max(1, Int(bbox.width.rounded(.up)))
         let height = max(1, Int(bbox.height.rounded(.up)))
-        var allocation = page.allocate(width: width, height: height)
-        if allocation == nil {
-            // Full: reset this page and retry once.
-            evict(page)
-            allocation = page.allocate(width: width, height: height)
-        }
-        guard let origin = allocation,
+        guard let origin = allocate(width: width, height: height, in: page),
             let context = CGContext(
                 data: nil, width: width, height: height, bitsPerComponent: 8,
                 bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
                 bitmapInfo: CGImageAlphaInfo.none.rawValue)
         else { return GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero) }
-        context.setAllowsAntialiasing(true)
-        context.setShouldAntialias(true)
-        context.setShouldSmoothFonts(false)  // no subpixel AA since Mojave
+        Self.prepareForText(context)
         context.setFillColor(gray: 1, alpha: 1)
         if strokeWidth > 0 {
             context.setStrokeColor(gray: 1, alpha: 1)
@@ -623,14 +606,7 @@ nonisolated final class GlyphAtlas {
             region: MTLRegionMake2D(origin.x, origin.y, width, height),
             mipmapLevel: 0, withBytes: data, bytesPerRow: width)
 
-        return GlyphInfo(
-            uvRect: SIMD4<Float>(
-                Float(origin.x) / Float(atlasPixelSize), Float(origin.y) / Float(atlasPixelSize),
-                Float(width) / Float(atlasPixelSize), Float(height) / Float(atlasPixelSize)),
-            atlasIndex: rectangleIndex(page: page, x: origin.x, y: origin.y, width: width, height: height),
-            size: SIMD2<Float>(Float(width), Float(height)),
-            bearing: SIMD2<Float>(Float(bbox.minX), Float(bbox.minY))
-        )
+        return placed(at: origin, width: width, height: height, bearing: bbox.origin, in: page)
     }
 
     /// The color half of `rasterize`, into `colorPage`.
@@ -648,19 +624,11 @@ nonisolated final class GlyphAtlas {
     /// blend (`sourceRGB = .one`).
     private func rasterizeColor(_ runs: [ShapedRun]) -> GlyphInfo {
         let empty = GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero, isColor: true)
-        var bounds = CGRect.null
-        for run in runs {
-            if let ctRun = run.ctRun {
-                // Length 0 means the whole run.
-                bounds = bounds.union(CTRunGetImageBounds(ctRun, nil, CFRange(location: 0, length: 0)))
-            } else {
-                var glyphs = run.glyphs
-                var rects = [CGRect](repeating: .zero, count: glyphs.count)
-                CTFontGetBoundingRectsForGlyphs(run.font, .horizontal, &glyphs, &rects, glyphs.count)
-                for (rect, position) in zip(rects, run.positions) {
-                    bounds = bounds.union(rect.offsetBy(dx: position.x, dy: position.y))
-                }
-            }
+        // A bitmap's real extent; length 0 means the whole run.
+        let bounds = runs.reduce(CGRect.null) { bounds, run in
+            bounds.union(
+                run.ctRun.map { CTRunGetImageBounds($0, nil, CFRange(location: 0, length: 0)) }
+                    ?? Self.outlineBounds(of: run))
         }
         guard !bounds.isNull, !bounds.isEmpty, bounds.width.isFinite, bounds.height.isFinite else { return empty }
         let pad = CGFloat(Self.bitmapPadding)
@@ -678,22 +646,14 @@ nonisolated final class GlyphAtlas {
         let width = max(1, Int(bbox.width.rounded(.up)))
         let height = max(1, Int(bbox.height.rounded(.up)))
         guard width <= atlasPixelSize, height <= atlasPixelSize else { return empty }
-        var allocation = colorPage.allocate(width: width, height: height)
-        if allocation == nil {
-            // Full: reset this page and retry once.
-            evict(colorPage)
-            allocation = colorPage.allocate(width: width, height: height)
-        }
-        guard let origin = allocation,
+        guard let origin = allocate(width: width, height: height, in: colorPage),
             let context = CGContext(
                 data: nil, width: width, height: height, bitsPerComponent: 8,
                 bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
                 bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
                     | CGBitmapInfo.byteOrder32Little.rawValue)
         else { return empty }
-        context.setAllowsAntialiasing(true)
-        context.setShouldAntialias(true)
-        context.setShouldSmoothFonts(false)  // no subpixel AA since Mojave
+        Self.prepareForText(context)
         context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
         // No CTM flip, as in the grayscale path. Positions are in the
         // unscaled space the scale maps onto the bitmap.
@@ -721,15 +681,46 @@ nonisolated final class GlyphAtlas {
             region: MTLRegionMake2D(origin.x, origin.y, width, height),
             mipmapLevel: 0, withBytes: data, bytesPerRow: width * 4)
 
-        return GlyphInfo(
+        return placed(at: origin, width: width, height: height, bearing: bbox.origin, in: colorPage, isColor: true)
+    }
+
+    /// Where an outline run's glyphs draw, from the pen origin: a cluster's
+    /// glyphs don't share an origin.
+    private static func outlineBounds(of run: ShapedRun) -> CGRect {
+        var glyphs = run.glyphs
+        var rects = [CGRect](repeating: .zero, count: glyphs.count)
+        CTFontGetBoundingRectsForGlyphs(run.font, .horizontal, &glyphs, &rects, glyphs.count)
+        return zip(rects, run.positions).reduce(CGRect.null) { bounds, glyph in
+            bounds.union(glyph.0.offsetBy(dx: glyph.1.x, dy: glyph.1.y))
+        }
+    }
+
+    /// Room on `page`; a full page is reset and asked once more.
+    private func allocate(width: Int, height: Int, in page: AtlasPage) -> (x: Int, y: Int)? {
+        if let origin = page.allocate(width: width, height: height) { return origin }
+        evict(page)
+        return page.allocate(width: width, height: height)
+    }
+
+    private static func prepareForText(_ context: CGContext) {
+        context.setAllowsAntialiasing(true)
+        context.setShouldAntialias(true)
+        context.setShouldSmoothFonts(false)  // no subpixel AA since Mojave
+    }
+
+    /// The glyph's entry once its texels are uploaded at `origin`.
+    private func placed(
+        at origin: (x: Int, y: Int), width: Int, height: Int, bearing: CGPoint, in page: AtlasPage,
+        isColor: Bool = false
+    ) -> GlyphInfo {
+        GlyphInfo(
             uvRect: SIMD4<Float>(
                 Float(origin.x) / Float(atlasPixelSize), Float(origin.y) / Float(atlasPixelSize),
                 Float(width) / Float(atlasPixelSize), Float(height) / Float(atlasPixelSize)),
-            atlasIndex: rectangleIndex(page: colorPage, x: origin.x, y: origin.y, width: width, height: height),
+            atlasIndex: rectangleIndex(page: page, x: origin.x, y: origin.y, width: width, height: height),
             size: SIMD2<Float>(Float(width), Float(height)),
-            bearing: SIMD2<Float>(Float(bbox.minX), Float(bbox.minY)),
-            isColor: true
-        )
+            bearing: SIMD2<Float>(Float(bearing.x), Float(bearing.y)),
+            isColor: isColor)
     }
 
     /// Resets one page in place: its allocator rewinds and its caches clear,
