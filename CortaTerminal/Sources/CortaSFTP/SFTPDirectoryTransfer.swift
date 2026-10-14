@@ -148,39 +148,14 @@ extension SFTPTransferEngine {
             }
         }
 
-        var completedBytes: UInt64 = 0
-        for (index, file) in plan.files.enumerated() {
-            if Task.isCancelled { throw .cancelled }
-            let completedSoFar = completedBytes
-            progress?(
-                DirectoryTransferProgress(
-                    filesCompleted: index, filesTotal: plan.files.count,
-                    completedBytes: completedSoFar, totalBytes: plan.totalBytes,
-                    currentFile: file.relativePath))
+        try await transferFiles(of: plan, into: &receipt, progress: progress) { file, fileProgress throws(SFTPError) in
             try Self.rejectLocalSymlinkComponents(
                 localDirectory.appendingPathComponent(file.relativePath), within: localDirectory)
-            let fileReceipt = try await download(
+            return try await download(
                 remotePath: Self.join(remotePath, file.relativePath),
                 to: localDirectory.appendingPathComponent(file.relativePath),
-                policy: filePolicy,
-                partialDisposition: .automatic,
-                progress: progress.map { handler in
-                    { @Sendable fileProgress in
-                        handler(
-                            DirectoryTransferProgress(
-                                filesCompleted: index, filesTotal: plan.files.count,
-                                completedBytes: completedSoFar + fileProgress.completedBytes,
-                                totalBytes: plan.totalBytes, currentFile: file.relativePath))
-                    }
-                })
-            completedBytes += fileReceipt.bytesTransferred
-            receipt.filesTransferred += 1
-            receipt.bytesTransferred += fileReceipt.bytesTransferred
+                policy: filePolicy, partialDisposition: .automatic, progress: fileProgress)
         }
-        progress?(
-            DirectoryTransferProgress(
-                filesCompleted: plan.files.count, filesTotal: plan.files.count,
-                completedBytes: completedBytes, totalBytes: plan.totalBytes, currentFile: ""))
         return receipt
     }
 
@@ -246,6 +221,23 @@ extension SFTPTransferEngine {
             if try await ensureRemoteDirectory(path) { receipt.directoriesCreated += 1 }
         }
 
+        try await transferFiles(of: plan, into: &receipt, progress: progress) { file, fileProgress throws(SFTPError) in
+            try await upload(
+                from: localDirectory.appendingPathComponent(file.relativePath),
+                to: Self.join(remotePath, file.relativePath),
+                policy: policy, partialDisposition: .automatic, progress: fileProgress)
+        }
+        return receipt
+    }
+
+    /// Moves `plan`'s files one at a time with `transfer`, reporting the
+    /// directory's progress before each file, through each file's own
+    /// progress, and once at the end.
+    private func transferFiles(
+        of plan: TreePlan, into receipt: inout DirectoryTransferReceipt,
+        progress: DirectoryProgressHandler?,
+        transfer: (TreePlan.PlannedFile, ProgressHandler?) async throws(SFTPError) -> SFTPTransferReceipt
+    ) async throws(SFTPError) {
         var completedBytes: UInt64 = 0
         for (index, file) in plan.files.enumerated() {
             if Task.isCancelled { throw .cancelled }
@@ -255,12 +247,9 @@ extension SFTPTransferEngine {
                     filesCompleted: index, filesTotal: plan.files.count,
                     completedBytes: completedSoFar, totalBytes: plan.totalBytes,
                     currentFile: file.relativePath))
-            let fileReceipt = try await upload(
-                from: localDirectory.appendingPathComponent(file.relativePath),
-                to: Self.join(remotePath, file.relativePath),
-                policy: policy,
-                partialDisposition: .automatic,
-                progress: progress.map { handler in
+            let fileReceipt = try await transfer(
+                file,
+                progress.map { handler in
                     { @Sendable fileProgress in
                         handler(
                             DirectoryTransferProgress(
@@ -277,7 +266,6 @@ extension SFTPTransferEngine {
             DirectoryTransferProgress(
                 filesCompleted: plan.files.count, filesTotal: plan.files.count,
                 completedBytes: completedBytes, totalBytes: plan.totalBytes, currentFile: ""))
-        return receipt
     }
 
     // MARK: - Enumeration
