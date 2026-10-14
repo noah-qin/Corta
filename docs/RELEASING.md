@@ -30,6 +30,14 @@ signatures, notarisation and archive/feed checks still gate delivery.
    PR's head commit as a status of the same name, linked to the job; a job
    that did not succeed is reported as failed. The feed PR (step 6) does the
    same. Without it the 1.1.5 version PR sat blocked behind green checks.
+   Opening the PR also leaves a `pull_request` run of each PR workflow
+   held for approval — the repository holds outside contributors' runs,
+   and `github-actions[bot]` counts as one — that never starts.
+   `scripts/cancel-held-pr-runs.sh` cancels those before the merge (or
+   deletes one that will not cancel); otherwise GitHub marks each failed
+   once the branch is deleted, and every release showed red runs beside
+   the green one. It only tidies the run list, so it warns instead of
+   failing the release.
 4. It checks out that exact merge commit, reruns core/app tests, archives
    with the pinned Xcode and Developer ID, exports, packages, notarises,
    staples and checks the app and image with `corta-release-check --require-notarized`.
