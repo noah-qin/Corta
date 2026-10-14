@@ -99,12 +99,18 @@ extension PerformanceSuites {
                 }
             }
             // The first frame of a scenario may rasterise a glyph or grow the
-            // scroll journal; after it, damage must not change the count.
+            // scroll journal; after it, damage must not change the count by
+            // more than Metal's own bookkeeping, which drifts by a few from
+            // frame to frame. One allocation per row would add 40 here, one
+            // per cell thousands.
+            let tolerance = 16
             for name in ["ascii", "mixed"] {
                 let idle = results["\(name) idle"]!.dropFirst().max()!
                 for kind in ["full", "typing", "scroll"] {
                     let steady = results["\(name) \(kind)"]!.dropFirst()
-                    #expect(steady.allSatisfy { $0 <= idle }, "\(name) \(kind) allocates beyond its idle frame")
+                    #expect(
+                        steady.allSatisfy { $0 <= idle + tolerance },
+                        "\(name) \(kind) allocates beyond its idle frame: \(Array(steady)) against \(idle)")
                 }
             }
         }
