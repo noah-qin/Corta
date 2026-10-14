@@ -93,6 +93,5 @@ fuzzing and app-level verification.
 ### Processes
 
 - ``ChildEnvironment``
-- ``ProcessExit``
 - ``PTYError``
 - ``TerminalSize``
