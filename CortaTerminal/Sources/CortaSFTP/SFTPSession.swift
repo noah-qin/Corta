@@ -19,183 +19,6 @@ import Dispatch
 import Foundation
 import Synchronization
 
-/// The typed failure surface of the SFTP engine. Every layer below
-/// the app reports through this one type, so a caller's `catch` never has
-/// to guess which layer spoke.
-public enum SFTPError: Error, Equatable {
-    /// The server answered with a STATUS that was not `SSH_FX_OK` — a
-    /// definitive answer to the request. Never retried: asking again gets
-    /// the same answer.
-    case server(SFTPStatus)
-    /// The channel itself broke: the ssh subprocess died, a pipe failed,
-    /// or the channel was closed. The only class the transfer engine
-    /// retries, and only against a fresh channel.
-    case transport(SFTPTransportError)
-    /// The peer sent bytes that are not SFTPv3: an undecodable frame, a
-    /// reply to a request-id nothing sent, or a wrong-shaped response.
-    /// Also used when peer data exceeds an aggregate resource limit.
-    case protocolViolation(String)
-    /// The caller cancelled; in-flight requests were abandoned and the
-    /// server was told nothing more.
-    case cancelled
-    /// The transfer engine found the destination already present under a
-    /// `.fail` conflict policy.
-    case destinationConflict(path: String)
-    /// A local filesystem operation failed while staging a transfer.
-    case localIOFailed(operation: String, code: Int32)
-    /// The source changed while it was being read — it shrank, grew, was
-    /// rewritten or replaced — so what arrived is none of its versions.
-    /// Nothing was committed; the destination is as it was.
-    case sourceChanged(path: String)
-    /// Replacing the destination on a server without `posix-rename` failed
-    /// half-way, and putting the old file back failed too. Nothing is lost,
-    /// but the copies are apart: the old content is at `previousCopy`, the
-    /// new at `newCopy`, and `destination` may hold neither.
-    case replaceIncomplete(destination: String, previousCopy: String, newCopy: String)
-
-    /// Whether a retry against a fresh channel could plausibly succeed.
-    /// Transport failures only — a server STATUS is a considered answer,
-    /// and a protocol violation means the peer is not speaking the
-    /// protocol at all.
-    public var isRetryableTransportFailure: Bool {
-        if case .transport = self { return true }
-        return false
-    }
-
-    /// Whether this is `.replaceIncomplete`: the one failure after which
-    /// the partial must stay, because it may hold the only new copy.
-    var isIncompleteReplacement: Bool {
-        if case .replaceIncomplete = self { return true }
-        return false
-    }
-
-    /// A STATUS of plain `SSH_FX_FAILURE` — what OpenSSH answers for an
-    /// exclusive create of a name that exists.
-    var isPlainServerFailure: Bool {
-        if case .server(let status) = self { return status.code == .failure }
-        return false
-    }
-}
-
-extension SFTPError: CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case .server(let status):
-            "the server answered \(status.code.rawValue): \(status.messageString)"
-        case .transport(let error): "the channel failed: \(error)"
-        case .protocolViolation(let detail): "protocol violation: \(detail)"
-        case .cancelled: "cancelled"
-        case .destinationConflict(let path): "the destination already exists: \(path)"
-        case .localIOFailed(let operation, let code):
-            "local \(operation) failed: errno \(code)"
-        case .sourceChanged(let path): "the source changed during the transfer: \(path)"
-        case .replaceIncomplete(let destination, let previousCopy, let newCopy):
-            "replacing \(destination) did not finish: the old file is at \(previousCopy), the new one at \(newCopy)"
-        }
-    }
-}
-
-/// An open file or directory on the server. An opaque byte string by
-/// protocol (§6.1: "the handle is a string... not interpreted by the
-/// client"); equality is all the engine needs of it.
-public struct SFTPHandle: Equatable, Sendable {
-    public var rawValue: [UInt8]
-
-    public init(rawValue: [UInt8]) {
-        self.rawValue = rawValue
-    }
-}
-
-/// What the server's VERSION told us, reduced to the capabilities the
-/// engine acts on. Extensions the engine does not understand are kept
-/// verbatim in `extensions` for the app to display.
-public struct SFTPServerCapabilities: Equatable, Sendable {
-    /// The protocol version the server answered INIT with.
-    public var version: UInt32
-    /// Extension name → data, as advertised.
-    public var extensions: [String: [UInt8]]
-    /// `statvfs@openssh.com` — filesystem capacity queries. When false,
-    /// volume information is *unavailable*, not zero.
-    public var supportsStatVFS: Bool
-    /// `posix-rename@openssh.com` — rename that overwrites atomically.
-    /// When false, version 3's plain RENAME fails against an existing
-    /// destination and the transfer engine falls back to a documented
-    /// non-atomic REMOVE+RENAME.
-    public var supportsPosixRename: Bool
-
-    public init(
-        version: UInt32,
-        extensions: [String: [UInt8]],
-        supportsStatVFS: Bool,
-        supportsPosixRename: Bool
-    ) {
-        self.version = version
-        self.extensions = extensions
-        self.supportsStatVFS = supportsStatVFS
-        self.supportsPosixRename = supportsPosixRename
-    }
-}
-
-/// The answer to `statvfs@openssh.com` (OpenSSH's `sftp-server` man page):
-/// eleven `uint64` fields in the order of `struct statvfs`.
-public struct SFTPVolumeInfo: Equatable, Sendable {
-    public var blockSize: UInt64
-    public var fragmentSize: UInt64
-    public var blocks: UInt64
-    public var blocksFree: UInt64
-    public var blocksAvailable: UInt64
-    public var files: UInt64
-    public var filesFree: UInt64
-    public var filesAvailable: UInt64
-    public var filesystemID: UInt64
-    public var flags: UInt64
-    public var nameMaximum: UInt64
-
-    public init(
-        blockSize: UInt64, fragmentSize: UInt64, blocks: UInt64, blocksFree: UInt64,
-        blocksAvailable: UInt64, files: UInt64, filesFree: UInt64, filesAvailable: UInt64,
-        filesystemID: UInt64, flags: UInt64, nameMaximum: UInt64
-    ) {
-        self.blockSize = blockSize
-        self.fragmentSize = fragmentSize
-        self.blocks = blocks
-        self.blocksFree = blocksFree
-        self.blocksAvailable = blocksAvailable
-        self.files = files
-        self.filesFree = filesFree
-        self.filesAvailable = filesAvailable
-        self.filesystemID = filesystemID
-        self.flags = flags
-        self.nameMaximum = nameMaximum
-    }
-
-    /// Decodes an EXTENDED_REPLY body. `nil` for any shape but eleven
-    /// words — a short reply is the server and the extension disagreeing,
-    /// which is unanswerable rather than partially true.
-    public init?(extendedReplyBody bytes: [UInt8]) {
-        var reader = SFTPReader(bytes: bytes)
-        guard
-            let blockSize = try? reader.readUInt64(),
-            let fragmentSize = try? reader.readUInt64(),
-            let blocks = try? reader.readUInt64(),
-            let blocksFree = try? reader.readUInt64(),
-            let blocksAvailable = try? reader.readUInt64(),
-            let files = try? reader.readUInt64(),
-            let filesFree = try? reader.readUInt64(),
-            let filesAvailable = try? reader.readUInt64(),
-            let filesystemID = try? reader.readUInt64(),
-            let flags = try? reader.readUInt64(),
-            let nameMaximum = try? reader.readUInt64(),
-            !reader.hasRemaining
-        else { return nil }
-        self.init(
-            blockSize: blockSize, fragmentSize: fragmentSize, blocks: blocks, blocksFree: blocksFree,
-            blocksAvailable: blocksAvailable, files: files, filesFree: filesFree,
-            filesAvailable: filesAvailable, filesystemID: filesystemID, flags: flags,
-            nameMaximum: nameMaximum)
-    }
-}
-
 /// One SSH_FXP_* conversation over a channel: request multiplexing,
 /// reply dispatch, and the bounded in-flight window.
 ///
@@ -231,9 +54,9 @@ public final class SFTPSession: @unchecked Sendable {
     }
 
     public let configuration: Configuration
-    private let transport: SFTPChannelTransport
+    let transport: SFTPChannelTransport
 
-    private struct State {
+    struct State {
         /// Id allocation, recycling and the three cancellation orderings.
         /// A value, and tested as one — `SFTPRequestIDLedger`.
         var ids = SFTPRequestIDLedger()
@@ -276,7 +99,7 @@ public final class SFTPSession: @unchecked Sendable {
         var serverInfo: SFTPServerCapabilities?
     }
 
-    private let state = Mutex(State())
+    let state = Mutex(State())
     /// Serialises frame writes; two senders must never interleave bytes
     /// of their frames on the wire. Its own thread: a write blocks while ssh
     /// is slower than the window, and the cooperative pool has one thread
@@ -386,191 +209,6 @@ public final class SFTPSession: @unchecked Sendable {
         tearDown(with: .cancelled, closingTransport: true)
     }
 
-    // MARK: - Requests
-
-    /// OPEN (§8.1.1). `attributes` applies only when creating.
-    public func open(
-        path: String, flags: SFTPOpenFlags, attributes: SFTPAttributes = .init()
-    ) async throws(SFTPError) -> SFTPHandle {
-        let reply = try await request { _ in
-            .open(path: Array(path.utf8), flags: flags, attributes: attributes)
-        }
-        guard case .handle(let handle) = reply.payload else {
-            throw unexpected(reply, wanted: "HANDLE")
-        }
-        return SFTPHandle(rawValue: handle)
-    }
-
-    /// OPENDIR (§8.1.2).
-    public func openDirectory(path: String) async throws(SFTPError) -> SFTPHandle {
-        let reply = try await request { _ in .opendir(path: Array(path.utf8)) }
-        guard case .handle(let handle) = reply.payload else {
-            throw unexpected(reply, wanted: "HANDLE")
-        }
-        return SFTPHandle(rawValue: handle)
-    }
-
-    /// CLOSE (§8.1.3). Always safe to call on a handle the server may
-    /// already have dropped: its STATUS is the answer, and a stale handle
-    /// simply gets a failure STATUS back.
-    public func close(_ handle: SFTPHandle) async throws(SFTPError) {
-        try expectOK(await request { _ in .close(handle: handle.rawValue) })
-    }
-
-    /// READ (§8.2.1). Returns the bytes read; fewer than `length` at end
-    /// of file, and an empty array when the server answered EOF outright,
-    /// so a caller's loop ends on `data.isEmpty` rather than on a thrown
-    /// status.
-    public func read(
-        handle: SFTPHandle, offset: UInt64, length: UInt32
-    ) async throws(SFTPError) -> [UInt8] {
-        let reply = try await request { _ in
-            .read(handle: handle.rawValue, offset: offset, length: length)
-        }
-        switch reply.payload {
-        case .data(let data):
-            return data
-        case .status(let status) where status.code == .endOfFile:
-            return []
-        default:
-            throw unexpected(reply, wanted: "DATA")
-        }
-    }
-
-    /// WRITE (§8.2.2).
-    public func write(
-        handle: SFTPHandle, offset: UInt64, data: [UInt8]
-    ) async throws(SFTPError) {
-        try expectOK(await request { _ in .write(handle: handle.rawValue, offset: offset, data: data) })
-    }
-
-    /// STAT (§8.3): follows symbolic links.
-    public func stat(path: String) async throws(SFTPError) -> SFTPAttributes {
-        try await attributesRequest { _ in .stat(path: Array(path.utf8)) }
-    }
-
-    /// LSTAT (§8.3): does not follow symbolic links.
-    public func lstat(path: String) async throws(SFTPError) -> SFTPAttributes {
-        try await attributesRequest { _ in .lstat(path: Array(path.utf8)) }
-    }
-
-    /// FSTAT (§8.3) on an open handle.
-    public func fstat(handle: SFTPHandle) async throws(SFTPError) -> SFTPAttributes {
-        try await attributesRequest { _ in .fstat(handle: handle.rawValue) }
-    }
-
-    /// SETSTAT (§8.4).
-    public func setStat(path: String, attributes: SFTPAttributes) async throws(SFTPError) {
-        try expectOK(await request { _ in .setstat(path: Array(path.utf8), attributes: attributes) })
-    }
-
-    /// FSETSTAT (§8.4) on an open handle.
-    public func fsetStat(handle: SFTPHandle, attributes: SFTPAttributes) async throws(SFTPError) {
-        try expectOK(await request { _ in .fsetstat(handle: handle.rawValue, attributes: attributes) })
-    }
-
-    /// MKDIR (§8.5).
-    public func makeDirectory(path: String, attributes: SFTPAttributes = .init()) async throws(SFTPError) {
-        try expectOK(await request { _ in .mkdir(path: Array(path.utf8), attributes: attributes) })
-    }
-
-    /// RMDIR (§8.6).
-    public func removeDirectory(path: String) async throws(SFTPError) {
-        try expectOK(await request { _ in .rmdir(path: Array(path.utf8)) })
-    }
-
-    /// REMOVE (§8.7) — a file, never a directory.
-    public func remove(path: String) async throws(SFTPError) {
-        try expectOK(await request { _ in .remove(path: Array(path.utf8)) })
-    }
-
-    /// RENAME (§8.8). Version 3 semantics: fails when the destination
-    /// exists. For atomic overwrite use `posixRename(from:to:)`.
-    public func rename(from oldPath: String, to newPath: String) async throws(SFTPError) {
-        try expectOK(await request { _ in
-            .rename(oldPath: Array(oldPath.utf8), newPath: Array(newPath.utf8))
-        })
-    }
-
-    /// `posix-rename@openssh.com`: RENAME that overwrites an existing
-    /// destination atomically. Returns false — rather than throwing — when
-    /// the server never advertised the extension, so the caller can fall
-    /// back explicitly; a refusal from a server that *did* advertise it is
-    /// a real error and throws.
-    @discardableResult
-    public func posixRename(from oldPath: String, to newPath: String) async throws(SFTPError) -> Bool {
-        guard capabilities?.supportsPosixRename == true else { return false }
-        var writer = SFTPWriter()
-        writer.writeString(Array(oldPath.utf8))
-        writer.writeString(Array(newPath.utf8))
-        do {
-            let reply = try await extended(
-                name: SFTPCodec.posixRenameExtensionName, data: writer.bytes)
-            try expectOK(reply)
-            return true
-        } catch SFTPError.server(let status) where status.code == .operationUnsupported {
-            return false
-        }
-    }
-
-    /// REALPATH (§8.9). Returns the canonical path as raw bytes.
-    public func realPath(path: String) async throws(SFTPError) -> [UInt8] {
-        let reply = try await request { _ in .realpath(path: Array(path.utf8)) }
-        guard case .name(let entries) = reply.payload, let first = entries.first else {
-            throw unexpected(reply, wanted: "NAME with one entry")
-        }
-        return first.filename
-    }
-
-    /// One READDIR batch (§8.2.3). The server parcels a directory into as
-    /// many batches as it likes; an empty array means the server answered
-    /// EOF — the listing is complete. Loop until empty for the whole
-    /// directory (`SFTPTransferEngine.listDirectory` does).
-    public func readDirectory(handle: SFTPHandle) async throws(SFTPError) -> [SFTPEntry] {
-        let reply = try await request { _ in .readdir(handle: handle.rawValue) }
-        switch reply.payload {
-        case .name(let entries):
-            return entries
-        case .status(let status) where status.code == .endOfFile:
-            return []
-        default:
-            throw unexpected(reply, wanted: "NAME")
-        }
-    }
-
-    /// A raw EXTENDED round trip (§10): `name` selects the extension and
-    /// `data` is its request body. The reply body is returned uninterpreted.
-    public func extended(name: String, data: [UInt8]) async throws(SFTPError) -> SFTPMessage {
-        try await request { _ in .extended(name: Array(name.utf8), data: data) }
-    }
-
-    /// `statvfs@openssh.com`: filesystem capacity for the filesystem
-    /// containing `path`. `nil` — explicitly, never guessed — when the
-    /// server does not support the extension, whether because its VERSION
-    /// did not advertise it or because it answered OP_UNSUPPORTED.
-    public func volumeInfo(path: String = "/") async throws(SFTPError) -> SFTPVolumeInfo? {
-        guard capabilities?.supportsStatVFS == true else { return nil }
-        var writer = SFTPWriter()
-        writer.writeString(Array(path.utf8))
-        do {
-            let reply = try await extended(name: SFTPCodec.statVFSExtensionName, data: writer.bytes)
-            guard case .extendedReply(let body) = reply.payload else {
-                throw unexpected(reply, wanted: "EXTENDED_REPLY")
-            }
-            guard let info = SFTPVolumeInfo(extendedReplyBody: body) else {
-                throw SFTPError.protocolViolation("malformed statvfs reply (\(body.count) bytes)")
-            }
-            return info
-        } catch SFTPError.server(let status) where status.code == .operationUnsupported {
-            // Advertised but refused: degrade all the same.
-            return nil
-        } catch let error as SFTPError {
-            throw error
-        } catch {
-            throw SFTPError.protocolViolation("\(error)")
-        }
-    }
-
     // MARK: - Request plumbing
 
     /// Sends one request and awaits its reply. Window admission, id
@@ -578,7 +216,7 @@ public final class SFTPSession: @unchecked Sendable {
     /// cancellation are sequenced so that a reply can never arrive to find
     /// no waiter, and a cancelled request's id is never recycled before
     /// its late reply lands.
-    private func request(
+    func request(
         _ payload: (UInt32) -> SFTPPayload
     ) async throws(SFTPError) -> SFTPMessage {
         let ticket = try await acquireRequestSlot()
@@ -726,7 +364,7 @@ public final class SFTPSession: @unchecked Sendable {
     /// Gives a slot back: to the next FIFO waiter if there is one and the
     /// writer queue has a place for it — the slot passes to it and
     /// `windowUsed` does not move — otherwise to the window.
-    private func releaseWindowSlot(_ state: inout State) {
+    func releaseWindowSlot(_ state: inout State) {
         guard state.closed == nil else { return }
         guard !state.windowWaiters.isEmpty,
             state.unwrittenFrames < configuration.maxInFlightRequests
@@ -784,7 +422,7 @@ public final class SFTPSession: @unchecked Sendable {
         }
     }
 
-    private func finishHandshake(_ result: Result<SFTPMessage, SFTPError>) {
+    func finishHandshake(_ result: Result<SFTPMessage, SFTPError>) {
         state.withLock { state in
             guard let handshake = state.handshake else { return }
             state.handshake = nil
@@ -797,7 +435,7 @@ public final class SFTPSession: @unchecked Sendable {
     /// with it. The transport is closed unless the reader itself is
     /// tearing down after a transport failure (closing it again is
     /// harmless but pointless).
-    private func tearDown(with error: SFTPError, closingTransport: Bool) {
+    func tearDown(with error: SFTPError, closingTransport: Bool) {
         let drained = state.withLock { state -> (
             handshakes: [CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>],
             requests: [CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>],
@@ -825,131 +463,4 @@ public final class SFTPSession: @unchecked Sendable {
         for waiter in drained.waiters { waiter.resume(returning: false) }
     }
 
-    // MARK: - Reader loop
-
-    /// Runs on the dedicated reader thread: frame in, dispatch, repeat.
-    /// Any failure — EOF, a transport error, an undecodable frame, a reply
-    /// to an unknown id — ends the session, because after any of them the
-    /// byte stream can no longer be trusted to align with requests.
-    private func readerLoop() {
-        var lengthBytes = [UInt8](repeating: 0, count: 4)
-        while true {
-            do {
-                guard try readExact(&lengthBytes) else {
-                    tearDown(with: .transport(.connectionLost), closingTransport: false)
-                    return
-                }
-                let length = (UInt32(lengthBytes[0]) << 24) | (UInt32(lengthBytes[1]) << 16)
-                    | (UInt32(lengthBytes[2]) << 8) | UInt32(lengthBytes[3])
-                let frameLength = try SFTPCodec.validateFrameLength(length)
-                var frame = [UInt8](repeating: 0, count: frameLength)
-                guard try readExact(&frame) else {
-                    tearDown(with: .transport(.connectionLost), closingTransport: false)
-                    return
-                }
-                let message = try SFTPCodec.decodeFrame(frame)
-                dispatch(message)
-            } catch let error as SFTPCodecError {
-                tearDown(
-                    with: .protocolViolation("undecodable frame: \(error)"),
-                    closingTransport: true)
-                return
-            } catch let error as SFTPTransportError {
-                tearDown(with: .transport(error), closingTransport: false)
-                return
-            } catch let error as SFTPError {
-                tearDown(with: error, closingTransport: true)
-                return
-            } catch {
-                tearDown(with: .protocolViolation("\(error)"), closingTransport: true)
-                return
-            }
-        }
-    }
-
-    /// Reads exactly `buffer.count` bytes. Returns false at EOF before
-    /// the first byte of this read; EOF part-way through a frame is a
-    /// lost connection, thrown as such.
-    private func readExact(_ buffer: inout [UInt8]) throws -> Bool {
-        var filled = 0
-        while filled < buffer.count {
-            let count = try buffer.withUnsafeMutableBytes { raw -> Int in
-                guard let base = raw.baseAddress else { return 0 }
-                return try transport.read(
-                    into: UnsafeMutableRawBufferPointer(start: base + filled, count: raw.count - filled))
-            }
-            if count == 0 {
-                if filled == 0 { return false }
-                throw SFTPTransportError.connectionLost
-            }
-            filled += count
-        }
-        return true
-    }
-
-    /// Routes one decoded message to its waiter.
-    private func dispatch(_ message: SFTPMessage) {
-        if case .version = message.payload {
-            finishHandshake(.success(message))
-            return
-        }
-        let resolved = state.withLock { state -> (
-            continuation: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>?,
-            wasCancelled: Bool,
-            unknown: Bool
-        ) in
-            if let entry = state.inFlight.removeValue(forKey: message.requestID) {
-                releaseWindowSlot(&state)
-                state.ids.resolved(entry.ticket)
-                return (entry.continuation, false, false)
-            }
-            if state.ids.acceptLateReply(message.requestID) {
-                // The late reply to a cancelled request: swallow it, and
-                // only now is the id safe to recycle.
-                return (nil, true, false)
-            }
-            return (nil, false, true)
-        }
-        if let continuation = resolved.continuation {
-            continuation.resume(returning: .success(message))
-        } else if resolved.unknown {
-            tearDown(
-                with: .protocolViolation(
-                    "a reply arrived for request-id \(message.requestID), which nothing sent"),
-                closingTransport: true)
-        }
-    }
-
-    // MARK: - Response mapping
-
-    private func attributesRequest(
-        _ payload: @escaping (UInt32) -> SFTPPayload
-    ) async throws(SFTPError) -> SFTPAttributes {
-        let reply = try await request(payload)
-        guard case .attrs(let attributes) = reply.payload else {
-            throw unexpected(reply, wanted: "ATTRS")
-        }
-        return attributes
-    }
-
-    /// Voids a reply that should be STATUS-OK; any other STATUS is the
-    /// server's definitive answer to the request.
-    private func expectOK(_ reply: SFTPMessage) throws(SFTPError) {
-        switch reply.payload {
-        case .status(let status):
-            if status.code == .ok { return }
-            throw .server(status)
-        default:
-            throw unexpected(reply, wanted: "STATUS")
-        }
-    }
-
-    private func unexpected(_ reply: SFTPMessage, wanted: String) -> SFTPError {
-        // A STATUS payload here is the server declining the request —
-        // surface it as the server's answer, not as framing trouble.
-        if case .status(let status) = reply.payload {
-            return .server(status)
-        }
-        return .protocolViolation("expected \(wanted), got message type \(reply.type)")
-    }
 }
