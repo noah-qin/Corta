@@ -15823,7 +15823,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "remote?"
+            "value": "Remote?"
           }
         },
         "zh-Hans": {
@@ -15853,25 +15853,25 @@
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "entfernt?"
+            "value": "Entfernt?"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "distant ?"
+            "value": "Distant ?"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "¿remoto?"
+            "value": "¿Remoto?"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "remoto?"
+            "value": "Remoto?"
           }
         }
       }
@@ -36580,6 +36580,65 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Iniciar"
+          }
+        }
+      }
+    },
+    "remote.badge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remote: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "远程：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "遠端：%@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "リモート: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "원격: %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Entfernt: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Distant : %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Remoto: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Remoto: %@"
           }
         }
       }

@@ -723,7 +723,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     @MainActor
     private func noteChildExit(_ exit: ChildExit, generation: Int) {
         guard !didTeardown, frameLoop.isCurrent(generation) else { return }
-        // A dead child produces no output to rebuild the title; the `⟂ host`
+        // A dead child produces no output to rebuild the title; the `Remote: host`
         // badge would outlive its connection.
         windowTitle.invalidateProcessFacts()
         windowTitle.apply()

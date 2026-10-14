@@ -175,6 +175,10 @@ final class SplitViewController: NSViewController {
         // Nothing else claims first responder; without it keyDown never fires
         // and First Responder menu actions (⌘V, ⌘=, ⌘D) dead-end.
         window.makeFirstResponder(pane.terminalView)
+        // The first title, before any output: the root pane was focused at
+        // creation, so no focus change applies one, and a child that says
+        // nothing at first — an ssh still connecting — left "Corta" there.
+        applyWindowTitle()
         // Ask for the first frame at the final size before the window shows;
         // until it lands the layer shows the theme's background.
         view.layoutSubtreeIfNeeded()

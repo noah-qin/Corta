@@ -17,6 +17,13 @@ Versioning for compatibility changes.
   without a `~/.ssh/config` alias, and a chosen key is the only one offered
   to the server. Recent connections remember the fields they were made with.
 
+### Changed
+
+- The remote badge at the front of a window title reads *Remote:* instead
+  of the `⟂` symbol, and a connection opened from the connect sheet names
+  the destination you typed instead of *host unknown*. Browse Remote Files…
+  in such a pane connects to that destination without asking for it again.
+
 ### Fixed
 
 - Configuration and user guides now include every scalar setting in the

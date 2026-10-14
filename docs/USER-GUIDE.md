@@ -397,10 +397,11 @@ turn off directory suggestions.
 Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
 `ProxyJump` all apply — and has no SSH implementation of its own.
 
-- **The host badge.** A pane connected to another machine shows a badge
-  at the front of the window title. It names the host when the remote shell
-  reports it (shell integration installed there); otherwise it says the
-  pane is remote without knowing which host.
+- **The host badge.** A pane connected to another machine shows
+  *Remote:* at the front of the window title. It names the host and folder
+  when the remote shell reports them (shell integration installed there),
+  and the destination you typed when the connection came from the connect
+  sheet; otherwise it says the pane is remote without knowing which host.
 - **Reconnect.** When an `ssh` or `mosh` session ends, **Reconnect to Host**
   runs the same command again, as a new connection.
 - **Connecting.** The toolbar's globe and folder buttons open a sheet for an

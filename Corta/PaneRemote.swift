@@ -80,7 +80,8 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
             remoteContext: session.remoteContext,
             hasForegroundJob: session.hasForegroundJob,
             foregroundProcessName: session.foregroundProcessName,
-            childIsRemoteLauncher: childIsLiveLauncher)
+            childIsRemoteLauncher: childIsLiveLauncher,
+            connectTarget: host?.preset?.connectTarget?.displayName)
     }
 
     /// The pane's own child is a live remote launcher, which the foreground
@@ -235,12 +236,12 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
 
     // MARK: - Browse Remote Files…
 
-    /// `.remote` knows the host; `.remoteUnknown` asks, since argv and
-    /// screen text aren't honest sources. `.local` and `.unknown` get no
-    /// offer. Pure, for tests.
+    /// `.remote` and `.connected` know the host; `.remoteUnknown` asks,
+    /// since argv and screen text aren't honest sources. `.local` and
+    /// `.unknown` get no offer. Pure, for tests.
     nonisolated static func canBrowseFiles(state: PaneRemoteState) -> Bool {
         switch state {
-        case .remote, .remoteUnknown: return true
+        case .remote, .connected, .remoteUnknown: return true
         case .local, .unknown: return false
         }
     }

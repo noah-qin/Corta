@@ -449,7 +449,7 @@ that `exec`s the real `/usr/libexec/sftp-server`. The UI-test runner is
 sandboxed (it reads all of `/`, writes only its container, which the app
 cannot read), so the app builds the stage itself: the test's first
 launch types `stage-remote-ui.sh` into an ordinary terminal. The walk:
-`⟂` badge → keystrokes reach the pane → Browse Remote Files… (asked
+`Remote:` badge → keystrokes reach the pane → Browse Remote Files… (asked
 first, host prefilled, nothing spawned before Connect) → a listing
 answered by OpenSSH's own server → Edit → the "editor" rewrites the
 managed copy → the upload prompt → the remote file changed with no

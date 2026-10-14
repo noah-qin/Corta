@@ -40,8 +40,8 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
 
     let model: SFTPBrowserModel
 
-    /// Opens the browser for a pane in `state`. Only called for `.remote`
-    /// and `.remoteUnknown` — `PaneRemote.canBrowseFiles` gates the menu
+    /// Opens the browser for a pane in `state`. Only called for `.remote`,
+    /// `.connected` and `.remoteUnknown` — `PaneRemote.canBrowseFiles` gates the menu
     /// item — and anything else is refused here as well, because a window
     /// over a local pane would be a silent local file manager wearing a
     /// remote UI.
@@ -67,6 +67,10 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
                 host: nil, startDirectory: directory, suggestedHost: host)
             unconnected[ObjectIdentifier(controller)] = controller
             controller.present()
+        case .connected(let target):
+            // The destination the user typed into the connect sheet — their
+            // own consent, as `open(host:)` takes it.
+            open(host: target)
         case .remoteUnknown:
             // The host is genuinely not known, and the rule stands:
             // never the launcher's argv (aliases and `~/.ssh/config` names

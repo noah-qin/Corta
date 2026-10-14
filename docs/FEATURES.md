@@ -92,7 +92,9 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 - A connect sheet for SSH and SFTP with host, user, port and private-key
   fields, each passed to OpenSSH as its own argument; empty ones fall to
   `~/.ssh/config`. It suggests recent connections, with the fields they used,
-  and the `Host` names in `~/.ssh/config` (read, never executed).
+  and the `Host` names in `~/.ssh/config` (read, never executed). A pane
+  opened from it names that destination in its title until the remote shell
+  reports its own.
 - An SFTP browser for listing, transferring, renaming and deleting remote files
   and directories, with managed local copies for editing: Back and Forward, a
   breadcrumb path, sortable columns, hidden files on request, a row menu, drag

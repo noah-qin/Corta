@@ -25,10 +25,13 @@ import Foundation
 /// - The foreground process (`PTY.foregroundProcessName`): `ssh`/`mosh`
 ///   means remote; `tmux`/`screen` means it can't be told.
 /// - What the pane spawned: an ssh preset's child is the launcher itself,
-///   with no foreground job to see.
+///   with no foreground job to see — and when the connect sheet built that
+///   preset, the destination the user typed into it.
 ///
 /// Never read from the screen text (hostile, `SECURITY.md` §2) or the
 /// launcher's argv (aliases and `~/.ssh/config` names read back wrong).
+/// The connect sheet's destination is neither: it is the user's own input,
+/// recorded beside the spawn rather than parsed back out of it.
 nonisolated enum PaneRemoteState: Equatable {
     /// A local shell or command owns the terminal; a lingering remote report
     /// is stale without a launcher to emit it.
@@ -37,6 +40,9 @@ nonisolated enum PaneRemoteState: Equatable {
     case remote(host: String, directory: String, provenance: RemoteContext.Provenance)
     /// A launcher in front, but no report: remote, host unknown.
     case remoteUnknown(provenance: RemoteContext.Provenance)
+    /// The pane's own child is the ssh the connect sheet started for
+    /// `target` (`SSHTarget.displayName`), and no report has arrived.
+    case connected(target: String)
     /// A multiplexer in front, or the name couldn't be read: uncertain, since
     /// even a report may predate the attach.
     case unknown
@@ -60,15 +66,17 @@ nonisolated enum PaneRemoteState: Equatable {
     /// launcher; pass it only while that child lives.
     static func resolve(
         remoteContext: RemoteContext?, hasForegroundJob: Bool, foregroundProcessName: String?,
-        childIsRemoteLauncher: Bool = false
+        childIsRemoteLauncher: Bool = false, connectTarget: String? = nil
     ) -> PaneRemoteState {
         if childIsRemoteLauncher {
-            // The report outranks the spawn: it alone names a host.
+            // The report outranks the spawn: it alone names the directory,
+            // and the host as the far end knows itself.
             if let remoteContext {
                 return .remote(
                     host: remoteContext.host, directory: remoteContext.directory,
                     provenance: remoteContext.provenance)
             }
+            if let connectTarget { return .connected(target: connectTarget) }
             return .remoteUnknown(provenance: .spawnedLauncher)
         }
         guard hasForegroundJob else { return .local }
@@ -101,13 +109,14 @@ nonisolated enum PaneRemoteState: Equatable {
         /// `PaneRemoteState.resolve` with the mask applied and advanced.
         mutating func resolve(
             remoteContext: RemoteContext?, hasForegroundJob: Bool,
-            foregroundProcessName: String?, childIsRemoteLauncher: Bool = false
+            foregroundProcessName: String?, childIsRemoteLauncher: Bool = false,
+            connectTarget: String? = nil
         ) -> PaneRemoteState {
             let report = remoteContext == supersededReport ? nil : remoteContext
             let state = PaneRemoteState.resolve(
                 remoteContext: report, hasForegroundJob: hasForegroundJob,
                 foregroundProcessName: foregroundProcessName,
-                childIsRemoteLauncher: childIsRemoteLauncher)
+                childIsRemoteLauncher: childIsRemoteLauncher, connectTarget: connectTarget)
             if case .local = state, let lingering = remoteContext {
                 supersededReport = lingering
             }
@@ -115,19 +124,28 @@ nonisolated enum PaneRemoteState: Equatable {
         }
     }
 
-    /// The title badge — `⟂ build-box · app`, `⟂ host unknown`,
-    /// `⟂ remote?` — or nil when local. Never a guess.
+    /// The title badge — `Remote: build-box · app`, `Remote: user@host`,
+    /// `Remote: host unknown`, `Remote?` — or nil when local. Never a guess.
+    /// A word rather than a symbol: a window title is plain text, and no
+    /// glyph there says "another computer" to someone who has not been told.
     var titleComponent: String? {
         switch self {
         case .local:
             return nil
         case .remote(let host, let directory, _):
-            return "⟂ \(host) · \(Self.abbreviated(directory))"
+            return Self.badge("\(host) · \(Self.abbreviated(directory))")
+        case .connected(let target):
+            return Self.badge(target)
         case .remoteUnknown:
-            return "⟂ \(L10n.text("remote.hostUnknown"))"
+            return Self.badge(L10n.text("remote.hostUnknown"))
         case .unknown:
-            return "⟂ \(L10n.text("remote.uncertain"))"
+            return L10n.text("remote.uncertain")
         }
+    }
+
+    /// `Remote: <what>`, for the title and the command history's host column.
+    static func badge(_ what: String) -> String {
+        L10n.format("remote.badge", what)
     }
 
     /// The last component, without the local `~` rule, which means nothing

@@ -108,7 +108,7 @@ final class RemoteWorkflowUITests: XCTestCase {
         // The far end reports `file://fakebox<stage>/remote/srv/app`; the
         // badge follows within one process-facts interval.
         XCTAssertTrue(
-            waitUntil(timeout: 10) { app.windows.firstMatch.title.contains("⟂ fakebox · app") },
+            waitUntil(timeout: 10) { app.windows.firstMatch.title.contains("Remote: fakebox · app") },
             "title was: \(app.windows.firstMatch.title)")
 
         // Keystrokes reach the fake remote shell (a baseline for the same
@@ -234,7 +234,7 @@ final class RemoteWorkflowUITests: XCTestCase {
             "keystrokes must reach the pane after the browser window closed (first responder)")
         app.typeText("exit\n")
         XCTAssertTrue(
-            waitUntil(timeout: 10) { !app.windows.firstMatch.title.contains("⟂") },
+            waitUntil(timeout: 10) { !app.windows.firstMatch.title.contains("Remote:") },
             "a dead launcher's report must not keep the badge: \(app.windows.firstMatch.title)")
         shellMenu.click()
         let reconnect = shellMenu.menuItems["Reconnect to Host"]
@@ -242,7 +242,7 @@ final class RemoteWorkflowUITests: XCTestCase {
         XCTAssertTrue(reconnect.isEnabled, "a dead remote launcher must offer Reconnect")
         reconnect.click()
         XCTAssertTrue(
-            waitUntil(timeout: 10) { app.windows.firstMatch.title.contains("⟂ fakebox · app") },
+            waitUntil(timeout: 10) { app.windows.firstMatch.title.contains("Remote: fakebox · app") },
             "the new connection's report must bring the badge back: \(app.windows.firstMatch.title)")
         // The rebuilt pane must take keystrokes without a click — a
         // reconnect that leaves the keyboard dead is the first-responder

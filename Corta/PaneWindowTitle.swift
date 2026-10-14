@@ -22,7 +22,7 @@ import Synchronization
 /// One pane's window title and proxy icon: what they say, the process facts
 /// behind them, and when those are read.
 ///
-/// `⟂ host — <title or directory> — <process> — <columns>×<rows>`, as
+/// `Remote: host — <title or directory> — <process> — <columns>×<rows>`, as
 /// Terminal.app shows; unknown parts are left out. Rebuilt on the output
 /// batch (`PaneFrameLoop.onOutputBatch`) and at command boundaries, focus
 /// and resizes; the pane decides when, this decides what.

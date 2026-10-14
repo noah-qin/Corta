@@ -110,12 +110,39 @@ struct PaneRemoteStateTests {
         #expect(
             PaneRemoteState.remote(
                 host: "build-box", directory: "/srv/app", provenance: .osc7
-            ).titleComponent == "⟂ build-box · app")
+            ).titleComponent == PaneRemoteState.badge("build-box · app"))
         let unknown = PaneRemoteState.remoteUnknown(provenance: .foregroundProcess).titleComponent
-        #expect(unknown?.contains("⟂") == true)
-        #expect(unknown?.contains(L10n.text("remote.hostUnknown")) == true)
+        #expect(unknown == PaneRemoteState.badge(L10n.text("remote.hostUnknown")))
+        #expect(PaneRemoteState.connected(target: "deploy@box:2222").titleComponent
+            == PaneRemoteState.badge("deploy@box:2222"))
         let uncertain = PaneRemoteState.unknown.titleComponent
-        #expect(uncertain == "⟂ \(L10n.text("remote.uncertain"))")
+        #expect(uncertain == L10n.text("remote.uncertain"))
+    }
+
+    /// A pane the connect sheet started knows where it went: the user typed
+    /// it. Without that record it would read "host unknown" for a
+    /// destination Corta itself passed to ssh; a report still outranks it,
+    /// since only the far end names the directory.
+    @Test("a connect-sheet pane names the destination the user typed")
+    func connectSheetTarget() {
+        #expect(
+            PaneRemoteState.resolve(
+                remoteContext: nil, hasForegroundJob: false, foregroundProcessName: nil,
+                childIsRemoteLauncher: true, connectTarget: "ecs-user@203.0.113.9")
+                == .connected(target: "ecs-user@203.0.113.9"))
+        #expect(
+            PaneRemoteState.resolve(
+                remoteContext: Self.report(), hasForegroundJob: false, foregroundProcessName: nil,
+                childIsRemoteLauncher: true, connectTarget: "ecs-user@203.0.113.9")
+                == .remote(host: "build-box", directory: "/srv/app", provenance: .osc7))
+        // Only the pane's own child: an ssh typed at a later prompt is not
+        // the destination the sheet started.
+        #expect(
+            PaneRemoteState.resolve(
+                remoteContext: nil, hasForegroundJob: true, foregroundProcessName: "ssh",
+                connectTarget: "ecs-user@203.0.113.9")
+                == .remoteUnknown(provenance: .foregroundProcess))
+        #expect(PaneRemote.canBrowseFiles(state: .connected(target: "ecs-user@203.0.113.9")))
     }
 
     /// The case the two process signals cannot see: a pane spawned *as*
@@ -285,7 +312,7 @@ struct RemotePaneIsolationTests {
         // path on another machine.
         #expect(pane.remote.state == .local)
         #expect(pane.commands.shellDirectory == nil)
-        #expect(!pane.windowTitle.composed.contains("⟂"))
+        #expect(!pane.windowTitle.composed.contains(PaneRemoteState.badge("")))
     }
 
     /// End to end through the split the user's ⌘D takes: a pane referring
@@ -377,7 +404,7 @@ struct CommandHistoryHostScopeTests {
         #expect(model.rows.count == 1)
         // The host labels the row, not the directory field — which for a
         // remote record names a local directory the command never ran in.
-        #expect(model.rows.first?.directoryText == "⟂ build-box")
+        #expect(model.rows.first?.directoryText == PaneRemoteState.badge("build-box"))
         #expect(model.rows.first?.directoryTooltip == nil)
 
         model.hostScope = .local
@@ -469,7 +496,7 @@ struct SSHPresetPaneTests {
         // The title's copy of the state is cached on an interval; force the
         // re-read rather than racing it.
         pane.windowTitle.invalidateProcessFacts()
-        #expect(pane.windowTitle.composed.contains("⟂ build-box"))
+        #expect(pane.windowTitle.composed.contains(PaneRemoteState.badge("build-box")))
         // Nothing local changed its mind: the remote report never reaches
         // the local-spawn value.
         #expect(session.workingDirectory == nil)
@@ -490,7 +517,7 @@ struct SSHPresetPaneTests {
         #expect(session.remoteContext?.directory == "/srv/app\ninjected")
         pane.windowTitle.invalidateProcessFacts()
         let title = pane.windowTitle.composed
-        #expect(title.contains("⟂ build-box"))
+        #expect(title.contains(PaneRemoteState.badge("build-box")))
         #expect(!title.contains("\n"))
     }
 

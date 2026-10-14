@@ -223,7 +223,7 @@ final class CommandHistoryModel {
         let directoryText: String
         let directoryTooltip: String?
         if let host = record.host {
-            directoryText = "⟂ \(host)"
+            directoryText = PaneRemoteState.badge(host)
             directoryTooltip = nil
         } else {
             directoryText =

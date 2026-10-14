@@ -471,7 +471,7 @@ The child is the system's own OpenSSH client, so everything its
 configuration does — `Host` blocks, `Include`, `Match`, `ProxyJump`, agent
 keys, `ControlMaster` connection sharing — applies exactly as it does in any
 other terminal; Corta parses none of it. `directory`, if set, remains a
-*local* working directory for the launcher. The pane's title carries a `⟂`
+*local* working directory for the launcher. The pane's title carries a `Remote:`
 badge with the remote host and directory once the remote shell reports them
 (OSC 7), and says so when it cannot know them. When the connection dies,
 Shell ▸ Terminal and Connection ▸ Reconnect to Host (`reconnect-remote`) starts a new connection to
