@@ -72,72 +72,82 @@ public struct Performer: ParserPerformer, Sendable {
         // other marker or intermediate form is ignored cleanly, which is the
         // correct and safe default (`SECURITY.md` §3).
         if sequence.privateMarker != 0 {
-            // DECRQM's private form carries a `$` intermediate: `CSI ? Ps $ p`
-            // is a question about a mode, not a mode change.
-            if sequence.intermediates.count == 1, sequence.intermediates[0] == 0x24,
-                sequence.final == 0x70, sequence.privateMarker == 0x3F
-            {
-                reportMode(sequence.parameters, isPrivate: true)
-                return
-            }
-            guard sequence.intermediates.count == 0 else { return }
-            switch (sequence.privateMarker, sequence.final) {
-            case (0x3E, 0x63):  // DA2 — CSI > c
-                reportSecondaryDeviceAttributes()
-            case (0x3E, 0x71):  // XTVERSION — CSI > Ps q
-                reportVersion(sequence.parameters)
-            // The kitty keyboard protocol. Four private markers on
-            // one final byte: `?` queries, `>` pushes, `<` pops, `=` sets.
-            case (0x3F, 0x75):
-                reportKeyboardProtocol()
-            case (0x3E, 0x75):
-                pushKeyboardProtocol(sequence.parameters)
-            case (0x3C, 0x75):
-                popKeyboardProtocol(sequence.parameters)
-            case (0x3D, 0x75):
-                setKeyboardProtocol(sequence.parameters)
-            case (0x3F, 0x6E):  // DECXCPR — CSI ? Ps n
-                reportExtendedCursorPosition(sequence.parameters)
-            case (0x3F, 0x68):  // DECSET — CSI ? Pm h
-                applyPrivateModes(sequence.parameters, enabled: true)
-                _ = performAlternateScreenMode(final: sequence.final, parameters: sequence.parameters)
-            case (0x3F, 0x6C):  // DECRST — CSI ? Pm l
-                applyPrivateModes(sequence.parameters, enabled: false)
-                _ = performAlternateScreenMode(final: sequence.final, parameters: sequence.parameters)
-            default:
-                break
-            }
-            return
+            dispatchPrivateCSI(sequence)
+        } else if sequence.intermediates.count > 0 {
+            dispatchIntermediateCSI(sequence)
+        } else {
+            dispatchPlainCSI(final: sequence.final, parameters: sequence.parameters)
         }
-        // DECSCUSR (`CSI Ps SP q`) and its kin carry an intermediate byte.
-        if sequence.intermediates.count > 0 {
-            // DECRQM, ANSI form — `CSI Ps $ p`.
-            if sequence.intermediates.count == 1, sequence.intermediates[0] == 0x24,
-                sequence.final == 0x70
-            {
-                reportMode(sequence.parameters, isPrivate: false)
-                return
-            }
-            // DECSCL — `CSI Ps ; Ps " p`, the announced conformance level.
-            if sequence.intermediates.count == 1, sequence.intermediates[0] == 0x22,
-                sequence.final == 0x70
-            {
-                setConformanceLevel(sequence.parameters)
-                return
-            }
-            _ = performIntermediate(
-                final: sequence.final,
-                intermediates: sequence.intermediates,
-                parameters: sequence.parameters
-            )
-            return
-        }
+    }
 
-        let parameters = sequence.parameters
+    /// `CSI ? …`, `CSI > …`, `CSI < …` and `CSI = …`.
+    private mutating func dispatchPrivateCSI(_ sequence: CSISequence) {
+        // DECRQM's private form carries a `$` intermediate: `CSI ? Ps $ p`
+        // is a question about a mode, not a mode change.
+        if sequence.intermediates.count == 1, sequence.intermediates[0] == 0x24,
+            sequence.final == 0x70, sequence.privateMarker == 0x3F
+        {
+            reportMode(sequence.parameters, isPrivate: true)
+            return
+        }
+        guard sequence.intermediates.count == 0 else { return }
+        switch (sequence.privateMarker, sequence.final) {
+        case (0x3E, 0x63):  // DA2 — CSI > c
+            reportSecondaryDeviceAttributes()
+        case (0x3E, 0x71):  // XTVERSION — CSI > Ps q
+            reportVersion(sequence.parameters)
+        // The kitty keyboard protocol. Four private markers on
+        // one final byte: `?` queries, `>` pushes, `<` pops, `=` sets.
+        case (0x3F, 0x75):
+            reportKeyboardProtocol()
+        case (0x3E, 0x75):
+            pushKeyboardProtocol(sequence.parameters)
+        case (0x3C, 0x75):
+            popKeyboardProtocol(sequence.parameters)
+        case (0x3D, 0x75):
+            setKeyboardProtocol(sequence.parameters)
+        case (0x3F, 0x6E):  // DECXCPR — CSI ? Ps n
+            reportExtendedCursorPosition(sequence.parameters)
+        case (0x3F, 0x68):  // DECSET — CSI ? Pm h
+            applyPrivateModes(sequence.parameters, enabled: true)
+            _ = performAlternateScreenMode(final: sequence.final, parameters: sequence.parameters)
+        case (0x3F, 0x6C):  // DECRST — CSI ? Pm l
+            applyPrivateModes(sequence.parameters, enabled: false)
+            _ = performAlternateScreenMode(final: sequence.final, parameters: sequence.parameters)
+        default:
+            break
+        }
+    }
+
+    /// DECSCUSR (`CSI Ps SP q`) and its kin carry an intermediate byte.
+    private mutating func dispatchIntermediateCSI(_ sequence: CSISequence) {
+        // DECRQM, ANSI form — `CSI Ps $ p`.
+        if sequence.intermediates.count == 1, sequence.intermediates[0] == 0x24,
+            sequence.final == 0x70
+        {
+            reportMode(sequence.parameters, isPrivate: false)
+            return
+        }
+        // DECSCL — `CSI Ps ; Ps " p`, the announced conformance level.
+        if sequence.intermediates.count == 1, sequence.intermediates[0] == 0x22,
+            sequence.final == 0x70
+        {
+            setConformanceLevel(sequence.parameters)
+            return
+        }
+        _ = performIntermediate(
+            final: sequence.final,
+            intermediates: sequence.intermediates,
+            parameters: sequence.parameters
+        )
+    }
+
+    /// A CSI sequence with neither a private marker nor an intermediate.
+    private mutating func dispatchPlainCSI(final: UInt8, parameters: Parameters) {
         // SGR dominates coloured shell/log output. It cannot be a cursor,
         // erase or editing command, so do not make every colour change walk
         // those three dispatch tables first.
-        if sequence.final == 0x6D {
+        if final == 0x6D {
             applyGraphicRendition(parameters)
             return
         }
@@ -145,18 +155,18 @@ public struct Performer: ParserPerformer, Sendable {
         // DECSET/DECRST above, which carry the `?` marker; `CSI 4 h` (insert
         // mode) and `CSI ? 4 h` (smooth scroll) are different sequences, and
         // must not land in the same place.
-        if sequence.final == 0x68 {
+        if final == 0x68 {
             applyAnsiModes(parameters, enabled: true)
             return
         }
-        if sequence.final == 0x6C {
+        if final == 0x6C {
             applyAnsiModes(parameters, enabled: false)
             return
         }
-        if performCursorControl(final: sequence.final, parameters: parameters) { return }
-        if performErase(final: sequence.final, parameters: parameters) { return }
-        if performEditing(final: sequence.final, parameters: parameters) { return }
-        switch sequence.final {
+        if performCursorControl(final: final, parameters: parameters) { return }
+        if performErase(final: final, parameters: parameters) { return }
+        if performEditing(final: final, parameters: parameters) { return }
+        switch final {
         case 0x63:  // DA1
             reportPrimaryDeviceAttributes()
         case 0x6E:  // DSR

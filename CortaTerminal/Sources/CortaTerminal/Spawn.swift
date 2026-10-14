@@ -56,6 +56,49 @@ enum Spawn {
         // Closed by `execve` succeeding — the parent's "it worked".
         _ = fcntl(writeEnd, F_SETFD, FD_CLOEXEC)
 
+        let pid: pid_t
+        do throws(PTYError) {
+            pid = try launchHelper(
+                helperPath, statusPipe: writeEnd, executable: executable, arguments: arguments,
+                environment: environment, replicaPath: replicaPath, workingDirectory: workingDirectory)
+        } catch {
+            close(readEnd)
+            close(writeEnd)
+            throw error
+        }
+
+        // `corta-exec` holds its own reference once `posix_spawn` returns, so
+        // close now: waiting could make this the *last* close, and on Darwin a
+        // last close by the primary's holder discards unread child output. Never a
+        // gap with no reference either — that reset the size to 0×0.
+        close(parentReplica)
+        parentReplicaClosed = true
+
+        close(writeEnd)
+        defer { close(readEnd) }
+        // Bounded: the UI calls this synchronously.
+        let status = Self.readHelperStatus(
+            from: readEnd,
+            deadline: ContinuousClock.now + Self.helperHandshakeTimeout
+        )
+        let failure: Int32
+        switch status {
+        case .execSucceeded: return pid
+        case .execFailed(let code), .readFailed(let code): failure = code
+        case .truncated: failure = EIO
+        case .timedOut: failure = ETIMEDOUT
+        }
+        Self.reapFailedChild(pid)
+        throw .spawnFailed(code: failure)
+    }
+
+    /// `posix_spawn`s `corta-exec` on the replica with `statusPipe` as the
+    /// only other descriptor it inherits, every signal at its default and a
+    /// session of its own.
+    private static func launchHelper(
+        _ helperPath: String, statusPipe writeEnd: Int32, executable: String, arguments: [String],
+        environment: [String: String], replicaPath: String, workingDirectory: String?
+    ) throws(PTYError) -> pid_t {
         var fileActions: posix_spawn_file_actions_t?
         posix_spawn_file_actions_init(&fileActions)
         defer { posix_spawn_file_actions_destroy(&fileActions) }
@@ -94,42 +137,8 @@ enum Spawn {
                 posix_spawn(&pid, helperPath, &fileActions, &attributes, argv, envp)
             }
         }
-        guard spawnResult == 0 else {
-            close(readEnd)
-            close(writeEnd)
-            throw .spawnFailed(code: spawnResult)
-        }
-
-        // `corta-exec` holds its own reference once `posix_spawn` returns, so
-        // close now: waiting could make this the *last* close, and on Darwin a
-        // last close by the primary's holder discards unread child output. Never a
-        // gap with no reference either — that reset the size to 0×0.
-        close(parentReplica)
-        parentReplicaClosed = true
-
-        close(writeEnd)
-        defer { close(readEnd) }
-        // Bounded: the UI calls this synchronously.
-        let status = Self.readHelperStatus(
-            from: readEnd,
-            deadline: ContinuousClock.now + Self.helperHandshakeTimeout
-        )
-        switch status {
-        case .execSucceeded:
-            return pid
-        case .execFailed(let code):
-            Self.reapFailedChild(pid)
-            throw .spawnFailed(code: code)
-        case .truncated:
-            Self.reapFailedChild(pid)
-            throw .spawnFailed(code: EIO)
-        case .timedOut:
-            Self.reapFailedChild(pid)
-            throw .spawnFailed(code: ETIMEDOUT)
-        case .readFailed(let code):
-            Self.reapFailedChild(pid)
-            throw .spawnFailed(code: code)
-        }
+        guard spawnResult == 0 else { throw .spawnFailed(code: spawnResult) }
+        return pid
     }
 
     /// Generous — a false positive kills a healthy shell.

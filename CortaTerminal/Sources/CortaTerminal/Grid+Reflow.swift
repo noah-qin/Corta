@@ -246,108 +246,141 @@ extension Grid {
         rows: [Line], cursorRow: Int, cursorColumn: Int, cursorPendingWrap: Bool,
         rowOfStart: [(row: Int, column: Int)]
     ) {
-        var rows: [Line] = []
-        var current = Line()
-        current.reserveCapacity(min(newColumns, cells.count))
-        var column = 0
-        var cursorRow = 0
-        var cursorColumn = 0
-        var rowOfStart: [(row: Int, column: Int)] = []
-        rowOfStart.reserveCapacity(rowStarts.count)
-
-        func record(_ cellIndex: Int) {
-            while rowOfStart.count < rowStarts.count, rowStarts[rowOfStart.count] <= cellIndex {
-                rowOfStart.append((rows.count, column))
-            }
-            guard let targetIndex, cellIndex == targetIndex else { return }
-            cursorRow = rows.count
-            cursorColumn = column
-        }
-
         if cells.isEmpty {
             // Rows of blanks trimmed to nothing: every start is this one row.
-            while rowOfStart.count < rowStarts.count { rowOfStart.append((0, 0)) }
             let blanks = targetIndex ?? 0
             return (
                 [Line()], 0, min(blanks, newColumns - 1), blanks >= newColumns,
-                rowOfStart
+                Array(repeating: (0, 0), count: rowStarts.count)
             )
         }
-
+        var packer = RowPacker(
+            columns: newColumns, cellCount: cells.count, targetIndex: targetIndex, rowStarts: rowStarts)
         var i = 0
         while i < cells.count {
             // Most logical lines contain no wide pairs. Copy their cells in
             // row-sized runs, preserving every colour/attribute, instead of
             // growing and assigning the row once for each cell.
             if cells[i].attributes.rawValue & CellAttributes.widePair.rawValue == 0 {
-                if column >= newColumns {
-                    current.wrapped = true; rows.append(current)
-                    current = Line(); current.reserveCapacity(min(newColumns, cells.count - i))
-                    column = 0
-                }
-                var end = i + 1
-                let limit = min(cells.count, i + newColumns - column)
-                while end < limit, cells[end].attributes.rawValue & CellAttributes.widePair.rawValue == 0 { end += 1 }
-                while rowOfStart.count < rowStarts.count, rowStarts[rowOfStart.count] < end {
-                    rowOfStart.append((rows.count, column + max(0, rowStarts[rowOfStart.count] - i)))
-                }
-                if let targetIndex, targetIndex >= i, targetIndex < end {
-                    cursorRow = rows.count; cursorColumn = column + targetIndex - i
-                }
-                current.appendNarrowCells(cells[i..<end])
-                column += end - i; i = end
-                continue
+                i = packer.appendNarrowRun(of: cells, from: i)
+            } else {
+                i = packer.appendPair(of: cells, at: i)
             }
-            let cell = cells[i]
+        }
+        return packer.finish()
+    }
+
+    /// The rows one logical line is being packed into, and where its row
+    /// starts and the cursor land.
+    private struct RowPacker {
+        let columns: Int
+        let cellCount: Int
+        let targetIndex: Int?
+        let rowStarts: [Int]
+        var rows: [Line] = []
+        var current = Line()
+        var column = 0
+        var cursorRow = 0
+        var cursorColumn = 0
+        var rowOfStart: [(row: Int, column: Int)] = []
+
+        init(columns: Int, cellCount: Int, targetIndex: Int?, rowStarts: [Int]) {
+            self.columns = columns
+            self.cellCount = cellCount
+            self.targetIndex = targetIndex
+            self.rowStarts = rowStarts
+            current.reserveCapacity(min(columns, cellCount))
+            rowOfStart.reserveCapacity(rowStarts.count)
+        }
+
+        /// Ends the current row as wrapped and starts the next, sized for
+        /// what is left from `index`.
+        mutating func wrap(before index: Int) {
+            current.wrapped = true
+            rows.append(current)
+            current = Line()
+            current.reserveCapacity(min(columns, cellCount - index))
+            column = 0
+        }
+
+        /// Notes where cell `index` lands, for the row starts at or before
+        /// it and for the cursor.
+        mutating func record(_ index: Int) {
+            while rowOfStart.count < rowStarts.count, rowStarts[rowOfStart.count] <= index {
+                rowOfStart.append((rows.count, column))
+            }
+            guard let targetIndex, index == targetIndex else { return }
+            cursorRow = rows.count
+            cursorColumn = column
+        }
+
+        /// Copies the narrow cells from `start` up to the row's end or the
+        /// next wide pair in one run. Returns the next index.
+        mutating func appendNarrowRun(of cells: [Cell], from start: Int) -> Int {
+            if column >= columns { wrap(before: start) }
+            var end = start + 1
+            let limit = min(cells.count, start + columns - column)
+            while end < limit, cells[end].attributes.rawValue & CellAttributes.widePair.rawValue == 0 { end += 1 }
+            while rowOfStart.count < rowStarts.count, rowStarts[rowOfStart.count] < end {
+                rowOfStart.append((rows.count, column + max(0, rowStarts[rowOfStart.count] - start)))
+            }
+            if let targetIndex, targetIndex >= start, targetIndex < end {
+                cursorRow = rows.count
+                cursorColumn = column + targetIndex - start
+            }
+            current.appendNarrowCells(cells[start..<end])
+            column += end - start
+            return end
+        }
+
+        /// Places the wide pair (or lone wide half) at `index`, never split
+        /// across rows. Returns the next index.
+        mutating func appendPair(of cells: [Cell], at index: Int) -> Int {
+            let cell = cells[index]
             // A lead whose spacer is missing is drawn narrow rather than read
             // past: the grid never writes one, but a reflow must not trust
             // that, since an out-of-range read here takes the app down.
-            let hasSpacer = i + 1 < cells.count && cells[i + 1].attributes.contains(.wideSpacer)
+            let hasSpacer = index + 1 < cells.count && cells[index + 1].attributes.contains(.wideSpacer)
             let width = cell.attributes.contains(.wide) && hasSpacer ? 2 : 1
-            if width > newColumns || (width == 1 && cell.attributes.contains(.wide)) {
+            if width > columns || (width == 1 && cell.attributes.contains(.wide)) {
                 // Degenerate: a pair that could never fit even alone (a
                 // 1-column grid), or an orphaned lead. Demote to narrow
                 // rather than loop forever.
                 var demoted = cell
                 demoted.attributes.remove(.wide)
-                if column >= newColumns {
-                    current.wrapped = true
-                    rows.append(current)
-                    current = Line()
-                    current.reserveCapacity(min(newColumns, cells.count - i))
-                    column = 0
-                }
-                record(i)
+                if column >= columns { wrap(before: index) }
+                record(index)
                 current[column] = demoted
                 column += 1
-                i += hasSpacer ? 2 : 1
-                continue
+                return index + (hasSpacer ? 2 : 1)
             }
-            if column + width > newColumns {
-                current.wrapped = true
-                rows.append(current)
-                current = Line()
-                current.reserveCapacity(min(newColumns, cells.count - i))
-                column = 0
-            }
-            record(i)
+            if column + width > columns { wrap(before: index) }
+            record(index)
             current[column] = cell
             if width == 2 {
-                current[column + 1] = cells[i + 1]
+                current[column + 1] = cells[index + 1]
             }
             column += width
-            i += width
+            return index + width
         }
-        rows.append(current)
-        while rowOfStart.count < rowStarts.count { rowOfStart.append((rows.count - 1, column)) }
 
-        var cursorPendingWrap = false
-        if let targetIndex, targetIndex >= cells.count {
-            let target = column + (targetIndex - cells.count)
-            cursorRow = rows.count - 1
-            cursorColumn = min(target, newColumns - 1)
-            cursorPendingWrap = target >= newColumns
+        /// The last row, the starts past the last cell, and a cursor past
+        /// it as that many blanks on the last row, clamped to its margin;
+        /// exactly at the margin it is a pending wrap.
+        mutating func finish() -> (
+            rows: [Line], cursorRow: Int, cursorColumn: Int, cursorPendingWrap: Bool,
+            rowOfStart: [(row: Int, column: Int)]
+        ) {
+            rows.append(current)
+            while rowOfStart.count < rowStarts.count { rowOfStart.append((rows.count - 1, column)) }
+            var cursorPendingWrap = false
+            if let targetIndex, targetIndex >= cellCount {
+                let target = column + (targetIndex - cellCount)
+                cursorRow = rows.count - 1
+                cursorColumn = min(target, columns - 1)
+                cursorPendingWrap = target >= columns
+            }
+            return (rows, cursorRow, cursorColumn, cursorPendingWrap, rowOfStart)
         }
-        return (rows, cursorRow, cursorColumn, cursorPendingWrap, rowOfStart)
     }
 }

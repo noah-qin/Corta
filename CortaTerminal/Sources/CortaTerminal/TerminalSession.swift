@@ -450,7 +450,7 @@ public final class TerminalSession: @unchecked Sendable {
 
     fileprivate func runReaderLoop() {
         let source = readerSource ?? liveReaderSource
-        let buffer = UnsafeMutableRawPointer.allocate(
+        let buffer = UnsafeMutableRawBufferPointer.allocate(
             byteCount: Self.readChunkSize, alignment: MemoryLayout<UInt8>.alignment
         )
         defer { buffer.deallocate() }
@@ -462,82 +462,86 @@ public final class TerminalSession: @unchecked Sendable {
             // Between batches too: a flood is mostly single-slice batches.
             yieldToStateWaiters()
             batch.removeAll(keepingCapacity: true)
-            var reachedEOF = false
-
-            while batch.count < Self.batchByteCap {
-                let region = UnsafeMutableRawBufferPointer(start: buffer, count: Self.readChunkSize)
-                let read: Int
-                do {
-                    read = try source.read(region)
-                } catch {
-                    reportIOFailure(error, operation: .read)
-                    reachedEOF = true
-                    break
-                }
-                if read == 0 {
-                    reachedEOF = true
-                    break
-                }
-                batch.append(contentsOf: UnsafeRawBufferPointer(start: buffer, count: read))
-                if read < Self.readChunkSize {
-                    break
-                }
-                // Ask readiness rather than block: an exact chunk-multiple burst
-                // would otherwise sit unapplied until the child speaks again.
-                if !source.isReadable() { break }
-            }
-
+            let reachedEOF = readBatch(into: &batch, from: source, through: buffer)
             applyReaderPriority()
-            if !batch.isEmpty {
-                // Under the lock, in slices, so a snapshot or resize never waits
-                // behind a whole batch.
-                var responses: [UInt8] = []
-                var episode: Int?
-                var offset = 0
-                while offset < batch.count {
-                    let end = min(offset + Self.feedLockSliceSize, batch.count)
-                    let slice = batch[offset..<end]
-                    let applied = state.withLock { current -> (responses: [UInt8], episode: Int?, compress: Bool) in
-                        let episodeBefore = current.terminal.synchronizedOutputEpisode
-                        current.terminal.feed(slice)
-                        reportImageBytes(current.terminal)
-                        let sliceResponses = current.terminal.takeOutput()
-                        // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
-                        // A repeated BSU does not extend it, or a child that never sends
-                        // ESU could stall presentation forever.
-                        let episodeAfter = current.terminal.synchronizedOutputEpisode
-                        // An integer compare: a pass is queued only once a batch seals.
-                        let compress = current.terminal.hasCompressionWork
-                        guard episodeAfter != episodeBefore else { return (sliceResponses, nil, compress) }
-                        current.synchronizedOutputEpisode = episodeAfter
-                        return (sliceResponses, episodeAfter, compress)
-                    }
-                    if responses.count + applied.responses.count <= Self.maxResponseBytesPerBatch {
-                        responses.append(contentsOf: applied.responses)
-                    }
-                    if let newEpisode = applied.episode { episode = newEpisode }
-                    offset = end
-                    if applied.compress { scheduleCompression() }
-                    // After the last slice too: the next batch's first slice is
-                    // one `read(2)` away, sooner than a waiter's wake, so a flood
-                    // of one-slice batches would never leave a gap.
-                    yieldToStateWaiters()
-                }
-                // Fixed-format only (`SECURITY.md` §2.1); same queue as input.
-                if !responses.isEmpty {
-                    enqueueWrite([responses])
-                }
-                if let episode {
-                    scheduleSynchronizedOutputTimeout(episode: episode)
-                }
-                callbacks.withLock { $0.onOutput }?()
-            }
-
+            if !batch.isEmpty { apply(batch) }
             if reachedEOF { break }
         }
+        finishReading()
+    }
 
-        // A dead child never ends `?2026`; end it here so withheld output
-        // draws.
+    /// Reads until a batch is full, a read comes up short, or nothing more
+    /// is ready. Returns whether the stream ended.
+    private func readBatch(
+        into batch: inout [UInt8], from source: ReaderSource, through buffer: UnsafeMutableRawBufferPointer
+    ) -> Bool {
+        while batch.count < Self.batchByteCap {
+            let read: Int
+            do {
+                read = try source.read(buffer)
+            } catch {
+                reportIOFailure(error, operation: .read)
+                return true
+            }
+            if read == 0 { return true }
+            batch.append(contentsOf: UnsafeRawBufferPointer(rebasing: buffer[..<read]))
+            if read < Self.readChunkSize { return false }
+            // Ask readiness rather than block: an exact chunk-multiple burst
+            // would otherwise sit unapplied until the child speaks again.
+            if !source.isReadable() { return false }
+        }
+        return false
+    }
+
+    /// Feeds one batch to the terminal under the lock, in slices, so a
+    /// snapshot or resize never waits behind a whole batch; then sends the
+    /// replies, arms a `?2026` timeout for a new episode and signals output.
+    private func apply(_ batch: [UInt8]) {
+        var responses: [UInt8] = []
+        var episode: Int?
+        var offset = 0
+        while offset < batch.count {
+            let end = min(offset + Self.feedLockSliceSize, batch.count)
+            let slice = batch[offset..<end]
+            let applied = state.withLock { current -> (responses: [UInt8], episode: Int?, compress: Bool) in
+                let episodeBefore = current.terminal.synchronizedOutputEpisode
+                current.terminal.feed(slice)
+                reportImageBytes(current.terminal)
+                let sliceResponses = current.terminal.takeOutput()
+                // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
+                // A repeated BSU does not extend it, or a child that never sends
+                // ESU could stall presentation forever.
+                let episodeAfter = current.terminal.synchronizedOutputEpisode
+                // An integer compare: a pass is queued only once a batch seals.
+                let compress = current.terminal.hasCompressionWork
+                guard episodeAfter != episodeBefore else { return (sliceResponses, nil, compress) }
+                current.synchronizedOutputEpisode = episodeAfter
+                return (sliceResponses, episodeAfter, compress)
+            }
+            if responses.count + applied.responses.count <= Self.maxResponseBytesPerBatch {
+                responses.append(contentsOf: applied.responses)
+            }
+            if let newEpisode = applied.episode { episode = newEpisode }
+            offset = end
+            if applied.compress { scheduleCompression() }
+            // After the last slice too: the next batch's first slice is
+            // one `read(2)` away, sooner than a waiter's wake, so a flood
+            // of one-slice batches would never leave a gap.
+            yieldToStateWaiters()
+        }
+        // Fixed-format only (`SECURITY.md` §2.1); same queue as input.
+        if !responses.isEmpty {
+            enqueueWrite([responses])
+        }
+        if let episode {
+            scheduleSynchronizedOutputTimeout(episode: episode)
+        }
+        callbacks.withLock { $0.onOutput }?()
+    }
+
+    /// After the last read: ends a `?2026` episode the dead child never
+    /// will, then reports how the child ended — or why it cannot be known.
+    private func finishReading() {
         let clearedSync = state.withLock { current -> Bool in
             guard current.terminal.isSynchronizedOutputEnabled else { return false }
             current.terminal.endSynchronizedOutput()

@@ -114,71 +114,12 @@ extension Performer {
     private mutating func finishTransmission(_ pending: PendingImageTransmission) {
         let imageID = pending.header.imageID
         let quiet = pending.header.quiet
-        guard let decoded = Data(base64Encoded: Data(Self.padded(pending.base64))) else {
-            respond(imageID: imageID, placementID: nil, quiet: quiet, error: "EINVAL:bad base64")
-            return
-        }
-        var bytes = [UInt8](decoded)
-        guard bytes.count <= KittyGraphics.maximumImageBytes else {
-            respond(imageID: imageID, placementID: nil, quiet: quiet, error: "EINVAL:too large")
-            return
-        }
-        let format = pending.header.format ?? .rgba
-        let width = pending.header.width ?? 0
-        let height = pending.header.height ?? 0
-        if pending.header.compressed {
-            // Pixels inflate to exactly their declared size, so that is the
-            // ceiling; a PNG's size is unknown until decoded, so it gets the
-            // per-image cap. Either way the expansion stops at the ceiling.
-            let limit: Int
-            switch format {
-            case .rgb: limit = width * height * 3
-            case .rgba: limit = width * height * 4
-            case .png: limit = KittyGraphics.maximumImageBytes
-            }
-            guard limit > 0, limit <= KittyGraphics.maximumImageBytes,
-                let inflated = KittyGraphics.inflateZlib(bytes, limit: limit)
-            else {
-                respond(imageID: imageID, placementID: nil, quiet: quiet, error: "EINVAL:bad compressed data")
-                return
-            }
-            bytes = inflated
-        }
-        // Exactly `width * height * bytesPerPixel`, or dropped — never padded.
-        switch format {
-        case .rgb:
-            guard bytes.count == width * height * 3 else {
-                respond(imageID: imageID, placementID: nil, quiet: quiet, error: "EINVAL:bad size")
-                return
-            }
-        case .rgba:
-            guard bytes.count == width * height * 4 else {
-                respond(imageID: imageID, placementID: nil, quiet: quiet, error: "EINVAL:bad size")
-                return
-            }
-        case .png:
-            break  // Decoded (and validated) by the app layer, which owns ImageIO.
-        }
-        var data = KittyGraphics.ImageData(format: format, width: width, height: height, bytes: bytes)
-        data.receivedAt = ProcessInfo.processInfo.systemUptime
         let storedID: KittyGraphics.ImageID
-        let refusal: ImagePlacementTable.StoreRefusal?
-        if imageID.rawValue == 0 {
-            (storedID, refusal) = grid.imagePlacements.storeAnonymous(data)
-        } else {
-            (storedID, refusal) = (imageID, grid.imagePlacements.store(imageID, data: data))
-        }
-        switch refusal {
-        case nil:
-            break
-        case .dimensionsExceedCaps?:
-            respond(imageID: imageID, placementID: nil, quiet: quiet, error: "EINVAL:image dimensions too large")
-            return
-        case .tooManyImages?:
-            respond(imageID: imageID, placementID: nil, quiet: quiet, error: "ENOSPC:too many images")
-            return
-        case .byteBudgetExceeded?:
-            respond(imageID: imageID, placementID: nil, quiet: quiet, error: "ENOSPC:image data too large")
+        do throws(TransmissionRefusal) {
+            let data = try Self.transmittedImage(pending)
+            storedID = try store(data, as: imageID)
+        } catch {
+            respond(imageID: imageID, placementID: nil, quiet: quiet, error: error.message)
             return
         }
         // One response for `a=T`, not a second from its placement.
@@ -192,6 +133,71 @@ extension Performer {
             placeAtCursor(display, respond: false)
         }
         respond(imageID: imageID, placementID: nil, quiet: quiet, error: nil)
+    }
+
+    /// Why a transmission was not stored, in the protocol's `CODE:text` form.
+    private struct TransmissionRefusal: Error {
+        let message: String
+    }
+
+    /// The transmitted pixels, decoded, inflated and checked against their
+    /// declared size: exactly `width * height * bytesPerPixel`, or refused —
+    /// never padded. A PNG is decoded (and validated) by the app layer,
+    /// which owns ImageIO.
+    private static func transmittedImage(
+        _ pending: PendingImageTransmission
+    ) throws(TransmissionRefusal) -> KittyGraphics.ImageData {
+        guard let decoded = Data(base64Encoded: Data(padded(pending.base64))) else {
+            throw TransmissionRefusal(message: "EINVAL:bad base64")
+        }
+        var bytes = [UInt8](decoded)
+        guard bytes.count <= KittyGraphics.maximumImageBytes else {
+            throw TransmissionRefusal(message: "EINVAL:too large")
+        }
+        let format = pending.header.format ?? .rgba
+        let width = pending.header.width ?? 0
+        let height = pending.header.height ?? 0
+        let bytesPerPixel: Int? =
+            switch format {
+            case .rgb: 3
+            case .rgba: 4
+            case .png: nil
+            }
+        if pending.header.compressed {
+            // Pixels inflate to exactly their declared size, so that is the
+            // ceiling; a PNG's size is unknown until decoded, so it gets the
+            // per-image cap. Either way the expansion stops at the ceiling.
+            let limit = bytesPerPixel.map { width * height * $0 } ?? KittyGraphics.maximumImageBytes
+            guard limit > 0, limit <= KittyGraphics.maximumImageBytes,
+                let inflated = KittyGraphics.inflateZlib(bytes, limit: limit)
+            else { throw TransmissionRefusal(message: "EINVAL:bad compressed data") }
+            bytes = inflated
+        }
+        if let bytesPerPixel, bytes.count != width * height * bytesPerPixel {
+            throw TransmissionRefusal(message: "EINVAL:bad size")
+        }
+        var data = KittyGraphics.ImageData(format: format, width: width, height: height, bytes: bytes)
+        data.receivedAt = ProcessInfo.processInfo.systemUptime
+        return data
+    }
+
+    /// Stores `data` under `imageID`, or under a fresh id when it is 0.
+    private mutating func store(
+        _ data: KittyGraphics.ImageData, as imageID: KittyGraphics.ImageID
+    ) throws(TransmissionRefusal) -> KittyGraphics.ImageID {
+        let storedID: KittyGraphics.ImageID
+        let refusal: ImagePlacementTable.StoreRefusal?
+        if imageID.rawValue == 0 {
+            (storedID, refusal) = grid.imagePlacements.storeAnonymous(data)
+        } else {
+            (storedID, refusal) = (imageID, grid.imagePlacements.store(imageID, data: data))
+        }
+        switch refusal {
+        case nil: return storedID
+        case .dimensionsExceedCaps?: throw TransmissionRefusal(message: "EINVAL:image dimensions too large")
+        case .tooManyImages?: throw TransmissionRefusal(message: "ENOSPC:too many images")
+        case .byteBudgetExceeded?: throw TransmissionRefusal(message: "ENOSPC:image data too large")
+        }
     }
 
     /// What the process-wide budget leaves this terminal, less what the
