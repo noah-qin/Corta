@@ -39,6 +39,9 @@ Versioning for compatibility changes.
 - The SFTP sign-in failure message no longer suggests connecting in the
   terminal first, which does not let SFTP sign in; it points at a key held
   by `ssh-agent` or the keychain, or one chosen in the connect sheet.
+- SFTP and remote editing work for a host whose `~/.ssh/config` entry has a
+  `RemoteCommand`, which made ssh refuse the file channel, and no longer
+  inherit `RequestTTY force` or become a `ControlMaster` themselves.
 
 ## [1.2.0] - 2026-10-13
 

@@ -62,6 +62,8 @@ def run_fixture(root):
         (root/'ssh.conf').write_text(base);(root/'auth-failure.conf').write_text(base.replace(f'{root}/client',f'{root}/wrong'))
         (root/'key-failure.conf').write_text(base.replace(f'{root}/known_hosts',f'{root}/wrong_known_hosts'))
         wrong=(root/'wrong.pub').read_text().split();(root/'wrong_known_hosts').write_text(f'[127.0.0.1]:{port} {wrong[0]} {wrong[1]}\n')
+        # Login-only settings a file channel must override, not inherit.
+        (root/'login.conf').write_text(base + ' RemoteCommand echo login-only\n RequestTTY force\n')
         # No user, port or key: the connect sheet's -l, -p and -i supply them.
         (root/'bare.conf').write_text(f'Host *\n IdentityAgent none\n ForwardAgent no\n BatchMode yes\n StrictHostKeyChecking yes\n UserKnownHostsFile {root}/known_hosts\n GlobalKnownHostsFile /dev/null\n ConnectTimeout 3\n')
         env = dict(os.environ, CORTA_SSH_TEST_ROOT=str(root), CORTA_SSH_TEST_PORT=str(port),

@@ -28,7 +28,8 @@ struct SFTPChannelTests {
     func invocationArguments() {
         let options = [
             "-oForwardAgent=no", "-oForwardX11=no", "-oClearAllForwardings=yes",
-            "-oPermitLocalCommand=no",
+            "-oPermitLocalCommand=no", "-oRemoteCommand=none", "-oRequestTTY=no",
+            "-oControlMaster=no",
         ]
         // `--` before the host: a hostile or mistyped host must never be
         // parsed as an ssh option.

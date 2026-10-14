@@ -506,9 +506,10 @@ The engine speaks the SFTPv3 wire protocol itself
 simply the system's `ssh -s -- <host> sftp` subprocess with **plain
 pipes** — a PTY would corrupt binary frames — so authentication, host
 keys, `ProxyJump` and every `~/.ssh/config` behavior stay with OpenSSH,
-where they belong — except forwarding: like `sftp(1)`, the channel passes
-`ForwardAgent=no`, `ForwardX11=no`, `ClearAllForwardings=yes` and
-`PermitLocalCommand=no`, since a file channel needs none of them. Two
+where they belong — except what a file channel must not inherit: like
+`sftp(1)` and `scp(1)`, the channel passes `ForwardAgent=no`,
+`ForwardX11=no`, `ClearAllForwardings=yes`, `PermitLocalCommand=no`,
+`RemoteCommand=none`, `RequestTTY=no` and `ControlMaster=no`. Two
 consequences are owned rather than hidden. The channel has no terminal (it is spawned into its own
 session), so ssh can prompt for nothing: password, passphrase and
 host-key questions fail as their own typed errors whose wording says

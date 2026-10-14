@@ -69,6 +69,20 @@ struct SFTPSSHIntegrationTests {
         #expect(try await connection.connect().version == 3)
     }
 
+    /// A `RemoteCommand` or `RequestTTY force` written for interactive
+    /// logins: ssh would refuse the subsystem, or a remote terminal would
+    /// mangle the frames, unless the channel switches them off.
+    @Test("login-only RemoteCommand and RequestTTY do not reach the channel")
+    func loginSettingsAreOverridden() async throws {
+        let connection = SFTPConnection(
+            host: "fixture",
+            arguments: SFTPSubprocessChannel.arguments(
+                host: "fixture", options: ["-F", root.appendingPathComponent("login.conf").path]),
+            environment: ProcessInfo.processInfo.environment)
+        defer { connection.close() }
+        #expect(try await connection.connect().version == 3)
+    }
+
     @Test("wrong client key cannot establish an SFTP session")
     func authenticationFails() async {
         let connection = client(config: "auth-failure.conf")

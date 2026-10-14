@@ -101,13 +101,20 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     /// caller has validated, since they are passed as they are — name a user
     /// (`-l`), a port (`-p`) or a key (`-i`) of their own.
     ///
-    /// What a file channel never needs is switched off, as `sftp(1)` itself
-    /// does: a `ForwardAgent yes` meant for interactive logins would hand the
-    /// agent to a host a pane's OSC 7 named, and `LocalForward`/`RemoteForward`
-    /// would open ports for every browser and remote-edit connection.
+    /// What a file channel never needs is switched off, as `sftp(1)` and
+    /// `scp(1)` themselves do: a `ForwardAgent yes` meant for interactive
+    /// logins would hand the agent to a host a pane's OSC 7 named, and
+    /// `LocalForward`/`RemoteForward` would open ports for every browser and
+    /// remote-edit connection. A `RemoteCommand` meant for logins makes ssh
+    /// refuse the subsystem outright, and `RequestTTY force` would put a
+    /// remote terminal's line discipline between the binary frames. And
+    /// the channel never becomes a `ControlMaster` itself — a master left
+    /// behind would outlive the window — though it still reuses one the
+    /// user's terminal opened.
     public static let channelOptions = [
         "-oForwardAgent=no", "-oForwardX11=no", "-oClearAllForwardings=yes",
-        "-oPermitLocalCommand=no",
+        "-oPermitLocalCommand=no", "-oRemoteCommand=none", "-oRequestTTY=no",
+        "-oControlMaster=no",
     ]
 
     public static func arguments(host: String, options: [String] = []) -> [String] {
