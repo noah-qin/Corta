@@ -126,9 +126,6 @@ nonisolated final class GlyphAtlas {
         var cache: [GlyphKey: GlyphInfo] = [:]
         var rectangleIndices: [SIMD4<UInt16>: UInt32] = [:]
         var clusterCache: [ClusterKey: GlyphInfo] = [:]
-        /// The ASCII page's cache, indexed by `(style << 7) | scalar`: the
-        /// per-cell lookup is an index, not a hash. Empty on other pages.
-        var asciiTable: ContiguousArray<GlyphInfo?>
         private var nextOrigin: (x: Int, y: Int)
         private var rowHeight: Int
 
@@ -137,7 +134,6 @@ nonisolated final class GlyphAtlas {
         init(regionOrigin: (x: Int, y: Int), regionSize: (width: Int, height: Int), reservedFirstRow: Bool) {
             self.regionOrigin = regionOrigin
             self.regionSize = regionSize
-            self.asciiTable = reservedFirstRow ? ContiguousArray(repeating: nil, count: 4 << 7) : []
             self.nextOrigin = reservedFirstRow ? (regionOrigin.x, regionOrigin.y + 1) : regionOrigin
             self.rowHeight = reservedFirstRow ? 1 : 0
         }
@@ -159,7 +155,6 @@ nonisolated final class GlyphAtlas {
         func evict(reservedFirstRow: Bool) {
             cache.removeAll(keepingCapacity: true)
             clusterCache.removeAll(keepingCapacity: true)
-            for index in asciiTable.indices { asciiTable[index] = nil }
             nextOrigin = reservedFirstRow ? (regionOrigin.x, regionOrigin.y + 1) : regionOrigin
             rowHeight = reservedFirstRow ? 1 : 0
         }
@@ -216,6 +211,11 @@ nonisolated final class GlyphAtlas {
 
     /// Font-sized ASCII region at the top of the grayscale texture.
     private var asciiPage: AtlasPage
+    /// The ASCII page's glyphs, indexed by `(style << 7) | scalar`: the
+    /// per-cell lookup is an index, not a hash. A `let` buffer, not an
+    /// array in a `var`, so the read carries no exclusivity check; cleared
+    /// with the page.
+    private let asciiTable: UnsafeMutableBufferPointer<GlyphInfo?>
     /// Shaped region below the ASCII shelves.
     private var shapedPage: AtlasPage
     /// The whole color texture.
@@ -323,10 +323,16 @@ nonisolated final class GlyphAtlas {
         self.isDegraded = size < atlasPixelSize
 
         (self.asciiPage, self.shapedPage, self.colorPage) = Self.makePages(atlasPixelSize: size, font: base)
+        asciiTable = .allocate(capacity: 4 << 7)
+        asciiTable.initialize(repeating: nil)
 
         var white: UInt8 = 255
         texture.replace(
             region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)
+    }
+
+    deinit {
+        asciiTable.deallocate()
     }
 
     /// Two cells of `font`, which is already in pixels: the renderer's box
@@ -365,6 +371,7 @@ nonisolated final class GlyphAtlas {
         (fonts, isSyntheticBold) = Self.faces(of: base)
         colorBox = Self.colorBox(for: base)
         (asciiPage, shapedPage, colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize, font: base)
+        asciiTable.update(repeating: nil)
         evictionCount += 1
         generation += 1
         clearRectangleTable()
@@ -396,11 +403,17 @@ nonisolated final class GlyphAtlas {
 
     /// ASCII fast path — see the type comment. The renderer passes only
     /// ASCII, looked up by index; anything else keeps a dictionary entry.
+    /// Inlined into the per-cell loop: a hit is one load. A miss leaves it.
+    @inline(__always)
     func glyph(forASCII scalar: UInt32, style: Style) -> GlyphInfo? {
+        if scalar < 0x80, let cached = asciiTable[Int(style.rawValue) << 7 | Int(scalar)] { return cached }
+        return rasterizeASCII(scalar, style: style)
+    }
+
+    @inline(never)
+    private func rasterizeASCII(_ scalar: UInt32, style: Style) -> GlyphInfo? {
         let index = scalar < 0x80 ? Int(style.rawValue) << 7 | Int(scalar) : nil
-        if let index {
-            if let cached = asciiPage.asciiTable[index] { return cached }
-        } else if let cached = asciiPage.cache[GlyphKey(scalar: scalar, style: style)] {
+        if index == nil, let cached = asciiPage.cache[GlyphKey(scalar: scalar, style: style)] {
             return cached
         }
         var utf16 = [UniChar(scalar)]
@@ -424,7 +437,7 @@ nonisolated final class GlyphAtlas {
 
     private func store(_ info: GlyphInfo, forASCII scalar: UInt32, style: Style, at index: Int?) {
         if let index {
-            asciiPage.asciiTable[index] = info
+            asciiTable[index] = info
         } else {
             asciiPage.cache[GlyphKey(scalar: scalar, style: style)] = info
         }
@@ -725,6 +738,7 @@ nonisolated final class GlyphAtlas {
         freeRectangleIndices.append(contentsOf: page.rectangleIndices.values)
         page.rectangleIndices.removeAll(keepingCapacity: true)
         page.evict(reservedFirstRow: page === asciiPage)
+        if page === asciiPage { asciiTable.update(repeating: nil) }
         evictionCount += 1
         generation += 1
         if texturesInUse() {
