@@ -108,7 +108,7 @@ public struct Terminal: Sendable {
         performer.applyRowRemaps()
     }
 
-    public var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }
+    var hasPendingOutput: Bool { !performer.state.outputBuffer.isEmpty }
 
     public var isBracketedPasteEnabled: Bool { performer.state.bracketedPasteEnabled }
 

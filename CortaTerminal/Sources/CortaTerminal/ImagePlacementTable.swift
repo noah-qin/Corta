@@ -86,7 +86,7 @@ public struct ImagePlacementTable: Sendable {
     public init() {}
 
     public var placementCount: Int { placements.count }
-    public var imageCount: Int { images.count }
+    var imageCount: Int { images.count }
 
     public func storeGeneration(for id: KittyGraphics.ImageID) -> UInt64? {
         storeGenerations[id]
