@@ -40,6 +40,9 @@ final class ShellOverlayView: NSView {
         var font: NSFont
         var baseline: CGFloat
         var composing: Bool
+        /// A theme or appearance change must redraw a hint already showing.
+        var foreground: SIMD4<Float>
+        var background: SIMD4<Float>
     }
     private var lastCompletionPresentation: CompletionPresentation?
     private var preview: DirectoryGhostView?
@@ -65,7 +68,9 @@ final class ShellOverlayView: NSView {
         font: NSFont = .monospacedSystemFont(ofSize: 14, weight: .regular), baseline: CGFloat = 12) {
         let presentation = CompletionPresentation(
             state: state, anchor: anchor, bounds: bounds,
-            font: font, baseline: baseline, composing: isInputComposing)
+            font: font, baseline: baseline, composing: isInputComposing,
+            foreground: TerminalColorPalette.defaultForeground,
+            background: TerminalColorPalette.defaultBackground)
         guard lastCompletionPresentation != presentation else { return }
         lastCompletionPresentation = presentation
         guard !isInputComposing, let state, let suffix = state.previewSuffix, !suffix.isEmpty else {
@@ -116,6 +121,15 @@ final class ShellOverlayView: NSView {
     }
 
     func hideCompletion() { showCompletion(nil, anchor: .zero) }
+
+    /// The renderer's text colour, faded: the theme's, built-in or from the
+    /// config file, never the system label colour, which follows macOS
+    /// appearance and was black on a forced-dark canvas (#346).
+    static func hintColor(alpha: CGFloat) -> CGColor {
+        let color = TerminalColorPalette.defaultForeground
+        return CGColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y),
+            blue: CGFloat(color.z), alpha: alpha)
+    }
 }
 
 /// CoreText uses the renderer's font and baseline, so the suggestion reads as
@@ -134,9 +148,8 @@ private final class DirectoryGhostView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
-        let color = NSColor.secondaryLabelColor.withAlphaComponent(0.35)
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: text,
-            attributes: [.font: font, .foregroundColor: color.cgColor]))
+            attributes: [.font: font, .foregroundColor: ShellOverlayView.hintColor(alpha: 0.35)]))
         context.saveGState()
         context.clip(to: bounds)
         context.translateBy(x: 0, y: baseline)
@@ -151,7 +164,9 @@ private final class DirectoryGhostView: NSView {
 /// A quiet, single-line set of alternatives. Selection is conveyed by stronger
 /// text and an underline, with no panel chrome or focusable controls.
 private final class DirectoryCandidateRowView: NSView {
-    private var content = NSAttributedString(string: "")
+    /// Text and whether it is the selection; coloured when drawn.
+    private var pieces: [(text: String, selected: Bool)] = []
+    private var font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
     private var visibleText = ""
     var baseline: CGFloat = 12
     var coversOutput = false
@@ -185,31 +200,36 @@ private final class DirectoryCandidateRowView: NSView {
             used += extra
             end += 1
         }
-        let muted: [NSAttributedString.Key: Any] = [
-            .font: font, .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.35).cgColor,
-        ]
-        let result = NSMutableAttributedString(string: start > 0 ? "…  " : "", attributes: muted)
+        var pieces: [(text: String, selected: Bool)] = start > 0 ? [("…  ", false)] : []
         for index in start..<end {
-            if index > start { result.append(NSAttributedString(string: gap, attributes: muted)) }
-            var attributes = muted
-            if index == state.selectedIndex {
-                attributes[.foregroundColor] = NSColor.secondaryLabelColor.withAlphaComponent(0.65).cgColor
-                attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
-            }
-            result.append(NSAttributedString(string: state.candidates[index], attributes: attributes))
+            if index > start { pieces.append((gap, false)) }
+            pieces.append((state.candidates[index], index == state.selectedIndex))
         }
-        if end < state.candidates.count { result.append(NSAttributedString(string: "  …", attributes: muted)) }
-        content = result
-        visibleText = result.string
+        if end < state.candidates.count { pieces.append(("  …", false)) }
+        self.pieces = pieces
+        self.font = font
+        visibleText = pieces.map(\.text).joined()
     }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         if coversOutput {
             let background = TerminalColorPalette.clearColor
-            NSColor(deviceRed: CGFloat(background.x), green: CGFloat(background.y),
+            NSColor(srgbRed: CGFloat(background.x), green: CGFloat(background.y),
                 blue: CGFloat(background.z), alpha: 1).setFill()
             bounds.fill()
+        }
+        let muted: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: ShellOverlayView.hintColor(alpha: 0.35),
+        ]
+        let content = NSMutableAttributedString()
+        for piece in pieces {
+            var attributes = muted
+            if piece.selected {
+                attributes[.foregroundColor] = ShellOverlayView.hintColor(alpha: 0.65)
+                attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+            }
+            content.append(NSAttributedString(string: piece.text, attributes: attributes))
         }
         let full = CTLineCreateWithAttributedString(content)
         let token = CTLineCreateWithAttributedString(NSAttributedString(string: "…",

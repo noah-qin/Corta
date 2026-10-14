@@ -51,6 +51,60 @@ import Testing
         #expect(overlay.completion != nil)
     }
 
+    /// Found under macOS Light with `appearance = dark`: the alternatives
+    /// were drawn in the system label colour, resolved to its light (black)
+    /// variant, and vanished on the dark canvas (#346). A theme from the
+    /// config file must colour them exactly as a built-in one does.
+    @Test func completionHintTakesItsColourFromTheTheme() throws {
+        let (configuration, unknown) = Configuration.parse(
+            """
+            theme = ink
+            theme.ink.dark.background = #102030
+            theme.ink.dark.foreground = #f0e0c0
+            """)
+        #expect(unknown.isEmpty)
+        let theme = try #require(Theme.named("ink", in: configuration))
+        let saved = TerminalColorPalette.activeVariant
+        defer { TerminalColorPalette.apply(saved) }
+        TerminalColorPalette.apply(theme.variant(dark: true))
+
+        let overlay = ShellOverlayView(frame: CGRect(x: 0, y: 0, width: 600, height: 200))
+        // The appearance AppKit resolved when the bug showed.
+        overlay.appearance = NSAppearance(named: .aqua)
+        let completion = try #require(DirectoryCompletion(payload: "1;0;p=;Applications/;Desktop/"))
+        let anchor = CGRect(x: 80, y: 40, width: 8, height: 17)
+        overlay.showCompletion(completion, anchor: anchor)
+
+        /// The most opaque pixel of the row, unpremultiplied: a glyph's core.
+        func strongestInk() throws -> NSColor {
+            let row = try #require(overlay.subviews.first {
+                $0.accessibilityIdentifier() == "directory-completion-candidates" })
+            let bitmap = try #require(row.bitmapImageRepForCachingDisplay(in: row.bounds))
+            row.cacheDisplay(in: row.bounds, to: bitmap)
+            var best: NSColor?
+            for y in 0..<bitmap.pixelsHigh {
+                for x in 0..<bitmap.pixelsWide {
+                    guard let pixel = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                    if pixel.alphaComponent > (best?.alphaComponent ?? 0) { best = pixel }
+                }
+            }
+            return try #require(best)
+        }
+
+        let ink = try strongestInk()
+        #expect(ink.alphaComponent > 0.4)
+        // #f0e0c0, not the black the light system colour gives.
+        #expect(ink.redComponent > 0.85 && ink.greenComponent > 0.75 && ink.blueComponent > 0.6)
+
+        // A theme switch while the row shows recolours it.
+        var red = theme.variant(dark: true)
+        red.foreground = SIMD4<Float>(1, 0, 0, 1)
+        TerminalColorPalette.apply(red)
+        overlay.showCompletion(completion, anchor: anchor)
+        let recoloured = try strongestInk()
+        #expect(recoloured.redComponent > 0.85 && recoloured.greenComponent < 0.3)
+    }
+
     @Test func statusGutterHasTextOutsideTerminalCells() {
         let overlay = ShellOverlayView()
         let rect = CGRect(x: 7, y: 60, width: 2, height: 20)

@@ -10,6 +10,14 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- The `cd` directory-completion hint takes its colour from the theme —
+  built-in or defined in the config file — instead of the system label
+  colour, which drew the alternatives almost black on a dark theme while
+  macOS itself was in Light mode. A theme change recolours a hint already
+  showing.
+
 ## [1.2.1] - 2026-10-14
 
 ### Added
