@@ -61,17 +61,17 @@ public final class TerminalSession: @unchecked Sendable {
     }
     /// Per `read`; internal so lifecycle tests can feed exact boundaries.
     static let readChunkSize = 64 * 1024
-    private static let batchByteCap = 1024 * 1024
+    static let batchByteCap = 1024 * 1024
     public let pty: PTY
 
-    private struct State {
+    struct State {
         var terminal: Terminal
         /// The `?2026` episode the recovery timeout was armed for, so a stale
         /// timer cannot end a later one.
         var synchronizedOutputEpisode = 0
     }
 
-    private struct Callbacks {
+    struct Callbacks {
         var onOutput: (@Sendable () -> Void)?
         var onChildExit: (@Sendable (ProcessExit) -> Void)?
         /// Replayed to a callback installed after the exit.
@@ -80,9 +80,9 @@ public final class TerminalSession: @unchecked Sendable {
         var onIOFailure: (@Sendable (IOFailure) -> Void)?
     }
 
-    private let state: Mutex<State>
-    private let callbacks = Mutex(Callbacks())
-    private let stopped = Mutex(false)
+    let state: Mutex<State>
+    let callbacks = Mutex(Callbacks())
+    let stopped = Mutex(false)
     private let started = Mutex(false)
 
     /// Stand-ins for the PTY's two directions, a step every queued resize
@@ -109,13 +109,13 @@ public final class TerminalSession: @unchecked Sendable {
         var hangupGracePeriod: Duration = .seconds(10)
     }
 
-    private let readerSource: ReaderSource?
+    let readerSource: ReaderSource?
     /// `Seams.synchronizedOutputTimeout`.
-    private let synchronizedOutputTimeout: Duration
+    let synchronizedOutputTimeout: Duration
     /// `Seams.scheduleSynchronizedOutputTimeout`.
-    private let scheduleTimeout: (@Sendable (Duration, @escaping @Sendable () -> Void) -> Void)?
+    let scheduleTimeout: (@Sendable (Duration, @escaping @Sendable () -> Void) -> Void)?
     /// `Seams.hangupGracePeriod`.
-    private let hangupGracePeriod: Duration
+    let hangupGracePeriod: Duration
     /// Serial: resizes apply in request order.
     private let resizeQueue = DispatchQueue(label: "dev.corta.terminal-session.resize")
 
@@ -123,13 +123,13 @@ public final class TerminalSession: @unchecked Sendable {
     private let requestedResize = Mutex<(serial: UInt64, size: TerminalSize)?>(nil)
 
     private let resizeWorkGate: (@Sendable () -> Void)?
-    private let syncTimeoutQueue = DispatchQueue(label: "dev.corta.terminal-session.sync-timeout")
+    let syncTimeoutQueue = DispatchQueue(label: "dev.corta.terminal-session.sync-timeout")
 
     /// A FIFO with a head index: popping one chunk at a time keeps `bytes` an
     /// exact backlog for the back-pressure cap, in amortized O(1). A paste's
     /// chunks carry its id, so a cancel can take them out from among the
     /// keystrokes typed after them.
-    private struct PendingWrites {
+    struct PendingWrites {
         struct Chunk {
             var bytes: [UInt8]
             var paste: UInt64?
@@ -223,18 +223,18 @@ public final class TerminalSession: @unchecked Sendable {
             pastes = [:]
         }
     }
-    private let pendingWrites = Mutex(PendingWrites())
+    let pendingWrites = Mutex(PendingWrites())
     /// Serial: chunks reach the PTY in enqueue order.
-    private let writerQueue = DispatchQueue(label: "dev.corta.terminal-session.writer")
+    let writerQueue = DispatchQueue(label: "dev.corta.terminal-session.writer")
 
     /// A backlog past this means the child stopped reading (the PTY alone
     /// absorbs ~100 MB), so more input is dropped rather than buffered without
     /// bound. A chunk larger than the cap is accepted while the backlog is under
     /// it, so a paste goes through while the pipe drains at all.
-    private static let maxPendingWriteBytes = 4 * 1024 * 1024
+    static let maxPendingWriteBytes = 4 * 1024 * 1024
 
     /// Per lock acquisition; ≈ 4 ms at the worst measured feed rate.
-    private static let feedLockSliceSize = 16 * 1024
+    static let feedLockSliceSize = 16 * 1024
 
     /// Query replies one read batch may queue. A reply can be several times
     /// its query (`ESC]4;0;?` is answered with an `rgb:` triple), so a 1 MB
@@ -244,15 +244,15 @@ public final class TerminalSession: @unchecked Sendable {
     /// queries is not a program waiting for every answer.
     static let maxResponseBytesPerBatch = 64 * 1024
 
-    private let writerSink: (@Sendable ([UInt8]) throws -> Void)?
+    let writerSink: (@Sendable ([UInt8]) throws -> Void)?
 
     /// Shared with the app's other sessions; charged after every slice and
     /// released when this session stops.
-    private let imageBudget: ImageMemoryBudget?
+    let imageBudget: ImageMemoryBudget?
     private let compressionQueue = DispatchQueue(label: "Corta.scrollback.compression", qos: .utility)
     private let compressionScheduled = Mutex(false)
 
-    private func scheduleCompression() {
+    func scheduleCompression() {
         let start = compressionScheduled.withLock { active in
             if active { return false }
             active = true
@@ -275,7 +275,7 @@ public final class TerminalSession: @unchecked Sendable {
         }
     }
     /// The last figure reported, written under `state`'s lock.
-    private let reportedImageBytes = Mutex(0)
+    let reportedImageBytes = Mutex(0)
 
     /// Render-path callers waiting on `state`; bumped before blocking, so an
     /// over-count only costs the reader one gap.
@@ -283,14 +283,14 @@ public final class TerminalSession: @unchecked Sendable {
 
     /// Leaves the lock uncontended long enough for a waiter to land: the
     /// reader's unlock → relock is shorter than a futex wake.
-    private func yieldToStateWaiters() {
+    func yieldToStateWaiters() {
         guard stateWaiters.withLock({ $0 }) > 0 else { return }
         Thread.sleep(forTimeInterval: 0.0001)
     }
 
     /// Not a `withLock`-shaped wrapper: `Mutex.withLock`'s `sending` closure
     /// does not forward through one.
-    private func registerStateWaiter<T>(_ body: () -> T) -> T {
+    func registerStateWaiter<T>(_ body: () -> T) -> T {
         stateWaiters.withLock { $0 += 1 }
         defer { stateWaiters.withLock { $0 -= 1 } }
         return body()
@@ -318,7 +318,7 @@ public final class TerminalSession: @unchecked Sendable {
 
     public var ioFailure: IOFailure? { callbacks.withLock { $0.ioFailure } }
 
-    private func reportIOFailure(_ error: any Error, operation: IOFailure.Operation) {
+    func reportIOFailure(_ error: any Error, operation: IOFailure.Operation) {
         guard !stopped.withLock({ $0 }) else { return }
         let failure = IOFailure(operation: operation, message: String(describing: error))
         let delivery = callbacks.withLock { current -> ((@Sendable (IOFailure) -> Void)?, Bool) in
@@ -435,7 +435,7 @@ public final class TerminalSession: @unchecked Sendable {
     public var readerPriority: ReaderPriority {
         ReaderPriority(rawValue: appliedReaderPriority.load(ordering: .acquiring)) ?? .interactive
     }
-    private func applyReaderPriority() {
+    func applyReaderPriority() {
         let requested = requestedReaderPriority.load(ordering: .acquiring)
         guard requested != appliedReaderPriority.load(ordering: .relaxed) else { return }
         let qos =
@@ -443,181 +443,6 @@ public final class TerminalSession: @unchecked Sendable {
             ? QOS_CLASS_UTILITY : QOS_CLASS_USER_INITIATED
         if pthread_set_qos_class_self_np(qos, 0) == 0 {
             appliedReaderPriority.store(requested, ordering: .releasing)
-        }
-    }
-
-    // MARK: - Reading (runs on `readerThread` only)
-
-    fileprivate func runReaderLoop() {
-        let source = readerSource ?? liveReaderSource
-        let buffer = UnsafeMutableRawBufferPointer.allocate(
-            byteCount: Self.readChunkSize, alignment: MemoryLayout<UInt8>.alignment
-        )
-        defer { buffer.deallocate() }
-        var batch = [UInt8]()
-        batch.reserveCapacity(Self.batchByteCap)
-
-        while !stopped.withLock({ $0 }) {
-            applyReaderPriority()
-            // Between batches too: a flood is mostly single-slice batches.
-            yieldToStateWaiters()
-            batch.removeAll(keepingCapacity: true)
-            let reachedEOF = readBatch(into: &batch, from: source, through: buffer)
-            applyReaderPriority()
-            if !batch.isEmpty { apply(batch) }
-            if reachedEOF { break }
-        }
-        finishReading()
-    }
-
-    /// Reads until a batch is full, a read comes up short, or nothing more
-    /// is ready. Returns whether the stream ended.
-    private func readBatch(
-        into batch: inout [UInt8], from source: ReaderSource, through buffer: UnsafeMutableRawBufferPointer
-    ) -> Bool {
-        while batch.count < Self.batchByteCap {
-            let read: Int
-            do {
-                read = try source.read(buffer)
-            } catch {
-                reportIOFailure(error, operation: .read)
-                return true
-            }
-            if read == 0 { return true }
-            batch.append(contentsOf: UnsafeRawBufferPointer(rebasing: buffer[..<read]))
-            if read < Self.readChunkSize { return false }
-            // Ask readiness rather than block: an exact chunk-multiple burst
-            // would otherwise sit unapplied until the child speaks again.
-            if !source.isReadable() { return false }
-        }
-        return false
-    }
-
-    /// Feeds one batch to the terminal under the lock, in slices, so a
-    /// snapshot or resize never waits behind a whole batch; then sends the
-    /// replies, arms a `?2026` timeout for a new episode and signals output.
-    private func apply(_ batch: [UInt8]) {
-        var responses: [UInt8] = []
-        var episode: Int?
-        var offset = 0
-        while offset < batch.count {
-            let end = min(offset + Self.feedLockSliceSize, batch.count)
-            let slice = batch[offset..<end]
-            let applied = state.withLock { current -> (responses: [UInt8], episode: Int?, compress: Bool) in
-                let episodeBefore = current.terminal.synchronizedOutputEpisode
-                current.terminal.feed(slice)
-                reportImageBytes(current.terminal)
-                let sliceResponses = current.terminal.takeOutput()
-                // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
-                // A repeated BSU does not extend it, or a child that never sends
-                // ESU could stall presentation forever.
-                let episodeAfter = current.terminal.synchronizedOutputEpisode
-                // An integer compare: a pass is queued only once a batch seals.
-                let compress = current.terminal.hasCompressionWork
-                guard episodeAfter != episodeBefore else { return (sliceResponses, nil, compress) }
-                current.synchronizedOutputEpisode = episodeAfter
-                return (sliceResponses, episodeAfter, compress)
-            }
-            if responses.count + applied.responses.count <= Self.maxResponseBytesPerBatch {
-                responses.append(contentsOf: applied.responses)
-            }
-            if let newEpisode = applied.episode { episode = newEpisode }
-            offset = end
-            if applied.compress { scheduleCompression() }
-            // After the last slice too: the next batch's first slice is
-            // one `read(2)` away, sooner than a waiter's wake, so a flood
-            // of one-slice batches would never leave a gap.
-            yieldToStateWaiters()
-        }
-        // Fixed-format only (`SECURITY.md` §2.1); same queue as input.
-        if !responses.isEmpty {
-            enqueueWrite([responses])
-        }
-        if let episode {
-            scheduleSynchronizedOutputTimeout(episode: episode)
-        }
-        callbacks.withLock { $0.onOutput }?()
-    }
-
-    /// After the last read: ends a `?2026` episode the dead child never
-    /// will, then reports how the child ended — or why it cannot be known.
-    private func finishReading() {
-        let clearedSync = state.withLock { current -> Bool in
-            guard current.terminal.isSynchronizedOutputEnabled else { return false }
-            current.terminal.endSynchronizedOutput()
-            return true
-        }
-        if clearedSync {
-            callbacks.withLock { $0.onOutput }?()
-        }
-
-        // An I/O fault is not child exit. Report it immediately rather than
-        // park here for ten seconds and silently lose the only reader.
-        guard ioFailure == nil else { return }
-        var exit = pty.waitForExit(timeout: hangupGracePeriod)
-        if exit == nil, !stopped.withLock({ $0 }) {
-            // End of file, and the child lives on: it gave up its terminal
-            // (`TIOCNOTTY`) and closed it. Nothing it does reaches this pane
-            // again, and no exit is coming to say so — offer recovery.
-            reportIOFailure(PTYError.ioFailed(code: ENXIO), operation: .read)
-            return
-        }
-        if exit == nil, stopped.withLock({ $0 }) {
-            // Closed, and the group ignored `SIGHUP` (`trap '' HUP`, a daemon
-            // that kept the terminal): closing a pane stops what was in it
-            // (`SECURITY.md` §4.4). Left alone it ran on with no terminal,
-            // and nothing was left to reap it once it did exit. Only this
-            // group: a job the shell put in its own is not this pane's to end.
-            pty.signalProcessGroup(SIGKILL)
-            exit = pty.waitForExit(timeout: .seconds(2))
-        }
-        if let exit {
-            let callback = callbacks.withLock { state -> (@Sendable (ProcessExit) -> Void)? in
-                state.childExit = exit
-                return state.onChildExit
-            }
-            callback?(exit)
-        }
-    }
-
-    private var liveReaderSource: ReaderSource {
-        ReaderSource(
-            read: { [pty] buffer in
-                // close() explicitly wakes this wait, even for a silent child
-                // that ignores hangup. No timer wakes an idle reader.
-                while true {
-                    if try pty.waitUntilReadable(timeoutMilliseconds: -1) {
-                        return try pty.read(into: buffer)
-                    }
-                }
-            },
-            isReadable: { [pty] in
-                // Any revents count; the read observes end of file.
-                (try? pty.waitUntilReadable(timeoutMilliseconds: 0)) ?? true
-            }
-        )
-    }
-
-    /// Ends a `?2026` episode the child never closes, unless a later episode
-    /// has begun.
-    private func scheduleSynchronizedOutputTimeout(episode: Int) {
-        let expire: @Sendable () -> Void = { [self] in
-            let ended = state.withLock { current -> Bool in
-                guard current.synchronizedOutputEpisode == episode,
-                      current.terminal.isSynchronizedOutputEnabled
-                else { return false }
-                current.terminal.endSynchronizedOutput()
-                return true
-            }
-            if ended {
-                callbacks.withLock { $0.onOutput }?()
-            }
-        }
-        if let scheduleTimeout {
-            scheduleTimeout(synchronizedOutputTimeout, expire)
-        } else {
-            syncTimeoutQueue.asyncAfter(
-                deadline: DispatchTime.now() + synchronizedOutputTimeout.dispatchInterval, execute: expire)
         }
     }
 
@@ -658,350 +483,6 @@ public final class TerminalSession: @unchecked Sendable {
                 reportImageBytes($0.terminal)
             }
         }
-    }
-
-    /// Under `state`'s lock. Not after `stop()`: a last slice racing it would
-    /// charge the shared budget again for a pane that is gone.
-    private func reportImageBytes(_ terminal: Terminal) {
-        guard let imageBudget else { return }
-        // Most slices hold no image: skip the shared lock unless the figure moved.
-        let bytes = terminal.retainedImageBytes
-        guard bytes != reportedImageBytes.withLock({ $0 }), !stopped.withLock({ $0 }) else { return }
-        reportedImageBytes.withLock { $0 = bytes }
-        imageBudget.report(bytes, for: ObjectIdentifier(self))
-    }
-
-    /// Lets a caller (a paste) tell "queued" from "dropped, child not reading"
-    /// from "session gone".
-    public enum WriteOutcome: Sendable, Equatable {
-        /// Queued (or empty — nothing to queue).
-        case accepted
-        /// Dropped: the backlog was already over the cap.
-        case backpressured
-        case stopped
-        case failed
-    }
-
-    /// Keyboard input only — never PTY output (`SECURITY.md` §6). Enqueues and
-    /// returns; a blocking `write(2)` measured 43 ms per MB once the PTY filled.
-    @discardableResult
-    public func write(_ bytes: [UInt8]) -> WriteOutcome {
-        setReaderPriority(.interactive)
-        return enqueueWrite([bytes])
-    }
-
-    /// A fixed focus protocol report, not user input. Preserve the reader's
-    /// visibility policy instead of promoting a hidden session indefinitely.
-    /// Shares input's bounded queue and ordering, including backpressure.
-    @discardableResult
-    public func writeFocusReport(isFocused: Bool) -> WriteOutcome {
-        enqueueWrite([[0x1B, 0x5B, isFocused ? 0x49 : 0x4F]])
-    }
-
-    /// Every chunk or none, under one backlog check. Admitted while the
-    /// backlog is under the cap, however large — the cap pushes back on a
-    /// child that stopped reading. A paste goes through `write(paste:closing:)`
-    /// instead, whose cut is closed rather than left in paste mode.
-    @discardableResult
-    public func write(chunks: [[UInt8]]) -> WriteOutcome {
-        setReaderPriority(.interactive)
-        return enqueueWrite(chunks)
-    }
-
-    /// A paste: as `write(chunks:)`, but its queued chunks can be dropped
-    /// (`interruptPendingPaste`). `closing` is what ends it for the child —
-    /// `ESC[201~` for a bracketed paste — and is sent in place of the rest
-    /// when a cancel cuts one the child has started reading; it should be
-    /// the paste's last chunk on its own, so a cut never splits it.
-    @discardableResult
-    public func write(paste chunks: [[UInt8]], closing: [UInt8]?) -> WriteOutcome {
-        setReaderPriority(.interactive)
-        return enqueueWrite(chunks, kind: .paste(closing: closing))
-    }
-
-    /// A paste is still queued for the child.
-    var hasPendingPaste: Bool {
-        pendingWrites.withLock { !$0.pastes.isEmpty }
-    }
-
-    /// A paste's chunk is being written and has not returned.
-    var isPasteInFlight: Bool {
-        pendingWrites.withLock { $0.writing && $0.inFlightPaste != nil }
-    }
-
-    /// What Ctrl-C did to a paste still queued ahead of it.
-    public struct PasteInterrupt: Sendable, Equatable {
-        /// Queued paste chunks were dropped.
-        public var cancelledPaste = false
-        /// The interrupt was delivered as `SIGINT`; do not also write `^C`.
-        public var signalled = false
-    }
-
-    /// Ctrl-C with a paste queued: drops what is still queued of every paste,
-    /// keeping keystrokes typed after it — before, Ctrl-C waited behind the
-    /// whole paste, or was refused by the back-pressure cap. When a chunk is
-    /// still being written — blocked on a child that stopped reading — a `^C`
-    /// queued behind it would wait for that write too; if the line discipline
-    /// would turn `^C` into `SIGINT` (`ISIG`), the signal goes to the
-    /// foreground group now, as the terminal would deliver it. That holds
-    /// for a paste's last chunk too: popped, nothing of it is queued any
-    /// more, but until its write returns the child has not read it and a
-    /// `^C` behind it waits just the same.
-    public func interruptPendingPaste() -> PasteInterrupt {
-        let (cancelled, writing, pasteInFlight) = pendingWrites.withLock { pending in
-            (pending.cancelPastes(), pending.writing, pending.inFlightPaste != nil)
-        }
-        guard cancelled || (writing && pasteInFlight) else { return PasteInterrupt() }
-        guard writing, writerSink == nil, pty.interruptForegroundGroupIfSignalsEnabled() else {
-            return PasteInterrupt(cancelledPaste: cancelled)
-        }
-        return PasteInterrupt(cancelledPaste: cancelled, signalled: true)
-    }
-
-    private enum WriteKind {
-        case input
-        case paste(closing: [UInt8]?)
-    }
-
-    /// One queue for input and replies keeps them ordered.
-    @discardableResult
-    private func enqueueWrite(_ chunks: [[UInt8]], kind: WriteKind = .input) -> WriteOutcome {
-        let chunks = chunks.filter { !$0.isEmpty }
-        guard !chunks.isEmpty else { return .accepted }
-        guard !stopped.withLock({ $0 }) else { return .stopped }
-        guard ioFailure == nil else { return .failed }
-        guard callbacks.withLock({ $0.childExit == nil }) else { return .stopped }
-        var shouldSchedule = false
-        let outcome = pendingWrites.withLock { pending -> WriteOutcome in
-            guard !pending.hungUp else { return .stopped }
-            guard pending.bytes <= Self.maxPendingWriteBytes else { return .backpressured }
-            var pasteID: UInt64?
-            if case .paste(let closing) = kind {
-                pending.nextPasteID &+= 1
-                pasteID = pending.nextPasteID
-                pending.pastes[pending.nextPasteID] = PendingWrites.Paste(
-                    remaining: chunks.count, closing: closing)
-            }
-            for chunk in chunks { pending.push(chunk, paste: pasteID) }
-            if !pending.isDraining {
-                pending.isDraining = true
-                shouldSchedule = true
-            }
-            return .accepted
-        }
-        if shouldSchedule {
-            writerQueue.async { [self] in drainPendingWrites() }
-        }
-        return outcome
-    }
-
-    /// Returns once every write queued so far has been written or dropped:
-    /// one drain empties the queue. For tests, so "never written" is a fact
-    /// rather than a wait that happened to be long enough.
-    func waitForQueuedWrites() { writerQueue.sync {} }
-
-    /// A failed chunk fails the session; later chunks must not silently follow
-    /// a partial write (particularly a bracketed paste).
-    /// Popped before writing, so a `stop()` mid-write cannot be observed twice.
-    private func drainPendingWrites() {
-        while true {
-            guard !stopped.withLock({ $0 }), ioFailure == nil else {
-                pendingWrites.withLock { pending in
-                    pending.removeAll()
-                    pending.isDraining = false
-                }
-                return
-            }
-            let chunk = pendingWrites.withLock { pending -> [UInt8]? in
-                guard let chunk = pending.pop() else {
-                    pending.isDraining = false
-                    pending.writing = false
-                    pending.inFlightPaste = nil
-                    return nil
-                }
-                pending.writing = true
-                return chunk
-            }
-            guard let chunk else { return }
-            defer {
-                pendingWrites.withLock { pending in
-                    pending.writing = false
-                    pending.inFlightPaste = nil
-                }
-            }
-            do {
-                if let writerSink {
-                    try writerSink(chunk)
-                } else {
-                    try chunk.withUnsafeBytes { _ = try pty.writeAll($0) }
-                }
-            } catch PTYError.ioFailed(code: EIO) {
-                // Darwin's answer to a write once the last replica holder
-                // closed it: the child is gone, or left its terminal. An
-                // exit, not a fault — the child's own exit report follows,
-                // and input from now on is refused as for a stopped session.
-                noteHangup()
-            } catch {
-                reportIOFailure(error, operation: .write)
-            }
-        }
-    }
-
-    /// Nothing holds the replica any more: queued input has nowhere to go.
-    private func noteHangup() {
-        pendingWrites.withLock { pending in
-            pending.hungUp = true
-            pending.removeAll()
-        }
-    }
-
-    /// Without a full `snapshot()`; read on every scroll and output batch.
-    public var scrollbackTotalPushed: Int {
-        registerStateWaiter { state.withLock { $0.terminal.grid.scrollback.totalPushed } }
-    }
-
-    public var scrollbackCount: Int {
-        registerStateWaiter { state.withLock { $0.terminal.grid.scrollback.count } }
-    }
-
-    public var isBracketedPasteEnabled: Bool {
-        registerStateWaiter { state.withLock { $0.terminal.isBracketedPasteEnabled } }
-    }
-
-    /// `.off` unless SGR encoding is on; both read under one lock.
-    public var sgrMouseTrackingMode: MouseTrackingMode {
-        registerStateWaiter {
-            state.withLock {
-                $0.terminal.isSgrMouseEncodingEnabled ? $0.terminal.mouseTrackingMode : .off
-            }
-        }
-    }
-
-    public var isSgrMouseEncodingEnabled: Bool {
-        registerStateWaiter { state.withLock { $0.terminal.isSgrMouseEncodingEnabled } }
-    }
-
-    /// Can go false without the child's DECRST (timeout, exit).
-    public var isSynchronizedOutputEnabled: Bool {
-        registerStateWaiter { state.withLock { $0.terminal.isSynchronizedOutputEnabled } }
-    }
-
-    public var isFocusReportingEnabled: Bool {
-        registerStateWaiter { state.withLock { $0.terminal.isFocusReportingEnabled } }
-    }
-
-    public var isNewLineModeEnabled: Bool {
-        registerStateWaiter { state.withLock { $0.terminal.isNewLineModeEnabled } }
-    }
-
-    /// `Terminal.wheelSendsArrowKeys`, read per wheel event.
-    public var wheelSendsArrowKeys: Bool {
-        registerStateWaiter { state.withLock { $0.terminal.wheelSendsArrowKeys } }
-    }
-
-    public var applicationCursorKeysEnabled: Bool {
-        registerStateWaiter { state.withLock { $0.terminal.applicationCursorKeysEnabled } }
-    }
-
-    public var applicationKeypadEnabled: Bool {
-        registerStateWaiter { state.withLock { $0.terminal.applicationKeypadEnabled } }
-    }
-
-    public var dynamicColors: DynamicColors {
-        get { registerStateWaiter { state.withLock { $0.terminal.dynamicColors } } }
-        set { registerStateWaiter { state.withLock { $0.terminal.dynamicColors = newValue } } }
-    }
-
-    public var indexedPalette: IndexedPalette {
-        get { registerStateWaiter { state.withLock { $0.terminal.indexedPalette } } }
-        set { registerStateWaiter { state.withLock { $0.terminal.indexedPalette = newValue } } }
-    }
-
-    /// Under one lock: a get-then-set would race the reader's OSC 4 writes and
-    /// could drop an override.
-    public func updateIndexedPaletteDefaults(
-        to newDefaults: [(red: UInt8, green: UInt8, blue: UInt8)]
-    ) {
-        registerStateWaiter { state.withLock { $0.terminal.indexedPalette.updateDefaults(to: newDefaults) } }
-    }
-
-    public var specialColors: SpecialColors {
-        get { registerStateWaiter { state.withLock { $0.terminal.specialColors } } }
-        set { registerStateWaiter { state.withLock { $0.terminal.specialColors = newValue } } }
-    }
-
-    public var keyboardEnhancements: KeyboardEnhancementFlags {
-        registerStateWaiter { state.withLock { $0.terminal.keyboardEnhancements } }
-    }
-
-    public func takeBell() -> Bool {
-        registerStateWaiter { state.withLock { $0.terminal.takeBell() } }
-    }
-
-    public var windowTitle: String? {
-        registerStateWaiter { state.withLock { $0.terminal.windowTitle } }
-    }
-
-    /// Always local, safe to spawn or restore from: the shell's OSC 7 report,
-    /// once the kernel agrees a local process is there
-    /// (`PTY.confirmedWorkingDirectory`); `nil` until a local report arrives.
-    public var workingDirectory: String? {
-        guard let reported = registerStateWaiter({ state.withLock { $0.terminal.workingDirectory } })
-        else { return nil }
-        return pty.confirmedWorkingDirectory(reported)
-    }
-
-    /// Informational only; never for spawning.
-    public var remoteContext: RemoteContext? {
-        registerStateWaiter { state.withLock { $0.terminal.remoteContext } }
-    }
-
-    /// A command other than the shell is running — what a close confirmation
-    /// asks (`PTY.hasForegroundJob`).
-    public var hasForegroundJob: Bool { pty.hasForegroundJob }
-
-    public var foregroundProcessName: String? { pty.foregroundProcessName }
-
-    /// Shell included, for a title bar.
-    public var activeProcessName: String? { pty.activeProcessName }
-
-    /// OSC 7 first (the shell's own answer); else the kernel's for the
-    /// foreground group, since stock macOS zsh sends OSC 7 only to Terminal.app.
-    public var currentDirectory: String? {
-        workingDirectory ?? pty.currentWorkingDirectory
-    }
-
-    public var isCommandRunning: Bool {
-        registerStateWaiter { state.withLock { $0.terminal.isCommandRunning } }
-    }
-
-    public var hasShellIntegration: Bool {
-        registerStateWaiter { state.withLock { $0.terminal.hasShellIntegration } }
-    }
-
-    public var promptEndPosition: (row: Int, column: Int)? {
-        registerStateWaiter { state.withLock { $0.terminal.promptEndPosition } }
-    }
-
-    public var directoryCompletion: DirectoryCompletion? {
-        registerStateWaiter { state.withLock { $0.terminal.directoryCompletion } }
-    }
-
-    public var commandRecords: CommandRecordStore {
-        registerStateWaiter { state.withLock { $0.terminal.commandRecords } }
-    }
-
-    public func clearCommandRecords() {
-        registerStateWaiter { state.withLock { $0.terminal.clearCommandRecords() } }
-    }
-
-    public func takeFinishedCommand() -> Int? {
-        registerStateWaiter { state.withLock { $0.terminal.takeFinishedCommand() } }
-    }
-
-    /// OSC 52; the app decides whether it reaches the pasteboard.
-    public func takeClipboardCopy() -> String? {
-        registerStateWaiter { state.withLock { $0.terminal.takeClipboardCopy() } }
     }
 
     /// The child must never see (`TIOCGWINSZ`/`SIGWINCH`) a size the grid has
