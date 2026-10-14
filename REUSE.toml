@@ -58,7 +58,7 @@ SPDX-FileCopyrightText = "2026 Noah Qin"
 SPDX-License-Identifier = "LicenseRef-Corta-Brand"
 
 # Sparkle's own license, shipped inside the app because its terms require
-# the notice to accompany the software (Corta/AcknowledgementsView.swift).
+# the notice to accompany the software (Corta/App/AcknowledgementsView.swift).
 [[annotations]]
 path = "Corta/Acknowledgements/Sparkle-LICENSE.txt"
 SPDX-FileCopyrightText = [

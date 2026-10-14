@@ -57,7 +57,7 @@ struct LicenseHeaderRuleTests {
     @Test(
         "each kind of file is classified",
         arguments: [
-            ("Corta/AppDelegate.swift", LicenseHeaders.Treatment.header(.slashes)),
+            ("Corta/App/AppDelegate.swift", LicenseHeaders.Treatment.header(.slashes)),
             ("Corta/SharedMemory.c", .header(.slashes)),
             ("CortaTerminal/Package.swift", .header(.slashes)),
             ("Corta/Renderer/Shaders.metal", .header(.slashes)),

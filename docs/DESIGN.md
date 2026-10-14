@@ -205,7 +205,7 @@ four reasons and what it would have bought.
 | `CortaPOSIX`        | `CortaTerminal/Sources/CortaPOSIX/`  | nonisolated | Process plumbing both libraries and the app's image decoder share: `GuardedDescriptor`, `ProcessExit`, a spawn's signal reset |
 | Renderer            | `Corta/Renderer/`                    | nonisolated | `TerminalRenderer`, `Metal4Backend` (the only GPU backend: one render pass per frame, D21), `QuadPipelineCache`, `GlyphAtlas`, `KittyImageRenderer`; draws a session into a rect, driven from the display link |
 | Font stack          | `Corta/Renderer/`                    | nonisolated | `TerminalFont`, `MonospacedFontCatalog`, `CellMetrics`: Core Text shaping, fallback, verification, the ASCII fast path |
-| Shell               | `Corta/`                             | MainActor   | Windows, tabs, the split tree, key bindings, IME, settings, shell integration, remote context |
+| Shell               | `Corta/`: `App`, `Window`, `Pane`, `TerminalView`, `Settings`, `Remote`, `Shell` | MainActor   | The app and its menus; windows, tabs and the split tree; a pane and its collaborators; the terminal view's input, IME and frame pacing; settings, themes and key bindings; SFTP, remote editing and ssh sign-in; shell integration |
 
 `CortaTerminal` is the terminal core — PTY, parser, grid, selection,
 search, shell integration — and nothing else. `CortaSFTP` sits beside it

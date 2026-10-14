@@ -555,7 +555,7 @@ fixtures and clean up the resources you create.
 ### Environment switches
 
 The app reads these from its own launch environment, and only through
-`DiagnosticsEnvironment` (`Corta/DiagnosticsEnvironment.swift`). They are
+`DiagnosticsEnvironment` (`Corta/App/DiagnosticsEnvironment.swift`). They are
 measurement and staging seams, deliberately not config keys (D10): a
 launch that sets none behaves as shipped. Set one on the launch you
 control — or as `TEST_RUNNER_<name>` in front of `xcodebuild test`, which

@@ -348,7 +348,7 @@ claim that it used a different toolchain.
 
 An end-to-end number says whether the last change helped. It cannot say
 *where* the time goes, and each stage has a different fix — so the whole
-chain emits `os_signpost` intervals (`Corta/InputLatencySignposts.swift`),
+chain emits `os_signpost` intervals (`Corta/TerminalView/InputLatencySignposts.swift`),
 subsystem `dev.noahqin.Corta`, category `input-latency`:
 
 | Signpost  | Covers                                              |
@@ -472,7 +472,7 @@ Pair it with a signpost trace: if double buffering is costing rather than
 saving, it appears as the `frame` interval growing at its front.
 
 **Preliminary signal, not the A/B itself.** `RenderMetrics`
-(`Corta/RenderMetrics.swift`, `CORTA_RENDER_METRICS=1`) reports
+(`Corta/TerminalView/RenderMetrics.swift`, `CORTA_RENDER_METRICS=1`) reports
 `drawableWait` — how long
 `nextDrawable()` blocks — directly, without Instruments. One
 informal run at the default drawable count (3), auto-repeat plus `yes`
