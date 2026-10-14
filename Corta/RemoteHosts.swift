@@ -22,11 +22,11 @@ import Foundation
 /// character check a typed host does (`SSHDestination`), so neither file can
 /// put anything into the argv a person could not have typed.
 nonisolated enum RemoteHostName {
-    /// What the connect form accepts for a destination named as one string:
-    /// a host, `user@host`, an IPv6 literal — or one the user connected to
-    /// this run with a port or a key (`SSHTarget.resolve`).
+    /// What the connect form accepts as a bare destination: a host,
+    /// `user@host`, an IPv6 literal — never a port or a key, which a
+    /// reported name or a config alias has no business carrying.
     static func isAcceptable(_ name: String) -> Bool {
-        SSHTarget.resolve(name) != nil
+        SSHTarget.named(name) != nil
     }
 }
 
@@ -211,12 +211,6 @@ final class RecentHostsStore {
         save()
     }
 
-    /// A destination named as one string — the SFTP browser's — with the
-    /// fields this run connected to it with (`SSHTarget.resolve`).
-    func record(_ name: String) {
-        if let target = SSHTarget.resolve(name) { record(target) }
-    }
-
     func remove(_ target: SSHTarget) {
         targets.removeAll { $0.displayName == target.displayName }
         save()
@@ -239,11 +233,13 @@ final class RecentHostsStore {
         ).get()
     }
 
-    /// Version 1 held `host` or `user@host` strings; version 2 the fields.
+    /// `hosts` is what every build reads: `host` or `user@host`. `targets`,
+    /// added beside it, carries the fields; an older build ignores it and
+    /// still finds the hosts a port does not change the meaning of.
     private nonisolated struct Persisted: Codable {
-        static let currentVersion = 2
+        static let currentVersion = 1
         var version: Int
-        var hosts: [String]?
+        var hosts: [String]
         var targets: [SSHTarget]?
     }
 
@@ -252,7 +248,7 @@ final class RecentHostsStore {
             let persisted = try? JSONDecoder().decode(Persisted.self, from: data),
             persisted.version <= Persisted.currentVersion
         else { return }
-        let stored = persisted.targets ?? (persisted.hosts ?? []).compactMap(SSHTarget.named)
+        let stored = persisted.targets ?? persisted.hosts.compactMap(SSHTarget.named)
         var seen = Set<String>()
         targets = Array(
             stored.compactMap(Self.checked).filter { seen.insert($0.displayName).inserted }
@@ -263,9 +259,13 @@ final class RecentHostsStore {
     /// enough to write in place. Owner-only, since host names and key paths
     /// say where you work.
     private func save() {
+        // A host with a port is left out of `hosts`: an older build would
+        // read `host:port` as a host name.
+        let hosts = targets.filter { $0.port == nil }
+            .map { SSHTarget(host: $0.host, user: $0.user).displayName }
         guard
             let data = try? JSONEncoder().encode(
-                Persisted(version: Persisted.currentVersion, hosts: nil, targets: targets))
+                Persisted(version: Persisted.currentVersion, hosts: hosts, targets: targets))
         else { return }
         try? PrivateFile.write(data, to: fileURL)
     }

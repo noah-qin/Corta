@@ -148,9 +148,23 @@ struct RecentHostsStoreTests {
 
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(#"{"version":2,"targets":[{"host":"ok-box"},{"host":"-oEvil"},{"host":"b","port":70000}]}"#.utf8)
+        try Data(#"{"version":1,"hosts":[],"targets":[{"host":"ok-box"},{"host":"-oEvil"},{"host":"b","port":70000}]}"#.utf8)
             .write(to: url)
         #expect(RecentHostsStore(fileURL: url).targets.map(\.displayName) == ["ok-box"])
+    }
+
+    /// An older build reads only `hosts`, and must neither find the file
+    /// unreadable nor be handed `host:port` as a host name.
+    @Test("the file stays readable by a build that knows only host names")
+    func olderBuildsStillReadTheFile() throws {
+        let url = temporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let store = RecentHostsStore(fileURL: url)
+        store.record(SSHTarget(host: "plain", user: "deploy", identityFile: "/k"))
+        store.record(SSHTarget(host: "ported", port: 2222))
+        let object = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        #expect(object?["version"] as? Int == 1)
+        #expect(object?["hosts"] as? [String] == ["deploy@plain"])
     }
 
     @Test("a version-1 file of names reads back as targets")

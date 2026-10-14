@@ -41,8 +41,11 @@ nonisolated enum PaneRemoteState: Equatable {
     /// A launcher in front, but no report: remote, host unknown.
     case remoteUnknown(provenance: RemoteContext.Provenance)
     /// The pane's own child is the ssh the connect sheet started for
-    /// `target` (`SSHTarget.displayName`), and no report has arrived.
-    case connected(target: String)
+    /// `target` (`SSHTarget.key`): the user's own destination, kept when the
+    /// far end reports itself — its name for itself may be one ssh cannot
+    /// reach, and it says nothing of the user, port or key — with the
+    /// report's directory once there is one.
+    case connected(target: String, directory: String?)
     /// A multiplexer in front, or the name couldn't be read: uncertain, since
     /// even a report may predate the attach.
     case unknown
@@ -69,14 +72,15 @@ nonisolated enum PaneRemoteState: Equatable {
         childIsRemoteLauncher: Bool = false, connectTarget: String? = nil
     ) -> PaneRemoteState {
         if childIsRemoteLauncher {
-            // The report outranks the spawn: it alone names the directory,
-            // and the host as the far end knows itself.
+            if let connectTarget {
+                return .connected(target: connectTarget, directory: remoteContext?.directory)
+            }
+            // The report outranks the spawn: it alone names a host.
             if let remoteContext {
                 return .remote(
                     host: remoteContext.host, directory: remoteContext.directory,
                     provenance: remoteContext.provenance)
             }
-            if let connectTarget { return .connected(target: connectTarget) }
             return .remoteUnknown(provenance: .spawnedLauncher)
         }
         guard hasForegroundJob else { return .local }
@@ -134,8 +138,9 @@ nonisolated enum PaneRemoteState: Equatable {
             return nil
         case .remote(let host, let directory, _):
             return Self.badge("\(host) · \(Self.abbreviated(directory))")
-        case .connected(let target):
-            return Self.badge(target)
+        case .connected(let target, let directory):
+            let name = SSHTarget.displayName(forKey: target)
+            return Self.badge(directory.map { "\(name) · \(Self.abbreviated($0))" } ?? name)
         case .remoteUnknown:
             return Self.badge(L10n.text("remote.hostUnknown"))
         case .unknown:

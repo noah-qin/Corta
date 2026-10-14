@@ -122,7 +122,7 @@ struct SFTPBrowserView: View {
     private var connecting: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text(L10n.format("sftp.connecting", model.host ?? ""))
+            Text(L10n.format("sftp.connecting", model.displayHost ?? ""))
                 .foregroundStyle(.secondary)
             Button(L10n.text("common.cancel")) { model.cancelConnect() }
                 .keyboardShortcut(.cancelAction)

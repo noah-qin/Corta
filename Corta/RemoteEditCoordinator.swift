@@ -57,7 +57,7 @@ final class RemoteEditCoordinator {
         var contentDigest: String? = nil
         var id: String { copy.id }
         /// Display string for the prompt: the remote file this would land on.
-        var remoteDisplay: String { "\(copy.host):\(copy.remotePath)" }
+        var remoteDisplay: String { "\(SSHTarget.displayName(forKey: copy.host)):\(copy.remotePath)" }
     }
 
     /// An upload that found the remote changed since download.
@@ -165,7 +165,7 @@ final class RemoteEditCoordinator {
         self.store = store
         self.connectTimeout = connectTimeout
         self.makeClient = makeClient ?? {
-            SFTPConnection.forApp(host: $0, maximumDownloadBytes: RemoteEditCoordinator.maximumCopyBytes)
+            SFTPConnection.forApp(key: $0, maximumDownloadBytes: RemoteEditCoordinator.maximumCopyBytes)
         }
         self.opener = opener ?? PanePointer.openRemoteFileAt(url:line:column:)
         self.presenter = presenter ?? RemoteEditPresenter(
@@ -205,11 +205,13 @@ final class RemoteEditCoordinator {
         // end's (`RemoteHostConsent`). A reused copy still goes through
         // this: opening it starts a watch whose upload would connect.
         // Nor is a name passed on that could not have been typed.
-        guard RemoteHostName.isAcceptable(host) else {
+        // `host` is an `SSHTarget.key`: a reported name already read as one
+        // (`PaneRemote.resolve`), or a browser's or connect sheet's target.
+        guard SSHTarget(key: host) != nil else {
             throw .protocolViolation("not a host name ssh is given: \(host)")
         }
         if !RemoteHostConsent.isConfirmed(host) {
-            guard await presenter.confirmConnection(host, remotePath) else {
+            guard await presenter.confirmConnection(SSHTarget.displayName(forKey: host), remotePath) else {
                 throw .cancelled
             }
             RemoteHostConsent.confirm(host)
@@ -251,7 +253,8 @@ final class RemoteEditCoordinator {
         var keptOrphan: URL?
         let tellAboutOrphan = { [presenter] in
             if let keptOrphan {
-                presenter.showError(L10n.format("remoteEdit.orphanKept", remotePath, host, keptOrphan.path))
+                presenter.showError(L10n.format(
+                    "remoteEdit.orphanKept", remotePath, SSHTarget.displayName(forKey: host), keptOrphan.path))
             }
         }
         let copy: RemoteEditStore.RemoteCopy

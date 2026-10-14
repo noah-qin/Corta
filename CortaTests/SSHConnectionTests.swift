@@ -49,6 +49,7 @@ struct SSHConnectionTests {
     @Test func anIPv6LiteralIsBracketedOnlyWhereAPortFollows() throws {
         #expect(try target("2001:db8::1", user: "u", port: "2222").get().displayName == "u@[2001:db8::1]:2222")
         #expect(try target("[2001:db8::1]", port: "22").get().displayName == "[2001:db8::1]:22")
+        #expect(try target("[2001:db8::1]").get().host == "2001:db8::1", "ssh is given the address")
         #expect(try target("u@2001:db8::1").get().displayName == "u@2001:db8::1")
     }
 
@@ -66,12 +67,12 @@ struct SSHConnectionTests {
         #expect(target("box", identityFile: missing) == .failure(.identityFileMissing))
         #expect(target("box", identityFile: "/tmp") == .failure(.identityFileMissing), "a directory")
         #expect((try? SSHTarget.parse(host: "box", identityFile: missing, checkingFiles: false).get()) != nil)
-        for path in ["id_ed25519", "~/.ssh/id_ed25519", "/keys/%h", "/keys/${HOME}", "/keys/a\nb"] {
+        for path in ["id_ed25519", "~/.ssh/id_ed25519", "/keys/%h", "/keys/${HOME}", "/keys/a\nb", " /keys/k"] {
             #expect(target("box", identityFile: path) == .failure(.identityFile), "\(path)")
         }
     }
 
-    @Test(arguments: ["", "-oProxyCommand=bad", "a;touch", "a\nb", "user@", "a@b@c", "a b", "a$(echo)", "host%h", "box:22", "[2001:db8::1]:22", "[::1", "[box]"])
+    @Test(arguments: ["", "-oProxyCommand=bad", "a;touch", "a\nb", "user@", "a@b@c", "a b", "a$(echo)", "host%h", "box:22", "[2001:db8::1]:22", "[::1", "[box]", "box]"])
     func rejectsInvalidHosts(_ host: String) {
         #expect(target(host) == .failure(.host))
     }
@@ -89,11 +90,34 @@ struct SSHConnectionTests {
         #expect(target("host", port: port) == .failure(.port))
     }
 
-    @Test func aTargetEnteredThisRunResolvesByItsName() throws {
-        let value = try target("resolve-\(UUID().uuidString)", user: "deploy", port: "2200").get()
-        #expect(SSHTarget.resolve(value.displayName) == nil, "never entered: not a plain host either")
-        SSHTarget.remember(value)
-        #expect(SSHTarget.resolve(value.displayName) == value)
-        #expect(SSHTarget.resolve("plain-box") == SSHTarget(host: "plain-box"))
+    /// The window registry, remote editing and its saved copies name a
+    /// connection by `key`; reading it back must give the same connection,
+    /// key included, with nothing remembered on the side.
+    @Test func aKeyReadsBackAsTheSameTarget() throws {
+        let targets: [SSHTarget] = [
+            SSHTarget(host: "box"),
+            SSHTarget(host: "box", user: "deploy"),
+            SSHTarget(host: "box", user: "deploy", port: 2222),
+            SSHTarget(host: "2001:db8::1", user: "u", port: 22),
+            SSHTarget(host: "2001:db8::1"),
+            SSHTarget(host: "box", port: 2200, identityFile: "/Users/me/.ssh/work key "),
+        ]
+        for value in targets {
+            #expect(SSHTarget(key: value.key) == value, "\(value.key)")
+        }
+        #expect(SSHTarget(host: "box", identityFile: "/k").key == "box -i /k")
+        #expect(SSHTarget(host: "box", identityFile: "/k").displayName == "box")
+        #expect(SSHTarget.displayName(forKey: "u@box:22 -i /k") == "u@box:22")
+        for bad in ["", "@box", "box:", "[box]:22", "-oEvil", "box -i relative"] {
+            #expect(SSHTarget(key: bad) == nil, "\(bad)")
+        }
+    }
+
+    /// A pane's report is child output: read as a bare name, it can carry
+    /// neither a port nor the file ssh signs in with.
+    @Test func aReportedNameTakesNoPortAndNoKey() {
+        #expect(SSHTarget.named("deploy@box") == SSHTarget(host: "box", user: "deploy"))
+        #expect(SSHTarget.named("box:22") == nil)
+        #expect(SSHTarget.named("box -i /etc/ssh/key") == nil)
     }
 }

@@ -408,8 +408,8 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   SSH terminal or an SFTP browser, with the same fields for both: the host
   (a name, an address or an SSH alias), the user, the port and a private
   key. Leave any of the last three empty and your `~/.ssh/config` and
-  OpenSSH's defaults decide it; a chosen key is the only one offered to the
-  server. The sheet lists the connections you made recently — with the
+  OpenSSH's defaults decide it; a chosen key is offered first, and other
+  keys in `ssh-agent` are not tried. The sheet lists the connections you made recently — with the
   user, port and key they used — and the `Host` names in your
   `~/.ssh/config`; type to narrow the list, click one (or use ↑ and ↓ from
   the host field) to fill the fields, double-click or press Return to

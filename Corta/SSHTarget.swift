@@ -15,7 +15,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Foundation
-import Synchronization
 
 /// Where an SSH or SFTP connection goes, as the user entered it: a host or
 /// `~/.ssh/config` alias, and optionally a user, a port and a private key.
@@ -29,6 +28,14 @@ nonisolated struct SSHTarget: Hashable, Codable, Sendable {
     var port: Int?
     /// An absolute path to a private key, passed as `-i`.
     var identityFile: String?
+
+    /// Unchecked: `parse` is the way in for anything typed or stored.
+    init(host: String, user: String? = nil, port: Int? = nil, identityFile: String? = nil) {
+        self.host = host
+        self.user = user
+        self.port = port
+        self.identityFile = identityFile
+    }
 
     enum Problem: Error, Equatable {
         case host, user, userTwice, port, identityFile, identityFileMissing
@@ -54,6 +61,12 @@ nonisolated struct SSHTarget: Hashable, Codable, Sendable {
             host = String(host[host.index(after: at)...])
             guard !user.isEmpty else { return .failure(.user) }
         }
+        // `[2001:db8::1]` is how an IPv6 literal is written beside a port;
+        // ssh is given the address itself, and the port as `-p`.
+        if host.hasPrefix("["), host.hasSuffix("]") {
+            host = String(host.dropFirst().dropLast())
+            guard host.contains(":") else { return .failure(.host) }
+        }
         guard isAcceptableHost(host) else { return .failure(.host) }
         guard user.isEmpty || isAcceptableUser(user) else { return .failure(.user) }
         let portText = rawPort.trimmingCharacters(in: .whitespaces)
@@ -64,7 +77,9 @@ nonisolated struct SSHTarget: Hashable, Codable, Sendable {
             }
             port = value
         }
-        let identity = rawIdentity.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Not trimmed: the path comes from an open panel, and a file whose
+        // name ends in a space is still that file.
+        let identity = rawIdentity
         if !identity.isEmpty {
             guard isAcceptableIdentityPath(identity) else { return .failure(.identityFile) }
             if checkingFiles, !isReadableFile(identity) { return .failure(.identityFileMissing) }
@@ -80,10 +95,12 @@ nonisolated struct SSHTarget: Hashable, Codable, Sendable {
         try? parse(host: name, checkingFiles: false).get()
     }
 
-    /// Options for ssh, ahead of its `--`. A chosen key is the only one
-    /// offered (`IdentitiesOnly`): an agent holding several would otherwise
-    /// try each first, and a server counting `MaxAuthTries` refuses the
-    /// connection before reaching the one the user picked.
+    /// Options for ssh, ahead of its `--`. A chosen key is offered first —
+    /// command-line identities come before any `IdentityFile` in
+    /// `~/.ssh/config` — and `IdentitiesOnly` keeps an agent's other keys
+    /// out: an agent holding several would otherwise try each first, and a
+    /// server counting `MaxAuthTries` refuses the connection before
+    /// reaching the one the user picked.
     var sshOptions: [String] {
         var options: [String] = []
         if let user { options += ["-l", user] }
@@ -96,9 +113,9 @@ nonisolated struct SSHTarget: Hashable, Codable, Sendable {
     var sshArguments: [String] { sshOptions + ["--", host] }
 
     /// `user@host`, with `:port` when one was given — an IPv6 literal in
-    /// brackets then, so the port reads as one. What titles, recents and the
-    /// SFTP window registry show and key on; the key is left out, since it
-    /// says how to sign in, not where to.
+    /// brackets then, so the port reads as one. What titles, recents and
+    /// dialogs show; the key is left out, since it says how to sign in, not
+    /// where to.
     var displayName: String {
         var name = user.map { "\($0)@" } ?? ""
         if let port {
@@ -110,27 +127,74 @@ nonisolated struct SSHTarget: Hashable, Codable, Sendable {
         return name
     }
 
-    // MARK: - Rules
-
-    /// Letters, digits, `.`, `_`, `-`, and `:`/`[]` for IPv6 literals; never
-    /// a leading `-`, the shape of an option — `--` already stops ssh
-    /// reading one, and this keeps the name from looking like one anywhere.
-    /// A single `:` is `host:port`, which ssh would read as a host name: the
-    /// port has its own field, and a `displayName` with one is not a host.
-    static func isAcceptableHost(_ host: String) -> Bool {
-        let allowed = CharacterSet(
-            charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-:[]")
-        guard !host.isEmpty, host.count <= 255, !host.hasPrefix("-"),
-            host.unicodeScalars.allSatisfy(allowed.contains)
-        else { return false }
-        let bracketed = host.hasPrefix("[") && host.hasSuffix("]")
-        let inner = bracketed ? host.dropFirst().dropLast() : Substring(host)
-        guard !inner.contains("["), !inner.contains("]") else { return false }
-        return inner.count(where: { $0 == ":" }) != 1 && (!bracketed || inner.contains(":"))
+    /// The whole target as one string, read back by `init(key:)`: the SFTP
+    /// window registry, remote editing's connections and its saved copies
+    /// name a connection by this, so a relaunch, a reconnect or an upload
+    /// reaches the same user, port and key. `displayName`, then ` -i ` and
+    /// the key's path — a display name never holds a space, so the split is
+    /// unambiguous. A plain host's key is its name, as saved copies from
+    /// before the fields existed already are.
+    var key: String {
+        identityFile.map { "\(displayName) -i \($0)" } ?? displayName
     }
 
-    /// The portable POSIX user-name set. Nothing ssh would expand — its
-    /// `%` tokens and `${}` variables — and no leading `-`.
+    /// How a `key` is shown: its display name, without the key's path.
+    static func displayName(forKey key: String) -> String {
+        SSHTarget(key: key)?.displayName ?? key
+    }
+
+    /// Reads back a `key`, under the rules a typed target passes.
+    ///
+    /// Only for names Corta made: a pane's report is read with `named(_:)`,
+    /// which takes no port and no key — a remote shell cannot pick the file
+    /// ssh signs in with.
+    init?(key: String) {
+        var name = Substring(key)
+        var identity = ""
+        if let marker = key.range(of: " -i ") {
+            name = key[..<marker.lowerBound]
+            identity = String(key[marker.upperBound...])
+        }
+        var user = ""
+        var rest = name
+        if let at = name.firstIndex(of: "@") {
+            user = String(name[..<at])
+            rest = name[name.index(after: at)...]
+            guard !user.isEmpty else { return nil }
+        }
+        var host = String(rest)
+        var port = ""
+        if rest.hasPrefix("["), let close = rest.firstIndex(of: "]") {
+            host = String(rest[rest.index(after: rest.startIndex)..<close])
+            let after = rest[rest.index(after: close)...]
+            guard host.contains(":"), after.isEmpty || after.hasPrefix(":") else { return nil }
+            port = String(after.dropFirst())
+        } else if rest.count(where: { $0 == ":" }) == 1, let colon = rest.firstIndex(of: ":") {
+            host = String(rest[..<colon])
+            port = String(rest[rest.index(after: colon)...])
+            guard !port.isEmpty else { return nil }
+        }
+        guard let target = try? Self.parse(
+            host: host, user: user, port: port, identityFile: identity, checkingFiles: false
+        ).get() else { return nil }
+        self = target
+    }
+
+    // MARK: - Rules
+
+    /// Letters, digits, `.`, `_`, `-`, and `:` for IPv6 literals; never a
+    /// leading `-`, the shape of an option — `--` already stops ssh reading
+    /// one, and this keeps the name from looking like one anywhere. A single
+    /// `:` is `host:port`, which ssh would read as a host name: the port has
+    /// its own field.
+    static func isAcceptableHost(_ host: String) -> Bool {
+        let allowed = CharacterSet(
+            charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-:")
+        return !host.isEmpty && host.count <= 255 && !host.hasPrefix("-")
+            && host.unicodeScalars.allSatisfy(allowed.contains)
+            && host.count(where: { $0 == ":" }) != 1
+    }
+
     static func isAcceptableUser(_ user: String) -> Bool {
         let allowed = CharacterSet(
             charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
@@ -150,22 +214,6 @@ nonisolated struct SSHTarget: Hashable, Codable, Sendable {
         var isDirectory: ObjCBool = false
         return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
             && !isDirectory.boolValue && FileManager.default.isReadableFile(atPath: path)
-    }
-
-    // MARK: - This run's targets
-
-    /// Targets the user connected to this run, by `displayName`. The SFTP
-    /// browser, remote editing and the window registry name a connection by
-    /// that string; this is how one made with a port or a key is spawned
-    /// with them again. A name never entered here is a plain destination.
-    private static let entered = Mutex<[String: SSHTarget]>([:])
-
-    static func remember(_ target: SSHTarget) {
-        entered.withLock { $0[target.displayName] = target }
-    }
-
-    static func resolve(_ name: String) -> SSHTarget? {
-        entered.withLock { $0[name] } ?? named(name)
     }
 }
 

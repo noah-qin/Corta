@@ -81,7 +81,7 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
             hasForegroundJob: session.hasForegroundJob,
             foregroundProcessName: session.foregroundProcessName,
             childIsRemoteLauncher: childIsLiveLauncher,
-            connectTarget: host?.preset?.connectTarget?.displayName)
+            connectTarget: host?.preset?.connectTarget?.key)
     }
 
     /// The pane's own child is a live remote launcher, which the foreground
@@ -173,11 +173,21 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
     nonisolated static func resolve(
         _ reference: FileReferenceDetection.Reference, state: PaneRemoteState
     ) -> ResolvedReference? {
-        guard case .remote(let host, let directory, _) = state,
+        let host: String
+        let directory: String
+        switch state {
+        case .remote(let reported, let reportedDirectory, _):
             // The host is a remote shell's report; it reaches ssh only if it
-            // could have been typed (`RemoteHostName`).
-            RemoteHostName.isAcceptable(host)
-        else { return nil }
+            // could have been typed (`RemoteHostName`), and as Corta names it.
+            guard let target = SSHTarget.named(reported) else { return nil }
+            host = target.key
+            directory = reportedDirectory
+        case .connected(let key, let reportedDirectory?):
+            host = key
+            directory = reportedDirectory
+        default:
+            return nil
+        }
         let path = reference.path
         guard !path.hasPrefix("~") else { return nil }
         let absolute =

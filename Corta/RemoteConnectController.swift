@@ -118,7 +118,6 @@ final class RemoteConnectController: NSWindowController {
         case .failure(let problem): return problem
         }
         close()
-        SSHTarget.remember(target)
         switch mode {
         case .ssh:
             RecentHostsStore.shared.record(target)
@@ -126,7 +125,7 @@ final class RemoteConnectController: NSWindowController {
                 SSHDestination.preset(for: target), inNewWindow: true)
         case .sftp:
             // Recorded once connected, by the browser.
-            SFTPBrowserController.open(host: target.displayName)
+            SFTPBrowserController.open(target)
         }
         return nil
     }
@@ -222,7 +221,9 @@ struct RemoteConnectForm: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        // Computed once per body: each keystroke narrows the lists.
+        let shown = visibleSuggestions
+        return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
                 Image(systemName: mode.symbol)
                     .font(.system(size: 22))
@@ -257,8 +258,8 @@ struct RemoteConnectForm: View {
             }
             .formStyle(.columns)
             .textFieldStyle(.roundedBorder)
-            if !visibleSuggestions.isEmpty {
-                suggestions
+            if !shown.recents.isEmpty || !shown.aliases.isEmpty {
+                suggestions(shown)
             }
             if let error {
                 // Said in words with a symbol, never by colour alone.
@@ -353,21 +354,23 @@ struct RemoteConnectForm: View {
     /// What has been typed narrows the list, the way an address field's
     /// suggestions do; a picked suggestion shows every one again.
     private var filter: String {
-        if let picked, picked.fields == fields { return "" }
-        return fields.host.trimmingCharacters(in: .whitespaces)
+        pickedIsCurrent ? "" : fields.host.trimmingCharacters(in: .whitespaces)
     }
 
-    private var visibleRecents: [Suggestion] {
-        Self.matching(recents.map(Suggestion.recent), filter)
+    /// The fields still hold the picked suggestion's, unedited.
+    private var pickedIsCurrent: Bool {
+        picked.map { $0.fields == fields } ?? false
     }
 
-    private var visibleAliases: [Suggestion] {
+    /// The suggestions the typed host leaves, recents first; an alias that
+    /// is also a recent is listed once, as the recent.
+    private var visibleSuggestions: (recents: [Suggestion], aliases: [Suggestion]) {
+        let filter = filter
         let recentHosts = Set(recents.map(\.displayName))
-        return Self.matching(
-            aliases.filter { !recentHosts.contains($0) }.map(Suggestion.alias), filter)
+        return (
+            Self.matching(recents.map(Suggestion.recent), filter),
+            Self.matching(aliases.filter { !recentHosts.contains($0) }.map(Suggestion.alias), filter))
     }
-
-    private var visibleSuggestions: [Suggestion] { visibleRecents + visibleAliases }
 
     private func pick(_ suggestion: Suggestion) {
         picked = suggestion
@@ -376,7 +379,8 @@ struct RemoteConnectForm: View {
 
     /// Moves the pick through the visible suggestions, recents first.
     private func stepSuggestion(by delta: Int) -> KeyPress.Result {
-        let suggestions = visibleSuggestions
+        let shown = visibleSuggestions
+        let suggestions = shown.recents + shown.aliases
         guard !suggestions.isEmpty else { return .ignored }
         let current = picked.flatMap { suggestions.firstIndex(of: $0) }
         let next = current.map { min(max($0 + delta, 0), suggestions.count - 1) }
@@ -394,16 +398,16 @@ struct RemoteConnectForm: View {
     /// fills the fields, a double-click connects, the menu forgets a recent
     /// host. Drawn as plain rows — a `List` brought a square frame or its
     /// own insets, and either sat badly in a rounded sheet.
-    private var suggestions: some View {
+    private func suggestions(_ shown: (recents: [Suggestion], aliases: [Suggestion])) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 1) {
-                suggestionSection(L10n.text("ui.connect.recent"), visibleRecents, symbol: "clock")
-                suggestionSection(L10n.text("ui.connect.sshConfig"), visibleAliases, symbol: "doc.text")
+                suggestionSection(L10n.text("ui.connect.recent"), shown.recents, symbol: "clock")
+                suggestionSection(L10n.text("ui.connect.sshConfig"), shown.aliases, symbol: "doc.text")
             }
             .padding(6)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .frame(height: suggestionHeight)
+        .frame(height: Self.suggestionHeight(shown))
         .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator))
     }
@@ -423,7 +427,7 @@ struct RemoteConnectForm: View {
     }
 
     private func suggestionRow(_ suggestion: Suggestion, symbol: String) -> some View {
-        let isPicked = picked == suggestion && suggestion.fields == fields
+        let isPicked = picked == suggestion && pickedIsCurrent
         return Button {
             pick(suggestion)
         } label: {
@@ -471,9 +475,9 @@ struct RemoteConnectForm: View {
     private static let headerHeight: CGFloat = 20
 
     /// Exactly what there is, up to about six rows; then it scrolls.
-    private var suggestionHeight: CGFloat {
-        let rows = visibleSuggestions.count
-        let headers = (visibleRecents.isEmpty ? 0 : 1) + (visibleAliases.isEmpty ? 0 : 1)
+    private static func suggestionHeight(_ shown: (recents: [Suggestion], aliases: [Suggestion])) -> CGFloat {
+        let rows = shown.recents.count + shown.aliases.count
+        let headers = (shown.recents.isEmpty ? 0 : 1) + (shown.aliases.isEmpty ? 0 : 1)
         let content = CGFloat(rows) * (Self.rowHeight + 1) + CGFloat(headers) * (Self.headerHeight + 1) + 12
         return min(190, content)
     }

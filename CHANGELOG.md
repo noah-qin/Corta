@@ -14,8 +14,8 @@ Versioning for compatibility changes.
 
 - The SSH and SFTP connect sheet has user, port and private-key fields
   beside the host, the same for both: SFTP can now reach a non-default port
-  without a `~/.ssh/config` alias, and a chosen key is the only one offered
-  to the server. Recent connections remember the fields they were made with.
+  without a `~/.ssh/config` alias, and a chosen key is offered first, with
+  other `ssh-agent` keys left out. Recent connections remember the fields they were made with.
 
 ### Changed
 

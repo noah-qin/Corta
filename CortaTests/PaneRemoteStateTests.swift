@@ -113,28 +113,31 @@ struct PaneRemoteStateTests {
             ).titleComponent == PaneRemoteState.badge("build-box · app"))
         let unknown = PaneRemoteState.remoteUnknown(provenance: .foregroundProcess).titleComponent
         #expect(unknown == PaneRemoteState.badge(L10n.text("remote.hostUnknown")))
-        #expect(PaneRemoteState.connected(target: "deploy@box:2222").titleComponent
-            == PaneRemoteState.badge("deploy@box:2222"))
+        #expect(PaneRemoteState.connected(target: "deploy@box:2222 -i /k", directory: nil).titleComponent
+            == PaneRemoteState.badge("deploy@box:2222"), "the key's path is not shown")
+        #expect(PaneRemoteState.connected(target: "box", directory: "/srv/app").titleComponent
+            == PaneRemoteState.badge("box · app"))
         let uncertain = PaneRemoteState.unknown.titleComponent
         #expect(uncertain == L10n.text("remote.uncertain"))
     }
 
     /// A pane the connect sheet started knows where it went: the user typed
     /// it. Without that record it would read "host unknown" for a
-    /// destination Corta itself passed to ssh; a report still outranks it,
-    /// since only the far end names the directory.
+    /// destination Corta itself passed to ssh. A report adds its directory
+    /// but does not replace the destination: the far end's name for itself
+    /// may be one ssh cannot reach, and says nothing of user, port or key.
     @Test("a connect-sheet pane names the destination the user typed")
     func connectSheetTarget() {
         #expect(
             PaneRemoteState.resolve(
                 remoteContext: nil, hasForegroundJob: false, foregroundProcessName: nil,
                 childIsRemoteLauncher: true, connectTarget: "ecs-user@203.0.113.9")
-                == .connected(target: "ecs-user@203.0.113.9"))
+                == .connected(target: "ecs-user@203.0.113.9", directory: nil))
         #expect(
             PaneRemoteState.resolve(
                 remoteContext: Self.report(), hasForegroundJob: false, foregroundProcessName: nil,
                 childIsRemoteLauncher: true, connectTarget: "ecs-user@203.0.113.9")
-                == .remote(host: "build-box", directory: "/srv/app", provenance: .osc7))
+                == .connected(target: "ecs-user@203.0.113.9", directory: "/srv/app"))
         // Only the pane's own child: an ssh typed at a later prompt is not
         // the destination the sheet started.
         #expect(
@@ -142,7 +145,7 @@ struct PaneRemoteStateTests {
                 remoteContext: nil, hasForegroundJob: true, foregroundProcessName: "ssh",
                 connectTarget: "ecs-user@203.0.113.9")
                 == .remoteUnknown(provenance: .foregroundProcess))
-        #expect(PaneRemote.canBrowseFiles(state: .connected(target: "ecs-user@203.0.113.9")))
+        #expect(PaneRemote.canBrowseFiles(state: .connected(target: "ecs-user@203.0.113.9", directory: nil)))
     }
 
     /// The case the two process signals cannot see: a pane spawned *as*
