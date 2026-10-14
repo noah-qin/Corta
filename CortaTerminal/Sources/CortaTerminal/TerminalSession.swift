@@ -791,6 +791,11 @@ public final class TerminalSession: @unchecked Sendable {
         return outcome
     }
 
+    /// Returns once every write queued so far has been written or dropped:
+    /// one drain empties the queue. For tests, so "never written" is a fact
+    /// rather than a wait that happened to be long enough.
+    func waitForQueuedWrites() { writerQueue.sync {} }
+
     /// A failed chunk fails the session; later chunks must not silently follow
     /// a partial write (particularly a bracketed paste).
     /// Popped before writing, so a `stop()` mid-write cannot be observed twice.

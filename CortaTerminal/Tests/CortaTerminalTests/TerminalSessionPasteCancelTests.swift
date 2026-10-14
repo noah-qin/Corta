@@ -95,7 +95,7 @@ import Testing
         sink.released.withLock { $0 = true }
 
         #expect(wait { sink.chunks.count == 2 })
-        Thread.sleep(forTimeInterval: 0.05)
+        session.waitForQueuedWrites()
         #expect(sink.chunks == [[0x61], [0x62]])
     }
 

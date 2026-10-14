@@ -73,8 +73,12 @@ struct DescriptorHygieneTests {
             returned.signal()
         }
         reader.start()
-        // Long enough for the reader to be parked inside `read(2)`.
-        Thread.sleep(forTimeInterval: 0.3)
+        // The read has entered the guard; what remains before `read(2)`
+        // parks is a few instructions, and the child writes nothing.
+        let deadline = ContinuousClock.now + .seconds(10)
+        while pty.callsInFlight == 0, ContinuousClock.now < deadline { Thread.sleep(forTimeInterval: 0.001) }
+        #expect(pty.callsInFlight == 1, "the reader never started its read")
+        Thread.sleep(forTimeInterval: 0.01)
 
         // Darwin's `close(2)` would sleep until the read returned — here,
         // until `sleep 30` ended. The caller may be the main thread.

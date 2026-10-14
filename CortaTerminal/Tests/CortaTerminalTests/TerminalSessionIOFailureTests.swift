@@ -88,8 +88,8 @@ struct TerminalSessionIOFailureTests {
         #expect(session.write(chunks: [[1], [2], [3]]) == .accepted)
         #expect(wait { session.write([4]) == .stopped })
         #expect(attempts.withLock { $0 } == 1, "queued input after the hangup is dropped")
+        session.waitForQueuedWrites()
         #expect(session.ioFailure == nil)
-        Thread.sleep(forTimeInterval: 0.1)
         #expect(failures.withLock { $0 } == 0)
     }
 
@@ -113,11 +113,15 @@ struct TerminalSessionIOFailureTests {
     @Test func ownerShutdownDoesNotReportAnIOFailure() throws {
         let session = try TerminalSession(executable: "/bin/cat")
         let failures = Mutex(0)
+        let exited = Mutex(false)
         session.onIOFailure = { _ in failures.withLock { $0 += 1 } }
+        session.onChildExit = { _ in exited.withLock { $0 = true } }
         session.start()
         session.stop()
         #expect(session.write([65]) == .stopped)
-        Thread.sleep(forTimeInterval: 0.3)
+        // Reporting the exit is the reader's last act; a failure it reported
+        // on the way would have come first, and instead of the exit.
+        #expect(wait { exited.withLock { $0 } })
         #expect(failures.withLock { $0 } == 0)
     }
 }

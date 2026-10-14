@@ -56,6 +56,10 @@ package final class GuardedDescriptor: Sendable {
 
     package var isClosed: Bool { state.withLock { $0.isClosed } }
 
+    /// Calls between `enter()` and `leave()`: how a test knows a read is
+    /// under way before it closes.
+    package var callsInFlight: Int { state.withLock { $0.inFlight } }
+
     /// `false` once closed; on `true`, `leave()` must follow.
     package func enter() -> Bool {
         state.withLock { state in

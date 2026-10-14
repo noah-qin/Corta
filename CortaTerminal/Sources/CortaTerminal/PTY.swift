@@ -27,6 +27,9 @@ public final class PTY: @unchecked Sendable {
     /// stop once the session has.
     public var fileDescriptor: Int32 { descriptor.number }
 
+    /// System calls on the primary still running (`GuardedDescriptor`).
+    var callsInFlight: Int { descriptor.callsInFlight }
+
     /// Every system call on the primary goes through this, so a `close()` on
     /// another thread can never hand an in-flight call a recycled number.
     private let descriptor: GuardedDescriptor
