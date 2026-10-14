@@ -505,39 +505,14 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         // still holds the old one open writes into a file nothing commits,
         // never into this transfer's.
         if offset == 0, partialInfo != nil { Darwin.unlink(partialPath) }
-        let descriptor = Darwin.open(
-            partialPath, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW
-                | (offset == 0 ? O_EXCL : 0), 0o600)
-        guard descriptor >= 0 else {
-            let code = errno
+        let descriptor: Int32
+        do throws(SFTPError) {
+            let opened = try Self.openPrivatePartial(partialPath, fresh: offset == 0)
+            descriptor = opened.descriptor
+            ownedPartial.withLock { $0 = opened.identity }
+        } catch {
             await cleanUpRemote { try? await session.close(handle) }
-            if code == EEXIST { throw .destinationConflict(path: partialPath) }
-            throw SFTPError.localIOFailed(operation: "open", code: code)
-        }
-
-        // Resumed partials from older builds also become private before use.
-        // A volume without ACLs (exFAT, FAT, some SMB shares) answers
-        // ENOTSUP: it has no inherited ACL to clear, and refusing it would
-        // make every download to a USB stick fail.
-        let emptyACL = acl_init(0)
-        var aclResult = emptyACL.map { acl_set_fd_np(descriptor, $0, ACL_TYPE_EXTENDED) } ?? -1
-        if aclResult != 0, errno == ENOTSUP || errno == EOPNOTSUPP { aclResult = 0 }
-        if let emptyACL { acl_free(UnsafeMutableRawPointer(emptyACL)) }
-        guard aclResult == 0, Darwin.fchmod(descriptor, 0o600) == 0 else {
-            let code = errno
-            Darwin.close(descriptor)
-            await cleanUpRemote { try? await session.close(handle) }
-            throw SFTPError.localIOFailed(operation: "private download permissions", code: code)
-        }
-        var openedStat = Darwin.stat()
-        guard Darwin.fstat(descriptor, &openedStat) == 0 else {
-            let code = errno
-            Darwin.close(descriptor)
-            await cleanUpRemote { try? await session.close(handle) }
-            throw .localIOFailed(operation: "fstat partial", code: code)
-        }
-        ownedPartial.withLock {
-            $0 = LocalPartialIdentity(device: openedStat.st_dev, inode: openedStat.st_ino)
+            throw error
         }
 
         let abort = AbortFlag()
@@ -565,21 +540,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
             {
                 throw SFTPError.sourceChanged(path: remotePath)
             }
-            // On the partial, so the file appears at its name already marked:
-            // marked after the rename, it sat there unmarked for a moment.
-            if configuration.quarantinesDownloads { Self.markQuarantined(partialPath) }
-            // Commit: rename over the destination atomically — or, when the
-            // policy forbids replacing it, only if it is still absent: a file
-            // that appeared since the check is not ours to overwrite.
-            let renamed =
-                resolution == .fail
-                ? renamex_np(partialPath, destinationPath, UInt32(RENAME_EXCL))
-                : Darwin.rename(partialPath, destinationPath)
-            guard renamed == 0 else {
-                let code = errno
-                if code == EEXIST { throw SFTPError.destinationConflict(path: destinationPath) }
-                throw SFTPError.localIOFailed(operation: "rename", code: code)
-            }
+            try commitDownload(partialPath, to: destinationPath, mayReplace: resolution != .fail)
             return SFTPTransferReceipt(
                 bytesTransferred: receipt, resumedFromOffset: offset, attempts: 0)
         } catch {
@@ -592,6 +553,61 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 keepForResume: resolution == .resume)
             if let sftpError = error as? SFTPError, !abort.isSet { throw sftpError }
             throw .cancelled
+        }
+    }
+
+    /// A download's partial, opened for writing and made private: created
+    /// exclusively when `fresh`, so a stale holder of the old name writes
+    /// into a file nothing commits. Its identity is how a retry recognises it.
+    private static func openPrivatePartial(
+        _ path: String, fresh: Bool
+    ) throws(SFTPError) -> (descriptor: Int32, identity: LocalPartialIdentity) {
+        let descriptor = Darwin.open(
+            path, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW | (fresh ? O_EXCL : 0), 0o600)
+        guard descriptor >= 0 else {
+            let code = errno
+            if code == EEXIST { throw .destinationConflict(path: path) }
+            throw .localIOFailed(operation: "open", code: code)
+        }
+        // Resumed partials from older builds also become private before use.
+        // A volume without ACLs (exFAT, FAT, some SMB shares) answers
+        // ENOTSUP: it has no inherited ACL to clear, and refusing it would
+        // make every download to a USB stick fail.
+        let emptyACL = acl_init(0)
+        var aclResult = emptyACL.map { acl_set_fd_np(descriptor, $0, ACL_TYPE_EXTENDED) } ?? -1
+        if aclResult != 0, errno == ENOTSUP || errno == EOPNOTSUPP { aclResult = 0 }
+        if let emptyACL { acl_free(UnsafeMutableRawPointer(emptyACL)) }
+        guard aclResult == 0, Darwin.fchmod(descriptor, 0o600) == 0 else {
+            let code = errno
+            Darwin.close(descriptor)
+            throw .localIOFailed(operation: "private download permissions", code: code)
+        }
+        var openedStat = Darwin.stat()
+        guard Darwin.fstat(descriptor, &openedStat) == 0 else {
+            let code = errno
+            Darwin.close(descriptor)
+            throw .localIOFailed(operation: "fstat partial", code: code)
+        }
+        return (descriptor, LocalPartialIdentity(device: openedStat.st_dev, inode: openedStat.st_ino))
+    }
+
+    /// Renames a finished partial over the destination atomically — or, when
+    /// the policy forbids replacing it, only if it is still absent: a file
+    /// that appeared since the check is not ours to overwrite.
+    private func commitDownload(
+        _ partialPath: String, to destinationPath: String, mayReplace: Bool
+    ) throws(SFTPError) {
+        // On the partial, so the file appears at its name already marked:
+        // marked after the rename, it sat there unmarked for a moment.
+        if configuration.quarantinesDownloads { Self.markQuarantined(partialPath) }
+        let renamed =
+            mayReplace
+            ? Darwin.rename(partialPath, destinationPath)
+            : renamex_np(partialPath, destinationPath, UInt32(RENAME_EXCL))
+        guard renamed == 0 else {
+            let code = errno
+            if code == EEXIST { throw .destinationConflict(path: destinationPath) }
+            throw .localIOFailed(operation: "rename", code: code)
         }
     }
 
@@ -760,46 +776,12 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 sourceModificationTime: sourceMTime),
             destinationPath: remotePath)
 
-        var offset: UInt64 = 0
-        if resolution == .resume, let partial = partialAttributes, let partialSize = partial.size,
-            sourceSize >= partialSize
-        {
-            // The remote partial recorded the local source's mtime in its
-            // own when the interrupted upload was cleaned up (see below), or
-            // this process remembers writing it from this very source.
-            let recorded = Self.uploadResumeRecords.withLock { $0[recordKey] }
-            if let recorded, recorded.source == source {
-                offset = min(partialSize, recorded.confirmedOffset)
-            } else if partial.modificationTime == sourceMTime {
-                offset = partialSize
-            }
-        }
-
-        var flags: SFTPOpenFlags = [.write]
-        if offset == 0 {
-            // From zero, the partial is this transfer's own file: the old
-            // name goes, and the new one is created exclusively. A handle
-            // another process still holds then writes into a file nobody
-            // commits — never into this one after it is renamed into place.
-            if partialAttributes != nil { try await session.remove(path: partialPath) }
-            flags.formUnion([.create, .exclude])
-        }
-        var openedHandle: SFTPHandle?
-        var openFailure: SFTPError?
-        do throws(SFTPError) {
-            openedHandle = try await session.open(path: partialPath, flags: flags)
-        } catch {
-            openFailure = error
-        }
-        guard let handle = openedHandle else {
-            let failure = openFailure ?? .cancelled
-            // OpenSSH answers an exclusive create of an existing name with
-            // a plain FAILURE: someone else made the partial since the check.
-            if offset == 0, failure.isPlainServerFailure {
-                throw .destinationConflict(path: partialPath)
-            }
-            throw failure
-        }
+        let offset =
+            resolution == .resume
+            ? Self.uploadResumeOffset(partial: partialAttributes, source: source, recordKey: recordKey)
+            : 0
+        let handle = try await openUploadPartial(
+            partialPath, fresh: offset == 0, replacing: partialAttributes != nil, session: session)
         Self.uploadResumeRecords.withLock {
             $0[recordKey] = UploadResumeRecord(source: source, confirmedOffset: offset)
         }
@@ -842,39 +824,87 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 Self.uploadResumeRecords.withLock { $0[recordKey] = nil }
                 throw failure
             }
-            let handleClosed = Mutex(!handleOpen)
-            if handleOpen {
-                await cleanUpRemote {
-                    do {
-                        try await session.close(handle)
-                        handleClosed.withLock { $0 = true }
-                    } catch {}
-                }
-            }
-            if Self.keepsPartial(partialDisposition, keepForResume: resolution == .resume) {
-                // Concurrent WRITE tasks can reach the server out of offset
-                // order. File size may include holes beyond the acknowledged
-                // contiguous prefix. CLOSE is a barrier against late writes;
-                // only then truncate and stamp a safe resume point.
-                if handleClosed.withLock({ $0 }) {
-                    let prefix = confirmedOffset.withLock { $0 }
-                    await cleanUpRemote {
-                        do {
-                            try await session.setStat(
-                                path: partialPath,
-                                attributes: SFTPAttributes(size: prefix, modificationTime: sourceMTime))
-                            Self.uploadResumeRecords.withLock {
-                                $0[recordKey] = UploadResumeRecord(source: source, confirmedOffset: prefix)
-                            }
-                        } catch {}
-                    }
-                }
-            } else {
-                Self.uploadResumeRecords.withLock { $0[recordKey] = nil }
-                await cleanUpRemote { try? await session.remove(path: partialPath) }
-            }
+            await cleanUpFailedUpload(
+                handle: handleOpen ? handle : nil, partialPath: partialPath,
+                keep: Self.keepsPartial(partialDisposition, keepForResume: resolution == .resume),
+                confirmedOffset: { confirmedOffset.withLock { $0 } }, source: source,
+                recordKey: recordKey, session: session)
             if let failure, !abort.isSet { throw failure }
             throw .cancelled
+        }
+    }
+
+    /// Where an upload the user chose to resume picks up: the remote partial
+    /// recorded the local source's mtime in its own when the interrupted
+    /// upload was cleaned up (`cleanUpFailedUpload`), or this process
+    /// remembers writing it from this very source. Anything else restarts.
+    private static func uploadResumeOffset(
+        partial: SFTPAttributes?, source: LocalSourceIdentity, recordKey: String
+    ) -> UInt64 {
+        guard let partial, let partialSize = partial.size, source.size >= partialSize else { return 0 }
+        let recorded = uploadResumeRecords.withLock { $0[recordKey] }
+        if let recorded, recorded.source == source { return min(partialSize, recorded.confirmedOffset) }
+        return partial.modificationTime == source.sftpModificationTime ? partialSize : 0
+    }
+
+    /// Opens the remote partial for writing. From zero, the partial is this
+    /// transfer's own file: the old name goes, and the new one is created
+    /// exclusively. A handle another process still holds then writes into a
+    /// file nobody commits — never into this one after it is renamed into place.
+    private func openUploadPartial(
+        _ partialPath: String, fresh: Bool, replacing: Bool, session: SFTPSession
+    ) async throws(SFTPError) -> SFTPHandle {
+        var flags: SFTPOpenFlags = [.write]
+        if fresh {
+            if replacing { try await session.remove(path: partialPath) }
+            flags.formUnion([.create, .exclude])
+        }
+        do throws(SFTPError) {
+            return try await session.open(path: partialPath, flags: flags)
+        } catch {
+            // OpenSSH answers an exclusive create of an existing name with
+            // a plain FAILURE: someone else made the partial since the check.
+            if fresh, error.isPlainServerFailure { throw .destinationConflict(path: partialPath) }
+            throw error
+        }
+    }
+
+    /// After a failed upload: close `handle` if still open, then either keep
+    /// the partial at a safe resume point or remove it.
+    private func cleanUpFailedUpload(
+        handle: SFTPHandle?, partialPath: String, keep: Bool, confirmedOffset: () -> UInt64,
+        source: LocalSourceIdentity, recordKey: String, session: SFTPSession
+    ) async {
+        let handleClosed = Mutex(handle == nil)
+        if let handle {
+            await cleanUpRemote {
+                do {
+                    try await session.close(handle)
+                    handleClosed.withLock { $0 = true }
+                } catch {}
+            }
+        }
+        guard keep else {
+            Self.uploadResumeRecords.withLock { $0[recordKey] = nil }
+            await cleanUpRemote { try? await session.remove(path: partialPath) }
+            return
+        }
+        // Concurrent WRITE tasks can reach the server out of offset order.
+        // File size may include holes beyond the acknowledged contiguous
+        // prefix. CLOSE is a barrier against late writes; only then truncate
+        // and stamp a safe resume point.
+        guard handleClosed.withLock({ $0 }) else { return }
+        let prefix = confirmedOffset()
+        let modificationTime = source.sftpModificationTime
+        await cleanUpRemote {
+            do {
+                try await session.setStat(
+                    path: partialPath,
+                    attributes: SFTPAttributes(size: prefix, modificationTime: modificationTime))
+                Self.uploadResumeRecords.withLock {
+                    $0[recordKey] = UploadResumeRecord(source: source, confirmedOffset: prefix)
+                }
+            } catch {}
         }
     }
 
