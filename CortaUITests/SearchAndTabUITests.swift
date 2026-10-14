@@ -123,7 +123,6 @@ final class SearchAndTabUITests: XCTestCase {
         // XCTest teardown also runs when a fail-fast assertion aborts the
         // test before Swift's normal scope cleanup.
         addTeardownBlock { LatinInputSource.restore(previousInput) }
-        defer { LatinInputSource.restore(previousInput) }
         guard let externalStage = ProcessInfo.processInfo.environment["CORTA_FEEDBACK_STAGE"] else {
             throw XCTSkip("Set TEST_RUNNER_CORTA_FEEDBACK_STAGE using stage-feedback-ui.sh; the app cannot use another app's sandbox container.")
         }

@@ -22,7 +22,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
     @MainActor func testToolbarLongInputExecutionAndSettings() throws {
         continueAfterFailure = false
         let previous = LatinInputSource.select()
-        defer { LatinInputSource.restore(previous) }
+        addTeardownBlock { LatinInputSource.restore(previous) }
         let stage = try UIFixtures.stage("input-source-toolbar")
         let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
         app.launch()
@@ -127,7 +127,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
     @MainActor func testPinyinCandidatesFollowWindowMovement() throws {
         continueAfterFailure = false
         let previous = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
-        defer { TISSelectInputSource(previous) }
+        addTeardownBlock { TISSelectInputSource(previous) }
         guard let sources = TISCreateInputSourceList(nil, false)?.takeRetainedValue() as? [TISInputSource],
             let pinyin = sources.first(where: { source in
                 guard let raw = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return false }
@@ -178,7 +178,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
 
     @MainActor func testInstalledCJKInputSourcesUpdateWithoutTyping() throws {
         let previous = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
-        defer { TISSelectInputSource(previous) }
+        addTeardownBlock { TISSelectInputSource(previous) }
         guard let sources = TISCreateInputSourceList(nil, false)?.takeRetainedValue() as? [TISInputSource] else {
             throw XCTSkip("No input source inventory")
         }
@@ -209,7 +209,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
 
     @MainActor func testOptionalPromptPositionAvoidsLongCommands() throws {
         let previous = LatinInputSource.select()
-        defer { LatinInputSource.restore(previous) }
+        addTeardownBlock { LatinInputSource.restore(previous) }
         let stage = try UIFixtures.stage("input-source-prompt")
         let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
         app.launch(); app.activate()

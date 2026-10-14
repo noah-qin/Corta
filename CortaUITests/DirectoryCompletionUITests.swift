@@ -20,7 +20,7 @@ final class DirectoryCompletionUITests: XCTestCase {
     @MainActor func testFoldersFilterAndTabOnlyFills() throws {
         continueAfterFailure = false
         let previousInputSource = LatinInputSource.select()
-        defer { LatinInputSource.restore(previousInputSource) }
+        addTeardownBlock { LatinInputSource.restore(previousInputSource) }
         // Prepared by stage-ui-fixtures.sh: the runner cannot write folders
         // the app's shell can see.
         let stage = try UIFixtures.stage("directory-completion")

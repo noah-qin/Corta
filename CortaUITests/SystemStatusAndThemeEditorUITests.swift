@@ -67,7 +67,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
     @MainActor func testGraphicalThemeEditorSavesColorsAndCancelPreservesConfig() throws {
         continueAfterFailure = false
         let previous = LatinInputSource.select()
-        defer { LatinInputSource.restore(previous) }
+        addTeardownBlock { LatinInputSource.restore(previous) }
         let stage = try UIFixtures.stage("system-theme-editor")
         let app = makeApp(stage)
         app.launch()

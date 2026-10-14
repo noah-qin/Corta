@@ -242,7 +242,7 @@ final class MeasurementUITests: XCTestCase {
 
     @MainActor func testKitty4096PNGToGlass() throws {
         let previous = LatinInputSource.select()
-        defer { LatinInputSource.restore(previous) }
+        addTeardownBlock { LatinInputSource.restore(previous) }
         let shell = measurementStage.appendingPathComponent("kitty-shell").path
         guard FileManager.default.fileExists(atPath: "/tmp/corta-4096.png"),
             FileManager.default.isExecutableFile(atPath: shell),

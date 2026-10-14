@@ -22,7 +22,6 @@ final class TerminalRecoveryUITests: XCTestCase {
         continueAfterFailure = false
         let original = LatinInputSource.select()
         addTeardownBlock { LatinInputSource.restore(original) }
-        defer { LatinInputSource.restore(original) }
         let stage = try UIFixtures.stage("terminal-recovery").path
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)"]
@@ -72,7 +71,6 @@ final class TerminalRecoveryUITests: XCTestCase {
         continueAfterFailure = false
         let originalSource = LatinInputSource.select()
         addTeardownBlock { LatinInputSource.restore(originalSource) }
-        defer { LatinInputSource.restore(originalSource) }
         let stage = try UIFixtures.stage("terminal-recovery").path
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)"]

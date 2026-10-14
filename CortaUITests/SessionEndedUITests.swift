@@ -21,7 +21,7 @@ final class SessionEndedUITests: XCTestCase {
     @MainActor func testCompactExitCardFitsAndCanStartANewSession() throws {
         continueAfterFailure = false
         let previous = LatinInputSource.select()
-        defer { LatinInputSource.restore(previous) }
+        addTeardownBlock { LatinInputSource.restore(previous) }
         for fixture in ["session-ended", "session-ended-narrow"] {
             let app = UIFixtures.app(stage: try UIFixtures.stage(fixture), runner: Self.self, usingTestTarget: true)
             app.launch()
