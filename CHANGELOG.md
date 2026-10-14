@@ -16,7 +16,7 @@ Versioning for compatibility changes.
   built-in or defined in the config file — instead of the system label
   colour, which drew the alternatives almost black on a dark theme while
   macOS itself was in Light mode. A theme change recolours a hint already
-  showing.
+  showing, and Increase Contrast strengthens it.
 
 ## [1.2.1] - 2026-10-14
 

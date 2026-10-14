@@ -69,6 +69,10 @@ import Testing
         TerminalColorPalette.apply(theme.variant(dark: true))
 
         let overlay = ShellOverlayView(frame: CGRect(x: 0, y: 0, width: 600, height: 200))
+        // In a window, so `needsDisplay` is tracked.
+        let window = NSWindow(contentRect: overlay.frame, styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.contentView?.addSubview(overlay)
         // The appearance AppKit resolved when the bug showed.
         overlay.appearance = NSAppearance(named: .aqua)
         let completion = try #require(DirectoryCompletion(payload: "1;0;p=;Applications/;Desktop/"))
@@ -96,11 +100,17 @@ import Testing
         // #f0e0c0, not the black the light system colour gives.
         #expect(ink.redComponent > 0.85 && ink.greenComponent > 0.75 && ink.blueComponent > 0.6)
 
-        // A theme switch while the row shows recolours it.
+        // A theme switch while the row shows recolours it: the next frame's
+        // refresh must mark it dirty, not leave the old colours on screen.
+        let row = try #require(overlay.subviews.first {
+            $0.accessibilityIdentifier() == "directory-completion-candidates" })
+        overlay.showCompletion(completion, anchor: anchor)
+        row.needsDisplay = false
         var red = theme.variant(dark: true)
         red.foreground = SIMD4<Float>(1, 0, 0, 1)
         TerminalColorPalette.apply(red)
         overlay.showCompletion(completion, anchor: anchor)
+        #expect(row.needsDisplay)
         let recoloured = try strongestInk()
         #expect(recoloured.redComponent > 0.85 && recoloured.greenComponent < 0.3)
     }

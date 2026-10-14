@@ -33,16 +33,18 @@ final class ShellOverlayView: NSView {
     var isInputComposing = false {
         didSet { if isInputComposing { hideCompletion() } }
     }
-    private struct CompletionPresentation: Equatable {
+    fileprivate struct CompletionPresentation: Equatable {
         var state: DirectoryCompletion?
         var anchor: CGRect
         var bounds: CGRect
         var font: NSFont
         var baseline: CGFloat
         var composing: Bool
-        /// A theme or appearance change must redraw a hint already showing.
+        /// A theme, appearance or contrast change must redraw a hint
+        /// already showing.
         var foreground: SIMD4<Float>
         var background: SIMD4<Float>
+        var increaseContrast: Bool
     }
     private var lastCompletionPresentation: CompletionPresentation?
     private var preview: DirectoryGhostView?
@@ -66,11 +68,13 @@ final class ShellOverlayView: NSView {
 
     func showCompletion(_ state: DirectoryCompletion?, anchor: CGRect,
         font: NSFont = .monospacedSystemFont(ofSize: 14, weight: .regular), baseline: CGFloat = 12) {
+        // Once per frame, not a lock per colour.
+        let variant = TerminalColorPalette.activeVariant
         let presentation = CompletionPresentation(
             state: state, anchor: anchor, bounds: bounds,
             font: font, baseline: baseline, composing: isInputComposing,
-            foreground: TerminalColorPalette.defaultForeground,
-            background: TerminalColorPalette.defaultBackground)
+            foreground: variant.foreground, background: variant.background,
+            increaseContrast: SystemAccessibility.increaseContrast)
         guard lastCompletionPresentation != presentation else { return }
         lastCompletionPresentation = presentation
         guard !isInputComposing, let state, let suffix = state.previewSuffix, !suffix.isEmpty else {
@@ -82,10 +86,12 @@ final class ShellOverlayView: NSView {
             return
         }
         completion = state
+        let colors = HintColors(presentation)
         if !state.typedPrefix.isEmpty {
             let ghost = preview ?? DirectoryGhostView()
             ghost.text = suffix
             ghost.font = font
+            ghost.color = colors.muted
             ghost.baseline = baseline
             ghost.frame = CGRect(x: anchor.minX, y: anchor.minY,
                 width: max(0, bounds.width - TerminalLayout.insets.right - anchor.minX), height: anchor.height)
@@ -112,8 +118,8 @@ final class ShellOverlayView: NSView {
         row.frame = CGRect(x: x, y: fitsBelow ? below : max(0, anchor.minY - anchor.height - 3),
             width: max(0, bounds.width - TerminalLayout.insets.right - x), height: anchor.height)
         row.baseline = baseline
-        row.coversOutput = !fitsBelow
-        row.update(state: state, font: font)
+        row.backdrop = fitsBelow ? nil : colors.backdrop
+        row.update(state: state, font: font, colors: colors)
         row.toolTip = L10n.text("completion.hint")
         if candidateRow == nil { addSubview(row)
             candidateRow = row }
@@ -124,11 +130,23 @@ final class ShellOverlayView: NSView {
 
     /// The renderer's text colour, faded: the theme's, built-in or from the
     /// config file, never the system label colour, which follows macOS
-    /// appearance and was black on a forced-dark canvas (#346).
-    static func hintColor(alpha: CGFloat) -> CGColor {
-        let color = TerminalColorPalette.defaultForeground
-        return CGColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y),
-            blue: CGFloat(color.z), alpha: alpha)
+    /// appearance and was black on a forced-dark canvas (#346). Increase
+    /// Contrast strengthens both, as it promotes secondary labels elsewhere.
+    fileprivate struct HintColors {
+        var muted: CGColor
+        var selected: CGColor
+        var backdrop: CGColor
+
+        init(_ presentation: CompletionPresentation) {
+            func srgb(_ color: SIMD4<Float>, alpha: CGFloat) -> CGColor {
+                CGColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y),
+                    blue: CGFloat(color.z), alpha: alpha)
+            }
+            let contrast = presentation.increaseContrast
+            muted = srgb(presentation.foreground, alpha: contrast ? 0.7 : 0.35)
+            selected = srgb(presentation.foreground, alpha: contrast ? 1 : 0.65)
+            backdrop = srgb(presentation.background, alpha: 1)
+        }
     }
 }
 
@@ -138,6 +156,7 @@ private final class DirectoryGhostView: NSView {
     var text = ""
     var font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
     var baseline: CGFloat = 12
+    var color = CGColor(gray: 0.5, alpha: 0.35)
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func isAccessibilityElement() -> Bool { true }
@@ -149,7 +168,7 @@ private final class DirectoryGhostView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: text,
-            attributes: [.font: font, .foregroundColor: ShellOverlayView.hintColor(alpha: 0.35)]))
+            attributes: [.font: font, .foregroundColor: color]))
         context.saveGState()
         context.clip(to: bounds)
         context.translateBy(x: 0, y: baseline)
@@ -164,12 +183,12 @@ private final class DirectoryGhostView: NSView {
 /// A quiet, single-line set of alternatives. Selection is conveyed by stronger
 /// text and an underline, with no panel chrome or focusable controls.
 private final class DirectoryCandidateRowView: NSView {
-    /// Text and whether it is the selection; coloured when drawn.
-    private var pieces: [(text: String, selected: Bool)] = []
-    private var font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+    private var content = NSAttributedString(string: "")
+    private var token = NSAttributedString(string: "…")
     private var visibleText = ""
     var baseline: CGFloat = 12
-    var coversOutput = false
+    /// The canvas colour, when the row sits over output above the prompt.
+    var backdrop: CGColor?
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func isAccessibilityElement() -> Bool { true }
@@ -178,7 +197,7 @@ private final class DirectoryCandidateRowView: NSView {
     override func accessibilityValue() -> Any? { visibleText }
     override func accessibilityIdentifier() -> String { "directory-completion-candidates" }
 
-    func update(state: DirectoryCompletion, font: NSFont) {
+    fileprivate func update(state: DirectoryCompletion, font: NSFont, colors: ShellOverlayView.HintColors) {
         let gap = "  "
         func width(_ text: String) -> CGFloat {
             (text as NSString).size(withAttributes: [.font: font]).width
@@ -200,41 +219,33 @@ private final class DirectoryCandidateRowView: NSView {
             used += extra
             end += 1
         }
-        var pieces: [(text: String, selected: Bool)] = start > 0 ? [("…  ", false)] : []
+        let muted: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.muted]
+        let result = NSMutableAttributedString(string: start > 0 ? "…  " : "", attributes: muted)
         for index in start..<end {
-            if index > start { pieces.append((gap, false)) }
-            pieces.append((state.candidates[index], index == state.selectedIndex))
+            if index > start { result.append(NSAttributedString(string: gap, attributes: muted)) }
+            var attributes = muted
+            if index == state.selectedIndex {
+                attributes[.foregroundColor] = colors.selected
+                attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+            }
+            result.append(NSAttributedString(string: state.candidates[index], attributes: attributes))
         }
-        if end < state.candidates.count { pieces.append(("  …", false)) }
-        self.pieces = pieces
-        self.font = font
-        visibleText = pieces.map(\.text).joined()
+        if end < state.candidates.count { result.append(NSAttributedString(string: "  …", attributes: muted)) }
+        content = result
+        // Truncation is not part of the selection, even beside it.
+        token = NSAttributedString(string: "…", attributes: muted)
+        visibleText = result.string
     }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
-        if coversOutput {
-            let background = TerminalColorPalette.clearColor
-            NSColor(srgbRed: CGFloat(background.x), green: CGFloat(background.y),
-                blue: CGFloat(background.z), alpha: 1).setFill()
-            bounds.fill()
-        }
-        let muted: [NSAttributedString.Key: Any] = [
-            .font: font, .foregroundColor: ShellOverlayView.hintColor(alpha: 0.35),
-        ]
-        let content = NSMutableAttributedString()
-        for piece in pieces {
-            var attributes = muted
-            if piece.selected {
-                attributes[.foregroundColor] = ShellOverlayView.hintColor(alpha: 0.65)
-                attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
-            }
-            content.append(NSAttributedString(string: piece.text, attributes: attributes))
+        if let backdrop {
+            context.setFillColor(backdrop)
+            context.fill(bounds)
         }
         let full = CTLineCreateWithAttributedString(content)
-        let token = CTLineCreateWithAttributedString(NSAttributedString(string: "…",
-            attributes: content.length > 0 ? content.attributes(at: 0, effectiveRange: nil) : [:]))
-        let line = CTLineCreateTruncatedLine(full, Double(bounds.width), .end, token) ?? full
+        let ellipsis = CTLineCreateWithAttributedString(token)
+        let line = CTLineCreateTruncatedLine(full, Double(bounds.width), .end, ellipsis) ?? full
         context.saveGState()
         context.clip(to: bounds)
         context.translateBy(x: 0, y: baseline)
