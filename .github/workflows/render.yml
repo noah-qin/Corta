@@ -52,13 +52,6 @@ on:
 permissions:
   contents: read
 
-env:
-  # Kept aligned with ci.yml and nightly.yml. A self-hosted machine has its
-  # own Xcode wherever its owner installed it, so this is checked by version
-  # rather than by path — the point is that the one run that can exercise
-  # Metal 4 is not quietly produced by a beta compiler CI never uses.
-  XCODE_PIN: "26.6.0"
-
 jobs:
   render:
     name: Render tests on Metal 4 hardware
@@ -71,20 +64,22 @@ jobs:
       # Xcode its owner installed, and this job is the only place the Metal 4
       # tests can run — so a pass produced by a toolchain CI never uses is
       # still worth having, as long as the log says which one produced it.
-      # A mismatch is a warning rather than a failure because bumping
-      # XCODE_PIN changes what every other workflow compiles with, which is
-      # a deliberate decision (ci.yml), not something this job should force.
+      # A self-hosted machine has its own Xcode wherever its owner
+      # installed it, so this checks the version rather than a path. A
+      # mismatch is a warning rather than a failure because changing
+      # `.xcode-version` changes what every other workflow compiles with,
+      # which is a deliberate decision, not something this job should force.
       - name: Record the toolchain
         run: |
           set -euo pipefail
           xcodebuild -version
           selected=$(xcodebuild -version | head -1 | awk '{print $2}')
-          pinned=${XCODE_PIN%.0}
-          if [ "$selected" != "$pinned" ] && [ "$selected" != "$XCODE_PIN" ]; then
-            echo "::warning::Xcode $selected, not the pinned $XCODE_PIN. These"\
-                 "results were produced by a toolchain CI does not use. Bump"\
-                 "XCODE_PIN in all five workflows together, or"\
-                 "xcode-select the pinned release before trusting a comparison."
+          pin=$(tr -d '[:space:]' < .xcode-version)
+          if [ "$selected" != "${pin%.0}" ] && [ "$selected" != "$pin" ]; then
+            echo "::warning::Xcode $selected, not the pinned $pin. These"\
+                 "results were produced by a toolchain CI does not use. Change"\
+                 ".xcode-version, or xcode-select the pinned release before"\
+                 "trusting a comparison."
           fi
 
       # The whole point of this job is the device it runs on, so state it

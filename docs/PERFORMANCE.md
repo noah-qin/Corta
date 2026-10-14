@@ -320,8 +320,8 @@ The host runs macOS 27.0 (26A428). Results and diagnostics are recorded in
 the [dated verification record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-19-issues-88-90.md).
 
 **The pin and the measurement are deliberately two different toolchains.**
-`XCODE_PIN` — 26.6.0 in `ci.yml`, `nightly.yml`, `release.yml`,
-`render.yml` and `codeql.yml`, which move together — is what compiles the binary users run.
+`.xcode-version` — 26.6.0, which every workflow selects — is what compiles
+the binary users run.
 The numbers in this document come from the machine above and whatever
 toolchain it has, currently Xcode 27.0. There is no standard GitHub-hosted
 runner with Xcode 27 (`macos-27` is not a label; the `xcode-27` image is a

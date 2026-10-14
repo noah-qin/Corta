@@ -218,9 +218,10 @@ can never be deleted from. `CONTRIBUTING.md` rule 6.
 
 ## Build and Test
 
-Only stable, released Xcode toolchains are supported. `XCODE_PIN` is set
-in five workflows — `ci.yml`, `nightly.yml`, `release.yml`, `render.yml`
-and `codeql.yml` — and they move together or not at all.
+Only stable, released Xcode toolchains are supported. `.xcode-version`
+names the one every workflow uses, through
+`.github/actions/select-xcode`; changing that file changes the toolchain
+the shipped binary is built with.
 
 **The pin governs the artifact; it does not govern the numbers.** The pin
 is what compiles the binary users run. Every measurement in

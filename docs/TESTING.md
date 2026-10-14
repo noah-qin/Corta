@@ -4,9 +4,9 @@
 
 Run commands from the repository root. Use macOS 26.0 or later and an Xcode
 toolchain with Swift 6.2 or later. Only released Xcode toolchains are supported.
-[CI](../.github/workflows/ci.yml), [nightly](../.github/workflows/nightly.yml),
-release, render and CodeQL pin the same stable release; update all five
-`XCODE_PIN` values together. A failed build is not a failed test run.
+Every workflow builds with the stable release `.xcode-version` names,
+selected by `.github/actions/select-xcode`. A failed build is not a failed
+test run.
 
 ## Choose a check
 

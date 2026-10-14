@@ -51,9 +51,8 @@ def main():
             run = json.loads(subprocess.check_output(
                 ["gh", "run", "view", run_id, "--json", "headSha,conclusion,jobs"], text=True))
             subprocess.run(["git", "fetch", "origin", head], check=True)
-            pin = re.search(r'^  XCODE_PIN: "([^"\n]+)"', Path(".github/workflows/ci.yml").read_text(), re.MULTILINE)
             reuse = can_reuse(run, head, git("rev-parse", head + "^{tree}"), git("rev-parse", "HEAD^{tree}"),
-                              pin[1] if pin else "", os.environ["XCODE_PIN"], False,
+                              git("show", head + ":.xcode-version"), Path(".xcode-version").read_text().strip(), False,
                               not git("status", "--porcelain", "--untracked-files=no"))
         except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
             print(f"Preparation evidence unavailable; running tests: {error}")

@@ -210,6 +210,8 @@ class CodeQLBaselineTests(DiffTests):
             ".github/workflows/codeql.yml": set(ci.LANGUAGES),
             "scripts/codeql-extract.py": set(ci.LANGUAGES),
             "Corta.xcodeproj/project.pbxproj": {"swift", "c-cpp"},
+            ".xcode-version": {"swift", "c-cpp"},
+            ".github/actions/select-xcode/action.yml": {"swift", "c-cpp", "actions"},
             "CortaTerminal/Package.resolved": {"swift", "c-cpp"},
             "docs/TESTING.md": set(),
             "appcast.xml": set(),

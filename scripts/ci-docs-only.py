@@ -98,7 +98,8 @@ def scope_for_paths(paths):
 
 NATIVE_SUFFIXES = (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".m", ".mm")
 TEST_ROOTS = ("CortaTests/", "CortaUITests/", "CortaPerformanceTests/")
-BUILD_INPUTS = ("Package.swift", "Package.resolved", "project.pbxproj")
+BUILD_INPUTS = ("Package.swift", "Package.resolved", "project.pbxproj", ".xcode-version")
+TOOLCHAIN_ACTION = ".github/actions/select-xcode/"
 ANALYSIS_INPUTS = (".github/workflows/codeql.yml", "scripts/codeql-extract.py")
 
 
@@ -107,6 +108,8 @@ def analysed_languages(path):
     name = path.rsplit("/", 1)[-1]
     if path in ANALYSIS_INPUTS:
         return set(LANGUAGES)
+    if path.startswith(TOOLCHAIN_ACTION):
+        return {"swift", "c-cpp", "actions"}
     if name in BUILD_INPUTS or path.endswith(".xcconfig"):
         return {"swift", "c-cpp"}
     if path.startswith(".github/") and path.endswith((".yml", ".yaml")) or name in ("action.yml", "action.yaml"):

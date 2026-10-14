@@ -70,8 +70,7 @@ class EvidenceTests(unittest.TestCase):
             git("init", "-q")
             git("config", "user.name", "Test")
             git("config", "user.email", "test@example.invalid")
-            (root / ".github/workflows").mkdir(parents=True)
-            (root / ".github/workflows/ci.yml").write_text('env:\n  XCODE_PIN: "26.6.0"\n')
+            (root / ".xcode-version").write_text("26.6.0\n")
             (root / "README.md").write_text("source")
             git("add", ".")
             git("commit", "-qm", "tested")
@@ -88,7 +87,7 @@ class EvidenceTests(unittest.TestCase):
             gh.chmod(0o755)
             output = root / "output"
             env = dict(os.environ, PATH=str(binary) + ":" + os.environ["PATH"], CI_RUN="123",
-                       TESTED_HEAD=head, XCODE_PIN="26.6.0", DRY_RUN="false", GITHUB_OUTPUT=str(output))
+                       TESTED_HEAD=head, DRY_RUN="false", GITHUB_OUTPUT=str(output))
             def invoke():
                 output.write_text("")
                 result = subprocess.run([sys.executable, "-B", str(Path(evidence.__file__))],

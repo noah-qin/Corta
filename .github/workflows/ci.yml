@@ -48,12 +48,9 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  # Stable releases only. Keep this pin aligned with nightly.yml so
-  # runner image updates cannot silently change the compiler under a PR.
-  # If the pinned release disappears, deliberately update both workflows.
-  XCODE_PIN: "26.6.0"
-
+# The toolchain is `.xcode-version`, a stable release, selected by
+# `.github/actions/select-xcode` in every workflow: runner image updates
+# cannot silently change the compiler under a PR.
 
 jobs:
   changes:
@@ -156,17 +153,7 @@ jobs:
           persist-credentials: false
 
       - name: Select the pinned Xcode
-        run: |
-          pinned="/Applications/Xcode_${XCODE_PIN}.app"
-          if [ ! -d "$pinned" ]; then
-            echo "::error::$pinned is not on this runner image."
-            echo "Installed: $(ls -d /Applications/Xcode*.app | tr '\n' ' ')"
-            echo "Bump XCODE_PIN in this workflow deliberately, or restore the image."
-            exit 1
-          fi
-          sudo xcode-select -s "$pinned"
-          xcodebuild -version
-          swift --version
+        uses: ./.github/actions/select-xcode
 
       - name: Check repository license headers
         run: swift run --package-path CortaTerminal corta-license check
@@ -267,16 +254,7 @@ jobs:
           persist-credentials: false
 
       - name: Select the pinned Xcode
-        run: |
-          pinned="/Applications/Xcode_${XCODE_PIN}.app"
-          if [ ! -d "$pinned" ]; then
-            echo "::error::$pinned is not on this runner image."
-            echo "Installed: $(ls -d /Applications/Xcode*.app | tr '\n' ' ')"
-            echo "Bump XCODE_PIN in this workflow deliberately, or restore the image."
-            exit 1
-          fi
-          sudo xcode-select -s "$pinned"
-          xcodebuild -version
+        uses: ./.github/actions/select-xcode
 
       # Metal 4 is the only renderer (#109), and it needs
       # `MTLGPUFamily.metal4`. This runner is a virtual machine on Apple

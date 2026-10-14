@@ -37,10 +37,6 @@ on:
 permissions:
   contents: read
 
-# Stable releases only; keep this pin aligned with ci.yml.
-env:
-  XCODE_PIN: "26.6.0"
-
 jobs:
   sanitizers:
     name: Core suite under sanitizers
@@ -56,16 +52,9 @@ jobs:
           persist-credentials: false
 
       - name: Select the pinned stable Xcode
-        run: |
-          pinned="/Applications/Xcode_${XCODE_PIN}.app"
-          if [ ! -d "$pinned" ]; then
-            echo "::error::$pinned is not on this runner image."
-            echo "Update the stable XCODE_PIN in all five workflows together."
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=$pinned/Contents/Developer" >> "$GITHUB_ENV"
-          DEVELOPER_DIR="$pinned/Contents/Developer" xcodebuild -version
-          DEVELOPER_DIR="$pinned/Contents/Developer" xcrun swift --version
+        uses: ./.github/actions/select-xcode
+        with:
+          scope: job
 
       # The core is where the concurrency is — the write queue, the reader
       # thread, the session teardown — and it is the part that runs without a
@@ -88,16 +77,9 @@ jobs:
           persist-credentials: false
 
       - name: Select the pinned stable Xcode
-        run: |
-          pinned="/Applications/Xcode_${XCODE_PIN}.app"
-          if [ ! -d "$pinned" ]; then
-            echo "::error::$pinned is not on this runner image."
-            echo "Update the stable XCODE_PIN in all five workflows together."
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=$pinned/Contents/Developer" >> "$GITHUB_ENV"
-          DEVELOPER_DIR="$pinned/Contents/Developer" xcodebuild -version
-          DEVELOPER_DIR="$pinned/Contents/Developer" xcrun swift --version
+        uses: ./.github/actions/select-xcode
+        with:
+          scope: job
 
       - name: Build
         run: swift build --package-path CortaTerminal -c release --product corta-fuzz
@@ -156,14 +138,9 @@ jobs:
           persist-credentials: false
 
       - name: Select the pinned stable Xcode
-        run: |
-          pinned="/Applications/Xcode_${XCODE_PIN}.app"
-          if [ ! -d "$pinned" ]; then
-            echo "::error::$pinned is not on this runner image."
-            echo "Update the stable XCODE_PIN in all five workflows together."
-            exit 1
-          fi
-          sudo xcode-select -s "$pinned"
+        uses: ./.github/actions/select-xcode
+        with:
+          scope: job
 
       - name: Verify every item in the feed
         run: swift scripts/verify-appcast.swift --download

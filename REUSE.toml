@@ -38,6 +38,7 @@ path = [
   "Sparkle-Info.plist",
   "Corta/PrivacyInfo.xcprivacy",
   "appcast.xml",
+  ".xcode-version",
   "scripts/disk-image/background.tiff",
   "scripts/disk-image/DS_Store",
 ]

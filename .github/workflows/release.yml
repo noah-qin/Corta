@@ -43,9 +43,6 @@ permissions:
   contents: read
 
 env:
-  # The shipping artifact is the one place the toolchain matters most; see
-  # the same pin in `ci.yml`.
-  XCODE_PIN: "26.6.0"
   # The team the Developer ID certificate belongs to.
   TEAM_ID: 646VSJ9K5F
   # Same pinned signing tool as appcast.yml; a rehearsal signs the feed
@@ -159,16 +156,7 @@ jobs:
 
       - name: Select the pinned Xcode
         if: steps.published.outputs.exists != 'true'
-        run: |
-          pinned="/Applications/Xcode_${XCODE_PIN}.app"
-          if [ ! -d "$pinned" ]; then
-            echo "::error::$pinned is not on this runner image."
-            echo "Installed: $(ls -d /Applications/Xcode*.app | tr '\n' ' ')"
-            echo "A release builds on the pinned toolchain or not at all."
-            exit 1
-          fi
-          sudo xcode-select -s "$pinned"
-          xcodebuild -version
+        uses: ./.github/actions/select-xcode
 
       - name: Work out the version
         if: steps.published.outputs.exists != 'true'
