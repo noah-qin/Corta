@@ -48,7 +48,6 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
 
     /// The renderer shifts its cache by the delta. Not `totalPushed`, which is
     /// silent on the alternate screen.
-    private(set) var totalRotated: UInt64 = 0
     static let scrollEventCapacity = 64
     private var scrollEvents = ContiguousArray<ScrollEvent>()
     private(set) var scrollEventsTotal: UInt64 = 0
@@ -115,7 +114,6 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
             head += 1
             if head == storage.count { head = 0 }
         }
-        totalRotated &+= UInt64(clamped)
         if clamped > 0 { recordScroll(top: 0, bottom: storage.count - 1, delta: clamped) }
     }
 

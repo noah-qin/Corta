@@ -207,7 +207,6 @@ public struct Grid: Sendable {
     /// resize), whose revisions restart from zero.
     public var linesGeneration: UInt64 { lines.generation }
 
-    public var linesRotated: UInt64 { lines.totalRotated }
     public var scrollEventsTotal: UInt64 { lines.scrollEventsTotal }
     /// Events kept for replay; a consumer further behind rebuilds.
     public static var scrollEventCapacity: Int { ScreenLines.scrollEventCapacity }
