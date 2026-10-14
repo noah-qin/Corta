@@ -3,7 +3,7 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status (2026-10-09): 1.1.8 is the current release; the next
+**Status (2026-10-14): 1.2.1 is the current release; the next
 version's GitHub milestone is the working list.** A release is a
 single manual `Release` run on `main` that versions, signs, notarises,
 publishes and signs `appcast.xml` (D20, amended) — `docs/RELEASING.md` has
@@ -82,6 +82,8 @@ line each:
   published ZIPs remain unchanged. **D27** SFTP asks for passwords,
   passphrases and host keys through OpenSSH's `SSH_ASKPASS`, answered by
   Corta's own executable and a dialog; nothing is stored.
+- **D28** Local tools are Swift; CI-only glue may be Python (standard
+  library, tested in `scripts/tests/`).
 
 ## Working Rules
 
@@ -251,21 +253,28 @@ CortaTerminal/.build/release/corta-bench
 
 Layout:
 
-- `Corta/` — AppKit shell, Metal renderer, font stack
+- `Corta/` — AppKit shell, Metal renderer, font stack, in subfolders by
+  area: `App`, `Window`, `Pane`, `TerminalView`, `Renderer`, `Shell`,
+  `Remote`, `Settings` (synchronized groups: a moved file needs no
+  `project.pbxproj` edit)
 - `CortaTerminal/` — the terminal core as a local SwiftPM package, with
-  its own tests, golden fixtures, fuzz corpus and DocC catalog
+  its own tests, golden fixtures, fuzz corpus and DocC catalog; its
+  `CortaPOSIX` target holds the descriptor, spawn and exit-status code the
+  core and the SFTP client share
 - `CortaTests/`, `CortaUITests/` — app-hosted test targets;
   `CortaPerformanceTests/` — the Release measurements, without `@testable`
 - `Corta.xcodeproj/` — build settings live in `project.pbxproj`
-- `scripts/` — the two Swift scripts CI runs (Metal 4 probe, feed check)
-  and the release workflow's `prepare-release` helpers with their tests;
-  `script/` — local helpers (`build_and_run.sh`) and the isolated-sshd
-  fixture CI runs for the real SSH/SFTP suite;
+- `scripts/` — every helper, one directory: the Swift scripts CI runs
+  (Metal 4 probe, feed check), `build-and-run.sh`, the isolated-sshd
+  fixture for the real SSH/SFTP suite, `disk-image/` and `brand/`, and the
+  Python CI glue (the D28 exception) with its tests in `scripts/tests/`;
   packaging is `corta-release-check`, measurement is `TestPlans/Release`
+- `.xcode-version` and `.github/actions/select-xcode` — the one Xcode pin
+  and the action every workflow selects it with
 - `TestPlans/` — `Unit` (the default), `UI` (interactive sessions only)
   and `Release` (`-configuration Benchmark`: the D17 measurement, and
   `MeasurementUITests` for the app-level numbers)
-- `docs/` — user and design documentation, plus the dated records
+- `docs/` — user and design documentation
 
 Deployment target is macOS 26.0, Swift 6, app sandbox disabled
 (intentionally — `docs/SECURITY.md` §4.1).

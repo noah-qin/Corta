@@ -676,3 +676,30 @@ its two environment variables before anything else runs.
 asks there. Reopen only with a reason to store a secret (a keychain item
 would be a new decision of its own) or a different transport for the
 question.
+
+## D28 — Local tools are Swift; CI-only glue may be Python
+
+**Decision.** The app, its command-line products (`corta-bench`,
+`corta-fuzz`, `corta-license`, `corta-release-check`) and every script a
+developer runs on their own Mac are Swift, or a few lines of shell around
+an Apple tool. A script that only a GitHub workflow runs — reading event
+payloads, routing a docs-only change, collecting CI evidence, checking
+links or a pull request title, driving the isolated sshd fixture — may be
+Python 3 from the runner's standard library, with no third-party packages,
+and carries tests in `scripts/tests/`. All of it lives in `scripts/`.
+
+**Why.** #133 moved the local tooling to Swift and Xcode so a contributor
+needs nothing beyond Xcode, and that still holds. The CI glue grew back in
+Python because much of it runs on Ubuntu runners, where a Swift script
+costs a toolchain install and minutes on every run, and because its work
+is JSON and text handling that Python's standard library does in a few
+lines. Rewriting about a thousand tested lines would buy uniformity and
+nothing a user sees.
+
+**What it costs.** Two languages in `scripts/`. A Python script that a
+developer starts running locally has crossed the line and should become
+Swift; a new rule about packaging still belongs in `corta-release-check`,
+never in a script.
+
+**Consequence.** Reopen with a reason the runners' Python cannot meet, or
+when the macOS runners become the only ones the glue needs.

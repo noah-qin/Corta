@@ -126,7 +126,7 @@ files, remote connections and child-process input.
 - Sparkle updates through **Corta ▸ Check for Updates…**, plus an optional
   daily background check.
 
-## Optional system status and graphical themes
+## Appearance and system status
 
 - A bottom status bar, off by default, with individually selectable local CPU,
   load, memory, network rates, home-volume free space and four thermal levels.
@@ -136,7 +136,6 @@ files, remote connections and child-process input.
   previews, color pickers and HEX fields, save/cancel and source-color reset.
   It saves through the existing configuration file; manual editing remains
   supported. Built-ins are copied, while custom themes can be edited.
-
 - View → Local host details and Terminal settings expose host configuration
   even with the bar disabled. View → Theme editor opens color editing directly.
 - System Monospaced is the primary font, with configurable size and system

@@ -65,9 +65,9 @@ files only when you choose Install. If an installed integration is outdated,
 choose Update and open a new shell. See the
 [shell-integration guide](docs/USER-GUIDE.md#shell-integration) for details.
 
-## 1.2: built for speed
+## Built for speed
 
-Corta 1.2 makes a big leap in speed and efficiency: more than double the
+Corta 1.2 made a big leap in speed and efficiency: more than double the
 core throughput, a frame less of full-screen input latency, and a fraction
 of the memory for long histories. Measured on one Apple M5 MacBook Air,
 before and after, with the same toolchain:

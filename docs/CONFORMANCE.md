@@ -587,10 +587,13 @@ is made in its place.
 
 ### 4.7 The records
 
-Every pass of §4.4, §4.4.2 and §4.6 is written up under
-[`test-results/`](https://github.com/noah-qin/Corta/tree/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results) as a dated file — what was checked, what
-passed, what failed and what was *not judged* — and the findings are worked
-off in the CHANGELOG. The record stays as written.
+Up to 1.2.0, every pass of §4.4, §4.4.2 and §4.6 was written up as a dated
+file under
+[`test-results/`](https://github.com/noah-qin/Corta/tree/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results)
+— what was checked, what passed, what failed and what was *not judged* —
+and those records are preserved at commit `f632d59`, listed below. Since
+then a pass is recorded in the pull request or issue it verifies, in the
+same terms; the tree carries no dated records.
 
 | Record | What it covers |
 | --- | --- |
