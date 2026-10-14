@@ -28,33 +28,9 @@ import Testing
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
 @Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct SearchHighlightRenderTests {
-    private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
-        r: UInt8, g: UInt8, b: UInt8, a: UInt8
-    ) {
-        var bytes = [UInt8](repeating: 0, count: 4)
-        texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
-        return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
-    }
-
-
-    private struct Fixture {
-        let renderer: TerminalRenderer
-        let width: Int
-        let height: Int
-    }
-
-    private static func fixture() throws -> Fixture? {
-        guard let device = MTLCreateSystemDefaultDevice() else { return nil }
-        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
-        return Fixture(
-            renderer: renderer, width: Int(renderer.metrics.cellWidth * 10),
-            height: Int(renderer.metrics.cellHeight * 4))
-    }
-
     @discardableResult
     private static func draw(
-        _ fixture: Fixture, grid: Grid, scrollOffset: Int,
+        _ fixture: RenderFixture, grid: Grid, scrollOffset: Int,
         searchMatches: [TerminalSelection], currentSearchMatchIndex: Int?
     ) -> MTLTexture {
         let texture = MetalRenderTarget.make(
@@ -69,19 +45,10 @@ import Testing
         return texture
     }
 
-    private static func cellCenter(
-        _ fixture: Fixture, column: Int, row: Int
-    ) -> (x: Int, y: Int) {
-        (
-            x: Int((Float(column) + 0.5) * Float(fixture.renderer.metrics.cellWidth)),
-            y: Int((Float(row) + 0.5) * Float(fixture.renderer.metrics.cellHeight))
-        )
-    }
-
     /// Two matches on otherwise blank columns: row 1 and row 2 of a 10x4
     /// grid, both over columns 4...8 so glyph ink never confuses the tint.
     @Test func matchesHighlightAndTheCurrentOneReadsDifferently() throws {
-        guard let fixture = try Self.fixture() else {
+        guard let fixture = try RenderFixture() else {
             Issue.record("No Metal device available in this environment")
             return
         }
@@ -95,14 +62,14 @@ import Testing
         let plain = Self.draw(
             fixture, grid: grid, scrollOffset: 0, searchMatches: matches,
             currentSearchMatchIndex: nil)
-        let row1 = Self.cellCenter(fixture, column: 6, row: 1)
-        let row2 = Self.cellCenter(fixture, column: 6, row: 2)
-        let outside = Self.cellCenter(fixture, column: 2, row: 1)
+        let row1 = fixture.cellCenter(column: 6, row: 1)
+        let row2 = fixture.cellCenter(column: 6, row: 2)
+        let outside = fixture.cellCenter(column: 2, row: 1)
         // The pass clears to opaque black, so tint shows in the colour
         // channels: the match colour, the theme's yellow, carries red.
-        #expect(Self.pixel(of: plain, x: row1.x, y: row1.y).r > 0, "a match paints its cells")
+        #expect(MetalRenderTarget.pixel(of: plain, x: row1.x, y: row1.y).r > 0, "a match paints its cells")
         #expect(
-            Self.pixel(of: plain, x: outside.x, y: outside.y).r == 0,
+            MetalRenderTarget.pixel(of: plain, x: outside.x, y: outside.y).r == 0,
             "cells outside every match stay clear")
 
         let withCurrent = Self.draw(
@@ -110,8 +77,8 @@ import Testing
             currentSearchMatchIndex: 1)
         // The same yellow at 0.7 alpha paints more red than at 0.35.
         #expect(
-            Self.pixel(of: withCurrent, x: row2.x, y: row2.y).r
-                > Self.pixel(of: withCurrent, x: row1.x, y: row1.y).r,
+            MetalRenderTarget.pixel(of: withCurrent, x: row2.x, y: row2.y).r
+                > MetalRenderTarget.pixel(of: withCurrent, x: row1.x, y: row1.y).r,
             "the current match paints more strongly than the others")
     }
 }

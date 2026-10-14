@@ -25,14 +25,6 @@ import Testing
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
 @Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct TerminalRendererTests {
-    private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
-        r: UInt8, g: UInt8, b: UInt8, a: UInt8
-    ) {
-        var bytes = [UInt8](repeating: 0, count: 4)
-        texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
-        return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
-    }
-
 
     @Test("a static Retina CJK screen fills across budgeted frames")
     func deferredCJKCompletes() throws {
@@ -102,8 +94,8 @@ import Testing
 
         let cursorX = Int(Float(grid.cursor.column) * Float(renderer.metrics.cellWidth) + Float(renderer.metrics.cellWidth) / 2)
         let cursorY = Int(Float(grid.cursor.row) * Float(renderer.metrics.cellHeight) + Float(renderer.metrics.cellHeight) / 2)
-        let atCursor = Self.pixel(of: texture, x: cursorX, y: cursorY)
-        let elsewhere = Self.pixel(of: texture, x: width - 4, y: height - 4)
+        let atCursor = MetalRenderTarget.pixel(of: texture, x: cursorX, y: cursorY)
+        let elsewhere = MetalRenderTarget.pixel(of: texture, x: width - 4, y: height - 4)
 
         // The cursor block is the theme's light cursor, opaque over black —
         // brighter than the untouched background, which stays pure black.
@@ -141,8 +133,8 @@ import Testing
         let insideY = Int(Float(1) * Float(renderer.metrics.cellHeight) + Float(renderer.metrics.cellHeight) / 2)
         let outsideX = Int(Float(7) * Float(renderer.metrics.cellWidth) + Float(renderer.metrics.cellWidth) / 2)
 
-        let inside = Self.pixel(of: texture, x: insideX, y: insideY)
-        let outside = Self.pixel(of: texture, x: outsideX, y: insideY)
+        let inside = MetalRenderTarget.pixel(of: texture, x: insideX, y: insideY)
+        let outside = MetalRenderTarget.pixel(of: texture, x: outsideX, y: insideY)
         if inside.b <= outside.b {
             MetalRenderTarget.attachPNG(texture, named: "selection-highlight-render.png")
         }

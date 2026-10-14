@@ -35,12 +35,6 @@ import Testing
 @Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct ThemeColorRenderTests {
     private typealias Pixel = (r: UInt8, g: UInt8, b: UInt8, a: UInt8)
 
-    private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> Pixel {
-        var bytes = [UInt8](repeating: 0, count: 4)
-        texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
-        return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
-    }
-
     private static func byte(_ value: Float) -> Int { Int((min(1, max(0, value)) * 255).rounded()) }
 
     /// Within `tolerance` per channel of `color` drawn at its alpha over
@@ -64,7 +58,7 @@ import Testing
         let cellHeight: Int
 
         func center(row: Int, column: Int) -> Pixel {
-            ThemeColorRenderTests.pixel(
+            MetalRenderTarget.pixel(
                 of: texture, x: column * cellWidth + cellWidth / 2, y: row * cellHeight + cellHeight / 2)
         }
     }
@@ -218,7 +212,7 @@ import Testing
 
         // The rule sits two device pixels above the row's bottom, over the
         // selection; opaque, so it is the link colour alone.
-        let rule = Self.pixel(of: frame.texture, x: frame.cellWidth + frame.cellWidth / 2, y: frame.cellHeight - 2)
+        let rule = MetalRenderTarget.pixel(of: frame.texture, x: frame.cellWidth + frame.cellWidth / 2, y: frame.cellHeight - 2)
         #expect(Self.matches(rule, overlay.linkUnderline, over: background), "link: \(rule)")
     }
 
@@ -273,23 +267,23 @@ import Testing
             (2, overlay.markInterrupted, "interrupted", 4),
         ] {
             for x in [ruleX, ruleX + 1] {
-                let edge = Self.pixel(of: frame.texture, x: x, y: row * frame.cellHeight + y)
+                let edge = MetalRenderTarget.pixel(of: frame.texture, x: x, y: row * frame.cellHeight + y)
                 #expect(Self.matches(edge, color, over: background), "\(name) at x \(x): \(edge)")
             }
         }
         // Never over a cell, and the rule is two points wide.
         for row in 0..<3 {
             let y = row * frame.cellHeight + 4
-            let cell = Self.pixel(of: frame.texture, x: margin, y: y)
+            let cell = MetalRenderTarget.pixel(of: frame.texture, x: margin, y: y)
             #expect(Self.matches(cell, background, over: background), "row \(row) first cell: \(cell)")
-            let beside = Self.pixel(of: frame.texture, x: ruleX + 2, y: y)
+            let beside = MetalRenderTarget.pixel(of: frame.texture, x: ruleX + 2, y: y)
             #expect(Self.matches(beside, background, over: background), "row \(row) beside: \(beside)")
         }
         // An interruption is two pieces: its middle is clear.
-        let gap = Self.pixel(of: frame.texture, x: ruleX, y: 2 * frame.cellHeight + frame.cellHeight / 2)
+        let gap = MetalRenderTarget.pixel(of: frame.texture, x: ruleX, y: 2 * frame.cellHeight + frame.cellHeight / 2)
         #expect(Self.matches(gap, background, over: background), "interrupted middle: \(gap)")
         // Two points shorter than the row at each end: neighbours stay apart.
-        let between = Self.pixel(of: frame.texture, x: ruleX, y: frame.cellHeight)
+        let between = MetalRenderTarget.pixel(of: frame.texture, x: ruleX, y: frame.cellHeight)
         #expect(Self.matches(between, background, over: background), "between rows: \(between)")
     }
 
@@ -300,7 +294,7 @@ import Testing
         func ruleCount(_ frame: Frame, margin: Int) -> Int {
             (0..<3).filter { row in
                 !Self.matches(
-                    Self.pixel(of: frame.texture, x: margin - 6, y: row * frame.cellHeight + 4),
+                    MetalRenderTarget.pixel(of: frame.texture, x: margin - 6, y: row * frame.cellHeight + 4),
                     background, over: background)
             }.count
         }
@@ -342,7 +336,7 @@ import Testing
         var foregroundPixels = 0
         for y in 0..<onLetter.cellHeight {
             for x in onLetter.cellWidth..<(2 * onLetter.cellWidth) {
-                let sample = Self.pixel(of: onLetter.texture, x: x, y: y)
+                let sample = MetalRenderTarget.pixel(of: onLetter.texture, x: x, y: y)
                 if Self.matches(sample, variant.cursor, over: opaque, tolerance: 8) { cursorPixels += 1 }
                 if Self.matches(sample, variant.background, over: opaque, tolerance: 8) { backgroundPixels += 1 }
                 if Self.matches(sample, variant.foreground, over: opaque, tolerance: 40) { foregroundPixels += 1 }
@@ -365,7 +359,7 @@ import Testing
             let frame = try Self.render(terminal.grid, variant: variant, cursorVisible: true)
             // Corners: outside the ideograph's ink in both cells.
             for x in [1, 2 * frame.cellWidth - 2] {
-                let corner = Self.pixel(of: frame.texture, x: x, y: frame.cellHeight - 1)
+                let corner = MetalRenderTarget.pixel(of: frame.texture, x: x, y: frame.cellHeight - 1)
                 #expect(Self.matches(corner, variant.cursor, over: opaque), "column \(column), x \(x): \(corner)")
             }
             terminal.feed(Array("\u{1B}[1;1H".utf8))

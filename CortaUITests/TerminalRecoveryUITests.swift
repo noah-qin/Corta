@@ -23,10 +23,7 @@ final class TerminalRecoveryUITests: XCTestCase {
         let original = LatinInputSource.select()
         addTeardownBlock { LatinInputSource.restore(original) }
         defer { LatinInputSource.restore(original) }
-        guard let fixtures = ProcessInfo.processInfo.environment["CORTA_UI_FIXTURES"] else {
-            throw XCTSkip("Prepare fixtures using stage-ui-fixtures.sh")
-        }
-        let stage = URL(fileURLWithPath: fixtures).appendingPathComponent("terminal-recovery").path
+        let stage = try UIFixtures.stage("terminal-recovery").path
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)"]
         app.launchEnvironment["CORTA_STAGE_DIR"] = stage
@@ -76,10 +73,7 @@ final class TerminalRecoveryUITests: XCTestCase {
         let originalSource = LatinInputSource.select()
         addTeardownBlock { LatinInputSource.restore(originalSource) }
         defer { LatinInputSource.restore(originalSource) }
-        guard let fixtures = ProcessInfo.processInfo.environment["CORTA_UI_FIXTURES"] else {
-            throw XCTSkip("Prepare fixtures using stage-ui-fixtures.sh")
-        }
-        let stage = URL(fileURLWithPath: fixtures).appendingPathComponent("terminal-recovery").path
+        let stage = try UIFixtures.stage("terminal-recovery").path
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)"]
         app.launchEnvironment["CORTA_STAGE_DIR"] = stage

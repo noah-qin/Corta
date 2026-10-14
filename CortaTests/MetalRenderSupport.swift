@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CoreGraphics
+import CoreText
 import CortaTerminal
 import Foundation
 import ImageIO
@@ -67,6 +68,13 @@ enum MetalRenderTarget {
     /// A degenerate or absurd size fails the test that asked for it — with
     /// the numbers in the message — and the run continues on a 1x1 stand-in.
     /// Handing the numbers straight to Metal instead ends the process.
+    /// One pixel of a `bgra8Unorm` target, as RGBA.
+    static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (r: UInt8, g: UInt8, b: UInt8, a: UInt8) {
+        var bytes = [UInt8](repeating: 0, count: 4)
+        texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
+        return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
+    }
+
     static func make(device: MTLDevice, width: Int, height: Int) -> MTLTexture {
         // A 1x1 stand-in, not a clamp. Clamping an absurd request down to
         // the maximum would still allocate a 16384-wide texture to satisfy a
@@ -227,6 +235,31 @@ extension TerminalRenderer {
         if let error = failure.withLock({ $0 }) {
             Issue.record("the frame failed: \(error)", sourceLocation: sourceLocation)
         }
+    }
+}
+
+
+/// A Menlo 14 renderer and a target sized to a `columns × rows` grid, for
+/// tests that sample a frame's pixels. `nil` without a Metal device.
+struct RenderFixture {
+    let renderer: TerminalRenderer
+    let width: Int
+    let height: Int
+
+    init?(columns: Int = 10, rows: Int = 4) throws {
+        guard let device = MTLCreateSystemDefaultDevice() else { return nil }
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        renderer = try TerminalRenderer(device: device, font: font, scale: 1)
+        width = Int(renderer.metrics.cellWidth * CGFloat(columns))
+        height = Int(renderer.metrics.cellHeight * CGFloat(rows))
+    }
+
+    /// The centre of a cell in the target.
+    func cellCenter(column: Int, row: Int) -> (x: Int, y: Int) {
+        (
+            x: Int((Float(column) + 0.5) * Float(renderer.metrics.cellWidth)),
+            y: Int((Float(row) + 0.5) * Float(renderer.metrics.cellHeight))
+        )
     }
 }
 

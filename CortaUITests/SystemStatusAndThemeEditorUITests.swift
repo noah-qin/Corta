@@ -19,7 +19,7 @@ import XCTest
 final class SystemStatusAndThemeEditorUITests: XCTestCase {
     @MainActor func testStatusBarIsOptionalSelectableAndHasLocalHostDetails() throws {
         continueAfterFailure = false
-        let stage = try preparedStage("system-status-bar")
+        let stage = try UIFixtures.stage("system-status-bar")
         let app = makeApp(stage)
         app.launch()
         defer { app.terminate() }
@@ -68,7 +68,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         continueAfterFailure = false
         let previous = LatinInputSource.select()
         defer { LatinInputSource.restore(previous) }
-        let stage = try preparedStage("system-theme-editor")
+        let stage = try UIFixtures.stage("system-theme-editor")
         let app = makeApp(stage)
         app.launch()
         defer { app.terminate() }
@@ -105,7 +105,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
 
     @MainActor func testMenuEntrypointsAndImmediateAppearancePreview() throws {
         continueAfterFailure = false
-        let stage = try preparedStage("system-menu-preview")
+        let stage = try UIFixtures.stage("system-menu-preview")
         let app = makeApp(stage)
         app.launch()
         defer { app.terminate() }
@@ -153,7 +153,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
             ("pt-BR", ["Visualização", "Editor de temas", "Detalhes do host local", "Cancelar", "Local", "Carga", "Memória", "Rede", "Disco livre", "Estado térmico"]),
         ]
         for (language, labels) in translations {
-            let stage = try preparedStage("system-language-\(language)")
+            let stage = try UIFixtures.stage("system-language-\(language)")
             let app = makeApp(stage)
             app.launchArguments = ["-AppleLanguages", "(\(language))"]
             app.launch()
@@ -192,18 +192,6 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         menu.click()
         menu.menuItems["Settings…"].click()
         XCTAssertTrue(app.windows["Corta.Settings"].waitForExistence(timeout: 5))
-    }
-    /// The stage `stage-ui-fixtures.sh` prepared for `name`: the sandboxed
-    /// runner cannot write one the app could read.
-    private func preparedStage(_ name: String) throws -> URL {
-        guard let root = ProcessInfo.processInfo.environment["CORTA_UI_FIXTURES"] else {
-            throw XCTSkip(
-                "Set TEST_RUNNER_CORTA_UI_FIXTURES using CortaUITests/stage-ui-fixtures.sh; the runner's sandbox cannot write a stage the app can read.")
-        }
-        let stage = URL(fileURLWithPath: root, isDirectory: true).appendingPathComponent(name)
-        guard FileManager.default.fileExists(atPath: stage.appendingPathComponent("config").path)
-        else { throw XCTSkip("stage-ui-fixtures.sh made no stage named \(name)") }
-        return stage
     }
     @MainActor private func makeApp(_ stage: URL) -> XCUIApplication {
         // Multiple development checkouts share a bundle identifier. Launch the

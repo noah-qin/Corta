@@ -28,12 +28,6 @@ import Testing
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
 @Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct WideGlyphRenderTests {
-    private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> UInt8 {
-        var bytes = [UInt8](repeating: 0, count: 4)
-        texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
-        return bytes[2]  // r of bgra
-    }
-
 
     /// Renders `grid` onto a fresh black texture sized exactly to the grid.
     private static func render(
@@ -94,8 +88,8 @@ import Testing
         let cellWidth = Int(renderer.metrics.cellWidth)
         let cellHeight = Int(renderer.metrics.cellHeight)
         let centreY = cellHeight / 2
-        let leadInk = Self.pixel(of: texture, x: cellWidth / 2, y: centreY)
-        let spacerInk = Self.pixel(of: texture, x: cellWidth + cellWidth / 2, y: centreY)
+        let leadInk = MetalRenderTarget.pixel(of: texture, x: cellWidth / 2, y: centreY).r
+        let spacerInk = MetalRenderTarget.pixel(of: texture, x: cellWidth + cellWidth / 2, y: centreY).r
 
         #expect(leadInk > 0, "expected ink in the pair's lead cell")
         #expect(spacerInk > 0, "expected the wide glyph to cover the spacer's cell too")
@@ -123,7 +117,7 @@ import Testing
         // pair drew at the wrong width.
         let cellWidth = Int(renderer.metrics.cellWidth)
         let cellHeight = Int(renderer.metrics.cellHeight)
-        let aInk = Self.pixel(of: texture, x: 4 * cellWidth + cellWidth / 2, y: cellHeight / 2)
+        let aInk = MetalRenderTarget.pixel(of: texture, x: 4 * cellWidth + cellWidth / 2, y: cellHeight / 2).r
         #expect(aInk > 0, "expected 'a' at column 4, undrifted by the wide pairs before it")
         #expect(
             Self.cellIsBlank(texture, row: 0, column: 6, metrics: renderer.metrics),
@@ -149,7 +143,7 @@ import Testing
         let texture = Self.render(grid, renderer: renderer, device: device)
         let cellWidth = Int(renderer.metrics.cellWidth)
         let cellHeight = Int(renderer.metrics.cellHeight)
-        let ink = Self.pixel(of: texture, x: cellWidth / 2, y: cellHeight / 2)
+        let ink = MetalRenderTarget.pixel(of: texture, x: cellWidth / 2, y: cellHeight / 2).r
         #expect(ink > 0, "expected the é cluster to ink its cell")
         #expect(
             Self.cellIsBlank(texture, row: 0, column: 1, metrics: renderer.metrics),
@@ -229,7 +223,7 @@ import Testing
             })
 
         let centreX = Int(cellWidth)  // centre of the two-cell box
-        let ink = Self.pixel(of: texture, x: centreX, y: height / 2)
+        let ink = MetalRenderTarget.pixel(of: texture, x: centreX, y: height / 2).r
         #expect(ink > 0, "expected the family emoji to ink its double-width cell")
         #expect(
             Self.cellIsBlank(texture, row: 0, column: 2, metrics: renderer.metrics),

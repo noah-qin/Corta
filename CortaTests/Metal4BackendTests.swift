@@ -63,14 +63,6 @@ struct Metal4BackendTests {
     }
 
     /// Reads back one BGRA8 pixel from `texture` at `x, y`.
-    private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
-        r: UInt8, g: UInt8, b: UInt8, a: UInt8
-    ) {
-        var bytes = [UInt8](repeating: 0, count: 4)
-        texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
-        return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
-    }
-
     private static let width = 40
     private static let height = 20
     private static let drawableSize = CGSize(width: width, height: height)
@@ -95,7 +87,7 @@ struct Metal4BackendTests {
                     [red], rect: CGRect(origin: .zero, size: Self.drawableSize),
                     drawableSize: Self.drawableSize)
             })
-        let centre = Self.pixel(of: texture, x: 10, y: 10)
+        let centre = MetalRenderTarget.pixel(of: texture, x: 10, y: 10)
         #expect(centre.r == 255 && centre.g == 0 && centre.b == 0)
     }
 
@@ -115,8 +107,8 @@ struct Metal4BackendTests {
                     green, rect: CGRect(x: 20, y: 0, width: 20, height: 20),
                     drawableSize: Self.drawableSize)
             })
-        #expect(Self.pixel(of: texture, x: 5, y: 10).g == 255)
-        #expect(Self.pixel(of: texture, x: 25, y: 10).g == 255)
+        #expect(MetalRenderTarget.pixel(of: texture, x: 5, y: 10).g == 255)
+        #expect(MetalRenderTarget.pixel(of: texture, x: 25, y: 10).g == 255)
     }
 
     /// `presentsByCopy` renders into a staging texture and copies it to the
@@ -136,9 +128,9 @@ struct Metal4BackendTests {
                 })
         }
         #expect(backend.copyFrame == 2)
-        let centre = Self.pixel(of: texture, x: 10, y: 10)
+        let centre = MetalRenderTarget.pixel(of: texture, x: 10, y: 10)
         #expect(centre.r == 255 && centre.g == 0 && centre.b == 0)
-        #expect(Self.pixel(of: texture, x: 30, y: 10).r == 0)
+        #expect(MetalRenderTarget.pixel(of: texture, x: 30, y: 10).r == 0)
     }
 
     @Test func aQuadNeverPaintsOutsideItsRect() throws {
@@ -155,8 +147,8 @@ struct Metal4BackendTests {
                     overflowing, rect: CGRect(x: 0, y: 0, width: 10, height: 10),
                     drawableSize: Self.drawableSize)
             })
-        #expect(Self.pixel(of: texture, x: 5, y: 5).b == 255)
-        #expect(Self.pixel(of: texture, x: 20, y: 15).b == 0)
+        #expect(MetalRenderTarget.pixel(of: texture, x: 5, y: 5).b == 255)
+        #expect(MetalRenderTarget.pixel(of: texture, x: 20, y: 15).b == 0)
     }
 
     /// Eight frames through one backend, none waited for until the last: the
@@ -188,7 +180,7 @@ struct Metal4BackendTests {
                     rect: CGRect(origin: .zero, size: size), drawableSize: size)
             })
         #expect(backend.droppedFrameCount == 0)
-        let pixel = Self.pixel(of: target, x: 8, y: 8)
+        let pixel = MetalRenderTarget.pixel(of: target, x: 8, y: 8)
         #expect(abs(Int(pixel.b) - Int((last.z * 255).rounded())) <= 1)
         #expect(abs(Int(pixel.g) - Int((last.y * 255).rounded())) <= 1)
         #expect(abs(Int(pixel.r) - Int((last.x * 255).rounded())) <= 1)
@@ -211,8 +203,8 @@ struct Metal4BackendTests {
                 $0.drawSolidQuads(left, rect: CGRect(origin: .zero, size: Self.drawableSize), drawableSize: Self.drawableSize)
                 $0.drawSolidQuads(many, rect: CGRect(origin: .zero, size: Self.drawableSize), drawableSize: Self.drawableSize)
             })
-        #expect(Self.pixel(of: texture, x: 5, y: 10).r == 255)
-        #expect(Self.pixel(of: texture, x: 30, y: 10).b == 255)
+        #expect(MetalRenderTarget.pixel(of: texture, x: 5, y: 10).r == 255)
+        #expect(MetalRenderTarget.pixel(of: texture, x: 30, y: 10).b == 255)
     }
 
     /// Releasing the backend while the GPU is still running its frames must

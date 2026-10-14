@@ -26,35 +26,9 @@ import Testing
 /// negative) are translated to viewport rows through the scroll offset and
 /// the scrollback's growth since the selection was recorded.
 @Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct SelectionRendererTests {
-    private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
-        r: UInt8, g: UInt8, b: UInt8, a: UInt8
-    ) {
-        var bytes = [UInt8](repeating: 0, count: 4)
-        texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
-        return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
-    }
-
-
-    private struct Fixture {
-        let renderer: TerminalRenderer
-        let width: Int
-        let height: Int
-    }
-
-    /// A renderer and a render target sized to a 10x4 grid, or nil when no
-    /// Metal device is available.
-    private static func fixture() throws -> Fixture? {
-        guard let device = MTLCreateSystemDefaultDevice() else { return nil }
-        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-        let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
-        return Fixture(
-            renderer: renderer, width: Int(renderer.metrics.cellWidth * 10),
-            height: Int(renderer.metrics.cellHeight * 4))
-    }
-
     @discardableResult
     private static func draw(
-        _ fixture: Fixture, grid: Grid, scrollOffset: Int, selection: TerminalSelection?
+        _ fixture: RenderFixture, grid: Grid, scrollOffset: Int, selection: TerminalSelection?
     ) -> MTLTexture {
         let texture = MetalRenderTarget.make(
             device: fixture.renderer.backend.device, width: fixture.width, height: fixture.height)
@@ -67,16 +41,6 @@ import Testing
         return texture
     }
 
-    /// The centre of a cell in the fixture's texture.
-    private static func cellCenter(
-        _ fixture: Fixture, column: Int, row: Int
-    ) -> (x: Int, y: Int) {
-        (
-            x: Int((Float(column) + 0.5) * Float(fixture.renderer.metrics.cellWidth)),
-            y: Int((Float(row) + 0.5) * Float(fixture.renderer.metrics.cellHeight))
-        )
-    }
-
     /// A 4x10 terminal with six two-character lines; the first three have
     /// scrolled into the scrollback. Selected columns (4...8) are blank on
     /// every line, so glyph pixels never confuse the tint check.
@@ -87,7 +51,7 @@ import Testing
     }
 
     @Test func scrollbackSelectionRendersWhenScrolledIntoView() throws {
-        guard let fixture = try Self.fixture() else {
+        guard let fixture = try RenderFixture() else {
             Issue.record("No Metal device available in this environment")
             return
         }
@@ -105,23 +69,23 @@ import Testing
 
         // Scrolled all the way up, that line is viewport row 0.
         let scrolled = Self.draw(fixture, grid: grid, scrollOffset: count, selection: selection)
-        let inside = Self.cellCenter(fixture, column: 6, row: 0)
-        let outside = Self.cellCenter(fixture, column: 2, row: 0)
+        let inside = fixture.cellCenter(column: 6, row: 0)
+        let outside = fixture.cellCenter(column: 2, row: 0)
         #expect(
-            Self.pixel(of: scrolled, x: inside.x, y: inside.y).b
-                > Self.pixel(of: scrolled, x: outside.x, y: outside.y).b,
+            MetalRenderTarget.pixel(of: scrolled, x: inside.x, y: inside.y).b
+                > MetalRenderTarget.pixel(of: scrolled, x: outside.x, y: outside.y).b,
             "expected the selection tint over the selected scrollback line")
 
         // On the live screen the same selection is entirely above the
         // viewport and must paint nothing.
         let live = Self.draw(fixture, grid: grid, scrollOffset: 0, selection: selection)
-        let tinted = Self.pixel(of: scrolled, x: inside.x, y: inside.y)
-        let untinted = Self.pixel(of: live, x: inside.x, y: inside.y)
+        let tinted = MetalRenderTarget.pixel(of: scrolled, x: inside.x, y: inside.y)
+        let untinted = MetalRenderTarget.pixel(of: live, x: inside.x, y: inside.y)
         #expect(untinted.b < tinted.b, "an offscreen selection must not paint")
     }
 
     @Test func selectionFollowsItsTextWhenOutputScrolls() throws {
-        guard let fixture = try Self.fixture() else {
+        guard let fixture = try RenderFixture() else {
             Issue.record("No Metal device available in this environment")
             return
         }
@@ -140,9 +104,9 @@ import Testing
 
         // Frame 1 populates the renderer's caches, overlay included.
         let before = Self.draw(fixture, grid: grid1, scrollOffset: 0, selection: selection)
-        let row1 = Self.cellCenter(fixture, column: 6, row: 1)
+        let row1 = fixture.cellCenter(column: 6, row: 1)
         #expect(
-            Self.pixel(of: before, x: row1.x, y: row1.y).b > 0,
+            MetalRenderTarget.pixel(of: before, x: row1.x, y: row1.y).b > 0,
             "the selection tints the line it was made on")
 
         // Output pushes "ab" into the scrollback; every row below it moves
@@ -154,12 +118,12 @@ import Testing
         #expect(grid2.scrollback.count == 1)
 
         let after = Self.draw(fixture, grid: grid2, scrollOffset: 0, selection: selection)
-        let row0 = Self.cellCenter(fixture, column: 6, row: 0)
+        let row0 = fixture.cellCenter(column: 6, row: 0)
         #expect(
-            Self.pixel(of: after, x: row0.x, y: row0.y).b > 0,
+            MetalRenderTarget.pixel(of: after, x: row0.x, y: row0.y).b > 0,
             "the highlight must move up with its text")
         #expect(
-            Self.pixel(of: after, x: row1.x, y: row1.y).b == 0,
+            MetalRenderTarget.pixel(of: after, x: row1.x, y: row1.y).b == 0,
             "a stale highlight would still sit on the old row")
     }
 
@@ -171,7 +135,7 @@ import Testing
     /// is full. A limit of 2 makes it full after two evictions with only a
     /// handful of feeds.
     @Test func selectionTracksItsLineAfterTheRingSaturates() throws {
-        guard let fixture = try Self.fixture() else {
+        guard let fixture = try RenderFixture() else {
             Issue.record("No Metal device available in this environment")
             return
         }
@@ -201,13 +165,13 @@ import Testing
         // Scrolled fully into history, viewport row 0 is the oldest
         // surviving scrollback line — "cd" — and row 1 is "ef".
         let scrolled = Self.draw(fixture, grid: grid, scrollOffset: grid.scrollback.count, selection: selection)
-        let cdRow = Self.cellCenter(fixture, column: 6, row: 0)
-        let efRow = Self.cellCenter(fixture, column: 6, row: 1)
+        let cdRow = fixture.cellCenter(column: 6, row: 0)
+        let efRow = fixture.cellCenter(column: 6, row: 1)
         #expect(
-            Self.pixel(of: scrolled, x: cdRow.x, y: cdRow.y).b > 0,
+            MetalRenderTarget.pixel(of: scrolled, x: cdRow.x, y: cdRow.y).b > 0,
             "the highlight must follow \"cd\" onto the row it actually ended up on")
         #expect(
-            Self.pixel(of: scrolled, x: efRow.x, y: efRow.y).b == 0,
+            MetalRenderTarget.pixel(of: scrolled, x: efRow.x, y: efRow.y).b == 0,
             "a `.count`-based shift would place the highlight one row off, on \"ef\" instead")
     }
 }

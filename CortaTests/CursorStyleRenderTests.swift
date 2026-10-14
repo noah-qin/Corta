@@ -28,14 +28,6 @@ import Testing
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
 @Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct CursorStyleRenderTests {
-    private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
-        r: UInt8, g: UInt8, b: UInt8, a: UInt8
-    ) {
-        var bytes = [UInt8](repeating: 0, count: 4)
-        texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
-        return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
-    }
-
 
     /// Renders a 4x10 grid containing "abc" (cursor on row 0, column 3) with
     /// the given DECSCUSR parameter applied, and returns the texture. The
@@ -79,8 +71,8 @@ import Testing
         let cellH = Int(renderer.metrics.cellHeight)
         let cellX = 3 * cellW  // cursor column
 
-        let top = Self.pixel(of: texture, x: cellX + cellW / 2, y: cellH / 2)
-        let bottom = Self.pixel(of: texture, x: cellX + cellW / 2, y: cellH - 1)
+        let top = MetalRenderTarget.pixel(of: texture, x: cellX + cellW / 2, y: cellH / 2)
+        let bottom = MetalRenderTarget.pixel(of: texture, x: cellX + cellW / 2, y: cellH - 1)
         // The default dark theme's light cursor over the black clear colour.
         #expect(top.r < 30, "cell interior must stay background, got \(top)")
         #expect(bottom.r > 60, "bottom stroke must carry the cursor colour, got \(bottom)")
@@ -96,8 +88,8 @@ import Testing
         let cellH = Int(renderer.metrics.cellHeight)
         let cellX = 3 * cellW
 
-        let leading = Self.pixel(of: texture, x: cellX + 1, y: cellH / 2)
-        let trailing = Self.pixel(of: texture, x: cellX + cellW - 2, y: cellH / 2)
+        let leading = MetalRenderTarget.pixel(of: texture, x: cellX + 1, y: cellH / 2)
+        let trailing = MetalRenderTarget.pixel(of: texture, x: cellX + cellW - 2, y: cellH / 2)
         #expect(leading.r > 60, "leading stroke must carry the cursor colour, got \(leading)")
         #expect(trailing.r < 30, "cell interior must stay background, got \(trailing)")
     }
@@ -112,8 +104,8 @@ import Testing
         let cellH = Int(renderer.metrics.cellHeight)
         let cellX = 3 * cellW
 
-        let top = Self.pixel(of: texture, x: cellX + cellW / 2, y: 1)
-        let bottom = Self.pixel(of: texture, x: cellX + cellW / 2, y: cellH - 1)
+        let top = MetalRenderTarget.pixel(of: texture, x: cellX + cellW / 2, y: 1)
+        let bottom = MetalRenderTarget.pixel(of: texture, x: cellX + cellW / 2, y: cellH - 1)
         #expect(top.r > 60, "block must cover the cell top, got \(top)")
         #expect(bottom.r > 60, "block must cover the cell bottom, got \(bottom)")
     }
@@ -145,7 +137,7 @@ import Testing
                 case "6": (cellX + 1, cellH / 2)
                 default: (cellX + cellW / 2, cellH / 2)
                 }
-            let pixel = Self.pixel(of: texture, x: point.x, y: point.y)
+            let pixel = MetalRenderTarget.pixel(of: texture, x: point.x, y: point.y)
             #expect(pixel.b > 100, "\(sample) cursor must carry the theme colour, got \(pixel)")
             #expect(pixel.r < 30 && pixel.g < 30, "\(sample) cursor must not keep the old grey, got \(pixel)")
         }
@@ -191,7 +183,7 @@ import Testing
         var green = Theme.corta.dark
         green.cursor = SIMD4<Float>(0, 1, 0, 1)
         let (texture, renderer) = try Self.renderWithCursorStyle("2", variant: green)
-        let pixel = Self.pixel(
+        let pixel = MetalRenderTarget.pixel(
             of: texture, x: Int(renderer.metrics.cellWidth * 3.5),
             y: Int(renderer.metrics.cellHeight / 2))
         #expect(pixel.g > 100 && pixel.r < 60 && pixel.b < 60, "the pinned green cursor; got \(pixel)")

@@ -28,14 +28,6 @@ import Testing
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded by
 /// design — see the type's comment.
 @Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct IndexedPaletteRenderTests {
-    private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
-        r: UInt8, g: UInt8, b: UInt8, a: UInt8
-    ) {
-        var bytes = [UInt8](repeating: 0, count: 4)
-        texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
-        return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
-    }
-
 
     /// Renders a 4x10 grid whose whole first row carries background index
     /// 196 (xterm's cube red, `48;5;196m`), with `oscBeforeContent` fed
@@ -79,7 +71,7 @@ import Testing
             oscBeforeContent: nil)
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
-        let sample = Self.pixel(of: texture, x: cellW / 2, y: cellH / 2)
+        let sample = MetalRenderTarget.pixel(of: texture, x: cellW / 2, y: cellH / 2)
         // Index 196 is xterm's cube red: (255, 0, 0).
         #expect(sample.r > 200, "expected cube red, got \(sample)")
         #expect(sample.g < 30, "expected cube red, got \(sample)")
@@ -96,7 +88,7 @@ import Testing
             oscBeforeContent: "\u{1B}]4;196;#00ff00\u{1B}\\")
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
-        let sample = Self.pixel(of: texture, x: cellW / 2, y: cellH / 2)
+        let sample = MetalRenderTarget.pixel(of: texture, x: cellW / 2, y: cellH / 2)
         #expect(sample.r < 30, "expected the override (green), got \(sample)")
         #expect(sample.g > 200, "expected the override (green), got \(sample)")
         #expect(sample.b < 30, "expected the override (green), got \(sample)")
@@ -113,7 +105,7 @@ import Testing
             oscBeforeContent: "\u{1B}]4;196;#00ff00\u{1B}\\\u{1B}]104;196\u{1B}\\")
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
-        let sample = Self.pixel(of: texture, x: cellW / 2, y: cellH / 2)
+        let sample = MetalRenderTarget.pixel(of: texture, x: cellW / 2, y: cellH / 2)
         // Back to xterm's cube red.
         #expect(sample.r > 200, "expected cube red after reset, got \(sample)")
         #expect(sample.g < 30, "expected cube red after reset, got \(sample)")
@@ -150,13 +142,13 @@ import Testing
         renderOnce()
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
-        let before = Self.pixel(of: texture, x: cellW / 2, y: cellH / 2)
+        let before = MetalRenderTarget.pixel(of: texture, x: cellW / 2, y: cellH / 2)
         #expect(before.r > 200 && before.g < 30, "expected cube red before the override, got \(before)")
 
         // The override lands without touching the grid's own content at all.
         terminal.feed(Array("\u{1B}]4;196;#00ff00\u{1B}\\".utf8))
         renderOnce()
-        let after = Self.pixel(of: texture, x: cellW / 2, y: cellH / 2)
+        let after = MetalRenderTarget.pixel(of: texture, x: cellW / 2, y: cellH / 2)
         #expect(after.g > 200 && after.r < 30, "expected the override to repaint the cell, got \(after)")
     }
 }

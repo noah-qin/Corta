@@ -191,14 +191,6 @@ import Testing
 
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
-    private static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (
-        r: UInt8, g: UInt8, b: UInt8, a: UInt8
-    ) {
-        var bytes = [UInt8](repeating: 0, count: 4)
-        texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
-        return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
-    }
-
     @Test func asciiPathNeverCallsIntoShaping() throws {
         guard let device = Self.makeDevice() else {
             Issue.record("No Metal device available in this environment")
@@ -418,8 +410,8 @@ import Testing
         // necessarily reach the middle of an oversized cell.
         let sampleX = Int((instance.origin.x + instance.size.x / 2).rounded())
         let sampleY = Int((instance.origin.y + instance.size.y / 2).rounded())
-        let centre = Self.pixel(of: target, x: sampleX, y: sampleY)
-        let corner = Self.pixel(of: target, x: 1, y: 1)
+        let centre = MetalRenderTarget.pixel(of: target, x: sampleX, y: sampleY)
+        let corner = MetalRenderTarget.pixel(of: target, x: 1, y: 1)
         #expect(centre.r > 0, "expected ink at the centre of a rasterised 'X'")
         #expect(corner.r == 0, "expected background outside the glyph's ink")
     }
