@@ -7,6 +7,7 @@
     }
   ],
   "defaultOptions": {
+    "codeCoverage": false,
     "environmentVariableEntries": [
       {
         "key": "CORTA_RESTORE_WINDOWS",

@@ -7,6 +7,7 @@
     }
   ],
   "defaultOptions": {
+    "codeCoverage": false,
     "targetForVariableExpansion": {
       "containerPath": "container:Corta.xcodeproj",
       "identifier": "4F17769E30465E1F00E8DD20",
