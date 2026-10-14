@@ -100,6 +100,10 @@ public final class TerminalSession: @unchecked Sendable {
         /// How long `?2026` may gate presents — the one-second cap terminals
         /// commonly use; the core reads no configuration.
         var synchronizedOutputTimeout: Duration = .seconds(1)
+        /// Arms the `?2026` timeout; unset, a dispatch timer after
+        /// `synchronizedOutputTimeout`. Tests take the callback and fire it
+        /// in the order they mean to check, without waiting it out.
+        var scheduleSynchronizedOutputTimeout: (@Sendable (Duration, @escaping @Sendable () -> Void) -> Void)?
         /// How long a stopped session's process group has to leave after
         /// `SIGHUP` before it gets `SIGKILL`.
         var hangupGracePeriod: Duration = .seconds(10)
@@ -108,6 +112,8 @@ public final class TerminalSession: @unchecked Sendable {
     private let readerSource: ReaderSource?
     /// `Seams.synchronizedOutputTimeout`.
     private let synchronizedOutputTimeout: Duration
+    /// `Seams.scheduleSynchronizedOutputTimeout`.
+    private let scheduleTimeout: (@Sendable (Duration, @escaping @Sendable () -> Void) -> Void)?
     /// `Seams.hangupGracePeriod`.
     private let hangupGracePeriod: Duration
     /// Serial: resizes apply in request order.
@@ -371,6 +377,7 @@ public final class TerminalSession: @unchecked Sendable {
         writerSink = seams.writerSink
         resizeWorkGate = seams.resizeWorkGate
         synchronizedOutputTimeout = seams.synchronizedOutputTimeout
+        scheduleTimeout = seams.scheduleSynchronizedOutputTimeout
         hangupGracePeriod = seams.hangupGracePeriod
         let pty = try PTY.spawn(
             executable: executable,
@@ -590,8 +597,7 @@ public final class TerminalSession: @unchecked Sendable {
     /// Ends a `?2026` episode the child never closes, unless a later episode
     /// has begun.
     private func scheduleSynchronizedOutputTimeout(episode: Int) {
-        let deadline = DispatchTime.now() + synchronizedOutputTimeout.dispatchInterval
-        syncTimeoutQueue.asyncAfter(deadline: deadline) { [self] in
+        let expire: @Sendable () -> Void = { [self] in
             let ended = state.withLock { current -> Bool in
                 guard current.synchronizedOutputEpisode == episode,
                       current.terminal.isSynchronizedOutputEnabled
@@ -602,6 +608,12 @@ public final class TerminalSession: @unchecked Sendable {
             if ended {
                 callbacks.withLock { $0.onOutput }?()
             }
+        }
+        if let scheduleTimeout {
+            scheduleTimeout(synchronizedOutputTimeout, expire)
+        } else {
+            syncTimeoutQueue.asyncAfter(
+                deadline: DispatchTime.now() + synchronizedOutputTimeout.dispatchInterval, execute: expire)
         }
     }
 
