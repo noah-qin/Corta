@@ -195,12 +195,11 @@ struct SettingsView: View {
     private var appearancePage: some View {
         Form {
             if model.listedThemes.count >= 2 {
-                Picker(L10n.text("settings.label.theme"), selection: $model.theme) {
+                Picker(L10n.text("settings.label.theme"), selection: bind(\.theme)) {
                     ForEach(model.listedThemes, id: \.name) { theme in
                         Text(theme.displayName).tag(theme.name)
                     }
                 }
-                .onChange(of: model.theme) { _, value in model.setTheme(value) }
                 .accessibilityIdentifier("appearance-theme")
             }
             HStack {
@@ -213,7 +212,7 @@ struct SettingsView: View {
                     }.accessibilityIdentifier("theme-edit")
                 }
             }
-            Picker(L10n.text("settings.label.lightOrDark"), selection: bind(model.appearance, model.setAppearance)) {
+            Picker(L10n.text("settings.label.lightOrDark"), selection: bind(\.appearance)) {
                 ForEach(Configuration.Appearance.allCases, id: \.self) { appearance in
                     Text(
                         appearance == .auto
@@ -229,18 +228,18 @@ struct SettingsView: View {
                     .accessibilityIdentifier("supported-font")
             }
             LabeledContent(L10n.text("settings.label.size")) {
-                Stepper(value: bind(model.fontSize, model.setFontSize), in: 8...64) {
+                Stepper(value: bind(model.fontSize, model.setFontSize), in: Configuration.fontSizeRange) {
                     Text(model.fontSize, format: .number)
                 }
             }
             Section(L10n.text("settings.section.cursor")) {
-                Picker(L10n.text("settings.label.cursorShape"), selection: bind(model.cursorShape, model.setCursorShape)) {
+                Picker(L10n.text("settings.label.cursorShape"), selection: bind(\.cursorShape)) {
                     ForEach(Configuration.CursorShape.allCases, id: \.self) { shape in
                         Text(L10n.text("settings.cursor.\(shape.rawValue)")).tag(shape)
                     }
                 }
                 .accessibilityIdentifier("cursor-shape")
-                Toggle(L10n.text("settings.label.cursorBlink"), isOn: bind(model.cursorBlink, model.setCursorBlink))
+                Toggle(L10n.text("settings.label.cursorBlink"), isOn: bind(\.cursorBlink))
                     .accessibilityIdentifier("cursor-blink")
                     .help(L10n.text("settings.help.cursor"))
                 LabeledContent(L10n.text("settings.label.preview")) {
@@ -263,7 +262,7 @@ struct SettingsView: View {
             Section(L10n.text("status.settings")) {
                 Button(L10n.text("status.details")) { navigation.showHostDetails = true }
                     .accessibilityIdentifier("host-details")
-                Toggle(L10n.text("status.enable"), isOn: bind(model.statusBar, model.setStatusBar))
+                Toggle(L10n.text("status.enable"), isOn: bind(\.statusBar))
                     .accessibilityIdentifier("status-bar-enable")
                 ForEach(SystemMetrics.Item.allCases, id: \.self) { item in
                     Toggle(L10n.text("status.item.\(item.rawValue)"), isOn: Binding(
@@ -284,21 +283,20 @@ struct SettingsView: View {
                     numberField(bind(model.commandHistoryLimit, model.setCommandHistoryLimit), width: 92)
                 }
                 .help(L10n.text("ui.history.newSessions"))
-                Picker(L10n.text("settings.label.bell"), selection: $model.bell) {
+                Picker(L10n.text("settings.label.bell"), selection: bind(\.bell)) {
                     ForEach(SettingsModel.bellModes, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
-                .onChange(of: model.bell) { _, value in model.setBell(value) }
             }
             Section(L10n.text("ui.section.search")) {
-                Toggle(L10n.text("ui.search.case"), isOn: bind(model.searchCaseSensitive, model.setSearchCaseSensitive))
-                Toggle(L10n.text("ui.search.regex"), isOn: bind(model.searchRegex, model.setSearchRegex))
+                Toggle(L10n.text("ui.search.case"), isOn: bind(\.searchCaseSensitive))
+                Toggle(L10n.text("ui.search.regex"), isOn: bind(\.searchRegex))
             }
             Section(L10n.text("settings.section.shell")) {
-                Toggle(L10n.text("settings.label.directoryCompletion"), isOn: bind(model.directoryCompletion, model.setDirectoryCompletion))
+                Toggle(L10n.text("settings.label.directoryCompletion"), isOn: bind(\.directoryCompletion))
                     .help(L10n.text("settings.help.directoryCompletion"))
-                Toggle(L10n.text("settings.label.commandStatusMarks"), isOn: bind(model.commandStatusMarks, model.setCommandStatusMarks))
+                Toggle(L10n.text("settings.label.commandStatusMarks"), isOn: bind(\.commandStatusMarks))
                 LabeledContent(L10n.text("settings.label.openFileCommand")) {
                     OpenFileCommandField(model: model)
                 }
@@ -318,14 +316,14 @@ struct SettingsView: View {
     private var keyboardMousePage: some View {
         Form {
             Section(L10n.text("inputSource.settings.title")) {
-                Picker(L10n.text("inputSource.settings.display"), selection: bind(model.inputSourceIndicator, model.setInputSourceIndicator)) {
+                Picker(L10n.text("inputSource.settings.display"), selection: bind(\.inputSourceIndicator)) {
                     ForEach(Configuration.InputSourceIndicatorMode.allCases, id: \.self) { mode in
                         Text(L10n.text("inputSource.mode.\(mode.rawValue)")).tag(mode)
                     }
                 }
                 .accessibilityIdentifier("input-source-indicator-mode")
                 .help(L10n.text("inputSource.settings.help"))
-                Picker(L10n.text("inputSource.settings.position"), selection: bind(model.inputSourceIndicatorPosition, model.setInputSourceIndicatorPosition)) {
+                Picker(L10n.text("inputSource.settings.position"), selection: bind(\.inputSourceIndicatorPosition)) {
                     ForEach(Configuration.InputSourceIndicatorPosition.allCases, id: \.self) { position in
                         Text(L10n.text("inputSource.position.\(position.rawValue)")).tag(position)
                     }
@@ -337,28 +335,27 @@ struct SettingsView: View {
             Section(L10n.text("settings.section.keyboard")) {
                 Toggle(
                     L10n.text("settings.label.optionAsMeta"),
-                    isOn: bind(model.optionAsMeta, model.setOptionAsMeta)
+                    isOn: bind(\.optionAsMeta)
                 )
                 .help(L10n.text("settings.help.optionAsMeta"))
             }
             Section(L10n.text("settings.section.mouse")) {
                 Picker(
-                    L10n.text("settings.label.openLinksWith"), selection: $model.linkActivation
+                    L10n.text("settings.label.openLinksWith"), selection: bind(\.linkActivation)
                 ) {
                     Text(L10n.text("settings.linkActivation.commandClick"))
                         .tag(Configuration.LinkActivation.command)
                     Text(L10n.text("settings.linkActivation.click"))
                         .tag(Configuration.LinkActivation.click)
                 }
-                .onChange(of: model.linkActivation) { _, value in model.setLinkActivation(value) }
-                Picker(L10n.text("ui.mouse.override"), selection: bind(model.mouseOverrideModifier, model.setMouseOverrideModifier)) {
+                Picker(L10n.text("ui.mouse.override"), selection: bind(\.mouseOverrideModifier)) {
                     ForEach(Configuration.MouseOverrideModifier.allCases, id: \.self) { value in
                         Text(verbatim: value == .option ? "⌥ Option" : value == .shift ? "⇧ Shift" : "⌃ Control").tag(value)
                     }
                 }
                 Toggle(
                     L10n.text("settings.label.copyOnSelect"),
-                    isOn: bind(model.copyOnSelect, model.setCopyOnSelect))
+                    isOn: bind(\.copyOnSelect))
             }
         }
     }
@@ -372,14 +369,14 @@ struct SettingsView: View {
             Section(L10n.text("settings.section.clipboard")) {
                 Toggle(
                     L10n.text("settings.label.allowClipboardCopy"),
-                    isOn: bind(model.allowClipboardWrite, model.setAllowClipboardWrite)
+                    isOn: bind(\.allowClipboardWrite)
                 )
                 .help(L10n.text("settings.help.allowClipboardCopy"))
             }
             Section(L10n.text("settings.section.keyboard")) {
                 Toggle(
                     L10n.text("command.secureKeyboardEntry"),
-                    isOn: bind(model.secureKeyboardEntry, model.setSecureKeyboardEntry)
+                    isOn: bind(\.secureKeyboardEntry)
                 )
                 .help(L10n.text("settings.help.secureKeyboardEntry"))
             }
@@ -395,15 +392,15 @@ struct SettingsView: View {
             Section(L10n.text("settings.section.closing")) {
                 Toggle(
                     L10n.text("settings.label.confirmClose"),
-                    isOn: bind(model.confirmClose, model.setConfirmClose)
+                    isOn: bind(\.confirmClose)
                 )
                 .help(L10n.text("settings.help.confirmClose"))
             }
             notificationsSection
             if UpdateController.isAvailable {
                 Section(L10n.text("ui.section.updates")) {
-                    Toggle(L10n.text("ui.update.auto"), isOn: bind(model.updateAutoCheck, model.setUpdateAutoCheck))
-                    Toggle(L10n.text("ui.update.applications"), isOn: bind(model.suggestApplicationsFolder, model.setSuggestApplicationsFolder))
+                    Toggle(L10n.text("ui.update.auto"), isOn: bind(\.updateAutoCheck))
+                    Toggle(L10n.text("ui.update.applications"), isOn: bind(\.suggestApplicationsFolder))
                 }
             }
         }
@@ -452,7 +449,7 @@ struct SettingsView: View {
             .help(L10n.text("settings.help.newWindow"))
             Toggle(
                 L10n.text("settings.label.restoreWindows"),
-                isOn: bind(model.restoreWindows, model.setRestoreWindows))
+                isOn: bind(\.restoreWindows))
         }
     }
 
@@ -461,7 +458,7 @@ struct SettingsView: View {
         Section {
             Toggle(
                 L10n.text("settings.label.quickTerminalHotkey"),
-                isOn: bind(model.quickTerminal, model.setQuickTerminal)
+                isOn: bind(\.quickTerminal)
             )
             .help(L10n.text("settings.help.quickTerminal"))
             LabeledContent(L10n.text("ui.shortcut.global")) {
@@ -474,26 +471,20 @@ struct SettingsView: View {
             }
             Picker(
                 L10n.text("settings.label.quickTerminalPosition"),
-                selection: $model.quickTerminalPosition
+                selection: bind(\.quickTerminalPosition)
             ) {
                 ForEach(Configuration.QuickTerminalPosition.allCases, id: \.self) { position in
                     Text(L10n.text("settings.quickTerminalPosition.\(position.rawValue)"))
                         .tag(position)
                 }
             }
-            .onChange(of: model.quickTerminalPosition) { _, value in
-                model.setQuickTerminalPosition(value)
-            }
             Picker(
                 L10n.text("settings.label.quickTerminalScreen"),
-                selection: $model.quickTerminalScreen
+                selection: bind(\.quickTerminalScreen)
             ) {
                 ForEach(Configuration.QuickTerminalScreen.allCases, id: \.self) { screen in
                     Text(L10n.text("settings.quickTerminalScreen.\(screen.rawValue)")).tag(screen)
                 }
-            }
-            .onChange(of: model.quickTerminalScreen) { _, value in
-                model.setQuickTerminalScreen(value)
             }
         }
     }
@@ -502,7 +493,7 @@ struct SettingsView: View {
         Section(L10n.text("settings.section.notifications")) {
             Toggle(
                 L10n.text("settings.label.notifyOnLongTasks"),
-                isOn: bind(model.notifyOnLongTask, model.setNotifyOnLongTask)
+                isOn: bind(\.notifyOnLongTask)
             )
             .help(L10n.text("settings.help.notifyOnLongTasks"))
             if model.notificationPermissionNotice.kind != .none {
@@ -526,7 +517,7 @@ struct SettingsView: View {
         Section(L10n.text("settings.section.history")) {
             Toggle(
                 L10n.text("settings.label.directoryHistory"),
-                isOn: bind(model.directoryHistory, model.setDirectoryHistory)
+                isOn: bind(\.directoryHistory)
             )
             .help(L10n.text("settings.help.directoryHistory"))
             LabeledContent(L10n.text("settings.label.directoryHistoryClear")) {
@@ -560,6 +551,11 @@ struct SettingsView: View {
     /// and an error once the isolation is checked strictly.
     private func bind<Value>(_ value: Value, _ set: @escaping (Value) -> Void) -> Binding<Value> {
         Binding(get: { value }, set: { set($0) })
+    }
+
+    /// A control over one configuration field, written as given.
+    private func bind<Value>(_ path: WritableKeyPath<Configuration, Value>) -> Binding<Value> {
+        Binding(get: { model.configuration[keyPath: path] }, set: { model.set(path, $0) })
     }
 
     /// A right-aligned numeric field. `TextField(value:format:)` writes its

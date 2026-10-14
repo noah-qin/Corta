@@ -270,7 +270,10 @@ nonisolated struct Configuration: Equatable, Sendable {
                     continue
                 }
                 unknown.append((key, value))
-            } else if !configuration.apply(key: key, value: value) {
+            } else if Self.scalarKeys[key]?.read(&configuration, value) != true {
+                // Not ours, or a value that does not parse: the line survives
+                // verbatim for the user to fix. A parseable out-of-range value
+                // is clamped and rewritten canonically.
                 unknown.append((key, value))
             }
         }
@@ -279,158 +282,6 @@ nonisolated struct Configuration: Equatable, Sendable {
         // that would fail at spawn.
         configuration.presets = presetOrder.compactMap { presetDrafts[$0] }.filter(\.isUsable)
         return (configuration, unknown)
-    }
-
-    /// Applies one key; false when it isn't ours or its value doesn't parse,
-    /// so the line survives verbatim for the user to fix. A parseable
-    /// out-of-range value is clamped and rewritten canonically.
-    private mutating func apply(key: String, value: String) -> Bool {
-        switch key {
-        case "input-source-indicator":
-            guard let mode = InputSourceIndicatorMode(rawValue: value) else { return false }
-            inputSourceIndicator = mode
-        case "input-source-indicator-position":
-            guard let position = InputSourceIndicatorPosition(rawValue: value) else { return false }
-            inputSourceIndicatorPosition = position
-        case "input-source-direct-color", "input-source-ime-color":
-            guard let color = value.isEmpty ? "" : Theme.color(value).map(Theme.hex) else { return false }
-            if key == "input-source-direct-color" { inputSourceDirectColor = color }
-            else { inputSourceIMEColor = color }
-        case "status-bar":
-            guard let enabled = Self.parseBool(value) else { return false }
-            statusBar = enabled
-        case "status-items":
-            let names = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-            let items = names.compactMap(SystemMetrics.Item.init(rawValue:))
-            guard items.count == names.count else { return false }
-            statusItems = Set(items)
-        case "status-network-interface":
-            guard !value.isEmpty, value.count < 32,
-                value.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-") }) else { return false }
-            statusNetworkInterface = value
-        case "cursor-shape":
-            guard let shape = CursorShape(rawValue: value) else { return false }
-            cursorShape = shape
-        case "cursor-blink":
-            guard let blink = Self.parseBool(value) else { return false }
-            cursorBlink = blink
-        case "font-family":
-            // Legacy family names migrate to the single supported face.
-            fontFamily = Self.systemFontFamily
-        case "font-size":
-            // The ⌘+/⌘− clamp: below ~8pt the cell degenerates.
-            guard let size = Double(value) else { return false }
-            fontSize = min(64, max(8, size))
-        case "theme":
-            // Resolved at use: a custom theme may be defined further down.
-            theme = value.isEmpty ? Theme.corta.name : value
-        case "appearance":
-            guard let parsed = Appearance(rawValue: value) else { return false }
-            appearance = parsed
-        case "columns":
-            // Clamped between the minimum grid and a sane maximum.
-            guard let value = Int(value) else { return false }
-            columns = min(500, max(20, value))
-        case "rows":
-            guard let value = Int(value) else { return false }
-            rows = min(300, max(5, value))
-        case "scrollback-lines":
-            // Every unbounded input needs a cap (`SECURITY.md` §3).
-            guard let lines = Int(value) else { return false }
-            scrollbackLines = min(1_000_000, max(0, lines))
-        case "command-history-limit":
-            guard let limit = Int(value) else { return false }
-            commandHistoryLimit = min(10_000, max(0, limit))
-        case "bell":
-            guard let mode = BellMode(rawValue: value) else { return false }
-            bell = mode
-        case "notify-on-long-task":
-            guard let parsed = Self.parseBool(value) else { return false }
-            notifyOnLongTask = parsed
-        case "notification-threshold":
-            guard let seconds = Double(value) else { return false }
-            notificationThreshold = max(1, seconds)
-        case "open-file-command":
-            // Validated when set, not at click time. A bare name would resolve
-            // through a `PATH` the user's shell controls, not Corta.
-            guard Self.isUsableOpenFileCommand(value) else { return false }
-            openFileCommand = value
-        case "search-regex":
-            guard let parsed = Self.parseBool(value) else { return false }
-            searchRegex = parsed
-        case "search-case-sensitive":
-            guard let parsed = Self.parseBool(value) else { return false }
-            searchCaseSensitive = parsed
-        case "option-as-meta":
-            guard let parsed = Self.parseBool(value) else { return false }
-            optionAsMeta = parsed
-        case "copy-on-select":
-            guard let parsed = Self.parseBool(value) else { return false }
-            copyOnSelect = parsed
-        case "mouse-override-modifier":
-            guard let modifier = MouseOverrideModifier(rawValue: value) else { return false }
-            mouseOverrideModifier = modifier
-        case "link-activation":
-            guard let activation = LinkActivation(rawValue: value) else { return false }
-            linkActivation = activation
-        case "allow-clipboard-write":
-            guard let parsed = Self.parseBool(value) else { return false }
-            allowClipboardWrite = parsed
-        case "directory-completion":
-            guard let parsed = Self.parseBool(value) else { return false }
-            directoryCompletion = parsed
-        case "command-status-marks":
-            guard let parsed = Self.parseBool(value) else { return false }
-            commandStatusMarks = parsed
-        case "directory-history":
-            guard let parsed = Self.parseBool(value) else { return false }
-            directoryHistory = parsed
-        case "restore-windows":
-            guard let parsed = Self.parseBool(value) else { return false }
-            restoreWindows = parsed
-        case "confirm-close":
-            guard let parsed = Self.parseBool(value) else { return false }
-            confirmClose = parsed
-        case "update-auto-check":
-            guard let parsed = Self.parseBool(value) else { return false }
-            updateAutoCheck = parsed
-        case "suggest-applications-folder":
-            guard let parsed = Self.parseBool(value) else { return false }
-            suggestApplicationsFolder = parsed
-        case "quick-terminal":
-            guard let parsed = Self.parseBool(value) else { return false }
-            quickTerminal = parsed
-        case "quick-terminal-key":
-            // Empty means no hotkey (menu and palette only). A shortcut with no
-            // modifier is refused: it would swallow the key system-wide.
-            if value.isEmpty {
-                quickTerminalKey = nil
-            } else {
-                guard let shortcut = Shortcut.parse(value), GlobalHotKey.isRegistrable(shortcut)
-                else { return false }
-                quickTerminalKey = shortcut
-            }
-        case "quick-terminal-position":
-            guard let parsed = QuickTerminalPosition(rawValue: value) else { return false }
-            quickTerminalPosition = parsed
-        case "quick-terminal-screen":
-            guard let parsed = QuickTerminalScreen(rawValue: value) else { return false }
-            quickTerminalScreen = parsed
-        case "secure-keyboard-entry":
-            guard let parsed = Self.parseBool(value) else { return false }
-            secureKeyboardEntry = parsed
-        default:
-            return false
-        }
-        return true
-    }
-
-    private static func parseBool(_ value: String) -> Bool? {
-        switch value.lowercased() {
-        case "true", "yes", "on", "1": return true
-        case "false", "no", "off", "0": return false
-        default: return nil
-        }
     }
 
     // MARK: - Custom themes
@@ -584,55 +435,12 @@ nonisolated struct Configuration: Equatable, Sendable {
             "#",
             "# This file is the single source of truth. The settings page edits it,",
             "# and an edit made here is picked up while Corta is running.",
-            "",
-            "# Appearance",
-            "theme = \(theme)",
-            "appearance = \(appearance.rawValue)",
-            "input-source-indicator = \(inputSourceIndicator.rawValue)",
-            "input-source-indicator-position = \(inputSourceIndicatorPosition.rawValue)",
-            "input-source-direct-color = \(inputSourceDirectColor)",
-            "input-source-ime-color = \(inputSourceIMEColor)",
-            "status-bar = \(statusBar)",
-            "status-items = \(SystemMetrics.Item.allCases.filter { statusItems.contains($0) }.map(\.rawValue).joined(separator: ","))",
-            "status-network-interface = \(statusNetworkInterface)",
-            "cursor-shape = \(cursorShape.rawValue)",
-            "cursor-blink = \(cursorBlink)",
-            "font-family = \(fontFamily)",
-            "font-size = \(Self.number(fontSize))",
-            "",
-            "# Terminal",
-            "columns = \(columns)",
-            "rows = \(rows)",
-            "scrollback-lines = \(scrollbackLines)",
-            "command-history-limit = \(commandHistoryLimit)",
-            "bell = \(bell.rawValue)",
-            "copy-on-select = \(copyOnSelect)",
-            "link-activation = \(linkActivation.rawValue)",
-            "mouse-override-modifier = \(mouseOverrideModifier.rawValue)",
-            "option-as-meta = \(optionAsMeta)",
-            "search-case-sensitive = \(searchCaseSensitive)",
-            "search-regex = \(searchRegex)",
-            "open-file-command = \(openFileCommand)",
-            "allow-clipboard-write = \(allowClipboardWrite)",
-            "directory-history = \(directoryHistory)",
-            "directory-completion = \(directoryCompletion)",
-            "command-status-marks = \(commandStatusMarks)",
-            "restore-windows = \(restoreWindows)",
-            "confirm-close = \(confirmClose)",
-            "update-auto-check = \(updateAutoCheck)",
-            "suggest-applications-folder = \(suggestApplicationsFolder)",
-            "secure-keyboard-entry = \(secureKeyboardEntry)",
-            "",
-            "# Quick Terminal: a panel summoned by a system-wide hotkey.",
-            "quick-terminal = \(quickTerminal)",
-            "quick-terminal-key = \(quickTerminalKey?.text ?? "")",
-            "quick-terminal-position = \(quickTerminalPosition.rawValue)",
-            "quick-terminal-screen = \(quickTerminalScreen.rawValue)",
-            "",
-            "# Notifications",
-            "notify-on-long-task = \(notifyOnLongTask)",
-            "notification-threshold = \(Self.number(notificationThreshold))",
         ]
+        for (heading, keys) in Self.scalarSections {
+            lines.append("")
+            lines.append(heading)
+            for key in keys { lines.append("\(key.name) = \(key.write(self))") }
+        }
         if !presets.isEmpty {
             lines.append("")
             lines.append("# Presets: a shell, a directory and a few variables.")
@@ -672,9 +480,5 @@ nonisolated struct Configuration: Equatable, Sendable {
             lines.append("\(prefix).ansi = \(variant.ansi.map(Theme.hex).joined(separator: ", "))")
         }
         return lines
-    }
-
-    private static func number(_ value: Double) -> String {
-        value == value.rounded() ? String(Int(value)) : String(value)
     }
 }

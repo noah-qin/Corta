@@ -49,9 +49,9 @@ struct SettingsPageTests {
     func thresholdNoticeFollowsTheSwitch() {
         let model = SettingsModel()
         let original = model.notifyOnLongTask
-        defer { model.setNotifyOnLongTask(original) }
+        defer { model.set(\.notifyOnLongTask, original) }
 
-        model.setNotifyOnLongTask(false)
+        model.set(\.notifyOnLongTask, false)
         #expect(model.notificationPermissionNotice.kind == .none)
     }
 

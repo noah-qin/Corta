@@ -48,52 +48,18 @@ struct RowStatus: Equatable {
 /// field on commit — and per-field validation is what that shape wants.
 @MainActor
 @Observable
+@dynamicMemberLookup
 final class SettingsModel {
-    // MARK: - Config mirrors
+    // MARK: - Config mirror
 
-    var commandHistoryLimit = 512
-    var mouseOverrideModifier: Configuration.MouseOverrideModifier = .option
-    var searchCaseSensitive = false
-    var searchRegex = false
-    var updateAutoCheck = true
-    var suggestApplicationsFolder = true
-    var presets: [Preset] = []
-    var keybindings = Keybindings()
+    /// The store's configuration as of the last `refresh()`. Controls read
+    /// through it (`model.copyOnSelect` is `configuration.copyOnSelect`) and
+    /// write through `set` or a setter below — never into it directly.
+    private(set) var configuration = Configuration()
 
-    var statusBar = false
-    var statusItems = Set(SystemMetrics.Item.allCases)
-    var statusNetworkInterface = "auto"
-    var theme: String = Theme.corta.name
-    var inputSourceIndicatorPosition: Configuration.InputSourceIndicatorPosition = .toolbar
-    var inputSourceIndicator: Configuration.InputSourceIndicatorMode = .auto
-    var inputSourceDirectColor = ""
-    var inputSourceIMEColor = ""
-    var cursorShape: Configuration.CursorShape = .block
-    var cursorBlink: Bool = false
-    var appearance: Configuration.Appearance = .auto
-    var fontFamily: String = Configuration.systemFontFamily
-    var fontSize: Double = 12
-    var scrollbackLines: Int = 10_000
-    var columns: Int = 120
-    var rows: Int = 30
-    var bell: BellMode = .visual
-    var optionAsMeta: Bool = false
-    var openFileCommand: String = ""
-    var copyOnSelect: Bool = true
-    var linkActivation: Configuration.LinkActivation = .command
-    var allowClipboardWrite: Bool = false
-    var directoryHistory: Bool = true
-    var directoryCompletion: Bool = true
-    var commandStatusMarks: Bool = true
-    var restoreWindows: Bool = true
-    var confirmClose: Bool = true
-    var notifyOnLongTask: Bool = false
-    var notificationThreshold: Double = 30
-    var quickTerminal: Bool = false
-    var quickTerminalKey: Shortcut? = Shortcut.parse(Configuration.defaultQuickTerminalKey)
-    var quickTerminalPosition: Configuration.QuickTerminalPosition = .top
-    var quickTerminalScreen: Configuration.QuickTerminalScreen = .mouse
-    var secureKeyboardEntry: Bool = false
+    subscript<Value>(dynamicMember path: KeyPath<Configuration, Value>) -> Value {
+        configuration[keyPath: path]
+    }
 
     /// The bell modes in the order the picker lists them.
     static let bellModes: [BellMode] = [.visual, .audible, .muted]
@@ -115,12 +81,6 @@ final class SettingsModel {
 
     private var clearTask: Task<Void, Never>?
     private var notificationObservers: [NSObjectProtocol] = []
-
-    /// What the page last mirrored. `commit` refreshes directly, and the
-    /// store's `didChange` for that same write then arrives here too;
-    /// without this the page refreshed twice per control change. An
-    /// external edit differs from this and still refreshes.
-    private var mirrored: Configuration?
 
     /// What `previewFont` was built for, so a change to any other setting
     /// does not rebuild the face.
@@ -174,7 +134,10 @@ final class SettingsModel {
     }
 
     private func storeDidChange() {
-        guard ConfigurationStore.shared.configuration != mirrored else { return }
+        // `commit` refreshes directly, and the store's `didChange` for that
+        // same write arrives here too: without this the page refreshed twice
+        // per control change. An external edit differs and still refreshes.
+        guard ConfigurationStore.shared.configuration != configuration else { return }
         refresh()
     }
 
@@ -183,52 +146,10 @@ final class SettingsModel {
     /// `refreshExternalState`.
     func refresh() {
         let configuration = ConfigurationStore.shared.configuration
-        mirrored = configuration
+        self.configuration = configuration
         listedThemes = Theme.all(in: configuration)
-        commandHistoryLimit = configuration.commandHistoryLimit
-        mouseOverrideModifier = configuration.mouseOverrideModifier
-        searchCaseSensitive = configuration.searchCaseSensitive
-        searchRegex = configuration.searchRegex
-        updateAutoCheck = configuration.updateAutoCheck
-        suggestApplicationsFolder = configuration.suggestApplicationsFolder
-        presets = configuration.presets
-        keybindings = configuration.keybindings
-        statusBar = configuration.statusBar
-        statusItems = configuration.statusItems
-        statusNetworkInterface = configuration.statusNetworkInterface
-        theme = configuration.theme
-        inputSourceIndicatorPosition = configuration.inputSourceIndicatorPosition
-        inputSourceIndicator = configuration.inputSourceIndicator
-        inputSourceDirectColor = configuration.inputSourceDirectColor
-        inputSourceIMEColor = configuration.inputSourceIMEColor
-        cursorShape = configuration.cursorShape
-        cursorBlink = configuration.cursorBlink
-        appearance = configuration.appearance
-        fontFamily = Configuration.systemFontFamily
-        fontSize = configuration.fontSize
-        scrollbackLines = configuration.scrollbackLines
-        columns = configuration.columns
-        rows = configuration.rows
-        bell = configuration.bell
-        optionAsMeta = configuration.optionAsMeta
-        openFileCommand = configuration.openFileCommand
-        copyOnSelect = configuration.copyOnSelect
-        linkActivation = configuration.linkActivation
-        allowClipboardWrite = configuration.allowClipboardWrite
-        directoryHistory = configuration.directoryHistory
-        directoryCompletion = configuration.directoryCompletion
-        commandStatusMarks = configuration.commandStatusMarks
-        restoreWindows = configuration.restoreWindows
-        confirmClose = configuration.confirmClose
-        notifyOnLongTask = configuration.notifyOnLongTask
-        notificationThreshold = configuration.notificationThreshold
-        quickTerminal = configuration.quickTerminal
-        quickTerminalKey = configuration.quickTerminalKey
-        quickTerminalPosition = configuration.quickTerminalPosition
-        quickTerminalScreen = configuration.quickTerminalScreen
-        secureKeyboardEntry = configuration.secureKeyboardEntry
-        previewTheme = Theme.named(theme, in: configuration) ?? .corta
-        if previewedFont?.size != fontSize || previewedFont?.family != fontFamily {
+        previewTheme = Theme.named(configuration.theme, in: configuration) ?? .corta
+        if previewedFont?.size != configuration.fontSize || previewedFont?.family != configuration.fontFamily {
             refreshPreviewFont()
         }
         refreshQuickTerminalStatus()
@@ -236,8 +157,8 @@ final class SettingsModel {
     }
 
     private func refreshPreviewFont() {
-        previewedFont = (fontSize, fontFamily)
-        previewFont = TerminalFont.primary(ofSize: fontSize, family: fontFamily)
+        previewedFont = (configuration.fontSize, configuration.fontFamily)
+        previewFont = TerminalFont.primary(ofSize: configuration.fontSize, family: configuration.fontFamily)
     }
 
     /// The rows whose ground truth is a file this page does not own —
@@ -255,7 +176,7 @@ final class SettingsModel {
     /// Explicit selection drives the preview immediately; AppKit appearance
     /// propagation and configuration notifications may arrive later.
     var previewIsDark: Bool {
-        switch appearance {
+        switch configuration.appearance {
         case .light: false
         case .dark: true
         case .auto: followsSystemDark
@@ -274,9 +195,6 @@ final class SettingsModel {
 
     // MARK: - Setters
 
-    func setStatusBar(_ enabled: Bool) {
-        commit { $0.statusBar = enabled; return nil }
-    }
     func setStatusItem(_ item: SystemMetrics.Item, enabled: Bool) {
         commit { config in
             if enabled { config.statusItems.insert(item) } else { config.statusItems.remove(item) }
@@ -290,27 +208,6 @@ final class SettingsModel {
         commit { $0.statusNetworkInterface = parsed.statusNetworkInterface; return nil }
     }
 
-    func setTheme(_ name: String) {
-        commit { configuration in
-            configuration.theme = name
-            return nil
-        }
-    }
-
-    func setInputSourceIndicator(_ value: Configuration.InputSourceIndicatorMode) {
-        commit { configuration in
-            configuration.inputSourceIndicator = value
-            return nil
-        }
-    }
-
-    func setInputSourceIndicatorPosition(_ value: Configuration.InputSourceIndicatorPosition) {
-        commit { configuration in
-            configuration.inputSourceIndicatorPosition = value
-            return nil
-        }
-    }
-
     func setInputSourceColor(_ value: String, direct: Bool) {
         commit { configuration in
             guard let normalized = value.isEmpty ? "" : Theme.color(value).map(Theme.hex) else {
@@ -322,75 +219,20 @@ final class SettingsModel {
         }
     }
 
-    func setCursorShape(_ value: Configuration.CursorShape) {
-        commit { configuration in
-            configuration.cursorShape = value
-            return nil
-        }
-    }
-
-    func setCursorBlink(_ value: Bool) {
-        commit { configuration in
-            configuration.cursorBlink = value
-            return nil
-        }
-    }
-
-    func setAppearance(_ value: Configuration.Appearance) {
-        commit { configuration in
-            configuration.appearance = value
-            return nil
-        }
-    }
-
     func setFontSize(_ value: Double) {
-        commit { configuration in
-            let (clamped, message) = Self.clamp(
-                value, 8, 64, label: L10n.text("settings.label.size"))
-            configuration.fontSize = clamped
-            return message
-        }
+        set(\.fontSize, value, clampedTo: Configuration.fontSizeRange, label: L10n.text("settings.label.size"))
     }
 
     func setScrollbackLines(_ value: Int) {
-        commit { configuration in
-            let (clamped, message) = Self.clamp(
-                value, 0, 1_000_000, label: L10n.text("settings.label.scrollback"))
-            configuration.scrollbackLines = clamped
-            return message
-        }
+        set(\.scrollbackLines, value, clampedTo: Configuration.scrollbackLinesRange, label: L10n.text("settings.label.scrollback"))
     }
 
     func setColumns(_ value: Int) {
-        commit { configuration in
-            let (clamped, message) = Self.clamp(
-                value, 20, 500, label: L10n.text("settings.label.columns"))
-            configuration.columns = clamped
-            return message
-        }
+        set(\.columns, value, clampedTo: Configuration.columnsRange, label: L10n.text("settings.label.columns"))
     }
 
     func setRows(_ value: Int) {
-        commit { configuration in
-            let (clamped, message) = Self.clamp(
-                value, 5, 300, label: L10n.text("settings.label.rows"))
-            configuration.rows = clamped
-            return message
-        }
-    }
-
-    func setBell(_ value: BellMode) {
-        commit { configuration in
-            configuration.bell = value
-            return nil
-        }
-    }
-
-    func setOptionAsMeta(_ value: Bool) {
-        commit { configuration in
-            configuration.optionAsMeta = value
-            return nil
-        }
+        set(\.rows, value, clampedTo: Configuration.rowsRange, label: L10n.text("settings.label.rows"))
     }
 
     /// Refused rather than written: the page is a front over the config
@@ -407,78 +249,7 @@ final class SettingsModel {
         }
     }
 
-    func setCopyOnSelect(_ value: Bool) {
-        commit { configuration in
-            configuration.copyOnSelect = value
-            return nil
-        }
-    }
-
-    func setLinkActivation(_ value: Configuration.LinkActivation) {
-        commit { configuration in
-            configuration.linkActivation = value
-            return nil
-        }
-    }
-
-    func setAllowClipboardWrite(_ value: Bool) {
-        commit { configuration in
-            configuration.allowClipboardWrite = value
-            return nil
-        }
-    }
-
-    func setDirectoryCompletion(_ value: Bool) {
-        commit { $0.directoryCompletion = value; return nil }
-    }
-
-    func setCommandStatusMarks(_ value: Bool) {
-        commit { $0.commandStatusMarks = value; return nil }
-    }
-
-    func setDirectoryHistory(_ value: Bool) {
-        commit { configuration in
-            configuration.directoryHistory = value
-            return nil
-        }
-    }
-
-    func setRestoreWindows(_ value: Bool) {
-        commit { configuration in
-            configuration.restoreWindows = value
-            return nil
-        }
-    }
-
     // MARK: - System entry points
-
-    func setQuickTerminal(_ value: Bool) {
-        commit { configuration in
-            configuration.quickTerminal = value
-            return nil
-        }
-    }
-
-    func setQuickTerminalPosition(_ value: Configuration.QuickTerminalPosition) {
-        commit { configuration in
-            configuration.quickTerminalPosition = value
-            return nil
-        }
-    }
-
-    func setQuickTerminalScreen(_ value: Configuration.QuickTerminalScreen) {
-        commit { configuration in
-            configuration.quickTerminalScreen = value
-            return nil
-        }
-    }
-
-    func setSecureKeyboardEntry(_ value: Bool) {
-        commit { configuration in
-            configuration.secureKeyboardEntry = value
-            return nil
-        }
-    }
 
     /// The hotkey line under the Quick Terminal toggle. The key itself is
     /// edited in the config file (`quick-terminal-key`), like every `bind.*`
@@ -486,12 +257,12 @@ final class SettingsModel {
     /// value. What the page adds is the fact the file cannot show — whether
     /// the system actually granted the key.
     private func refreshQuickTerminalStatus() {
-        guard quickTerminal else {
+        guard configuration.quickTerminal else {
             quickTerminalStatus = RowStatus(
                 kind: .none, message: L10n.text("settings.status.quickTerminalOff"))
             return
         }
-        guard let key = quickTerminalKey else {
+        guard let key = configuration.quickTerminalKey else {
             quickTerminalStatus = RowStatus(
                 kind: .adjusted, message: L10n.text("settings.status.quickTerminalNoKey"))
             return
@@ -507,25 +278,24 @@ final class SettingsModel {
         }
     }
 
-    func setConfirmClose(_ value: Bool) {
-        commit { configuration in
-            configuration.confirmClose = value
-            return nil
-        }
-    }
-
-    func setNotifyOnLongTask(_ value: Bool) {
-        commit { configuration in
-            configuration.notifyOnLongTask = value
-            return nil
-        }
-    }
-
     func setNotificationThreshold(_ value: Double) {
+        set(\.notificationThreshold, value, clampedTo: Configuration.notificationThresholdRange, label: L10n.text("settings.label.longerThan"))
+    }
+
+    /// A field written as given.
+    func set<Value>(_ path: WritableKeyPath<Configuration, Value>, _ value: Value) {
+        commit { $0[keyPath: path] = value; return nil }
+    }
+
+    /// A numeric field the file clamps: the nearest value in `range` is
+    /// written, and the page says so.
+    private func set<Value: Comparable & CustomStringConvertible>(
+        _ path: WritableKeyPath<Configuration, Value>, _ value: Value,
+        clampedTo range: ClosedRange<Value>, label: String
+    ) {
         commit { configuration in
-            let (clamped, message) = Self.clamp(
-                value, 1, 86_400, label: L10n.text("settings.label.longerThan"))
-            configuration.notificationThreshold = clamped
+            let (clamped, message) = Self.clamp(value, range.lowerBound, range.upperBound, label: label)
+            configuration[keyPath: path] = clamped
             return message
         }
     }
@@ -744,7 +514,7 @@ final class SettingsModel {
     /// not the truth.
     private func refreshNotificationPermissionNotice() {
         let denied = TaskNotifier.permission == .denied
-        guard notifyOnLongTask && denied else {
+        guard configuration.notifyOnLongTask && denied else {
             notificationPermissionNotice = RowStatus()
             return
         }
@@ -761,28 +531,9 @@ final class SettingsModel {
 // Editors share the existing config-file write and rollback path.
 extension SettingsModel {
     func setCommandHistoryLimit(_ value: Int) {
-        commit { configuration in
-            let (limit, message) = Self.clamp(value, 0, 10_000, label: L10n.text("ui.history.commands"))
-            configuration.commandHistoryLimit = limit
-            return message
-        }
+        set(\.commandHistoryLimit, value, clampedTo: Configuration.commandHistoryLimitRange, label: L10n.text("ui.history.commands"))
     }
 
-    func setMouseOverrideModifier(_ value: Configuration.MouseOverrideModifier) {
-        commit { $0.mouseOverrideModifier = value; return nil }
-    }
-    func setSearchCaseSensitive(_ value: Bool) {
-        commit { $0.searchCaseSensitive = value; return nil }
-    }
-    func setSearchRegex(_ value: Bool) {
-        commit { $0.searchRegex = value; return nil }
-    }
-    func setUpdateAutoCheck(_ value: Bool) {
-        commit { $0.updateAutoCheck = value; return nil }
-    }
-    func setSuggestApplicationsFolder(_ value: Bool) {
-        commit { $0.suggestApplicationsFolder = value; return nil }
-    }
     func setQuickTerminalKey(_ value: Shortcut?) {
         commit { configuration in
             guard value == nil || !value!.modifiers.intersection([.command, .control, .option, .shift]).isEmpty else {
@@ -806,14 +557,14 @@ extension SettingsModel {
     }
     func savePreset(_ preset: Preset, replacing originalName: String?) -> Bool {
         guard Self.validPresetName(preset.name), preset.isUsable,
-            !presets.contains(where: { $0.name == preset.name && $0.name != originalName }) else { return false }
+            !configuration.presets.contains(where: { $0.name == preset.name && $0.name != originalName }) else { return false }
         commit { configuration in
             if let index = configuration.presets.firstIndex(where: { $0.name == originalName }) {
                 configuration.presets[index] = preset
             } else { configuration.presets.append(preset) }
             return nil
         }
-        return presets.contains(preset)
+        return configuration.presets.contains(preset)
     }
     nonisolated static func validPresetName(_ name: String) -> Bool {
         !name.isEmpty && !name.contains(where: { $0.isWhitespace || $0 == "." || $0 == "=" || $0 == "#" || $0.isNewline || $0 == "\0" })

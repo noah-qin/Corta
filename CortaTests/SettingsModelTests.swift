@@ -28,10 +28,10 @@ struct SettingsModelTests {
     @Test func explicitAppearanceImmediatelyUpdatesPreviewAndFontIsFixed() {
         let model = SettingsModel()
         let original = model.appearance
-        defer { model.setAppearance(original) }
-        model.setAppearance(.dark)
+        defer { model.set(\.appearance, original) }
+        model.set(\.appearance, .dark)
         #expect(model.previewIsDark)
-        model.setAppearance(.light)
+        model.set(\.appearance, .light)
         #expect(!model.previewIsDark)
         #expect(model.fontFamily == Configuration.systemFontFamily)
     }
@@ -153,7 +153,7 @@ struct SettingsModelTests {
         model.setFontSize(16)
         #expect(CTFontGetSize(model.previewFont) == 16)
         let before = model.previewFont
-        model.setCopyOnSelect(model.copyOnSelect)
+        model.set(\.copyOnSelect, model.copyOnSelect)
         #expect(model.previewFont === before, "an unrelated change must not rebuild the face")
     }
 
@@ -173,9 +173,9 @@ struct SettingsModelTests {
     func notificationNoticeHiddenWhenSettingOff() {
         let model = SettingsModel()
         let original = model.notifyOnLongTask
-        defer { model.setNotifyOnLongTask(original) }
+        defer { model.set(\.notifyOnLongTask, original) }
 
-        model.setNotifyOnLongTask(false)
+        model.set(\.notifyOnLongTask, false)
         #expect(model.notificationPermissionNotice.kind == .none)
     }
 
