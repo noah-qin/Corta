@@ -627,14 +627,7 @@ public nonisolated final class Metal4Backend {
         // The pass (and its clear) opened in `beginFrame`.
         guard let encoder, !instances.isEmpty else { return }
 
-        // The scissor keeps every instance inside `rect`.
-        let x = max(0, Int(rect.minX.rounded(.down)))
-        let y = max(0, Int(rect.minY.rounded(.down)))
-        let maxWidth = max(0, Int(drawableSize.width) - x)
-        let maxHeight = max(0, Int(drawableSize.height) - y)
-        let width = min(Int(rect.width.rounded(.up)), maxWidth)
-        let height = min(Int(rect.height.rounded(.up)), maxHeight)
-        guard width > 0, height > 0 else { return }
+        guard let scissor = Self.scissor(for: rect, in: drawableSize) else { return }
 
         let uniforms = QuadUniforms(
             rectOrigin: SIMD2<Float>(Float(rect.minX), Float(rect.minY)),
@@ -643,10 +636,52 @@ public nonisolated final class Metal4Backend {
             atlasSize: SIMD2<Float>(Float(atlas?.width ?? 1), Float(atlas?.height ?? 1)),
             imageUVRect: imageUVRect
         )
+        guard
+            upload(
+                instances, uniforms: uniforms, atlasRects: atlasRects, atlasRectsVersion: atlasRectsVersion,
+                through: ring)
+        else { return }
+        if let atlas {
+            makeResident(atlas, transient: transientTexture)
+            argumentTable.setTexture(atlas.gpuResourceID, index: 0)
+            argumentTable.setSamplerState(sampler.gpuResourceID, index: 0)
+        }
+
+        if lastPipeline !== pipeline {
+            encoder.setRenderPipelineState(pipeline)
+            lastPipeline = pipeline
+        }
+        encoder.setArgumentTable(argumentTable, stages: [.vertex, .fragment])
+        setScissorAndViewport(scissor, drawableSize: drawableSize, on: encoder)
+        encoder.pushDebugGroup(label)
+        encoder.drawPrimitives(
+            primitiveType: .triangleStrip, vertexStart: 0, vertexCount: 4,
+            instanceCount: instances.count)
+        encoder.popDebugGroup()
+    }
+
+    /// The scissor that keeps every instance inside `rect`, clipped to the
+    /// drawable; `nil` when nothing of it is on the drawable.
+    private static func scissor(for rect: CGRect, in drawableSize: CGSize) -> MTLScissorRect? {
+        let x = max(0, Int(rect.minX.rounded(.down)))
+        let y = max(0, Int(rect.minY.rounded(.down)))
+        let width = min(Int(rect.width.rounded(.up)), max(0, Int(drawableSize.width) - x))
+        let height = min(Int(rect.height.rounded(.up)), max(0, Int(drawableSize.height) - y))
+        guard width > 0, height > 0 else { return nil }
+        return MTLScissorRect(x: x, y: y, width: width, height: height)
+    }
+
+    /// Copies the instances, uniforms and — unless the atlas's own table is
+    /// current — its rectangles into this frame's slot of `ring`, and points
+    /// the argument table at them. `false` when there was no room.
+    private func upload(
+        _ instances: ContiguousArray<QuadInstance>, uniforms: QuadUniforms, atlasRects: [SIMD4<UInt16>],
+        atlasRectsVersion: UInt64?, through ring: InstanceBufferRing
+    ) -> Bool {
         let instanceByteCount = MemoryLayout<QuadInstance>.stride * instances.count
         var tableAddress: MTLGPUAddress?
         if let atlasRectsVersion, !atlasRects.isEmpty {
-            guard let address = rectangleTableAddress(atlasRects, version: atlasRectsVersion) else { return }
+            guard let address = rectangleTableAddress(atlasRects, version: atlasRectsVersion) else { return false }
             tableAddress = address
         }
         let copiedRects = tableAddress == nil ? atlasRects : []
@@ -660,24 +695,20 @@ public nonisolated final class Metal4Backend {
                     retired.append((frame: frameNumber, allocation: buffer))
                 }
             })
-        else { return }
+        else { return false }
         uploadedInstanceBytes += instanceByteCount
         uploadedRectangleBytes += copiedRects.count * MemoryLayout<SIMD4<UInt16>>.stride
         argumentTable.setAddress(addresses.0, index: 0)
         argumentTable.setAddress(addresses.1, index: 1)
         argumentTable.setAddress(tableAddress ?? addresses.2, index: 2)
-        if let atlas {
-            makeResident(atlas, transient: transientTexture)
-            argumentTable.setTexture(atlas.gpuResourceID, index: 0)
-            argumentTable.setSamplerState(sampler.gpuResourceID, index: 0)
-        }
+        return true
+    }
 
-        if lastPipeline !== pipeline {
-            encoder.setRenderPipelineState(pipeline)
-            lastPipeline = pipeline
-        }
-        encoder.setArgumentTable(argumentTable, stages: [.vertex, .fragment])
-        let scissor = MTLScissorRect(x: x, y: y, width: width, height: height)
+    /// Sets the scissor and the full-drawable viewport, each only when it
+    /// differs from what the encoder already has.
+    private func setScissorAndViewport(
+        _ scissor: MTLScissorRect, drawableSize: CGSize, on encoder: any MTL4RenderCommandEncoder
+    ) {
         let scissorIsCurrent =
             lastScissor.map {
                 $0.x == scissor.x && $0.y == scissor.y
@@ -701,11 +732,6 @@ public nonisolated final class Metal4Backend {
             encoder.setViewport(viewport)
             lastViewport = viewport
         }
-        encoder.pushDebugGroup(label)
-        encoder.drawPrimitives(
-            primitiveType: .triangleStrip, vertexStart: 0, vertexCount: 4,
-            instanceCount: instances.count)
-        encoder.popDebugGroup()
     }
 
     /// A texture nothing will bind again — an atlas texture replaced while

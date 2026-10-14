@@ -88,7 +88,7 @@ final class PaneAppearance: NSObject {
         // A zoom survives config changes; `resetFontSize` ends it. Family
         // and size apply together, so a reload that changes both re-points
         // the renderer, fits the window and resizes the child once.
-        let size = isFontSizeZoomed ? fontSize : min(64, max(8, configuration.fontSize))
+        let size = isFontSizeZoomed ? fontSize : Configuration.fontSizeRange.clamped(configuration.fontSize)
         if configuration.fontFamily != fontFamily || size != fontSize {
             fontFamily = configuration.fontFamily
             applyFont(size: size, settle: true)
@@ -139,7 +139,7 @@ final class PaneAppearance: NSObject {
     /// steps a point at a time, several a second — so the grid refits through
     /// the drag debounce until `settleFontChange()`.
     func setFontSize(_ newSize: CGFloat, settle: Bool = true) {
-        let clamped = min(64, max(8, newSize))
+        let clamped = Configuration.fontSizeRange.clamped(newSize)
         guard clamped != fontSize else { return }
         applyFont(size: clamped, settle: settle)
     }
@@ -155,7 +155,7 @@ final class PaneAppearance: NSObject {
     /// cell metrics. Below ~8pt the cell degenerates; above 64pt it outgrows
     /// the minimum window.
     private func applyFont(size: CGFloat, settle: Bool) {
-        fontSize = min(64, max(8, size))
+        fontSize = Configuration.fontSizeRange.clamped(size)
         // A failed pane has no renderer; its retry builds one at the
         // configured size.
         guard let terminalRenderer else { return }

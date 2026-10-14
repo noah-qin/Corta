@@ -174,19 +174,57 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     ) {
         let placements = table.orderedPlacements()
         let liveIDs = Set(placements.map(\.imageID))
-        var toSchedule: [(KittyGraphics.ImageID, UInt64, KittyGraphics.ImageData, DecodePermit)] = []
+        var toSchedule: [DecodeJob] = []
 
         lock.lock()
+        pruneLocked(keeping: liveIDs, table: table)
+        let visible = visibleImagesLocked(
+            placements, table: table, rows: rows, offset: offset,
+            scrollbackTotalPushed: scrollbackTotalPushed, cellHeight: cellHeight)
+        knownDecodedBytes = knownDecodedBytes.filter { liveIDs.contains($0.key) }
+        if visible != visibleIDs {
+            visibleIDs = visible
+            visibilityGeneration &+= 1
+        }
+        for placement in placements {
+            if let job = decodeJobLocked(for: placement.imageID, table: table, visible: visible) {
+                toSchedule.append(job)
+            }
+        }
+        lock.unlock()
+
+        for job in toSchedule {
+            decodeScheduler { [weak self] in
+                defer { job.permit.release() }
+                self?.decodeAndInstall(id: job.id, generation: job.generation, data: job.data)
+            }
+        }
+    }
+
+    private typealias DecodeJob = (
+        id: KittyGraphics.ImageID, generation: UInt64, data: KittyGraphics.ImageData, permit: DecodePermit
+    )
+
+    /// Releases textures and forgets failures and budget blocks for images
+    /// the table no longer holds. The table keeps the bytes, so a later
+    /// re-placement re-decodes.
+    private func pruneLocked(keeping liveIDs: Set<KittyGraphics.ImageID>, table: ImagePlacementTable) {
         for id in textures.keys where !liveIDs.contains(id) {
             releaseTextureLocked(id)
         }
-        // The table keeps the bytes, so a later re-placement re-decodes.
         failedGenerations = failedGenerations.filter { liveIDs.contains($0.key) }
         budgetBlocked = budgetBlocked.filter { liveIDs.contains($0.key) }
         desiredGenerations = Dictionary(uniqueKeysWithValues: liveIDs.compactMap { id in
             table.storeGeneration(for: id).map { (id, $0) }
         })
-        // One pass, and none at all (no allocation) for a pane without images.
+    }
+
+    /// The images some placement may show in the viewport. One pass, and
+    /// none at all (no allocation) for a pane without images.
+    private func visibleImagesLocked(
+        _ placements: [KittyGraphics.Placement], table: ImagePlacementTable, rows: Int, offset: Int,
+        scrollbackTotalPushed: Int, cellHeight: Float
+    ) -> Set<KittyGraphics.ImageID> {
         var visible = Set<KittyGraphics.ImageID>()
         for placement in placements where !visible.contains(placement.imageID) {
             guard let data = table.image(placement.imageID),
@@ -197,57 +235,49 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             else { continue }
             visible.insert(placement.imageID)
         }
-        knownDecodedBytes = knownDecodedBytes.filter { liveIDs.contains($0.key) }
-        if visible != visibleIDs {
-            visibleIDs = visible
-            visibilityGeneration &+= 1
-        }
+        return visible
+    }
 
-        for placement in placements {
-            let id = placement.imageID
-            guard let data = table.image(id),
-                let generation = table.storeGeneration(for: id)
-            else { continue }
-            if textureGenerations[id] == generation, textures[id] != nil { continue }
-            if textureGenerations[id] != generation, textures[id] != nil {
-                releaseTextureLocked(id)
-            }
-            guard failedGenerations[id] != generation else { continue }
-            // A replacement cannot orphan an actual queued/running job.
-            guard inFlight[id] == nil else { continue }
-            if let blocked = budgetBlocked[id], blocked.storeGeneration == generation {
-                guard blocked.globalGeneration != globalBudget.generation
-                    || blocked.paneGeneration != paneBudget.generation
-                    || blocked.visibilityGeneration != visibilityGeneration else { continue }
-                budgetBlocked[id] = nil
-            }
-            guard visible.contains(id) else { continue }
-            guard data.bytes.count <= 64 * 1024 * 1024 else {
-                failedGenerations[id] = generation
-                continue
-            }
-            // Known not to fit beside the visible textures, which are never
-            // evicted: wait without decoding — a blocked image retried on every
-            // visibility change was a full decode each time.
-            if let needed = decodedBytes(of: data, id: id, generation: generation),
-                needed > textureByteBudget - visibleTextureBytes(excluding: id)
-            {
-                budgetBlocked[id] = (
-                    generation, globalBudget.generation, paneBudget.generation, visibilityGeneration)
-                continue
-            }
-            guard Self.decodeBudget.tryReserve(1) else { continue }
-            inFlight[id] = generation
-            toSchedule.append((id, generation, data, DecodePermit()))
+    /// A decode to schedule for `id`, reserved and marked in flight, or
+    /// `nil` when its texture is current, it failed, a decode is running, it
+    /// is off screen or it cannot fit the budget.
+    private func decodeJobLocked(
+        for id: KittyGraphics.ImageID, table: ImagePlacementTable, visible: Set<KittyGraphics.ImageID>
+    ) -> DecodeJob? {
+        guard let data = table.image(id),
+            let generation = table.storeGeneration(for: id)
+        else { return nil }
+        if textureGenerations[id] == generation, textures[id] != nil { return nil }
+        if textureGenerations[id] != generation, textures[id] != nil {
+            releaseTextureLocked(id)
         }
-        lock.unlock()
-
-        for (id, generation, data, permit) in toSchedule {
-            decodeScheduler { [weak self] in
-                defer { permit.release() }
-                self?.decodeAndInstall(id: id, generation: generation, data: data)
-            }
+        guard failedGenerations[id] != generation else { return nil }
+        // A replacement cannot orphan an actual queued/running job.
+        guard inFlight[id] == nil else { return nil }
+        if let blocked = budgetBlocked[id], blocked.storeGeneration == generation {
+            guard blocked.globalGeneration != globalBudget.generation
+                || blocked.paneGeneration != paneBudget.generation
+                || blocked.visibilityGeneration != visibilityGeneration else { return nil }
+            budgetBlocked[id] = nil
         }
+        guard visible.contains(id) else { return nil }
+        guard data.bytes.count <= 64 * 1024 * 1024 else {
+            failedGenerations[id] = generation
+            return nil
+        }
+        // Known not to fit beside the visible textures, which are never
+        // evicted: wait without decoding — a blocked image retried on every
+        // visibility change was a full decode each time.
+        if let needed = decodedBytes(of: data, id: id, generation: generation),
+            needed > textureByteBudget - visibleTextureBytes(excluding: id)
+        {
+            budgetBlocked[id] = (
+                generation, globalBudget.generation, paneBudget.generation, visibilityGeneration)
+            return nil
+        }
+        guard Self.decodeBudget.tryReserve(1) else { return nil }
+        inFlight[id] = generation
+        return (id, generation, data, DecodePermit())
     }
 
     /// Texture bytes an image needs, before decoding it: from the header for

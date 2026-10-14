@@ -426,87 +426,97 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         // explicitly.
         largeTextTask = Task.detached(priority: .userInitiated) { [weak self] in
             let text = Self.exportableText(grid: grid, selection: range)
-
-            enum Outcome {
-                case cancelledOrDismissed
-                case empty
-                case wrote
-                case failed(Error)
-            }
-            let outcome: Outcome
+            let outcome: ExportOutcome
             if Task.isCancelled {
                 outcome = .cancelledOrDismissed
             } else if text.isEmpty {
                 outcome = .empty
             } else {
-                // Lets cancellation dismiss the panel and resume at once; the
-                // continuation alone has no cancellation awareness.
-                let panelBox = PresentedPanelBox()
-                let url: URL? = await withTaskCancellationHandler {
-                    await withCheckedContinuation { continuation in
-                        Task { @MainActor in
-                            guard let self, self.host?.didTeardown == false,
-                                self.largeTextTaskGeneration == generation
-                            else {
-                                continuation.resume(returning: nil)
-                                return
-                            }
-                            let panel = NSSavePanel()
-                            panel.allowedContentTypes = [.plainText]
-                            panel.nameFieldStringValue = filename
-                            panel.canCreateDirectories = true
-                            panel.isExtensionHidden = false
-                            panel.message = L10n.text(messageKey)
-                            panelBox.panel = panel
-                            panel.beginSheetModal(for: window) { response in
-                                continuation.resume(returning: response == .OK ? panel.url : nil)
-                            }
-                        }
-                    }
-                } onCancel: {
-                    // Accepted race: `onCancel` can run before the panel is
-                    // stored, and then the panel still shows. Closing it needs an
-                    // atomic handoff not worth it for a window this small.
-                    Task { @MainActor in
-                        guard let panel = panelBox.panel else { return }
-                        window.endSheet(panel, returnCode: .cancel)
-                    }
-                }
-                if Task.isCancelled {
-                    outcome = .cancelledOrDismissed
-                } else if let url {
-                    do {
-                        try Self.write(text, to: url)
-                        outcome = .wrote
-                    } catch {
-                        // Access was granted, so this is a full disk or read-only
-                        // volume: alert, since the file doesn't exist.
-                        outcome = .failed(error)
-                    }
-                } else {
-                    outcome = .cancelledOrDismissed
-                }
+                let url = await self?.exportDestination(
+                    in: window, filename: filename, messageKey: messageKey, generation: generation)
+                outcome = Self.export(text, to: url)
             }
-
             // One exit: clear the handle (generation-guarded) and apply.
             await MainActor.run {
                 guard let self, self.host?.didTeardown == false,
                     self.largeTextTaskGeneration == generation
                 else { return }
                 self.largeTextTask = nil
-                switch outcome {
-                case .cancelledOrDismissed:
-                    break
-                case .empty:
-                    self.host?.terminalView?.showToast(
-                        L10n.text("toast.nothingToExport"), kind: .warning)
-                case .wrote:
-                    self.host?.terminalView?.showToast(L10n.text("toast.exported"))
-                case .failed(let error):
-                    let alert = NSAlert(error: error)
-                    alert.beginSheetModal(for: window)
+                self.report(outcome, in: window)
+            }
+        }
+    }
+
+    private enum ExportOutcome {
+        case cancelledOrDismissed
+        case empty
+        case wrote
+        case failed(Error)
+    }
+
+    /// Where the user saves the export, from a sheet on `window`; `nil` when
+    /// dismissed, superseded or cancelled. Cancellation dismisses the panel
+    /// and resumes at once; the continuation alone has no cancellation
+    /// awareness.
+    nonisolated private func exportDestination(
+        in window: NSWindow, filename: String, messageKey: String, generation: Int
+    ) async -> URL? {
+        let panelBox = PresentedPanelBox()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                Task { @MainActor in
+                    guard self.host?.didTeardown == false, self.largeTextTaskGeneration == generation
+                    else {
+                        continuation.resume(returning: nil)
+                        return
+                    }
+                    let panel = NSSavePanel()
+                    panel.allowedContentTypes = [.plainText]
+                    panel.nameFieldStringValue = filename
+                    panel.canCreateDirectories = true
+                    panel.isExtensionHidden = false
+                    panel.message = L10n.text(messageKey)
+                    panelBox.panel = panel
+                    panel.beginSheetModal(for: window) { response in
+                        continuation.resume(returning: response == .OK ? panel.url : nil)
+                    }
                 }
             }
+        } onCancel: {
+            // Accepted race: `onCancel` can run before the panel is
+            // stored, and then the panel still shows. Closing it needs an
+            // atomic handoff not worth it for a window this small.
+            Task { @MainActor in
+                guard let panel = panelBox.panel else { return }
+                window.endSheet(panel, returnCode: .cancel)
+            }
+        }
+    }
+
+    /// Writes `text` to the chosen `url`, unless the task was cancelled or
+    /// nothing was chosen.
+    nonisolated private static func export(_ text: String, to url: URL?) -> ExportOutcome {
+        guard !Task.isCancelled, let url else { return .cancelledOrDismissed }
+        do {
+            try write(text, to: url)
+            return .wrote
+        } catch {
+            // Access was granted, so this is a full disk or read-only
+            // volume: alert, since the file doesn't exist.
+            return .failed(error)
+        }
+    }
+
+    private func report(_ outcome: ExportOutcome, in window: NSWindow) {
+        switch outcome {
+        case .cancelledOrDismissed:
+            break
+        case .empty:
+            host?.terminalView?.showToast(L10n.text("toast.nothingToExport"), kind: .warning)
+        case .wrote:
+            host?.terminalView?.showToast(L10n.text("toast.exported"))
+        case .failed(let error):
+            NSAlert(error: error).beginSheetModal(for: window)
         }
     }
 

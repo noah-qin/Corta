@@ -60,7 +60,7 @@ nonisolated struct ConfigurationKey: Sendable {
             name: name,
             read: { configuration, value in
                 guard let parsed = Int(value) else { return false }
-                configuration[keyPath: path] = min(range.upperBound, max(range.lowerBound, parsed))
+                configuration[keyPath: path] = range.clamped(parsed)
                 return true
             },
             write: { String($0[keyPath: path]) })
@@ -71,7 +71,7 @@ nonisolated struct ConfigurationKey: Sendable {
             name: name,
             read: { configuration, value in
                 guard let parsed = Double(value) else { return false }
-                configuration[keyPath: path] = min(range.upperBound, max(range.lowerBound, parsed))
+                configuration[keyPath: path] = range.clamped(parsed)
                 return true
             },
             write: { number($0[keyPath: path]) })
@@ -228,4 +228,11 @@ nonisolated extension Configuration {
 
     static let scalarKeys: [String: ConfigurationKey] = Dictionary(
         uniqueKeysWithValues: scalarSections.flatMap(\.keys).map { ($0.name, $0) })
+}
+
+nonisolated extension ClosedRange {
+    /// `value`, or the bound nearest it when it falls outside.
+    func clamped(_ value: Bound) -> Bound {
+        Swift.min(upperBound, Swift.max(lowerBound, value))
+    }
 }

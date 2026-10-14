@@ -283,13 +283,28 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// recorded command; ordinary startup may fall back to a working shell.
     private func setUpPane(strictRespawn: Bool = false) {
         let configuration = ConfigurationStore.shared.configuration
-        fontSize = min(64, max(8, configuration.fontSize))
+        fontSize = Configuration.fontSizeRange.clamped(configuration.fontSize)
         fontFamily = configuration.fontFamily
+        guard prepareRenderer() else { return }
+        let initialSize = initialTerminalSize()
+        guard let started = startSession(strictRespawn: strictRespawn, size: initialSize, configuration: configuration)
+        else { return }
+        adopt(started, size: initialSize)
+        installPaneViews()
+        installSessionCallbacks()
+        installTerminalCallbacks(on: terminalView)
+        // The PTY reader must not run until all callbacks and views are ready.
+        session.start()
+    }
+
+    /// A Metal 4 device and a renderer for it, or the failure view saying
+    /// why not.
+    private func prepareRenderer() -> Bool {
         guard let device = self.device ?? MTLCreateSystemDefaultDevice() else {
             presentFailure(
                 title: L10n.text("failure.title.metal"),
                 detail: L10n.text("failure.detail.metal"), canRetry: false)
-            return
+            return false
         }
         // Metal 4 is the only renderer (D21). A GPU without it — a virtual
         // machine's — gets this pane and no session, not a fallback.
@@ -297,43 +312,49 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             presentFailure(
                 title: L10n.text("failure.title.metal4"),
                 detail: L10n.text("failure.detail.metal4"), canRetry: false)
-            return
+            return false
         }
         self.device = device
         let scale = NSScreen.main?.backingScaleFactor ?? 2
         do {
             terminalRenderer = try makeRenderer(device: device, scale: scale)
+            return true
         } catch {
             presentFailure(
                 title: L10n.text("failure.title.renderer"),
                 detail: PaneSpawn.describe(error), canRetry: true)
-            return
+            return false
         }
+    }
 
-        var initialSize = initialGridSize ?? configuredGridSize
-        if let terminalRenderer {
-            let pixels = pixelSize(
-                columns: Int(initialSize.columns), rows: Int(initialSize.rows),
-                metrics: terminalRenderer.metrics)
-            initialSize = TerminalSize(
-                rows: initialSize.rows, columns: initialSize.columns,
-                pixelWidth: pixels.width, pixelHeight: pixels.height)
-        }
-        let started: PaneSpawn.Started
+    /// The grid the child starts with, and its size in pixels.
+    private func initialTerminalSize() -> TerminalSize {
+        let size = initialGridSize ?? configuredGridSize
+        guard let terminalRenderer else { return size }
+        let pixels = pixelSize(
+            columns: Int(size.columns), rows: Int(size.rows), metrics: terminalRenderer.metrics)
+        return TerminalSize(
+            rows: size.rows, columns: size.columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
+    }
+
+    /// The pane's child: the remote command again on a strict respawn,
+    /// otherwise the shell or preset. `nil` after presenting why it failed.
+    private func startSession(
+        strictRespawn: Bool, size: TerminalSize, configuration: Configuration
+    ) -> PaneSpawn.Started? {
         do {
             if strictRespawn, let command = remote.reconnectCommand {
-                started = PaneSpawn.Started(
+                return PaneSpawn.Started(
                     session: try PaneSpawn.respawn(
-                        command, size: initialSize, configuration: configuration, preset: preset,
+                        command, size: size, configuration: configuration, preset: preset,
                         workingDirectory: inheritedWorkingDirectory),
                     notice: nil, executable: command.executable, arguments: command.arguments)
-            } else {
-                started = try PaneSpawn.start(
-                    size: initialSize, directory: inheritedWorkingDirectory,
-                    scrollbackLimit: configuration.scrollbackLines,
-                    commandHistoryLimit: configuration.commandHistoryLimit, preset: preset,
-                    directoryCompletion: configuration.directoryCompletion)
             }
+            return try PaneSpawn.start(
+                size: size, directory: inheritedWorkingDirectory,
+                scrollbackLimit: configuration.scrollbackLines,
+                commandHistoryLimit: configuration.commandHistoryLimit, preset: preset,
+                directoryCompletion: configuration.directoryCompletion)
         } catch {
             presentFailure(
                 title: L10n.text("failure.title.session"),
@@ -341,26 +362,21 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 canReconnect: remote.reconnectCommand.map {
                     PaneRemoteState.isRemoteLauncher(executable: $0.executable)
                 } ?? false)
-            return
+            return nil
         }
+    }
+
+    /// Makes `started` this pane's session, coloured by the current theme.
+    private func adopt(_ started: PaneSpawn.Started, size: TerminalSize) {
         session = started.session
         launchedCommand = (started.executable, started.arguments)
         windowTitle.reset(session: started.session)
         remote.reset()
-        session.dynamicColors =
-            AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
-            .dynamicColors
-        session.indexedPalette =
-            AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
-            .indexedPaletteDefaults
+        let variant = AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
+        session.dynamicColors = variant.dynamicColors
+        session.indexedPalette = variant.indexedPaletteDefaults
         pendingSessionNotice = started.notice
-        lastRequestedSize = initialSize
-
-        installPaneViews()
-        installSessionCallbacks()
-        installTerminalCallbacks(on: terminalView)
-        // The PTY reader must not run until all callbacks and views are ready.
-        session.start()
+        lastRequestedSize = size
     }
 
     private func installPaneViews() {
@@ -414,8 +430,19 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     private func installTerminalCallbacks(on view: TerminalView) {
         frameLoop.install(on: view)
         pointer.install(on: view)
+        installInputSourceIndicator(on: view)
+        view.onCompletionKey = { [weak self] event in self?.shell.handleDirectoryCompletionKey(event) ?? false }
         // `view` weakly too: the closure is stored on it, and a strong capture
         // kept every closed pane's view — and its drawables — alive.
+        view.onKeyBytes = { [weak self, weak view] bytes in
+            self?.sendKeyBytes(bytes, from: view)
+        }
+        installKeyboardModes(on: view)
+        commands.installNativeIntegrations(on: view)
+        installViewEvents(on: view)
+    }
+
+    private func installInputSourceIndicator(on view: TerminalView) {
         view.addSubview(view.shellOverlay)
         view.addSubview(inputSourceIndicator.view)
         inputSourceIndicator.onChange = { [weak self] in self?.invalidateDisplay() }
@@ -425,36 +452,39 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             invalidateDisplay()
         }
         inputSourceIndicator.start()
-        view.onCompletionKey = { [weak self] event in self?.shell.handleDirectoryCompletionKey(event) ?? false }
-        view.onKeyBytes = { [weak self, weak view] bytes in
-            guard let self, self.isOperable else { return }
-            // Reader priority was raised by the view's `noteUserInput`, and
-            // by the session's own write.
-            if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view?.window) }
-            pointer.returnToBottomOnInput()
-            // Ctrl-C under a large paste: queued behind it, the interrupt
-            // waited for the whole paste — or, past the back-pressure cap,
-            // was refused. It drops what is left of the paste and goes next,
-            // or, with a write blocked on a child not reading, is delivered
-            // as the signal the terminal would raise for it.
-            if Paste.isInterrupt(bytes) {
-                let interrupt = session.interruptPendingPaste()
-                if interrupt.cancelledPaste {
-                    view?.showToast(L10n.text("toast.pasteCancelled"), kind: .warning)
-                }
-                if interrupt.signalled { return }
+    }
+
+    /// A keystroke's bytes, to the child.
+    private func sendKeyBytes(_ bytes: [UInt8], from view: TerminalView?) {
+        guard isOperable else { return }
+        // Reader priority was raised by the view's `noteUserInput`, and
+        // by the session's own write.
+        if bytes.contains(0x0D) { taskNotifier.noteCommandSubmitted(in: view?.window) }
+        pointer.returnToBottomOnInput()
+        // Ctrl-C under a large paste: queued behind it, the interrupt
+        // waited for the whole paste — or, past the back-pressure cap,
+        // was refused. It drops what is left of the paste and goes next,
+        // or, with a write blocked on a child not reading, is delivered
+        // as the signal the terminal would raise for it.
+        if Paste.isInterrupt(bytes) {
+            let interrupt = session.interruptPendingPaste()
+            if interrupt.cancelledPaste {
+                view?.showToast(L10n.text("toast.pasteCancelled"), kind: .warning)
             }
-            switch session.write(bytes) {
-            case .accepted, .failed: break // An async failure has its persistent recovery UI.
-            case .backpressured:
-                view?.showToast(L10n.text("toast.inputBackpressured"), kind: .warning)
-            case .stopped:
-                view?.showToast(L10n.text("toast.shellExited"), kind: .warning)
-            }
+            if interrupt.signalled { return }
         }
-        view.onLiveResizeEnded = { [weak self] in
-            self?.endLiveResize()
+        switch session.write(bytes) {
+        case .accepted, .failed: break // An async failure has its persistent recovery UI.
+        case .backpressured:
+            view?.showToast(L10n.text("toast.inputBackpressured"), kind: .warning)
+        case .stopped:
+            view?.showToast(L10n.text("toast.shellExited"), kind: .warning)
         }
+    }
+
+    /// What the key encoder asks per keystroke: the terminal's modes and
+    /// the settings that change what a key sends.
+    private func installKeyboardModes(on view: TerminalView) {
         view.isNewLineMode = { [weak self] in
             self?.session?.isNewLineModeEnabled ?? false
         }
@@ -473,7 +503,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         view.keybindings = {
             ConfigurationStore.shared.configuration.keybindings
         }
-        commands.installNativeIntegrations(on: view)
+    }
+
+    private func installViewEvents(on view: TerminalView) {
+        view.onLiveResizeEnded = { [weak self] in
+            self?.endLiveResize()
+        }
         view.onBackingScaleChange = { [weak self] scale in
             self?.appearance.rebuildAtlas(forBackingScale: scale)
         }

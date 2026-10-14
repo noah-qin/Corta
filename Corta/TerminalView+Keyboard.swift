@@ -175,40 +175,58 @@ extension TerminalView {
         if event.type == .keyUp { return nil }
 
         let modifiers = xtermModifiers(flags)
-
-        if let special = event.specialKey {
-            switch special {
-            case .upArrow:
-                return cursorKey("A", modifiers: modifiers, application: applicationCursorKeys)
-            case .downArrow:
-                return cursorKey("B", modifiers: modifiers, application: applicationCursorKeys)
-            case .rightArrow:
-                return cursorKey("C", modifiers: modifiers, application: applicationCursorKeys)
-            case .leftArrow:
-                return cursorKey("D", modifiers: modifiers, application: applicationCursorKeys)
-            case .home:
-                return cursorKey("H", modifiers: modifiers, application: applicationCursorKeys)
-            case .end:
-                return cursorKey("F", modifiers: modifiers, application: applicationCursorKeys)
-            case .pageUp: return tildeKey(5, modifiers: modifiers)
-            case .pageDown: return tildeKey(6, modifiers: modifiers)
-            case .deleteForward: return tildeKey(3, modifiers: modifiers)
-            case .f1: return functionKey("P", modifiers: modifiers)
-            case .f2: return functionKey("Q", modifiers: modifiers)
-            case .f3: return functionKey("R", modifiers: modifiers)
-            case .f4: return functionKey("S", modifiers: modifiers)
-            case .f5: return tildeKey(15, modifiers: modifiers)
-            case .f6: return tildeKey(17, modifiers: modifiers)
-            case .f7: return tildeKey(18, modifiers: modifiers)
-            case .f8: return tildeKey(19, modifiers: modifiers)
-            case .f9: return tildeKey(20, modifiers: modifiers)
-            case .f10: return tildeKey(21, modifiers: modifiers)
-            case .f11: return tildeKey(23, modifiers: modifiers)
-            case .f12: return tildeKey(24, modifiers: modifiers)
-            default: break
-            }
+        if let special = event.specialKey,
+            let encoded = specialKeyBytes(special, modifiers: modifiers, applicationCursorKeys: applicationCursorKeys)
+        {
+            return encoded
         }
+        return legacyBytes(
+            for: event, modifiers: modifiers, newLineMode: newLineMode,
+            applicationKeypad: applicationKeypad, optionAsMeta: optionAsMeta)
+    }
 
+    /// Arrows, the editing block and F1–F12 in their xterm CSI/SS3 forms.
+    private static func specialKeyBytes(
+        _ special: NSEvent.SpecialKey, modifiers: Int, applicationCursorKeys: Bool
+    ) -> [UInt8]? {
+        switch special {
+        case .upArrow:
+            return cursorKey("A", modifiers: modifiers, application: applicationCursorKeys)
+        case .downArrow:
+            return cursorKey("B", modifiers: modifiers, application: applicationCursorKeys)
+        case .rightArrow:
+            return cursorKey("C", modifiers: modifiers, application: applicationCursorKeys)
+        case .leftArrow:
+            return cursorKey("D", modifiers: modifiers, application: applicationCursorKeys)
+        case .home:
+            return cursorKey("H", modifiers: modifiers, application: applicationCursorKeys)
+        case .end:
+            return cursorKey("F", modifiers: modifiers, application: applicationCursorKeys)
+        case .pageUp: return tildeKey(5, modifiers: modifiers)
+        case .pageDown: return tildeKey(6, modifiers: modifiers)
+        case .deleteForward: return tildeKey(3, modifiers: modifiers)
+        case .f1: return functionKey("P", modifiers: modifiers)
+        case .f2: return functionKey("Q", modifiers: modifiers)
+        case .f3: return functionKey("R", modifiers: modifiers)
+        case .f4: return functionKey("S", modifiers: modifiers)
+        case .f5: return tildeKey(15, modifiers: modifiers)
+        case .f6: return tildeKey(17, modifiers: modifiers)
+        case .f7: return tildeKey(18, modifiers: modifiers)
+        case .f8: return tildeKey(19, modifiers: modifiers)
+        case .f9: return tildeKey(20, modifiers: modifiers)
+        case .f10: return tildeKey(21, modifiers: modifiers)
+        case .f11: return tildeKey(23, modifiers: modifiers)
+        case .f12: return tildeKey(24, modifiers: modifiers)
+        default: return nil
+        }
+    }
+
+    /// Everything else, in the legacy encoding: backtab, ⌥ as Meta, the
+    /// keypad, C0 control characters and text.
+    private static func legacyBytes(
+        for event: NSEvent, modifiers: Int, newLineMode: Bool, applicationKeypad: Bool, optionAsMeta: Bool
+    ) -> [UInt8]? {
+        let flags = event.modifierFlags
         // Shift-Tab is backtab (`CSI Z`, terminfo kcbt).
         if event.keyCode == 48, flags.contains(.shift) {
             return modifiers == 2
