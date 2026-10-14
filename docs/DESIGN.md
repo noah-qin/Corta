@@ -511,10 +511,11 @@ where they belong — except what a file channel must not inherit: like
 `ForwardX11=no`, `ClearAllForwardings=yes`, `PermitLocalCommand=no`,
 `RemoteCommand=none`, `RequestTTY=no` and `ControlMaster=no`. Two
 consequences are owned rather than hidden. The channel has no terminal (it is spawned into its own
-session), so ssh can prompt for nothing: password, passphrase and
-host-key questions fail as their own typed errors whose wording says
-to connect once in the terminal first — agent- or keychain-held keys
-and a host already in `known_hosts` are what work. And the host a
+session), so ssh can ask only through `SSH_ASKPASS`: Corta's own
+executable is that program, and carries each question — a password, a
+key passphrase, a one-time code, a new host key — to a dialog in the app
+over a socket only that ssh's children are answered on (D27,
+`SECURITY.md` §4.8). And the host a
 pane names is the remote shell's OSC 7 report — child output — so it
 is never connected to on the far end's say-so: the first connection
 to a host per run is asked with the name in front of the user,

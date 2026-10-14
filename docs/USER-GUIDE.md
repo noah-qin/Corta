@@ -444,11 +444,13 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   characters shows them as `�`, and a download saves them as `_`, so a name
   cannot pass for another one.
 
-The browser's connection has no terminal, so it cannot ask for a password,
-key passphrase or unknown host-key confirmation. Use a key available to
-OpenSSH through `ssh-agent` or the keychain, or an existing `ControlMaster`
-connection. Connect once in the terminal to confirm a new host's key; this
-alone does not make a password-only host usable in the browser.
+When the server asks for a password, a key passphrase or a one-time code,
+or when a host is new and its key needs your decision, the browser asks in
+a dialog on its window and hands your answer to OpenSSH; nothing is saved,
+so a reconnect asks again. The host-key dialog shows the fingerprint and
+defaults to Cancel. A key held by `ssh-agent` or the keychain, or an
+existing `ControlMaster` connection from your terminal, signs in without
+asking.
 
 Remote-edit uploads compare remote content as well as size and modification
 time and send the private snapshot you approved. If you save another local

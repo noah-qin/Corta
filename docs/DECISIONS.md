@@ -642,3 +642,35 @@ first official DMG update from 1.1.8, remain required human acceptance.
 On transition failure, revert this batch on main and ship a new ZIP patch;
 never replace a published asset. Enable release immutability only after
 those checks pass.
+
+## D27 — SFTP asks through OpenSSH's own askpass, answered by Corta
+
+**Decision.** An SFTP or remote-edit connection's `ssh` runs with
+`SSH_ASKPASS` set to Corta's own executable and `SSH_ASKPASS_REQUIRE=force`.
+When ssh needs a password, a key passphrase, a keyboard-interactive answer
+or a decision about a host key it has not seen, it runs that program with
+the question; the program carries it to the running app over a Unix socket
+and prints the answer the user gives in a dialog. Nothing is stored.
+
+**Why.** The channel has no terminal (`DESIGN.md` §7.9), and until now that
+meant SFTP could ask nothing: a host that takes only a password could not be
+browsed at all, and a new host key had to be accepted in a terminal first.
+The maintainer chose to close that gap on 2026-10-14, the way Transmit and
+Termius users expect. `SSH_ASKPASS` is OpenSSH's own mechanism for exactly
+this, so authentication, host-key policy and `known_hosts` stay with the
+system's ssh — no SSH library (D02), no second implementation of either.
+The system ssh (OpenSSH 10.3 on macOS 27) honours `SSH_ASKPASS_REQUIRE`.
+
+**What it costs.** A new local trust boundary (`SECURITY.md` §4.8): an
+answer goes only to a process that carries the connection's token, sends it
+on a socket in a `0700` directory, and is the child of an ssh that
+connection spawned. A keyboard-interactive prompt is the server's text and
+is shown cleaned, bounded and said to come from OpenSSH or the server. A
+reconnect after a dropped connection asks again, since nothing is kept. The
+askpass program is the app's main executable, which therefore checks for
+its two environment variables before anything else runs.
+
+**Consequence.** Terminal panes are unchanged: their ssh has a terminal and
+asks there. Reopen only with a reason to store a secret (a keychain item
+would be a new decision of its own) or a different transport for the
+question.

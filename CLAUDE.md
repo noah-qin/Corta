@@ -38,7 +38,7 @@ source of truth; this file is an index. `docs/README.md` is the fuller one.
 | `docs/DESIGN.md`           | Goals, architecture, modules, non-goals                     |
 | `docs/CONFORMANCE.md`      | Feature priorities (P0/P1/P2), the daily-driver checklist, test strategy, the five-point manual check |
 | `docs/PERFORMANCE.md`      | Targets, the hot-path rules, how each number is measured, the numbers |
-| `docs/SECURITY.md`         | Threat model, escape-sequence injection, resource caps, process safety, the three trust boundaries |
+| `docs/SECURITY.md`         | Threat model, escape-sequence injection, resource caps, process safety, the four trust boundaries |
 | `docs/TROUBLESHOOTING.md`  | What a user sees when something fails, and the fix          |
 | `docs/TESTING.md`          | Which check each kind of change needs, and how to run it   |
 | `docs/RELEASING.md`        | The release checklist, from `[Unreleased]` to a signed feed |
@@ -79,7 +79,9 @@ line each:
   extension. **D25** Metal frames present on their own, not with the
   Core Animation transaction.
 - **D26** Future releases and Sparkle updates use a signed, notarised DMG;
-  published ZIPs remain unchanged.
+  published ZIPs remain unchanged. **D27** SFTP asks for passwords,
+  passphrases and host keys through OpenSSH's `SSH_ASKPASS`, answered by
+  Corta's own executable and a dialog; nothing is stored.
 
 ## Working Rules
 

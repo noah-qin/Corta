@@ -19296,55 +19296,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Authentication failed connecting to %1$@:\n%2$@\n\nThe SFTP connection has no terminal, so ssh cannot ask for a password or a key passphrase here. Use a key held by ssh-agent or the keychain, or choose a private key when connecting."
+            "value": "Authentication failed connecting to %1$@:\n%2$@\n\nCheck the user, the password or the private key, and try again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连接 %1$@ 时认证失败：\n%2$@\n\nSFTP 连接没有终端，ssh 在这里无法询问密码或密钥口令。请使用 ssh-agent 或钥匙串持有的密钥，或在连接时选择私钥。"
+            "value": "连接 %1$@ 时认证失败：\n%2$@\n\n请检查用户名、密码或私钥后重试。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "連線 %1$@ 時驗證失敗：\n%2$@\n\nSFTP 連線沒有終端機，ssh 在這裡無法詢問密碼或金鑰密語。請使用 ssh-agent 或鑰匙圈持有的金鑰，或在連線時選擇私密金鑰。"
+            "value": "連線 %1$@ 時驗證失敗：\n%2$@\n\n請檢查使用者名稱、密碼或私密金鑰後重試。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$@ への接続で認証に失敗しました:\n%2$@\n\nSFTP 接続には端末がないため、ssh はここでパスワードや鍵のパスフレーズを尋ねられません。ssh-agent かキーチェーンが保持する鍵を使うか、接続時に秘密鍵を選択してください。"
+            "value": "%1$@ への接続で認証に失敗しました:\n%2$@\n\nユーザ、パスワード、秘密鍵を確認してもう一度お試しください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$@에 연결하는 중 인증에 실패했습니다:\n%2$@\n\nSFTP 연결에는 터미널이 없어 ssh가 여기서 암호나 키 암호 구문을 물을 수 없습니다. ssh-agent나 키체인이 보유한 키를 사용하거나, 연결할 때 개인 키를 선택하세요."
+            "value": "%1$@에 연결하는 중 인증에 실패했습니다:\n%2$@\n\n사용자, 암호 또는 개인 키를 확인한 뒤 다시 시도하세요."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Authentifizierung bei %1$@ fehlgeschlagen:\n%2$@\n\nDie SFTP-Verbindung hat kein Terminal, daher kann ssh hier weder nach einem Passwort noch nach einer Schlüssel-Passphrase fragen. Verwenden Sie einen Schlüssel aus ssh-agent oder dem Schlüsselbund, oder wählen Sie beim Verbinden einen privaten Schlüssel."
+            "value": "Authentifizierung bei %1$@ fehlgeschlagen:\n%2$@\n\nPrüfen Sie Benutzer, Passwort oder privaten Schlüssel und versuchen Sie es erneut."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Échec de l'authentification auprès de %1$@ :\n%2$@\n\nLa connexion SFTP n'a pas de terminal : ssh ne peut donc demander ici ni mot de passe ni phrase secrète de clé. Utilisez une clé détenue par ssh-agent ou le trousseau, ou choisissez une clé privée lors de la connexion."
+            "value": "Échec de l'authentification auprès de %1$@ :\n%2$@\n\nVérifiez l'utilisateur, le mot de passe ou la clé privée, puis réessayez."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Falló la autenticación al conectar con %1$@:\n%2$@\n\nLa conexión SFTP no tiene terminal, así que ssh no puede pedir aquí una contraseña ni la frase de una clave. Usa una clave que tenga ssh-agent o el llavero, o elige una clave privada al conectar."
+            "value": "Falló la autenticación al conectar con %1$@:\n%2$@\n\nComprueba el usuario, la contraseña o la clave privada y vuelve a intentarlo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Falha na autenticação ao conectar a %1$@:\n%2$@\n\nA conexão SFTP não tem terminal, então o ssh não pode pedir senha nem a frase-secreta de uma chave aqui. Use uma chave mantida pelo ssh-agent ou pelas chaves do sistema, ou escolha uma chave privada ao conectar."
+            "value": "Falha na autenticação ao conectar a %1$@:\n%2$@\n\nVerifique o usuário, a senha ou a chave privada e tente novamente."
           }
         }
       }
@@ -21007,55 +21007,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The host key of %1$@ could not be verified:\n%2$@\n\nThe SFTP connection has no terminal, so ssh cannot ask you to accept a new or changed host key here. Connect once in the terminal to review and accept it, then try again."
+            "value": "The host key of %1$@ could not be verified:\n%2$@\n\nA key that changed since it was trusted is refused until its old entry is removed from ~/.ssh/known_hosts. Check with the server’s administrator before you remove it."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法验证 %1$@ 的主机密钥：\n%2$@\n\nSFTP 连接没有终端，ssh 在这里无法请你接受新的或已变更的主机密钥。请先在终端里连接一次，审核并接受后再试。"
+            "value": "无法验证 %1$@ 的主机密钥：\n%2$@\n\n信任之后又发生变化的密钥会被拒绝，直到从 ~/.ssh/known_hosts 删除旧条目。删除之前请先向服务器管理员确认。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "無法驗證 %1$@ 的主機金鑰：\n%2$@\n\nSFTP 連線沒有終端機，ssh 在這裡無法請你接受新的或已變更的主機金鑰。請先在終端機裡連線一次，審核並接受後再試。"
+            "value": "無法驗證 %1$@ 的主機金鑰：\n%2$@\n\n信任之後又發生變化的金鑰會被拒絕，直到從 ~/.ssh/known_hosts 刪除舊項目。刪除之前請先向伺服器管理員確認。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$@ のホスト鍵を検証できませんでした:\n%2$@\n\nSFTP 接続には端末がないため、ssh はここで新しい、または変更されたホスト鍵の受け入れを尋ねられません。先に端末で一度接続して確認・受け入れてから、もう一度お試しください。"
+            "value": "%1$@ のホスト鍵を検証できませんでした:\n%2$@\n\n信頼した後に変わった鍵は、~/.ssh/known_hosts から古いエントリを削除するまで拒否されます。削除する前にサーバ管理者に確認してください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "%1$@의 호스트 키를 확인할 수 없습니다:\n%2$@\n\nSFTP 연결에는 터미널이 없어 ssh가 여기서 새 호스트 키나 변경된 호스트 키의 수락을 물을 수 없습니다. 먼저 터미널에서 한 번 연결해 검토하고 수락한 뒤 다시 시도하세요."
+            "value": "%1$@의 호스트 키를 확인할 수 없습니다:\n%2$@\n\n신뢰한 뒤에 바뀐 키는 ~/.ssh/known_hosts에서 이전 항목을 지울 때까지 거부됩니다. 지우기 전에 서버 관리자에게 확인하세요."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Der Hostschlüssel von %1$@ konnte nicht überprüft werden:\n%2$@\n\nDie SFTP-Verbindung hat kein Terminal, daher kann ssh Sie hier nicht bitten, einen neuen oder geänderten Hostschlüssel zu akzeptieren. Verbinden Sie sich zuerst einmal im Terminal, prüfen und akzeptieren Sie ihn, und versuchen Sie es dann erneut."
+            "value": "Der Host-Schlüssel von %1$@ konnte nicht überprüft werden:\n%2$@\n\nEin Schlüssel, der sich seit dem Vertrauen geändert hat, wird abgelehnt, bis sein alter Eintrag aus ~/.ssh/known_hosts entfernt ist. Fragen Sie vorher beim Administrator des Servers nach."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "La clé d'hôte de %1$@ n'a pas pu être vérifiée :\n%2$@\n\nLa connexion SFTP n'a pas de terminal : ssh ne peut donc pas vous demander ici d'accepter une clé d'hôte nouvelle ou modifiée. Connectez-vous d'abord une fois dans le terminal pour la vérifier et l'accepter, puis réessayez."
+            "value": "La clé d'hôte de %1$@ n'a pas pu être vérifiée :\n%2$@\n\nUne clé qui a changé depuis qu'elle a été approuvée est refusée tant que son ancienne entrée n'est pas retirée de ~/.ssh/known_hosts. Vérifiez auprès de l'administrateur du serveur avant de la retirer."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "No se pudo verificar la clave de host de %1$@:\n%2$@\n\nLa conexión SFTP no tiene terminal, así que ssh no puede pedirte aquí que aceptes una clave de host nueva o cambiada. Conecta primero una vez en el terminal para revisarla y aceptarla, y vuelve a intentarlo."
+            "value": "No se pudo verificar la clave de host de %1$@:\n%2$@\n\nUna clave que cambió después de aceptarla se rechaza hasta que se elimine su entrada antigua de ~/.ssh/known_hosts. Consulta con el administrador del servidor antes de eliminarla."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "A chave de host de %1$@ não pôde ser verificada:\n%2$@\n\nA conexão SFTP não tem terminal, então o ssh não pode pedir aqui que você aceite uma chave de host nova ou alterada. Conecte uma vez no terminal para revisá-la e aceitá-la, depois tente de novo."
+            "value": "Não foi possível verificar a chave de host de %1$@:\n%2$@\n\nUma chave que mudou depois de ser aceita é recusada até que sua entrada antiga seja removida de ~/.ssh/known_hosts. Confirme com o administrador do servidor antes de removê-la."
           }
         }
       }
@@ -26470,55 +26470,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "SFTP uses system OpenSSH and cannot ask for a password here: use a key held by ssh-agent or the keychain, or choose one above."
+            "value": "SFTP uses system OpenSSH, with its configuration and keys. When ssh needs a password, a key passphrase or a new host key accepted, Corta asks you; nothing is saved."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "SFTP 使用系统 OpenSSH，在这里无法询问密码：请使用 ssh-agent 或钥匙串持有的密钥，或在上方选择私钥。"
+            "value": "SFTP 使用系统 OpenSSH 及其配置和密钥。ssh 需要密码、密钥口令或确认新的主机密钥时，Corta 会询问你，且不保存任何内容。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP 使用系統 OpenSSH，在這裡無法詢問密碼：請使用 ssh-agent 或鑰匙圈持有的金鑰，或在上方選擇私密金鑰。"
+            "value": "SFTP 使用系統 OpenSSH 及其設定和金鑰。ssh 需要密碼、金鑰密語或確認新的主機金鑰時，Corta 會詢問你，且不儲存任何內容。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP はシステムの OpenSSH を使い、ここではパスワードを尋ねられません。ssh-agent かキーチェーンが保持する鍵を使うか、上で鍵を選択してください。"
+            "value": "SFTP はシステムの OpenSSH とその設定・鍵を使います。ssh がパスワード、鍵のパスフレーズ、新しいホスト鍵の承認を必要とするときは Corta が尋ね、何も保存しません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP는 시스템 OpenSSH를 사용하며 여기서는 암호를 물을 수 없습니다. ssh-agent나 키체인이 보유한 키를 사용하거나 위에서 키를 선택하세요."
+            "value": "SFTP는 시스템 OpenSSH와 그 설정 및 키를 사용합니다. ssh에 암호, 키 암호 구문 또는 새 호스트 키 승인이 필요하면 Corta가 묻고, 아무것도 저장하지 않습니다."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP verwendet das System-OpenSSH und kann hier nicht nach einem Passwort fragen: Verwenden Sie einen Schlüssel aus ssh-agent oder dem Schlüsselbund, oder wählen Sie oben einen aus."
+            "value": "SFTP verwendet das System-OpenSSH mit seiner Konfiguration und seinen Schlüsseln. Braucht ssh ein Passwort, eine Schlüssel-Passphrase oder die Zustimmung zu einem neuen Host-Schlüssel, fragt Corta Sie; nichts wird gespeichert."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP utilise l'OpenSSH du système et ne peut pas demander de mot de passe ici : utilisez une clé détenue par ssh-agent ou le trousseau, ou choisissez-en une ci-dessus."
+            "value": "SFTP utilise l'OpenSSH du système, avec sa configuration et ses clés. Quand ssh a besoin d'un mot de passe, d'une phrase secrète ou de l'acceptation d'une nouvelle clé d'hôte, Corta vous le demande ; rien n'est enregistré."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP usa el OpenSSH del sistema y no puede pedir una contraseña aquí: usa una clave que tenga ssh-agent o el llavero, o elige una arriba."
+            "value": "SFTP usa el OpenSSH del sistema, con su configuración y sus claves. Cuando ssh necesita una contraseña, la frase de una clave o aceptar una nueva clave de host, Corta te lo pregunta; no se guarda nada."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "O SFTP usa o OpenSSH do sistema e não pode pedir senha aqui: use uma chave mantida pelo ssh-agent ou pelas chaves do sistema, ou escolha uma acima."
+            "value": "O SFTP usa o OpenSSH do sistema, com sua configuração e suas chaves. Quando o ssh precisa de uma senha, da frase-secreta de uma chave ou da aceitação de uma nova chave de host, o Corta pergunta a você; nada é salvo."
           }
         }
       }
@@ -37347,6 +37347,655 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Não é possível ler o arquivo da chave privada. Escolha-o novamente."
+          }
+        }
+      }
+    },
+    "askpass.source": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This question comes from OpenSSH or the server. Corta passes your answer to ssh and keeps no copy."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个问题来自 OpenSSH 或服务器。Corta 只把你的回答交给 ssh，不保留任何副本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "這個問題來自 OpenSSH 或伺服器。Corta 只把你的回答交給 ssh，不保留任何副本。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "この質問は OpenSSH またはサーバからのものです。Corta は回答を ssh に渡すだけで、写しを残しません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 질문은 OpenSSH 또는 서버에서 온 것입니다. Corta는 답을 ssh에 전달할 뿐 사본을 남기지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Diese Frage stammt von OpenSSH oder vom Server. Corta gibt Ihre Antwort an ssh weiter und behält keine Kopie."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Cette question vient d'OpenSSH ou du serveur. Corta transmet votre réponse à ssh et n'en garde aucune copie."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta pregunta viene de OpenSSH o del servidor. Corta pasa tu respuesta a ssh y no guarda ninguna copia."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta pergunta vem do OpenSSH ou do servidor. O Corta repassa sua resposta ao ssh e não guarda nenhuma cópia."
+          }
+        }
+      }
+    },
+    "askpass.secret.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in to %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录 %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "登入 %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ にサインイン"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@에 로그인"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bei %@ anmelden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Se connecter à %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Iniciar sesión en %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Entrar em %@"
+          }
+        }
+      }
+    },
+    "askpass.continue": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "繼續"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "続ける"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "계속"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fortfahren"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Continuer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Continuar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Continuar"
+          }
+        }
+      }
+    },
+    "askpass.hostKey.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trust the host key of %@?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要信任 %@ 的主机密钥吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "要信任 %@ 的主機金鑰嗎？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ のホスト鍵を信頼しますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@의 호스트 키를 신뢰하시겠습니까?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dem Host-Schlüssel von %@ vertrauen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Faire confiance à la clé d'hôte de %@ ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "¿Confiar en la clave de host de %@?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Confiar na chave de host de %@?"
+          }
+        }
+      }
+    },
+    "askpass.hostKey.advice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trust it only if the fingerprint above matches the one the server’s administrator gave you. OpenSSH then saves it to ~/.ssh/known_hosts."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只有在上面的指纹与服务器管理员提供的一致时才信任。之后 OpenSSH 会把它保存到 ~/.ssh/known_hosts。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "只有在上面的指紋與伺服器管理員提供的一致時才信任。之後 OpenSSH 會把它儲存到 ~/.ssh/known_hosts。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上の指紋がサーバ管理者から伝えられたものと一致する場合にだけ信頼してください。OpenSSH はそれを ~/.ssh/known_hosts に保存します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "위 지문이 서버 관리자가 알려 준 것과 일치할 때만 신뢰하세요. 그러면 OpenSSH가 ~/.ssh/known_hosts에 저장합니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Vertrauen Sie ihm nur, wenn der Fingerabdruck oben mit dem übereinstimmt, den Ihnen der Administrator des Servers genannt hat. OpenSSH speichert ihn dann in ~/.ssh/known_hosts."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ne lui faites confiance que si l'empreinte ci-dessus correspond à celle que l'administrateur du serveur vous a donnée. OpenSSH l'enregistre ensuite dans ~/.ssh/known_hosts."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Confía solo si la huella de arriba coincide con la que te dio el administrador del servidor. OpenSSH la guardará entonces en ~/.ssh/known_hosts."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Confie apenas se a impressão digital acima corresponder à que o administrador do servidor lhe deu. O OpenSSH então a salva em ~/.ssh/known_hosts."
+          }
+        }
+      }
+    },
+    "askpass.hostKey.trust": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trust and Connect"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "信任并连接"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "信任並連線"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "信頼して接続"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "신뢰하고 연결"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Vertrauen und verbinden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Faire confiance et se connecter"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Confiar y conectar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Confiar e conectar"
+          }
+        }
+      }
+    },
+    "askpass.confirm.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow ssh to continue with %@?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许 ssh 继续连接 %@ 吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "允許 ssh 繼續連線 %@ 嗎？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh に %@ との処理を続行させますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh가 %@ 연결을 계속하도록 허용하시겠습니까?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh erlauben, mit %@ fortzufahren?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Autoriser ssh à continuer avec %@ ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "¿Permitir que ssh continúe con %@?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Permitir que o ssh continue com %@?"
+          }
+        }
+      }
+    },
+    "askpass.confirm.allow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "允許"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "許可"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "허용"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Erlauben"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Autoriser"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Permitir"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Permitir"
+          }
+        }
+      }
+    },
+    "askpass.confirm.deny": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deny"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拒绝"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "拒絕"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "拒否"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "거부"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ablehnen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Refuser"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Denegar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Negar"
+          }
+        }
+      }
+    },
+    "askpass.notify.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh is waiting for you (%@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh 正在等待你的操作（%@）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh 正在等待你的操作（%@）"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh が操作を待っています（%@）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh가 사용자의 동작을 기다리고 있습니다(%@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh wartet auf Sie (%@)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh attend votre action (%@)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh está esperando tu acción (%@)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O ssh está aguardando você (%@)"
+          }
+        }
+      }
+    },
+    "askpass.notify.hide": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "隱藏"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "隠す"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "숨기기"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ausblenden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Masquer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ocultar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ocultar"
           }
         }
       }

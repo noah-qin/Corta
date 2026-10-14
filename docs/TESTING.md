@@ -712,8 +712,14 @@ counts: passed, known bugs and failed.
 
 `script/verify_ssh_integration.py` runs `SFTPSSHIntegrationTests` through
 real OpenSSH on encrypted localhost TCP. It creates temporary host/client
-keys, known_hosts and client/server configs, disables agent use and
-forwarding, and reaps the test sshd and deletes credentials afterwards.
+keys (one with a passphrase), known_hosts and client/server configs,
+disables agent use and forwarding, and reaps the test sshd and deletes
+credentials afterwards. Besides sign-in and its refusals it covers a user,
+port and key given as options, a passphrase and a new host key asked
+through a forced `SSH_ASKPASS`, and a config's `RemoteCommand` and
+`RequestTTY force` not reaching the channel. The app's own askpass —
+`SSHAskpassBrokerTests` — runs the real executable against the broker,
+with the test process standing where ssh would.
 Run it from the repository root with `python3 script/verify_ssh_integration.py`;
 `ci.yml`'s core job runs it on every change, after `swift test`.
 It does not alter the installed SSH service or the user's SSH configuration.

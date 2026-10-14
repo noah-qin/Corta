@@ -234,12 +234,21 @@ and nothing here can tell — it is uncertainty, not an accusation.
 
 ### Browse Remote Files… says authentication failed, but `ssh` works in the pane
 
-The SFTP channel has no terminal, so `ssh` cannot ask for a password or a
-passphrase there. It works when a key is held by `ssh-agent` or the
-keychain, when you choose a private key in the connect form, or when
-`ControlMaster` in `~/.ssh/config` lets it reuse the connection the pane
-already opened. A host that only takes a password cannot be browsed; the
-error says so rather than hanging.
+The SFTP connection asks for a password or a key passphrase in a dialog
+on its window; a refused or cancelled dialog ends as this error. Check the
+user and port in the form — an alias's own `User` and `Port` apply only
+when those fields are empty — and the key, if you chose one: a chosen key
+is the only one offered. If no dialog appeared, the server refused every
+method ssh could try; `ssh -v` with the same user, port and key in a
+terminal shows which.
+
+### Browse Remote Files… says a host key could not be verified
+
+A host seen for the first time asks you to trust its key, in a dialog
+that shows the fingerprint. This error means the key *changed* since you
+trusted it — a reinstalled server, or someone in between. ssh refuses
+that until its old line is removed from `~/.ssh/known_hosts`
+(`ssh-keygen -R <host>`); ask the server's administrator first.
 
 ### Command History shows "(command text no longer in scrollback)"
 

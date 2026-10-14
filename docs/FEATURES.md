@@ -100,7 +100,9 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   breadcrumb path, sortable columns, hidden files on request, a row menu, drag
   and drop to upload and to Finder, and transfers in a toolbar popover with
   speed and time left. The first connection to a host in a run requires
-  confirmation; a remote report alone cannot open it.
+  confirmation; a remote report alone cannot open it. Passwords, key
+  passphrases, one-time codes and new host keys are asked in a dialog
+  through OpenSSH's `SSH_ASKPASS` and never saved.
 - Optional OSC 52 clipboard writes, disabled by default. Clipboard reads from
   terminal output are not implemented.
 

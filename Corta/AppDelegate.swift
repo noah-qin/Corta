@@ -27,6 +27,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// to it is weak, so its lifetime is extended across the run loop
     /// explicitly; a local alone is not guaranteed to live past its last use.
     static func main() {
+        // Started by an SFTP connection's ssh as its `SSH_ASKPASS`: carry the
+        // question to the running app and exit, before any UI exists.
+        if let status = SSHAskpassClient.runIfInvoked() { exit(status) }
         let delegate = AppDelegate()
         NSApplication.shared.delegate = delegate
         withExtendedLifetime(delegate) {
@@ -463,6 +466,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         flushLayoutSave()
         DirectoryHistoryStore.shared.flush()
         ZshBootstrap.removeGeneratedFiles()
+        // The askpass socket and its directory.
+        SSHAskpassBroker.shared.stop()
         // The secure-input count must reach zero before exit.
         SecureInput.shared.disengage()
         QuickTerminalController.shared.teardown()

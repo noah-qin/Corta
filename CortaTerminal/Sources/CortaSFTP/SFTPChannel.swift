@@ -22,10 +22,10 @@ import Synchronization
 /// The SFTP channel: the system `ssh -s -- <host> sftp` over plain pipes, so
 /// authentication, host keys and `~/.ssh/config` all belong to OpenSSH.
 ///
-/// The child has **no terminal** (its own session), so ssh cannot prompt: a
-/// password, an agent-less passphrase or an unknown host key fails as its own
-/// typed error whose remedy is connecting once in the terminal. `SSH_ASKPASS`
-/// is honoured by ssh itself.
+/// The child has **no terminal** (its own session), so ssh can prompt only
+/// through `SSH_ASKPASS`, which the app supplies (D27). Without it — a
+/// caller passing none — a password, an agent-less passphrase or an unknown
+/// host key fails as its own typed error.
 ///
 /// Pipes, not a PTY — line discipline would corrupt binary frames. Mirrored
 /// from `Spawn.child`: absolute paths only, `POSIX_SPAWN_CLOEXEC_DEFAULT`, the
@@ -44,7 +44,7 @@ public enum SFTPTransportError: Error, Equatable {
     case connectionLost
     case authenticationFailed(diagnostics: String)
     case hostUnreachable(diagnostics: String)
-    /// Unknown or changed host key; "yes" can never be typed here.
+    /// Unknown or changed host key, not accepted.
     case hostKeyUnverified(diagnostics: String)
     case subprocessFailed(exitCode: Int32, diagnostics: String)
 

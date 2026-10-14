@@ -661,11 +661,9 @@ belong to OpenSSH; there is nothing to configure here. Like `sftp(1)` and
 `scp(1)`, the channel never forwards the agent, X11 or ports, never runs a
 `LocalCommand` or a `RemoteCommand`, never asks for a remote terminal and
 never becomes a `ControlMaster`, whatever the configuration says for that
-host (it still reuses a master your terminal opened) — but it has
-**no terminal**, so ssh cannot prompt on it: a password, a key passphrase
-the agent does not hold, or a host key not yet in `known_hosts` fails with
-a message saying so rather than asking. Use a key held by `ssh-agent` or
-the keychain, and connect once in the terminal first for a new host.
+host (it still reuses a master your terminal opened). It has no terminal,
+so ssh asks for a password, a key passphrase or a new host key through
+Corta, in a dialog; nothing is saved.
 (`CORTA_SFTP_SSH`, an environment variable and never a config key, names
 an absolute path to run instead of `/usr/bin/ssh` with the same argv — a
 verification hook for driving a **Debug build only** against a local

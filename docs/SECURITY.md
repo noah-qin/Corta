@@ -324,6 +324,36 @@ app also notarised and stapled (D26). The feed retains historical ZIP
 entries; both formats keep EdDSA verification. Signed-feed enforcement,
 zero grace period and verification before mounting/extraction are unchanged.
 
+### 4.8 SFTP's sign-in questions are a fourth trust boundary
+
+An SFTP connection's `ssh` asks for a password, a key passphrase, a
+one-time code or a new host key through `SSH_ASKPASS` (D27): it runs
+Corta's own executable with the question, and that process carries it to
+the app over a Unix socket. Whatever reaches that socket could try to have
+a question shown — or read an answer — so a request is answered only when
+all of these hold:
+
+- The socket sits in a fresh `0700` directory in the user's temporary
+  folder (`mkdtemp`), mode `0600`, removed at quit.
+- The request carries the token of a live connection — 32 random bytes,
+  compared in constant time. The token lives in that ssh's environment
+  only; `ChildEnvironment` strips every `CORTA_` name from a shell's.
+- The sender (`LOCAL_PEERPID`) is the child of an ssh that connection
+  spawned, recorded as `posix_spawn` returns. The token alone is not
+  enough: the same user's processes can read ssh's environment.
+- A closed connection's token is dead: the broker holds it weakly.
+
+The request is one line of at most 16 KiB, read under a five-second
+timeout. A keyboard-interactive prompt is the *server's* text: the dialog
+shows it with controls and concealing scalars as U+FFFD, at most 24 lines
+and 2,000 characters, and says it comes from OpenSSH or the server. A
+host-key dialog defaults to Cancel. The answer is written to that socket
+and nowhere else — not stored, not logged — and the dialog closes,
+answering nothing, the moment the asking process goes away. Within §1's
+threat model a process already running as the user is out of scope; the
+parent check exists so that one *reading* ssh's environment cannot use the
+token on its own.
+
 ## 5. Data at Rest
 
 **Terminal contents are not automatically persisted.** Scrollback routinely
@@ -406,6 +436,16 @@ which records S01–S04 and S07 in full); the entries below are the ones
 whose write-up belongs with the design rather than with the release that
 made them.
 
+- **S21 — 2026-10-14: SFTP asks through askpass; the channel's login-only
+  settings.** SFTP and remote editing ask for passwords, passphrases and new
+  host keys through `SSH_ASKPASS` answered by the app (D27, §4.8). Reviewing
+  the channel for it found that a `RemoteCommand` in the user's
+  `~/.ssh/config` made ssh refuse the SFTP subsystem, and that
+  `RequestTTY force` would have put a remote terminal between the binary
+  frames: the channel now passes `RemoteCommand=none`, `RequestTTY=no` and,
+  as `sftp(1)` does, `ControlMaster=no`. The connect sheet's user, port and
+  key fields reach ssh as separate argv elements, with nothing ssh would
+  expand (`%`, `${}`) accepted in them.
 - **S20 — 2026-10-13: the 1.2.0 review.** A review of the release's work
   (#326) found no exploitable defect, and tightened the image path. The
   decoder receives one anonymous shared mapping, unlinked before spawn and

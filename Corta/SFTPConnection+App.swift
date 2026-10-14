@@ -29,7 +29,7 @@ extension SFTPConnection {
     /// one, since a server choosing what a ⌘-click fetches could otherwise
     /// fill the disk with no progress row to cancel from.
     static func forApp(key: String, maximumDownloadBytes: UInt64? = nil) -> SFTPConnection {
-        let environment = ChildEnvironment.default()
+        var environment = ChildEnvironment.default()
         // Remote bytes landing on this Mac get Gatekeeper's first-open check.
         var engine = SFTPTransferEngine.Configuration()
         engine.quarantinesDownloads = true
@@ -42,9 +42,19 @@ extension SFTPConnection {
         // connection is made with. Callers have already checked it.
         let target = SSHTarget(key: key) ?? SSHTarget(host: key)
         let arguments = SFTPSubprocessChannel.arguments(host: target.host, options: target.sshOptions)
+        // ssh asks for a password, a passphrase or a new host key through
+        // Corta (`SSHAskpass`, D27). The grant lives as long as this
+        // connection, which holds it through `onSpawn`.
+        var onSpawn: (@Sendable (pid_t) -> Void)?
+        // Its dialogs name the place, as the browser window's title does.
+        if let grant = SSHAskpassBroker.shared.grant(host: target.displayName) {
+            environment.merge(grant.environment) { _, granted in granted }
+            onSpawn = { pid in grant.admit(pid) }
+        }
         return SFTPConnection(
             host: key,
             sshExecutable: DiagnosticsEnvironment.sftpSSHExecutable() ?? SFTPSubprocessChannel.defaultSSHPath,
-            arguments: arguments, environment: environment, engineConfiguration: engine)
+            arguments: arguments, environment: environment, engineConfiguration: engine,
+            onSpawn: onSpawn)
     }
 }

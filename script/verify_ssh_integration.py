@@ -44,7 +44,9 @@ def run_fixture(root):
     try:
         for name in ('host','client','wrong'):
          subprocess.run(['/usr/bin/ssh-keygen','-q','-t','ed25519','-N','','-f',str(root/name)],check=True)
-        (root/'authorized_keys').write_text((root/'client.pub').read_text()); (root/'remote').mkdir()
+        # A key with a passphrase, which only SSH_ASKPASS can unlock here.
+        subprocess.run(['/usr/bin/ssh-keygen','-q','-t','ed25519','-N','corta pass phrase','-f',str(root/'locked')],check=True)
+        (root/'authorized_keys').write_text((root/'client.pub').read_text() + (root/'locked.pub').read_text()); (root/'remote').mkdir()
         sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close()
         (root/'sshd.conf').write_text(f'''ListenAddress 127.0.0.1\nPort {port}\nHostKey {root}/host\nPidFile {root}/sshd.pid\nAuthorizedKeysFile {root}/authorized_keys\nStrictModes no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nAllowUsers {pwd.getpwuid(os.getuid()).pw_name}\nSubsystem sftp internal-sftp -d {root}/remote\n''')
         log = open(root / 'sshd.log', 'w')
@@ -62,8 +64,13 @@ def run_fixture(root):
         (root/'ssh.conf').write_text(base);(root/'auth-failure.conf').write_text(base.replace(f'{root}/client',f'{root}/wrong'))
         (root/'key-failure.conf').write_text(base.replace(f'{root}/known_hosts',f'{root}/wrong_known_hosts'))
         wrong=(root/'wrong.pub').read_text().split();(root/'wrong_known_hosts').write_text(f'[127.0.0.1]:{port} {wrong[0]} {wrong[1]}\n')
+        # Asking through SSH_ASKPASS needs BatchMode off: a passphrase, and a
+        # host key not yet known (accepted into a file of the fixture's own).
+        asking = base.replace(' BatchMode yes\n', ' BatchMode no\n')
+        (root/'locked.conf').write_text(asking.replace(f'{root}/client', f'{root}/locked'))
         # Login-only settings a file channel must override, not inherit.
         (root/'login.conf').write_text(base + ' RemoteCommand echo login-only\n RequestTTY force\n')
+        (root/'tofu.conf').write_text(asking.replace(' StrictHostKeyChecking yes\n', ' StrictHostKeyChecking ask\n').replace(f'{root}/known_hosts', f'{root}/tofu_known_hosts'))
         # No user, port or key: the connect sheet's -l, -p and -i supply them.
         (root/'bare.conf').write_text(f'Host *\n IdentityAgent none\n ForwardAgent no\n BatchMode yes\n StrictHostKeyChecking yes\n UserKnownHostsFile {root}/known_hosts\n GlobalKnownHostsFile /dev/null\n ConnectTimeout 3\n')
         env = dict(os.environ, CORTA_SSH_TEST_ROOT=str(root), CORTA_SSH_TEST_PORT=str(port),
