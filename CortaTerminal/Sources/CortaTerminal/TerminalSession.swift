@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import Darwin
 import Dispatch
 import Foundation
@@ -72,9 +73,9 @@ public final class TerminalSession: @unchecked Sendable {
 
     private struct Callbacks {
         var onOutput: (@Sendable () -> Void)?
-        var onChildExit: (@Sendable (ChildExit) -> Void)?
+        var onChildExit: (@Sendable (ProcessExit) -> Void)?
         /// Replayed to a callback installed after the exit.
-        var childExit: ChildExit?
+        var childExit: ProcessExit?
         var ioFailure: IOFailure?
         var onIOFailure: (@Sendable (IOFailure) -> Void)?
     }
@@ -326,10 +327,10 @@ public final class TerminalSession: @unchecked Sendable {
 
     /// On the reader thread, after the loop stops; an earlier exit is replayed
     /// on the installing thread.
-    public var onChildExit: (@Sendable (ChildExit) -> Void)? {
+    public var onChildExit: (@Sendable (ProcessExit) -> Void)? {
         get { callbacks.withLock { $0.onChildExit } }
         set {
-            let replay: ChildExit? = callbacks.withLock { state in
+            let replay: ProcessExit? = callbacks.withLock { state in
                 state.onChildExit = newValue
                 return newValue == nil ? nil : state.childExit
             }
@@ -560,7 +561,7 @@ public final class TerminalSession: @unchecked Sendable {
             exit = pty.waitForExit(timeout: .seconds(2))
         }
         if let exit {
-            let callback = callbacks.withLock { state -> (@Sendable (ChildExit) -> Void)? in
+            let callback = callbacks.withLock { state -> (@Sendable (ProcessExit) -> Void)? in
                 state.childExit = exit
                 return state.onChildExit
             }

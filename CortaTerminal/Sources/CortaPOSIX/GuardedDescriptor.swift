@@ -32,11 +32,10 @@ import Synchronization
 /// child's 30-second `sleep`. Callers arrange a bounded wait or an explicit
 /// close wakeup so the deferred close follows promptly.
 ///
-/// This file exists twice, byte for byte: in `CortaTerminal` and in
-/// `CortaSFTP`, which shares no code with the core. `CortaSFTPTests` holds
-/// the two equal; change both or neither.
-final class GuardedDescriptor: Sendable {
-    let number: Int32
+/// Shared by the core's PTY and the SFTP channel through `package` access:
+/// neither library exposes it.
+package final class GuardedDescriptor: Sendable {
+    package let number: Int32
 
     private struct State {
         var inFlight = 0
@@ -47,7 +46,7 @@ final class GuardedDescriptor: Sendable {
 
     private let state = Mutex(State())
 
-    init(_ number: Int32) {
+    package init(_ number: Int32) {
         self.number = number
     }
 
@@ -55,10 +54,10 @@ final class GuardedDescriptor: Sendable {
         close()
     }
 
-    var isClosed: Bool { state.withLock { $0.isClosed } }
+    package var isClosed: Bool { state.withLock { $0.isClosed } }
 
     /// `false` once closed; on `true`, `leave()` must follow.
-    func enter() -> Bool {
+    package func enter() -> Bool {
         state.withLock { state in
             guard !state.isClosed else { return false }
             state.inFlight += 1
@@ -66,7 +65,7 @@ final class GuardedDescriptor: Sendable {
         }
     }
 
-    func leave() {
+    package func leave() {
         let release = state.withLock { state -> Bool in
             state.inFlight -= 1
             guard state.isClosed, state.inFlight == 0, !state.isReleased else { return false }
@@ -77,7 +76,7 @@ final class GuardedDescriptor: Sendable {
     }
 
     /// `nil` once closed; otherwise `body`'s result, with the number held.
-    func withNumber<Result, Failure: Error>(
+    package func withNumber<Result, Failure: Error>(
         _ body: (Int32) throws(Failure) -> Result
     ) throws(Failure) -> Result? {
         guard enter() else { return nil }
@@ -88,7 +87,7 @@ final class GuardedDescriptor: Sendable {
     /// Idempotent and non-blocking; `true` for the call that closed it. With a
     /// call in flight the number is closed when that call leaves.
     @discardableResult
-    func close() -> Bool {
+    package func close() -> Bool {
         let outcome = state.withLock { state -> (first: Bool, releaseNow: Bool) in
             guard !state.isClosed else { return (false, false) }
             state.isClosed = true

@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import Darwin
 import Dispatch
 import Synchronization
@@ -94,7 +95,7 @@ struct PTYWindowSizeTests {
     @Test("the exit code of the child is reported")
     func reportsChildExitCode() throws {
         let notified = DispatchSemaphore(value: 0)
-        let reported = Mutex<ChildExit?>(nil)
+        let reported = Mutex<ProcessExit?>(nil)
         let pty = try PTYFixture.shell("exit 7") { exit in
             reported.withLock { $0 = exit }
             notified.signal()

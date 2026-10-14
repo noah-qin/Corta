@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaPOSIX
 import CortaTerminal
 
 /// What a pane shows once its session has ended: a bar along one edge that
@@ -37,7 +38,7 @@ final class SessionEndedBar: NSView {
     /// The words for an exit, for the bar and for assistive technology.
     /// Exit code 0 is a normal end, said plainly; nothing here guesses why
     /// a program ended, only how.
-    nonisolated static func message(for exit: ChildExit, isConnection: Bool) -> String {
+    nonisolated static func message(for exit: ProcessExit, isConnection: Bool) -> String {
         switch exit {
         case .exited(let code):
             return L10n.format(
@@ -63,7 +64,7 @@ final class SessionEndedBar: NSView {
 
     /// - Parameter isConnection: the pane ran a remote launcher; its button
     ///   reconnects, and says so.
-    init(exit: ChildExit, isConnection: Bool) {
+    init(exit: ProcessExit, isConnection: Bool) {
         message = Self.message(for: exit, isConnection: isConnection)
         super.init(frame: .zero)
         wantsLayer = true

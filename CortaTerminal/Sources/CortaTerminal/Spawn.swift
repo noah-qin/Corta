@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import Darwin
 
 /// Launches a child on a pty replica by `posix_spawn`ing `corta-exec`, which
@@ -81,13 +82,7 @@ enum Spawn {
                 POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSID | POSIX_SPAWN_SETSIGDEF
                     | POSIX_SPAWN_SETSIGMASK)
         )
-        // Default signal actions, nothing blocked (`SECURITY.md` §4.3).
-        var allSignals = sigset_t()
-        sigfillset(&allSignals)
-        posix_spawnattr_setsigdefault(&attributes, &allSignals)
-        var noSignals = sigset_t()
-        sigemptyset(&noSignals)
-        posix_spawnattr_setsigmask(&attributes, &noSignals)
+        resetSignals(of: &attributes)
 
         var childArguments = [helperPath, String(writeEnd), executable]
         childArguments.append(contentsOf: arguments)
@@ -233,15 +228,3 @@ enum Spawn {
 /// A C function pointer, not a Swift closure (which can be a fat pointer):
 /// `dladdr` needs one address inside this module.
 private let addressAnchor: @convention(c) () -> Void = {}
-
-/// A null-terminated `char *[]`, valid for `body`.
-private func withCStringArray<Result>(
-    _ strings: [String], _ body: (UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> Result
-) -> Result {
-    var pointers = strings.map { strdup($0) }
-    pointers.append(nil)
-    defer { for pointer in pointers { free(pointer) } }
-    return pointers.withUnsafeMutableBufferPointer { buffer in
-        body(buffer.baseAddress!)
-    }
-}

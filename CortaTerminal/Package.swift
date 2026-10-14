@@ -28,6 +28,7 @@ let package = Package(
     products: [
         .library(name: "CortaTerminal", targets: ["CortaTerminal"]),
         .library(name: "CortaSFTP", targets: ["CortaSFTP"]),
+        .library(name: "CortaPOSIX", targets: ["CortaPOSIX"]),
         .executable(name: "corta-dump", targets: ["corta-dump"]),
         .executable(name: "corta-bench", targets: ["corta-bench"]),
         .executable(name: "corta-exec", targets: ["corta-exec"]),
@@ -37,8 +38,17 @@ let package = Package(
         .executable(name: "corta-release-check", targets: ["corta-release-check"]),
     ],
     targets: [
+        // The process plumbing the core's PTY, the SFTP channel and the app's
+        // image decoder all need: a descriptor that survives a racing close,
+        // how a child ended, and a spawn's signal state. Shared through
+        // `package` access, so neither library re-exports it.
+        .target(
+            name: "CortaPOSIX",
+            swiftSettings: [.defaultIsolation(nil)]
+        ),
         .target(
             name: "CortaTerminal",
+            dependencies: ["CortaPOSIX"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
         // The SFTP client, spoken to `ssh -s … sftp` over pipes. A sibling of
@@ -48,6 +58,7 @@ let package = Package(
         // an embedded dynamic framework. `ModuleBoundaryTests` keep it so.
         .target(
             name: "CortaSFTP",
+            dependencies: ["CortaPOSIX"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
         // The spawn helper `Spawn.swift` posix_spawns and then execve's over
@@ -77,7 +88,7 @@ let package = Package(
         // measured, not estimated. Run with `-c release` for real numbers.
         .executableTarget(
             name: "corta-bench",
-            dependencies: ["CortaTerminal"],
+            dependencies: ["CortaTerminal", "CortaPOSIX"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
         // Fuzz harness over the terminal feed path, the OSC and Kitty
@@ -129,7 +140,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CortaTerminalTests",
-            dependencies: ["CortaTerminal"],
+            dependencies: ["CortaTerminal", "CortaPOSIX"],
             // Golden-file inputs and expectations. Read from the source
             // directory through `#filePath`, so they are neither compiled
             // nor copied into a bundle.
@@ -138,7 +149,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CortaSFTPTests",
-            dependencies: ["CortaSFTP"],
+            dependencies: ["CortaSFTP", "CortaPOSIX"],
             swiftSettings: [.defaultIsolation(nil)]
         ),
     ]

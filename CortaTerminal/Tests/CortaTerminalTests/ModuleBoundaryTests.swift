@@ -19,7 +19,7 @@ import Testing
 
 @testable import CortaTerminal
 
-/// `CortaTerminal` and `CortaSFTP` must not import AppKit or Metal
+/// `CortaTerminal`, `CortaSFTP` and `CortaPOSIX` must not import AppKit or Metal
 /// (`DESIGN.md` §4), nor each other.
 /// The core is a headless library: it is what makes the parser and grid
 /// testable and benchmarkable without launching an app, and what keeps the
@@ -76,12 +76,12 @@ struct ModuleBoundaryTests {
 
     @Test(
         "a library imports no UI or GPU framework",
-        arguments: ["CortaTerminal", "CortaSFTP"]
+        arguments: ["CortaTerminal", "CortaSFTP", "CortaPOSIX"]
     )
     func libraryImportsNoUIFramework(target: String) throws {
         let files = Self.sourceFiles(of: target)
         // Guard against a path mistake silently passing this test.
-        #expect(files.count >= 4, "expected to find \(target)'s sources")
+        #expect(files.count >= 3, "expected to find \(target)'s sources")
 
         for file in files {
             for module in try Self.importedModules(in: file) {
@@ -99,7 +99,7 @@ struct ModuleBoundaryTests {
     )
     func librariesDoNotImportEachOther(target: String, sibling: String) throws {
         let files = Self.sourceFiles(of: target)
-        #expect(files.count >= 4, "expected to find \(target)'s sources")
+        #expect(files.count >= 3, "expected to find \(target)'s sources")
 
         for file in files {
             #expect(

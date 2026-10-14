@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import CortaTerminal
 import Darwin
 import Foundation
@@ -202,12 +203,7 @@ nonisolated enum ImageDecoderProcess {
             &attributes,
             Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSID | POSIX_SPAWN_SETSIGDEF
                 | POSIX_SPAWN_SETSIGMASK))
-        var allSignals = sigset_t()
-        sigfillset(&allSignals)
-        posix_spawnattr_setsigdefault(&attributes, &allSignals)
-        var noSignals = sigset_t()
-        sigemptyset(&noSignals)
-        posix_spawnattr_setsigmask(&attributes, &noSignals)
+        resetSignals(of: &attributes)
 
         let argv0 = strdup(helper)
         defer { free(argv0) }

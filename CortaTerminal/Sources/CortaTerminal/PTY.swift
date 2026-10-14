@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import Darwin
 import Dispatch
 import Synchronization
@@ -38,7 +39,7 @@ public final class PTY: @unchecked Sendable {
     public let replicaPath: String
 
     private struct State {
-        var exit: ChildExit?
+        var exit: ProcessExit?
         /// Two reapers never race for one status.
         var isReaping = false
     }
@@ -47,7 +48,7 @@ public final class PTY: @unchecked Sendable {
     private let exited = DispatchGroup()
     private let exitQueue: DispatchQueue
     private let exitSource: DispatchSourceProcess
-    private let terminationHandler: (@Sendable (ChildExit) -> Void)?
+    private let terminationHandler: (@Sendable (ProcessExit) -> Void)?
 
     // MARK: - Spawning
 
@@ -62,7 +63,7 @@ public final class PTY: @unchecked Sendable {
         environment: [String: String] = ChildEnvironment.default(),
         size: TerminalSize = TerminalSize(),
         workingDirectory: String? = nil,
-        terminationHandler: (@Sendable (ChildExit) -> Void)? = nil
+        terminationHandler: (@Sendable (ProcessExit) -> Void)? = nil
     ) throws(PTYError) -> PTY {
         let (primary, replica, path) = try openPair()
 
@@ -102,7 +103,7 @@ public final class PTY: @unchecked Sendable {
         fileDescriptor: Int32,
         processIdentifier: pid_t,
         replicaPath: String,
-        terminationHandler: (@Sendable (ChildExit) -> Void)?
+        terminationHandler: (@Sendable (ProcessExit) -> Void)?
     ) {
         self.descriptor = GuardedDescriptor(fileDescriptor)
         self.processIdentifier = processIdentifier
@@ -276,7 +277,7 @@ public final class PTY: @unchecked Sendable {
 
     // MARK: - Child lifecycle
 
-    public var exitStatus: ChildExit? { state.withLock { $0.exit } }
+    public var exitStatus: ProcessExit? { state.withLock { $0.exit } }
 
     /// "Is anything running?" without shell integration: a job gets its own
     /// group and the terminal, so a foreground group that is not the shell is a
@@ -418,7 +419,7 @@ public final class PTY: @unchecked Sendable {
 
     /// `nil` on timeout. For tests and teardown.
     @discardableResult
-    public func waitForExit(timeout: Duration = .seconds(10)) -> ChildExit? {
+    public func waitForExit(timeout: Duration = .seconds(10)) -> ProcessExit? {
         if exited.wait(timeout: .now() + timeout.dispatchInterval) == .success {
             return exitStatus
         }
@@ -426,7 +427,7 @@ public final class PTY: @unchecked Sendable {
     }
 
     @discardableResult
-    private func reap(blocking: Bool) -> ChildExit? {
+    private func reap(blocking: Bool) -> ProcessExit? {
         let claimed = state.withLock { state -> Bool in
             guard state.exit == nil, !state.isReaping else { return false }
             state.isReaping = true
@@ -445,7 +446,7 @@ public final class PTY: @unchecked Sendable {
             return nil
         }
 
-        let exit = ChildExit(waitpidStatus: status)
+        let exit = ProcessExit(waitpidStatus: status)
         state.withLock {
             $0.exit = exit
             $0.isReaping = false

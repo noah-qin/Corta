@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Compression
+import CortaPOSIX
 import CortaTerminal
 import Darwin
 import Dispatch
@@ -1077,7 +1078,7 @@ func benchmarkRealReaderProducers(priority: TerminalSession.ReaderPriority) {
                 let session = try TerminalSession(executable: "/bin/sh", arguments: ["-c", command],
                     size: TerminalSize(rows: 4, columns: 200))
                 let done = DispatchSemaphore(value: 0)
-                let outcome = Mutex<ChildExit?>(nil)
+                let outcome = Mutex<ProcessExit?>(nil)
                 session.onChildExit = { exit in outcome.withLock { $0 = exit }; done.signal() }
                 session.setReaderPriority(priority)
                 session.start()

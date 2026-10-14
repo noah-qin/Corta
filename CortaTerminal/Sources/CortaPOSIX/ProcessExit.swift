@@ -16,10 +16,9 @@
 
 import Darwin
 
-/// How the channel's `ssh` (or test `sftp-server`) ended — the SFTP side's
-/// own spelling of the core's `ChildExit`, since the two modules share no
-/// code.
-public enum SFTPProcessExit: Equatable, Sendable {
+/// How a child process ended: the terminal's shell, the SFTP channel's
+/// `ssh`, or any other process the app spawns.
+public enum ProcessExit: Equatable, Sendable {
     case exited(code: Int32)
     case signalled(signal: Int32)
 
@@ -27,7 +26,7 @@ public enum SFTPProcessExit: Equatable, Sendable {
     ///
     /// The `W*` macros in `<sys/wait.h>` are function-like macros and are
     /// therefore not imported into Swift; the arithmetic is reproduced here.
-    init(waitpidStatus status: Int32) {
+    package init(waitpidStatus status: Int32) {
         let termination = status & 0o177
         if termination == 0 {
             self = .exited(code: (status >> 8) & 0xff)
@@ -35,4 +34,7 @@ public enum SFTPProcessExit: Equatable, Sendable {
             self = .signalled(signal: termination)
         }
     }
+
+    /// True for a normal exit with status 0.
+    public var isCleanExit: Bool { self == .exited(code: 0) }
 }

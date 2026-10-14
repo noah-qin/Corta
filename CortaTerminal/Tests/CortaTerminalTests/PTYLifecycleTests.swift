@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import Darwin
 import Dispatch
 import Foundation
@@ -357,7 +358,7 @@ struct PTYLifecycleTests {
     /// thread is what normally hides this.
     private func waitForExitDraining(
         _ pty: PTY, timeout: Duration = .seconds(10)
-    ) -> ChildExit? {
+    ) -> ProcessExit? {
         let deadline = ContinuousClock.now + timeout
         while ContinuousClock.now < deadline {
             _ = pty.readOutput(timeout: .milliseconds(100))

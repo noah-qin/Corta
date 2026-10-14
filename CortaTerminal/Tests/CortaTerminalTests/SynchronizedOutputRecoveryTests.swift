@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import Foundation
 import Synchronization
 import Testing
@@ -135,7 +136,7 @@ import Testing
             arguments: ["-c", "printf '\\033[?2026hCORTA-SYNC-ORPHAN'"],
             seams: .init(synchronizedOutputTimeout: .seconds(30)))
         defer { session.stop() }
-        let exited = Mutex<ChildExit?>(nil)
+        let exited = Mutex<ProcessExit?>(nil)
         session.onChildExit = { exit in exited.withLock { $0 = exit } }
         session.start()
 

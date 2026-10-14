@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import Darwin
 import Dispatch
 import Foundation
@@ -103,7 +104,7 @@ struct DescriptorHygieneTests {
                 "-c", "(trap '' HUP; exec sleep 10) </dev/tty >/dev/tty 2>&1 & sleep 0.2; exit 3",
             ])
         defer { session.stop() }
-        let exited = Mutex<ChildExit?>(nil)
+        let exited = Mutex<ProcessExit?>(nil)
         session.onChildExit = { exit in exited.withLock { $0 = exit } }
         session.start()
 

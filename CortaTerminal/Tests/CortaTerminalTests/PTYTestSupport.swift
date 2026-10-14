@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import Foundation
 import Darwin
 import Testing
@@ -28,7 +29,7 @@ enum PTYFixture {
     static func shell(
         _ script: String,
         size: TerminalSize = TerminalSize(),
-        terminationHandler: (@Sendable (ChildExit) -> Void)? = nil
+        terminationHandler: (@Sendable (ProcessExit) -> Void)? = nil
     ) throws -> PTY {
         try PTY.spawn(
             executable: "/bin/sh",

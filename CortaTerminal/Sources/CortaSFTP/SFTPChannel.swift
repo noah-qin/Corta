@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import Darwin
 import Dispatch
 import Foundation
@@ -50,7 +51,7 @@ public enum SFTPTransportError: Error, Equatable {
 
     /// Pure, so the policy is testable. Only 255 is ssh's own error (`ssh(1)`);
     /// any other exit or signal is a broken channel.
-    public static func classify(exit: SFTPProcessExit, diagnostics: String) -> SFTPTransportError {
+    public static func classify(exit: ProcessExit, diagnostics: String) -> SFTPTransportError {
         guard case .exited(let code) = exit else {
             return .connectionLost
         }
@@ -128,7 +129,7 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     private let stdoutRead: GuardedDescriptor
 
     private struct State {
-        var exit: SFTPProcessExit?
+        var exit: ProcessExit?
         var isReaping = false
         var isClosed = false
     }
@@ -150,13 +151,13 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         return String(decoding: data, as: UTF8.self)
     }
 
-    public var exitStatus: SFTPProcessExit? { state.withLock { $0.exit } }
+    public var exitStatus: ProcessExit? { state.withLock { $0.exit } }
 
     /// Bounded, and for diagnostics only: turns a bare `.connectionLost` into
     /// the classification `classify(exit:)` gives. Never disturbs a live child.
-    public func awaitExit(timeout: Duration = .seconds(2)) -> SFTPProcessExit? {
+    public func awaitExit(timeout: Duration = .seconds(2)) -> ProcessExit? {
         let deadline = ContinuousClock.now + timeout
-        var exit: SFTPProcessExit?
+        var exit: ProcessExit?
         while true {
             if exit == nil { exit = reap(blocking: false) }
             // Both the exit and stderr's EOF.
@@ -216,20 +217,15 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
             Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF
                 | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSID
                 | (beforeStart == nil ? 0 : POSIX_SPAWN_START_SUSPENDED)))
-        var allSignals = sigset_t()
-        sigfillset(&allSignals)
-        posix_spawnattr_setsigdefault(&attributes, &allSignals)
-        var noSignals = sigset_t()
-        sigemptyset(&noSignals)
-        posix_spawnattr_setsigmask(&attributes, &noSignals)
+        resetSignals(of: &attributes)
 
         let argv0 = executable
         let childArguments = [argv0] + (arguments ?? Self.arguments(host: host))
         let environmentLines = environment.map { "\($0.key)=\($0.value)" }.sorted()
 
         var pid: pid_t = 0
-        let spawnResult = withSFTPStringArray(childArguments) { argv in
-            withSFTPStringArray(environmentLines) { envp in
+        let spawnResult = withCStringArray(childArguments) { argv in
+            withCStringArray(environmentLines) { envp in
                 posix_spawn(&pid, executable, &fileActions, &attributes, argv, envp)
             }
         }
@@ -383,7 +379,7 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
 
     /// Only one `waitpid` ever runs for this child, as in `PTY.reap`.
     @discardableResult
-    private func reap(blocking: Bool) -> SFTPProcessExit? {
+    private func reap(blocking: Bool) -> ProcessExit? {
         let shouldReap = state.withLock { state -> Bool in
             if state.exit != nil || state.isReaping { return false }
             state.isReaping = true
@@ -408,24 +404,11 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
             state.withLock { $0.isReaping = false }
             return state.withLock { $0.exit }
         }
-        let exit = SFTPProcessExit(waitpidStatus: status)
+        let exit = ProcessExit(waitpidStatus: status)
         state.withLock {
             $0.exit = exit
             $0.isReaping = false
         }
         return exit
-    }
-}
-
-/// A null-terminated `char *[]`, valid for `body`.
-private func withSFTPStringArray<Result>(
-    _ strings: [String],
-    _ body: (UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> Result
-) -> Result {
-    var pointers = strings.map { strdup($0) }
-    pointers.append(nil)
-    defer { for pointer in pointers { free(pointer) } }
-    return pointers.withUnsafeMutableBufferPointer { buffer in
-        body(buffer.baseAddress!)
     }
 }

@@ -202,6 +202,7 @@ four reasons and what it would have bought.
 | `PTY`, `corta-exec` | `CortaTerminal`                      | nonisolated | Spawn, read/write, winsize, child lifecycle          |
 | `corta-image-decoder` | `CortaTerminal/Sources/corta-image-decoder/` | own process | Decodes a Kitty PNG under the `pure-computation` sandbox; spawned by `ImageDecoderProcess` |
 | `CortaSFTP`         | `CortaTerminal/Sources/CortaSFTP/`   | nonisolated | The SFTP protocol over the system `ssh`, no SSH library (§7.9); a sibling library, not part of the core |
+| `CortaPOSIX`        | `CortaTerminal/Sources/CortaPOSIX/`  | nonisolated | Process plumbing both libraries and the app's image decoder share: `GuardedDescriptor`, `ProcessExit`, a spawn's signal reset |
 | Renderer            | `Corta/Renderer/`                    | nonisolated | `TerminalRenderer`, `Metal4Backend` (the only GPU backend: one render pass per frame, D21), `QuadPipelineCache`, `GlyphAtlas`, `KittyImageRenderer`; draws a session into a rect, driven from the display link |
 | Font stack          | `Corta/Renderer/`                    | nonisolated | `TerminalFont`, `MonospacedFontCatalog`, `CellMetrics`: Core Text shaping, fallback, verification, the ASCII fast path |
 | Shell               | `Corta/`                             | MainActor   | Windows, tabs, the split tree, key bindings, IME, settings, shell integration, remote context |
@@ -210,11 +211,11 @@ four reasons and what it would have bought.
 search, shell integration — and nothing else. `CortaSFTP` sits beside it
 in the same package: the app imports the two separately, and neither
 imports the other. A dependency either way would put the core into the app
-through two products, which Xcode resolves by linking it twice over; the
-one piece of descriptor machinery both need (`GuardedDescriptor`) is a
-byte-for-byte copy instead, held equal by `SharedSourceTests`, and the ssh
-child's environment is passed in by the app (the core's
-`ChildEnvironment`). Neither library may import AppKit or Metal
+through two products, which Xcode resolves by linking it twice over. What
+both need lives in `CortaPOSIX`, a third target each depends on: Xcode
+links it once, statically, and its descriptor and argv helpers are
+`package` API, so neither library re-exports them. The ssh child's
+environment is passed in by the app (the core's `ChildEnvironment`). Neither library may import AppKit or Metal
 (`PackageIsolationTests` and `ModuleBoundaryTests` hold those lines).
 
 ### 4.1 A pane and its collaborators

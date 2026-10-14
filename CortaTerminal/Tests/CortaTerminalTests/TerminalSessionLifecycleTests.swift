@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import Foundation
 import Synchronization
 import Testing
@@ -54,7 +55,7 @@ import Testing
         // The child is gone before any reader exists.
         #expect(session.pty.waitForExit(timeout: .seconds(30)) != nil)
 
-        let exited = Mutex<ChildExit?>(nil)
+        let exited = Mutex<ProcessExit?>(nil)
         session.onChildExit = { exit in exited.withLock { $0 = exit } }
         session.start()
 
@@ -68,7 +69,7 @@ import Testing
     @Test func exitRecordedBeforeCallbackInstalledIsReplayed() throws {
         let session = try TerminalSession(executable: "/usr/bin/true")
         defer { session.stop() }
-        let first = Mutex<ChildExit?>(nil)
+        let first = Mutex<ProcessExit?>(nil)
         session.onChildExit = { exit in first.withLock { $0 = exit } }
         session.start()
 
@@ -80,7 +81,7 @@ import Testing
 
         // Installing a callback after the exit was recorded must replay it —
         // synchronously, on this thread.
-        let replayed = Mutex<ChildExit?>(nil)
+        let replayed = Mutex<ProcessExit?>(nil)
         session.onChildExit = { exit in replayed.withLock { $0 = exit } }
         #expect(replayed.withLock { $0 } == .exited(code: 0))
     }
@@ -189,7 +190,7 @@ import Testing
             executable: "/bin/sh",
             arguments: ["-c", "trap '' HUP; printf 'CORTA-IGNORING'; while :; do sleep 1; done"],
             seams: .init(hangupGracePeriod: .milliseconds(300)))
-        let exited = Mutex<ChildExit?>(nil)
+        let exited = Mutex<ProcessExit?>(nil)
         session.onChildExit = { exit in exited.withLock { $0 = exit } }
         session.start()
         _ = waitForGrid(session) { $0.contains("CORTA-IGNORING") }

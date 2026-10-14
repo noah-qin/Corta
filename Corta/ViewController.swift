@@ -16,6 +16,7 @@
 
 import Cocoa
 import CoreText
+import CortaPOSIX
 import CortaTerminal
 import Metal
 import QuartzCore
@@ -702,7 +703,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// stopping the session, and must not toast; a generation check alone
     /// would miss it.
     @MainActor
-    private func noteChildExit(_ exit: ChildExit, generation: Int) {
+    private func noteChildExit(_ exit: ProcessExit, generation: Int) {
         guard !didTeardown, frameLoop.isCurrent(generation) else { return }
         // A dead child produces no output to rebuild the title; the `Remote: host`
         // badge would outlive its connection.
@@ -718,7 +719,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// Says, until something changes it, that this pane's session is over.
     /// Only the session's own child ending gets here — a program inside the
     /// shell exiting back to its prompt is not the session ending.
-    private func presentSessionEnded(_ exit: ChildExit, isConnection: Bool) {
+    private func presentSessionEnded(_ exit: ProcessExit, isConnection: Bool) {
         sessionEndedBar?.removeFromSuperview()
         let bar = SessionEndedBar(exit: exit, isConnection: isConnection)
         bar.onNewSession = { [weak self] in self?.confirmNewSession(isConnection: isConnection) }

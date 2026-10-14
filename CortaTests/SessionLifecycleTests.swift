@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaPOSIX
 import Darwin
 import Testing
 
@@ -101,11 +102,11 @@ struct SessionLifecycleTests {
     /// like a live one not answering. The bar stays until a new session
     /// starts, and says how the session ended.
     @Test(arguments: [
-        ("exit 0", ChildExit.exited(code: 0)),
-        ("exit 3", ChildExit.exited(code: 3)),
-        ("kill -TERM $$", ChildExit.signalled(signal: SIGTERM)),
+        ("exit 0", ProcessExit.exited(code: 0)),
+        ("exit 3", ProcessExit.exited(code: 3)),
+        ("kill -TERM $$", ProcessExit.signalled(signal: SIGTERM)),
     ])
-    func childExitOnItsOwnShowsTheEndedBar(script: String, expected: ChildExit) async throws {
+    func childExitOnItsOwnShowsTheEndedBar(script: String, expected: ProcessExit) async throws {
         // A shell that exits the moment it starts, rather than the default
         // login shell plus a typed `exit\n`: real dotfiles can fork
         // long-lived children that keep the pty's slave side open well past
