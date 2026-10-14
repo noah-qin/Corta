@@ -126,6 +126,29 @@ extension ReleaseCheck {
     /// here, shared by package, feed validation and local checks (D26).
     public static func inspectDiskImage(_ image: URL,
                                        runner: @escaping ImageToolRunner = runImageTool) throws -> DiskImageMount {
+        let (problems, team) = signatureProblems(of: image, runner: runner)
+        guard problems.isEmpty, let team else { throw ImageFailure(problems: problems) }
+        let root: URL
+        var scratch: URL?
+        if let existing = existingReadOnlyMount(of: image, runner: runner) {
+            root = existing
+        } else {
+            (root, scratch) = try attachReadOnly(image, runner: runner)
+        }
+        let mount = DiskImageMount(root: root, team: team, scratch: scratch, runner: runner)
+        let layout = layoutProblems(of: mount.root)
+        if !layout.isEmpty {
+            let cleanup = mount.close() ? [] : ["could not detach disk image at " + mount.root.path]
+            throw ImageFailure(problems: layout + cleanup)
+        }
+        return mount
+    }
+
+    /// Signature, team, stapled ticket, Gatekeeper and license checks on the
+    /// image file itself, and the team that signed it.
+    private static func signatureProblems(
+        of image: URL, runner: ImageToolRunner
+    ) -> (problems: [String], team: String?) {
         var problems: [String] = []
         if runner("/usr/bin/codesign", ["--verify", "--strict", image.path]).status != 0 {
             problems.append("disk image code signature does not verify")
@@ -145,73 +168,75 @@ extension ReleaseCheck {
         if metadata.status != 0 || diskImageHasLicense(in: metadata.stdout) != false {
             problems.append("disk image has a license agreement or unreadable license metadata")
         }
-        guard problems.isEmpty, let team else { throw ImageFailure(problems: problems) }
+        return (problems, team)
+    }
 
-        // Reuse only a read-only mount that hdiutil associates with these bytes.
-        // This avoids attaching the same volume twice in the feed workflow.
+    /// A read-only mount hdiutil already associates with these bytes, so the
+    /// feed workflow never attaches the same volume twice.
+    private static func existingReadOnlyMount(of image: URL, runner: ImageToolRunner) -> URL? {
         let info = runner("/usr/bin/hdiutil", ["info", "-plist"])
-        var root: URL?
-        if info.status == 0,
-           let object = try? PropertyListSerialization.propertyList(from: info.stdout, format: nil),
-           let dictionary = object as? [String: Any], let images = dictionary["images"] as? [[String: Any]] {
-            for item in images {
-                guard let path = item["image-path"] as? String,
-                      URL(fileURLWithPath: path).resolvingSymlinksInPath() == image.resolvingSymlinksInPath(),
-                      let entities = item["system-entities"] as? [[String: Any]] else { continue }
-                for entity in entities {
-                    guard let path = entity["mount-point"] as? String else { continue }
-                    let candidate = URL(fileURLWithPath: path)
-                    if (try? candidate.resourceValues(forKeys: [.volumeIsReadOnlyKey]).volumeIsReadOnly) == true {
-                        root = candidate; break
-                    }
+        guard info.status == 0,
+            let object = try? PropertyListSerialization.propertyList(from: info.stdout, format: nil),
+            let dictionary = object as? [String: Any], let images = dictionary["images"] as? [[String: Any]]
+        else { return nil }
+        for item in images {
+            guard let path = item["image-path"] as? String,
+                URL(fileURLWithPath: path).resolvingSymlinksInPath() == image.resolvingSymlinksInPath(),
+                let entities = item["system-entities"] as? [[String: Any]] else { continue }
+            for entity in entities {
+                guard let path = entity["mount-point"] as? String else { continue }
+                let candidate = URL(fileURLWithPath: path)
+                if (try? candidate.resourceValues(forKeys: [.volumeIsReadOnlyKey]).volumeIsReadOnly) == true {
+                    return candidate
                 }
             }
         }
-        var scratch: URL?
-        if root == nil {
-            let directory = FileManager.default.temporaryDirectory.appendingPathComponent("corta-image-" + UUID().uuidString)
-            let mount = directory.appendingPathComponent("mount")
-            try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: true)
-            let attached = runner("/usr/bin/hdiutil", ["attach", image.path, "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount.path])
-            if attached.status != 0 {
-                // A failed attach can still have reached the mount stage.
-                let detached = runner("/usr/bin/hdiutil", ["detach", mount.path])
-                let safe = detached.status == 0 || runner("/usr/bin/hdiutil", ["detach", "-force", mount.path]).status == 0
-                if safe {
-                    try? FileManager.default.removeItem(at: directory)
-                } else {
-                    // rmdir removes only empty directories, never a mounted tree.
-                    _ = runner("/bin/rmdir", [mount.path])
-                    _ = runner("/bin/rmdir", [directory.path])
-                }
-                throw ImageFailure(problems: ["could not mount disk image read-only"])
+        return nil
+    }
+
+    /// Attaches the image read-only at a scratch mount point; the scratch
+    /// directory is the mount's to remove.
+    private static func attachReadOnly(_ image: URL, runner: ImageToolRunner) throws -> (root: URL, scratch: URL) {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("corta-image-" + UUID().uuidString)
+        let mount = directory.appendingPathComponent("mount")
+        try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: true)
+        let attached = runner("/usr/bin/hdiutil", ["attach", image.path, "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount.path])
+        guard attached.status == 0 else {
+            // A failed attach can still have reached the mount stage.
+            let detached = runner("/usr/bin/hdiutil", ["detach", mount.path])
+            let safe = detached.status == 0 || runner("/usr/bin/hdiutil", ["detach", "-force", mount.path]).status == 0
+            if safe {
+                try? FileManager.default.removeItem(at: directory)
+            } else {
+                // rmdir removes only empty directories, never a mounted tree.
+                _ = runner("/bin/rmdir", [mount.path])
+                _ = runner("/bin/rmdir", [directory.path])
             }
-            root = mount; scratch = directory
+            throw ImageFailure(problems: ["could not mount disk image read-only"])
         }
-        guard let root else { throw ImageFailure(problems: ["no disk image mount"] ) }
-        let mount = DiskImageMount(root: root, team: team, scratch: scratch, runner: runner)
-        let entries = try? FileManager.default.contentsOfDirectory(atPath: mount.root.path)
-        let app = mount.root.appendingPathComponent("Corta.app")
-        let appType = (try? FileManager.default.attributesOfItem(atPath: app.path))?[.type] as? FileAttributeType
-        let link = try? FileManager.default.destinationOfSymbolicLink(atPath: mount.root.appendingPathComponent("Applications").path)
-        let readOnly = (try? mount.root.resourceValues(forKeys: [.volumeIsReadOnlyKey]).volumeIsReadOnly) == true
-        let background = mount.root.appendingPathComponent(".background")
-        let backgroundType = (try? FileManager.default.attributesOfItem(atPath: background.path))?[.type] as? FileAttributeType
+        return (mount, directory)
+    }
+
+    /// What the mounted volume holds against the Finder layout a release ships.
+    private static func layoutProblems(of root: URL) -> [String] {
+        let files = FileManager.default
+        let entries = try? files.contentsOfDirectory(atPath: root.path)
+        let app = root.appendingPathComponent("Corta.app")
+        let appType = (try? files.attributesOfItem(atPath: app.path))?[.type] as? FileAttributeType
+        let link = try? files.destinationOfSymbolicLink(atPath: root.appendingPathComponent("Applications").path)
+        let readOnly = (try? root.resourceValues(forKeys: [.volumeIsReadOnlyKey]).volumeIsReadOnly) == true
+        let background = root.appendingPathComponent(".background")
+        let backgroundType = (try? files.attributesOfItem(atPath: background.path))?[.type] as? FileAttributeType
         let backgroundEntries = backgroundType == .typeDirectory
-            ? try? FileManager.default.contentsOfDirectory(atPath: background.path) : nil
+            ? try? files.contentsOfDirectory(atPath: background.path) : nil
         let layoutFilesAreRegular = [".DS_Store", ".background/background.tiff"].allSatisfy {
-            (try? FileManager.default.attributesOfItem(atPath: mount.root.appendingPathComponent($0).path))?[.type]
+            (try? files.attributesOfItem(atPath: root.appendingPathComponent($0).path))?[.type]
                 as? FileAttributeType == .typeRegular
         }
-        let volumeName = try? mount.root.resourceValues(forKeys: [.volumeNameKey]).volumeName
-        let layout = diskImageLayoutProblems(entries: entries ?? [], backgroundEntries: backgroundEntries,
-                                              layoutFilesAreRegular: layoutFilesAreRegular, volumeName: volumeName,
-                                              appIsDirectory: appType == .typeDirectory,
-                                              applicationsTarget: link, readOnly: readOnly)
-        if !layout.isEmpty {
-            let cleanup = mount.close() ? [] : ["could not detach disk image at " + mount.root.path]
-            throw ImageFailure(problems: layout + cleanup)
-        }
-        return mount
+        let volumeName = try? root.resourceValues(forKeys: [.volumeNameKey]).volumeName
+        return diskImageLayoutProblems(entries: entries ?? [], backgroundEntries: backgroundEntries,
+                                       layoutFilesAreRegular: layoutFilesAreRegular, volumeName: volumeName,
+                                       appIsDirectory: appType == .typeDirectory,
+                                       applicationsTarget: link, readOnly: readOnly)
     }
 }
