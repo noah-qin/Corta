@@ -191,4 +191,17 @@ struct EmojiPresentationWidthTests {
         #expect(!terminal.grid[0, 0].attributes.contains(.wide))
         #expect(!terminal.grid[0, 0].attributes.contains(.wideSpacer))
     }
+
+    /// EL 0 from a wide character's right half starts at its lead: erasing
+    /// only the spacer would leave a lead whose second cell is gone.
+    @Test func eraseToEndFromASpacerErasesTheWholePair() {
+        var terminal = Terminal(rows: 2, columns: 6)
+        terminal.feed(Array("a中b".utf8))
+        terminal.feed(Array("\u{1B}[1;3H\u{1B}[K".utf8))
+        let line = terminal.grid.line(0)
+        #expect(line[0].scalar == 0x61)
+        #expect(line[1].scalar == 0x20 && !line[1].attributes.contains(.wide))
+        #expect(line[2].scalar == 0x20 && !line[2].attributes.contains(.wideSpacer))
+    }
+
 }

@@ -33,6 +33,22 @@ struct ScrollJournalTests {
         #expect(lines[1].isEmpty && lines[2].isEmpty)
     }
 
+    /// The journal is a ring: once it has wrapped, each sequence still in
+    /// it answers with its own event, not with whatever last took slot 0.
+    @Test func theJournalAnswersByItsOwnSequenceAfterWrapping() {
+        var lines = ScreenLines(repeating: Line(), count: 6)
+        let capacity = ScreenLines.scrollEventCapacity
+        for _ in 0..<capacity { lines.rotateUp(1) }
+        lines.rotate(top: 1, bottom: 4, by: 1)
+        lines.rotate(top: 2, bottom: 3, by: -1)
+        let total = lines.scrollEventsTotal
+        #expect(total == UInt64(capacity + 2))
+        #expect(lines.scrollEvent(at: total - 2) == ScrollEvent(top: 1, bottom: 4, delta: 1))
+        #expect(lines.scrollEvent(at: total - 1) == ScrollEvent(top: 2, bottom: 3, delta: -1))
+        #expect(lines.scrollEvent(at: total - 3) == ScrollEvent(top: 0, bottom: 5, delta: 1))
+        #expect(lines.scrollEvent(at: total - UInt64(capacity) - 1) == nil, "evicted from the ring")
+    }
+
     /// IL and DL scroll the band from the cursor to the bottom margin: one
     /// journaled event the renderer can shift by, not a re-stamp of every row.
     @Test func insertAndDeleteLinesJournalTheirBand() {
