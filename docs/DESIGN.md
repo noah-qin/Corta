@@ -467,6 +467,9 @@ event monitor makes that easy to get wrong:
   `Task.detached`, under a generation-guarded `largeTextTask`. Cancelling
   discards a build's result; it does not stop the row walk. The file
   write is atomic (`Data.write(options: .atomic)`).
+- **A stale result never reaches the bar.** A sweep's outcome checks the
+  search generation before it touches any status, as the directory proxy's
+  off-main validation checks its own before it shows an icon.
 
 The record: [history/2026-09-11-B05-SEARCH-STATE.md](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-09-11-B05-SEARCH-STATE.md).
 
@@ -541,6 +544,58 @@ only regular files and directories move; a symbolic link at either end
 is skipped and reported, since following one is how "download this
 folder" walks off into `/etc`.
 
+A session is single-use: it reserves its connection lifecycle before
+starting its one reader, cancelling the handshake closes the transport,
+and the connection wrapper refuses a second connect, tracks the pending
+session so `close` can cancel a handshake, and refuses an engine installed
+after close. Remote editing keeps a SHA-256 baseline of what it downloaded,
+validates the content before uploading, and sends the approved private
+snapshot rather than the live editor file (`SECURITY.md` §5).
+
+### 7.10 The status bar and the theme editor
+
+`SystemMetrics` reads public Mach, `getloadavg`, `getifaddrs`, volume and
+thermal APIs; one main-actor `SystemMetricsStore` owns the visible bars and
+a two-second timer, samples off the main thread and discards a result whose
+generation is stale. A window's bar is a sibling of the split tree, so
+toggling it rebuilds no session, and nothing is collected for an SSH host.
+
+`ThemeEditorModel` edits a draft copied from the active theme, validates
+names and hex colours and detects a concurrent change; Save writes through
+`ConfigurationStore`, Cancel drops the draft. The cursor preference supplies
+block, bar or underline and blinking; an explicit DECSCUSR style wins until
+reset. Once a blinking cursor is idle, `PaneFocus` hands it to a Core
+Animation opacity animation through the `CursorHandoffMailbox`, so blinking
+draws no Metal frame every half second; new output or input takes it back
+before the next frame, and it does not blink in a hidden pane or a viewport
+scrolled into history.
+
+The input-source badge reads macOS input-source metadata, never typed text.
+By default it sits in a fixed toolbar slot beside a window-owned spacer;
+turning it off, or placing it at the prompt's right edge, removes both. The
+prompt placement keeps clear of the live command without touching the grid
+or sending a byte. A private IME mode that cannot be identified gets
+neutral styling.
+
+### 7.11 History in arenas, rows shifted rather than rebuilt
+
+History rows live in 256-row arenas. The newest stay mutable; sealed cold
+arenas are compressed off the terminal lock and installed only if their
+identity and generation still match. Snapshot readers share the immutable
+storage, with bounded decoded caches for search, reflow and copy. The
+history line cap still drops the oldest rows; compression is in memory,
+not on disk (`PERFORMANCE.md` §5.15).
+
+The renderer's instances are 24-byte quads with integer atlas rectangles
+and a rectangle table uploaded only when it changes. A scroll journal
+shifts the retained rows for region and history scrolling and for inserted
+or deleted lines; a missing or incompatible journal falls back to
+rebuilding rows. Renderer mutation, encoding and submission run on the main
+thread, paced by the pane's display link. A full-screen window with one
+pane presents by copy and drops its canvas corner mask; windowed and split
+panes keep the ordinary Metal 4 path, and an overlay can still make the
+window server composite a frame (`PERFORMANCE.md` §5.17).
+
 ---
 
 ## 8. What "Done" Looks Like
@@ -555,69 +610,3 @@ training logs — a full day of use produces no reason to switch back.**
 
 That is a finite, reachable target. Section 3 of `CONFORMANCE.md` states
 it as a checklist.
-
-## Follow-up lifecycle and storage boundaries
-
-SFTP sessions reserve their single-use connection lifecycle before starting
-one reader. Handshake cancellation closes the transport. The connection
-wrapper rejects concurrent connects, tracks the pending session so close
-can cancel a handshake, and refuses installing an engine after close.
-
-Directory proxy validation is asynchronous, bounded process-wide and rejects
-stale results. Search outcomes likewise check generation before updating any
-UI status. Remote editing persists a SHA-256 remote baseline, validates
-content before upload, and sends the approved private snapshot rather than
-a live editor file. See [Security](SECURITY.md) for race and ACL boundaries.
-
-## Local status and appearance editing
-
-SystemMetrics uses public Mach, getloadavg, getifaddrs, Foundation volume and
-ProcessInfo thermal APIs. A shared main-actor SystemMetricsStore owns visible
-bar clients and one two-second timer. Its actor sampler performs reads off the
-main thread; cancellation and generation checks discard obsolete results.
-Window bars are siblings of the terminal split tree, so toggling the optional
-24-point bar does not reconstruct sessions. No metric is collected for SSH
-hosts. Host details are also reachable independently of the bar.
-
-ThemeEditorModel holds a draft copied from the active theme, validates names
-and HEX colors and detects concurrent changes. ThemeEditorView previews that
-draft; Save persists through ConfigurationStore and Cancel discards it. The
-primary font is System Monospaced; fallback shaping remains Core Text’s job.
-Cursor preference supplies block/bar/underline and blinking; explicit DECSCUSR
-styles override it until reset. Once a blinking cursor is idle, `PaneFocus`
-hands its presentation to a Core Animation opacity animation through the
-`CursorHandoffMailbox`. New output or input retires that overlay before
-the Metal cursor is drawn again. Blinking pauses outside visible active
-panes and at a scrolled-back viewport; idle blinking does not require a
-new application-rendered Metal frame every half second.
-
-The input-source badge observes macOS input-source metadata, never typed text.
-The default fixed toolbar slot hosts the focused pane's existing accessible
-badge, separated from action buttons by a window-owned native spacer. Disabling
-it or selecting prompt placement removes both the slot and its spacer. The
-optional right-edge prompt placement avoids live command content without
-changing the grid or sending bytes to the child. Unknown private IME modes use
-neutral styling; enabled non-Latin layouts and IMEs determine automatic display.
-
-## Current memory and rendering paths
-
-History rows are collected into 256-row arenas. The newest arenas remain
-mutable; sealed cold arenas can be compressed off the terminal lock and
-installed only if their identity and generation still match. Snapshot readers
-share immutable storage, with bounded decoded caches for search, reflow and
-copy. The history line cap still discards the oldest rows; compression is not
-on-disk persistence. See [Performance](PERFORMANCE.md) for measured resident
-memory, compression limits and the cost of first access.
-
-The renderer uses 24-byte quad instances, integer atlas rectangles and a
-rectangle table uploaded when it changes. A scroll journal shifts retained
-rendered rows for region/history scrolling and line insertion/deletion;
-missing or incompatible damage history falls back to rebuilding rows.
-
-Renderer mutation, frame encoding and submission run on the main thread,
-paced by the pane's display link. A full-screen window with exactly one pane uses the
-present-by-copy path and drops the canvas corner mask; windowed and split
-panes retain the ordinary Metal 4 presentation path. Overlays can still make
-the window server composite a frame. See [Testing](TESTING.md#environment-switches)
-for experiment switches and [Performance](PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13)
-for the measured 60 Hz result and unverified environments.
