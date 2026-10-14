@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-14
+
 ### Added
 
 - The SFTP browser and remote editing ask for a password, a key passphrase,
@@ -1834,7 +1836,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.2.0...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.2.1...main
+[1.2.1]: https://github.com/noah-qin/Corta/releases/tag/v1.2.1
 [1.2.0]: https://github.com/noah-qin/Corta/releases/tag/v1.2.0
 [1.1.9]: https://github.com/noah-qin/Corta/releases/tag/v1.1.9
 [1.1.8]: https://github.com/noah-qin/Corta/releases/tag/v1.1.8
