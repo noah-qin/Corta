@@ -48,9 +48,7 @@ final class ShellOverlayView: NSView {
         var composing: Bool
         /// A theme, appearance or contrast change must redraw a hint
         /// already showing.
-        var foreground: SIMD4<Float>
-        var background: SIMD4<Float>
-        var increaseContrast: Bool
+        var colors: CanvasTextColors
     }
     private var lastCompletionPresentation: CompletionPresentation?
     private var preview: DirectoryGhostView?
@@ -75,12 +73,10 @@ final class ShellOverlayView: NSView {
     func showCompletion(_ state: DirectoryCompletion?, anchor: CGRect,
         font: NSFont = .monospacedSystemFont(ofSize: 14, weight: .regular), baseline: CGFloat = 12) {
         // Once per frame, not a lock per colour.
-        let variant = TerminalColorPalette.activeVariant
         let presentation = CompletionPresentation(
             state: state, anchor: anchor, bounds: bounds,
             font: font, baseline: baseline, composing: isInputComposing,
-            foreground: variant.foreground, background: variant.background,
-            increaseContrast: SystemAccessibility.increaseContrast)
+            colors: .current)
         guard lastCompletionPresentation != presentation else { return }
         lastCompletionPresentation = presentation
         guard !isInputComposing, let state, let suffix = state.previewSuffix, !suffix.isEmpty else {
@@ -134,24 +130,16 @@ final class ShellOverlayView: NSView {
 
     func hideCompletion() { showCompletion(nil, anchor: .zero) }
 
-    /// The renderer's text colour, faded: the theme's, built-in or from the
-    /// config file, never the system label colour, which follows macOS
-    /// appearance and was black on a forced-dark canvas (#346). Increase
-    /// Contrast strengthens both, as it promotes secondary labels elsewhere.
+    /// The canvas text colour, faded for the hint (`CanvasTextColors`).
     fileprivate struct HintColors {
         var muted: CGColor
         var selected: CGColor
         var backdrop: CGColor
 
         init(_ presentation: CompletionPresentation) {
-            func srgb(_ color: SIMD4<Float>, alpha: CGFloat) -> CGColor {
-                CGColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y),
-                    blue: CGFloat(color.z), alpha: alpha)
-            }
-            let contrast = presentation.increaseContrast
-            muted = srgb(presentation.foreground, alpha: contrast ? 0.7 : 0.35)
-            selected = srgb(presentation.foreground, alpha: contrast ? 1 : 0.65)
-            backdrop = srgb(presentation.background, alpha: 1)
+            muted = presentation.colors.text(alpha: 0.35, contrastAlpha: 0.7)
+            selected = presentation.colors.text(alpha: 0.65, contrastAlpha: 1)
+            backdrop = presentation.colors.backdrop
         }
     }
 }

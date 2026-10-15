@@ -31,6 +31,9 @@ Versioning for compatibility changes.
 - A selection disappears when the program running in the pane rewrites the
   text it covers. Claude Code's in-place redraws left a highlight lying
   across unrelated text that a click could not remove (#341).
+- The input-source badge beside the prompt takes its text colour from the
+  terminal theme, as the directory hint does, so a theme darker or lighter
+  than macOS no longer draws it dark on dark (#348).
 - After a crash, restored tabs keep the tab that was selected and the names
   given to them: switching or renaming a tab now saves the arrangement, as
   moving or resizing a window already did.

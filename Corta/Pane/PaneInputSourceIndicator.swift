@@ -99,7 +99,7 @@ import CortaTerminal
             return
         }
         if !promptPlaced {
-            view.update(source: source, configuration: configuration)
+            view.update(source: source, configuration: configuration, canvas: nil)
             let frame = CGRect(x: 0, y: 0, width: 28, height: 24)
             if view.frame != frame { view.frame = frame }
             if view.isHidden { view.isHidden = false }
@@ -117,7 +117,7 @@ import CortaTerminal
         guard !blockedRects.contains(where: { $0.intersects(rect) }) else {
             if !view.isHidden { view.isHidden = true }
             return }
-        view.update(source: source, configuration: configuration)
+        view.update(source: source, configuration: configuration, canvas: .current)
         if view.frame != rect { view.frame = rect }
         if view.isHidden { view.isHidden = false }
     }
@@ -173,6 +173,9 @@ nonisolated struct InputSourceIndicatorPlacement {
     private let label = NSTextField(labelWithString: "")
     private var source: InputSourceState?
     private var configuration = Configuration()
+    /// The theme's colours when the badge sits on the canvas, beside the
+    /// prompt; nil in the toolbar, which is window chrome and follows macOS.
+    private var canvas: CanvasTextColors?
     override var isFlipped: Bool { true }
     override func isAccessibilityElement() -> Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -197,10 +200,12 @@ nonisolated struct InputSourceIndicatorPlacement {
         label.frame = CGRect(x: 0, y: (bounds.height - height) / 2, width: bounds.width, height: height)
     }
 
-    func update(source: InputSourceState, configuration: Configuration) {
-        guard self.source != source || self.configuration != configuration else { return }
+    func update(source: InputSourceState, configuration: Configuration, canvas: CanvasTextColors?) {
+        guard self.source != source || self.configuration != configuration || self.canvas != canvas
+        else { return }
         self.source = source
         self.configuration = configuration
+        self.canvas = canvas
         label.stringValue = source.badge
         let description = source.kind == .unknown
             ? L10n.format("inputSource.unknown", source.name)
@@ -220,10 +225,19 @@ nonisolated struct InputSourceIndicatorPlacement {
         // their original contrast-aware behavior.
         if custom.isEmpty || source.kind == .unknown {
             let tinted = source.kind == .ime || source.kind == .nonLatinLayout
-            label.textColor = source.kind == .direct ? .secondaryLabelColor
-                : tinted ? .systemIndigo : .secondaryLabelColor
-            layer?.backgroundColor = (tinted ? NSColor.systemIndigo : .secondaryLabelColor)
-                .withAlphaComponent(0.08).cgColor
+            if let canvas {
+                // On the canvas: the theme's text over a faint fill, so a
+                // theme darker or lighter than macOS still reads (#348).
+                label.textColor = NSColor(cgColor: canvas.text(alpha: tinted ? 0.85 : 0.65, contrastAlpha: 1))
+                layer?.backgroundColor = tinted
+                    ? NSColor.systemIndigo.withAlphaComponent(0.12).cgColor
+                    : canvas.text(alpha: 0.08, contrastAlpha: 0.12)
+            } else {
+                label.textColor = source.kind == .direct ? .secondaryLabelColor
+                    : tinted ? .systemIndigo : .secondaryLabelColor
+                layer?.backgroundColor = (tinted ? NSColor.systemIndigo : .secondaryLabelColor)
+                    .withAlphaComponent(0.08).cgColor
+            }
             layer?.borderWidth = SystemAccessibility.increaseContrast ? 1 : 0
             layer?.borderColor = label.textColor?.withAlphaComponent(0.4).cgColor
             return
