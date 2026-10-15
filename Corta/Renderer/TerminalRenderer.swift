@@ -20,7 +20,6 @@ import CortaTerminal
 import Foundation
 import Metal
 import Synchronization
-import simd
 
 /// A document position; negative rows are scrollback. Never a viewport row:
 /// scrolling translates, it does not move the selection.
@@ -333,29 +332,16 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
         let fullRebuild = cacheIsStale(for: grid, indexedOverridesGeneration: indexedOverridesGeneration)
 
-        var changed = fullRebuild
-        var rowsChanged = fullRebuild
         let previousBlockCursor = blockCursor
         let isBlock = effectiveCursorStyle == .block || effectiveCursorStyle == .blinkingBlock
         blockCursor =
             isBlock && cursorVisible && offset == 0
             ? BlockCursor(row: grid.cursor.row, column: grid.cursor.column) : nil
-        // An eviction mid-build stales every UV: rebuild once. Content that alone
-        // overflows the atlas draws blank.
         let atlasGeneration = glyphAtlas.generation
-        glyphAtlas.beginFrame(shapingBudget: Self.shapingBudgetPerFrame)
-        if fullRebuild {
-            rebuildAllRows(grid: grid, offset: offset)
-        } else {
-            changed = rebuildDamagedRows(
-                grid: grid, offset: offset, previousBlockCursor: previousBlockCursor)
-            rowsChanged = changed
-        }
-        if glyphAtlas.generation != atlasGeneration {
-            rebuildAllRows(grid: grid, offset: offset)
-            changed = true
-            rowsChanged = true
-        }
+        let rowsChanged = updateRows(
+            grid: grid, offset: offset, fullRebuild: fullRebuild,
+            previousBlockCursor: previousBlockCursor, atlasGeneration: atlasGeneration)
+        var changed = rowsChanged
 
         if fullRebuild
             || overlayIsStale(
@@ -370,28 +356,15 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
             changed = true
         }
 
-        // Decodes are scheduled here, never in `draw`; an image delete changes
-        // no cell, so it registers as damage here or not at all.
-        if cachedImagePlacements.revision != grid.imagePlacements.revision {
+        if updateImages(grid: grid, offset: offset) {
             changed = true
         }
-        kittyImageRenderer.update(
-            table: grid.imagePlacements, rows: grid.rows, offset: offset,
-            scrollbackTotalPushed: grid.scrollback.totalPushed,
-            cellWidth: Float(metricsValue.cellWidth), cellHeight: Float(metricsValue.cellHeight))
         remember(
             grid: grid, offset: offset, indexedOverridesGeneration: indexedOverridesGeneration,
             cursorStyle: effectiveCursorStyle, cursorVisible: cursorVisible, selection: selection,
             searchMatches: searchMatches, currentSearchMatchIndex: currentSearchMatchIndex,
             hoveredLink: hoveredLink)
-        // Rows that drew without some glyph are rebuilt next frame. Asked for
-        // only while nothing was evicted: past that the content overflows the
-        // atlas, and re-asking would shape a budget's worth every frame for as
-        // long as it stays on screen.
-        needsFullRebuild = glyphAtlas.deferredShaping && glyphAtlas.generation == atlasGeneration
-        if needsFullRebuild {
-            onGlyphsDeferred?()
-        }
+        requestRebuildForDeferredGlyphs(atlasGeneration: atlasGeneration)
         // Not on a cursor blink or a selection drag: only the rows carry marks.
         if rowsChanged || marksAreStale {
             changed = changed || marksAreStale
@@ -399,6 +372,51 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
             marksAreStale = false
         }
         return changed
+    }
+
+    /// Brings the row instances up to date and reports whether any changed.
+    /// An eviction mid-build stales every UV: rebuild once. Content that
+    /// alone overflows the atlas draws blank.
+    private func updateRows(
+        grid: Grid, offset: Int, fullRebuild: Bool, previousBlockCursor: BlockCursor?,
+        atlasGeneration: Int
+    ) -> Bool {
+        glyphAtlas.beginFrame(shapingBudget: Self.shapingBudgetPerFrame)
+        var changed = fullRebuild
+        if fullRebuild {
+            rebuildAllRows(grid: grid, offset: offset)
+        } else {
+            changed = rebuildDamagedRows(
+                grid: grid, offset: offset, previousBlockCursor: previousBlockCursor)
+        }
+        if glyphAtlas.generation != atlasGeneration {
+            rebuildAllRows(grid: grid, offset: offset)
+            changed = true
+        }
+        return changed
+    }
+
+    /// Hands the placements to the image renderer and reports whether they
+    /// changed. Decodes are scheduled here, never in `draw`; an image delete
+    /// changes no cell, so it registers as damage here or not at all.
+    private func updateImages(grid: Grid, offset: Int) -> Bool {
+        let changed = cachedImagePlacements.revision != grid.imagePlacements.revision
+        kittyImageRenderer.update(
+            table: grid.imagePlacements, rows: grid.rows, offset: offset,
+            scrollbackTotalPushed: grid.scrollback.totalPushed,
+            cellWidth: Float(metricsValue.cellWidth), cellHeight: Float(metricsValue.cellHeight))
+        return changed
+    }
+
+    /// Rows that drew without some glyph are rebuilt next frame. Asked for
+    /// only while nothing was evicted: past that the content overflows the
+    /// atlas, and re-asking would shape a budget's worth every frame for as
+    /// long as it stays on screen.
+    private func requestRebuildForDeferredGlyphs(atlasGeneration: Int) {
+        needsFullRebuild = glyphAtlas.deferredShaping && glyphAtlas.generation == atlasGeneration
+        if needsFullRebuild {
+            onGlyphsDeferred?()
+        }
     }
 
     /// Whether every row must be rebuilt: the grid's shape or lines were

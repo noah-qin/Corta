@@ -285,27 +285,9 @@ final class SFTPTransferQueue {
             return
         }
         if plan.isUpload {
-            let local = try? FileManager.default.attributesOfItem(atPath: plan.localURL.path)
-            plan.sourceSize = (local?[.size] as? NSNumber)?.uint64Value
-            plan.sourceModified = local?[.modificationDate] as? Date
-            let destination = try? await client.lstat(path: plan.remotePath)
-            plan.destinationExists = destination != nil
-            plan.destinationSize = destination?.size
-            plan.destinationModified = destination?.modificationTime.map {
-                Date(timeIntervalSince1970: TimeInterval($0))
-            }
-            let partial = try? await client.lstat(
-                path: SFTPTransferEngine.partialPath(for: plan.remotePath))
-            plan.partialSize = partial?.size
+            await Self.inspectUpload(&plan, client: client)
         } else {
-            let destination = try? FileManager.default.attributesOfItem(
-                atPath: plan.localURL.path)
-            plan.destinationExists = destination != nil
-            plan.destinationSize = (destination?[.size] as? NSNumber)?.uint64Value
-            plan.destinationModified = destination?[.modificationDate] as? Date
-            let partial = try? FileManager.default.attributesOfItem(
-                atPath: SFTPTransferEngine.partialPath(for: plan.localURL.path))
-            plan.partialSize = (partial?[.size] as? NSNumber)?.uint64Value
+            Self.inspectDownload(&plan)
         }
         jobs[id]?.plan = plan
         // Cancelled while the pre-flight ran: the row is already settled.
@@ -330,6 +312,36 @@ final class SFTPTransferQueue {
                     : SFTPBrowserModel.describe(size: plan.partialSize, modified: nil),
                 canResume: plan.partialSize != nil,
                 partialOnly: !plan.destinationExists))
+    }
+
+    /// An upload's facts for the sheet: the local source, and the remote
+    /// destination and partial by LSTAT.
+    private static func inspectUpload(_ plan: inout Plan, client: any SFTPClient) async {
+        let local = try? FileManager.default.attributesOfItem(atPath: plan.localURL.path)
+        plan.sourceSize = (local?[.size] as? NSNumber)?.uint64Value
+        plan.sourceModified = local?[.modificationDate] as? Date
+        let destination = try? await client.lstat(path: plan.remotePath)
+        plan.destinationExists = destination != nil
+        plan.destinationSize = destination?.size
+        plan.destinationModified = destination?.modificationTime.map {
+            Date(timeIntervalSince1970: TimeInterval($0))
+        }
+        let partial = try? await client.lstat(
+            path: SFTPTransferEngine.partialPath(for: plan.remotePath))
+        plan.partialSize = partial?.size
+    }
+
+    /// A download's facts for the sheet: the local destination and partial.
+    /// The source's size and mtime arrive with the listing the plan was
+    /// made from.
+    private static func inspectDownload(_ plan: inout Plan) {
+        let destination = try? FileManager.default.attributesOfItem(atPath: plan.localURL.path)
+        plan.destinationExists = destination != nil
+        plan.destinationSize = (destination?[.size] as? NSNumber)?.uint64Value
+        plan.destinationModified = destination?[.modificationDate] as? Date
+        let partial = try? FileManager.default.attributesOfItem(
+            atPath: SFTPTransferEngine.partialPath(for: plan.localURL.path))
+        plan.partialSize = (partial?[.size] as? NSNumber)?.uint64Value
     }
 
     /// The conflict sheet's answer, mapped onto engine policy (see the

@@ -120,18 +120,7 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
     private init(host: String?, startDirectory: String?, suggestedHost: String? = nil, previewModel: SFTPBrowserModel? = nil) {
         model = previewModel ?? SFTPBrowserModel(
             host: host, startDirectory: startDirectory, suggestedHost: suggestedHost)
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 460),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        // Found by tests and Accessibility whatever host names the window.
-        window.identifier = NSUserInterfaceItemIdentifier("Corta.SFTPBrowser")
-        // Wide enough that the toolbar — Back and Forward, the title, the
-        // path, the transfer actions and More — never overflows into a
-        // chevron at the size the window opens at.
-        window.minSize = NSSize(width: 720, height: 360)
-        window.toolbarStyle = .unified
+        let window = Self.makeWindow()
         super.init(window: window)
         window.delegate = self
         window.contentViewController = NSHostingController(
@@ -145,6 +134,29 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         }
         model.publishTitle()
         if isPreview { return }
+        installConnectionCallbacks()
+        installFileCallbacks()
+    }
+
+    private static func makeWindow() -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 460),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        // Found by tests and Accessibility whatever host names the window.
+        window.identifier = NSUserInterfaceItemIdentifier("Corta.SFTPBrowser")
+        // Wide enough that the toolbar — Back and Forward, the title, the
+        // path, the transfer actions and More — never overflows into a
+        // chevron at the size the window opens at.
+        window.minSize = NSSize(width: 720, height: 360)
+        window.toolbarStyle = .unified
+        return window
+    }
+
+    /// One window per host: the registry the model consults before and
+    /// after it connects.
+    private func installConnectionCallbacks() {
         model.shouldStartConnection = { [weak self] host in
             guard let self else { return false }
             if let existing = Self.byHost[host], existing !== self {
@@ -170,6 +182,10 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
             if Self.byHost[host] === self { Self.byHost.removeValue(forKey: host) }
             Self.unconnected[ObjectIdentifier(self)] = self
         }
+    }
+
+    /// The pickers and the Edit row action.
+    private func installFileCallbacks() {
         model.pickUploadFiles = { [weak self] in await self?.pickUploadFiles() ?? [] }
         model.pickDownloadDestination = { [weak self] entries in
             await self?.pickDownloadDestination(for: entries)

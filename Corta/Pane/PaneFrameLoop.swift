@@ -17,7 +17,6 @@
 import CortaTerminal
 import Metal
 import QuartzCore
-import Synchronization
 
 /// One pane's render loop: whether a frame is owed, the diff that decides
 /// it, and the draw.
@@ -258,31 +257,61 @@ final class PaneFrameLoop {
             drawable.present()
             return true
         }
+        guard recoverBackend(renderer, drawable: drawable) else { return true }
+        let generation = generation
+        let backendGeneration = renderer.backendGeneration
+        let rect = Self.contentRect(
+            in: drawableSize, scale: renderer.scale,
+            gridHeight: CGFloat(renderer.cachedRowCount) * renderer.metrics.cellHeight,
+            topInset: topInset())
+        let onCompleted = gpuCompletion(generation: generation, backendGeneration: backendGeneration)
+        let background = TerminalColorPalette.clearColor
+        let commit = InputLatencySignposts.begin(.commit)
+        let accepted = trackPreparedPresentation(of: drawable, generation: generation)
+        let drawn = renderer.draw(
+            rect: rect, drawableSize: drawableSize, target: drawable.texture,
+            clearColor: MTLClearColorMake(
+                Double(background.x), Double(background.y), Double(background.z),
+                Double(background.w)),
+            // For Metal System Trace: ties a command buffer to its pane.
+            drawable: drawable, label: "Corta.frame.\(ObjectIdentifier(self).hashValue)",
+            onCompleted: onCompleted)
+        InputLatencySignposts.end(.commit, commit)
+        accepted?.finishEncoding(drawn)
+        watchGPU(generation: generation, backendGeneration: backendGeneration)
+        return drawn
+    }
+
+    /// Rebuilds a backend that needs it, resetting the GPU watch. False when
+    /// recovery is exhausted: rendering stops and the drawable is presented
+    /// unchanged, since an unpresented one is never recycled.
+    private func recoverBackend(_ renderer: TerminalRenderer, drawable: CAMetalDrawable) -> Bool {
         do {
             if try renderer.recoverBackendIfNeeded() {
                 watchdog?.cancel()
                 watchdog = nil
                 feedback = GPUFrameFeedback()
             }
+            return true
         } catch {
             renderingStopped = true
             drawable.present()
             onRenderingFailure?(error)
-            return true
+            return false
         }
-        let generation = generation
-        let backendGeneration = renderer.backendGeneration
+    }
+
+    /// The frame's completion handler, opened as its submission begins.
+    /// `gpu` spans submission to completion — the only place GPU time and a
+    /// drawable wait become visible.
+    private func gpuCompletion(
+        generation: Int, backendGeneration: Int
+    ) -> @Sendable ((any Error)?) -> Void {
         let feedback = feedback
         let submission = feedback.begin()
-        let rect = Self.contentRect(
-            in: drawableSize, scale: renderer.scale,
-            gridHeight: CGFloat(renderer.cachedRowCount) * renderer.metrics.cellHeight,
-            topInset: topInset())
         let gpu = InputLatencySignposts.begin(.gpu)
         let gpuStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
-        // `gpu` spans submission to completion — the only place GPU time and a
-        // drawable wait become visible.
-        let onCompleted: @Sendable ((any Error)?) -> Void = { [weak self] error in
+        return { [weak self] error in
             feedback.complete(submission)
             InputLatencySignposts.end(.gpu, gpu)
             if let gpuStart {
@@ -301,33 +330,24 @@ final class PaneFrameLoop {
                 self.invalidate()
             }
         }
-        let background = TerminalColorPalette.clearColor
-        let commit = InputLatencySignposts.begin(.commit)
-        let token = preparedPresentationToken
-        let accepted = preparedPresentationPending
-            ? cursorHandoffSignal.trackPresentation(
-                of: drawable, token: token,
-                retry: { [weak self] in
-                    guard let self, self.isCurrent(generation) else { return }
-                    self.invalidate()
-                },
-                presented: { [weak self] token in
-                    guard let self, self.isCurrent(generation) else { return }
-                    self.onPresented?(token)
-                })
-            : nil
-        let drawn = renderer.draw(
-            rect: rect, drawableSize: drawableSize, target: drawable.texture,
-            clearColor: MTLClearColorMake(
-                Double(background.x), Double(background.y), Double(background.z),
-                Double(background.w)),
-            // For Metal System Trace: ties a command buffer to its pane.
-            drawable: drawable, label: "Corta.frame.\(ObjectIdentifier(self).hashValue)",
-            onCompleted: onCompleted)
-        InputLatencySignposts.end(.commit, commit)
-        accepted?.finishEncoding(drawn)
-        watchGPU(generation: generation, backendGeneration: backendGeneration)
-        return drawn
+    }
+
+    /// Watches the drawable of a frame whose presentation the cursor
+    /// handoff is waiting on; nil when none is.
+    private func trackPreparedPresentation(
+        of drawable: CAMetalDrawable, generation: Int
+    ) -> FrameAcceptanceMarker? {
+        guard preparedPresentationPending else { return nil }
+        return cursorHandoffSignal.trackPresentation(
+            of: drawable, token: preparedPresentationToken,
+            retry: { [weak self] in
+                guard let self, self.isCurrent(generation) else { return }
+                self.invalidate()
+            },
+            presented: { [weak self] token in
+                guard let self, self.isCurrent(generation) else { return }
+                self.onPresented?(token)
+            })
     }
 
     /// Top-anchored when the grid fits, so the rounding remainder sits at the
