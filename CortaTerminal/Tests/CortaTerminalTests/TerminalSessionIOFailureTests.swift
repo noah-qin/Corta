@@ -110,6 +110,32 @@ struct TerminalSessionIOFailureTests {
         #expect(session.pty.exitStatus == nil)
     }
 
+    /// A write the owner's `stop()` interrupts fails because the session is
+    /// going away, not because anything broke: that error must not surface
+    /// as a failure. Every caller of `reportIOFailure` but this one checks
+    /// `stopped` itself, so this is the test that pins its own guard.
+    @Test func aWriteFailingAfterStopIsNotReported() throws {
+        var seams = TerminalSession.Seams()
+        let entered = DispatchSemaphore(value: 0)
+        let release = DispatchSemaphore(value: 0)
+        seams.writerSink = { _ in
+            entered.signal()
+            release.wait()
+            throw PTYError.ioFailed(code: EBADF)
+        }
+        let session = try TerminalSession(executable: "/bin/cat", seams: seams)
+        defer { session.stop() }
+        let failures = Mutex(0)
+        session.onIOFailure = { _ in failures.withLock { $0 += 1 } }
+        #expect(session.write([1]) == .accepted)
+        #expect(entered.wait(timeout: .now() + testTimeoutInterval(5)) == .success)
+        session.stop()
+        release.signal()
+        session.waitForQueuedWrites()
+        #expect(session.ioFailure == nil)
+        #expect(failures.withLock { $0 } == 0)
+    }
+
     @Test func ownerShutdownDoesNotReportAnIOFailure() throws {
         let session = try TerminalSession(executable: "/bin/cat")
         let failures = Mutex(0)
