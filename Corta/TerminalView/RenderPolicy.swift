@@ -111,7 +111,11 @@ final class RenderPolicy {
     nonisolated private static let lowPower = CAFrameRateRange(minimum: 1, maximum: 30, preferred: 15)
     nonisolated private static let thermalPressure = CAFrameRateRange(minimum: 1, maximum: 20, preferred: 10)
 
+    /// - Parameter scheduler: the display link whose frame rate this sets.
     /// - Parameter window: observed for key/resign to track focus.
+    /// - Parameter scheduleTypingExpiry: when typing stops counting as recent;
+    ///   tests run it by hand.
+    /// - Parameter now: the clock typing is timed on; tests supply their own.
     init(scheduler: FrameScheduler, window: NSWindow?,
         scheduleTypingExpiry: @escaping (TimeInterval, DispatchWorkItem) -> Void = { delay, work in
             DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)

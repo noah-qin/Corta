@@ -136,8 +136,12 @@ extension TerminalView {
     /// editing block and F1–F12, with modifiers as `CSI 1 ; m X` and DECCKM
     /// selecting SS3 for unmodified cursor keys and Home/End.
     ///
+    /// - Parameter event: the key-down to translate.
     /// - Parameter enhancements: kitty flags; `disambiguate` sends colliding
     ///   keys as `CSI code ; modifiers u`.
+    /// - Parameter newLineMode: LNM: Return sends CR LF rather than CR.
+    /// - Parameter applicationCursorKeys: DECCKM: cursor keys and Home/End send
+    ///   SS3 rather than CSI when unmodified.
     /// - Parameter applicationKeypad: DECKPAM (`ESC =`): the keypad sends
     ///   `ESC O p`…`ESC O y` and `ESC O M`, as `smkx` programs expect.
     /// - Parameter optionAsMeta: ⌥ on a text or control key sends an ESC

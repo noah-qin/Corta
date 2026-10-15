@@ -227,11 +227,14 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     var pointMetrics: CellMetrics { geometry.withLock { $0.points } }
     var scale: CGFloat { geometry.withLock { $0.scale } }
 
-    /// - Parameter scale: glyphs rasterise at `size × scale` and `metrics` are
+    /// - Parameter device: a GPU in `MTLGPUFamily.metal4`.
+    /// - Parameter font: the primary font, at its point size.
+    /// - Parameter scaleValue: glyphs rasterise at `size × scale` and `metrics` are
     ///   pixels, the shader's space; 1× on a 2× display rendered half-size and
     ///   soft.
     /// - Parameter atlasPixelSize: small in tests, to exercise eviction;
     ///   `nil` is `GlyphAtlas.atlasSize`.
+    /// - Parameter atlasStorageMode: the atlas texture's storage.
     /// - Throws: `Metal4BackendError.metal4Unsupported` on a GPU without
     ///   `MTLGPUFamily.metal4`. There is no other renderer to fall back to.
     public init(

@@ -133,6 +133,8 @@ nonisolated final class GlyphAtlas {
         private var nextOrigin: (x: Int, y: Int)
         private var rowHeight: Int
 
+        /// - Parameter regionOrigin: the page's corner in the atlas texture.
+        /// - Parameter regionSize: the page's extent in texels.
         /// - Parameter reservedFirstRow: skip the first row, which holds the
         ///   opaque texel at the origin that cursor and selection quads share
         ///   the glyph pipeline through (for `asciiPage`; never evicted).
@@ -277,8 +279,11 @@ nonisolated final class GlyphAtlas {
         return true
     }
 
+    /// - Parameter device: the GPU the atlas texture lives on.
+    /// - Parameter font: the primary font, rasterised at its own size.
     /// - Parameter atlasPixelSize: the square atlas edge; tests pass a small
     ///   one to exercise eviction.
+    /// - Parameter storageMode: the texture's storage; tests measure each.
     /// - Parameter makeTexture: a test hook to fail allocations; nil uses the
     ///   device.
     init(

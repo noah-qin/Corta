@@ -357,9 +357,11 @@ extension PanePointer {
     /// Resolves a reference against a directory, or refuses. Pure, with the
     /// filesystem check injected.
     ///
+    /// - Parameter reference: a detected path, with its line and column.
     /// - Parameter directory: the pane's local working directory. Nil (remote
     ///   or unreported) refuses even absolute paths, which name remote files
     ///   there too.
+    /// - Parameter isRegularFile: the filesystem check; tests pass their own.
     static func resolve(
         _ reference: FileReferenceDetection.Reference, directory: String?,
         isRegularFile: (String) -> Bool = PathProbe.isRegularFile

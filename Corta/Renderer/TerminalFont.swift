@@ -35,6 +35,7 @@ nonisolated enum TerminalFont {
     /// The primary font, cascade pinned. `.medium` matches Terminal.app's stem
     /// density at 12pt; `.regular` reads soft through the grayscale atlas.
     ///
+    /// - Parameter size: in points.
     /// - Parameter family: nil for System Monospaced. A family that isn't
     ///   installed or that `MonospacedFontCatalog` rejects falls back to the
     ///   system font — the config file can name anything (D12).

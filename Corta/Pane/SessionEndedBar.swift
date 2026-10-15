@@ -59,6 +59,7 @@ final class SessionEndedBar: NSView {
         return names[signal] ?? "signal \(signal)"
     }
 
+    /// - Parameter exit: how the child ended, which the message words.
     /// - Parameter isConnection: the pane ran a remote launcher; its button
     ///   reconnects, and says so.
     init(exit: ProcessExit, isConnection: Bool) {

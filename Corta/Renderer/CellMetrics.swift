@@ -35,6 +35,8 @@ public nonisolated struct CellMetrics: Sendable {
         return copy
     }
 
+    /// - Parameter font: the primary font, whose advance and line metrics
+    ///   size the box.
     /// - Parameter scale: the backing scale. The box snaps to whole device
     ///   pixels, not points: point snapping (SF Mono's 0.6 advance gave 9pt at
     ///   both 14pt and 15pt) made font steps change the window's aspect

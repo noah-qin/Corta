@@ -333,6 +333,7 @@ public nonisolated final class Metal4Backend {
         device.supportsFamily(.metal4)
     }
 
+    /// - Parameter device: a GPU in `MTLGPUFamily.metal4`.
     /// - Parameter slotWaitLimit: the longest `beginFrame` waits for a busy
     ///   slot before dropping the frame.
     public init(device: MTLDevice, slotWaitLimit: DispatchTimeInterval = Metal4Backend.defaultSlotWaitLimit)

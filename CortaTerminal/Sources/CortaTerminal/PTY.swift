@@ -55,8 +55,10 @@ public final class PTY: @unchecked Sendable {
 
     /// - Parameters:
     ///   - executable: absolute; `PATH` is not searched.
+    ///   - arguments: after the executable, which is `argv[0]`.
     ///   - environment: sanitised by default (`ChildEnvironment`).
     ///   - size: applied before the child starts, so it never sees 0×0.
+    ///   - workingDirectory: where the child starts; nil inherits Corta's.
     ///   - terminationHandler: once, off the main thread, when reaped.
     public static func spawn(
         executable: String,

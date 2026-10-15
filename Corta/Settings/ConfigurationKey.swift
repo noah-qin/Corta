@@ -41,7 +41,7 @@ nonisolated struct ConfigurationKey: Sendable {
             write: { String($0[keyPath: path]) })
     }
 
-    static func choice<Value: RawRepresentable>(_ name: String, _ path: Path<Value>) -> Self
+    static func choice<Value: RawRepresentable & Sendable>(_ name: String, _ path: Path<Value>) -> Self
     where Value.RawValue == String {
         Self(
             name: name,

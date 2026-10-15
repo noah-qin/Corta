@@ -51,6 +51,8 @@ struct TerminalAccessibilitySnapshot {
     /// Each row's UTF-16 length, for clamping past the trimmed tail.
     private let rowLengths: [Int]
 
+    /// - Parameter grid: the snapshot whose visible rows become the text.
+    /// - Parameter selection: the current selection, if any.
     /// - Parameter scrollOffset: rows scrolled back; rows are read as document
     ///   rows, so the document-anchored `selection` indexes directly.
     init(grid: Grid, selection: SelectionRange?, scrollOffset: Int = 0) {

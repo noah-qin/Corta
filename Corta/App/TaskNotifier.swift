@@ -108,8 +108,12 @@ final class TaskNotifier {
 
     /// OSC 133 C / D; the first call disables the heuristic.
     ///
+    /// - Parameter running: true at OSC 133 C, false at D.
+    /// - Parameter exitStatus: the finished command's status; nil on a start.
     /// - Parameter commandID: the finished command, for the click; nil on a
     ///   start.
+    /// - Parameter window: the pane's window: nothing is posted while it is
+    ///   key, and the notice carries its title.
     func noteCommandRunning(
         _ running: Bool, exitStatus: Int?, commandID: Int?, in window: NSWindow?
     ) {

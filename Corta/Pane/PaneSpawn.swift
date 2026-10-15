@@ -32,8 +32,17 @@ enum PaneSpawn {
     /// Degrades rather than fails: `$SHELL` and the directory can each be stale
     /// (uninstalled shell, unmounted volume), and neither alone may abort the
     /// pane. Each is dropped in turn; `/bin/sh` in `/` is guaranteed by POSIX.
+    /// - Parameter size: the grid the child starts at.
+    /// - Parameter directory: where it starts; dropped when it is unusable.
+    /// - Parameter scrollbackLimit: the history cap, in lines.
+    /// - Parameter commandHistoryLimit: the OSC 133 records kept.
+    /// - Parameter preset: the shell, directory and environment it names.
     /// - Parameter configuredShell: a parameter so tests can stage a missing
     ///   shell without setting `$SHELL` for anything else.
+    /// - Parameter directoryCompletion: whether zsh gets the bundled hint
+    ///   integration.
+    /// - Parameter directoryCheckTimeout: how long the off-main existence
+    ///   check of `directory` may take before the next rung.
     static func start(
         size: TerminalSize, directory: String?, scrollbackLimit: Int,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity, preset: Preset? = nil,
