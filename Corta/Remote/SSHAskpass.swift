@@ -14,7 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import CortaTerminal
 import Darwin
 import Foundation
 import Security
@@ -274,21 +273,20 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
     /// room for a `ProxyCommand` wrapper or two.
     static let ancestryLimit = 4
 
-    /// A connection's permission to ask: its token, the host its dialogs
-    /// name, and the ssh processes it spawned. Held by the connection; the
+    /// A connection's permission to ask: the host its dialogs name, the
+    /// environment (with its token) its ssh runs under, and the ssh
+    /// processes it spawned. Held by the connection; the
     /// broker keeps it weakly, so a closed connection can ask nothing.
     final class Grant: Sendable {
-        let token: String
         let host: String
         let environment: [String: String]
         private let processes = Mutex([pid_t: UInt64]())
         private let record: @Sendable (pid_t) -> ProcessRecord?
 
         fileprivate init(
-            token: String, host: String, environment: [String: String],
+            host: String, environment: [String: String],
             record: @escaping @Sendable (pid_t) -> ProcessRecord?
         ) {
-            self.token = token
             self.host = host
             self.environment = environment
             self.record = record
@@ -350,7 +348,7 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
             return nil
         }
         let grant = Grant(
-            token: token, host: host,
+            host: host,
             environment: SSHAskpass.environment(
                 executable: executable, socketPath: socketPath, token: token),
             record: record)

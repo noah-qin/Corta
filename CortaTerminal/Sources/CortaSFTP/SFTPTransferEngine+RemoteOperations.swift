@@ -80,10 +80,6 @@ extension SFTPTransferEngine {
         try await session.rename(from: oldPath, to: newPath)
     }
 
-    public func stat(path: String) async throws(SFTPError) -> SFTPAttributes {
-        try await session.stat(path: path)
-    }
-
     public func lstat(path: String) async throws(SFTPError) -> SFTPAttributes {
         try await session.lstat(path: path)
     }

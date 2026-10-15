@@ -15,7 +15,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
-import CortaTerminal
 import Metal
 
 /// Evicting a page, and growing or replacing the textures while frames may still sample them.

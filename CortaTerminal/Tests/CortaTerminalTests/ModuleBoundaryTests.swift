@@ -17,8 +17,6 @@
 import Foundation
 import Testing
 
-@testable import CortaTerminal
-
 /// `CortaTerminal`, `CortaSFTP` and `CortaPOSIX` must not import AppKit or Metal
 /// (`DESIGN.md` §4), nor each other.
 /// The core is a headless library: it is what makes the parser and grid

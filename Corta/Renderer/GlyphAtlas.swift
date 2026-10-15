@@ -129,8 +129,9 @@ nonisolated final class GlyphAtlas {
         private var nextOrigin: (x: Int, y: Int)
         private var rowHeight: Int
 
-        /// - Parameter reservedFirstRow: skip the first row, which holds
-        ///   `GlyphAtlas.solidWhiteUV` (for `asciiPage`).
+        /// - Parameter reservedFirstRow: skip the first row, which holds the
+        ///   opaque texel at the origin that cursor and selection quads share
+        ///   the glyph pipeline through (for `asciiPage`; never evicted).
         init(regionOrigin: (x: Int, y: Int), regionSize: (width: Int, height: Int), reservedFirstRow: Bool) {
             self.regionOrigin = regionOrigin
             self.regionSize = regionSize
@@ -271,10 +272,6 @@ nonisolated final class GlyphAtlas {
         shapingAllowance -= 1
         return true
     }
-
-    /// An opaque texel at the origin, so cursor and selection quads share the
-    /// glyph pipeline. Reserved in `asciiPage`, never evicted.
-    static let solidWhiteUV = SIMD4<Float>(0, 0, 0, 0)
 
     /// - Parameter atlasPixelSize: the square atlas edge; tests pass a small
     ///   one to exercise eviction.

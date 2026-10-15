@@ -17,7 +17,6 @@
 import Foundation
 import Testing
 
-@testable import Corta
 @testable import CortaTerminal
 
 /// Q02 — the two places a version number is written by hand have to agree.

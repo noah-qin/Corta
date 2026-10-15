@@ -145,8 +145,6 @@ nonisolated enum ImageDecoderProcess {
         var width: Int
         var height: Int
         var pixels: SharedPixels
-        // Inspection only; the texture path never asks for a packed CPU copy.
-        var bgra: [UInt8] { pixels.packedBytes(width: width, height: height) }
     }
 
     /// The header's size, held to the caps before anything is allocated.

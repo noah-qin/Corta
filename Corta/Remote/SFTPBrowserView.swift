@@ -15,8 +15,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
-import CortaSFTP
-import CortaTerminal
 import SwiftUI
 
 /// The SwiftUI half of the remote-file browser;

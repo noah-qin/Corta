@@ -16,7 +16,6 @@
 
 import AppKit
 import CortaPOSIX
-import CortaTerminal
 
 /// What a pane shows once its session has ended: a bar along one edge that
 /// says so, how it ended, and what can be done — start a new session here,
@@ -32,8 +31,6 @@ final class SessionEndedBar: NSView {
     var onClosePane: (() -> Void)?
 
     let message: String
-    private(set) var newSessionButton: NSButton!
-    private(set) var closeButton: NSButton!
 
     /// The words for an exit, for the bar and for assistive technology.
     /// Exit code 0 is a normal end, said plainly; nothing here guesses why
@@ -98,14 +95,12 @@ final class SessionEndedBar: NSView {
         newSession.bezelStyle = .rounded
         newSession.toolTip = L10n.text(
             isConnection ? "session.ended.confirm.remoteMessage" : "session.ended.confirm.message")
-        newSessionButton = newSession
 
         let close = NSButton(
             title: L10n.text("menu.closePane"), target: self, action: #selector(closeTapped))
         close.controlSize = .regular
         close.bezelStyle = .inline
         close.contentTintColor = .secondaryLabelColor
-        closeButton = close
 
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)

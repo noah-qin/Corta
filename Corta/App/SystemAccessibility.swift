@@ -16,20 +16,15 @@
 
 import AppKit
 
-/// Reduce Motion, Reduce Transparency and Increase Contrast in one place,
-/// so no new animation or panel forgets one; `observe(_:)` follows live
-/// changes. System preferences, never config keys: a copy would drift
-/// (D10).
+/// Reduce Motion and Increase Contrast for AppKit views in one place, so no
+/// new animation or panel forgets one; SwiftUI views read the same
+/// preferences from their environment. System preferences, never config
+/// keys: a copy would drift (D10).
 @MainActor
 enum SystemAccessibility {
     /// Arrive at the final state instead of animating.
     static var reduceMotion: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-    }
-
-    /// Replace glass with an opaque fill: nothing may show through.
-    static var reduceTransparency: Bool {
-        NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
     }
 
     /// Promote hairlines and secondary label colours.
@@ -40,23 +35,5 @@ enum SystemAccessibility {
     /// Zero under Reduce Motion, so call sites keep their animation code.
     static func duration(_ preferred: CFTimeInterval) -> CFTimeInterval {
         reduceMotion ? 0 : preferred
-    }
-
-    /// Full label colour under Increase Contrast, where 60% grey fails.
-    static var secondaryLabelColor: NSColor {
-        increaseContrast ? .labelColor : .secondaryLabelColor
-    }
-
-    /// Calls `handler` now and on any change, so setup and updates share one
-    /// path. Retain the token; releasing it unregisters.
-    static func observe(_ handler: @escaping @MainActor () -> Void) -> Any {
-        let token = NotificationCenter.default.addObserver(
-            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
-            object: NSWorkspace.shared, queue: .main
-        ) { _ in
-            MainActor.assumeIsolated { handler() }
-        }
-        handler()
-        return token
     }
 }

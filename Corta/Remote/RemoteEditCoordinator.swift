@@ -141,12 +141,8 @@ final class RemoteEditCoordinator {
     var pendingUploads: [PendingUpload] = []
     var pendingConflicts: [UploadConflict] = []
 
-    private struct Watch {
-        var source: DispatchSourceFileSystemObject
-        var descriptor: Int32
-    }
-
-    private var watches: [String: Watch] = [:]
+    /// Each watched copy's source; cancelling one closes its descriptor.
+    private var watches: [String: DispatchSourceFileSystemObject] = [:]
     /// The SHA-256 of each watched copy as last approved (at download,
     /// upload, or the previously-prompted edit) — the baseline the next
     /// change is measured against.
@@ -178,7 +174,7 @@ final class RemoteEditCoordinator {
     }
 
     isolated deinit {
-        for (_, watch) in watches { watch.source.cancel() }
+        for source in watches.values { source.cancel() }
         for (_, check) in pendingChecks { check.cancel() }
         for (_, connection) in connections {
             connection.task?.cancel()
@@ -438,7 +434,7 @@ final class RemoteEditCoordinator {
         }
         source.setCancelHandler { Darwin.close(descriptor) }
         source.resume()
-        watches[copy.id] = Watch(source: source, descriptor: descriptor)
+        watches[copy.id] = source
     }
 
     private func repointWatch(copyID: String) {
@@ -451,7 +447,7 @@ final class RemoteEditCoordinator {
     private func unwatch(_ copyID: String) {
         pendingChecks[copyID]?.cancel()
         pendingChecks[copyID] = nil
-        watches[copyID]?.source.cancel()
+        watches[copyID]?.cancel()
         watches[copyID] = nil
     }
 

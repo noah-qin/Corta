@@ -20,10 +20,9 @@ import CortaSFTP
 
 /// Read-only fixtures for the real browser. Never opens a channel or local file.
 nonisolated final class SFTPPreviewClient: SFTPClient {
-    var capabilities: SFTPServerCapabilities? {
+    func connect() async throws(SFTPError) -> SFTPServerCapabilities {
         .init(version: 3, extensions: [:], supportsStatVFS: true, supportsPosixRename: false)
     }
-    func connect() async throws(SFTPError) -> SFTPServerCapabilities { capabilities! }
     func realPath(path: String) async throws(SFTPError) -> String { "/home/demo" }
     func listDirectory(path: String) async throws(SFTPError) -> [SFTPEntry] {
         switch path {

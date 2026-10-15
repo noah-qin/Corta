@@ -123,7 +123,6 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     }
 
     public let processIdentifier: pid_t
-    public let host: String
 
     private let stdinWrite: GuardedDescriptor
     private let stdoutRead: GuardedDescriptor
@@ -150,8 +149,6 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         let data = diagnostics.withLock { $0 }
         return String(decoding: data, as: UTF8.self)
     }
-
-    public var exitStatus: ProcessExit? { state.withLock { $0.exit } }
 
     /// Bounded, and for diagnostics only: turns a bare `.connectionLost` into
     /// the classification `classify(exit:)` gives. Never disturbs a live child.
@@ -214,7 +211,7 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
             kill(pid, SIGCONT)
         }
         return SFTPSubprocessChannel(
-            pid: pid, host: host,
+            pid: pid,
             stdinWrite: stdinPipe[1], stdoutRead: stdoutPipe[0],
             stderrRead: stderrPipe[0])
     }
@@ -280,9 +277,8 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         let code: Int32
     }
 
-    private init(pid: pid_t, host: String, stdinWrite: Int32, stdoutRead: Int32, stderrRead: Int32) {
+    private init(pid: pid_t, stdinWrite: Int32, stdoutRead: Int32, stderrRead: Int32) {
         self.processIdentifier = pid
-        self.host = host
         self.stdinWrite = GuardedDescriptor(stdinWrite)
         self.stdoutRead = GuardedDescriptor(stdoutRead)
         // EPIPE, never SIGPIPE: its default action kills the whole app.

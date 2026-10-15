@@ -15,7 +15,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CortaSFTP
-import CortaTerminal
 import Foundation
 import Synchronization
 import Testing

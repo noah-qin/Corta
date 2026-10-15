@@ -31,10 +31,6 @@ import Testing
 @MainActor
 struct MenuAndPaletteAuditTests {
 
-    private static func items(in menu: NSMenu) -> [NSMenuItem] {
-        menu.items.flatMap { item in [item] + (item.submenu.map { items(in: $0) } ?? []) }
-    }
-
     /// The menus Corta builds, which is what an audit of Corta's menus can
     /// speak to. AppKit populates the Window and Services menus itself: the
     /// window list is one item per open window (two windows named "Corta" are

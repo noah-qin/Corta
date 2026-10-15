@@ -16,7 +16,6 @@
 
 import AppKit
 import CortaSFTP
-import CortaTerminal
 import Foundation
 
 extension RemoteEditCoordinator {

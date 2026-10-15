@@ -40,19 +40,6 @@ import Testing
 @Suite(.serialized) struct FontOptionsTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
-    /// Programming faces people actually ask for, then the monospaced
-    /// families macOS itself ships that are *not* the default, so the
-    /// end-to-end case has something to run on any machine.
-    private static let thirdPartyCandidates = [
-        "Fira Code", "JetBrains Mono", "Cascadia Code", "IBM Plex Mono",
-        "Source Code Pro", "Hack", "Iosevka", "Andale Mono", "PT Mono",
-    ]
-
-    private static func installedCandidate() -> String? {
-        let installed = Set(NSFontManager.shared.availableFontFamilies)
-        return thirdPartyCandidates.first { installed.contains($0) }
-    }
-
     /// Whether the font subsystem can currently hand back a usable face for
     /// `family` at all — a face, and glyphs for ASCII.
     ///

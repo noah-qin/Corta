@@ -25,10 +25,6 @@ extension TerminalSession {
         registerStateWaiter { state.withLock { $0.terminal.grid.scrollback.totalPushed } }
     }
 
-    public var scrollbackCount: Int {
-        registerStateWaiter { state.withLock { $0.terminal.grid.scrollback.count } }
-    }
-
     public var isBracketedPasteEnabled: Bool {
         registerStateWaiter { state.withLock { $0.terminal.isBracketedPasteEnabled } }
     }
@@ -40,10 +36,6 @@ extension TerminalSession {
                 $0.terminal.isSgrMouseEncodingEnabled ? $0.terminal.mouseTrackingMode : .off
             }
         }
-    }
-
-    public var isSgrMouseEncodingEnabled: Bool {
-        registerStateWaiter { state.withLock { $0.terminal.isSgrMouseEncodingEnabled } }
     }
 
     /// Can go false without the child's DECRST (timeout, exit).
@@ -88,11 +80,6 @@ extension TerminalSession {
         to newDefaults: [(red: UInt8, green: UInt8, blue: UInt8)]
     ) {
         registerStateWaiter { state.withLock { $0.terminal.indexedPalette.updateDefaults(to: newDefaults) } }
-    }
-
-    public var specialColors: SpecialColors {
-        get { registerStateWaiter { state.withLock { $0.terminal.specialColors } } }
-        set { registerStateWaiter { state.withLock { $0.terminal.specialColors = newValue } } }
     }
 
     public var keyboardEnhancements: KeyboardEnhancementFlags {

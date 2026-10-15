@@ -31,7 +31,6 @@ protocol PaneShellIntegrationHost: AnyObject {
     var scrollOffset: Int { get set }
     var search: PaneSearch { get }
     var pointer: PanePointer { get }
-    var remote: PaneRemote { get }
     var commands: PaneCommands { get }
     func invalidateDisplay()
 }

@@ -19,7 +19,6 @@ import Carbon.HIToolbox
 import Testing
 import Synchronization
 import CortaPOSIX
-import CortaTerminal
 
 @testable import Corta
 

@@ -15,11 +15,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CortaSFTP
-import CortaTerminal
 import Foundation
 import Testing
-
-@testable import Corta
 
 /// The shared SFTP test support: a fake `SFTPClient` that answers in
 /// the model's terms and records what it was asked, plus the small helpers

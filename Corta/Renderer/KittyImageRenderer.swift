@@ -549,14 +549,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     struct DecodedImage {
         var width: Int
         var height: Int
-        private var packed: [UInt8]?
         var pixels: ImageDecoderProcess.SharedPixels?
-        var bgra: [UInt8] { packed ?? pixels?.packedBytes(width: width, height: height) ?? [] }
-        init(width: Int, height: Int, bgra: [UInt8]) {
-            self.width = width
-            self.height = height
-            self.packed = bgra
-        }
+        var bgra: [UInt8] { pixels?.packedBytes(width: width, height: height) ?? [] }
         init(width: Int, height: Int, pixels: ImageDecoderProcess.SharedPixels) {
             self.width = width
             self.height = height

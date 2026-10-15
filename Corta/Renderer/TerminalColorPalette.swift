@@ -55,15 +55,6 @@ nonisolated enum TerminalColorPalette {
             c.x * backgroundOpacity, c.y * backgroundOpacity, c.z * backgroundOpacity,
             backgroundOpacity)
     }
-
-    /// Resolves `.default` to the foreground rather than the background.
-    static func resolveForeground(_ color: Color) -> SIMD4<Float> {
-        active.resolveForeground(color)
-    }
-
-    static func resolveBackground(_ color: Color) -> SIMD4<Float> {
-        active.resolveBackground(color)
-    }
 }
 
 /// OSC 4 overrides as a raw dictionary, so the common no-override path

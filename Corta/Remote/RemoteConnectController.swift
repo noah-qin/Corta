@@ -77,8 +77,6 @@ final class RemoteConnectController: NSWindowController {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    @objc func show(_ sender: Any?) { show(.ssh, sender: sender) }
-
     func show(_ mode: RemoteConnectMode, sender: Any?) {
         guard let window else { return }
         if window.isVisible {

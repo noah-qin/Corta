@@ -14,7 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import CortaTerminal
 import Foundation
 
 /// What a frame draws besides the grid, read from the pane once per frame.

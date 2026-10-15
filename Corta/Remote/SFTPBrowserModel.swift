@@ -15,7 +15,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CortaSFTP
-import CortaTerminal
 import Foundation
 import Observation
 
@@ -105,9 +104,7 @@ final class SFTPBrowserModel {
         case available(free: UInt64, total: UInt64)
     }
 
-    typealias TransferState = SFTPTransferQueue.TransferState
     typealias Transfer = SFTPTransferQueue.Transfer
-    typealias Resolution = SFTPTransferQueue.Resolution
     typealias ConflictPrompt = SFTPTransferQueue.ConflictPrompt
     typealias ConflictChoice = SFTPTransferQueue.ConflictChoice
 

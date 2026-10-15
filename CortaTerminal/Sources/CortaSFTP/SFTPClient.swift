@@ -35,10 +35,6 @@ import Synchronization
 /// only this layer can supply, because re-running ssh (and its
 /// authentication) is a spawn, and spawning belongs here.
 public protocol SFTPClient: AnyObject, Sendable {
-    /// The server's capabilities, from its VERSION answer; `nil` until
-    /// `connect()` completes.
-    var capabilities: SFTPServerCapabilities? { get }
-
     /// Spawns the channel and completes the INIT/VERSION handshake.
     /// A second call on a live connection answers from the first.
     @discardableResult
@@ -165,6 +161,8 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
         self.environment = environment
     }
 
+    /// The server's capabilities, from its VERSION answer; `nil` until
+    /// `connect()` completes.
     public var capabilities: SFTPServerCapabilities? {
         state.withLock { $0.capabilities }
     }

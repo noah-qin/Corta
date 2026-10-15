@@ -123,8 +123,6 @@ final class QuickTerminalController {
         return window === panel
     }
 
-    var isVisible: Bool { controller?.window?.isVisible == true }
-
     func toggle() {
         // A panel sliding out is going away: the hotkey brings it back.
         if let window = controller?.window, window.isVisible, !visibility.isHiding {

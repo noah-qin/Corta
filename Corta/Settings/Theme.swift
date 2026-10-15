@@ -238,14 +238,6 @@ extension Theme {
 // MARK: - User-defined themes
 
 extension Theme {
-    /// A theme from config keys, inheriting the rest from `base`: overriding
-    /// two colours is the common case, and a half-typed theme still renders.
-    nonisolated static func custom(
-        name: String, displayName: String, base: Theme, dark: Variant, light: Variant
-    ) -> Theme {
-        Theme(name: name, displayName: displayName, dark: dark, light: light)
-    }
-
     /// `#rgb` or `#rrggbb`, with or without the `#`.
     nonisolated static func color(_ text: String) -> SIMD4<Float>? {
         var digits = Substring(text.trimmingCharacters(in: .whitespaces))

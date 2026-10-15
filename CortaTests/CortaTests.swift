@@ -16,7 +16,6 @@
 
 import CoreGraphics
 import Testing
-import CortaTerminal
 @testable import Corta
 
 struct CortaTests {

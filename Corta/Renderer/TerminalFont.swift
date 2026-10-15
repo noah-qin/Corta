@@ -85,11 +85,6 @@ nonisolated enum TerminalFont {
         )
     }
 
-    /// The bold variant.
-    static func bold(of font: CTFont) -> CTFont {
-        variant(of: font, bold: true, italic: false).font
-    }
-
     /// Re-applies the pinned cascade; idempotent.
     static func pinningCascadeList(_ font: CTFont, size: CGFloat) -> CTFont {
         let attributes = [kCTFontCascadeListAttribute: cascadeList] as CFDictionary
