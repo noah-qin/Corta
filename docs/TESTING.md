@@ -18,6 +18,7 @@ test run.
 | Rendering or hot path | Relevant rendering tests and app suite | Before/after frame CPU under Release (`-testPlan Release`), same machine |
 | Localization or accessibility | Relevant app tests | In-context language or VoiceOver review |
 | Packaging or release | `corta-release-check` against the artifact ([below](#packaging)) | Signing and notarization evidence |
+| Removing code or narrowing access | Build every test plan, then the suites the code touched | Both Periphery scans read together ([below](#dead-code)) |
 
 The [conformance guide](CONFORMANCE.md) defines manual checks and protocol
 coverage. [Performance](PERFORMANCE.md) defines benchmark workloads. Record
@@ -806,6 +807,34 @@ complete INI example are also checked against a fresh `Configuration`,
 including its documented nondefault values. Link existence alone cannot
 verify these contracts. For release-tool changes, also run Python helper
 tests and `swift test --package-path CortaTerminal --filter ReleaseCheckTests`.
+
+## Dead code
+
+[Periphery](https://periphery.pro) finds unused declarations, parameters,
+properties that are only ever written, `public` that nothing outside its
+module uses, and unused imports. Its scans run locally from the CLI after
+`periphery auth login`; nothing in CI runs it, because the repository's
+Actions policy admits only GitHub's own actions. Two scans, each from its
+checked-in configuration:
+
+```sh
+periphery scan --format json > /tmp/periphery-app.json     # repository root: .periphery.yml
+cd CortaTerminal && periphery scan --format json > /tmp/periphery-package.json
+```
+
+Read them together. The app scan cannot see the package's executables and
+tests, and the package scan cannot see the app, so each reports
+declarations the other uses: a declaration under `CortaTerminal/Sources/`
+is dead only when both scans report it, and anything else only when its
+own scan does. The app scheme builds the Unit plan; to count code that only
+the UI or Release plans use, build each plan with
+`COMPILER_INDEX_STORE_ENABLE=YES` into its own derived data and pass every
+`Index.noindex/DataStore` with `--index-store-path`.
+
+Code kept on purpose carries a `// periphery:ignore - reason` comment on
+the member the scan reports, not on its type, which the scan would call
+superfluous: a field read only by a synthesised `==` or `hash`, one the
+shader reads, a protocol's named constant, an action reached by selector.
 
 ## Report a result
 
