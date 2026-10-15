@@ -84,3 +84,63 @@ struct SelectionRewriteTests {
         #expect(pane.selection != nil)
     }
 }
+
+/// A real child and a visible pane exercise the output-to-frame wiring,
+/// beyond comparing synthetic grids. All shell state is local to the child.
+@MainActor
+@Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct SelectionLiveOutputTests {
+    private func waitUntilTrue(timeout: Duration, _ condition: () -> Bool) async -> Bool {
+        let deadline = SuspendingClock.now + timeout * testTimeoutScale
+        while SuspendingClock.now < deadline {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return condition()
+    }
+
+    @Test(arguments: ["selected", "rewritten"])
+    func aLiveRedrawValidatesTheSelection(text: String) async throws {
+        var preset = Preset(name: "selection-redraw")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", """
+            stty -echo
+            printf '\\033[2J\\033[Hselected\\r\\nREADY'
+            while IFS= read -r text; do
+                printf '\\033[1;1H\\033[2K%s\\033[3;1HDONE' "$text"
+            done
+            """]
+        let pane = ViewController()
+        pane.preset = preset
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentViewController = pane
+        window.orderFront(nil)
+        defer { pane.teardown(); window.close() }
+        let session = try #require(pane.session)
+        var batches = 0
+        let onBatch = pane.frameLoop.onOutputBatch
+        pane.frameLoop.onOutputBatch = { batches += 1; onBatch?() }
+        let ready = await waitUntilTrue(timeout: .seconds(5)) {
+            _ = pane.frameLoop.prepareFrame()
+            return session.snapshot().logicalLines().contains { $0.text.contains("READY") }
+        }
+        try #require(ready)
+        let range = SelectionRange(start: SelectionPoint(row: 0, column: 0), end: SelectionPoint(row: 0, column: 7))
+        #expect(Selection.text(of: range, in: session.snapshot()) == "selected")
+        pane.pointer.setSelection(range, in: session.snapshot())
+        let before = batches
+        session.write(Array("\(text)\n".utf8))
+        let redrawn = await waitUntilTrue(timeout: .seconds(5)) {
+            _ = pane.frameLoop.prepareFrame()
+            return batches > before
+                && session.snapshot().logicalLines().contains { $0.text.contains("DONE") }
+                && (text == "selected" || pane.selection == nil)
+        }
+        try #require(redrawn)
+        #expect(Selection.text(of: range, in: session.snapshot()) == String(text.prefix(8)))
+        #expect((pane.selection != nil) == (text == "selected"))
+    }
+}
