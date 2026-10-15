@@ -273,11 +273,10 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     ) {
         guard let host, host.isOperable else { return }
         host.session.apply(command)
-        host.selection = nil
+        host.pointer.clearSelection()
         host.scrollOffset = 0
         host.invalidateDisplay()
         host.terminalView?.noteAccessibilityValueChanged()
-        host.terminalView?.noteAccessibilitySelectionChanged()
         host.terminalView?.showToast(L10n.text(notice))
     }
 

@@ -270,54 +270,87 @@ public enum Selection {
     }
 }
 
-/// What the live rows under a selection held when it was made, so the shell
-/// can tell when the program rewrote them in place.
+/// What the rows under a selection held when it was made, so the shell can
+/// tell when the program rewrote the text it covers.
 ///
 /// Output that *scrolls* keeps a selection on its text
 /// (`SelectionRange.shifted(byScrollbackGrowth:)`). Output that *rewrites*
-/// the rows it covers — a printed character, an erase, an insert or delete,
-/// a region scroll, the alternate screen — leaves it naming text it no longer
-/// covers, so it is dropped: a redraw such as Claude Code's (cursor up,
-/// `CSI 2K`, write again) otherwise left a highlight lying across whatever
-/// came next. Alacritty, xterm and URxvt drop a selection an erase overlaps;
-/// this also drops one a write lands in, which is the case a redraw hits.
+/// the selected text in place — a printed character, an erase, an insert or
+/// delete, a region scroll, the alternate screen — leaves it naming text it
+/// no longer covers, so it is dropped: a redraw such as Claude Code's (cursor
+/// up, `CSI 2K`, write again) otherwise left a highlight lying across
+/// whatever came next. Alacritty, xterm and URxvt drop a selection an erase
+/// overlaps; this also drops one a write changes, which is what a redraw does.
 ///
-/// Built from the per-row revisions damage tracking already keeps
-/// (`Grid.lineRevision`), which travel with their lines through a
-/// full-screen scroll: a row reads as changed only when something wrote it.
-/// One comparison per selected live row, off the output path.
+/// Three things are not a rewrite. A row written with the same text — Ink
+/// redraws every dynamic line each frame — or written only in columns the
+/// selection does not cover. And selected *blank* space that output then
+/// fills: streaming output landing on the empty rows a select-all covers
+/// appends; it changes no text the selection named.
+///
+/// The per-row revisions damage tracking keeps (`Grid.lineRevision`), which
+/// travel with their lines through a full-screen scroll, are the fast path:
+/// an unchanged revision is unchanged text, and only a changed one reads
+/// the cells.
 public struct SelectionContent: Equatable, Sendable {
     let generation: UInt64
     let totalPushed: Int
+    let range: SelectionRange
     let firstRow: Int
     let revisions: [UInt64]
+    let texts: [String]
 }
 
 extension Selection {
-    /// Records what `range`'s live rows hold now. Rows in the scrollback are
-    /// left out: output never rewrites history.
+    /// Records what `range` covers now, in the grid it was made against.
     public static func content(of range: SelectionRange, in grid: Grid) -> SelectionContent {
         let first = max(0, range.start.row)
         let last = min(grid.rows - 1, range.end.row)
+        let rows = first <= last ? Array(first...last) : []
         return SelectionContent(
             generation: grid.linesGeneration,
             totalPushed: grid.scrollback.totalPushed,
+            range: range,
             firstRow: first,
-            revisions: first <= last ? (first...last).map { grid.lineRevision($0) } : [])
+            revisions: rows.map { grid.lineRevision($0) },
+            texts: rows.map { rowText(range, documentRow: $0, shift: 0, in: grid) })
     }
 
-    /// Whether every row `content` recorded still holds what it did: the
-    /// same screen (not the alternate one, not a reflow), and no write to a
-    /// row that is still live. A row output has since pushed into the
-    /// scrollback is unchanged by definition.
+    /// Whether the text `content` recorded is still there: the same screen
+    /// (not the alternate one, not a reflow), the selection's history not
+    /// cleared or evicted, and no non-blank selected text on a still-live
+    /// row rewritten.
     public static func isUnchanged(_ content: SelectionContent, in grid: Grid) -> Bool {
         guard grid.linesGeneration == content.generation else { return false }
         let growth = max(0, grid.scrollback.totalPushed - content.totalPushed)
+        // `CSI 3J` or the ring's limit took the top of it away.
+        guard content.range.start.row - growth >= -grid.scrollback.count else { return false }
         for (offset, revision) in content.revisions.enumerated() {
-            let row = content.firstRow + offset - growth
-            guard row >= 0 else { continue }
-            guard row < grid.rows, grid.lineRevision(row) == revision else { return false }
+            let recorded = content.firstRow + offset
+            let row = recorded - growth
+            guard row >= 0 else { continue }  // Now history, which output cannot rewrite.
+            guard row < grid.rows else { return false }
+            guard grid.lineRevision(row) != revision, !content.texts[offset].isEmpty else { continue }
+            if rowText(content.range, documentRow: recorded, shift: growth, in: grid)
+                != content.texts[offset]
+            {
+                return false
+            }
         }
         return true
+    }
+
+    /// The selected columns of one row of `range`, which is in coordinates
+    /// `shift` pushed lines old.
+    private static func rowText(
+        _ range: SelectionRange, documentRow: Int, shift: Int, in grid: Grid
+    ) -> String {
+        let row = documentRow - shift
+        let start = documentRow == range.start.row ? range.start.column : 0
+        let end = documentRow == range.end.row ? range.end.column : grid.columns - 1
+        return text(
+            of: SelectionRange(
+                start: SelectionPoint(row: row, column: start), end: SelectionPoint(row: row, column: end)),
+            in: grid)
     }
 }

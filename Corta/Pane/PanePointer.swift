@@ -63,6 +63,7 @@ final class PanePointer: NSObject {
     /// The pane's view and session are being replaced: the pill and the
     /// hover belonged to the old ones.
     func reset() {
+        selectionContent = nil
         scrollPositionIndicator?.removeFromSuperview()
         scrollPositionIndicator = nil
         hoveredLink = nil
@@ -211,11 +212,11 @@ final class PanePointer: NSObject {
     @objc func selectAll(_: Any?) {
         guard session != nil else { return }
         let grid = session.snapshot()
-        selection = TerminalSelection(
-            start: GridPosition(row: -grid.scrollback.count, column: 0),
-            end: GridPosition(row: grid.rows - 1, column: grid.columns - 1),
-            baseScrollbackTotal: grid.scrollback.totalPushed)
-        invalidateDisplay()
+        setSelection(
+            SelectionRange(
+                start: SelectionPoint(row: -grid.scrollback.count, column: 0),
+                end: SelectionPoint(row: grid.rows - 1, column: grid.columns - 1)),
+            in: grid)
     }
 
 }

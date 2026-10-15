@@ -24,16 +24,19 @@ import Testing
 /// a row under it, and keeps it while output only scrolls (#341).
 @MainActor
 struct SelectionRewriteTests {
-    @Test func aRewrittenRowDropsTheSelectionAndScrollingDoesNot() {
-        let pane = ViewController()
+    private func numbered() -> Terminal {
         var terminal = Terminal(rows: 6, columns: 20)
         terminal.feed(Array((0..<10).map { "\($0)" }.joined(separator: "\r\n").utf8))
-        let range = SelectionRange(
-            start: SelectionPoint(row: 2, column: 0), end: SelectionPoint(row: 2, column: 5))
-        pane.selection = TerminalSelection(range, grid: terminal.grid)
+        return terminal
+    }
 
-        pane.pointer.dropSelectionIfRewritten(in: terminal.grid)
-        #expect(pane.selection != nil, "the first frame only records the rows")
+    private let row2 = SelectionRange(
+        start: SelectionPoint(row: 2, column: 0), end: SelectionPoint(row: 2, column: 5))
+
+    @Test func aRewrittenRowDropsTheSelectionAndScrollingDoesNot() {
+        let pane = ViewController()
+        var terminal = numbered()
+        pane.pointer.setSelection(row2, in: terminal.grid)
 
         terminal.feed(Array("\r\nscrolled".utf8))
         pane.pointer.dropSelectionIfRewritten(in: terminal.grid)
@@ -45,20 +48,38 @@ struct SelectionRewriteTests {
         #expect(pane.selection == nil)
     }
 
-    @Test func aNewSelectionIsRecordedAfresh() {
+    /// Recorded as it is made: a redraw that lands before the next frame is
+    /// a change, not the baseline.
+    @Test func aRewriteBeforeTheFirstFrameIsCaught() {
+        let pane = ViewController()
+        var terminal = numbered()
+        pane.pointer.setSelection(row2, in: terminal.grid)
+        terminal.feed(Array("\u{1B}7\u{1B}[3;1H\u{1B}[2Knew\u{1B}8".utf8))
+        pane.pointer.dropSelectionIfRewritten(in: terminal.grid)
+        #expect(pane.selection == nil)
+    }
+
+    @Test func reselectingTheSameRangeRecordsItAfresh() {
+        let pane = ViewController()
+        var terminal = numbered()
+        pane.pointer.setSelection(row2, in: terminal.grid)
+        terminal.feed(Array("\u{1B}7\u{1B}[3;1Hz\u{1B}8".utf8))
+        // The same range selected again over the new text: that is the baseline now.
+        pane.pointer.setSelection(row2, in: terminal.grid)
+        pane.pointer.dropSelectionIfRewritten(in: terminal.grid)
+        #expect(pane.selection != nil)
+    }
+
+    /// ⌘A covers the blank rows below the cursor; output landing there does
+    /// not rewrite anything it selected.
+    @Test func aSelectAllSurvivesOutputBelowThePrompt() {
         let pane = ViewController()
         var terminal = Terminal(rows: 6, columns: 20)
-        terminal.feed(Array("a\r\nb\r\nc".utf8))
-        let first = SelectionRange(
-            start: SelectionPoint(row: 0, column: 0), end: SelectionPoint(row: 0, column: 1))
-        pane.selection = TerminalSelection(first, grid: terminal.grid)
-        pane.pointer.dropSelectionIfRewritten(in: terminal.grid)
-        terminal.feed(Array("\u{1B}[1;1Hz".utf8))
-        // Selected again after the rewrite: what is recorded is the new text.
-        let second = SelectionRange(
-            start: SelectionPoint(row: 0, column: 0), end: SelectionPoint(row: 0, column: 0))
-        pane.selection = TerminalSelection(second, grid: terminal.grid)
-        pane.pointer.dropSelectionIfRewritten(in: terminal.grid)
+        terminal.feed(Array("$ ".utf8))
+        let all = SelectionRange(
+            start: SelectionPoint(row: 0, column: 0), end: SelectionPoint(row: 5, column: 19))
+        pane.pointer.setSelection(all, in: terminal.grid)
+        terminal.feed(Array("\r\nline one\r\nline two".utf8))
         pane.pointer.dropSelectionIfRewritten(in: terminal.grid)
         #expect(pane.selection != nil)
     }

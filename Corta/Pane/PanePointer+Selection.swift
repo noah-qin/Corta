@@ -43,9 +43,7 @@ extension PanePointer {
             let current = selectionRange(for: existing, in: grid)
             anchor = anchor <= current.start ? current.end : current.start
         } else if unit == .character {
-            selection = nil
-            terminalView.noteAccessibilitySelectionChanged()
-            invalidateDisplay()
+            clearSelection()
         } else {
             applySelection(anchor: anchor, head: anchor, unit: unit, grid: grid)
         }
@@ -114,17 +112,33 @@ extension PanePointer {
     private func applySelection(
         anchor: SelectionPoint, head: SelectionPoint, unit: SelectionUnit, grid: Grid
     ) {
-        let range = Selection.range(from: anchor, to: head, unit: unit, in: grid)
-        selection = TerminalSelection(range, grid: grid)
+        setSelection(Selection.range(from: anchor, to: head, unit: unit, in: grid), in: grid)
+    }
+
+    /// Selects `range` of `grid`, recording what it covers from that same
+    /// grid: a rewrite that lands before the next frame is then a change, not
+    /// the baseline (#341).
+    func setSelection(_ range: SelectionRange, in grid: Grid) {
+        let selection = TerminalSelection(range, grid: grid)
+        self.selection = selection
+        selectionContent = (selection, Selection.content(of: range, in: grid))
         // No output batch reports a local change.
         terminalView?.noteAccessibilitySelectionChanged()
         invalidateDisplay()
     }
 
-    /// Drops the selection once the program rewrites a row it covers, which
-    /// otherwise leaves the highlight on text it no longer names (#341).
-    /// Once per frame, against that frame's grid: the first frame after a
-    /// selection records its rows, later ones compare.
+    func clearSelection() {
+        selection = nil
+        selectionContent = nil
+        terminalView?.noteAccessibilitySelectionChanged()
+        invalidateDisplay()
+    }
+
+    /// Drops the selection once the program rewrites the text it covers,
+    /// which otherwise leaves the highlight on text it no longer names
+    /// (#341). Once per frame, and before a copy or an export reads it. A
+    /// selection made here was recorded as it was made; one set elsewhere is
+    /// recorded against the first grid it meets.
     func dropSelectionIfRewritten(in grid: Grid) {
         guard let selection else {
             selectionContent = nil
@@ -136,10 +150,7 @@ extension PanePointer {
             return
         }
         guard !Selection.isUnchanged(recorded.content, in: grid) else { return }
-        self.selection = nil
-        selectionContent = nil
-        terminalView?.noteAccessibilitySelectionChanged()
-        invalidateDisplay()
+        clearSelection()
     }
 
     /// The selection against the current grid: rows shift by lines pushed

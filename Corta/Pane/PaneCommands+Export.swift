@@ -25,8 +25,11 @@ extension PaneCommands {
     /// is O(selection) — the whole document for ⌘A — so it runs off the main
     /// actor on `largeTextTask`, like `exportText(_:)`.
     @objc func copy(_: Any?) {
-        guard let host, let selection = host.selection, let session = host.session else { return }
+        guard let host, host.selection != nil, let session = host.session else { return }
         let grid = session.snapshot()
+        // Text the program has since rewritten is not what was selected.
+        host.pointer.dropSelectionIfRewritten(in: grid)
+        guard let selection = host.selection else { return }
         let range = host.pointer.selectionRange(for: selection, in: grid)
         // The pasteboard is shared by every pane and app: recheck `changeCount`
         // before writing so a slow copy never clobbers a newer write.
@@ -73,6 +76,7 @@ extension PaneCommands {
     @objc func exportText(_: Any?) {
         guard let host, host.isOperable, let window = host.view.window else { return }
         let grid = host.session.snapshot()
+        host.pointer.dropSelectionIfRewritten(in: grid)
         let selection = host.selection
         let range = selection.map { host.pointer.selectionRange(for: $0, in: grid) }
         performExport(

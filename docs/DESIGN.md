@@ -130,13 +130,17 @@ drops the selection instead: a printed character, an erase, an insert or
 delete, a region scroll or the alternate screen leaves the highlight
 naming text it no longer covers — Claude Code's redraw (cursor up,
 `CSI 2K`, write again) left a bar across whatever came next (#341).
-`Selection.content(of:in:)` records the selected live rows' revisions,
-which travel with their lines through a full-screen scroll, and the pane
-compares them once a frame (`PanePointer.dropSelectionIfRewritten`).
-Alacritty, xterm and URxvt drop a selection an erase overlaps; Corta also
-drops one a write lands in, which is what a redraw does. One consequence
-is deliberate: a selection on the prompt row of a command still running
-is dropped when the command's end marks that row.
+`Selection.content(of:in:)` records the selected text and its rows'
+revisions as the selection is made; the pane compares once a frame and
+before a copy or an export (`PanePointer.dropSelectionIfRewritten`). An
+unchanged revision is unchanged text — revisions travel with their lines
+through a full-screen scroll — and only a changed one reads the cells, so
+a row rewritten with the same text (Ink redraws every line it owns), a
+write in columns the selection does not cover, and output filling
+selected blank space (a select-all over empty rows) all keep it. Clearing
+the history under it (`CSI 3J`) drops it. Alacritty, xterm and URxvt drop
+a selection an erase overlaps; Corta also drops one whose text a write
+changes, which is what a redraw does.
 
 Reflow and search must preserve these invariants: reflow
 rewrites document rows wholesale and must invalidate or re-anchor any

@@ -102,6 +102,41 @@ struct SelectionContentTests {
         #expect(!Selection.isUnchanged(content, in: terminal.grid))
     }
 
+    @Test("rewriting the row with the same text keeps it")
+    func identicalRewriteKeepsIt() {
+        #expect(onSelectedRow("\u{1B}[2K6"))
+    }
+
+    @Test("a write in columns the selection does not cover keeps it")
+    func otherColumnsKeepIt() {
+        #expect(onSelectedRow("\u{1B}[3;12Hclock"))
+    }
+
+    @Test("output filling selected blank space keeps it; changing selected text does not")
+    func blankSpaceFilledKeepsIt() {
+        // A select-all: every live row, the blank ones below the cursor too.
+        var terminal = Terminal(rows: 6, columns: 20)
+        terminal.feed(Array("$ ".utf8))
+        let all = SelectionRange(
+            start: SelectionPoint(row: 0, column: 0), end: SelectionPoint(row: 5, column: 19))
+        let content = Selection.content(of: all, in: terminal.grid)
+        terminal.feed(Array("\r\n\r\nstreamed\r\nmore".utf8))
+        #expect(Selection.isUnchanged(content, in: terminal.grid), "landed on selected blanks")
+        terminal.feed(Array("\u{1B}[1;1Hrewritten".utf8))
+        #expect(!Selection.isUnchanged(content, in: terminal.grid), "rewrote the selected prompt")
+    }
+
+    @Test("clearing the history under a selection drops it")
+    func clearedHistoryDropsIt() {
+        var terminal = Terminal(rows: 6, columns: 20)
+        terminal.feed(Array((0..<10).map { "\($0)" }.joined(separator: "\r\n").utf8))
+        let range = SelectionRange(
+            start: SelectionPoint(row: -2, column: 0), end: SelectionPoint(row: -1, column: 5))
+        let content = Selection.content(of: range, in: terminal.grid)
+        terminal.feed(Array("\u{1B}[3J".utf8))
+        #expect(!Selection.isUnchanged(content, in: terminal.grid))
+    }
+
     @Test("a selection wholly in history is never dropped by output")
     func historyOnlyIsKept() {
         var terminal = Terminal(rows: 6, columns: 20)
