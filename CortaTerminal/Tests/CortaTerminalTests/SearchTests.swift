@@ -166,7 +166,7 @@ struct SearchTests {
         var terminal = Terminal(rows: 50, columns: 80, scrollbackLimit: 4096)
         terminal.feed([UInt8](repeating: UInt8(ascii: "a"), count: 131_072))
         let query = String(repeating: "a", count: 4095) + "b"
-        let started = ContinuousClock.now
+        let started = SuspendingClock.now
         #expect(Search.find(query, in: terminal.grid).isEmpty)
         // Linear: well under the quarter-second the quadratic scan took.
         #expect(started.duration(to: .now) < .seconds(2))
@@ -232,7 +232,7 @@ struct SearchTests {
     @Test func aMissedBacktrackingShapeStopsDuringTheMatchAttempt() {
         var terminal = Terminal(rows: 2, columns: 100)
         terminal.feed(Array(String(repeating: "a", count: 32).utf8))
-        let start = ContinuousClock.now
+        let start = SuspendingClock.now
         let result = Search.findRegex("^(a{1,3})+b$", in: terminal.grid,
             timeBudget: .milliseconds(30))
         #expect(result.timedOut)
@@ -243,7 +243,7 @@ struct SearchTests {
     @Test func cancellationInterruptsAFailingMatchAttempt() {
         var terminal = Terminal(rows: 2, columns: 100)
         terminal.feed(Array(String(repeating: "a", count: 32).utf8))
-        let start = ContinuousClock.now
+        let start = SuspendingClock.now
         let result = Search.findRegex("^(a{1,3})+b$", in: terminal.grid,
             timeBudget: .seconds(2), shouldStop: { start.duration(to: .now) >= .milliseconds(30) })
         #expect(!result.timedOut)
@@ -385,9 +385,9 @@ struct SearchTests {
     func refusedPatternsDoNotRun() {
         var terminal = Terminal(rows: 4, columns: 200, scrollbackLimit: 10)
         terminal.feed(Array(String(repeating: "a", count: 120).utf8))
-        let start = ContinuousClock.now
+        let start = SuspendingClock.now
         let result = Search.findRegex("(a+)+b", in: terminal.grid)
-        let elapsed = ContinuousClock.now - start
+        let elapsed = SuspendingClock.now - start
         #expect(result.matches.isEmpty)
         // 120 characters of that pattern would not finish in this universe.
         #expect(elapsed < .milliseconds(50))

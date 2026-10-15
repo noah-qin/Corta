@@ -279,8 +279,8 @@ struct SFTPRealServerTests {
                 if progress.completedBytes > 0 { moved.withLock { $0 = true } }
             }
         }
-        let deadline = ContinuousClock.now + .seconds(10)
-        while !moved.withLock({ $0 }), ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(10)
+        while !moved.withLock({ $0 }), SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(1))
         }
         transfer.cancel()

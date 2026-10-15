@@ -248,8 +248,8 @@ struct ConfigurationStoreTests {
     /// loaded CI machine.
     @MainActor
     private func waitUpTo(_ seconds: Double, _ condition: @MainActor () -> Bool) async -> Bool {
-        let deadline = ContinuousClock.now + .seconds(seconds * Double(testTimeoutScale))
-        while ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(seconds * Double(testTimeoutScale))
+        while SuspendingClock.now < deadline {
             if condition() { return true }
             try? await Task.sleep(for: .milliseconds(20))
         }

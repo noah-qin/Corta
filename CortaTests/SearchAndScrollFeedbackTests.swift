@@ -183,8 +183,8 @@ struct ScrollIndicatorIntegrationTests {
     private func fill(_ pane: ViewController, atLeast lines: Int) -> Bool {
         guard let session = pane.session else { return false }
         session.write(Array("printf 'scrollback %s\\n' $(seq 1 400)\n".utf8))
-        let deadline = Date().addingTimeInterval(15)
-        while session.snapshot().scrollback.count < lines, Date() < deadline {
+        let deadline = SuspendingClock.now + .seconds(15)
+        while session.snapshot().scrollback.count < lines, SuspendingClock.now < deadline {
             RunLoop.current.run(until: Date().addingTimeInterval(0.02))
         }
         return session.snapshot().scrollback.count >= lines
@@ -268,8 +268,8 @@ struct ScrollIndicatorIntegrationTests {
         // then smaller than the shift `prepareFrame` correctly applied for
         // everything that had arrived by the time it ran, and the run that
         // caught this reported 95 against an expected 33.
-        let deadline = Date().addingTimeInterval(15)
-        while Date() < deadline, session.scrollbackTotalPushed == totalBefore {
+        let deadline = SuspendingClock.now + .seconds(15)
+        while SuspendingClock.now < deadline, session.scrollbackTotalPushed == totalBefore {
             RunLoop.current.run(until: Date().addingTimeInterval(0.02))
         }
         try #require(

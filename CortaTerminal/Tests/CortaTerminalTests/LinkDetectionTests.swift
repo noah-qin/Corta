@@ -229,10 +229,10 @@ struct LinkDetectionTests {
         var terminal = Terminal(rows: 50, columns: 200, scrollbackLimit: 1_000)
         terminal.feed(Array(String(repeating: "a", count: 99_800).utf8))
         let grid = terminal.grid
-        let start = ContinuousClock.now
+        let start = SuspendingClock.now
         let found = FileReferenceDetection.reference(
             at: SelectionPoint(row: grid.cursor.row, column: 5), in: grid)
-        let elapsed = ContinuousClock.now - start
+        let elapsed = SuspendingClock.now - start
         #expect(found == nil)
         // Quadratic, this took 54 s; linear, a few milliseconds.
         #expect(elapsed < .seconds(1), "took \(elapsed)")
@@ -243,9 +243,9 @@ struct LinkDetectionTests {
         var terminal = Terminal(rows: 50, columns: 200, scrollbackLimit: 1_000)
         terminal.feed(Array(String(repeating: "a:1 ", count: 24_950).utf8))
         let grid = terminal.grid
-        let start = ContinuousClock.now
+        let start = SuspendingClock.now
         _ = FileReferenceDetection.reference(at: SelectionPoint(row: grid.cursor.row, column: 5), in: grid)
-        let elapsed = ContinuousClock.now - start
+        let elapsed = SuspendingClock.now - start
         // Counted from the line's start per match, this took 7 s.
         #expect(elapsed < .seconds(1), "took \(elapsed)")
     }
@@ -258,9 +258,9 @@ struct LinkDetectionTests {
         var terminal = Terminal(rows: 50, columns: (token.count + 1) * 14, scrollbackLimit: 1_000)
         terminal.feed(Array(text.utf8))
         let line = terminal.grid.logicalLine(containing: terminal.grid.cursor.row)
-        let start = ContinuousClock.now
+        let start = SuspendingClock.now
         let found = FileReferenceDetection.references(in: line)
-        #expect(ContinuousClock.now - start < .seconds(1))
+        #expect(SuspendingClock.now - start < .seconds(1))
         #expect(found.count == 4_000)
         for index in [0, 1, 3_999] {
             let reference = try #require(found.indices.contains(index) ? found[index] : nil)

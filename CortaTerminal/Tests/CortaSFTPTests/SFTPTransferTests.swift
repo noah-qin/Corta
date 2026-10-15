@@ -219,13 +219,13 @@ struct SFTPTransferTests {
                 }
                 return try await rig.engine.download(remotePath: "/file", to: destination, policy: .overwrite)
             }
-            let deadline = ContinuousClock.now + .seconds(testTimeoutInterval(3))
-            while !observedRequest.withLock({ $0 }), ContinuousClock.now < deadline {
+            let deadline = SuspendingClock.now + .seconds(testTimeoutInterval(3))
+            while !observedRequest.withLock({ $0 }), SuspendingClock.now < deadline {
                 try await Task.sleep(for: .milliseconds(1))
             }
             #expect(observedRequest.withLock { $0 })
             transfer.cancel()
-            while !completed.withLock({ $0 }), ContinuousClock.now < deadline {
+            while !completed.withLock({ $0 }), SuspendingClock.now < deadline {
                 try await Task.sleep(for: .milliseconds(1))
             }
             #expect(completed.withLock { $0 }, "cancellation must not need a remote response")
@@ -1162,8 +1162,8 @@ struct SFTPTransferTests {
             ) { _ in progress.mark() }
         }
         // Wait for the transfer to actually be mid-flight, then cancel.
-        let deadline = Date().addingTimeInterval(testTimeoutInterval(15))
-        while !progress.wasSeen, Date() < deadline {
+        let deadline = SuspendingClock.now + .seconds(testTimeoutInterval(15))
+        while !progress.wasSeen, SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(5))
         }
         #expect(progress.wasSeen)
@@ -1205,8 +1205,8 @@ struct SFTPTransferTests {
                 remotePath: "/big.bin", to: destination, policy: .resume
             ) { _ in progress.mark() }
         }
-        let deadline = Date().addingTimeInterval(testTimeoutInterval(15))
-        while !progress.wasSeen, Date() < deadline {
+        let deadline = SuspendingClock.now + .seconds(testTimeoutInterval(15))
+        while !progress.wasSeen, SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(5))
         }
         task.cancel()
@@ -1332,8 +1332,8 @@ struct SFTPTransferTests {
     }
 
     private func waitForFlag(_ flag: borrowing Mutex<Bool>) async throws -> Bool {
-        let deadline = ContinuousClock.now + .seconds(testTimeoutInterval(3))
-        while !flag.withLock({ $0 }), ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(testTimeoutInterval(3))
+        while !flag.withLock({ $0 }), SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(1))
         }
         return flag.withLock { $0 }

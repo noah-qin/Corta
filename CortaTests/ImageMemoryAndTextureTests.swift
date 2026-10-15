@@ -290,9 +290,9 @@ import Testing
         let device = try #require(Self.makeDevice())
         let seconds = min(3600, max(1, Double(ProcessInfo.processInfo.environment["CORTA_STRESS_SECONDS"] ?? "1") ?? 1))
         let global = GlobalTextureBudget(limit: 128 * 1024)
-        let deadline = ContinuousClock.now + .seconds(seconds)
+        let deadline = SuspendingClock.now + .seconds(seconds)
         var cycles = 0
-        while ContinuousClock.now < deadline {
+        while SuspendingClock.now < deadline {
             try autoreleasepool {
                 let renderers = (0..<4).map { _ in
                     KittyImageRenderer(device: device, textureByteBudget: 32 * 1024, globalBudget: global)

@@ -42,8 +42,8 @@ import Testing
     }
 
     private func waitForReady(_ session: TerminalSession) -> Bool {
-        let deadline = ContinuousClock.now + testTimeout(30)
-        while ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + testTimeout(30)
+        while SuspendingClock.now < deadline {
             if session.snapshot().dump().contains("READY") { return true }
             Thread.sleep(forTimeInterval: 0.01)
         }

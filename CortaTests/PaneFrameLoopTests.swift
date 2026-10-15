@@ -63,8 +63,8 @@ struct PaneFrameLoopTests {
 
         /// Runs frames until `condition` holds, as the display link would.
         func frames(until condition: () -> Bool) -> Bool {
-            let deadline = Date().addingTimeInterval(5 * Double(testTimeoutScale))
-            while Date() < deadline {
+            let deadline = SuspendingClock.now + .seconds(5 * Double(testTimeoutScale))
+            while SuspendingClock.now < deadline {
                 _ = loop.prepareFrame()
                 if condition() { return true }
                 RunLoop.current.run(until: Date().addingTimeInterval(0.02))
@@ -153,8 +153,8 @@ struct PaneFrameLoopTests {
 
         // The old session talks; the loop is no longer listening.
         rig.session.write(Array("stale\n".utf8))
-        let deadline = Date().addingTimeInterval(5 * Double(testTimeoutScale))
-        while Date() < deadline,
+        let deadline = SuspendingClock.now + .seconds(5 * Double(testTimeoutScale))
+        while SuspendingClock.now < deadline,
             !rig.session.snapshot().logicalLines().contains(where: { $0.text.contains("stale") })
         {
             RunLoop.current.run(until: Date().addingTimeInterval(0.02))

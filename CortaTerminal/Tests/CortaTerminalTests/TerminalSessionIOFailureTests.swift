@@ -22,8 +22,8 @@ import Testing
 @Suite(.serialized)
 struct TerminalSessionIOFailureTests {
     private func wait(_ condition: () -> Bool) -> Bool {
-        let deadline = ContinuousClock.now + testTimeout(5)
-        while !condition(), ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + testTimeout(5)
+        while !condition(), SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.005)
         }
         return condition()

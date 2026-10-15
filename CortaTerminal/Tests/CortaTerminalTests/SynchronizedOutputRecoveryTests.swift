@@ -169,9 +169,9 @@ import Testing
         _ session: TerminalSession, timeout: Duration = .seconds(30),
         until condition: (String) -> Bool
     ) -> String {
-        let deadline = ContinuousClock.now + timeout
+        let deadline = SuspendingClock.now + timeout
         var dump = session.snapshot().dump()
-        while !condition(dump), ContinuousClock.now < deadline {
+        while !condition(dump), SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
             dump = session.snapshot().dump()
         }
@@ -182,8 +182,8 @@ import Testing
     private func waitForCondition(
         _ condition: @autoclosure () -> Bool, timeout: Duration
     ) -> Bool {
-        let deadline = ContinuousClock.now + timeout
-        while !condition(), ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + timeout
+        while !condition(), SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
         }
         return condition()

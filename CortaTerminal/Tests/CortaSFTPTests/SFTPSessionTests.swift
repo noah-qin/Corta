@@ -45,8 +45,8 @@ struct SFTPSessionTests {
         let session = SFTPSession(transport: connection.clientTransport())
         defer { session.close() }
         let task = Task { try await session.connect() }
-        let deadline = ContinuousClock.now + .seconds(testTimeoutInterval(3))
-        while !session.handshakePending, ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(testTimeoutInterval(3))
+        while !session.handshakePending, SuspendingClock.now < deadline {
             await Task.yield()
         }
         #expect(session.handshakePending)
@@ -65,8 +65,8 @@ struct SFTPSessionTests {
         let session = SFTPSession(transport: connection.clientTransport())
         defer { session.close() }
         let first = Task { try await session.connect() }
-        let deadline = ContinuousClock.now + .seconds(testTimeoutInterval(3))
-        while !session.handshakePending, ContinuousClock.now < deadline { await Task.yield() }
+        let deadline = SuspendingClock.now + .seconds(testTimeoutInterval(3))
+        while !session.handshakePending, SuspendingClock.now < deadline { await Task.yield() }
         #expect(session.handshakePending)
         await #expect(throws: SFTPError.protocolViolation("connect() called on a used session")) {
             try await session.connect()

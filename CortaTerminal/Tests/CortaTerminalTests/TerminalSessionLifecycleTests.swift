@@ -35,8 +35,8 @@ import Testing
 
         // Negative check, so it is bounded and short: with no reader the
         // child's bytes sit in the pty and the grid must stay empty.
-        let deadline = ContinuousClock.now + .milliseconds(300)
-        while ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .milliseconds(300)
+        while SuspendingClock.now < deadline {
             #expect(!session.snapshot().dump().contains("CORTA-NOT-YET"))
             Thread.sleep(forTimeInterval: 0.01)
         }
@@ -59,8 +59,8 @@ import Testing
         session.onChildExit = { exit in exited.withLock { $0 = exit } }
         session.start()
 
-        let deadline = ContinuousClock.now + .seconds(30)
-        while exited.withLock({ $0 }) == nil, ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(30)
+        while exited.withLock({ $0 }) == nil, SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
         }
         #expect(exited.withLock { $0 } == .exited(code: 0))
@@ -73,8 +73,8 @@ import Testing
         session.onChildExit = { exit in first.withLock { $0 = exit } }
         session.start()
 
-        let deadline = ContinuousClock.now + .seconds(30)
-        while first.withLock({ $0 }) == nil, ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(30)
+        while first.withLock({ $0 }) == nil, SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
         }
         #expect(first.withLock { $0 } == .exited(code: 0))
@@ -124,8 +124,8 @@ import Testing
             #expect(session.write(Array("\(marker)\n".utf8)) == .accepted)
             let text = waitForGrid(session) { $0.contains("CHILD:\(marker)") }
             #expect(text.contains("CHILD:\(marker)"))
-            let deadline = ContinuousClock.now + .seconds(5)
-            while outputs.withLock({ $0 }) == before, ContinuousClock.now < deadline {
+            let deadline = SuspendingClock.now + .seconds(5)
+            while outputs.withLock({ $0 }) == before, SuspendingClock.now < deadline {
                 try await Task.sleep(for: .milliseconds(10))
             }
             #expect(outputs.withLock { $0 } > before,
@@ -196,8 +196,8 @@ import Testing
         _ = waitForGrid(session) { $0.contains("CORTA-IGNORING") }
         session.stop()
 
-        let deadline = ContinuousClock.now + .seconds(10)
-        while exited.withLock({ $0 }) == nil, ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(10)
+        while exited.withLock({ $0 }) == nil, SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.02)
         }
         #expect(exited.withLock { $0 } == .signalled(signal: SIGKILL))
@@ -220,9 +220,9 @@ import Testing
         _ session: TerminalSession, timeout: Duration = .seconds(30),
         until condition: (String) -> Bool
     ) -> String {
-        let deadline = ContinuousClock.now + timeout
+        let deadline = SuspendingClock.now + timeout
         var dump = session.snapshot().dump()
-        while !condition(dump), ContinuousClock.now < deadline {
+        while !condition(dump), SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
             dump = session.snapshot().dump()
         }

@@ -27,14 +27,14 @@ struct InputAmplificationTests {
     @Test("huge tab counts stop at the margin and allow following output")
     func tabCountsStopAtMargins() {
         var terminal = Terminal(rows: 2, columns: 80)
-        let start = ContinuousClock.now
+        let start = SuspendingClock.now
         for _ in 0..<2_000 {
             terminal.feed(Array("\u{1B}[65535I\u{1B}[65535Z".utf8))
         }
         #expect(terminal.grid.cursor.column == 0)
         terminal.feed(Array("ok".utf8))
         #expect(terminal.grid.rowText(0).hasPrefix("ok"))
-        #expect(ContinuousClock.now - start < .seconds(1))
+        #expect(SuspendingClock.now - start < .seconds(1))
 
         for columns in [1, 17, 80] {
             var grid = Grid(rows: 2, columns: columns)

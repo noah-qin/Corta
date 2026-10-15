@@ -57,8 +57,8 @@ struct DirectoryCompletionSessionTests {
         defer { session.stop() }
         session.start()
         func wait(_ predicate: () -> Bool) throws {
-            let end = Date().addingTimeInterval(5 * Double(testTimeoutScale))
-            while Date() < end {
+            let end = SuspendingClock.now + .seconds(5 * Double(testTimeoutScale))
+            while SuspendingClock.now < end {
                 if predicate() { return }
                 Thread.sleep(forTimeInterval: 0.01)
             }
@@ -121,11 +121,11 @@ struct DirectoryCompletionSessionTests {
         session.start()
         // Startup-file preservation is complete when .zlogin writes its marker;
         // the prompt protocol is covered by shellOwnsFilteringAndAcceptance.
-        let end = Date().addingTimeInterval(5 * Double(testTimeoutScale))
+        let end = SuspendingClock.now + .seconds(5 * Double(testTimeoutScale))
         func startupFinished() -> Bool {
             (try? String(contentsOf: order, encoding: .utf8))?.hasSuffix("login\n") == true
         }
-        while !startupFinished() && Date() < end { Thread.sleep(forTimeInterval: 0.01) }
+        while !startupFinished() && SuspendingClock.now < end { Thread.sleep(forTimeInterval: 0.01) }
         try #require(startupFinished(), "Startup did not finish: \(session.snapshot().dump())")
         #expect(try String(contentsOf: seen, encoding: .utf8) == (explicit ? "1\n" : "0\n"))
         #expect(try String(contentsOf: order, encoding: .utf8) == "profile\nrc\nlogin\n")

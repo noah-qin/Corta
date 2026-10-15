@@ -549,6 +549,12 @@ length; that is why #128 recurred there.
 It scales a *ceiling*, never a sleep: a wait finishes as soon as its
 condition holds, so a larger ceiling costs nothing on a healthy run.
 
+Ceilings are measured on `SuspendingClock`, which stops while the Mac
+sleeps. On `ContinuousClock` or `Date` a closed lid mid-run spent every
+deadline in flight at once: two unrelated app tests failed together, each
+"after" less than its own ceiling, across a 93-second clamshell sleep.
+Only an instant a production API takes keeps that API's clock.
+
 **It is not a substitute for a test that races.** An assertion that
 something has *not* happened yet, or one that compares against a value
 sampled before the event it is about, gets rarer under a bigger ceiling and

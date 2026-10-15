@@ -51,10 +51,10 @@ extension PTY {
     ) -> String {
         var accumulated = [UInt8]()
         var buffer = [UInt8](repeating: 0, count: 4096)
-        let deadline = ContinuousClock.now + timeout
+        let deadline = SuspendingClock.now + timeout
 
-        while ContinuousClock.now < deadline {
-            let remaining = ContinuousClock.now.duration(to: deadline)
+        while SuspendingClock.now < deadline {
+            let remaining = SuspendingClock.now.duration(to: deadline)
             let milliseconds = Int32(
                 clamping: remaining.components.seconds * 1000
                     + remaining.components.attoseconds / 1_000_000_000_000_000

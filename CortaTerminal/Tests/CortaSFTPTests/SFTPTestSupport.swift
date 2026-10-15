@@ -37,8 +37,8 @@ import Testing
 /// recording the exact request sequence (which is what makes the
 /// atomic-rename and CLOSE-on-cancel assertions possible).
 
-/// A `Date`-arithmetic ceiling (the rig's idle-read deadline and its log
-/// polling), scaled by `CORTA_TEST_TIMEOUT_SCALE` for the sanitizer lane —
+/// A ceiling in seconds (the rig's idle-read deadline, which an
+/// `NSCondition` takes as a `Date`, and its log polling), scaled by `CORTA_TEST_TIMEOUT_SCALE` for the sanitizer lane —
 /// the same rule as `CortaTerminalTests`' `testTimeout`, repeated because
 /// test targets cannot share a file.
 func testTimeoutInterval(_ seconds: TimeInterval) -> TimeInterval {
@@ -328,8 +328,8 @@ final class FakeSFTPServer: @unchecked Sendable {
         sourceLocation: SourceLocation = #_sourceLocation,
         predicate: (FakeServerLog) -> Bool
     ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
+        let deadline = SuspendingClock.now + .seconds(timeout)
+        while SuspendingClock.now < deadline {
             if predicate(log) { return }
             Thread.sleep(forTimeInterval: 0.005)
         }

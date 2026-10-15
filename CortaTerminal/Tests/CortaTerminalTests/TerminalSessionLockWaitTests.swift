@@ -45,8 +45,8 @@ import Testing
             executable: "/usr/bin/yes", size: TerminalSize(rows: 50, columns: 200))
         defer { session.stop() }
         session.start()
-        let floodDeadline = ContinuousClock.now + .seconds(30)
-        while !session.snapshot().dump().contains("y"), ContinuousClock.now < floodDeadline {
+        let floodDeadline = SuspendingClock.now + .seconds(30)
+        while !session.snapshot().dump().contains("y"), SuspendingClock.now < floodDeadline {
             Thread.sleep(forTimeInterval: 0.01)
         }
         let read: @Sendable () -> Void = {
@@ -80,8 +80,8 @@ import Testing
             done.withLock { $0 = true }
         }
         sampler.start()
-        let hangCeiling = ContinuousClock.now + .seconds(30)
-        while !done.withLock({ $0 }), ContinuousClock.now < hangCeiling {
+        let hangCeiling = SuspendingClock.now + .seconds(30)
+        while !done.withLock({ $0 }), SuspendingClock.now < hangCeiling {
             Thread.sleep(forTimeInterval: 0.01)
         }
         return done.withLock { $0 } ? maxWaitNanos.withLock { $0 } : nil
@@ -95,8 +95,8 @@ import Testing
 
         // Establish the precondition by condition, not by the clock: the
         // flood is visible in the grid before sampling starts.
-        let floodDeadline = ContinuousClock.now + .seconds(30)
-        while !session.snapshot().dump().contains("y"), ContinuousClock.now < floodDeadline {
+        let floodDeadline = SuspendingClock.now + .seconds(30)
+        while !session.snapshot().dump().contains("y"), SuspendingClock.now < floodDeadline {
             Thread.sleep(forTimeInterval: 0.01)
         }
 
@@ -118,8 +118,8 @@ import Testing
         }
         sampler.start()
 
-        let hangCeiling = ContinuousClock.now + .seconds(30)
-        while !samplerDone.withLock({ $0 }), ContinuousClock.now < hangCeiling {
+        let hangCeiling = SuspendingClock.now + .seconds(30)
+        while !samplerDone.withLock({ $0 }), SuspendingClock.now < hangCeiling {
             Thread.sleep(forTimeInterval: 0.01)
         }
         #expect(

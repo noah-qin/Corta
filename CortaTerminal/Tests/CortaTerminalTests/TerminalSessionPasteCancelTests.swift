@@ -39,8 +39,8 @@ import Testing
                 return chunks.count == 1
             }
             guard isFirst else { return }
-            let deadline = ContinuousClock.now + testTimeout(10)
-            while !released.withLock({ $0 }), ContinuousClock.now < deadline {
+            let deadline = SuspendingClock.now + testTimeout(10)
+            while !released.withLock({ $0 }), SuspendingClock.now < deadline {
                 Thread.sleep(forTimeInterval: 0.002)
             }
         }
@@ -49,8 +49,8 @@ import Testing
     }
 
     private func wait(_ condition: () -> Bool) -> Bool {
-        let deadline = ContinuousClock.now + testTimeout(5)
-        while !condition(), ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + testTimeout(5)
+        while !condition(), SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.002)
         }
         return condition()
@@ -131,8 +131,8 @@ import Testing
     }
 
     private func waitForGrid(_ session: TerminalSession, until condition: (String) -> Bool) -> Bool {
-        let deadline = ContinuousClock.now + testTimeout(10)
-        while !condition(session.snapshot().dump()), ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + testTimeout(10)
+        while !condition(session.snapshot().dump()), SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
         }
         return condition(session.snapshot().dump())

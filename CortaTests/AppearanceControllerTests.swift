@@ -38,8 +38,8 @@ struct AppearanceControllerTests {
         NSWorkspace.shared.notificationCenter.post(
             name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
             object: NSWorkspace.shared)
-        let deadline = Date().addingTimeInterval(TimeInterval(5 * testTimeoutScale))
-        while heard == 0, Date() < deadline {
+        let deadline = SuspendingClock.now + .seconds(TimeInterval(5 * testTimeoutScale))
+        while heard == 0, SuspendingClock.now < deadline {
             RunLoop.main.run(until: Date().addingTimeInterval(0.01))
         }
         #expect(heard >= 1)

@@ -136,8 +136,8 @@ import Testing
 
         session.resize(to: TerminalSize(rows: 30, columns: 100))
 
-        let deadline = ContinuousClock.now + .seconds(10)
-        while session.snapshot().columns != 100, ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(10)
+        while session.snapshot().columns != 100, SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
         }
         #expect(session.snapshot().rows == 30)
@@ -224,9 +224,9 @@ import Testing
         _ session: TerminalSession, timeout: Duration = testTimeout(30),
         until condition: (String) -> Bool
     ) -> String {
-        let deadline = ContinuousClock.now + timeout
+        let deadline = SuspendingClock.now + timeout
         var dump = session.snapshot().dump()
-        while !condition(dump), ContinuousClock.now < deadline {
+        while !condition(dump), SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
             dump = session.snapshot().dump()
         }

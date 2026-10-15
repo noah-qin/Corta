@@ -256,9 +256,9 @@ func waitUntil(
     // A passing wait returns the moment the condition holds; the ceiling
     // only decides how long a failing one takes to say so, and scales on CI
     // like every other wait in this target (`testTimeoutScale`).
-    let deadline = ContinuousClock.now + .seconds(15) * testTimeoutScale
+    let deadline = SuspendingClock.now + .seconds(15) * testTimeoutScale
     while !condition() {
-        if ContinuousClock.now > deadline {
+        if SuspendingClock.now > deadline {
             Issue.record("timed out waiting for \(description)", sourceLocation: sourceLocation)
             return
         }

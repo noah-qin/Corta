@@ -162,9 +162,9 @@ struct PaneCommandsTests {
         host.session = session
         host.commands.insertAsPaste("safe\u{1B}[31mtext")
         session.write(Array("\n".utf8))
-        let deadline = Date().addingTimeInterval(5 * Double(testTimeoutScale))
+        let deadline = SuspendingClock.now + .seconds(5 * Double(testTimeoutScale))
         func lines() -> [String] { session.snapshot().logicalLines().map(\.text) }
-        while Date() < deadline, !lines().contains(where: { $0.contains("safe") }) {
+        while SuspendingClock.now < deadline, !lines().contains(where: { $0.contains("safe") }) {
             RunLoop.current.run(until: Date().addingTimeInterval(0.02))
         }
         let echoed = try #require(lines().first { $0.contains("safe") })

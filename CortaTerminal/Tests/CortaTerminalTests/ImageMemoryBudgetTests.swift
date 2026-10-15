@@ -215,8 +215,8 @@ struct ImageMemoryBudgetTests {
         let budget = ImageMemoryBudget(limit: 10_000)
         let session = try TerminalSession(executable: "/bin/cat", arguments: [path.path], imageBudget: budget)
         session.start()
-        let deadline = Date().addingTimeInterval(testTimeoutInterval(10))
-        while budget.totalBytes == 0, Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
+        let deadline = SuspendingClock.now + .seconds(testTimeoutInterval(10))
+        while budget.totalBytes == 0, SuspendingClock.now < deadline { Thread.sleep(forTimeInterval: 0.01) }
         #expect(budget.totalBytes == 600)
         session.stop()
         #expect(budget.totalBytes == 0, "a closed pane's images no longer count against the others")
@@ -239,8 +239,8 @@ struct ImageMemoryBudgetTests {
         let exited = Mutex(false)
         session.onChildExit = { _ in exited.withLock { $0 = true } }
         session.start()
-        let deadline = Date().addingTimeInterval(testTimeoutInterval(10))
-        while !exited.withLock({ $0 }), Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
+        let deadline = SuspendingClock.now + .seconds(testTimeoutInterval(10))
+        while !exited.withLock({ $0 }), SuspendingClock.now < deadline { Thread.sleep(forTimeInterval: 0.01) }
         #expect(exited.withLock { $0 })
         #expect(session.snapshot().imagePlacements.imageCount == 0)
         #expect(budget.totalBytes == 500)

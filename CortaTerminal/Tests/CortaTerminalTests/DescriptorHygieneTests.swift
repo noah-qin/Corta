@@ -75,16 +75,16 @@ struct DescriptorHygieneTests {
         reader.start()
         // The read has entered the guard; what remains before `read(2)`
         // parks is a few instructions, and the child writes nothing.
-        let deadline = ContinuousClock.now + .seconds(10)
-        while pty.callsInFlight == 0, ContinuousClock.now < deadline { Thread.sleep(forTimeInterval: 0.001) }
+        let deadline = SuspendingClock.now + .seconds(10)
+        while pty.callsInFlight == 0, SuspendingClock.now < deadline { Thread.sleep(forTimeInterval: 0.001) }
         #expect(pty.callsInFlight == 1, "the reader never started its read")
         Thread.sleep(forTimeInterval: 0.01)
 
         // Darwin's `close(2)` would sleep until the read returned — here,
         // until `sleep 30` ended. The caller may be the main thread.
-        let closeStarted = ContinuousClock.now
+        let closeStarted = SuspendingClock.now
         pty.close()
-        #expect(ContinuousClock.now - closeStarted < .seconds(1))
+        #expect(SuspendingClock.now - closeStarted < .seconds(1))
 
         // The lowest free number is what `open` returns, so a released
         // number would come straight back here.
@@ -114,8 +114,8 @@ struct DescriptorHygieneTests {
 
         // Well inside the job's 10 s, which ends it on its own afterwards
         // (it ignores the hangup `stop()` sends).
-        let deadline = ContinuousClock.now + .seconds(5)
-        while exited.withLock({ $0 }) == nil, ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(5)
+        while exited.withLock({ $0 }) == nil, SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.02)
         }
         #expect(exited.withLock { $0 } == .exited(code: 3))

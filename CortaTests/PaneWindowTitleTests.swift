@@ -67,8 +67,8 @@ struct PaneWindowTitleTests {
             })
         }
         for title in stuck { title.probeRepresentedDirectory("/slow-mount") }
-        var deadline = ContinuousClock.now + .seconds(3) * testTimeoutScale
-        while entered.withLock({ $0 }) < 2, ContinuousClock.now < deadline {
+        var deadline = SuspendingClock.now + .seconds(3) * testTimeoutScale
+        while entered.withLock({ $0 }) < 2, SuspendingClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(10))
         }
         #expect(entered.withLock { $0 } == 2)
@@ -84,9 +84,9 @@ struct PaneWindowTitleTests {
 
         release.signal()
         release.signal()
-        deadline = ContinuousClock.now
+        deadline = SuspendingClock.now
             + .seconds(PaneWindowTitle.directoryProbeRetryDelay + 3) * testTimeoutScale
-        while !asked.withLock({ $0 }), ContinuousClock.now < deadline {
+        while !asked.withLock({ $0 }), SuspendingClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(20))
         }
         #expect(asked.withLock { $0 }, "the refused probe ran once there was room")
@@ -104,8 +104,8 @@ struct PaneWindowTitleTests {
         })
         defer { release.signal() }
         title.probeRepresentedDirectory("/slow-mount")
-        let deadline = ContinuousClock.now + .seconds(3)
-        while !entered.withLock({ $0 }), ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(3)
+        while !entered.withLock({ $0 }), SuspendingClock.now < deadline {
             await Task.yield()
         }
         #expect(entered.withLock { $0 })

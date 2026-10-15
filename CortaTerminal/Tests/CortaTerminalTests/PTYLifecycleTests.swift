@@ -359,8 +359,8 @@ struct PTYLifecycleTests {
     private func waitForExitDraining(
         _ pty: PTY, timeout: Duration = .seconds(10)
     ) -> ProcessExit? {
-        let deadline = ContinuousClock.now + timeout
-        while ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + timeout
+        while SuspendingClock.now < deadline {
             _ = pty.readOutput(timeout: .milliseconds(100))
             if let exit = pty.exitStatus { return exit }
         }
@@ -370,8 +370,8 @@ struct PTYLifecycleTests {
     /// Polls `condition` at 10 ms intervals for up to 10 seconds. Returns
     /// whether it ever held.
     private func waitForCondition(_ condition: () -> Bool) -> Bool {
-        let deadline = ContinuousClock.now + .seconds(10)
-        while ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(10)
+        while SuspendingClock.now < deadline {
             if condition() { return true }
             Thread.sleep(forTimeInterval: 0.01)
         }

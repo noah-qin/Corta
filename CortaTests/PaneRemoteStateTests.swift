@@ -277,8 +277,8 @@ struct RemotePaneIsolationTests {
     private func waitUntilTrue(
         timeout: Duration = .seconds(10), _ condition: () -> Bool
     ) async -> Bool {
-        let deadline = ContinuousClock.now + timeout * testTimeoutScale
-        while ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + timeout * testTimeoutScale
+        while SuspendingClock.now < deadline {
             if condition() { return true }
             try? await Task.sleep(for: .milliseconds(10))
         }
@@ -368,8 +368,8 @@ struct CommandHistoryHostScopeTests {
     private func waitUntilTrue(
         timeout: Duration = .seconds(10), _ condition: () -> Bool
     ) async -> Bool {
-        let deadline = ContinuousClock.now + timeout * testTimeoutScale
-        while ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + timeout * testTimeoutScale
+        while SuspendingClock.now < deadline {
             if condition() { return true }
             try? await Task.sleep(for: .milliseconds(10))
         }
@@ -461,8 +461,8 @@ struct SSHPresetPaneTests {
     private func waitUntilTrue(
         timeout: Duration = .seconds(10), _ condition: () -> Bool
     ) async -> Bool {
-        let deadline = ContinuousClock.now + timeout * testTimeoutScale
-        while ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + timeout * testTimeoutScale
+        while SuspendingClock.now < deadline {
             if condition() { return true }
             try? await Task.sleep(for: .milliseconds(10))
         }

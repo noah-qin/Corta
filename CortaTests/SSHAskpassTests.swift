@@ -127,8 +127,8 @@ struct SSHAskpassBrokerTests {
     }
 
     private func finish(_ process: Process) async -> (status: Int32, output: String) {
-        let deadline = ContinuousClock.now + .seconds(10) * testTimeoutScale
-        while process.isRunning, ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(10) * testTimeoutScale
+        while process.isRunning, SuspendingClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(10))
         }
         if process.isRunning { process.terminate() }
@@ -230,14 +230,14 @@ struct SSHAskpassBrokerTests {
         let grant = try #require(broker.grant(host: "box"))
         grant.admit(getpid())
         let process = try run(grant, prompt: "Confirm user presence for key ED25519-SK", promptKind: "none")
-        let deadline = ContinuousClock.now + .seconds(10) * testTimeoutScale
-        while recorder.asked.withLock({ $0.isEmpty }), ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(10) * testTimeoutScale
+        while recorder.asked.withLock({ $0.isEmpty }), SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(recorder.asked.withLock { $0.first?.0 } == .notify)
         process.terminate()
         process.waitUntilExit()
-        while !recorder.cancelled.withLock({ $0 }), ContinuousClock.now < deadline {
+        while !recorder.cancelled.withLock({ $0 }), SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(recorder.cancelled.withLock { $0 })

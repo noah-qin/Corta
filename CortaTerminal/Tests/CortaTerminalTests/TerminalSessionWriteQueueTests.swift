@@ -53,8 +53,8 @@ import Testing
                 // of file to the reader, which would stop it before the gate
                 // ever opened. Bounded so a mistake here fails rather than
                 // hangs.
-                let deadline = ContinuousClock.now + .seconds(10)
-                while !mayDeliverQuery.withLock({ $0 }), ContinuousClock.now < deadline {
+                let deadline = SuspendingClock.now + .seconds(10)
+                while !mayDeliverQuery.withLock({ $0 }), SuspendingClock.now < deadline {
                     Thread.sleep(forTimeInterval: 0.002)
                 }
                 let already = queryDelivered.withLock { delivered -> Bool in
@@ -371,8 +371,8 @@ import Testing
         timeout: Duration = .seconds(30),
         until condition: () -> Bool
     ) -> Bool {
-        let deadline = ContinuousClock.now + timeout
-        while !condition(), ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + timeout
+        while !condition(), SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
         }
         return condition()
@@ -389,9 +389,9 @@ import Testing
         _ session: TerminalSession, timeout: Duration = .seconds(30),
         until condition: (String) -> Bool
     ) -> String {
-        let deadline = ContinuousClock.now + timeout
+        let deadline = SuspendingClock.now + timeout
         var dump = session.snapshot().dump()
-        while !condition(dump), ContinuousClock.now < deadline {
+        while !condition(dump), SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
             dump = session.snapshot().dump()
         }

@@ -29,8 +29,8 @@ struct PathProbeTests {
     private final class Gate: Sendable {
         let released = Mutex(false)
         func wait() {
-            let deadline = ContinuousClock.now + .seconds(5)
-            while !released.withLock({ $0 }), ContinuousClock.now < deadline {
+            let deadline = SuspendingClock.now + .seconds(5)
+            while !released.withLock({ $0 }), SuspendingClock.now < deadline {
                 Thread.sleep(forTimeInterval: 0.005)
             }
         }
@@ -58,7 +58,7 @@ struct PathProbeTests {
     func hungDirectoryIsAbsentAfterTheTimeout() {
         let gate = Gate()
         defer { gate.released.withLock { $0 = true } }
-        let started = ContinuousClock.now
+        let started = SuspendingClock.now
         let found = PathProbe.directories(
             among: ["/fine", "/hung", "/fine"], timeout: .milliseconds(1000 * testTimeoutScale),
             isDirectory: { path in

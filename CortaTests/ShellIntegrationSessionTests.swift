@@ -51,8 +51,8 @@ struct ShellIntegrationSessionTests {
         defer { session.stop() }
         session.start()
         func waitFor(_ condition: (Grid) -> Bool) throws {
-            let deadline = ContinuousClock.now + .seconds(5) * testTimeoutScale
-            while ContinuousClock.now < deadline {
+            let deadline = SuspendingClock.now + .seconds(5) * testTimeoutScale
+            while SuspendingClock.now < deadline {
                 if condition(session.snapshot()) { return }
                 Thread.sleep(forTimeInterval: 0.01)
             }
@@ -106,8 +106,8 @@ struct ShellIntegrationSessionTests {
         session.start()
 
         func waitForPrompt(after row: Int) throws {
-            let deadline = ContinuousClock.now + .seconds(10) * testTimeoutScale
-            while ContinuousClock.now < deadline {
+            let deadline = SuspendingClock.now + .seconds(10) * testTimeoutScale
+            while SuspendingClock.now < deadline {
                 if let record = session.commandRecords.last,
                    record.promptRow > row, record.promptEndColumn == prompt.count {
                     return
