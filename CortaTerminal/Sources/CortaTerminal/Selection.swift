@@ -318,8 +318,8 @@ extension Selection {
 
     /// Whether the text `content` recorded is still there: the same screen
     /// (not the alternate one, not a reflow), the selection's history not
-    /// cleared or evicted, and no non-blank selected text on a still-live
-    /// row rewritten.
+    /// cleared or evicted, and no non-blank selected text rewritten, even
+    /// when the same batch then pushes that row into history.
     public static func isUnchanged(_ content: SelectionContent, in grid: Grid) -> Bool {
         guard grid.linesGeneration == content.generation else { return false }
         let growth = max(0, grid.scrollback.totalPushed - content.totalPushed)
@@ -328,9 +328,12 @@ extension Selection {
         for (offset, revision) in content.revisions.enumerated() {
             let recorded = content.firstRow + offset
             let row = recorded - growth
-            guard row >= 0 else { continue }  // Now history, which output cannot rewrite.
             guard row < grid.rows else { return false }
-            guard grid.lineRevision(row) != revision, !content.texts[offset].isEmpty else { continue }
+            guard !content.texts[offset].isEmpty else { continue }
+            // A row can be rewritten and pushed into history in one batch.
+            // History is immutable only after the push, so compare its text
+            // too; only a still-live row has a revision fast path.
+            if row >= 0, grid.lineRevision(row) == revision { continue }
             if rowText(content.range, documentRow: recorded, shift: growth, in: grid)
                 != content.texts[offset]
             {

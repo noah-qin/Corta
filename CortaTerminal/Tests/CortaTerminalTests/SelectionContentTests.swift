@@ -67,6 +67,13 @@ struct SelectionContentTests {
         #expect(!onSelectedRow(sequence))
     }
 
+    @Test("a rewrite followed by scrolling into history still drops it")
+    func rewrittenThenScrolledDropsIt() {
+        var (terminal, content) = selected()
+        terminal.feed(Array("\u{1B}[3;1Hz\u{1B}[6;1H\r\nmore\r\nmore\r\nmore".utf8))
+        #expect(!Selection.isUnchanged(content, in: terminal.grid))
+    }
+
     @Test("the same operations on another row keep it")
     func otherRowsKeepIt() {
         var (terminal, content) = selected()
