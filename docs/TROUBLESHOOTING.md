@@ -187,6 +187,16 @@ a local file to read is exactly what the threat model rejects
 to request direct transmission explicitly. An image must fit the 8192-pixel
 per-side and 16-million-pixel limits; invalid or oversized images are refused.
 
+### Empty Return draws a green or red command marker
+
+An empty Return is not a command, and current integration hooks record
+none. A startup-file block installed by an older Corta can still report
+one: open **Settings ▸ Terminal ▸ Shell Integration**, choose **Update**,
+then open a new shell. Existing shells keep the old functions until they
+restart, and markers already drawn stay. Only the marked Corta block in the
+startup file is updated. Standard local zsh sessions using the automatic
+hooks get the bundled version when a new shell starts.
+
 ---
 
 ## Behaviour that differs from other terminals
@@ -277,6 +287,62 @@ other application, and while Settings is key, keystrokes are delivered
 normally — that is the point, and it is why the indicator follows the
 engaged state rather than the setting.
 
+### A directory proxy icon is missing on a network mount
+
+Corta checks the reported local directory in the background. If the mount is
+slow or two checks are already waiting, it leaves the proxy icon absent so
+output and keyboard interaction can continue. Check the mount independently;
+changing directory after it recovers requests a new check.
+
+### A pane opens in the home folder instead of a network directory
+
+A new pane, or a window restored at launch, starts in the directory it was
+asked for only if that directory answers within a short limit. A network
+volume that has stopped answering counts as missing, so the pane opens in
+the home folder rather than freezing Corta. The same limit applies to
+⌘-clicking or hovering a `path:line` reference there: it is not offered as
+a link. Reconnect the volume, then `cd` to it or open a new pane there.
+
+### Remote editing asks again after an upload prompt
+
+The local file changed after the version shown by the original prompt.
+Approve the new edit explicitly. An older managed entry without a remote
+content digest also needs a conflict decision once. A content comparison
+can identify remote changes even when file size and timestamp are unchanged.
+
+---
+
+## Appearance and the status bar
+
+### The cursor does not blink
+
+Blinking is off by default: turn on **Blink cursor** in Settings ▸
+Appearance ▸ Cursor. It pauses while the pane is inactive, hidden or
+scrolled back. A terminal program can change the shape or blinking for
+itself with DECSCUSR; Reset Terminal returns to the configured style.
+
+### The status bar shows no network rate, or the wrong one
+
+Rates need two samples, so allow a few seconds after enabling the bar.
+`auto` measures one primary interface; when a VPN or several adapters make
+that the wrong one, enter the interface name in Settings ▸ Terminal. An
+explicit interface that does not exist shows no rate. The bar always
+reports the local Mac, also in an SSH pane, and thermal levels are macOS's
+classifications, not degrees. A narrow window may truncate the bar; click
+it for every selected value.
+
+### The theme editor will not save
+
+An invalid HEX colour disables Save. If the custom theme was changed in
+the config file while the editor was open, close and reopen the editor
+before saving, so it does not overwrite that edit.
+
+### The interface is in the wrong language
+
+Corta follows the language macOS chooses for it (System Settings ▸ General
+▸ Language & Region ▸ Applications). Restart Corta after changing it.
+Number formatting follows the region and can differ from the language.
+
 ---
 
 ## Updating
@@ -293,17 +359,6 @@ on GitHub. `update-auto-check = false` disables only the daily background
 check; the menu item always works.
 
 ---
-
-## Empty Return draws a green or red command marker
-
-Corta 1.1.1 fixes empty Return being reported as a completed command by the
-zsh, bash and legacy fish integration. If it still happens after updating,
-open **Settings ▸ Terminal ▸ Shell Integration**, choose **Update**, then
-open a new shell. Existing shells keep the old functions until restarted;
-old markers already drawn are not removed. Only the marked Corta block in
-the startup file is updated. Standard local zsh sessions using automatic
-hooks get the bundled version when a new shell starts, without needing a
-startup-file installation.
 
 ## Going back to your old terminal
 
@@ -332,52 +387,3 @@ Then, if you are willing, open an issue with the **Went back to my old
 terminal** template and say what sent you back. A missing feature, a
 rendering bug and "it just felt slower" are all answers the project can
 act on.
-
-### A directory proxy icon is missing on a network mount
-
-Corta checks the reported local directory in the background. If the mount is
-slow or two checks are already waiting, it leaves the proxy icon absent so
-output and keyboard interaction can continue. Check the mount independently;
-changing directory after it recovers requests a new check.
-
-### A pane opens in the home folder instead of a network directory
-
-A new pane, or a window restored at launch, starts in the directory it was
-asked for only if that directory answers within a short limit. A network
-volume that has stopped answering counts as missing, so the pane opens in
-the home folder rather than freezing Corta. The same limit applies to
-⌘-clicking or hovering a `path:line` reference there: it is not offered as
-a link. Reconnect the volume, then `cd` to it or open a new pane there.
-
-### Remote editing asks again after an upload prompt
-
-The local file changed after the version shown by the original prompt.
-Approve the new edit explicitly. An older managed entry without a remote
-content digest also needs a conflict decision once. A content comparison
-can identify remote changes even when file size and timestamp are unchanged.
-
-## Cursor, system status and theme editor
-
-These features arrived in 1.1.5. In Settings
-(⌘,) → Appearance → Cursor, select a shape and enable Blink cursor separately.
-The default is a nonblinking block. Blinking pauses while the pane is inactive,
-hidden or scrolled back; a terminal program can temporarily override the setting
-with DECSCUSR. Reset Terminal restores the configured style.
-
-The bottom status bar is disabled by default. Enable it and choose metrics in
-Settings → Terminal. View → Local host details… works even when the bar is off.
-Rates need two samples, so allow a few seconds. Network auto measures one
-primary interface: choose an explicit interface when a VPN or multiple adapters
-makes that choice unsuitable. SSH panes still report the local Mac. Thermal
-levels are macOS classifications, not Celsius readings. Narrow windows may
-truncate the bar; click it for the complete selected values.
-
-View → Theme editor… opens color editing directly; Appearance settings also
-has Create theme and, for custom themes, Edit theme. Invalid HEX colors disable
-Save. If the config was edited elsewhere, reopen the editor to avoid overwriting
-that edit. System Monospaced is the only primary font; old family names migrate
-to it, and font size remains configurable.
-
-The interface follows macOS’s language choice for Corta. Restart after changing
-that app-language preference. Nine translations ship; language and numeric
-region formatting can differ. See the [tutorial](USER-GUIDE.md#personalizing-the-terminal).

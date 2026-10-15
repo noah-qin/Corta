@@ -17,9 +17,11 @@ repository root.
 | `input-source-long-command.png` | Right-edge badge moved below a long command, without changing the grid |
 | `directory-suggestions.png` | Local zsh suggestions and command-status marks from an isolated UI-test demo shell |
 | `about.png`                 | About with separated links (development build)                   |
-| `compose-screenshot.swift`  | Adds the shadow, margin and poster type to a window capture      |
 | `social-preview.png`        | GitHub social preview card, 1280 × 640                            |
-| `social-preview.swift`      | Renders the card above                                           |
+
+The two scripts that make these images live in `scripts/brand/`:
+`compose-screenshot.swift` adds the shadow, margin and poster type to a
+window capture, and `social-preview.swift` renders the social preview card.
 
 ## The mascot animation
 

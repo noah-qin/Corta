@@ -19,7 +19,6 @@ change: in its pull request, and in the release notes.
 
 Start with the [personalization tutorial](USER-GUIDE.md#personalizing-the-terminal)
 for cursor defaults, the optional system bar, host details and graphical themes.
-These features arrived in 1.1.5; its changelog section lists them.
 
 ## For contributors
 
@@ -29,19 +28,23 @@ These features arrived in 1.1.5; its changelog section lists them.
 | [Testing](TESTING.md) | Local setup, focused suites, golden fixtures, fuzzing and reporting results. |
 | [Decisions](DECISIONS.md) | The settled decisions, one record each: what, why, and what reopening costs. Read before proposing an architecture change. |
 | [Design](DESIGN.md) | Goals, the architecture, every module and its boundaries, the non-goals. |
-| [Conformance](CONFORMANCE.md) | Feature priorities (P0/P1/P2), the daily-driver checklist, the test strategy — esctest, the fuzz harness, and the five-point manual check every app-layer change gets. |
+| [Conformance](CONFORMANCE.md) | Feature priorities (P0/P1/P2), the daily-driver checklist, the test strategy — esctest, the fuzz harness, and the launched-app check every app-layer change gets. |
 | [Performance](PERFORMANCE.md) | Targets, the hot-path rules, how each number is measured, and the numbers. |
-| [Security](SECURITY.md) | The threat model, escape-sequence injection, resource caps, process safety, the four trust boundaries, and a change log of every security-relevant change. |
+| [Security](SECURITY.md) | The threat model, escape-sequence injection, resource caps, process safety and the four trust boundaries. A change's security reasoning lives in its pull request; the earlier S-series log is linked from §8. |
 | [Releasing](RELEASING.md) | The maintainer's one-click release pipeline: one manual run on main versions, tests, signs, notarises, publishes and updates the signed feed. |
 | [Licensing](LICENSING.md) | The license header every source file carries, which files are covered by `REUSE.toml` instead, and the tool that checks and adds headers. |
 
-The public core API is documented in place:
-[`CortaTerminal.docc`](../CortaTerminal/Sources/CortaTerminal/CortaTerminal.docc/CortaTerminal.md)
-holds the landing page and one article on the pipeline, and
+The code is documented in place. Four DocC catalogs hold the landing
+pages: [`CortaTerminal.docc`](../CortaTerminal/Sources/CortaTerminal/CortaTerminal.docc/CortaTerminal.md)
+for the core, with one article on [where a byte goes](../CortaTerminal/Sources/CortaTerminal/CortaTerminal.docc/Pipeline.md);
+[`Corta.docc`](../Corta/Corta.docc/Corta.md) for the app; and one each for
+the two helpers the app embeds,
+[`corta-exec`](../CortaTerminal/Sources/corta-exec/corta-exec.docc/corta-exec.md) and
+[`corta-image-decoder`](../CortaTerminal/Sources/corta-image-decoder/corta-image-decoder.docc/corta-image-decoder.md).
 `xcodebuild docbuild -project Corta.xcodeproj -scheme Corta` (or
-Product ▸ Build Documentation in Xcode) renders it with the symbol
-documentation. Generated documentation is not a goal in itself; the
-catalog exists so that a contributor can find where a byte goes.
+Product ▸ Build Documentation in Xcode) renders them with the symbol
+documentation, without warnings. Generated documentation is not a goal in
+itself; the catalogs exist so that a contributor can find where a byte goes.
 
 Tools live in [`scripts/`](../scripts/):
 

@@ -54,9 +54,8 @@ per line so the renderer redraws only what changed.
 ### 5. Reading it back
 
 The app takes a grid snapshot under the session's lock, releases that lock,
-and builds the instance buffer from the snapshot. The default frame driver
-runs on the main thread; an experimental per-window render thread can own
-rendering instead. Presentation never gates the PTY reader. The document-anchored
+and builds the instance buffer from the snapshot, on the main thread, paced
+by the pane's display link. Presentation never gates the PTY reader. The document-anchored
 readers live here too so they can be tested without a window:
 ``Selection`` (rows counted from the screen boundary backwards into
 scrollback), ``Search`` (budgeted, so a pattern that would never finish is

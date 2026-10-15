@@ -102,8 +102,8 @@ The two thread boundaries are the interesting part of this diagram:
 
 ### 3.1 Document coordinates
 
-
-Selection coordinates are document coordinates (`CortaTerminal/Selection.swift`):
+Selection coordinates are document coordinates
+(`CortaTerminal/Sources/CortaTerminal/Selection.swift`):
 row ≥ 0 is a live-screen row, row < 0 addresses the scrollback counting
 backwards from the screen boundary (row −1 is the newest history line).
 A selection therefore survives the user scrolling, and when output pushes
@@ -223,7 +223,7 @@ environment is passed in by the app (the core's `ChildEnvironment`). Neither lib
 A pane is a `ViewController` that composes collaborators, each owning one
 concern with its own state and tests; new behaviour is added as a
 collaborator, never as another `ViewController+X.swift` — there are
-none. The controller (one file, under 800 lines) keeps the session, the
+none. The controller (one file, just under a thousand lines) keeps the session, the
 view, the renderer, sizing, teardown, the viewport's offset and the
 selection, and the wiring between its collaborators. Each reaches the pane
 through its own `Pane…Host` protocol, so its tests drive it with a stand-in
@@ -359,7 +359,7 @@ As implemented (M3.1–M3.4, `TerminalView+IME.swift`,
 Between `fork` and `exec` only
 async-signal-safe functions are legal, and the Swift runtime is not —
 touching `String`, allocating, or retaining can deadlock. Resolved by
-not calling `fork()` at all: `CortaTerminal/Spawn.swift` `posix_spawn`s
+not calling `fork()` at all: `Spawn.swift` in the core `posix_spawn`s
 a small helper executable (`corta-exec`, its own SwiftPM product) onto
 the pty replica, with `POSIX_SPAWN_SETSID` and file actions dup'ing the
 replica to fds 0/1/2 and changing to the working directory.
@@ -405,8 +405,15 @@ eviction policy; those cells draw blank.
 
 macOS has had no subpixel antialiasing
 since Mojave. Naively alpha-blending grayscale-AA glyphs makes light
-text on a dark background look visibly thinner than Terminal.app.
-Gamma-corrected blending or stem darkening is needed to match.
+text on a dark background look visibly thinner than Terminal.app, which
+AppKit's own text avoids with stem darkening.
+
+As implemented: colours and the atlas blend in sRGB space (a `.bgra8Unorm`
+target, as xterm, Alacritty and Ghostty do), and the glyph fragment shader
+raises atlas coverage to the power 1/1.45 before blending, which restores
+the edge density at 12 pt (`Shaders.metal`). Linear-space blending would
+need real stem darkening to look right and is not done
+(`QuadPipelineCache`).
 
 ### 7.6 Ownership and synchronization
 

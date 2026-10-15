@@ -213,8 +213,8 @@ through every feature and where to find it.
 
 ## Build and test
 
-Use macOS 26.0 or later on Apple silicon and Xcode with Swift 6.2 or later. CI's exact Xcode
-pin is recorded in [the workflow](.github/workflows/ci.yml). The app resolves
+Use macOS 26.0 or later on Apple silicon and Xcode with Swift 6.2 or later. The exact
+Xcode CI and releases build with is in [`.xcode-version`](.xcode-version). The app resolves
 Sparkle on its first build; the terminal core has no external packages.
 
 ```sh

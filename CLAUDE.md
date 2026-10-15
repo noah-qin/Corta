@@ -36,7 +36,7 @@ source of truth; this file is an index. `docs/README.md` is the fuller one.
 | `docs/CONFIGURATION.md`    | Every config-file key: settings, themes, keybindings, presets, and when each applies — `DocumentationDriftTests` pins it to the code |
 | `docs/DECISIONS.md`        | The settled decisions, one record each — read before proposing an architecture change |
 | `docs/DESIGN.md`           | Goals, architecture, modules, non-goals                     |
-| `docs/CONFORMANCE.md`      | Feature priorities (P0/P1/P2), the daily-driver checklist, test strategy, the five-point manual check |
+| `docs/CONFORMANCE.md`      | Feature priorities (P0/P1/P2), the daily-driver checklist, test strategy, the launched-app check |
 | `docs/PERFORMANCE.md`      | Targets, the hot-path rules, how each number is measured, the numbers |
 | `docs/SECURITY.md`         | Threat model, escape-sequence injection, resource caps, process safety, the four trust boundaries |
 | `docs/TROUBLESHOOTING.md`  | What a user sees when something fails, and the fix          |
@@ -78,8 +78,8 @@ line each:
 - **D24** The canvas stays below an opaque titlebar; no background
   extension. **D25** Metal frames present on their own, not with the
   Core Animation transaction.
-- **D26** Future releases and Sparkle updates use a signed, notarised DMG;
-  published ZIPs remain unchanged. **D27** SFTP asks for passwords,
+- **D26** Releases and Sparkle updates use a signed, notarised DMG since
+  1.1.9; published ZIPs remain unchanged. **D27** SFTP asks for passwords,
   passphrases and host keys through OpenSSH's `SSH_ASKPASS`, answered by
   Corta's own executable and a dialog; nothing is stored.
 - **D28** Local tools are Swift; CI-only glue may be Python (standard
@@ -122,7 +122,7 @@ anything else that outlives the test. Clean up what you create.
 tests assert pixel coverage and cannot see view-hierarchy, orientation,
 startup-ordering or gesture defects — six such bugs shipped a blank or
 unusable window while those tests stayed green. `docs/CONFORMANCE.md`
-§4.4 has the five-point check.
+§4.4 has the check, seven points.
 
 **First responder is not free.** Nothing makes the terminal view first
 responder by default; `SplitViewController.viewWillAppear` calls
@@ -266,7 +266,7 @@ Layout:
   `Remote`, `Settings` (synchronized groups: a moved file needs no
   `project.pbxproj` edit)
 - `CortaTerminal/` — the terminal core as a local SwiftPM package, with
-  its own tests, golden fixtures, fuzz corpus and DocC catalog; its
+  its own tests, golden fixtures, fuzz corpus and DocC catalogs; its
   `CortaPOSIX` target holds the descriptor, spawn and exit-status code the
   core and the SFTP client share
 - `CortaTests/`, `CortaUITests/` — app-hosted test targets;

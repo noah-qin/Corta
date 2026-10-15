@@ -60,7 +60,7 @@ and copying a long command inserts a spurious newline. Retrofitting it
 means rewriting the grid and every consumer.
 
 **Consequence.** Any new feature that touches rows has to say what it does
-with the flag. `CortaTerminal/Selection.swift` is the reference consumer.
+with the flag. The core's `Selection.swift` is the reference consumer.
 Reflow of a large scrollback has to stay cheap enough for a live window
 drag, which fires resize continuously.
 
@@ -112,7 +112,7 @@ keyed by position, not a new field. `CellTests` asserts the size.
 
 **Decision.** Selection coordinates are document rows — scrollback counts
 backwards from the screen boundary — never viewport rows. The rules that
-consult the `wrapped` flag live in `CortaTerminal/Selection.swift`; the
+consult the `wrapped` flag live in the core's `Selection.swift`; the
 app stores only the range.
 
 **Why.** A selection anchored to the viewport moves when output scrolls.
@@ -218,7 +218,7 @@ under a bare `zsh -f` with no `PATH` and a demo banner for days, and
 
 **Decision.** Offscreen render tests assert pixel coverage and cannot see
 view-hierarchy, orientation, startup-ordering or gesture defects.
-`CONFORMANCE.md` §4.4 is the five-point check a person runs.
+`CONFORMANCE.md` §4.4 is the check a person runs on the launched app.
 
 **Why.** Six such bugs shipped a blank or unusable window while every
 test stayed green.
@@ -368,9 +368,10 @@ approval.
 a leaked Developer ID certificate is revoked and replaced, but a new
 Sparkle public key is only known to copies that already updated, so a
 rotation strands every install that did not. Hence the environment
-rather than a repository secret: a workflow that reaches the key has to
-run from a release tag and be approved by a person, so neither a pull
-request nor a pushed branch can read it. Third-party actions in that
+rather than a repository secret: until the 2026-10-06 amendment below, a
+workflow that reached the key had to run from a release tag and be
+approved by a person; since it, only a run on protected `main` can, so
+neither a pull request nor another branch can read it. Third-party actions in that
 workflow are pinned by commit SHA, and Sparkle's tools by the tarball's
 SHA-256. The maintainer keeps no separate backup of the key by choice;
 the login keychain it was exported from is the only readable copy.
@@ -601,10 +602,9 @@ after drawing the new Metal cursor exposed duplicate positions; holding the
 old Metal position until removal instead added measured staleness. Neither
 approach is used. Metal presentation remains independent of CA transactions.
 
-
 ## D26 — Releases ship as a disk image
 
-**Decision.** Starting with the next release after 1.1.8, publish only
+**Decision.** From 1.1.9 (2026-10-09), publish only
 `Corta-<version>.dmg` and `Corta-<version>.dmg.sha256`. Sparkle installs
 from the same disk image. Already published ZIPs, including Intel's 1.0.1,
 remain unchanged. The image contains only `Corta.app`, an `Applications`

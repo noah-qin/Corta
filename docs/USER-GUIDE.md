@@ -31,19 +31,18 @@ and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 
 Corta needs **macOS 26.0 or later**, **Apple silicon** and a **Metal 4-capable
 GPU**. A virtual machine with a paravirtual GPU cannot render the terminal.
-For releases after 1.1.8, download the `.dmg` and its `.sha256` file from
-[GitHub Releases](https://github.com/noah-qin/Corta/releases/latest), check
-the checksum, then open the image and drag Corta into Applications:
-
-Keep both files in the same folder and replace `x.y.z` with the downloaded
-version before running these commands there:
+Download the `.dmg` and its `.sha256` file from
+[GitHub Releases](https://github.com/noah-qin/Corta/releases/latest), keep
+both in the same folder, and check the checksum there before opening the
+image (replace `x.y.z` with the downloaded version):
 
 ```sh
 shasum -a 256 -c Corta-x.y.z.dmg.sha256
 open Corta-x.y.z.dmg
 ```
 
-Eject the image after copying. Versions through 1.1.8 keep their original ZIPs.
+Drag Corta into Applications, then eject the image. Releases since 1.1.9
+are disk images; 1.1.8 and earlier keep their original ZIPs.
 
 Official releases are Developer ID-signed and notarised. If macOS rejects
 a download, follow [Troubleshooting](TROUBLESHOOTING.md#installing). Launched from anywhere else, Corta offers to
@@ -177,6 +176,10 @@ so VPN traffic is not added to physical traffic. Enter a specific interface
 name in Settings to measure it instead. Sampling stops while every enabled
 bar is hidden. Thermal state is a four-level macOS report, not degrees.
 
+The bar uses compact labels, a single-space separator and short byte
+units; full names and precision are in its tooltip, its accessibility
+value and the host-details popover.
+
 ### Creating and editing themes
 
 Settings → Appearance → Create theme opens a graphical editor. Name your
@@ -205,20 +208,12 @@ completion binding. This is a ZLE widget; terminal output tab stops remain eight
 columns, and full-screen programs continue receiving the Tab key. Without the
 integration, the shell retains its own input-tab behavior.
 
-The bottom status bar uses compact labels, a single-space separator, and short
-byte units. Full names and precision remain in its tooltip, accessibility
-value and host-details popover. Status, host and theme-editor text is translated
-in all nine shipped languages and follows macOS's language choice for the app.
-
-### Language and defaults
+### Language
 
 The app follows macOS’s preferred language for Corta: English, Simplified and
 Traditional Chinese, Japanese, Korean, German, French, Spanish and Brazilian
 Portuguese. Restart Corta after changing its app-language preference in macOS.
-Numeric formatting follows the current locale. Existing explicit cursor and
-status settings are preserved; defaults apply when those keys are absent.
-
-These features arrived in 1.1.5. macOS 26+ and Apple silicon are required.
+Numeric formatting follows the current locale.
 
 ## When a session ends
 
@@ -285,8 +280,7 @@ not end the terminal session.
 
 Opening any file reference requires a configured `open-file-command`. Corta
 never opens output-derived files in their system default application: some
-file types run code when opened. After a connection failure, the next editing or upload action
-connects again; failed uploads keep their pending decision.
+file types run code when opened.
 
 ## Shell integration
 
@@ -304,8 +298,7 @@ enable command boundaries there.
 
 When Settings reports an outdated integration, choose **Update** and open a
 new shell. Updating the app alone does not replace a previously installed
-startup-file block. In 1.1.1 this loads the corrected command hooks: an empty
-Return has no command result and draws no green or red rule.
+startup-file block.
 
 With the hooks loaded, automatically or through startup-file installation:
 
@@ -348,9 +341,10 @@ integration does). From the command palette:
   Pane** split the pane with a shell started there.
 
 The folder icon in the title bar is the directory too: drag it, or ⌘-click
-it to see the path. With `directory-history` on, Corta remembers the
-directories your commands ran in; **Settings ▸ Privacy & Security ▸ History** shows
-how many and clears them.
+it to see the path. With `directory-history` on (the default), Corta records
+the local directories your commands ran in. Nothing in the app lists them
+yet; **Settings ▸ Privacy & Security ▸ History** shows how many there are
+and clears them.
 
 ## Directory suggestions (zsh)
 
@@ -455,8 +449,10 @@ asking.
 Remote-edit uploads compare remote content as well as size and modification
 time and send the private snapshot you approved. If you save another local
 edit after the approval prompt, Corta asks for a new decision; saves during
-an upload remain pending. Preserve undecided local edits before deleting
-application data. See [data-at-rest policy](SECURITY.md#5-data-at-rest).
+an upload remain pending. After a connection failure, the next edit or
+upload connects again, and a failed upload keeps its pending decision.
+Preserve undecided local edits before deleting application data. See
+[data-at-rest policy](SECURITY.md#5-data-at-rest).
 
 ## Images in the terminal
 
@@ -577,7 +573,7 @@ Settings is a sidebar of categories, the way System Settings is laid out:
 - **Quick Terminal** — the system-wide hotkey, position and screen.
 - **Connections** — Connect with SSH, and saved presets.
 - **Privacy & Security** — clipboard writes from programs (OSC 52), Secure
-  Keyboard Entry, and the directory history.
+  Keyboard Entry, the directory history and recent hosts.
 
 These controls edit the same config file. Custom theme colors can be edited
 graphically or through the file.

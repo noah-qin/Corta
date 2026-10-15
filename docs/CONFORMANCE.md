@@ -146,7 +146,6 @@ no marked text and an active composition, has not been collected: the
 original report's environment cannot be recovered (CHANGELOG 1.0.0). The
 2026-09-17 record's A1 items are the closest evidence since.
 
-
 ### 2.2 Rendering
 
 | Capability                                       | Tier | Notes                                              |
@@ -160,7 +159,7 @@ original report's environment cannot be recovered (CHANGELOG 1.0.0). The
 | Retina / HiDPI scaling                           | P0   | Grid laid out in pixels, not points — one of §4.4's shipped bugs |
 | **Font fallback** for CJK and emoji              | P0   | Core Text cascade list; the shaped run's font rasterises the glyph (M3.5) |
 | Atlas eviction (LRU or multi-page)               | P0   | Full-page reset on exhaustion + `generation` rebuild (M3, `DESIGN.md` §7.4) |
-| Gamma-corrected glyph blending                   | P1   | Otherwise light-on-dark text looks too thin         |
+| Glyph weight under grayscale antialiasing        | P1   | Otherwise light-on-dark text looks too thin; a coverage curve over sRGB blending — `DESIGN.md` §7.5 |
 | Runtime font scaling (⌘+ / ⌘−)                   | P1   | Per-window, temporary; never writes `font-size` |
 | Ligatures                                        | P2   | Conflicts with the cell grid — `DESIGN.md` §7.3     |
 | Background transparency, blur, padding           | P2   |                                                    |
@@ -178,9 +177,11 @@ never implements — the shortcut arrived dead. `MenuShortcutTests` pins
 the invariant: no keystroke is claimed by two menu items. The
 cursor uses the configured block, bar or underline shape, with optional
 blinking (off by default). DECSCUSR can temporarily override shape and blink;
-parameter 0 and terminal resets return to the configured defaults. A half-second
-timer wakes only the visible, focused live pane when blinking is enabled;
-inactive, occluded and scrolled-back panes stop that timer.
+parameter 0 and terminal resets return to the configured defaults. Only the
+visible, focused live pane blinks; once its cursor is idle the blink is
+handed to a Core Animation opacity animation, so it draws no Metal frame
+every half second (`DESIGN.md` §7.10). Inactive, occluded and
+scrolled-back panes do not blink.
 
 ### 2.3 Windows and sessions
 
@@ -218,7 +219,7 @@ whose record is a roadmap tick has not been re-run since it landed.
 
 | # | Holds when | Last verified by hand | Pinned by |
 | --- | --- | --- | --- |
-| 1 | Opens to a working shell with correct colour output | 2026-09-17 pass, H31 and G29 ([record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-17-interactive.md)) | §4.4's five-point check |
+| 1 | Opens to a working shell with correct colour output | 2026-09-17 pass, H31 and G29 ([record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-17-interactive.md)) | §4.4's launched-app check |
 | 2 | `vim` / `less` / `htop` render without artifacts | 2026-09-17 pass: `less` and `git log` clean (G29); `tmux` + `htop` left residue after a window shrink (G25) — ECH was unimplemented, fixed the same day (§4.4.2) | `EditingTests`, golden fixtures |
 | 3 | Chinese input works, displays, and never drifts out of alignment | 2026-09-17 pass, A1 on a physical keyboard, both panes of a split | `TerminalViewIMETests`, `WideGlyphRenderTests` |
 | 4 | Copy and paste work; pasting multi-line code does not auto-execute | 2026-09-17 pass, G28 (the multi-line warning appeared for a REPL without bracketed paste) and 2026-09-19 (Option-drag selection to the clipboard) | `PasteTests`, `MouseReportingTests` |
@@ -373,8 +374,9 @@ and still shipped a blank or unusable window:
   `.fullSizeContentView` took effect) and shrank the session 30 → 28
   rows, then grew it back — stranding two blank rows under the prompt
   while `stty size` and the render rect both reported the correct 30
-  (M2 closeout, D.1; fixed by gating session resizes on the view
-  filling its window's frame).
+  (M2 closeout, D.1; first fixed by gating session resizes on the view
+  filling its window's frame, now by creating the window at its final
+  size — `DECISIONS.md`, "What replaced D15 and D16").
 
 These are properties of the live view hierarchy, of orientation, and of
 startup ordering — none of which a texture readback can see. Any change
@@ -609,5 +611,5 @@ same terms; the tree carries no dated records.
 | [2026-10-03 — 1.1.0 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-03-1.1.0-checks.md) | §4.4 points 1–5 and 7 on the merged tree, the esctest re-run, what was not judged |
 | [2026-10-03 — 1.1.1 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-03-1.1.1-checks.md) | Real-shell empty-Return regression tests, full core/Unit suites and user-confirmed launched-app check |
 | [2026-10-07 — 1.1.5 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-07-1.1.5-checks.md) | Full core/Unit suites, fuzz, esctest re-run, core benchmark and Release frame CPU, and the user-confirmed resize check |
-| [2026-10-09 — Mac audit closeout](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-mac-audit-closeout.md) | §4.4 points 1–5, native session lifecycle, Quick Terminal and paste checks; explicit UI, VoiceOver, Shortcuts and remote limits |
 | [2026-10-07 — 1.1.6 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-07-1.1.6-checks.md) | Rounded box corners: render tests failing on 1.1.5, the launched app, and a Release frame-CPU A/B |
+| [2026-10-09 — Mac audit closeout](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-mac-audit-closeout.md) | §4.4 points 1–5, native session lifecycle, Quick Terminal and paste checks; explicit UI, VoiceOver, Shortcuts and remote limits |

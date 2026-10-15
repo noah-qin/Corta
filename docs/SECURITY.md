@@ -215,7 +215,7 @@ allocating without bound. These caps are asserted in the fuzz harness
 | OSC / DCS string length    | Hard limit; discard the sequence on overflow and resynchronise |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
 | Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size; 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) |
-| Kitty PNG decoding         | `corta-image-decoder`, a process of its own under the `pure-computation` sandbox (no files, no network), 10 s, a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count | The helper maps an inherited, immediately unlinked shared-memory descriptor before sandbox entry; decoded pixels never travel over stdout, and the `pure-computation` sandbox is unchanged. `ImageDecoderProcessTests` runs the helper's `--check-sandbox` mode, which enters the sandbox and must be refused a file read — checked by the suite, not per decode, which logged a sandbox violation for every image.
+| Kitty PNG decoding         | `corta-image-decoder`, a process of its own under the `pure-computation` sandbox (no files, no network), 10 s, a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor before sandbox entry, so decoded pixels never travel over stdout |
 | Compressed Kitty image (`o=z`) | Inflates to exactly its declared pixels (RGB, RGBA) or at most the 64 MB image cap (PNG); the stream stops at the ceiling and the image is refused, so the expansion is never allocated. The zlib header and Adler-32 must check out; any other `o=` value is refused |
 | CSI parameter count        | 16 (xterm's limit); ignore the remainder               |
 | CSI parameter value        | Clamp to a sane maximum before use                     |
@@ -226,6 +226,11 @@ allocating without bound. These caps are asserted in the fuzz harness
 
 An unterminated OSC string is the canonical case: a stream that opens one
 and never closes it must not accumulate gigabytes in a buffer.
+
+The decoder's sandbox is checked by the suite, not per decode:
+`ImageDecoderProcessTests` runs the helper's `--check-sandbox` mode, which
+enters the sandbox and must be refused a file read. Checking it on every
+image logged a sandbox violation for each picture shown.
 
 Unknown sequences must be **safely ignored**. Because `$TERM` announces
 `xterm-256color` (`DECISIONS.md` D08), programs will send sequences Corta
@@ -294,8 +299,6 @@ closing a window stopped what was in it. A group still there ten seconds
 later — it ignored `SIGHUP` — gets `SIGKILL`, and is reaped. Only that
 group: a job the shell moved into its own group is the shell's to end.
 
----
-
 ### 4.5 Secure keyboard entry
 
 Shipped in B16 as `secure-keyboard-entry` (`docs/CONFIGURATION.md` §2),
@@ -353,8 +356,8 @@ with sit in the same environment; the
 certificate reaches the runner only inside a keychain the job creates
 and deletes.
 
-Future updates use a Developer ID signed, notarised disk image, with the
-app also notarised and stapled (D26). The feed retains historical ZIP
+Since 1.1.9, updates use a Developer ID signed, notarised disk image, with
+the app also notarised and stapled (D26). The feed retains historical ZIP
 entries; both formats keep EdDSA verification. Signed-feed enforcement,
 zero grace period and verification before mounting/extraction are unchanged.
 

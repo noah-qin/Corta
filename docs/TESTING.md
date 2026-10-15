@@ -14,7 +14,7 @@ test run.
 | :--- | :--- | :--- |
 | Documentation or GitHub templates | `python3 -B scripts/check-doc-links.py`; for configuration-reference changes, also `DocumentationDriftTests` | Review rendered Markdown, heading fragments and examples |
 | Parser, grid, search or session | Core suite, focused regression test, fuzz replay for PTY input changes | Specification or minimal reproducer |
-| AppKit, input, settings or windows | Relevant `CortaTests`, then app suite | Launch the app; record the five-point manual check |
+| AppKit, input, settings or windows | Relevant `CortaTests`, then app suite | Launch the app; record the launched-app check (`CONFORMANCE.md` §4.4) |
 | Rendering or hot path | Relevant rendering tests and app suite | Before/after frame CPU under Release (`-testPlan Release`), same machine |
 | Localization or accessibility | Relevant app tests | In-context language or VoiceOver review |
 | Packaging or release | `corta-release-check` against the artifact ([below](#packaging)) | Signing and notarization evidence |
@@ -472,7 +472,6 @@ swift scripts/metal-capability.swift                  # print the families
 swift scripts/metal-capability.swift --require-metal4  # exit 1 without Metal 4
 ```
 
-
 | Environment | Device | `MTLGPUFamily.metal4` | Families |
 | ----------- | ------ | --------------------- | -------- |
 | GitHub hosted `macos-26` | `Apple Paravirtual device` | **no** | `apple5` |
@@ -509,8 +508,8 @@ and there are two ways to get there:
   the result.
 - Locally, on any Apple silicon Mac:
   `xcodebuild test -scheme Corta -testPlan Unit`, with the result recorded
-  in the pull request before a release. The five-point
-  launched-app check (`CONFORMANCE.md` §4.4) is done on the same machine
+  in the pull request before a release. The launched-app check
+  (`CONFORMANCE.md` §4.4) is done on the same machine
   and carries the rest of the guarantee.
 
 That is the trade #107 measured and #109 accepted; it is not a reason to
@@ -580,7 +579,7 @@ yours — not `~/.config/corta/config`, not
 be set on the command line for that to hold, and the next test host
 removes the stages of earlier runs whose process has gone.
 
-That last step is new on 2026-10-02. Before it the test host used the
+That last step dates from 2026-10-02. Before it the test host used the
 development build's stage, and a sanitizer abort between
 `commandHistoryBounds`' write and its `defer` left
 `command-history-limit = 0` in the developer's `Corta Dev/config`; every
@@ -652,7 +651,7 @@ log stream --info --predicate 'subsystem == "dev.noahqin.Corta"'
 `CORTA_RESTORE_WINDOWS=0` (set by the `Corta (Dev)` scheme) skips the
 restore, and `SHELL` names the shell to spawn — pass it in the environment
 of the launch you control, never through `launchctl setenv`. Then run the
-five-point check in
+launched-app check in
 [conformance §4.4](CONFORMANCE.md#44-app-layer-verification-requires-a-launched-app).
 
 **Glass under the accessibility settings.** Reduce Transparency and

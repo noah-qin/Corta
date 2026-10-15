@@ -116,6 +116,50 @@ into another application hides it without moving focus again.
 | `allow-clipboard-write` | boolean | `false` | Whether OSC 52 may put text on the system clipboard — the only route from inside `tmux` or an `ssh` session. Off by default because *any* output could use it. The **read** direction does not exist under any setting (`SECURITY.md` §6). |
 | `secure-keyboard-entry` | boolean | `false` | Secure Keyboard Entry: while a Corta terminal window is key and Corta is the active application, the system stops delivering keystrokes to any other process — event taps, keyloggers, macro tools and accessibility clients alike. Shell ▸ Secure Keyboard Entry toggles this key and shows a checkmark; a lock in the titlebar shows when it is *actually engaged*, which is not while another app is frontmost or Settings is key. Off by default because it is system-wide and also silences the tools a person may rely on (`SECURITY.md` §4.5). The Quick Terminal's hotkey keeps working while it is on. |
 
+#### Following a file reference
+
+⌘-click on `src/main.rs:42:17` in program output opens that file, at that
+line where `open-file-command` can express one. A URL wins where both could
+match.
+
+Start with the editor's installed command-line executable. Run `command -v
+code` (or your editor's CLI name) in a shell and use its absolute path:
+
+```ini
+open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}
+```
+
+Replace `/usr/local/bin/code` with the actual executable on your Mac. The
+template is split on whitespace before placeholders are substituted; quoted
+paths, `~`, `$HOME`, pipes and other shell syntax are not interpreted. For an
+executable in a path containing spaces, use a command-line launcher or symlink
+whose path contains no whitespace. Referenced file paths containing spaces
+remain one argument after substitution. Empty disables both local and remote
+file opening.
+
+Local and remote references share this editor template, but resolve in
+different places:
+
+- **A bare path is not a reference.** Only `path:line` — the shape a tool
+  emits — is detected. Ordinary output is full of things that look like paths
+  (`and/or`, `n/a`, `TODO/FIXME`), and underlining a third of every line
+  teaches you to ignore underlines.
+- **Local references:** resolve against the pane's confirmed local working
+  directory and must name an existing regular file. A remote OSC 7 report
+  never becomes a local working directory.
+- **Remote references:** use the pane's known remote host and directory.
+  After host confirmation and SFTP authentication, Corta downloads a managed
+  local copy and opens it with the configured editor. It never treats the
+  remote path as a path on your Mac. The copy is limited to 64 MiB; uploading
+  edits requires an explicit decision and a remote-content conflict check.
+  See [Remote work](USER-GUIDE.md#remote-work-ssh-and-sftp).
+
+This does **not** widen the URL scheme allowlist (`SECURITY.md` §2.4). A
+`file://` string in output is still plain text and still cannot be detected as
+a link. Output-derived files are opened only through your configured editor,
+never through a system default handler. Paths are substituted as arguments
+and the command runs directly, without a shell.
+
 #### Shell integration
 
 Two paths provide the same bundled hooks. Standard local zsh sessions load
@@ -197,15 +241,16 @@ status, never the command text (`SECURITY.md` §5).
 | --- | --- | --- | --- |
 | `directory-completion` | boolean | `true` | Faint folder alternatives below `cd`, with an inline suffix as you narrow the matches in a standard local zsh session. Tab fills the selected path; Left/Right select the previous/next candidate; Esc dismisses. Up/Down retain shell history navigation and Shift+Tab goes to the shell. Set to `false` to disable suggestions and restore native key handling. New sessions load the bundled hooks without editing the user's startup files. Restart the shell after enabling. Bash and fish retain native completion. See [Directory suggestions](USER-GUIDE.md#directory-suggestions-zsh). |
 | `command-status-marks` | boolean | `true` | Show command outcomes in the left margin: green for exit 0, red for other errors, and a split gray line for interruption (exit 130). Hover for the textual outcome. |
-| `directory-history` | boolean | `true` | Whether Corta remembers directories a completed command actually ran in (`OSC 7`), to rank for the directory switcher. |
+| `directory-history` | boolean | `true` | Whether Corta records the local directories a completed command actually ran in (`OSC 7`). Nothing in the app lists the record yet; Settings ▸ Privacy & Security ▸ History shows its size and clears it. |
 
 Not the config file's own state: `directory-history` only gates whether
 `DirectoryHistoryStore` reads and writes its file (Application Support, not
 `~/.config/corta/config` — the same split `SessionRestore` draws between
 settings and app-managed state). Turning the key off stops it being read
 *or* written; **Clear** in Settings ▸ Privacy & Security ▸ History empties it (and
-deletes the file) regardless of the setting. Ranking is frecency — visit
-count that halves every three days, at most 1,000 directories;
+deletes the file) regardless of the setting. Entries are ranked by
+frecency — a visit count that halves every three days — and at most 1,000
+are kept; the ranking has no reader in the app yet.
 `DirectoryHistory.projectRoot(for:)` separately finds the nearest ancestor
 directory containing `.git`, for jumping to a project root rather than
 wherever inside it a command happened to run. A directory only ever enters
@@ -370,52 +415,6 @@ theme.midnight.dark.cursor = #00c2c7
 theme.midnight.dark.ansi1 = #ff5f56
 ```
 
-### Following a file reference
-
-⌘-click on `src/main.rs:42:17` in program output opens that file, at that
-line where `open-file-command` can express one. A URL wins where both could
-match.
-
-Start with the editor's installed command-line executable. Run `command -v
-code` (or your editor's CLI name) in a shell and use its absolute path:
-
-```ini
-open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}
-```
-
-Replace `/usr/local/bin/code` with the actual executable on your Mac. The
-template is split on whitespace before placeholders are substituted; quoted
-paths, `~`, `$HOME`, pipes and other shell syntax are not interpreted. For an
-executable in a path containing spaces, use a command-line launcher or symlink
-whose path contains no whitespace. Referenced file paths containing spaces
-remain one argument after substitution. Empty disables both local and remote
-file opening.
-
-Local and remote references share this editor template, but resolve in
-different places:
-
-- **A bare path is not a reference.** Only `path:line` — the shape a tool
-  emits — is detected. Ordinary output is full of things that look like paths
-  (`and/or`, `n/a`, `TODO/FIXME`), and underlining a third of every line
-  teaches you to ignore underlines.
-- **Local references:** resolve against the pane's confirmed local working
-  directory and must name an existing regular file. A remote OSC 7 report
-  never becomes a local working directory.
-- **Remote references:** use the pane's known remote host and directory.
-  After host confirmation and SFTP authentication, Corta downloads a managed
-  local copy and opens it with the configured editor. It never treats the
-  remote path as a path on your Mac. The copy is limited to 64 MiB; uploading
-  edits requires an explicit decision and a remote-content conflict check.
-  See [Remote work](USER-GUIDE.md#remote-work-ssh-and-sftp).
-
-This does **not** widen the URL scheme allowlist (`SECURITY.md` §2.4). A
-`file://` string in output is still plain text and still cannot be detected as
-a link. Output-derived files are opened only through your configured editor,
-never through a system default handler. Paths are substituted as arguments
-and the command runs directly, without a shell.
-
----
-
 ### Graphical theme editing
 
 View → Theme editor opens the editor directly. Settings → Appearance → Create theme copies the selected theme into an
@@ -427,6 +426,7 @@ current variant to the colors it had when the editor opened. Invalid colors
 disable saving. An external edit to the same custom theme requires reopening
 the editor before saving.
 
+---
 
 ## 4a. Presets
 
@@ -779,23 +779,10 @@ needed one: unknown keys are preserved verbatim (§1) and an unparsed line
 is simply skipped, so it already degrades one line at a time rather than as
 a whole file.
 
-Remote-edit uploads check the remote content as well as size and modification
-time. Each upload sends the version approved in the prompt. If the local copy
-changes after that prompt, Corta asks for a new decision; further saves during
-an upload remain pending edits. Managed copies remain on disk with private
-file modes. Restored sessions retain arrangement and directory metadata,
-with `restore-windows = true` by default, and start fresh processes without
-restoring terminal text. See [data-at-rest policy](SECURITY.md#5-data-at-rest).
+What each of these files may contain, and the modes they are written with,
+is the [data-at-rest policy](SECURITY.md#5-data-at-rest).
 
-With Corta zsh integration loaded automatically or installed explicitly,
-Tab on a whitespace-only command line inserts four spaces; normal command completion bindings remain
-intact. Output tab stops remain eight columns. The shell keeps its original
-input behavior without integration.
-
-Host details are also available from View → Local host details or Settings →
-Terminal → Local host details, even with the status bar disabled.
-
-## 9. Local system status and input indentation
+## 9. Local system status
 
 CPU is the busy fraction of Mach CPU tick deltas between samples. Load shows
 1-, 5-, and 15-minute averages. Memory is wired + non-purgeable anonymous +
@@ -812,3 +799,5 @@ The bottom bar is 24 points high. It uses abbreviated labels and byte quantities
 with up to one decimal digit to fit more selected metrics. Hover or open details
 for full labels and precision; accessibility also receives the full text.
 Numbers follow the current locale, and labels follow the app's selected language.
+Host details are also available from View → Local host details or Settings →
+Terminal → Local host details, even with the status bar disabled.

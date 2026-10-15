@@ -43,6 +43,11 @@ Versioning for compatibility changes.
   colour, which drew the alternatives almost black on a dark theme while
   macOS itself was in Light mode. A theme change recolours a hint already
   showing, and Increase Contrast strengthens it.
+- The user guide and configuration reference no longer promise a directory
+  switcher: directory history is recorded and can be cleared in Settings,
+  but nothing in the app lists it yet. Troubleshooting entries that had
+  drifted below "Going back to your old terminal" are back under their
+  topics, and release-specific notes read as current behaviour.
 
 ## [1.2.1] - 2026-10-14
 

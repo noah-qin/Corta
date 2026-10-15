@@ -214,8 +214,8 @@ justified here: a full array copy is a sub-millisecond `memcpy`
 
 ## 5. Benchmarks
 
-Because the terminal core is a separate SwiftPM package (`DESIGN.md`
-§2.2), all of these run without launching the app.
+Because the terminal core is a separate SwiftPM package (`DECISIONS.md`
+D04), the core benchmarks run without launching the app.
 
 | Benchmark                              | Measures                              |
 | -------------------------------------- | ------------------------------------- |
@@ -561,16 +561,6 @@ Throughput (vtebench ms per 1 MiB sample, lower is faster; `cat` in MiB/s):
 
 ### 5.6 Numbers by release
 
-The 2026-10-11 same-M5/toolchain optimization run measures 100k history
-RSS increment **185 → 11.4 MiB** (maintained ingestion), CJK feed median
-**70.8 → 87.4 MiB/s**, and AI ANSI feed **123.3 → 133.7 MiB/s**.
-The Unicode driver measures five samples after one warmup. ASCII feed
-**345.2 → 340.3 MiB/s** has overlapping ranges; it is not an unqualified
-speedup. Warm ASCII history search is approximately **25.6 → 20.8 ms**;
-first-query setup is slower (**27.2 → 44.7 ms**).
-[The dated record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-memory-core-optimization.md)
-provides corpora, distributions, stage gates and verification limits.
-
 One column per release, on the machine §5.2 records. A cell says *not
 re-measured* rather than carrying an older figure forward. Each release's
 full run — machine state, every scenario, the energy tables and the
@@ -621,71 +611,21 @@ but it includes the GPU's round trip (§5.8); the CPU-only rebuild, 0.13–0.15
 ms at 1.1.0, is the comparison, and it did not move. Every scripted core
 figure is inside the 1.0.0–1.1.1 range or better than it.
 
+**Since 1.1.5 no release has had a whole-table run.** 1.2.0's changes were
+measured one batch at a time, each before/after on the same M5 and
+toolchain: scrolling and throughput in §5.14, memory and the core in §5.15,
+full screen in §5.17, the instance build in §5.19. The 2026-10-11 memory
+and core run, for instance, measures the 100k-line history's resident
+increment at **185 → 11.4 MiB** (maintained ingestion), the CJK feed median
+at **70.8 → 87.4 MiB/s** and the AI ANSI feed at **123.3 → 133.7 MiB/s**,
+each five samples after one warmup. The ASCII feed, **345.2 → 340.3
+MiB/s**, has overlapping ranges and is not a speedup. Warm ASCII history
+search is about **25.6 → 20.8 ms**, while first-query setup is slower
+(**27.2 → 44.7 ms**).
+[The dated record](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-memory-core-optimization.md)
+has the corpora, distributions, stage gates and verification limits.
+
 ### 5.7 Keypress → glass, measured from inside the app
-
-**October 9 follow-up (#280, #282).** Correlated diagnostics now record
-keypress→output, echo→main, main→frame and frame→actual glass, alongside
-`wakeHop`, callback target lead, first-after-resume lead, resume→callback,
-actual-target presentation slip and delivered `frameInterval`. Timing is
-conditional on metrics being enabled. Requested ranges are recorded as
-requests, not evidence of delivered refresh.
-
-Three alternating same-binary rounds on the built-in 60 Hz panel, AC and Low
-Power Mode off, give DisplayLink p50 **83.75–84.12 ms** and opt-in on-demand
-p50 **33.94–34.21 ms**, with lower p95/p99. Three Typometer rounds confirm the
-direction: **54.81–56.37 ms → 22.26–24.12 ms**. Internal and external gains
-differ by about one frame; the old calibration offset is not reused. Human
-rounds were subsequently recorded on reported battery power; these are supplemental, not verified mains acceptance. #279's external baseline is now closed.
-
-The first resumed callback has approximately the same 49.9 ms target lead as
-steady callbacks; resume→callback is approximately 16.4 ms. No additional
-first-tick penalty was observed, so no hold-awake was added. The mixed
-CAMetalDisplayLink/nextDrawable prototype trapped twice and was removed; the
-opt-in experiment uses separate CADisplayLink pacing and only bypasses pacing
-for paused-link echoes within 50 ms of input, rate-limited to one refresh.
-**DisplayLink stays the default:** three alternating flood rounds show higher experimental tails, so the promotion
-gate fails. Verified-mains human driver pairs later give median p50 **68.85 → 39.39 ms**
-with every paired p95/p99 lower; full visual/tearing acceptance is still pending; scripted power-mode pairs are recorded below.
-
-[Full environment, decomposition, raw rounds and acceptance limits](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-input-followup.md)
-also record final full Unit, D17, idle/occluded Activity Monitor counters and
-valid Allocations evidence. No 120 Hz panel was available. Idle process CPU
-was approximately 0.03%. A later explicit PTY close wakeup removes the 250 ms
-reader poll: input-then-idle interrupt wakeups fall from 4.7974/s to about
-0.4–0.55/s, with zero render commits/frame callbacks over 20 seconds. Total
-process wakeups are still not strictly zero; raw controls are linked above.
-
-Typing, committed IME text, selector commands, accepted paste and reported
-mouse input now request an interactive rate for a re-armed one-second grace.
-The pure policy overrides serious thermal pressure, Low Power Mode and window
-inactivity during interaction. Critical pressure still caps at 20 Hz, including
-scroll gestures (a change from their former precedence). Above 60 Hz the
-interactive range explicitly prefers the screen maximum; non-interactive
-output prefers 60 Hz with the screen maximum as its ceiling. Screen-change
-notifications reapply the policy. The scheduler still parks at idle; the grace
-does not wake it or re-present unchanged frames.
-
-Three scripted power-mode pairs (October 9–10, shipping DisplayLink driver)
-measure low-power p50 medians **186.64 → 64.08 ms** and normal-mode medians
-**108.48 → 107.23 ms**. Low-power target-interval p50/p99 is 16.67/16.67 ms.
-XCTest input cadence differs by power mode. Later three human mains pairs
-per power mode (current PTY-wakeup build) give normal p50 medians
-**68.32 → 69.02 ms**, low-power **184.54 → 68.33 ms**. Current normal
-first-pair p99 175.47 ms exceeds old max 169.47 ms; mixed key content and
-prelaunched inactive processes limit the result. Energy/visual acceptance
-and the full raw distributions remain in the linked record. No 120 Hz result or energy equivalence is inferred
-from policy tests.
-
-
-The [later authorized foreground retry](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-10-foreground-followup.md)
-fixes directory-preview overlap with real Pinyin preedit. Three further
-default-driver four-pane pairs still fail GPU tails: old p99 0.80/0.50/1.42
-ms versus current 1.05/2.80/1.73 ms. CPU/wakeup energy proxies do not
-increase in the recorded stable windows, but are not watts. System Trace
-confirms a 27.127-second blocked reader; process wakeups remain about
-0.45/s, and disabling diagnostics still gives about 0.60/s. The user did
-not observe the continuous animation, so physical temporal tearing remains
-unconfirmed. No experimental default or acceptance completion is claimed.
 
 A third-party screen-capture tool — one that grabs the window in a loop
 until the pixels change — can measure keypress to glass, but Corta
@@ -774,6 +714,69 @@ It says the same: 1 is no faster at the median or at p95. The tail is
 a person's — the default and 2 are one setting, yet their p99 differ by
 48 ms, since at 200 samples p99 is the second-slowest keystroke — and
 not something to choose a value by.
+
+**October 9 follow-up (#280, #282).** Correlated diagnostics now record
+keypress→output, echo→main, main→frame and frame→actual glass, alongside
+`wakeHop`, callback target lead, first-after-resume lead, resume→callback,
+actual-target presentation slip and delivered `frameInterval`. Timing is
+conditional on metrics being enabled. Requested ranges are recorded as
+requests, not evidence of delivered refresh.
+
+Three alternating same-binary rounds on the built-in 60 Hz panel, AC and Low
+Power Mode off, give DisplayLink p50 **83.75–84.12 ms** and opt-in on-demand
+p50 **33.94–34.21 ms**, with lower p95/p99. Three Typometer rounds confirm the
+direction: **54.81–56.37 ms → 22.26–24.12 ms**. Internal and external gains
+differ by about one frame; the old calibration offset is not reused. Human
+rounds were subsequently recorded on reported battery power; these are supplemental, not verified mains acceptance. #279's external baseline is now closed.
+
+The first resumed callback has approximately the same 49.9 ms target lead as
+steady callbacks; resume→callback is approximately 16.4 ms. No additional
+first-tick penalty was observed, so no hold-awake was added. The mixed
+CAMetalDisplayLink/nextDrawable prototype trapped twice and was removed; the
+opt-in experiment uses separate CADisplayLink pacing and only bypasses pacing
+for paused-link echoes within 50 ms of input, rate-limited to one refresh.
+**DisplayLink stays the default:** three alternating flood rounds show higher experimental tails, so the promotion
+gate fails. Verified-mains human driver pairs later give median p50 **68.85 → 39.39 ms**
+with every paired p95/p99 lower; full visual/tearing acceptance is still pending; scripted power-mode pairs are recorded below.
+
+[Full environment, decomposition, raw rounds and acceptance limits](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-input-followup.md)
+also record final full Unit, D17, idle/occluded Activity Monitor counters and
+valid Allocations evidence. No 120 Hz panel was available. Idle process CPU
+was approximately 0.03%. A later explicit PTY close wakeup removes the 250 ms
+reader poll: input-then-idle interrupt wakeups fall from 4.7974/s to about
+0.4–0.55/s, with zero render commits/frame callbacks over 20 seconds. Total
+process wakeups are still not strictly zero; raw controls are linked above.
+
+Typing, committed IME text, selector commands, accepted paste and reported
+mouse input now request an interactive rate for a re-armed one-second grace.
+The pure policy overrides serious thermal pressure, Low Power Mode and window
+inactivity during interaction. Critical pressure still caps at 20 Hz, including
+scroll gestures (a change from their former precedence). Above 60 Hz the
+interactive range explicitly prefers the screen maximum; non-interactive
+output prefers 60 Hz with the screen maximum as its ceiling. Screen-change
+notifications reapply the policy. The scheduler still parks at idle; the grace
+does not wake it or re-present unchanged frames.
+
+Three scripted power-mode pairs (October 9–10, shipping DisplayLink driver)
+measure low-power p50 medians **186.64 → 64.08 ms** and normal-mode medians
+**108.48 → 107.23 ms**. Low-power target-interval p50/p99 is 16.67/16.67 ms.
+XCTest input cadence differs by power mode. Later three human mains pairs
+per power mode (current PTY-wakeup build) give normal p50 medians
+**68.32 → 69.02 ms**, low-power **184.54 → 68.33 ms**. Current normal
+first-pair p99 175.47 ms exceeds old max 169.47 ms; mixed key content and
+prelaunched inactive processes limit the result. Energy/visual acceptance
+and the full raw distributions remain in the linked record. No 120 Hz result or energy equivalence is inferred
+from policy tests.
+
+The [later authorized foreground retry](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-10-foreground-followup.md)
+fixes directory-preview overlap with real Pinyin preedit. Three further
+default-driver four-pane pairs still fail GPU tails: old p99 0.80/0.50/1.42
+ms versus current 1.05/2.80/1.73 ms. CPU/wakeup energy proxies do not
+increase in the recorded stable windows, but are not watts. System Trace
+confirms a 27.127-second blocked reader; process wakeups remain about
+0.45/s, and disabling diagnostics still gives about 0.60/s. The user did
+not observe the continuous animation, so physical temporal tearing remains
+unconfirmed. No experimental default or acceptance completion is claimed.
 
 ### 5.8 The frame-CPU baseline, under Release (D17)
 
@@ -887,7 +890,6 @@ completion outside it, because a frame slot is released only when its
 previous frame completes. A warm backend costs 0.06 ms per pane where
 `QuadRenderer` cost nothing: each pane's backend owns its own queue,
 command buffers, allocators and residency set.
-
 
 ### 5.9 A snapshot's lifetime (#111)
 
@@ -1186,10 +1188,10 @@ The SIMD parser differential test has a scalar `advance` reference and
 random feed boundaries. `CORTA_DIFFERENTIAL_CASES=1000000 swift test
 --package-path CortaTerminal --filter ParserSIMDTests` runs the acceptance load.
 The four-pane 400×120 CPU gate has one render target per pane. GPU cell
-expansion remains dependent on #284; these pre-dependency figures do not
-approve that stage. Row-relative instance positions and shared ASCII atlases
-failed their benefit gates and were not adopted.
-
+expansion depended on #284's render thread, which was removed (D04), so
+that stage was never taken; these figures do not approve it. Row-relative
+instance positions and shared ASCII atlases failed their benefit gates and
+were not adopted.
 
 ### 5.16 Shared images, render ownership and idle energy (#291/#284/#290, 2026-10-11)
 

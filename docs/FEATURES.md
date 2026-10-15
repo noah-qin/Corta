@@ -67,13 +67,14 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 - A command palette (⇧⌘P), configurable shortcuts, themes and a native
   Settings window — a sidebar of eight categories, System Settings style —
   backed by `~/.config/corta/config`.
-- Directory navigation and history, shell/directory/environment presets, and
-  local `path:line:column` references that can open in an editor.
+- Working-directory commands (reveal, copy, `cd` to the parent or project
+  root, open a pane there), shell/directory/environment presets, and local
+  `path:line:column` references that can open in an editor.
 
 ## Shell and remote work
 
-- OSC 133 shell integration: prompt marks (empty Return has no result mark
-  since 1.1.1), command history, command-output
+- OSC 133 shell integration: prompt marks (an empty Return draws none),
+  command history, command-output
   copy/export, navigation between commands and long-task notifications.
   Standard local zsh sessions load the bundled hooks automatically with
   `directory-completion = true`. For explicit startup-file installation in
