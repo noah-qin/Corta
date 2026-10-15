@@ -15,7 +15,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
-import Metal
 import QuartzCore
 
 /// Owns one `TerminalView`'s presentation pipeline. The default

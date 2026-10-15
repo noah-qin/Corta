@@ -16,11 +16,7 @@
 
 import AppKit
 import CortaTerminal
-import CoreGraphics
-import CoreText
 import Metal
-import Synchronization
-import simd
 
 /// Evicting a page, and growing or replacing the textures while frames may still sample them.
 nonisolated extension GlyphAtlas {

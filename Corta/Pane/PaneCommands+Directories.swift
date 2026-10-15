@@ -16,7 +16,6 @@
 
 import AppKit
 import CortaTerminal
-import UniformTypeIdentifiers
 
 extension PaneCommands {
     // MARK: - Finder and the working directory

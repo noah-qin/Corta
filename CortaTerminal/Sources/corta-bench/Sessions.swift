@@ -14,7 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import Compression
 import CortaPOSIX
 import CortaTerminal
 import Darwin

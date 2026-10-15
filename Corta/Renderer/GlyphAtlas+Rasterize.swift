@@ -19,7 +19,6 @@ import CortaTerminal
 import CoreGraphics
 import CoreText
 import Metal
-import Synchronization
 import simd
 
 /// Shaping a run with Core Text and rasterising it into a page.

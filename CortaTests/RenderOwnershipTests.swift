@@ -16,9 +16,7 @@
 
 import CortaTerminal
 import Foundation
-import Metal
 import QuartzCore
-import Synchronization
 import Testing
 
 @testable import Corta

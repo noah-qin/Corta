@@ -15,9 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Darwin
-import Dispatch
 import Foundation
-import Synchronization
 
 /// The typed failure surface of the SFTP engine. Every layer below
 /// the app reports through this one type, so a caller's `catch` never has

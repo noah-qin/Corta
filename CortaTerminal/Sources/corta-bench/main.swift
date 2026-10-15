@@ -14,13 +14,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import Compression
-import CortaPOSIX
 import CortaTerminal
 import Darwin
-import Dispatch
 import Foundation
-import Synchronization
 
 /// `corta-bench` — measures the numbers `docs/PERFORMANCE.md` §1 sets
 /// targets for, so they are recorded, not estimated. Run release for real

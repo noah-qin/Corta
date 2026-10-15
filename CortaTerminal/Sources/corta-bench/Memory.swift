@@ -14,13 +14,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import Compression
-import CortaPOSIX
 import CortaTerminal
 import Darwin
 import Dispatch
 import Foundation
-import Synchronization
 
 // What history costs in memory, and where it goes.
 

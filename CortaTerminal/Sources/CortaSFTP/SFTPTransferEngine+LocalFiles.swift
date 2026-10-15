@@ -15,9 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Darwin
-import CoreServices
 import Foundation
-import Synchronization
 
 extension SFTPTransferEngine {
     // MARK: - Partial naming

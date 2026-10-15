@@ -17,9 +17,6 @@
 import CoreGraphics
 import Foundation
 import Metal
-import OSLog
-import QuartzCore
-import Synchronization
 
 nonisolated extension Metal4Backend {
     // MARK: - Encoding

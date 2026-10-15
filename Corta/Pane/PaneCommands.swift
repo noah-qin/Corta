@@ -16,7 +16,6 @@
 
 import AppKit
 import CortaTerminal
-import UniformTypeIdentifiers
 
 /// What a pane's commands act on.
 protocol PaneCommandsHost: AnyObject {

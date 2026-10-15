@@ -14,13 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import CoreGraphics
-import CoreText
 import CortaTerminal
 import Foundation
-import Metal
-import Synchronization
-import simd
 
 /// The damage-tracked row cache: which rows to rebuild, and moving retained rows instead of rebuilding them.
 nonisolated extension TerminalRenderer {

@@ -15,9 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Darwin
-import Dispatch
 import Foundation
-import Synchronization
 
 extension SFTPSession {
     // MARK: - Requests

@@ -15,11 +15,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Cocoa
-import CoreText
 import CortaPOSIX
 import CortaTerminal
 import Metal
-import QuartzCore
 
 /// One pane: a `TerminalSession` and the renderer and view that draw it.
 /// Knows no sibling panes beyond `splitController` (D07). The pane keeps

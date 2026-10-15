@@ -17,7 +17,6 @@
 import CortaSFTP
 import CortaTerminal
 import Foundation
-import Observation
 
 extension SFTPBrowserModel {
     // MARK: - Pure helpers (the testable half)

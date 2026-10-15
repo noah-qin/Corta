@@ -18,7 +18,6 @@ import AppKit
 import CortaSFTP
 import CortaTerminal
 import SwiftUI
-import UniformTypeIdentifiers
 
 // MARK: - Path bar
 

@@ -14,9 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import CortaPOSIX
 import Darwin
-import Dispatch
 import Foundation
 import Synchronization
 

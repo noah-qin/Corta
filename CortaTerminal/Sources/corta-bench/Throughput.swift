@@ -15,12 +15,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Compression
-import CortaPOSIX
 import CortaTerminal
 import Darwin
 import Dispatch
 import Foundation
-import Synchronization
 
 // How fast bytes become grid: the parse throughput and its corpora, and the scrollback codecs.
 

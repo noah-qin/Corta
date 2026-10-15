@@ -14,12 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import CoreGraphics
-import CoreText
 import CortaTerminal
 import Foundation
-import Metal
-import Synchronization
 import simd
 
 /// One row's cells as quad instances: colours, rules, block geometry and glyphs.

@@ -18,7 +18,6 @@ import AppKit
 import CortaSFTP
 import CortaTerminal
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// The SwiftUI half of the remote-file browser;
 /// `SFTPBrowserModel` owns every piece of state this renders, and

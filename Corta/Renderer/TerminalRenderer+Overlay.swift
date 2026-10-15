@@ -15,11 +15,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CoreGraphics
-import CoreText
 import CortaTerminal
 import Foundation
-import Metal
-import Synchronization
 import simd
 
 /// What draws over the cells: cursor, selection, search matches, the hovered link and command marks.
