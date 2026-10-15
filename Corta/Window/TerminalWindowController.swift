@@ -77,8 +77,13 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// The Quick Terminal's window: not saved or listed as an ordinary one.
     var isQuickTerminal = false
 
-    /// User-owned title; terminal output must never overwrite it.
-    var customTabTitle: String?
+    /// User-owned title; terminal output must never overwrite it. Part of
+    /// the saved arrangement, so a rename is written like a move.
+    var customTabTitle: String? {
+        didSet {
+            if customTabTitle != oldValue { (NSApp.delegate as? AppDelegate)?.noteLayoutChanged() }
+        }
+    }
     private var tabTitleField: TabTitleField?
     private var tabEventMonitor: Any?
 

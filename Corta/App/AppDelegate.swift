@@ -162,8 +162,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         NotificationCenter.default.addObserver(
             self, selector: #selector(windowWillClose(_:)),
             name: NSWindow.willCloseNotification, object: controller.window)
-        // Moves and resizes coalesce into one debounced write.
-        for name in [NSWindow.didResizeNotification, NSWindow.didMoveNotification] {
+        // Moves, resizes and a change of selected tab (the tab's window
+        // becomes main) coalesce into one debounced write.
+        for name in [
+            NSWindow.didResizeNotification, NSWindow.didMoveNotification,
+            NSWindow.didBecomeMainNotification,
+        ] {
             NotificationCenter.default.addObserver(
                 self, selector: #selector(noteLayoutChanged), name: name,
                 object: controller.window)

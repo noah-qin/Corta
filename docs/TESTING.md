@@ -298,6 +298,11 @@ TEST_RUNNER_CORTA_FEEDBACK_STAGE="$FEEDBACK_STAGE" xcodebuild test \
 ```
 
 Remove both printed directories once the development app has exited.
+Build into the default derived data, not a `-derivedDataPath` under a
+private temporary directory: the fixture launcher starts the app by URL
+from the test bundle's products, and from there the launch never gets a
+process ID — six fixture tests fail with that while every test launched
+through the default target passes.
 `InputSourceIndicatorUITests` and `DirectoryCompletionUITests` report a
 setup failure when the root or their config is missing, or the fixture
 prompt did not load. Their shared launcher also isolates `HOME` and

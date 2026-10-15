@@ -28,6 +28,9 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- After a crash, restored tabs keep the tab that was selected and the names
+  given to them: switching or renaming a tab now saves the arrangement, as
+  moving or resizing a window already did.
 - A pane no longer risks drawing its whole session in a fallback font
   with no letters when macOS's font service hiccups as the pane opens: the
   terminal font's fallback list is applied to the font already loaded
