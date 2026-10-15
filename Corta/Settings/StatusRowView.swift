@@ -30,13 +30,14 @@ struct StatusRowView: View {
     let status: RowStatus
     var action: (() -> Void)?
     var secondaryAction: (() -> Void)?
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         HStack(spacing: 5) {
             if let symbol {
                 Image(systemName: symbol)
                     .foregroundStyle(
-                        SystemAccessibility.increaseContrast ? AnyShapeStyle(.primary) : tint)
+                        contrast == .increased ? AnyShapeStyle(.primary) : tint)
             }
             Text(status.message)
                 .font(.system(size: NSFont.smallSystemFontSize))

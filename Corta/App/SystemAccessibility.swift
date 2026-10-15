@@ -18,8 +18,9 @@ import AppKit
 
 /// Reduce Motion and Increase Contrast for AppKit views in one place, so no
 /// new animation or panel forgets one; SwiftUI views read the same
-/// preferences from their environment. System preferences, never config
-/// keys: a copy would drift (D10).
+/// preferences from their environment. A change while running reaches
+/// AppKit views through `AppearanceController.didChange`. System
+/// preferences, never config keys: a copy would drift (D10).
 @MainActor
 enum SystemAccessibility {
     /// Arrive at the final state instead of animating.

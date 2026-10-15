@@ -28,6 +28,9 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- A split's focus ring, and the settings rows' status icons, follow
+  Increase Contrast when it is switched while Corta runs, instead of
+  keeping the width and colour they had until the focus next moved.
 - The `cd` directory-completion hint takes its colour from the theme —
   built-in or defined in the config file — instead of the system label
   colour, which drew the alternatives almost black on a dark theme while

@@ -765,6 +765,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         frameLoop.invalidate()
     }
 
+    func refreshFocusAppearance() { focus.applyAppearance() }
+
     /// The grid now, or nil for a failed pane.
     func snapshot() -> Grid? {
         session?.snapshot()

@@ -36,8 +36,12 @@ final class AppearanceController: NSObject {
             name: ConfigurationStore.didChange, object: nil)
     }
 
-    /// Once `NSApp` exists, from `applicationDidFinishLaunching`.
+    /// Once `NSApp` exists, from `applicationDidFinishLaunching`; a second
+    /// call changes nothing.
     func start() {
+        guard appearanceObservation == nil else { return }
+        // AppKit re-sends this when an accessibility display option such as
+        // Increase Contrast changes, even with Light or Dark forced.
         appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
             MainActor.assumeIsolated { self?.apply() }
         }

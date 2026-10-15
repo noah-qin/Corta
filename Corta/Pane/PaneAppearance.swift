@@ -32,6 +32,9 @@ protocol PaneAppearanceHost: AnyObject {
     /// A temporary zoom, which a configuration change leaves alone.
     var isFontSizeZoomed: Bool { get }
     func resizeSessionToFitView(coalesce: Bool)
+    /// The focus ring's width and colour follow Increase Contrast and the
+    /// accent, which an appearance change can move.
+    func refreshFocusAppearance()
     func invalidateDisplay()
 }
 
@@ -111,6 +114,8 @@ final class PaneAppearance: NSObject {
         // Colours are baked into the instance buffer, so rebuild it all; a
         // forced frame alone kept the old glyph colours (dark on dark).
         terminalRenderer?.invalidate()
+        // The hint above the prompt is re-presented by the frame drawn below.
+        host.refreshFocusAppearance()
         terminalView?.applyCanvasBackground()
         invalidateDisplay()
         terminalView?.drawNow()
