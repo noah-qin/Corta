@@ -19,6 +19,9 @@ Versioning for compatibility changes.
 
 ### Removed
 
+- Directory-history favourites. Nothing in the app could ever mark a
+  directory as one, so the history now ranks by frecency alone; a history
+  file that still carries the old flag loads as before.
 - The experimental per-window render thread (`CORTA_RENDER_THREAD=1`), which
   was off by default and never shown to save power. Every window renders on
   the main thread, as it always has by default.

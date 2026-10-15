@@ -205,7 +205,7 @@ Not the config file's own state: `directory-history` only gates whether
 settings and app-managed state). Turning the key off stops it being read
 *or* written; **Clear** in Settings ▸ Privacy & Security ▸ History empties it (and
 deletes the file) regardless of the setting. Ranking is frecency — visit
-count that halves every three days — with favorites always sorted first;
+count that halves every three days, at most 1,000 directories;
 `DirectoryHistory.projectRoot(for:)` separately finds the nearest ancestor
 directory containing `.git`, for jumping to a project root rather than
 wherever inside it a command happened to run. A directory only ever enters
@@ -219,7 +219,7 @@ writes `cd '<path>'` to the child only when
 `ViewController.canChangeDirectorySafely` holds: shell integration is
 active, no command is currently running, and the cursor is still exactly
 where the prompt finished drawing — so a directory a person picked from
-history or a favorite never lands on a busy shell, a TUI holding the
+history never lands on a busy shell, a TUI holding the
 screen, or a prompt with something already typed into it.
 
 ### Updates
@@ -757,7 +757,7 @@ managed remote-edit copies. Their contents are not configuration keys.
 | `Configuration.columns`/`.rows` | same file | The grid a *new* window opens with | **Window-launch default** — read once, at the moment a window is created; changing it does nothing to windows already open |
 | `Configuration.presets` | same file | Named shell/directory/environment combinations | **Pane-launch configuration** — read once, at the moment a pane spawns from that preset; never re-applied afterwards (`docs/CONFIGURATION.md` §4a) |
 | `SessionRestore` | `state.json` | Window frames and split arrangement, restored on the next launch | **Window/session state** — describes *this run's* windows, not a preference about future ones |
-| `DirectoryHistoryStore` | `directory-history.json` | Ranked recent/favourite directories | **Temporary interaction history** — gated by `directory-history`; clear it in Privacy & Security ▸ History |
+| `DirectoryHistoryStore` | `directory-history.json` | Ranked recent directories | **Temporary interaction history** — gated by `directory-history`; clear it in Privacy & Security ▸ History |
 | `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent Hosts |
 | `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — preserve undecided edits before deleting app data; used copies are pruned after 30 days unless edits are pending |
 

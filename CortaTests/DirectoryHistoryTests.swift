@@ -19,7 +19,7 @@ import Testing
 
 @testable import Corta
 
-/// Ranking, favorites, fuzzy matching and project-root detection.
+/// Ranking, fuzzy matching and project-root detection.
 /// Pure logic, no disk and no app: `DirectoryHistoryStoreTests` covers
 /// persistence separately.
 @MainActor
@@ -45,29 +45,6 @@ struct DirectoryHistoryTests {
         #expect(ranked.map(\.path) == ["/recent", "/old"])
     }
 
-    @Test("favorites always sort first, regardless of frecency")
-    func favoritesSortFirst() {
-        var history = DirectoryHistory()
-        let now = Date()
-        for _ in 0..<10 { history.record("/busy", at: now) }
-        history.record("/favorite", at: now.addingTimeInterval(-30 * 24 * 3600))
-        history.setFavorite(true, for: "/favorite")
-        #expect(history.ranked(now: now).first?.path == "/favorite")
-    }
-
-    @Test("unfavoriting returns a directory to its ordinary rank")
-    func unfavoritingRemovesTheBoost() {
-        var history = DirectoryHistory()
-        let now = Date()
-        history.record("/a", at: now)
-        history.record("/b", at: now)
-        history.record("/b", at: now)
-        history.setFavorite(true, for: "/a")
-        #expect(history.ranked(now: now).first?.path == "/a")
-        history.setFavorite(false, for: "/a")
-        #expect(history.ranked(now: now).first?.path == "/b")
-    }
-
     @Test("clearing removes every entry")
     func clearingRemovesEverything() {
         var history = DirectoryHistory()
@@ -77,39 +54,38 @@ struct DirectoryHistoryTests {
         #expect(history.ranked().isEmpty)
     }
 
-    @Test("the history keeps at most its limit of ordinary entries, and every favourite")
+    @Test("the history keeps at most its limit of entries")
     func historyIsBounded() {
         var history = DirectoryHistory()
         let start = Date(timeIntervalSince1970: 1_000_000)
-        history.setFavorite(true, for: "/favourite")
         for index in 0..<(DirectoryHistory.maximumEntries + 50) {
             history.record("/fake/\(index)", at: start.addingTimeInterval(TimeInterval(index)))
         }
-        let ordinary = history.entries.values.filter { !$0.isFavorite }
-        #expect(ordinary.count == DirectoryHistory.maximumEntries)
-        #expect(history.entries["/favourite"]?.isFavorite == true)
+        #expect(history.entries.count == DirectoryHistory.maximumEntries)
         // The newest survive; the oldest went first.
         #expect(history.entries["/fake/\(DirectoryHistory.maximumEntries + 49)"] != nil)
         #expect(history.entries["/fake/0"] == nil)
     }
 
-    @Test("a loaded history past the limit, or one a favourite left, is trimmed to it")
-    func loadedAndUnpinnedHistoryIsTrimmed() {
+    @Test("a loaded history past the limit is trimmed to it")
+    func loadedHistoryIsTrimmed() {
         let start = Date(timeIntervalSince1970: 1_000_000)
         let oversized = (0..<(DirectoryHistory.maximumEntries + 10)).map { index in
             DirectoryHistory.Entry(
                 path: "/loaded/\(index)", visitCount: 1,
-                lastVisit: start.addingTimeInterval(TimeInterval(index)), isFavorite: false)
+                lastVisit: start.addingTimeInterval(TimeInterval(index)))
         }
-        var history = DirectoryHistory(entries: oversized, now: start.addingTimeInterval(5_000))
+        let history = DirectoryHistory(entries: oversized, now: start.addingTimeInterval(5_000))
         #expect(history.entries.count == DirectoryHistory.maximumEntries)
         #expect(history.entries["/loaded/0"] == nil)
+    }
 
-        history.setFavorite(true, for: "/pinned")
-        history.record("/pinned")
-        history.setFavorite(false, for: "/pinned")
-        #expect(history.entries.values.filter { !$0.isFavorite }.count == DirectoryHistory.maximumEntries)
-        #expect(history.entries["/pinned"] != nil, "the directory just unpinned stays")
+    @Test("an entry written while favourites existed still loads")
+    func entryWithFavouriteFlagStillDecodes() throws {
+        let data = Data(#"[{"path":"/a","visitCount":2,"lastVisit":0,"isFavorite":true}]"#.utf8)
+        let entries = try JSONDecoder().decode([DirectoryHistory.Entry].self, from: data)
+        #expect(entries.map(\.path) == ["/a"])
+        #expect(entries.first?.visitCount == 2)
     }
 
     @Test("an empty path is never recorded")
@@ -276,7 +252,7 @@ struct DirectoryHistoryStoreTests {
         defer { removeDirectory() }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let entry = DirectoryHistory.Entry(
-            path: "/tmp", visitCount: 3, lastVisit: Date(), isFavorite: false)
+            path: "/tmp", visitCount: 3, lastVisit: Date())
         try JSONEncoder().encode([entry]).write(to: file)
         let store = DirectoryHistoryStore(fileURL: file)
         #expect(store.history.entries["/tmp"]?.visitCount == 3)

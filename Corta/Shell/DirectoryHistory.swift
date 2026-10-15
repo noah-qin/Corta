@@ -25,7 +25,6 @@ struct DirectoryHistory: Equatable {
         var path: String
         var visitCount: Int
         var lastVisit: Date
-        var isFavorite: Bool
     }
 
     var entries: [String: Entry] = [:]
@@ -38,11 +37,10 @@ struct DirectoryHistory: Equatable {
         enforceLimit(now: now)
     }
 
-    /// Favorites first, then frecency (visits fading with time); ties broken
-    /// by path, so the order is deterministic.
+    /// By frecency (visits fading with time); ties broken by path, so the
+    /// order is deterministic.
     func ranked(now: Date = Date()) -> [Entry] {
         entries.values.sorted { a, b in
-            if a.isFavorite != b.isFavorite { return a.isFavorite }
             let scoreA = Self.frecency(a, now: now)
             let scoreB = Self.frecency(b, now: now)
             if scoreA != scoreB { return scoreA > scoreB }
@@ -59,15 +57,14 @@ struct DirectoryHistory: Equatable {
         return Double(entry.visitCount) * pow(0.5, age / halfLife)
     }
 
-    /// Directories kept beyond the favourites. The paths are child-reported
+    /// Directories kept. The paths are child-reported
     /// (OSC 7, never checked to exist), so output that reports a fresh one
     /// per prompt would otherwise grow the file, and every save's encode,
     /// without bound — and fill the switcher with them.
     static let maximumEntries = 1_000
 
     /// Records a visit; ignores an empty path. Past `maximumEntries`, the
-    /// lowest-ranked directories that are not favourites go — never the one
-    /// just visited.
+    /// lowest-ranked directories go — never the one just visited.
     mutating func record(_ path: String, at date: Date = Date()) {
         guard !path.isEmpty else { return }
         if var entry = entries[path] {
@@ -75,35 +72,22 @@ struct DirectoryHistory: Equatable {
             entry.lastVisit = date
             entries[path] = entry
         } else {
-            entries[path] = Entry(path: path, visitCount: 1, lastVisit: date, isFavorite: false)
+            entries[path] = Entry(path: path, visitCount: 1, lastVisit: date)
             enforceLimit(now: date, keeping: path)
         }
     }
 
-    /// At most `maximumEntries` ordinary entries; favourites never count.
+    /// At most `maximumEntries` entries.
     private mutating func enforceLimit(now: Date, keeping kept: String? = nil) {
-        let ordinary = entries.values.filter { !$0.isFavorite }
-        let excess = ordinary.count - Self.maximumEntries
+        let excess = entries.count - Self.maximumEntries
         guard excess > 0 else { return }
-        let lowestFirst = ordinary.filter { $0.path != kept }.sorted { a, b in
+        let lowestFirst = entries.values.filter { $0.path != kept }.sorted { a, b in
             let scoreA = Self.frecency(a, now: now)
             let scoreB = Self.frecency(b, now: now)
             if scoreA != scoreB { return scoreA < scoreB }
             return a.path > b.path
         }
         for entry in lowestFirst.prefix(excess) { entries[entry.path] = nil }
-    }
-
-    /// Pins or unpins; pinning an unvisited path creates a zero-score entry.
-    mutating func setFavorite(_ isFavorite: Bool, for path: String) {
-        if var entry = entries[path] {
-            entry.isFavorite = isFavorite
-            entries[path] = entry
-            // An unpinned directory counts again.
-            if !isFavorite { enforceLimit(now: Date(), keeping: path) }
-        } else if isFavorite {
-            entries[path] = Entry(path: path, visitCount: 0, lastVisit: .distantPast, isFavorite: true)
-        }
     }
 
     mutating func clear() { entries.removeAll() }
@@ -201,11 +185,6 @@ final class DirectoryHistoryStore {
     func record(_ path: String) {
         guard ConfigurationStore.shared.configuration.directoryHistory else { return }
         history.record(path)
-        scheduleSave()
-    }
-
-    func setFavorite(_ isFavorite: Bool, for path: String) {
-        history.setFavorite(isFavorite, for: path)
         scheduleSave()
     }
 
