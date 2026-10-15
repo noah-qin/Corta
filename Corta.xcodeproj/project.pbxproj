@@ -20,6 +20,7 @@
 		C07A001130465E2000E8DD20 /* corta-image-decoder in Frameworks */ = {isa = PBXBuildFile; productRef = C07A001330465E2000E8DD20 /* corta-image-decoder */; };
 		C07A001230465E2000E8DD20 /* corta-image-decoder in Embed corta-exec */ = {isa = PBXBuildFile; productRef = C07A001330465E2000E8DD20 /* corta-image-decoder */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		5B0E0C1D30465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = 5B0E0C1C30465E2000E8DD20 /* CortaTerminal */; };
+		C07A001E30465E2000E8DD20 /* CortaPOSIX in Frameworks */ = {isa = PBXBuildFile; productRef = C07A001F30465E2000E8DD20 /* CortaPOSIX */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -129,6 +130,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5B0E0C1D30465E2000E8DD20 /* CortaTerminal in Frameworks */,
+				C07A001E30465E2000E8DD20 /* CortaPOSIX in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -259,6 +261,7 @@
 			name = CortaPerformanceTests;
 			packageProductDependencies = (
 				5B0E0C1C30465E2000E8DD20 /* CortaTerminal */,
+				C07A001F30465E2000E8DD20 /* CortaPOSIX */,
 			);
 			productName = CortaPerformanceTests;
 			productReference = 5B0E0C1130465E2000E8DD20 /* CortaPerformanceTests.xctest */;
@@ -1031,6 +1034,11 @@
 			productName = CortaPOSIX;
 		};
 		C07A001D30465E2000E8DD20 /* CortaPOSIX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
+			productName = CortaPOSIX;
+		};
+		C07A001F30465E2000E8DD20 /* CortaPOSIX */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C07A000430465E2000E8DD20 /* XCLocalSwiftPackageReference "CortaTerminal" */;
 			productName = CortaPOSIX;
