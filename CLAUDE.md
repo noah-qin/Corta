@@ -155,7 +155,12 @@ at its key-code mapping and `SecureInput` through an injected `System`.
 The unit-test host gets a throwaway stage of its own
 (`$TMPDIR/Corta-Tests-<pid>`, D22 amended), so the suite never reads or
 writes the `Corta Dev/config` a developer runs with; a test that seems to
-see odd settings is reading its own stage, not yours.
+see odd settings is reading its own stage, not yours. A wait's ceiling is
+measured on `SuspendingClock`: `ContinuousClock` and `Date` count the time a
+closed lid sleeps the Mac, which once spent every deadline in flight at
+once. Dead code is found with Periphery's two scans read together
+(`.periphery.yml`, `CortaTerminal/.periphery.yml`; `TESTING.md` "Dead
+code"), and code kept on purpose says why in a `periphery:ignore` comment.
 
 **SwiftUI where AppKit decides.** Settings' sidebar is an AppKit
 `NSSplitViewItem(sidebarWithViewController:)` with SwiftUI pages beside it:
@@ -184,7 +189,10 @@ goes there and nowhere else. The feed's own invariant — the appcast, its
 signature and the archive it names being the same bytes, verified under
 the app's `SUPublicEDKey` — is `scripts/verify-appcast.swift`, which that
 check calls at release time, `ci.yml` runs offline on every run and
-`nightly.yml` runs against the published archives.
+`nightly.yml` runs against the published archives. The feed is signed whole,
+so `appcast.xml` is never edited on `main`: a path its header comment names
+that has moved is repointed by `scripts/appcast-header.py`, which the
+signing run calls before it signs.
 
 **Release secrets live in the release environment, and signing needs the
 certificate.** The Developer ID `.p12` and its password, the App Store
@@ -240,8 +248,8 @@ xcodebuild -project Corta.xcodeproj -scheme Corta build
 xcodebuild -project Corta.xcodeproj -scheme Corta test
 ```
 
-Documentation for the core builds with
-`xcodebuild docbuild -project Corta.xcodeproj -scheme Corta`. Fuzzing and
+Documentation for the app, the core and its helpers builds, warning-free,
+with `xcodebuild docbuild -project Corta.xcodeproj -scheme Corta`. Fuzzing and
 the core benchmark are SwiftPM products:
 
 ```sh
