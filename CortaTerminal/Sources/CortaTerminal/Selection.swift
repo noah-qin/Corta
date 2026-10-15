@@ -269,3 +269,55 @@ public enum Selection {
             end: SelectionPoint(row: bottom, column: grid.columns - 1))
     }
 }
+
+/// What the live rows under a selection held when it was made, so the shell
+/// can tell when the program rewrote them in place.
+///
+/// Output that *scrolls* keeps a selection on its text
+/// (`SelectionRange.shifted(byScrollbackGrowth:)`). Output that *rewrites*
+/// the rows it covers — a printed character, an erase, an insert or delete,
+/// a region scroll, the alternate screen — leaves it naming text it no longer
+/// covers, so it is dropped: a redraw such as Claude Code's (cursor up,
+/// `CSI 2K`, write again) otherwise left a highlight lying across whatever
+/// came next. Alacritty, xterm and URxvt drop a selection an erase overlaps;
+/// this also drops one a write lands in, which is the case a redraw hits.
+///
+/// Built from the per-row revisions damage tracking already keeps
+/// (`Grid.lineRevision`), which travel with their lines through a
+/// full-screen scroll: a row reads as changed only when something wrote it.
+/// One comparison per selected live row, off the output path.
+public struct SelectionContent: Equatable, Sendable {
+    let generation: UInt64
+    let totalPushed: Int
+    let firstRow: Int
+    let revisions: [UInt64]
+}
+
+extension Selection {
+    /// Records what `range`'s live rows hold now. Rows in the scrollback are
+    /// left out: output never rewrites history.
+    public static func content(of range: SelectionRange, in grid: Grid) -> SelectionContent {
+        let first = max(0, range.start.row)
+        let last = min(grid.rows - 1, range.end.row)
+        return SelectionContent(
+            generation: grid.linesGeneration,
+            totalPushed: grid.scrollback.totalPushed,
+            firstRow: first,
+            revisions: first <= last ? (first...last).map { grid.lineRevision($0) } : [])
+    }
+
+    /// Whether every row `content` recorded still holds what it did: the
+    /// same screen (not the alternate one, not a reflow), and no write to a
+    /// row that is still live. A row output has since pushed into the
+    /// scrollback is unchanged by definition.
+    public static func isUnchanged(_ content: SelectionContent, in grid: Grid) -> Bool {
+        guard grid.linesGeneration == content.generation else { return false }
+        let growth = max(0, grid.scrollback.totalPushed - content.totalPushed)
+        for (offset, revision) in content.revisions.enumerated() {
+            let row = content.firstRow + offset - growth
+            guard row >= 0 else { continue }
+            guard row < grid.rows, grid.lineRevision(row) == revision else { return false }
+        }
+        return true
+    }
+}

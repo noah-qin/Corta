@@ -28,6 +28,9 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- A selection disappears when the program running in the pane rewrites the
+  text it covers. Claude Code's in-place redraws left a highlight lying
+  across unrelated text that a click could not remove (#341).
 - After a crash, restored tabs keep the tab that was selected and the names
   given to them: switching or renaming a tab now saves the arrangement, as
   moving or resizing a window already did.

@@ -121,6 +121,27 @@ extension PanePointer {
         invalidateDisplay()
     }
 
+    /// Drops the selection once the program rewrites a row it covers, which
+    /// otherwise leaves the highlight on text it no longer names (#341).
+    /// Once per frame, against that frame's grid: the first frame after a
+    /// selection records its rows, later ones compare.
+    func dropSelectionIfRewritten(in grid: Grid) {
+        guard let selection else {
+            selectionContent = nil
+            return
+        }
+        guard let recorded = selectionContent, recorded.selection == selection else {
+            selectionContent = (
+                selection, Selection.content(of: selectionRange(for: selection, in: grid), in: grid))
+            return
+        }
+        guard !Selection.isUnchanged(recorded.content, in: grid) else { return }
+        self.selection = nil
+        selectionContent = nil
+        terminalView?.noteAccessibilitySelectionChanged()
+        invalidateDisplay()
+    }
+
     /// The selection against the current grid: rows shift by lines pushed
     /// since `baseScrollbackTotal` (never negative). `totalPushed`, not
     /// `count`, which saturates once the ring evicts.

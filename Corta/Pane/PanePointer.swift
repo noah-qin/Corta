@@ -56,6 +56,9 @@ final class PanePointer: NSObject {
     /// Underlined, so the target shows before a click opens it.
     var hoveredLink: TerminalSelection?
     var scrollPositionIndicator: ScrollPositionIndicator?
+    /// What the selection's rows held when it was made, and which selection
+    /// that was (`dropSelectionIfRewritten(in:)`).
+    var selectionContent: (selection: TerminalSelection, content: SelectionContent)?
 
     /// The pane's view and session are being replaced: the pill and the
     /// hover belonged to the old ones.
