@@ -424,12 +424,19 @@ public enum SFTPPayload: Equatable, Sendable {
                 writer.writeString(item.name)
                 writer.writeString(item.data)
             }
+        // A request or reply that is one path, handle or block.
+        case .close(let string), .lstat(let string), .fstat(let string), .opendir(let string),
+            .readdir(let string), .remove(let string), .rmdir(let string),
+            .realpath(let string), .stat(let string), .handle(let string), .data(let string):
+            writer.writeString(string)
+        case .setstat(let string, let attributes), .fsetstat(let string, let attributes),
+            .mkdir(let string, let attributes):
+            writer.writeString(string)
+            writer.writeAttributes(attributes)
         case .open(let path, let flags, let attributes):
             writer.writeString(path)
             writer.writeUInt32(flags.rawValue)
             writer.writeAttributes(attributes)
-        case .close(let handle):
-            writer.writeString(handle)
         case .read(let handle, let offset, let length):
             writer.writeString(handle)
             writer.writeUInt64(offset)
@@ -438,31 +445,6 @@ public enum SFTPPayload: Equatable, Sendable {
             writer.writeString(handle)
             writer.writeUInt64(offset)
             writer.writeString(data)
-        case .lstat(let path):
-            writer.writeString(path)
-        case .fstat(let handle):
-            writer.writeString(handle)
-        case .setstat(let path, let attributes):
-            writer.writeString(path)
-            writer.writeAttributes(attributes)
-        case .fsetstat(let handle, let attributes):
-            writer.writeString(handle)
-            writer.writeAttributes(attributes)
-        case .opendir(let path):
-            writer.writeString(path)
-        case .readdir(let handle):
-            writer.writeString(handle)
-        case .remove(let path):
-            writer.writeString(path)
-        case .mkdir(let path, let attributes):
-            writer.writeString(path)
-            writer.writeAttributes(attributes)
-        case .rmdir(let path):
-            writer.writeString(path)
-        case .realpath(let path):
-            writer.writeString(path)
-        case .stat(let path):
-            writer.writeString(path)
         case .rename(let oldPath, let newPath):
             writer.writeString(oldPath)
             writer.writeString(newPath)
@@ -474,10 +456,6 @@ public enum SFTPPayload: Equatable, Sendable {
             writer.writeUInt32(status.code.rawValue)
             writer.writeString(status.message)
             writer.writeString(status.languageTag)
-        case .handle(let handle):
-            writer.writeString(handle)
-        case .data(let data):
-            writer.writeString(data)
         case .name(let entries):
             writer.writeUInt32(UInt32(entries.count))
             for entry in entries {

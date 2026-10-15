@@ -32,11 +32,7 @@ extension SFTPTransferEngine {
         ownedPartial: borrowing Mutex<LocalPartialIdentity?>
     ) async throws(SFTPError) -> SFTPTransferReceipt {
         let sourceAttributes = try await session.stat(path: remotePath)
-        if let limit = configuration.maximumDownloadBytes, let size = sourceAttributes.size,
-            size > limit
-        {
-            throw .localIOFailed(operation: "download size limit", code: EFBIG)
-        }
+        try checkDownloadLimit(sourceAttributes)
         let partialPath = Self.partialPath(for: destinationPath)
         let partialInfo = localFileInfo(partialPath)
         let conflict = downloadConflict(
@@ -47,23 +43,9 @@ extension SFTPTransferEngine {
             resolution == .resume
             ? Self.downloadResumeOffset(partial: partialInfo, source: sourceAttributes) : 0
 
-        // Remote first: a refused OPEN must leave no local partial behind,
-        // and nothing open to leak.
-        let handle = try await session.open(path: remotePath, flags: .read)
-        // A transfer from zero gets a file of its own: the old partial's
-        // name is removed and a new one created exclusively, so whoever
-        // still holds the old one open writes into a file nothing commits,
-        // never into this transfer's.
-        if offset == 0, partialInfo != nil { Darwin.unlink(partialPath) }
-        let descriptor: Int32
-        do throws(SFTPError) {
-            let opened = try Self.openPrivatePartial(partialPath, fresh: offset == 0)
-            descriptor = opened.descriptor
-            ownedPartial.withLock { $0 = opened.identity }
-        } catch {
-            await cleanUpRemote { try? await session.close(handle) }
-            throw error
-        }
+        let (handle, descriptor) = try await openDownloadEnds(
+            remotePath: remotePath, partialPath: partialPath, fresh: offset == 0,
+            replacing: partialInfo != nil, session: session, ownedPartial: ownedPartial)
 
         let abort = AbortFlag()
         // Closed exactly once: a failure after the success path's close
@@ -82,14 +64,7 @@ extension SFTPTransferEngine {
             Darwin.close(descriptor)
             descriptorOpen = false
             try await session.close(handle)
-            // A source that changed while it was read is not the file that
-            // was asked for: what landed may mix two versions, or stop short.
-            let after = try await session.stat(path: remotePath)
-            if after.size != sourceAttributes.size
-                || after.modificationTime != sourceAttributes.modificationTime
-            {
-                throw SFTPError.sourceChanged(path: remotePath)
-            }
+            try await verifyRemoteSourceUnchanged(remotePath, opened: sourceAttributes, session: session)
             try commitDownload(partialPath, to: destinationPath, mayReplace: resolution != .fail)
             return SFTPTransferReceipt(
                 bytesTransferred: receipt, resumedFromOffset: offset, attempts: 0)
@@ -103,6 +78,52 @@ extension SFTPTransferEngine {
                 keepForResume: resolution == .resume)
             if let sftpError = error as? SFTPError, !abort.isSet { throw sftpError }
             throw .cancelled
+        }
+    }
+
+    /// Refuses a download larger than the configured ceiling before
+    /// anything is opened.
+    private func checkDownloadLimit(_ source: SFTPAttributes) throws(SFTPError) {
+        if let limit = configuration.maximumDownloadBytes, let size = source.size, size > limit {
+            throw .localIOFailed(operation: "download size limit", code: EFBIG)
+        }
+    }
+
+    /// Opens the remote source, then the local partial. Remote first: a
+    /// refused OPEN must leave no local partial behind, and nothing open to
+    /// leak.
+    private func openDownloadEnds(
+        remotePath: String,
+        partialPath: String,
+        fresh: Bool,
+        replacing: Bool,
+        session: SFTPSession,
+        ownedPartial: borrowing Mutex<LocalPartialIdentity?>
+    ) async throws(SFTPError) -> (handle: SFTPHandle, descriptor: Int32) {
+        let handle = try await session.open(path: remotePath, flags: .read)
+        // A transfer from zero gets a file of its own: the old partial's
+        // name is removed and a new one created exclusively, so whoever
+        // still holds the old one open writes into a file nothing commits,
+        // never into this transfer's.
+        if fresh, replacing { Darwin.unlink(partialPath) }
+        do throws(SFTPError) {
+            let opened = try Self.openPrivatePartial(partialPath, fresh: fresh)
+            ownedPartial.withLock { $0 = opened.identity }
+            return (handle, opened.descriptor)
+        } catch {
+            await cleanUpRemote { try? await session.close(handle) }
+            throw error
+        }
+    }
+
+    /// A source that changed while it was read is not the file that was
+    /// asked for: what landed may mix two versions, or stop short.
+    private func verifyRemoteSourceUnchanged(
+        _ remotePath: String, opened: SFTPAttributes, session: SFTPSession
+    ) async throws(SFTPError) {
+        let after = try await session.stat(path: remotePath)
+        if after.size != opened.size || after.modificationTime != opened.modificationTime {
+            throw .sourceChanged(path: remotePath)
         }
     }
 
