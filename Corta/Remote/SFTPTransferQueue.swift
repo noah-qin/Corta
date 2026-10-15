@@ -58,7 +58,6 @@ final class SFTPTransferQueue {
         var filesTotal = 0
         /// Display name — the file's own name, no path.
         let name: String
-        var remotePath: String
         var localURL: URL
         let host: String
         var state: TransferState
@@ -155,8 +154,11 @@ final class SFTPTransferQueue {
     /// (and the same progress row) as any other.
     private var finishHandlers: [UUID: (Result<URL, TransferFailure>) -> Void] = [:]
 
-    nonisolated struct TransferFailure: Error, Equatable {
+    /// Why a transfer a caller waits on failed, in words the system shows
+    /// when it reports the error.
+    nonisolated struct TransferFailure: LocalizedError, Equatable {
         let message: String
+        var errorDescription: String? { message }
     }
 
     /// Transfers still queued or moving — the toolbar button's badge.
@@ -245,7 +247,7 @@ final class SFTPTransferQueue {
         transfers.append(
             Transfer(
                 id: id, isUpload: plan.isUpload, isDirectory: plan.isDirectory, name: name,
-                remotePath: plan.remotePath, localURL: plan.localURL,
+                localURL: plan.localURL,
                 host: host, state: .queued))
         jobs[id] = Job(plan: plan, host: host)
         Task { await preflight(id: id) }
@@ -406,7 +408,6 @@ final class SFTPTransferQueue {
         }
         jobs[id]?.plan = plan
         if let index = transfers.firstIndex(where: { $0.id == id }) {
-            transfers[index].remotePath = plan.remotePath
             transfers[index].localURL = plan.localURL
         }
         start(id: id, resolution: .fail)
@@ -684,7 +685,7 @@ extension SFTPTransferQueue {
             ("backup.tar.gz", false, .failed(message: L10n.text("ui.demo.error"), retryable: false))
         ]
         transfers = samples.map { name, upload, state in
-            Transfer(id: UUID(), isUpload: upload, name: name, remotePath: "/home/demo/" + name,
+            Transfer(id: UUID(), isUpload: upload, name: name,
                      localURL: URL(fileURLWithPath: "/development-preview/" + name), host: "demo.invalid", state: state)
         }
     }

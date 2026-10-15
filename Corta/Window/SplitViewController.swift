@@ -359,7 +359,7 @@ final class SplitViewController: NSViewController {
 
     var isPaneZoomed: Bool { zoomedPane != nil }
 
-    @objc func toggleZoomPane(_ sender: Any?) {
+    @objc func toggleZoomPane(_: Any?) {
         if zoomedPane != nil {
             unzoomPane()
         } else {
@@ -429,8 +429,8 @@ final class SplitViewController: NSViewController {
 
     // MARK: - Splitting and closing
 
-    @objc func splitRight(_ sender: Any?) { splitFocusedPane(orientation: .columns) }
-    @objc func splitDown(_ sender: Any?) { splitFocusedPane(orientation: .rows) }
+    @objc func splitRight(_: Any?) { splitFocusedPane(orientation: .columns) }
+    @objc func splitDown(_: Any?) { splitFocusedPane(orientation: .rows) }
 
     func splitFocusedPane(
         orientation: SplitOrientation, workingDirectory: String? = nil, preset: Preset? = nil
@@ -582,10 +582,10 @@ final class SplitViewController: NSViewController {
         focusedPane.windowTitle.apply()
     }
 
-    @objc func moveFocusLeft(_ sender: Any?) { moveFocus(.left) }
-    @objc func moveFocusRight(_ sender: Any?) { moveFocus(.right) }
-    @objc func moveFocusUp(_ sender: Any?) { moveFocus(.up) }
-    @objc func moveFocusDown(_ sender: Any?) { moveFocus(.down) }
+    @objc func moveFocusLeft(_: Any?) { moveFocus(.left) }
+    @objc func moveFocusRight(_: Any?) { moveFocus(.right) }
+    @objc func moveFocusUp(_: Any?) { moveFocus(.up) }
+    @objc func moveFocusDown(_: Any?) { moveFocus(.down) }
 
     private func moveFocus(_ direction: SplitMoveDirection) {
         guard let focusedPane,

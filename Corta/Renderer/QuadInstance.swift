@@ -50,9 +50,13 @@ nonisolated struct QuadInstance {
 
 /// Per-draw-call uniforms. Mirrors `QuadUniforms` in `Shaders.metal`.
 nonisolated struct QuadUniforms {
+    // periphery:ignore - read by the shader
     var rectOrigin: SIMD2<Float>
+    // periphery:ignore - read by the shader
     var rectSize: SIMD2<Float>
+    // periphery:ignore - read by the shader
     var drawableSize: SIMD2<Float>
+    // periphery:ignore - read by the shader
     var atlasSize: SIMD2<Float>
     var imageUVRect: SIMD4<Float> = .zero
 }

@@ -170,7 +170,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// schedules decodes for new or newly visible placements.
     func update(
         table: ImagePlacementTable, rows: Int, offset: Int, scrollbackTotalPushed: Int,
-        cellWidth: Float, cellHeight: Float
+        cellHeight: Float
     ) {
         let placements = table.orderedPlacements()
         let liveIDs = Set(placements.map(\.imageID))

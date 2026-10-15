@@ -155,10 +155,10 @@ final class PanePointer: NSObject {
 
     // MARK: - Scrolling from the keyboard
 
-    @objc func scrollHistoryPageUp(_ sender: Any?) { scroll(.page(up: true)) }
-    @objc func scrollHistoryPageDown(_ sender: Any?) { scroll(.page(up: false)) }
-    @objc func scrollHistoryToTop(_ sender: Any?) { scroll(.toTop) }
-    @objc func scrollHistoryToBottom(_ sender: Any?) { scroll(.toBottom) }
+    @objc func scrollHistoryPageUp(_: Any?) { scroll(.page(up: true)) }
+    @objc func scrollHistoryPageDown(_: Any?) { scroll(.page(up: false)) }
+    @objc func scrollHistoryToTop(_: Any?) { scroll(.toTop) }
+    @objc func scrollHistoryToBottom(_: Any?) { scroll(.toBottom) }
 
     /// Reporting needs both tracking and SGR encoding.
     func mouseReportingEnabled() -> Bool {
@@ -205,7 +205,7 @@ final class PanePointer: NSObject {
     }
 
     /// ⌘A: scrollback plus screen.
-    @objc func selectAll(_ sender: Any?) {
+    @objc func selectAll(_: Any?) {
         guard session != nil else { return }
         let grid = session.snapshot()
         selection = TerminalSelection(

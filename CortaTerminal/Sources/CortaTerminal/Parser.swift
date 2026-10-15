@@ -191,11 +191,14 @@ public struct Parser: Sendable {
         case .oscString: oscString(byte, performer: &performer)
         case .oscIgnore: oscIgnore(byte)
         case .dcsEntry, .dcsParam, .dcsIntermediate, .dcsIgnore:
-            dcs(byte, performer: &performer)
+            dcs(byte)
         case .sosPmString:
             break  // Consumed until ESC, handled above.
         case .apcString: apcString(byte)
-        case .apcIgnore: apcIgnore(byte)
+        case .apcIgnore:
+            // An overflowed APC string's remaining bytes: discarded, same as
+            // `oscIgnore`, until the "anywhere" ESC handling above ends it.
+            break
         }
     }
 
@@ -407,13 +410,9 @@ public struct Parser: Sendable {
         }
     }
 
-    /// An overflowed APC string's remaining bytes: discarded, same as
-    /// `oscIgnore`, until the "anywhere" ESC handling in `advance` ends it.
-    private mutating func apcIgnore(_ byte: UInt8) {}
-
     /// DCS is recognised so that its payload is consumed rather than printed.
     /// Nothing is dispatched; device control strings are P2.
-    private mutating func dcs<P: ParserPerformer>(_ byte: UInt8, performer: inout P) {
+    private mutating func dcs(_ byte: UInt8) {
         switch state {
         case .dcsEntry, .dcsParam, .dcsIntermediate:
             switch byte {

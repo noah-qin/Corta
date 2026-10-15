@@ -94,6 +94,7 @@ enum CortaIntentError: Error, CustomLocalizedStringResourceConvertible {
 
 struct OpenTerminalWindowIntent: AppIntent {
     static let title: LocalizedStringResource = "Open Corta Window"
+    // periphery:ignore - AppIntent metadata the system reads, not this code
     static let description = IntentDescription(
         "Opens a new Corta terminal window, in your home directory or in a folder you choose.",
         categoryName: "Windows")
@@ -144,6 +145,7 @@ struct OpenTerminalWindowIntent: AppIntent {
 
 struct FocusTerminalWindowIntent: AppIntent {
     static let title: LocalizedStringResource = "Focus Corta Window"
+    // periphery:ignore - AppIntent metadata the system reads, not this code
     static let description = IntentDescription(
         "Brings one of Corta's open windows to the front.", categoryName: "Windows")
     static let openAppWhenRun = true
@@ -166,6 +168,7 @@ struct FocusTerminalWindowIntent: AppIntent {
 /// The hotkey's toggle, for binding outside Corta.
 struct ToggleQuickTerminalIntent: AppIntent {
     static let title: LocalizedStringResource = "Toggle Quick Terminal"
+    // periphery:ignore - AppIntent metadata the system reads, not this code
     static let description = IntentDescription(
         "Shows the Quick Terminal if it is hidden, and hides it if it is showing.",
         categoryName: "Windows")

@@ -236,7 +236,7 @@ struct SFTPSessionTests {
             try await session.read(handle: handle, offset: 0, length: 8)
         }
         // Let the request reach the server, then cancel.
-        #expect(server.waitFor("the read to arrive") { $0.readOffsets == [0] })
+        server.waitFor("the read to arrive") { $0.readOffsets == [0] }
         task.cancel()
         do {
             _ = try await task.value
@@ -269,7 +269,7 @@ struct SFTPSessionTests {
         let handle = SFTPHandle(rawValue: [1])
         for offset in 0..<4 {
             let task = Task { try await session.read(handle: handle, offset: UInt64(offset), length: 1) }
-            #expect(server.waitFor("read on wire") { $0.readOffsets.count == offset + 1 })
+            server.waitFor("read on wire") { $0.readOffsets.count == offset + 1 }
             task.cancel()
             do {
                 _ = try await task.value
@@ -328,7 +328,7 @@ struct SFTPSessionTests {
         let task = Task {
             try await session.read(handle: handle, offset: 0, length: 8)
         }
-        #expect(server.waitFor("the read to arrive") { $0.readOffsets == [0] })
+        server.waitFor("the read to arrive") { $0.readOffsets == [0] }
         session.close()
         do {
             _ = try await task.value

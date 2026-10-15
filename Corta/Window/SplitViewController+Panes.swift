@@ -23,10 +23,10 @@ import CortaTerminal
 extension SplitViewController {
     // MARK: - Resizing panes from the keyboard
 
-    @objc func growPaneHorizontally(_ sender: Any?) { resizeFocusedPane(vertical: true, steps: 1) }
-    @objc func shrinkPaneHorizontally(_ sender: Any?) { resizeFocusedPane(vertical: true, steps: -1) }
-    @objc func growPaneVertically(_ sender: Any?) { resizeFocusedPane(vertical: false, steps: 1) }
-    @objc func shrinkPaneVertically(_ sender: Any?) { resizeFocusedPane(vertical: false, steps: -1) }
+    @objc func growPaneHorizontally(_: Any?) { resizeFocusedPane(vertical: true, steps: 1) }
+    @objc func shrinkPaneHorizontally(_: Any?) { resizeFocusedPane(vertical: true, steps: -1) }
+    @objc func growPaneVertically(_: Any?) { resizeFocusedPane(vertical: false, steps: 1) }
+    @objc func shrinkPaneVertically(_: Any?) { resizeFocusedPane(vertical: false, steps: -1) }
 
     /// Moves the focused pane's divider by whole cells, the unit the user
     /// adjusts; the constraints stop it at a minimum.
@@ -58,7 +58,7 @@ extension SplitViewController {
     }
 
     /// Halves every node, back to a fresh split's layout.
-    @objc func equalizePanes(_ sender: Any?) {
+    @objc func equalizePanes(_: Any?) {
         equalize(view.subviews.first)
         deliverPaneSizes()
     }
@@ -130,8 +130,8 @@ extension SplitViewController {
 
 
 extension SplitViewController {
-    @objc func selectPreviousCortaTab(_ sender: Any?) { selectAdjacentTab(offset: -1) }
-    @objc func selectNextCortaTab(_ sender: Any?) { selectAdjacentTab(offset: 1) }
+    @objc func selectPreviousCortaTab(_: Any?) { selectAdjacentTab(offset: -1) }
+    @objc func selectNextCortaTab(_: Any?) { selectAdjacentTab(offset: 1) }
 
     func selectAdjacentTab(offset: Int) {
         guard let window = view.window, let tabs = window.tabbedWindows,
@@ -141,7 +141,7 @@ extension SplitViewController {
         target.makeKeyAndOrderFront(nil)
     }
 
-    @objc func renameCurrentTab(_ sender: Any?) {
+    @objc func renameCurrentTab(_: Any?) {
         (view.window?.windowController as? TerminalWindowController)?.beginTabRename()
     }
 

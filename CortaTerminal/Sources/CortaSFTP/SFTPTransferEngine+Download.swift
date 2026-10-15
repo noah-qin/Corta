@@ -135,8 +135,7 @@ extension SFTPTransferEngine {
         var conflict = SFTPConflict(
             destinationExists: FileManager.default.fileExists(atPath: destinationPath),
             partialSize: partial?.size,
-            sourceSize: source.size,
-            sourceModificationTime: source.modificationTime)
+            sourceSize: source.size)
         var partialStat = Darwin.stat()
         if let ownedPartial, Darwin.lstat(partialPath, &partialStat) == 0 {
             conflict.partialIsOwned = ownedPartial == LocalPartialIdentity(

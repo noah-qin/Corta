@@ -39,8 +39,6 @@ public final class PTY: @unchecked Sendable {
     /// Also the group and session id (`POSIX_SPAWN_SETSID`).
     public let processIdentifier: pid_t
 
-    public let replicaPath: String
-
     private struct State {
         var exit: ProcessExit?
         /// Two reapers never race for one status.
@@ -97,7 +95,6 @@ public final class PTY: @unchecked Sendable {
         return PTY(
             fileDescriptor: primary,
             processIdentifier: pid,
-            replicaPath: path,
             terminationHandler: terminationHandler
         )
     }
@@ -105,12 +102,10 @@ public final class PTY: @unchecked Sendable {
     private init(
         fileDescriptor: Int32,
         processIdentifier: pid_t,
-        replicaPath: String,
         terminationHandler: (@Sendable (ProcessExit) -> Void)?
     ) {
         self.descriptor = GuardedDescriptor(fileDescriptor)
         self.processIdentifier = processIdentifier
-        self.replicaPath = replicaPath
         self.terminationHandler = terminationHandler
         // `.userInitiated`, matching `waitForExit`'s callers: a `DispatchGroup`
         // does not propagate its waiter's QoS, so a default queue would be a

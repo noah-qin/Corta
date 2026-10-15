@@ -86,11 +86,6 @@ extension SFTPSession {
         try await attributesRequest { _ in .lstat(path: Array(path.utf8)) }
     }
 
-    /// FSTAT (§8.3) on an open handle.
-    public func fstat(handle: SFTPHandle) async throws(SFTPError) -> SFTPAttributes {
-        try await attributesRequest { _ in .fstat(handle: handle.rawValue) }
-    }
-
     /// SETSTAT (§8.4).
     public func setStat(path: String, attributes: SFTPAttributes) async throws(SFTPError) {
         try expectOK(await request { _ in .setstat(path: Array(path.utf8), attributes: attributes) })

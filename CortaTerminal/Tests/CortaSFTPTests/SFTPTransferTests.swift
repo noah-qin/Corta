@@ -1179,8 +1179,7 @@ struct SFTPTransferTests {
         // overwrite policy removed the partial; the server saw CLOSE.
         #expect(!FileManager.default.fileExists(atPath: destination.path))
         #expect(!FileManager.default.fileExists(atPath: partial.path))
-        #expect(
-            rig.server.waitFor("the close of the aborted handle") { $0.closeCount >= 1 })
+        rig.server.waitFor("the close of the aborted handle") { $0.closeCount >= 1 }
     }
 
     @Test("a cancelled resume-policy download keeps its partial for later")
@@ -1270,8 +1269,7 @@ struct SFTPTransferTests {
             }
             #expect(status.code == .failure)
         }
-        #expect(
-            rig.server.waitFor("the failed listing's close") { $0.closeCount >= 1 })
+        rig.server.waitFor("the failed listing's close") { $0.closeCount >= 1 }
     }
 
     // MARK: - Concurrency queue

@@ -656,7 +656,7 @@ struct SFTPBrowserModelTests {
         let fake = FakeSFTPClient()
         fake.listings["/srv/app"] = [makeEntry("src", permissions: 0o040755, size: nil)]
         fake.onDirectoryTransfer = { _, progress in
-            progress?(.init(filesCompleted: 1, filesTotal: 3, completedBytes: 10, totalBytes: 30, currentFile: "a"))
+            progress?(.init(filesCompleted: 1, filesTotal: 3, completedBytes: 10, totalBytes: 30))
         }
         let model = await connectedModel(fake: fake)
         defer { model.disconnect() }

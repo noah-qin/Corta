@@ -479,7 +479,7 @@ private final class TabTitleField: NSTextField, NSTextFieldDelegate {
         if let menu = menu(for: event) { NSMenu.popUpContextMenu(menu, with: event, for: self) }
     }
 
-    @objc private func renameFromMenu(_ sender: Any?) { controller?.beginTabRename() }
+    @objc private func renameFromMenu(_: Any?) { controller?.beginTabRename() }
 
     func controlTextDidEndEditing(_ obj: Notification) {
         guard !startingEditor else { return }

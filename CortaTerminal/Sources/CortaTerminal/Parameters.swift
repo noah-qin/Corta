@@ -108,8 +108,6 @@ public struct Parameters: Equatable, Sendable {
 /// Two is xterm's limit; a third sends the sequence to the ignore state,
 /// which is the safe reading of an unknown sequence (`SECURITY.md` §3).
 public struct Intermediates: Equatable, Sendable {
-    public static let maxCount = 2
-
     public private(set) var first: UInt8 = 0
     public private(set) var second: UInt8 = 0
     public private(set) var count = 0

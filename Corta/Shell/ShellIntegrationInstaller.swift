@@ -197,10 +197,6 @@ struct ShellIntegrationInstaller {
         self.rcFileURL = rcFileURL
     }
 
-    init(shell: ShellKind) {
-        self.init(shell: shell, rcFileURL: shell.defaultRCFileURL)
-    }
-
     /// `rcFileURL` with the user's home as `~`. A staged build's rc file is
     /// shown in full, making plain it isn't the one real shells read (D22).
     var displayPath: String {

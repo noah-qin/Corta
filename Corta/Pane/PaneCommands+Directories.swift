@@ -31,13 +31,13 @@ extension PaneCommands {
 
     var hasKnownWorkingDirectory: Bool { knownWorkingDirectory != nil }
 
-    @objc func revealWorkingDirectoryInFinder(_ sender: Any?) {
+    @objc func revealWorkingDirectoryInFinder(_: Any?) {
         guard let directory = knownWorkingDirectory else { return }
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: directory)])
     }
 
     /// Copies the path, confirmed by toast.
-    @objc func copyWorkingDirectoryPath(_ sender: Any?) {
+    @objc func copyWorkingDirectoryPath(_: Any?) {
         guard let directory = knownWorkingDirectory else {
             host?.terminalView?.showToast(L10n.text("toast.noWorkingDirectory"), kind: .warning)
             return
@@ -50,7 +50,7 @@ extension PaneCommands {
     /// `cd ..` through the gated `changeDirectory(to:)`. Reads
     /// `shellDirectory`, so a remote pane walks its own directories; spawns and
     /// the project-root search use the local-only `session.workingDirectory`.
-    @objc func changeDirectoryToParent(_ sender: Any?) {
+    @objc func changeDirectoryToParent(_: Any?) {
         guard let directory = shellDirectory?.path else { return }
         let parent = (directory as NSString).deletingLastPathComponent
         guard !parent.isEmpty, parent != directory else { return }
@@ -59,7 +59,7 @@ extension PaneCommands {
 
     /// `cd` to the nearest `.git` ancestor, same gate; no ancestor is
     /// reported, never guessed.
-    @objc func changeDirectoryToProjectRoot(_ sender: Any?) {
+    @objc func changeDirectoryToProjectRoot(_: Any?) {
         guard let directory = knownWorkingDirectory else { return }
         withProjectRoot(of: directory) { commands, root in
             commands.changeDirectory(to: root)
@@ -67,14 +67,14 @@ extension PaneCommands {
     }
 
     /// Splits with a new pane rooted at the parent directory.
-    @objc func openParentDirectoryInNewPane(_ sender: Any?) {
+    @objc func openParentDirectoryInNewPane(_: Any?) {
         guard let directory = knownWorkingDirectory else { return }
         let parent = (directory as NSString).deletingLastPathComponent
         guard !parent.isEmpty, parent != directory else { return }
         host?.splitController?.splitFocusedPane(orientation: .columns, workingDirectory: parent)
     }
 
-    @objc func openProjectRootInNewPane(_ sender: Any?) {
+    @objc func openProjectRootInNewPane(_: Any?) {
         guard let directory = knownWorkingDirectory else { return }
         withProjectRoot(of: directory) { commands, root in
             commands.host?.splitController?.splitFocusedPane(

@@ -52,8 +52,8 @@ let pngSignature: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
 /// Swift. The named profile needs no profile language.
 @_silgen_name("sandbox_init")
 func sandboxInit(
-    _ profile: UnsafePointer<CChar>, _ flags: UInt64,
-    _ errorbuf: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
+    _: UnsafePointer<CChar>, _: UInt64,
+    _: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
 ) -> Int32
 let sandboxNamed: UInt64 = 0x0001
 

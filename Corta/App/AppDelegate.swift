@@ -53,7 +53,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var isAskingToTerminate = false
 
     /// File > New Window (⌘N).
-    @objc func newDocument(_ sender: Any?) {
+    @objc func newDocument(_: Any?) {
         openWindow(workingDirectory: nil)
     }
 
@@ -206,13 +206,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// Menu, palette and App Intent; the hotkey calls
     /// `QuickTerminalController.toggle` directly.
-    @objc func toggleQuickTerminal(_ sender: Any?) {
+    @objc func toggleQuickTerminal(_: Any?) {
         QuickTerminalController.shared.toggle()
     }
 
     /// Writes the config file, the setting's only store; `SecureInput`
     /// follows the file.
-    @objc func toggleSecureKeyboardEntry(_ sender: Any?) {
+    @objc func toggleSecureKeyboardEntry(_: Any?) {
         let turningOn = !ConfigurationStore.shared.configuration.secureKeyboardEntry
         ConfigurationStore.shared.update { $0.secureKeyboardEntry = turningOn }
         // A toast, because the effect itself is invisible.

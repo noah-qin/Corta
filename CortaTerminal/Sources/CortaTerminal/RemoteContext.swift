@@ -45,6 +45,7 @@ public struct RemoteContext: Sendable, Equatable {
 
     public let provenance: Provenance
 
+    // periphery:ignore - compared by ==: a fresh report of the same place unmasks a superseded one
     public let reportedAt: Date
 
     public init(host: String, directory: String, provenance: Provenance, reportedAt: Date) {

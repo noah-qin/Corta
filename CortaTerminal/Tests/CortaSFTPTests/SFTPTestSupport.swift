@@ -17,6 +17,7 @@
 import Darwin
 import Foundation
 import Synchronization
+import Testing
 
 @testable import CortaSFTP
 
@@ -299,7 +300,6 @@ final class FakeSFTPServer: @unchecked Sendable {
     private let state = Mutex(State())
     private let writeLock = NSLock()
     private let transport: SFTPLoopbackConnection.Transport
-    private var thread: Thread?
 
     /// Snapshot of what the server has seen so far.
     var log: FakeServerLog { state.withLock { $0.log } }
@@ -313,27 +313,27 @@ final class FakeSFTPServer: @unchecked Sendable {
     func start() {
         let thread = Thread { [weak self] in self?.run() }
         thread.name = "dev.corta.tests.fake-sftp-server"
-        self.thread = thread
         thread.start()
     }
 
     /// Waits until the log satisfies `predicate` or the deadline passes.
-    /// Polling, but bounded — a missing event fails the test with what was
-    /// actually recorded.
+    /// Polling, but bounded — a missing event fails the test, naming the
+    /// `description` it waited for.
     /// A passing test returns from this in milliseconds; the default
     /// `timeout` only decides how long a failing one takes to say so, and
     /// scales with `CORTA_TEST_TIMEOUT_SCALE` like `readDeadline`.
     func waitFor(
         _ description: String,
         timeout: TimeInterval = testTimeoutInterval(15),
+        sourceLocation: SourceLocation = #_sourceLocation,
         predicate: (FakeServerLog) -> Bool
-    ) -> Bool {
+    ) {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if predicate(log) { return true }
+            if predicate(log) { return }
             Thread.sleep(forTimeInterval: 0.005)
         }
-        return predicate(log)
+        #expect(predicate(log), "timed out waiting for \(description)", sourceLocation: sourceLocation)
     }
 
     // MARK: - Request loop
@@ -728,9 +728,4 @@ final class FakeSFTPServer: @unchecked Sendable {
     private func renameOnFileSystem(from oldName: String, to newName: String) {
         fileSystem.rename(from: oldName, to: newName)
     }
-}
-
-extension FakeServerLog {
-    /// The paths that were ever the target of a WRITE.
-    var writtenPaths: [String] { writePaths }
 }

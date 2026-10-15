@@ -356,8 +356,7 @@ struct SFTPTransferListTests {
     @Test("the rate needs two samples half a second apart, then follows a third of the way")
     func rateSmoothing() {
         var transfer = SFTPTransferQueue.Transfer(
-            id: UUID(), isUpload: false, name: "a", remotePath: "/a",
-            localURL: URL(fileURLWithPath: "/tmp/a"), host: "h",
+            id: UUID(), isUpload: false, name: "a", localURL: URL(fileURLWithPath: "/tmp/a"), host: "h",
             state: .active(completed: 0, total: 4000))
         transfer = SFTPTransferQueue.updatedRate(transfer, completed: 0, now: 10)
         #expect(transfer.bytesPerSecond == nil)

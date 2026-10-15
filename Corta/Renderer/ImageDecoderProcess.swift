@@ -363,5 +363,5 @@ nonisolated enum ImageDecoderProcess {
 
 @_silgen_name("corta_shared_memory_open")
 nonisolated private func sharedMemoryOpen(
-    _ name: UnsafePointer<CChar>, _ flags: Int32, _ mode: mode_t
+    _: UnsafePointer<CChar>, _: Int32, _: mode_t
 ) -> Int32

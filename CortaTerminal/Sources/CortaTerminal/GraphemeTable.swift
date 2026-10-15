@@ -52,7 +52,9 @@ public struct GraphemeTable: Sendable {
     private struct Extension: Hashable {
         /// `0` when `base` is a lone scalar not yet in the table.
         var parent: UInt16
+        // periphery:ignore - read by the synthesised hash and ==
         var base: UInt32
+        // periphery:ignore - read by the synthesised hash and ==
         var scalar: UInt32
     }
 
@@ -117,12 +119,5 @@ public struct GraphemeTable: Sendable {
             }
         }
         return freed
-    }
-
-    public mutating func removeAll() {
-        clusters.removeAll(keepingCapacity: true)
-        ids.removeAll(keepingCapacity: true)
-        freeSlots.removeAll(keepingCapacity: true)
-        extensions.removeAll(keepingCapacity: true)
     }
 }

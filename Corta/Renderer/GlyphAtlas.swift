@@ -90,14 +90,18 @@ nonisolated final class GlyphAtlas {
     }
 
     struct GlyphKey: Hashable {
+        // periphery:ignore - read by the synthesised hash and ==
         var scalar: UInt32
+        // periphery:ignore - read by the synthesised hash and ==
         var style: Style
     }
 
     /// A multi-scalar cluster plus weight, keyed by contents rather than
     /// `GraphemeID`, which is reused across grids and table resets.
     struct ClusterKey: Hashable {
+        // periphery:ignore - read by the synthesised hash and ==
         var scalars: [UInt32]
+        // periphery:ignore - read by the synthesised hash and ==
         var style: Style
     }
 

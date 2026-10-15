@@ -222,13 +222,6 @@ public struct SFTPAttributes: Equatable, Sendable {
         self.extended = extended
     }
 
-    /// True when nothing is set — the ATTRS block sent with a READ-ONLY
-    /// open or any request that carries no metadata to apply.
-    public var isEmpty: Bool {
-        size == nil && userID == nil && groupID == nil && permissions == nil
-            && accessTime == nil && modificationTime == nil && extended.isEmpty
-    }
-
     static let flagSize: UInt32 = 0x0000_0001
     static let flagIDs: UInt32 = 0x0000_0002
     static let flagPermissions: UInt32 = 0x0000_0004
@@ -295,7 +288,9 @@ public struct SFTPStatus: Equatable, Sendable {
         public static let permissionDenied = Code(rawValue: 3)
         public static let failure = Code(rawValue: 4)  // SSH_FX_FAILURE
         public static let badMessage = Code(rawValue: 5)
+        // periphery:ignore - an SFTP v3 status code, kept so the table is whole
         public static let noConnection = Code(rawValue: 6)
+        // periphery:ignore - an SFTP v3 status code, kept so the table is whole
         public static let connectionLost = Code(rawValue: 7)
         public static let operationUnsupported = Code(rawValue: 8)
     }
@@ -323,6 +318,7 @@ public struct SFTPOpenFlags: OptionSet, Equatable, Sendable {
 
     public static let read = SFTPOpenFlags(rawValue: 0x0000_0001)
     public static let write = SFTPOpenFlags(rawValue: 0x0000_0002)
+    // periphery:ignore - an SFTP v3 open flag, kept so the table is whole
     public static let append = SFTPOpenFlags(rawValue: 0x0000_0004)
     public static let create = SFTPOpenFlags(rawValue: 0x0000_0008)
     public static let truncate = SFTPOpenFlags(rawValue: 0x0000_0010)

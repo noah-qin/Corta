@@ -29,6 +29,7 @@ public struct ImagePlacementTable: Sendable {
     /// `graphics.c` keeps refs per image): `i=1,p=1` and `i=2,p=1` are two.
     private struct PlacementKey: Hashable {
         var imageID: KittyGraphics.ImageID
+        // periphery:ignore - read by the synthesised hash and ==
         var placementID: KittyGraphics.PlacementID
 
         init(_ imageID: KittyGraphics.ImageID, _ placementID: KittyGraphics.PlacementID) {

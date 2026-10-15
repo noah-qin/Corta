@@ -63,7 +63,7 @@ struct HotPathAllocationTests {
         Array((0..<count).map { _ in line + [0x0D, 0x0A] }.joined())
     }
 
-    func measure(_ name: String, scrollback: Int, warm: [UInt8], stream: [UInt8]) -> Int {
+    func measure(scrollback: Int, warm: [UInt8], stream: [UInt8]) -> Int {
         var terminal = Terminal(rows: 40, columns: 120, scrollbackLimit: scrollback)
         terminal.feed(warm)
         terminal.feed(stream)
@@ -73,41 +73,41 @@ struct HotPathAllocationTests {
 
     @Test func overwriteInPlace() {
         let frame = Array("\u{1B}[H".utf8) + Self.lines(39, Self.ascii)
-        #expect(measure("ascii-overwrite", scrollback: 0, warm: frame, stream: frame) == 0)
+        #expect(measure(scrollback: 0, warm: frame, stream: frame) == 0)
     }
 
     @Test func scrollWithoutHistory() {
         let text = Self.lines(400, Self.ascii)
-        #expect(measure("ascii-scroll-nohistory", scrollback: 0, warm: text, stream: text) == 0)
+        #expect(measure(scrollback: 0, warm: text, stream: text) == 0)
     }
 
     @Test func scrollIntoHistory() {
         let text = Self.lines(2_000, Self.ascii)
-        let count = measure("ascii-scroll-history", scrollback: 100_000, warm: text, stream: text)
+        let count = measure(scrollback: 100_000, warm: text, stream: text)
         #expect(count <= 2_000 / 256 * 4 + 8)
     }
 
     @Test func colouredText() {
         let line = Array("\u{1B}[1;31mred\u{1B}[0m \u{1B}[38;5;208morange\u{1B}[0m \u{1B}[38;2;10;200;30mtrue\u{1B}[0m plain text here".utf8)
         let text = Self.lines(400, line)
-        #expect(measure("sgr-scroll-nohistory", scrollback: 0, warm: text, stream: text) == 0)
+        #expect(measure(scrollback: 0, warm: text, stream: text) == 0)
     }
 
     @Test func cursorAndErase() {
         let ops = Array("\u{1B}[10;10H\u{1B}[2Kabc\u{1B}[5A\u{1B}[3Cxyz\u{1B}[J\u{1B}[1;1H\u{1B}[K\u{1B}[?25l\u{1B}[?25h".utf8)
         let stream = Array(repeating: ops, count: 200).flatMap { $0 }
-        #expect(measure("csi-cursor-erase", scrollback: 0, warm: stream, stream: stream) == 0)
+        #expect(measure(scrollback: 0, warm: stream, stream: stream) == 0)
     }
 
     @Test func wideText() {
         let line = Array("中文宽字符测试 日本語 한국어 mixed ASCII".utf8)
         let text = Self.lines(400, line)
-        #expect(measure("cjk-scroll-nohistory", scrollback: 0, warm: text, stream: text) == 0)
+        #expect(measure(scrollback: 0, warm: text, stream: text) == 0)
     }
 
     @Test func clusters() {
         let line = Array("e\u{301} 👍🏽 👨‍👩‍👧 🇨🇳 flags and marks".utf8)
         let text = Self.lines(400, line)
-        #expect(measure("grapheme-scroll-nohistory", scrollback: 0, warm: text, stream: text) == 0)
+        #expect(measure(scrollback: 0, warm: text, stream: text) == 0)
     }
 }

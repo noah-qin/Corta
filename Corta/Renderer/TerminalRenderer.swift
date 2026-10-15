@@ -404,7 +404,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         kittyImageRenderer.update(
             table: grid.imagePlacements, rows: grid.rows, offset: offset,
             scrollbackTotalPushed: grid.scrollback.totalPushed,
-            cellWidth: Float(metricsValue.cellWidth), cellHeight: Float(metricsValue.cellHeight))
+            cellHeight: Float(metricsValue.cellHeight))
         return changed
     }
 

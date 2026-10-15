@@ -222,7 +222,7 @@ extension AppDelegate {
     }
 
     /// "Corta Help" (⌘?) opens the README, which links on to `docs/`.
-    @objc func showHelpDocumentation(_ sender: Any?) {
+    @objc func showHelpDocumentation(_: Any?) {
         NSWorkspace.shared.open(Self.helpURL)
     }
 
@@ -387,6 +387,6 @@ extension NSMenu {
 
 #if DEBUG
 extension AppDelegate {
-    @objc func showSFTPDevelopmentPreview(_ sender: Any?) { SFTPBrowserController.showDevelopmentPreview() }
+    @objc func showSFTPDevelopmentPreview(_: Any?) { SFTPBrowserController.showDevelopmentPreview() }
 }
 #endif

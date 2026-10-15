@@ -28,6 +28,7 @@ extension SFTPTransferEngine {
         let inode: ino_t
         let size: UInt64
         let modificationSeconds: Int
+        // periphery:ignore - compared by ==, which is how a changed source is caught
         let modificationNanoseconds: Int
 
         init(_ info: Darwin.stat) {
@@ -144,8 +145,7 @@ extension SFTPTransferEngine {
             conflict: SFTPConflict(
                 destinationExists: destinationAttributes != nil,
                 partialSize: partialAttributes?.size,
-                sourceSize: source.size,
-                sourceModificationTime: source.sftpModificationTime),
+                sourceSize: source.size),
             destinationPath: remotePath)
 
         let offset =

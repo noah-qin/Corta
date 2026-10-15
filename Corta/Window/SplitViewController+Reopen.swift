@@ -60,7 +60,7 @@ extension SplitViewController {
 
     var canReopenClosedPane: Bool { lastClosedPane?.sibling != nil }
 
-    @objc func reopenClosedPane(_ sender: Any?) {
+    @objc func reopenClosedPane(_: Any?) {
         guard let record = lastClosedPane, let sibling = record.sibling else {
             // The sibling is gone: beep rather than open somewhere arbitrary.
             NSSound.beep()

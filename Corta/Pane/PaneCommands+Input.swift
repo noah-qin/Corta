@@ -181,7 +181,7 @@ extension PaneCommands {
     }
 
     /// ⌘V, and the context menu.
-    @objc func paste(_ sender: Any?) {
+    @objc func paste(_: Any?) {
         pasteFromClipboard()
     }
 

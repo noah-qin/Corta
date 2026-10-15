@@ -24,7 +24,7 @@ extension PaneCommands {
     /// ⌘C through the responder chain; never reaches the PTY. The text build
     /// is O(selection) — the whole document for ⌘A — so it runs off the main
     /// actor on `largeTextTask`, like `exportText(_:)`.
-    @objc func copy(_ sender: Any?) {
+    @objc func copy(_: Any?) {
         guard let host, let selection = host.selection, let session = host.session else { return }
         let grid = session.snapshot()
         let range = host.pointer.selectionRange(for: selection, in: grid)
@@ -70,7 +70,7 @@ extension PaneCommands {
     /// save panel, so empty text skips the panel. `largeTextTask` is cancelled
     /// by a newer export or `stop()`, which stops the panel and write that
     /// follow; a row walk in progress still finishes.
-    @objc func exportText(_ sender: Any?) {
+    @objc func exportText(_: Any?) {
         guard let host, host.isOperable, let window = host.view.window else { return }
         let grid = host.session.snapshot()
         let selection = host.selection
@@ -82,7 +82,7 @@ extension PaneCommands {
     }
 
     /// The same export for `effectiveCommand`'s output.
-    @objc func exportCommandOutput(_ sender: Any?) {
+    @objc func exportCommandOutput(_: Any?) {
         guard let host, host.isOperable, let window = host.view.window else { return }
         let grid = host.session.snapshot()
         guard let range = PaneShellIntegration.commandOutputRange(grid: grid, record: host.effectiveCommand)

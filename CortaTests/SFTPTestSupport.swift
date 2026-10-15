@@ -219,9 +219,9 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
             }
         } else {
             progress?(
-                .init(filesCompleted: 1, filesTotal: 2, completedBytes: 100, totalBytes: 300, currentFile: "b"))
+                .init(filesCompleted: 1, filesTotal: 2, completedBytes: 100, totalBytes: 300))
             progress?(
-                .init(filesCompleted: 2, filesTotal: 2, completedBytes: 300, totalBytes: 300, currentFile: ""))
+                .init(filesCompleted: 2, filesTotal: 2, completedBytes: 300, totalBytes: 300))
         }
         return SFTPTransferEngine.DirectoryTransferReceipt(
             filesTransferred: 2, directoriesCreated: 1, bytesTransferred: 300, skipped: [])

@@ -21,6 +21,7 @@ import Carbon
 /// IME's private ASCII toggle is not inferred from the last typed character.
 nonisolated struct InputSourceState: Equatable, Sendable {
     enum Kind: Sendable { case direct, nonLatinLayout, ime, unknown }
+    // periphery:ignore - compared by the synthesised ==, which is how a change is seen
     var identifier: String
     var name: String
     var badge: String

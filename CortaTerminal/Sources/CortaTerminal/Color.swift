@@ -73,16 +73,3 @@ public struct Color: Equatable, Hashable, Sendable {
         )
     }
 }
-
-extension Color {
-    // The eight ANSI colours, by name, for readable call sites in tests and
-    // in the performer. Bright variants are these plus eight.
-    public static let black = Color.indexed(0)
-    public static let red = Color.indexed(1)
-    public static let green = Color.indexed(2)
-    public static let yellow = Color.indexed(3)
-    public static let blue = Color.indexed(4)
-    public static let magenta = Color.indexed(5)
-    public static let cyan = Color.indexed(6)
-    public static let white = Color.indexed(7)
-}

@@ -68,8 +68,8 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
 
     // MARK: - Command to command
 
-    @objc func jumpToPreviousCommand(_ sender: Any?) { jumpToCommand(backwards: true) }
-    @objc func jumpToNextCommand(_ sender: Any?) { jumpToCommand(backwards: false) }
+    @objc func jumpToPreviousCommand(_: Any?) { jumpToCommand(backwards: true) }
+    @objc func jumpToNextCommand(_: Any?) { jumpToCommand(backwards: false) }
 
     /// Scrolls the nearest prompt in that direction to the top and makes it
     /// `effectiveCommand`. Walks `CommandRecordStore.records` by absolute row
@@ -119,11 +119,11 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
 
     // MARK: - Failed commands
 
-    @objc func jumpToPreviousFailedCommand(_ sender: Any?) {
+    @objc func jumpToPreviousFailedCommand(_: Any?) {
         jumpToCommand(backwards: true, failedOnly: true)
     }
 
-    @objc func jumpToNextFailedCommand(_ sender: Any?) {
+    @objc func jumpToNextFailedCommand(_: Any?) {
         jumpToCommand(backwards: false, failedOnly: true)
     }
 
@@ -137,7 +137,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
 
     /// Copies `effectiveCommand`'s output, bounded by its marks, instead of a
     /// drag-while-scrolling selection. A toast reports either outcome.
-    @objc func copyLastCommandOutput(_ sender: Any?) {
+    @objc func copyLastCommandOutput(_: Any?) {
         guard isOperable else { return }
         guard let text = commandOutputText(for: effectiveCommand), !text.isEmpty else {
             // No marks means no integration; no completed command means a fresh
@@ -156,7 +156,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
 
     /// Opens the first `path:line[:column]` in `effectiveCommand`'s output
     /// with the same logic as ⌘-click (`PanePointer`).
-    @objc func openFileReferenceInCommand(_ sender: Any?) {
+    @objc func openFileReferenceInCommand(_: Any?) {
         guard isOperable else { return }
         guard let host else { return }
         // Local, or the remote file's managed copy at the same line.
@@ -166,7 +166,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
         }
     }
 
-    @objc func searchCommandHistory(_ sender: Any?) {
+    @objc func searchCommandHistory(_: Any?) {
         guard isOperable, let pane = host as? ViewController else { return }
         CommandHistoryController.shared.show(for: pane)
     }
@@ -315,7 +315,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
 
     /// Snapshots a still-running command's output so far — a build log at
     /// minute three is worth reading.
-    @objc func snapshotRunningCommandOutput(_ sender: Any?) {
+    @objc func snapshotRunningCommandOutput(_: Any?) {
         guard isOperable else { return }
         let grid = session.snapshot()
         guard let record = session.commandRecords.last, record.isRunning else {

@@ -31,7 +31,6 @@ nonisolated struct SystemMetrics: Equatable, Sendable {
     var downloadRate: Double?
     var uploadRate: Double?
     var diskAvailable: Int64?
-    var diskTotal: Int64?
     var thermal: ProcessInfo.ThermalState?
 }
 
@@ -39,7 +38,7 @@ nonisolated struct SystemMetrics: Equatable, Sendable {
 actor SystemMetricsSampler {
     private var previousCPU: [UInt32]?
     private var previousNetwork: (name: String, index: UInt32, input: UInt32, output: UInt32, time: TimeInterval)?
-    private var diskSample: (available: Int64?, total: Int64?, time: TimeInterval)?
+    private var diskSample: (available: Int64?, time: TimeInterval)?
 
     func reset() {
         previousCPU = nil
@@ -82,11 +81,10 @@ actor SystemMetricsSampler {
         if items.contains(.disk) {
             if diskSample == nil || now - diskSample!.time >= 30 {
                 let values = try? URL(fileURLWithPath: NSHomeDirectory()).resourceValues(
-                    forKeys: [.volumeAvailableCapacityKey, .volumeTotalCapacityKey])
-                diskSample = (values?.volumeAvailableCapacity.map(Int64.init), values?.volumeTotalCapacity.map(Int64.init), now)
+                    forKeys: [.volumeAvailableCapacityKey])
+                diskSample = (values?.volumeAvailableCapacity.map(Int64.init), now)
             }
             result.diskAvailable = diskSample?.available
-            result.diskTotal = diskSample?.total
         }
         if items.contains(.thermal) { result.thermal = ProcessInfo.processInfo.thermalState }
         return result

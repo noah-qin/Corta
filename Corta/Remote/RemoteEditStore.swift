@@ -271,6 +271,7 @@ final class RemoteEditStore {
 
     private struct Persisted: Codable {
         static let currentVersion = 1
+        // periphery:ignore - the manifest's format version, written for a later reader
         var version: Int
         var copies: [RemoteCopy]
     }

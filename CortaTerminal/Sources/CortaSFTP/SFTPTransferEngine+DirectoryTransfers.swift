@@ -52,18 +52,14 @@ extension SFTPTransferEngine {
         /// The sum of the sizes the enumeration saw; `nil` when any file's
         /// size was not reported.
         public var totalBytes: UInt64?
-        /// The file currently moving, relative to the transferred root.
-        public var currentFile: String
 
         public init(
-            filesCompleted: Int, filesTotal: Int, completedBytes: UInt64, totalBytes: UInt64?,
-            currentFile: String
+            filesCompleted: Int, filesTotal: Int, completedBytes: UInt64, totalBytes: UInt64?
         ) {
             self.filesCompleted = filesCompleted
             self.filesTotal = filesTotal
             self.completedBytes = completedBytes
             self.totalBytes = totalBytes
-            self.currentFile = currentFile
         }
     }
 
@@ -245,8 +241,7 @@ extension SFTPTransferEngine {
             progress?(
                 DirectoryTransferProgress(
                     filesCompleted: index, filesTotal: plan.files.count,
-                    completedBytes: completedSoFar, totalBytes: plan.totalBytes,
-                    currentFile: file.relativePath))
+                    completedBytes: completedSoFar, totalBytes: plan.totalBytes))
             let fileReceipt = try await transfer(
                 file,
                 progress.map { handler in
@@ -255,7 +250,7 @@ extension SFTPTransferEngine {
                             DirectoryTransferProgress(
                                 filesCompleted: index, filesTotal: plan.files.count,
                                 completedBytes: completedSoFar + fileProgress.completedBytes,
-                                totalBytes: plan.totalBytes, currentFile: file.relativePath))
+                                totalBytes: plan.totalBytes))
                     }
                 })
             completedBytes += fileReceipt.bytesTransferred
@@ -265,7 +260,7 @@ extension SFTPTransferEngine {
         progress?(
             DirectoryTransferProgress(
                 filesCompleted: plan.files.count, filesTotal: plan.files.count,
-                completedBytes: completedBytes, totalBytes: plan.totalBytes, currentFile: ""))
+                completedBytes: completedBytes, totalBytes: plan.totalBytes))
     }
 
     // MARK: - Enumeration
@@ -281,11 +276,10 @@ extension SFTPTransferEngine {
 
         struct PlannedFile: Equatable, Sendable {
             var relativePath: String
-            var size: UInt64?
         }
 
         mutating func addFile(_ relativePath: String, size: UInt64?) {
-            files.append(PlannedFile(relativePath: relativePath, size: size))
+            files.append(PlannedFile(relativePath: relativePath))
             if let size, let total = totalBytes {
                 let sum = total.addingReportingOverflow(size)
                 totalBytes = sum.overflow ? nil : sum.partialValue

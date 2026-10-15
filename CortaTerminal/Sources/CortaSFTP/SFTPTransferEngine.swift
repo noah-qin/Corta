@@ -155,18 +155,11 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         /// retained across its transport retries. Never inferred from a name.
         public internal(set) var partialIsOwned = false
         public var sourceSize: UInt64?
-        public var sourceModificationTime: UInt32?
 
-        public init(
-            destinationExists: Bool,
-            partialSize: UInt64?,
-            sourceSize: UInt64?,
-            sourceModificationTime: UInt32?
-        ) {
+        public init(destinationExists: Bool, partialSize: UInt64?, sourceSize: UInt64?) {
             self.destinationExists = destinationExists
             self.partialSize = partialSize
             self.sourceSize = sourceSize
-            self.sourceModificationTime = sourceModificationTime
         }
     }
 
@@ -246,7 +239,9 @@ public final class SFTPTransferEngine: @unchecked Sendable {
     // MARK: - Transfers
 
     struct LocalPartialIdentity: Equatable, Sendable {
+        // periphery:ignore - compared by ==, which is how the download's own partial is recognised
         let device: dev_t
+        // periphery:ignore - compared by ==, which is how the download's own partial is recognised
         let inode: ino_t
     }
 

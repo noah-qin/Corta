@@ -34,11 +34,17 @@ final class ShellOverlayView: NSView {
         didSet { if isInputComposing { hideCompletion() } }
     }
     fileprivate struct CompletionPresentation: Equatable {
+        // periphery:ignore - read by the synthesised ==
         var state: DirectoryCompletion?
+        // periphery:ignore - read by the synthesised ==
         var anchor: CGRect
+        // periphery:ignore - read by the synthesised ==
         var bounds: CGRect
+        // periphery:ignore - read by the synthesised ==
         var font: NSFont
+        // periphery:ignore - read by the synthesised ==
         var baseline: CGFloat
+        // periphery:ignore - read by the synthesised ==
         var composing: Bool
         /// A theme, appearance or contrast change must redraw a hint
         /// already showing.
@@ -62,7 +68,7 @@ final class ShellOverlayView: NSView {
         for row in rows { addToolTip(row.rect.insetBy(dx: -3, dy: 0), owner: self, userData: nil) }
     }
 
-    @objc func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
+    @objc func view(_: NSView, stringForToolTip _: NSView.ToolTipTag, point: NSPoint, userData _: UnsafeMutableRawPointer?) -> String {
         statuses.first { $0.rect.insetBy(dx: -3, dy: 0).contains(point) }?.description ?? ""
     }
 

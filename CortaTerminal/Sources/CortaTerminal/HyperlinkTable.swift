@@ -85,10 +85,4 @@ public struct HyperlinkTable: Sendable {
         }
         return freed
     }
-
-    public mutating func removeAll() {
-        urls.removeAll(keepingCapacity: true)
-        ids.removeAll(keepingCapacity: true)
-        freeSlots.removeAll(keepingCapacity: true)
-    }
 }

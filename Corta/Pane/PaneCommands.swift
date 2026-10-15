@@ -123,19 +123,19 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
 
     /// ⌘= / ⌘- / ⌘0 apply to every pane: they share one cell geometry
     /// (`SplitViewController.setFontSizeForAllPanes`).
-    @objc func increaseFontSize(_ sender: Any?) {
+    @objc func increaseFontSize(_: Any?) {
         guard let host else { return }
         applyFontSizeForAllPanes(host.fontSize + 1, isZoomed: true, settle: true)
     }
 
-    @objc func decreaseFontSize(_ sender: Any?) {
+    @objc func decreaseFontSize(_: Any?) {
         guard let host else { return }
         applyFontSizeForAllPanes(host.fontSize - 1, isZoomed: true, settle: true)
     }
 
     /// Ends the zoom at the config file's current size, as a new window would
     /// open.
-    @objc func resetFontSize(_ sender: Any?) {
+    @objc func resetFontSize(_: Any?) {
         let configured = CGFloat(ConfigurationStore.shared.configuration.fontSize)
         applyFontSizeForAllPanes(configured, isZoomed: false, settle: true)
     }
@@ -224,17 +224,17 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     /// child's input would be typed characters (`SECURITY.md` §6). The child is
     /// never told, so running jobs are undisturbed; `vim` redraws on its next
     /// frame, a shell on ⌃L or Return.
-    @objc func clearScreen(_ sender: Any?) {
+    @objc func clearScreen(_: Any?) {
         applyTerminalState(.clearScreen, notice: "toast.clearedScreen")
     }
 
-    @objc func clearHistory(_ sender: Any?) {
+    @objc func clearHistory(_: Any?) {
         confirmDiscardingHistory(titleKey: "clear.history.title") { [weak self] in
             self?.applyTerminalState(.clearHistory, notice: "toast.clearedHistory")
         }
     }
 
-    @objc func resetTerminal(_ sender: Any?) {
+    @objc func resetTerminal(_: Any?) {
         confirmDiscardingHistory(titleKey: "clear.reset.title") { [weak self] in
             self?.applyTerminalState(.reset, notice: "toast.resetTerminal")
         }

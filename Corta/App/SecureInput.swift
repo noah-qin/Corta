@@ -42,6 +42,7 @@ final class SecureInput {
     }
 
     private let system: System
+    // periphery:ignore - the observation tokens, kept for the instance's lifetime
     private var observers: [NSObjectProtocol] = []
 
     /// The three inputs, so one change recomputes against the others.

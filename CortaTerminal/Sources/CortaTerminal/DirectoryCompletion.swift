@@ -18,6 +18,7 @@ import Foundation
 
 /// Display-only names. Acceptance sends fixed widget keys, never these strings.
 public struct DirectoryCompletion: Equatable, Sendable {
+    // periphery:ignore - compared by ==, so a new report re-presents even with the same labels
     public let revision: Int
     public let selectedIndex: Int
     public let candidates: [String]

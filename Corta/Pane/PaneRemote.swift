@@ -142,7 +142,7 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
         return false
     }
 
-    @objc func reconnectRemote(_ sender: Any?) {
+    @objc func reconnectRemote(_: Any?) {
         guard canReconnect else { return }
         host?.rebuildPane(strictRespawn: true)
     }
@@ -260,7 +260,7 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
         Self.canBrowseFiles(state: state)
     }
 
-    @objc func browseRemoteFiles(_ sender: Any?) {
+    @objc func browseRemoteFiles(_: Any?) {
         guard host?.isOperable == true else { return }
         let state = state
         guard Self.canBrowseFiles(state: state) else { return }

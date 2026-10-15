@@ -26,6 +26,7 @@ import SwiftUI
 /// app's `appearance`.
 @MainActor
 enum GlassAppearancePreview {
+    // periphery:ignore - keeps the preview window alive while it is shown
     private static var window: NSWindow?
 
     static func show() {
