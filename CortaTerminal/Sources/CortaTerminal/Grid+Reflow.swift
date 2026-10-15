@@ -32,7 +32,7 @@
 /// Where a reflow moved each row, for whatever holds absolute rows
 /// (`totalPushed + screenRow`) outside the grid — command records, the
 /// shell-integration state. A row maps to the row its first cell went to.
-public struct RowRemap: Sendable, Equatable {
+struct RowRemap: Sendable, Equatable {
     /// Absolute row of the old document's first row (scrollback index 0).
     let oldBase: Int
     let newBase: Int
@@ -42,7 +42,7 @@ public struct RowRemap: Sendable, Equatable {
     let newRowCount: Int
     let newColumns: Int
 
-    public func map(_ absolute: Int) -> Int {
+    func map(_ absolute: Int) -> Int {
         let row = absolute - oldBase
         if row < 0 { return absolute + (newBase - oldBase) }
         if row >= newRowOfOldRow.count {
@@ -66,7 +66,7 @@ public struct RowRemap: Sendable, Equatable {
     /// nothing between them wrapped. `nil` otherwise — a wide pair pushed
     /// to the next row would shift the count, and a guess is worse than
     /// none for what reads it (where a typed command starts).
-    public func mapPosition(row absolute: Int, column: Int) -> (row: Int, column: Int)? {
+    func mapPosition(row absolute: Int, column: Int) -> (row: Int, column: Int)? {
         let row = absolute - oldBase
         guard row >= 0, row < newRowOfOldRow.count else { return (map(absolute), column) }
         let newColumn = newColumnOfOldRow[row] + column

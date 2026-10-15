@@ -24,79 +24,79 @@ public enum MouseTrackingMode: Int, Sendable {
 
 /// Terminal state that is not the grid, surfaced read-only through
 /// `Terminal` and `TerminalSession`.
-public struct PerformerState: Sendable {
+struct PerformerState: Sendable {
     /// Query responses for the child. Fixed-format only — never text the
     /// input stream supplied (`SECURITY.md` §2.1–2.2).
-    public internal(set) var outputBuffer: [UInt8] = []
-    public internal(set) var bracketedPasteEnabled = false
+    var outputBuffer: [UInt8] = []
+    var bracketedPasteEnabled = false
     /// Independent of the wire encoding; the last mode enabled wins.
-    public internal(set) var mouseTrackingMode: MouseTrackingMode = .off
-    public internal(set) var sgrMouseEncodingEnabled = false
-    public internal(set) var synchronizedOutputEnabled = false
+    var mouseTrackingMode: MouseTrackingMode = .off
+    var sgrMouseEncodingEnabled = false
+    var synchronizedOutputEnabled = false
     /// Bumped on every `?2026` rising edge, including one that shares a
     /// batch with the previous episode's end — which a bool cannot show.
-    public internal(set) var synchronizedOutputEpisode = 0
-    public internal(set) var bellRequested = false
+    var synchronizedOutputEpisode = 0
+    var bellRequested = false
     /// Never reported back: the title query is a command-injection vector.
-    public internal(set) var windowTitle: String?
-    public internal(set) var directoryCompletion: DirectoryCompletion?
+    var windowTitle: String?
+    var directoryCompletion: DirectoryCompletion?
     /// Local only; a report naming another host goes to `remoteContext`.
-    public internal(set) var workingDirectory: String?
+    var workingDirectory: String?
     /// This machine's names when the session started (`Performer.localHostnames`).
     var hostnamesAtStart = Performer.localHostnames()
     /// Informational only — nothing that spawns a process may read it.
-    public internal(set) var remoteContext: RemoteContext?
-    public internal(set) var focusReportingEnabled = false
+    var remoteContext: RemoteContext?
+    var focusReportingEnabled = false
     /// `?1007`: on the alternate screen, with mouse reporting off, the wheel
     /// sends arrow keys — the alternate screen has no scrollback of its own,
     /// so `less`, `man` and `git log` would not scroll at all. On by
     /// default, as in Terminal.app and iTerm2 (xterm's is off).
-    public internal(set) var alternateScrollEnabled = true
+    var alternateScrollEnabled = true
     /// DECSCL; gates which sequences may answer (DECRQM above all).
-    public internal(set) var conformanceLevel = 65
+    var conformanceLevel = 65
     /// LNM — implemented, or a program relying on it prints a staircase.
-    public internal(set) var newLineModeEnabled = false
-    public internal(set) var applicationCursorKeysEnabled = false
-    public internal(set) var applicationKeypadEnabled = false
+    var newLineModeEnabled = false
+    var applicationCursorKeysEnabled = false
+    var applicationKeypadEnabled = false
     /// The active screen's stack. kitty keeps one per screen: a program on
     /// the alternate screen pushes onto its own, which is dropped when it
     /// leaves, so one that exits with `?1049l` alone — legal — cannot leave
     /// the shell's keys encoded as `CSI u` (Ctrl-C, Esc and all).
-    public internal(set) var keyboardProtocol = KeyboardProtocolStack()
+    var keyboardProtocol = KeyboardProtocolStack()
     /// The main screen's stack, parked while the alternate screen is up.
     var parkedMainKeyboardProtocol: KeyboardProtocolStack?
-    public internal(set) var dynamicColors = DynamicColors()
-    public internal(set) var indexedPalette = IndexedPalette()
-    public internal(set) var specialColors = SpecialColors()
+    var dynamicColors = DynamicColors()
+    var indexedPalette = IndexedPalette()
+    var specialColors = SpecialColors()
     /// Absolute rows and columns from OSC 133, so a status lands on its
     /// prompt however far output has scrolled since.
-    public internal(set) var promptRow: Int?
+    var promptRow: Int?
     /// While the cursor still sits here, nothing has been typed — the gate
     /// for an app-initiated `cd` (`ViewController.canChangeDirectorySafely`).
-    public internal(set) var promptEndColumn: Int?
-    public internal(set) var outputStartRow: Int?
-    public internal(set) var isCommandRunning = false
+    var promptEndColumn: Int?
+    var outputStartRow: Int?
+    var isCommandRunning = false
     /// Set by the first `C`. Only a shell that marks where output begins can
     /// be judged by a `C` missing; one that sends only `A` and `D` never will.
-    public internal(set) var shellMarksOutputStart = false
+    var shellMarksOutputStart = false
     /// An ED 2 wiped the waiting prompt; its repaint's `B` says where it is now.
     var promptAwaitsRepaint = false
     /// This prompt's `B` has arrived: the shell is waiting for a command line.
     var sawPromptEnd = false
     /// Drained by `Terminal.takeFinishedCommand()`, so a notification fires
     /// once per command, not once per frame.
-    public internal(set) var finishedCommandExitStatus: Int?
-    public internal(set) var commandExitStatus: Int?
-    public internal(set) var commandRecords = CommandRecordStore()
+    var finishedCommandExitStatus: Int?
+    var commandExitStatus: Int?
+    var commandRecords = CommandRecordStore()
     /// OSC 52 writes only. The read form would hand the clipboard to the
     /// child and stays unimplemented (`SECURITY.md` §6).
-    public internal(set) var pendingClipboardCopy: String?
+    var pendingClipboardCopy: String?
     var pendingImageTransmission: PendingImageTransmission?
     /// Image bytes this terminal may retain across both screens, from the
     /// session's `ImageMemoryBudget`; unlimited (the pane cap alone) without one.
     var imageByteAllowance = Int.max
 
-    public init() {}
+    init() {}
 }
 
 /// A Kitty graphics transmission across chunks, kept as base64 text: a

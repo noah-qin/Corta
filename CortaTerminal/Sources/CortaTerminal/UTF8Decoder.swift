@@ -20,9 +20,9 @@
 /// values past U+10FFFF are rejected, and a byte that cannot continue a
 /// sequence restarts one — so a truncated sequence cannot swallow an `ESC`.
 /// No `String` (`PERFORMANCE.md` §3).
-public struct UTF8Decoder: Sendable {
+struct UTF8Decoder: Sendable {
     /// Two scalars when the byte that ends a malformed sequence is itself one.
-    public enum Result: Equatable, Sendable {
+    enum Result: Equatable, Sendable {
         case incomplete
         case scalar(UInt32)
         case invalid
@@ -30,7 +30,7 @@ public struct UTF8Decoder: Sendable {
         case invalidThenIncomplete
     }
 
-    public static let replacement: UInt32 = 0xFFFD
+    static let replacement: UInt32 = 0xFFFD
 
     private var codepoint: UInt32 = 0
     private var bytesNeeded = 0
@@ -38,11 +38,11 @@ public struct UTF8Decoder: Sendable {
     private var lowerBoundary: UInt8 = 0x80
     private var upperBoundary: UInt8 = 0xBF
 
-    public init() {}
+    init() {}
 
-    public var isPending: Bool { bytesNeeded > 0 }
+    var isPending: Bool { bytesNeeded > 0 }
 
-    public mutating func decode(_ byte: UInt8) -> Result {
+    mutating func decode(_ byte: UInt8) -> Result {
         guard bytesNeeded > 0 else { return start(byte) }
 
         guard byte >= lowerBoundary, byte <= upperBoundary else {
@@ -68,7 +68,7 @@ public struct UTF8Decoder: Sendable {
     }
 
     /// `true`: a partial sequence was dropped; print one U+FFFD.
-    public mutating func flush() -> Bool {
+    mutating func flush() -> Bool {
         guard bytesNeeded > 0 else { return false }
         reset()
         return true

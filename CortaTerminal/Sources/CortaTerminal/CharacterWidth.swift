@@ -554,7 +554,7 @@ let characterWidthRanges: [CharacterWidthRange] = [
 /// Pure and allocation-free: a binary search over `characterWidthRanges`,
 /// behind a printable-ASCII fast path — the hot corpus is ASCII, and the
 /// first two ranges already exclude C0 and DEL/C1.
-public func displayWidth(of scalar: Unicode.Scalar) -> Int {
+func displayWidth(of scalar: Unicode.Scalar) -> Int {
     let value = scalar.value
     if value >= 0x20, value < 0x7F { return 1 }
     // The generated Unicode ranges assign width 2 throughout these two

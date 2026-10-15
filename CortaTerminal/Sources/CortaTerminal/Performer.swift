@@ -21,33 +21,33 @@
 /// `$TERM` claims `xterm-256color` (`DECISIONS.md` D08), so programs send
 /// sequences Corta does not implement, and skipping them is a correctness
 /// requirement (`SECURITY.md` §3).
-public struct Performer: ParserPerformer, Sendable {
-    public var grid: Grid
+struct Performer: ParserPerformer, Sendable {
+    var grid: Grid
 
     /// State that is not the grid: queued query responses, DEC mode flags,
     /// and the OSC-set title and working directory. The handlers live in the
     /// `Performer+Report/Modes/OSC` extensions; keeping the storage in one
     /// property keeps this struct's declaration small and out of their
     /// way.
-    public var state = PerformerState()
+    var state = PerformerState()
 
     var imageAllowanceProvider: (@Sendable () -> Int)?
 
-    public init(grid: Grid) {
+    init(grid: Grid) {
         self.grid = grid
     }
 
     // MARK: - Text and C0 controls
 
-    public mutating func print(_ scalar: UInt32) {
+    mutating func print(_ scalar: UInt32) {
         grid.write(scalar)
     }
 
-    public mutating func printASCII(_ bytes: ArraySlice<UInt8>) {
+    mutating func printASCII(_ bytes: ArraySlice<UInt8>) {
         grid.writeASCII(bytes)
     }
 
-    public mutating func execute(_ control: UInt8) {
+    mutating func execute(_ control: UInt8) {
         switch control {
         case 0x08: grid.backspace()
         case 0x09: grid.tab()
@@ -65,7 +65,7 @@ public struct Performer: ParserPerformer, Sendable {
 
     // MARK: - CSI dispatch
 
-    public mutating func csiDispatch(_ sequence: CSISequence) {
+    mutating func csiDispatch(_ sequence: CSISequence) {
         // A private marker or an intermediate makes it a different sequence
         // with the same final byte — `CSI ? 25 h` is not `CSI 25 h`, and
         // `CSI > c` is not `CSI c`. The ones Corta answers route here; every

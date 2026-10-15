@@ -27,8 +27,11 @@ public struct KeyboardEnhancementFlags: OptionSet, Sendable, Equatable {
 
     public static let disambiguate = KeyboardEnhancementFlags(rawValue: 1)
     public static let reportEventTypes = KeyboardEnhancementFlags(rawValue: 2)
+    // periphery:ignore - the kitty protocol's bit, named though not yet implemented
     public static let reportAlternateKeys = KeyboardEnhancementFlags(rawValue: 4)
+    // periphery:ignore - the kitty protocol's bit, named though not yet implemented
     public static let reportAllKeysAsEscapeCodes = KeyboardEnhancementFlags(rawValue: 8)
+    // periphery:ignore - the kitty protocol's bit, named though not yet implemented
     public static let reportAssociatedText = KeyboardEnhancementFlags(rawValue: 16)
 
     public static let supported: KeyboardEnhancementFlags = [.disambiguate, .reportEventTypes]
@@ -36,33 +39,33 @@ public struct KeyboardEnhancementFlags: OptionSet, Sendable, Equatable {
 
 /// A stack, as the protocol specifies: a program that runs a child (`vim` in
 /// `tmux`) must be able to restore exactly what it found.
-public struct KeyboardProtocolStack: Sendable, Equatable {
+struct KeyboardProtocolStack: Sendable, Equatable {
     /// Pushed by the byte stream, so capped (`SECURITY.md` §3), as kitty does.
     static let maximumDepth = 32
 
     private var stack: [KeyboardEnhancementFlags] = [[]]
 
-    public init() {}
+    init() {}
 
     /// Never empty: the base entry is the legacy encoding.
-    public var current: KeyboardEnhancementFlags { stack[stack.count - 1] }
+    var current: KeyboardEnhancementFlags { stack[stack.count - 1] }
 
     public var depth: Int { stack.count }
 
     /// `CSI > flags u`. At the cap the oldest entry goes, so a program that
     /// never pops is not stuck at what it last set.
-    public mutating func push(_ flags: KeyboardEnhancementFlags) {
+    mutating func push(_ flags: KeyboardEnhancementFlags) {
         stack.append(flags.intersection(.supported))
         if stack.count > Self.maximumDepth { stack.removeFirst() }
     }
 
     /// `CSI < number u`, default 1.
-    public mutating func pop(_ count: Int) {
+    mutating func pop(_ count: Int) {
         for _ in 0..<max(1, count) where stack.count > 1 { stack.removeLast() }
     }
 
     /// `CSI = flags ; mode u` — 1 sets, 2 adds, 3 removes.
-    public mutating func set(_ flags: KeyboardEnhancementFlags, mode: Int) {
+    mutating func set(_ flags: KeyboardEnhancementFlags, mode: Int) {
         let requested = flags.intersection(.supported)
         switch mode {
         case 2: stack[stack.count - 1].formUnion(requested)
