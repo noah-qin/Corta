@@ -185,6 +185,13 @@ days. It does not push that feed or publish the archive; the publication
 job stays skipped. This exercises `SURequireSignedFeed` before a release
 can offer a build that requires it.
 
+The feed is signed whole, so its header comment cannot be edited on
+`main` between releases: one changed byte and every Corta that checks the
+feed's signature refuses it. Before signing, both the rehearsal and
+`appcast.yml` run `scripts/appcast-header.py`, which repoints any path the
+comment names that has since moved (`Corta/UpdateController.swift`, now
+under `Corta/App/`) and fails the run if the file is gone or ambiguous.
+
 ## The signing secrets
 
 `release.yml` signs with the Developer ID Application certificate and

@@ -137,6 +137,9 @@ jobs:
           )
           if [ "$exists" != true ]; then
             test -n "$SPARKLE_PRIVATE_KEY" || { echo "::error::SPARKLE_PRIVATE_KEY is empty"; exit 1; }
+            # The feed is signed whole: a path its comment names that has
+            # since moved can only be corrected here, before signing.
+            python3 -B scripts/appcast-header.py appcast.xml
             cp appcast.xml feed/appcast.xml
             printf '%s\n' "$SPARKLE_PRIVATE_KEY" | sparkle/bin/generate_appcast \
               --ed-key-file - \

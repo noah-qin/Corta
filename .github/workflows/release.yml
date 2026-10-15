@@ -403,6 +403,7 @@ jobs:
           tar -xJf "$tools/sparkle.tar.xz" -C "$tools" ./bin/generate_appcast
           cp "$ARCHIVE" "$feed/"
           cp appcast.xml "$feed/appcast.xml"
+          python3 -B scripts/appcast-header.py "$feed/appcast.xml"
           printf '%s\n' "$SPARKLE_PRIVATE_KEY" | "$tools/bin/generate_appcast" \
             --ed-key-file - \
             --download-url-prefix "https://github.com/noah-qin/Corta/releases/download/$TAG/" \
