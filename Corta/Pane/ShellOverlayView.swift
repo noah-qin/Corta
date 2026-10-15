@@ -70,13 +70,15 @@ final class ShellOverlayView: NSView {
         statuses.first { $0.rect.insetBy(dx: -3, dy: 0).contains(point) }?.description ?? ""
     }
 
+    /// - Parameter colors: the frame's canvas colours, read once for every
+    ///   overlay that frame draws.
     func showCompletion(_ state: DirectoryCompletion?, anchor: CGRect,
-        font: NSFont = .monospacedSystemFont(ofSize: 14, weight: .regular), baseline: CGFloat = 12) {
-        // Once per frame, not a lock per colour.
+        font: NSFont = .monospacedSystemFont(ofSize: 14, weight: .regular), baseline: CGFloat = 12,
+        colors: CanvasTextColors = .current) {
         let presentation = CompletionPresentation(
             state: state, anchor: anchor, bounds: bounds,
             font: font, baseline: baseline, composing: isInputComposing,
-            colors: .current)
+            colors: colors)
         guard lastCompletionPresentation != presentation else { return }
         lastCompletionPresentation = presentation
         guard !isInputComposing, let state, let suffix = state.previewSuffix, !suffix.isEmpty else {

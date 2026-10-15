@@ -25,7 +25,9 @@ import Testing
 struct CanvasOverlayColourTests {
     /// A custom theme whose *light* variant is dark, under macOS Light: the
     /// case where the system label colour drew near-black on near-black.
-    private func applyDarkLightVariant() throws -> Theme.Variant {
+    /// Built from the theme directly, never applied to the process-wide
+    /// palette, which renderers in other suites read.
+    private func darkLightVariant() throws -> CanvasTextColors {
         let (configuration, unknown) = Configuration.parse(
             """
             theme = night
@@ -33,20 +35,20 @@ struct CanvasOverlayColourTests {
             theme.night.light.foreground = #e8e8e8
             """)
         #expect(unknown.isEmpty)
-        let theme = try #require(Theme.named("night", in: configuration))
-        let saved = TerminalColorPalette.activeVariant
-        TerminalColorPalette.apply(theme.variant(dark: false))
-        return saved
+        let variant = try #require(Theme.named("night", in: configuration)).variant(dark: false)
+        return CanvasTextColors(
+            foreground: variant.foreground, background: variant.background, increaseContrast: false)
     }
 
-    private func badge(placedOnCanvas: Bool) -> InputSourceIndicatorView {
+    private func badge(_ kind: InputSourceState.Kind, canvas: CanvasTextColors?) -> InputSourceIndicatorView {
         let view = InputSourceIndicatorView(frame: CGRect(x: 0, y: 0, width: 28, height: 16))
-        view.appearance = NSAppearance(named: .aqua)
+        let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: .aqua)
+        window.contentView?.addSubview(view)
         let source = InputSourceState(
-            identifier: "com.apple.keylayout.ABC", name: "ABC", badge: "A", kind: .direct)
-        view.update(
-            source: source, configuration: Configuration(),
-            canvas: placedOnCanvas ? .current : nil)
+            identifier: kind == .direct ? "com.apple.keylayout.ABC" : "com.apple.inputmethod.SCIM.ITABC",
+            name: kind == .direct ? "ABC" : "Pinyin", badge: kind == .direct ? "A" : "中", kind: kind)
+        view.update(source: source, configuration: Configuration(), canvas: canvas)
         return view
     }
 
@@ -60,18 +62,23 @@ struct CanvasOverlayColourTests {
     }
 
     @Test func aBadgeBesideThePromptTakesTheThemesForeground() throws {
-        let saved = try applyDarkLightVariant()
-        defer { TerminalColorPalette.apply(saved) }
-        let text = try textColour(badge(placedOnCanvas: true))
+        let text = try textColour(badge(.direct, canvas: darkLightVariant()))
         // #e8e8e8, faded: light on the #101010 canvas, not the system's dark grey.
         #expect(text.redComponent > 0.85 && text.greenComponent > 0.85 && text.blueComponent > 0.85)
         #expect(text.alphaComponent >= 0.6)
     }
 
+    @Test func anIMEBadgeOnADarkCanvasKeepsAnIndigoThatReads() throws {
+        let view = badge(.ime, canvas: try darkLightVariant())
+        #expect(view.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
+        // Indigo still, the cue that a mode is on, in the dark variant the
+        // canvas's appearance resolves.
+        let text = try textColour(view)
+        #expect(text.blueComponent > text.greenComponent)
+    }
+
     @Test func aBadgeInTheToolbarKeepsTheSystemColour() throws {
-        let saved = try applyDarkLightVariant()
-        defer { TerminalColorPalette.apply(saved) }
-        let text = try textColour(badge(placedOnCanvas: false))
+        let text = try textColour(badge(.direct, canvas: nil))
         // Window chrome follows macOS: Light's secondary label is dark.
         #expect(text.redComponent < 0.5 && text.greenComponent < 0.5 && text.blueComponent < 0.5)
     }

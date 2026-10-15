@@ -46,6 +46,18 @@ nonisolated struct CanvasTextColors: Equatable {
     /// The canvas itself, opaque: what an overlay covering output fills with.
     var backdrop: CGColor { Self.srgb(background, alpha: 1) }
 
+    /// Whether the canvas is dark, by its relative luminance — not whether
+    /// macOS is.
+    var isDark: Bool {
+        func linear(_ c: Float) -> Float { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(background.x) + 0.7152 * linear(background.y) + 0.0722 * linear(background.z) <= 0.179
+    }
+
+    /// The appearance a system colour drawn on the canvas resolves against:
+    /// dark on a dark canvas whatever macOS is, so `systemIndigo` and the
+    /// label colours take the variant that reads there.
+    var appearance: NSAppearance? { NSAppearance(named: isDark ? .darkAqua : .aqua) }
+
     private static func srgb(_ color: SIMD4<Float>, alpha: CGFloat) -> CGColor {
         CGColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y), blue: CGFloat(color.z), alpha: alpha)
     }

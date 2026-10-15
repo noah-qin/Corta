@@ -63,7 +63,7 @@ import Testing
         func update(_ mode: Configuration.InputSourceIndicatorMode = .auto) {
             var config = Configuration(); config.inputSourceIndicator = mode
             indicator.update(grid: terminal.grid, hasIntegration: true, promptRow: 0, focused: true,
-                scrollOffset: 0, configuration: config, cellSize: CGSize(width: 8, height: 16),
+                scrollOffset: 0, configuration: config, canvas: .current, cellSize: CGSize(width: 8, height: 16),
                 topInset: 0, compositionRect: nil)
         }
         update(); #expect(indicator.view.isHidden)
@@ -182,7 +182,7 @@ import Testing
             config.inputSourceIndicator = mode
             config.inputSourceIndicatorPosition = position
             indicator.update(grid: terminal.grid, hasIntegration: integration, promptRow: prompt,
-                focused: focus, scrollOffset: scroll, configuration: config,
+                focused: focus, scrollOffset: scroll, configuration: config, canvas: .current,
                 cellSize: CGSize(width: 8, height: 16), topInset: 0, compositionRect: nil)
         }
         // On the grid, the badge steps aside for a running command, history

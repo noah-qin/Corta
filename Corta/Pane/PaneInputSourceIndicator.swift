@@ -76,7 +76,7 @@ import CortaTerminal
     }
 
     func update(grid: Grid, hasIntegration: Bool, promptRow: Int?, focused: Bool,
-        scrollOffset: Int, configuration: Configuration, cellSize: CGSize,
+        scrollOffset: Int, configuration: Configuration, canvas: CanvasTextColors, cellSize: CGSize,
         topInset: CGFloat, compositionRect: CGRect?, blockedRects: [CGRect] = []) {
         guard let source, focused,
             configuration.inputSourceIndicator != .off,
@@ -117,7 +117,7 @@ import CortaTerminal
         guard !blockedRects.contains(where: { $0.intersects(rect) }) else {
             if !view.isHidden { view.isHidden = true }
             return }
-        view.update(source: source, configuration: configuration, canvas: .current)
+        view.update(source: source, configuration: configuration, canvas: canvas)
         if view.frame != rect { view.frame = rect }
         if view.isHidden { view.isHidden = false }
     }
@@ -220,25 +220,32 @@ nonisolated struct InputSourceIndicatorPlacement {
     }
     private func applyColors() {
         guard let source else { return }
+        // On the canvas, system colours resolve against the canvas's darkness;
+        // in the toolbar the badge inherits the window's (#348).
+        let wanted = canvas?.appearance
+        if appearance?.name != wanted?.name { appearance = wanted }
+        effectiveAppearance.performAsCurrentDrawingAppearance { applyColors(source) }
+    }
+    private func applyColors(_ source: InputSourceState) {
         let custom = source.kind == .direct ? configuration.inputSourceDirectColor : configuration.inputSourceIMEColor
         // Default presentation stays quiet. Explicit custom backgrounds retain
         // their original contrast-aware behavior.
         if custom.isEmpty || source.kind == .unknown {
             let tinted = source.kind == .ime || source.kind == .nonLatinLayout
-            if let canvas {
-                // On the canvas: the theme's text over a faint fill, so a
-                // theme darker or lighter than macOS still reads (#348).
-                label.textColor = NSColor(cgColor: canvas.text(alpha: tinted ? 0.85 : 0.65, contrastAlpha: 1))
-                layer?.backgroundColor = tinted
-                    ? NSColor.systemIndigo.withAlphaComponent(0.12).cgColor
-                    : canvas.text(alpha: 0.08, contrastAlpha: 0.12)
+            if let canvas, !tinted {
+                // Direct input on the canvas: the theme's own text, faded, so
+                // a theme darker or lighter than macOS still reads (#348).
+                label.textColor = NSColor(cgColor: canvas.text(alpha: 0.65, contrastAlpha: 1))
+                layer?.backgroundColor = canvas.text(alpha: 0.08, contrastAlpha: 0.12)
             } else {
-                label.textColor = source.kind == .direct ? .secondaryLabelColor
-                    : tinted ? .systemIndigo : .secondaryLabelColor
+                // The indigo of an IME mode stays its cue; resolved against the
+                // canvas's appearance above, it is the variant that reads there.
+                label.textColor = tinted ? .systemIndigo : .secondaryLabelColor
                 layer?.backgroundColor = (tinted ? NSColor.systemIndigo : .secondaryLabelColor)
-                    .withAlphaComponent(0.08).cgColor
+                    .withAlphaComponent(tinted && canvas != nil ? 0.16 : 0.08).cgColor
             }
-            layer?.borderWidth = SystemAccessibility.increaseContrast ? 1 : 0
+            let increaseContrast = canvas?.increaseContrast ?? SystemAccessibility.increaseContrast
+            layer?.borderWidth = increaseContrast ? 1 : 0
             layer?.borderColor = label.textColor?.withAlphaComponent(0.4).cgColor
             return
         }
@@ -252,7 +259,7 @@ nonisolated struct InputSourceIndicatorPlacement {
         let luminance = 0.2126 * linear(rgb.redComponent) + 0.7152 * linear(rgb.greenComponent) + 0.0722 * linear(rgb.blueComponent)
         label.textColor = luminance > 0.179 ? .black : .white
         layer?.backgroundColor = background.cgColor
-        layer?.borderWidth = SystemAccessibility.increaseContrast ? 1 : 0.5
+        layer?.borderWidth = (canvas?.increaseContrast ?? SystemAccessibility.increaseContrast) ? 1 : 0.5
         layer?.borderColor = label.textColor?.withAlphaComponent(0.35).cgColor
     }
 }

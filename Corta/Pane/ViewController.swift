@@ -656,7 +656,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         terminalView.refreshInputCompositionGeometry()
         let configuration = ConfigurationStore.shared.configuration
         splitController?.placeInputSourceIndicator(from: self, configuration: configuration)
-        shell.updateShellOverlay(grid: grid)
+        // Once per frame, for every overlay on the canvas.
+        let canvas = CanvasTextColors.current
+        shell.updateShellOverlay(grid: grid, canvas: canvas)
         pointer.dropSelectionIfRewritten(in: grid)
         if let inputMetadata, !terminalView.directPresentation.contains(.overlays) {
             let metrics = terminalRenderer.pointMetrics
@@ -664,7 +666,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 grid: grid, hasIntegration: inputMetadata.hasIntegration,
                 promptRow: inputMetadata.promptRow,
                 focused: focus.hasUserFocus && view.window?.firstResponder === terminalView,
-                scrollOffset: scrollOffset, configuration: configuration,
+                scrollOffset: scrollOffset, configuration: configuration, canvas: canvas,
                 cellSize: CGSize(width: metrics.cellWidth, height: metrics.cellHeight),
                 topInset: topInset, compositionRect: terminalView.inputCompositionRect,
                 blockedRects: terminalView.shellOverlay.occupiedRects + (search.bar.map { [$0.frame] } ?? []))

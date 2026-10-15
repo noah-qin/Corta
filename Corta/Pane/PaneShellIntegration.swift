@@ -404,7 +404,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
 
     // MARK: - Status marks and directory completion
 
-    func updateShellOverlay(grid: Grid) {
+    func updateShellOverlay(grid: Grid, canvas: CanvasTextColors) {
         guard let terminalView, let terminalRenderer else { return }
         let overlay = terminalView.shellOverlay
         if overlay.frame != terminalView.bounds { overlay.frame = terminalView.bounds }
@@ -443,7 +443,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
             font: TerminalFont.primary(
                 ofSize: host?.fontSize ?? ViewController.defaultFontSize, family: host?.fontFamily)
                 as NSFont,
-            baseline: metrics.baselineOffset)
+            baseline: metrics.baselineOffset, colors: canvas)
     }
 
     func handleDirectoryCompletionKey(_ event: NSEvent) -> Bool {
