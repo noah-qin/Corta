@@ -118,10 +118,10 @@ extension PaneCommands {
 
     /// The selection's text, or nil when there is none or it is empty.
     func selectedText() -> String? {
-        guard let host, let selection = host.selection, let session = host.session else {
-            return nil
-        }
+        guard let host, host.selection != nil, let session = host.session else { return nil }
         let grid = session.snapshot()
+        host.pointer.dropSelectionIfRewritten(in: grid)
+        guard let selection = host.selection else { return nil }
         let text = Selection.text(of: host.pointer.selectionRange(for: selection, in: grid), in: grid)
         return text.isEmpty ? nil : text
     }

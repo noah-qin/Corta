@@ -119,6 +119,7 @@ final class PanePointer: NSObject {
         view.accessibilitySnapshotProvider = { [weak self] in
             guard let self, let session else { return nil }
             let grid = session.snapshot()
+            dropSelectionIfRewritten(in: grid)
             return TerminalAccessibilitySnapshot(
                 grid: grid,
                 selection: selection.map { selectionRange(for: $0, in: grid) },

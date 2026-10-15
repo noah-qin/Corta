@@ -99,8 +99,8 @@ struct SelectionLiveOutputTests {
         return condition()
     }
 
-    @Test(arguments: ["selected", "rewritten"])
-    func aLiveRedrawValidatesTheSelection(text: String) async throws {
+    @Test(arguments: ["selected", "rewritten"], ["frame", "services", "accessibility"])
+    func aLiveRedrawValidatesTheSelection(text: String, reader: String) async throws {
         var preset = Preset(name: "selection-redraw")
         preset.shell = "/bin/sh"
         preset.arguments = ["-c", """
@@ -132,15 +132,21 @@ struct SelectionLiveOutputTests {
         #expect(Selection.text(of: range, in: session.snapshot()) == "selected")
         pane.pointer.setSelection(range, in: session.snapshot())
         let before = batches
+        if reader != "frame" { pane.frameLoop.suspendRendering() }
         session.write(Array("\(text)\n".utf8))
         let redrawn = await waitUntilTrue(timeout: .seconds(5)) {
             _ = pane.frameLoop.prepareFrame()
-            return batches > before
-                && session.snapshot().logicalLines().contains { $0.text.contains("DONE") }
-                && (text == "selected" || pane.selection == nil)
+            let received = session.snapshot().logicalLines().contains { $0.text.contains("DONE") }
+            return received && (reader != "frame" || (batches > before && (text == "selected" || pane.selection == nil)))
         }
         try #require(redrawn)
         #expect(Selection.text(of: range, in: session.snapshot()) == String(text.prefix(8)))
+        if reader == "services" {
+            #expect(pane.commands.selectedText() == (text == "selected" ? "selected" : nil))
+        } else if reader == "accessibility" {
+            let snapshot = try #require(pane.terminalView.accessibilitySnapshotProvider?())
+            #expect(snapshot.selectedRange.length == (text == "selected" ? 8 : 0))
+        }
         #expect((pane.selection != nil) == (text == "selected"))
     }
 }
