@@ -87,10 +87,15 @@ nonisolated enum TerminalFont {
     }
 
     /// Re-applies the pinned cascade; idempotent.
+    ///
+    /// A copy of the font in hand, not a font resolved again from its
+    /// descriptor: that lookup goes through the font daemon, and when it
+    /// came back empty (the font database logging `MDB_MAP_FULL`) Core Text
+    /// answered with LastResort — a face with no ASCII glyphs, for the
+    /// session's whole life. The copy keeps the face and its matrix.
     static func pinningCascadeList(_ font: CTFont, size: CGFloat) -> CTFont {
-        let attributes = [kCTFontCascadeListAttribute: cascadeList] as CFDictionary
-        let descriptor = CTFontDescriptorCreateCopyWithAttributes(
-            CTFontCopyFontDescriptor(font), attributes)
-        return CTFontCreateWithFontDescriptor(descriptor, size, nil)
+        let attributes = CTFontDescriptorCreateWithAttributes(
+            [kCTFontCascadeListAttribute: cascadeList] as CFDictionary)
+        return CTFontCreateCopyWithAttributes(font, size, nil, attributes)
     }
 }

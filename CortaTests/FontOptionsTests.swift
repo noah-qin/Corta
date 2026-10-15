@@ -79,6 +79,23 @@ import Testing
         return runs.reduce(0) { $0 + CTRunGetGlyphCount($1) }
     }
 
+    /// Pinning the cascade keeps the face it was given — size, shear and
+    /// all — and adds only the fallbacks.
+    @Test func pinningTheCascadeKeepsTheFace() {
+        let base = NSFont.monospacedSystemFont(ofSize: 24, weight: .medium) as CTFont
+        var shear = CGAffineTransform(a: 1, b: 0, c: 0.21, d: 1, tx: 0, ty: 0)
+        let oblique = CTFontCreateCopyWithAttributes(base, 0, &shear, nil)
+        let pinned = TerminalFont.pinningCascadeList(oblique, size: 18)
+        #expect(CTFontCopyPostScriptName(pinned) == CTFontCopyPostScriptName(base))
+        #expect(CTFontGetSize(pinned) == 18)
+        #expect(CTFontGetMatrix(pinned) == shear)
+        let cascade = CTFontCopyAttribute(pinned, kCTFontCascadeListAttribute) as? [CTFontDescriptor]
+        #expect(cascade?.count == 2)
+        var equals: UniChar = 0x3D
+        var glyph = CGGlyph(0)
+        #expect(CTFontGetGlyphsForCharacters(pinned, &equals, &glyph, 1))
+    }
+
     // MARK: - Ligatures
 
     /// One glyph per cell, and — the reason it can be nothing else — the
