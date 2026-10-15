@@ -22,6 +22,15 @@ import PackageDescription
 // the AppKit shell and wrong for the parser, grid and PTY reader — they
 // run off the main thread (`DECISIONS.md` D04). Disabling default
 // isolation here is the entire reason this package exists.
+//
+// `MemberImportVisibility`, as in the app's targets: a file sees members
+// only of the modules it imports itself, so an import a file relies on is
+// one it states.
+let swiftSettings: [SwiftSetting] = [
+    .defaultIsolation(nil),
+    .enableUpcomingFeature("MemberImportVisibility"),
+]
+
 let package = Package(
     name: "CortaTerminal",
     platforms: [.macOS("26.0")],
@@ -44,12 +53,12 @@ let package = Package(
         // `package` access, so neither library re-exports it.
         .target(
             name: "CortaPOSIX",
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         .target(
             name: "CortaTerminal",
             dependencies: ["CortaPOSIX"],
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         // The SFTP client, spoken to `ssh -s … sftp` over pipes. A sibling of
         // the core, not part of it: the terminal never needs it, the app
@@ -59,7 +68,7 @@ let package = Package(
         .target(
             name: "CortaSFTP",
             dependencies: ["CortaPOSIX"],
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         // The spawn helper `Spawn.swift` posix_spawns and then execve's over
         // — see that file's doc comment for why this replaced `fork()`.
@@ -67,7 +76,7 @@ let package = Package(
         // must become its own Mach-O image so `posix_spawn` can launch it.
         .executableTarget(
             name: "corta-exec",
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         // The PNG decoder the app spawns for Kitty images: ImageIO in a
         // process of its own under the `pure-computation` sandbox, so a
@@ -75,21 +84,21 @@ let package = Package(
         // `corta-exec`; see its doc comment.
         .executableTarget(
             name: "corta-image-decoder",
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         // Feeds stdin to a terminal and prints the grid, so the core can be
         // checked by hand against a real program's output without a window.
         .executableTarget(
             name: "corta-dump",
             dependencies: ["CortaTerminal"],
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         // Baseline measurements: parse throughput and scrollback memory,
         // measured, not estimated. Run with `-c release` for real numbers.
         .executableTarget(
             name: "corta-bench",
             dependencies: ["CortaTerminal", "CortaPOSIX"],
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         // Fuzz harness over the terminal feed path, the OSC and Kitty
         // payload handlers and the SFTP frame decoder (`--target`). Built
@@ -101,7 +110,7 @@ let package = Package(
         .executableTarget(
             name: "corta-fuzz",
             dependencies: ["CortaTerminal", "CortaSFTP"],
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         // The license-header rules (`docs/LICENSING.md`) and the tool that
         // checks and adds them. A library of its own so the rules are
@@ -109,34 +118,34 @@ let package = Package(
         // depends on it.
         .target(
             name: "LicenseHeaders",
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         .executableTarget(
             name: "corta-license",
             dependencies: ["LicenseHeaders"],
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "LicenseHeadersTests",
             dependencies: ["LicenseHeaders"],
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         // The release rules (`docs/RELEASING.md`) and the one tool that
         // enforces them. The judgements over text are a library so they are
         // testable without a built app; the tool gathers the facts.
         .target(
             name: "ReleaseCheck",
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         .executableTarget(
             name: "corta-release-check",
             dependencies: ["ReleaseCheck"],
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "ReleaseCheckTests",
             dependencies: ["ReleaseCheck"],
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "CortaTerminalTests",
@@ -145,12 +154,12 @@ let package = Package(
             // directory through `#filePath`, so they are neither compiled
             // nor copied into a bundle.
             exclude: ["Golden"],
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "CortaSFTPTests",
             dependencies: ["CortaSFTP", "CortaPOSIX"],
-            swiftSettings: [.defaultIsolation(nil)]
+            swiftSettings: swiftSettings
         ),
     ]
 )
