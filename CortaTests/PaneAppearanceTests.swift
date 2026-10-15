@@ -25,8 +25,11 @@ import Testing
 /// layers when it last drew them.
 @MainActor
 struct PaneAppearanceTests {
-    private final class Host: PaneAppearanceHost {
+    /// Main-actor like the pane it stands in for: its `NSView` is made there,
+    /// and Xcode 26 rejects a default initializer that mixes isolations.
+    @MainActor private final class Host: PaneAppearanceHost {
         let view = NSView()
+        init() {}
         var session: TerminalSession!
         var terminalView: TerminalView!
         var terminalRenderer: TerminalRenderer!
