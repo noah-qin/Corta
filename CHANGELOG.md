@@ -28,6 +28,10 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- A pane no longer risks drawing its whole session in a fallback font
+  with no letters when macOS's font service hiccups as the pane opens: the
+  terminal font's fallback list is applied to the font already loaded
+  instead of looking the font up again.
 - A split's focus ring, and the settings rows' status icons, follow
   Increase Contrast when it is switched while Corta runs, instead of
   keeping the width and colour they had until the focus next moved.
