@@ -436,7 +436,7 @@ struct RemoteEditCoordinatorTests {
         #expect(try await fixture.coordinator.open(
             host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil))
         try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
         fixture.fake.onTransfer = { call, _ in
             if call.isUpload { throw SFTPError.transport(.connectionLost) }
@@ -476,7 +476,7 @@ struct RemoteEditCoordinatorTests {
         #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
         let copy = try #require(store.copy(host: "build-box", remotePath: path))
         try "edited".write(to: store.localURL(for: copy), atomically: true, encoding: .utf8)
-        coordinator.noteLocalWrite(copyID: copy.id)
+        await coordinator.noteLocalWrite(copyID: copy.id)
         let pending = try #require(coordinator.pendingUploads.first)
         coordinator.upload(pending)
         await waitUntil("first upload failed") { !errors.isEmpty }
@@ -644,20 +644,20 @@ struct RemoteEditCoordinatorTests {
 
         // Same content: a touch, not an edit.
         try "remote v1".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         #expect(fixture.coordinator.pendingUploads.isEmpty)
         #expect(fixture.recorder.uploads.isEmpty)
 
         // A real edit prompts, once.
         try "remote v1, edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         #expect(fixture.coordinator.pendingUploads.count == 1)
         #expect(fixture.recorder.uploads.count == 1)
         #expect(fixture.recorder.uploads.first?.remoteDisplay == "build-box:/srv/app/main.rs")
 
         // A second edit while the first awaits a decision does not stack prompts.
         try "remote v1, edited more".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         #expect(fixture.coordinator.pendingUploads.count == 1)
     }
 
@@ -682,7 +682,7 @@ struct RemoteEditCoordinatorTests {
         _ = try await fixture.coordinator.open(
             host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
 
         // The upload succeeds; afterwards the server's stamp has moved.
@@ -712,7 +712,7 @@ struct RemoteEditCoordinatorTests {
         _ = try await fixture.coordinator.open(
             host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
 
         // The remote moved since the download.
@@ -748,8 +748,29 @@ struct RemoteEditCoordinatorTests {
             (try? String(contentsOf: fixture.localCopyURL, encoding: .utf8)) == "remote v2")
         // The local edits are gone, and the new content is the baseline:
         // checking the watch path now prompts nothing.
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         #expect(fixture.coordinator.pendingUploads.isEmpty)
+    }
+
+    @Test("a conflict answered inside its presenter can start the approved upload")
+    func conflictCanBeAnsweredImmediately() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(
+            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        try "approved edit".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        let pending = try #require(fixture.coordinator.pendingUploads.first)
+        fixture.fake.lstatResults["/srv/app/main.rs"] = SFTPAttributes(size: 999, modificationTime: 5000)
+        fixture.coordinator.presenter.promptConflict = { [weak coordinator = fixture.coordinator] conflict in
+            coordinator?.resolveConflict(conflict.id, choice: .uploadAnyway)
+        }
+        fixture.coordinator.upload(pending)
+        await waitUntil("upload settled") {
+            fixture.coordinator.pendingUploads.isEmpty && fixture.coordinator.uploadsInFlight.isEmpty
+        }
+        #expect(fixture.fake.transferCalls.contains { $0.isUpload })
+        #expect(fixture.coordinator.pendingConflicts.isEmpty)
     }
 
     @Test("upload anyway overwrites; save-elsewhere and dismiss send nothing")
@@ -763,7 +784,7 @@ struct RemoteEditCoordinatorTests {
             // Fresh content each stage: the digest baseline moves with
             // every resolution, and an unchanged write prompts nothing.
             try content.write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-            fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+            await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
             let pending = try #require(fixture.coordinator.pendingUploads.first)
             fixture.fake.lstatResults["/srv/app/main.rs"] =
                 SFTPAttributes(size: 999, modificationTime: 5000)
@@ -797,6 +818,7 @@ struct RemoteEditCoordinatorTests {
         let errorsBefore = fixture.recorder.errors.count
         let unwritable = fixture.root.appendingPathComponent("missing/dir/saved.rs")
         fixture.coordinator.resolveConflict(conflict.id, choice: .saveCopyElsewhere(unwritable))
+        await waitUntil("save failure reported") { fixture.recorder.errors.count == errorsBefore + 1 }
         #expect(fixture.recorder.errors.count == errorsBefore + 1)
         #expect(fixture.recorder.conflicts.count == prompted + 1)
         #expect(fixture.coordinator.pendingConflicts.count == 1)
@@ -804,6 +826,7 @@ struct RemoteEditCoordinatorTests {
         let elsewhere = fixture.root.appendingPathComponent("saved.rs")
         try "old".write(to: elsewhere, atomically: true, encoding: .utf8)
         fixture.coordinator.resolveConflict(conflict.id, choice: .saveCopyElsewhere(elsewhere))
+        await waitUntil("saved elsewhere") { fixture.coordinator.pendingConflicts.isEmpty }
         #expect((try? String(contentsOf: elsewhere, encoding: .utf8)) == "edit two")
         #expect(fixture.coordinator.pendingConflicts.isEmpty)
         let uploadsBefore = fixture.fake.transferCalls.filter { $0.isUpload }.count
@@ -826,7 +849,7 @@ struct RemoteEditCoordinatorTests {
         _ = try await fixture.coordinator.open(
             host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
 
         fixture.fake.lstatResults.removeValue(forKey: "/srv/app/main.rs")
@@ -846,7 +869,7 @@ struct RemoteEditCoordinatorTests {
         _ = try await fixture.coordinator.open(
             host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
 
         fixture.fake.onTransfer = { call, _ in
@@ -872,7 +895,7 @@ struct RemoteEditCoordinatorTests {
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
         fixture.fake.onTransfer = { call, _ in
             if !call.isUpload { try "remote v2".write(toFile: call.localPath, atomically: true, encoding: .utf8) }
@@ -895,7 +918,7 @@ struct RemoteEditCoordinatorTests {
         fixture.store.updateRemoteStamp(copy, size: copy.remoteSize, mtime: copy.remoteMTime, digest: nil)
         #expect(fixture.store.copies[fixture.copyID]?.remoteDigest == nil)
         try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
         fixture.coordinator.upload(pending)
         await waitUntil("conflict") { !fixture.coordinator.pendingConflicts.isEmpty }
@@ -952,12 +975,14 @@ struct RemoteEditCoordinatorTests {
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         try "first edit".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
         try "second edit".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
         fixture.coordinator.upload(pending)
         #expect(!fixture.fake.transferCalls.contains { $0.isUpload })
-        #expect(fixture.coordinator.pendingUploads.first?.contentDigest == RemoteEditStore.sha256Hex(Data("second edit".utf8)))
+        await waitUntil("fresh approval offered") {
+            fixture.coordinator.pendingUploads.first?.contentDigest == RemoteEditStore.sha256Hex(Data("second edit".utf8))
+        }
     }
 
     @Test("an edit during preflight cannot replace the approved upload bytes")
@@ -966,7 +991,7 @@ struct RemoteEditCoordinatorTests {
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         try "approved".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
         var uploaded: String?
         fixture.fake.onTransfer = { call, _ in
@@ -978,7 +1003,9 @@ struct RemoteEditCoordinatorTests {
             }
         }
         fixture.coordinator.upload(pending)
-        await waitUntil("frozen upload") { uploaded != nil && fixture.coordinator.pendingUploads.first?.contentDigest != pending.contentDigest }
+        await waitUntil("frozen upload and subsequent edit checked") {
+            uploaded != nil && fixture.coordinator.pendingUploads.first?.contentDigest == RemoteEditStore.sha256Hex(Data("later edit".utf8))
+        }
         #expect(uploaded == "approved")
         #expect(fixture.coordinator.pendingUploads.first?.contentDigest == RemoteEditStore.sha256Hex(Data("later edit".utf8)))
     }
@@ -992,7 +1019,7 @@ struct RemoteEditCoordinatorTests {
         _ = try await fixture.coordinator.open(
             host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.recorder.uploads.first)
         let content = "remote v1"
         fixture.fake.onTransfer = { call, _ in
@@ -1048,7 +1075,7 @@ struct RemoteEditCoordinatorTests {
         _ = try await fixture.coordinator.open(
             host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         try "edited, then dismissed".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         fixture.coordinator.dismissUpload(try #require(fixture.recorder.uploads.first))
 
         let recorder = Recorder()

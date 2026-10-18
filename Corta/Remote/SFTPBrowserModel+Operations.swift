@@ -26,6 +26,7 @@ extension SFTPBrowserModel {
         guard connectionState == .connected else { return }
         textPrompt = TextPrompt(
             action: .newDirectory,
+            directory: currentPath, connection: connectionGeneration,
             title: L10n.text("sftp.newDirectory.title"),
             message: L10n.format("sftp.newDirectory.message", currentPath),
             initialText: "")
@@ -35,6 +36,7 @@ extension SFTPBrowserModel {
         guard connectionState == .connected else { return }
         textPrompt = TextPrompt(
             action: .rename(entry),
+            directory: currentPath, connection: connectionGeneration,
             title: L10n.text("sftp.rename.title"),
             message: L10n.format("sftp.rename.message", entry.name),
             initialText: entry.name)
@@ -50,8 +52,9 @@ extension SFTPBrowserModel {
             listingError = L10n.text("sftp.name.invalid")
             return
         }
-        guard let client, let host else { return }
-        let directory = currentPath
+        guard let client, let host, prompt.connection == connectionGeneration else { return }
+        // Navigation may finish behind the sheet; act on the directory it named.
+        let directory = prompt.directory
         Task {
             do {
                 switch prompt.action {
@@ -62,8 +65,10 @@ extension SFTPBrowserModel {
                         from: Self.joinPath(directory, entry.name),
                         to: Self.joinPath(directory, name))
                 }
+                guard prompt.connection == connectionGeneration else { return }
                 refresh()
             } catch {
+                guard prompt.connection == connectionGeneration else { return }
                 listingError = Self.errorMessage(Self.sftpError(error), host: host)
             }
         }
@@ -133,7 +138,13 @@ extension SFTPBrowserModel {
     /// nothing.
     func requestUpload() {
         guard connectionState == .connected, let pickUploadFiles else { return }
-        Task { upload(await pickUploadFiles()) }
+        let directory = currentPath
+        let connection = connectionGeneration
+        Task {
+            let urls = await pickUploadFiles()
+            guard connection == connectionGeneration else { return }
+            upload(urls, into: directory)
+        }
     }
 
     /// Uploads local files and folders into `directory` (the current one by

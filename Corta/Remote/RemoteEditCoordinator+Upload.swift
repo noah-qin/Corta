@@ -23,33 +23,45 @@ extension RemoteEditCoordinator {
 
     /// The prompt's Upload: check the remote before anything is sent.
     func upload(_ pending: PendingUpload) {
+        guard uploadsInFlight.insert(pending.id).inserted else { return }
+        Task { await prepareUpload(pending) }
+    }
+
+    private func prepareUpload(_ pending: PendingUpload) async {
         let copy = pending.copy
-        guard !uploadsInFlight.contains(copy.id) else { return }
         let snapshot = store.approvalsURL.appendingPathComponent(UUID().uuidString)
         var retained = false
         defer { if !retained { try? FileManager.default.removeItem(at: snapshot) } }
         do {
-            try store.secureCopy(at: snapshot)
-            try FileManager.default.copyItem(at: store.localURL(for: copy), to: snapshot)
-            try store.secureCopy(at: snapshot)
-            guard let digest = RemoteEditStore.sha256Hex(ofFile: snapshot),
+            try await Self.makeSnapshot(
+                from: store.localURL(for: copy), at: snapshot, rootURL: store.rootURL)
+            guard let digest = await readDigest(at: snapshot),
                 digest == pending.contentDigest else {
                 try? FileManager.default.removeItem(at: snapshot)
                 pendingUploads.removeAll { $0.id == copy.id }
-                digests[copy.id] = nil
-                noteLocalWrite(copyID: copy.id)
+                setDigest(nil, for: copy.id)
+                uploadsInFlight.remove(copy.id)
+                await noteLocalWrite(copyID: copy.id)
                 return
             }
             removeSnapshot(copy.id)
             approvedSnapshots[copy.id] = snapshot
             retained = true
-            uploadsInFlight.insert(copy.id)
-            Task { await self.checkRemoteAndUpload(copy) }
+            await checkRemoteAndUpload(copy)
         } catch {
+            uploadsInFlight.remove(copy.id)
             presenter.showError(SFTPBrowserModel.errorMessage(
                 .localIOFailed(operation: "snapshot approved content", code: EIO), host: copy.host))
             askAgain(copy)
         }
+    }
+
+    @concurrent nonisolated private static func makeSnapshot(
+        from source: URL, at snapshot: URL, rootURL: URL
+    ) async throws {
+        try RemoteEditStore.secureCopy(at: snapshot, rootURL: rootURL)
+        try FileManager.default.copyItem(at: source, to: snapshot)
+        try RemoteEditStore.secureCopy(at: snapshot, rootURL: rootURL)
     }
 
     /// The prompt's Dismiss: not this edit. The copy stays watched, and the
@@ -62,7 +74,6 @@ extension RemoteEditCoordinator {
     }
 
     private func checkRemoteAndUpload(_ copy: RemoteEditStore.RemoteCopy) async {
-        defer { uploadsInFlight.remove(copy.id) }
         do {
             let current = try await withClient(for: copy.host) { client in
                 try await client.lstat(path: copy.remotePath)
@@ -82,16 +93,18 @@ extension RemoteEditCoordinator {
                     try await client.download(remotePath: copy.remotePath, to: probe,
                         policy: .fail, partialDisposition: .remove, progress: nil)
                 }
-                matchesContent = RemoteEditStore.sha256Hex(ofFile: probe) == baseline
+                matchesContent = await readDigest(at: probe) == baseline
             } else {
                 matchesContent = false
             }
             if matchesContent {
                 await performUpload(copy)
             } else {
+                uploadsInFlight.remove(copy.id)
                 presentConflict(copy, remote: current)
             }
         } catch {
+            uploadsInFlight.remove(copy.id)
             let error = Self.sftpError(error)
             if case .server(let status) = error, status.code == .noSuchFile {
                 presentConflict(copy, remote: nil)
@@ -150,14 +163,13 @@ extension RemoteEditCoordinator {
     func resolveConflict(_ conflictID: String, choice: ConflictChoice) {
         guard let conflict = pendingConflicts.first(where: { $0.id == conflictID }) else { return }
         let copy = conflict.copy
+        guard !uploadsInFlight.contains(copy.id) else { return }
         switch choice {
         case .uploadAnyway:
-            guard !uploadsInFlight.contains(copy.id) else { return }
             uploadsInFlight.insert(copy.id)
             pendingConflicts.removeAll { $0.id == conflictID }
             Task { [weak self] in
                 guard let self else { return }
-                defer { self.uploadsInFlight.remove(copy.id) }
                 await self.performUpload(copy)
             }
         case .redownload:
@@ -165,35 +177,55 @@ extension RemoteEditCoordinator {
             removeSnapshot(copy.id)
             Task { [weak self] in await self?.redownload(copy) }
         case .saveCopyElsewhere(let destination):
-            do {
-                // The save panel already asked about replacing an existing
-                // file — consent to replace it with the copy, not to lose it
-                // when the copy fails.
-                try Self.copyReplacing(store.localURL(for: copy), at: destination)
-            } catch {
-                // Said, and the decision asked again: dropped, it told the user
-                // nothing; kept silently, it blocked every later upload prompt.
-                let nsError = error as NSError
-                let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
-                let code =
-                    underlying?.code
-                    ?? (nsError.domain == NSPOSIXErrorDomain ? nsError.code : Int(EIO))
-                presenter.showError(SFTPBrowserModel.errorMessage(
-                    .localIOFailed(operation: "save copy", code: Int32(clamping: code)),
-                    host: copy.host))
-                presenter.promptConflict(conflict)
-                return
-            }
-            removeSnapshot(copy.id)
-            pendingConflicts.removeAll { $0.id == conflictID }
-            pendingUploads.removeAll { $0.id == conflictID }
-            store.recordApproved(copy, digest: digests[copy.id])
+            uploadsInFlight.insert(copy.id)
+            Task { await saveCopyElsewhere(copy, at: destination, conflict: conflict) }
         case .dismiss:
             removeSnapshot(copy.id)
             pendingConflicts.removeAll { $0.id == conflictID }
             pendingUploads.removeAll { $0.id == conflictID }
             store.recordApproved(copy, digest: digests[copy.id])
         }
+    }
+
+    private func saveCopyElsewhere(
+        _ copy: RemoteEditStore.RemoteCopy, at destination: URL, conflict: UploadConflict
+    ) async {
+        let digest: String?
+        do {
+            // The save panel already asked about replacing an existing
+            // file — consent to replace it with the copy, not to lose it
+            // when the copy fails.
+            digest = try await Self.copyReplacingInBackground(store.localURL(for: copy), at: destination)
+        } catch {
+            uploadsInFlight.remove(copy.id)
+            // Said, and the decision asked again: dropped, it told the user
+            // nothing; kept silently, it blocked every later upload prompt.
+            let nsError = error as NSError
+            let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
+            let code =
+                underlying?.code
+                ?? (nsError.domain == NSPOSIXErrorDomain ? nsError.code : Int(EIO))
+            presenter.showError(SFTPBrowserModel.errorMessage(
+                .localIOFailed(operation: "save copy", code: Int32(clamping: code)),
+                host: copy.host))
+            presenter.promptConflict(conflict)
+            return
+        }
+        uploadsInFlight.remove(copy.id)
+        removeSnapshot(copy.id)
+        pendingConflicts.removeAll { $0.id == copy.id }
+        pendingUploads.removeAll { $0.id == copy.id }
+        setDigest(digest, for: copy.id)
+        store.recordApproved(copy, digest: digest)
+        // A save in the editor while the copy ran is still a new decision.
+        await noteLocalWrite(copyID: copy.id)
+    }
+
+    @concurrent nonisolated private static func copyReplacingInBackground(
+        _ source: URL, at destination: URL
+    ) async throws -> String? {
+        try copyReplacing(source, at: destination)
+        return RemoteEditStore.sha256Hex(ofFile: destination)
     }
 
     /// Copies `source` to `destination`, replacing a file already there
@@ -248,16 +280,18 @@ extension RemoteEditCoordinator {
             let stamp = try? await withClient(for: copy.host) { client in
                 try await client.lstat(path: copy.remotePath)
             }
+            let digest = await readDigest(at: url)
             store.updateRemoteStamp(
                 copy, size: stamp?.size, mtime: stamp?.modificationTime,
-                digest: RemoteEditStore.sha256Hex(ofFile: url))
-            digests[copy.id] = RemoteEditStore.sha256Hex(ofFile: url)
+                digest: digest)
+            setDigest(digest, for: copy.id)
             pendingUploads.removeAll { $0.id == copy.id }
             pendingConflicts.removeAll { $0.id == copy.id }
             removeSnapshot(copy.id)
             uploadsInFlight.remove(copy.id)
-            noteLocalWrite(copyID: copy.id)
+            await noteLocalWrite(copyID: copy.id)
         } catch {
+            uploadsInFlight.remove(copy.id)
             // The pending entry stays: the decision is still owed. The
             // wording says what is known about the remote: untouched after
             // a refusal, unknown after a lost connection, and split in two
@@ -288,10 +322,11 @@ extension RemoteEditCoordinator {
                 return attributes
             }
             try store.secureCopy(at: url)
+            let digest = await readDigest(at: url)
             store.updateRemoteStamp(
                 copy, size: attributes.size, mtime: attributes.modificationTime,
-                digest: RemoteEditStore.sha256Hex(ofFile: url))
-            digests[copy.id] = RemoteEditStore.sha256Hex(ofFile: url)
+                digest: digest)
+            setDigest(digest, for: copy.id)
             pendingUploads.removeAll { $0.id == copy.id }
             // The atomic download replaced the copy's inode; the watch's
             // descriptor points at the old one.

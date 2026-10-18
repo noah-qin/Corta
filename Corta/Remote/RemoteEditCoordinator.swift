@@ -147,6 +147,9 @@ final class RemoteEditCoordinator {
     /// upload, or the previously-prompted edit) — the baseline the next
     /// change is measured against.
     var digests: [String: String] = [:]
+    /// A newer check, re-baseline or watch teardown invalidates an older read.
+    private var digestChecks: [String: UUID] = [:]
+    private let hashFile: @Sendable (URL) -> String?
     private var pendingChecks: [String: DispatchWorkItem] = [:]
     var uploadsInFlight: Set<String> = []
     var approvedSnapshots: [String: URL] = [:]
@@ -156,10 +159,12 @@ final class RemoteEditCoordinator {
         makeClient: ((String) -> any SFTPClient)? = nil,
         opener: (@MainActor (URL, Int, Int?) -> Bool)? = nil,
         presenter: RemoteEditPresenter? = nil,
-        connectTimeout: Duration = .seconds(30)
+        connectTimeout: Duration = .seconds(30),
+        hashFile: @escaping @Sendable (URL) -> String? = RemoteEditStore.sha256Hex(ofFile:)
     ) {
         self.store = store
         self.connectTimeout = connectTimeout
+        self.hashFile = hashFile
         self.makeClient = makeClient ?? {
             SFTPConnection.forApp(key: $0, maximumDownloadBytes: RemoteEditCoordinator.maximumCopyBytes)
         }
@@ -213,6 +218,11 @@ final class RemoteEditCoordinator {
             RemoteHostConsent.confirm(host)
         }
         let copy = try await materialize(host: host, remotePath: remotePath)
+        if digests[copy.id] == nil {
+            let baseline = copy.approvedDigest ?? copy.remoteDigest
+            let digest = if let baseline { baseline } else { await readDigest(at: store.localURL(for: copy)) }
+            if digests[copy.id] == nil { setDigest(digest, for: copy.id) }
+        }
         let alreadyWatched = watches[copy.id] != nil
         watch(copy)
         guard opener(store.localURL(for: copy), line, column) else {
@@ -221,7 +231,7 @@ final class RemoteEditCoordinator {
         }
         store.recordOpen(copy)
         // A synchronous editor save may precede delivery of the file event.
-        noteLocalWrite(copyID: copy.id)
+        await noteLocalWrite(copyID: copy.id)
         return true
     }
 
@@ -269,12 +279,13 @@ final class RemoteEditCoordinator {
             try await client.download(
                 remotePath: remotePath, to: url,
                 policy: .fail, partialDisposition: .remove, progress: nil)
+            let digest = await readDigest(at: url)
             let copy = store.recordDownload(
                 host: host, remotePath: remotePath,
                 remoteSize: attributes.size, remoteMTime: attributes.modificationTime,
-                remoteDigest: RemoteEditStore.sha256Hex(ofFile: url))
+                remoteDigest: digest)
             try store.secureCopy(at: url)
-            digests[copy.id] = RemoteEditStore.sha256Hex(ofFile: url)
+            setDigest(digest, for: copy.id)
             return copy
             }
         } catch {
@@ -404,14 +415,6 @@ final class RemoteEditCoordinator {
     func watch(_ copy: RemoteEditStore.RemoteCopy) {
         unwatch(copy.id)
         let url = store.localURL(for: copy)
-        if digests[copy.id] == nil {
-            // The content last decided on, when the manifest has it: a copy
-            // edited and never uploaded — a failed upload, then a quit — is
-            // then a pending edit on the next open, where the copy's current
-            // content would have made it the baseline; a dismissed one is not.
-            digests[copy.id] =
-                copy.approvedDigest ?? copy.remoteDigest ?? RemoteEditStore.sha256Hex(ofFile: url)
-        }
         let descriptor = Darwin.open(url.path, O_EVTONLY | O_CLOEXEC)
         guard descriptor >= 0 else { return }
         let source = DispatchSource.makeFileSystemObjectSource(
@@ -427,7 +430,7 @@ final class RemoteEditCoordinator {
             self.pendingChecks[id]?.cancel()
             let work = DispatchWorkItem { [weak self] in
                 self?.repointWatch(copyID: id)
-                self?.noteLocalWrite(copyID: id)
+                Task { [weak self] in await self?.noteLocalWrite(copyID: id) }
             }
             self.pendingChecks[id] = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
@@ -445,6 +448,7 @@ final class RemoteEditCoordinator {
     }
 
     private func unwatch(_ copyID: String) {
+        digestChecks[copyID] = nil
         pendingChecks[copyID]?.cancel()
         pendingChecks[copyID] = nil
         watches[copyID]?.cancel()
@@ -455,10 +459,15 @@ final class RemoteEditCoordinator {
     /// directly: a write whose content matches the approved digest is
     /// noise; anything else is an edit awaiting a decision. Internal, not
     /// private, for exactly that reason.
-    func noteLocalWrite(copyID: String) {
+    func noteLocalWrite(copyID: String) async {
         guard let copy = store.copies[copyID] else { return }
         let url = store.localURL(for: copy)
-        guard let digest = RemoteEditStore.sha256Hex(ofFile: url) else {
+        let check = UUID()
+        digestChecks[copyID] = check
+        let result = await readDigest(at: url)
+        guard !Task.isCancelled, digestChecks[copyID] == check else { return }
+        digestChecks[copyID] = nil
+        guard let digest = result else {
             // The copy was deleted underneath us: stop watching and drop
             // any pending decision about it.
             unwatch(copyID)
@@ -477,6 +486,17 @@ final class RemoteEditCoordinator {
         let pending = PendingUpload(copy: copy, contentDigest: digest)
         pendingUploads.append(pending)
         presenter.promptUpload(pending)
+    }
+
+    /// File content I/O never inherits the UI actor, even with approachable
+    /// concurrency enabled. The synchronous reader is injected for testing.
+    @concurrent nonisolated func readDigest(at url: URL) async -> String? {
+        hashFile(url)
+    }
+
+    func setDigest(_ digest: String?, for copyID: String) {
+        digestChecks[copyID] = nil
+        digests[copyID] = digest
     }
 
 }

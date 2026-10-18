@@ -131,6 +131,8 @@ final class SFTPBrowserModel {
 
         let id = UUID()
         let action: Action
+        let directory: String
+        let connection: Int
         let title: String
         let message: String
         let initialText: String

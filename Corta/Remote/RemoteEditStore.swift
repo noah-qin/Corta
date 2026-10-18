@@ -242,6 +242,10 @@ final class RemoteEditStore {
     /// Private directories and files, including copies downloaded by older
     /// builds. Mode checks do not make promises about administrator access.
     func secureCopy(at url: URL) throws {
+        try Self.secureCopy(at: url, rootURL: rootURL)
+    }
+
+    nonisolated static func secureCopy(at url: URL, rootURL: URL) throws {
         var directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700])
@@ -260,7 +264,7 @@ final class RemoteEditStore {
 
     /// Clears any extended ACL. A volume without ACL support (ENOTSUP) has
     /// none to inherit, so that counts as cleared rather than as a failure.
-    private static func removeACL(at url: URL) -> Bool {
+    nonisolated private static func removeACL(at url: URL) -> Bool {
         guard let acl = acl_init(0) else { return false }
         defer { acl_free(UnsafeMutableRawPointer(acl)) }
         if acl_set_file(url.path, ACL_TYPE_EXTENDED, acl) == 0 { return true }
