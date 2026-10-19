@@ -25,6 +25,21 @@ enum ZshBootstrap {
         folders.removeAll()
     }
 
+    /// The wrapper folder `environment` points zsh at, if this run made it.
+    static func folder(of environment: [String: String]) -> URL? {
+        guard let path = environment["ZDOTDIR"] else { return nil }
+        return folders.first { $0.path == path }
+    }
+
+    /// One session's folder, once its shell no longer needs it: a spawn
+    /// that failed, or a session that ended. Every tab, fallback rung and
+    /// reconnect makes one, and a long-running app kept them all until quit.
+    static func remove(_ folder: URL) {
+        guard let index = folders.firstIndex(of: folder) else { return }
+        folders.remove(at: index)
+        try? FileManager.default.removeItem(at: folder)
+    }
+
     /// Folders a run that never reached `removeGeneratedFiles` — a crash, a
     /// force quit — left behind. Only day-old ones: the development and
     /// release builds share the temporary directory, and the other may be

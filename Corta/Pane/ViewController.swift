@@ -91,6 +91,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// What actually spawned — after a fallback, not what was asked for. The
     /// remote-state composition and Reconnect read it.
     private(set) var launchedCommand: (executable: String, arguments: [String])?
+    /// `PaneSpawn.Started.bootstrapFolder` of the current session.
+    private var bootstrapFolder: URL?
     var scrollOffset = 0 {
         didSet {
             guard scrollOffset != oldValue else { return }
@@ -343,11 +345,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     ) -> PaneSpawn.Started? {
         do {
             if strictRespawn, let command = remote.reconnectCommand {
-                return PaneSpawn.Started(
-                    session: try PaneSpawn.respawn(
-                        command, size: size, configuration: configuration, preset: preset,
-                        workingDirectory: inheritedWorkingDirectory),
-                    notice: nil, executable: command.executable, arguments: command.arguments)
+                return try PaneSpawn.respawn(
+                    command, size: size, configuration: configuration, preset: preset,
+                    workingDirectory: inheritedWorkingDirectory)
             }
             return try PaneSpawn.start(
                 size: size, directory: inheritedWorkingDirectory,
@@ -368,6 +368,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// Makes `started` this pane's session, coloured by the current theme.
     private func adopt(_ started: PaneSpawn.Started, size: TerminalSize) {
         session = started.session
+        removeBootstrapFolder()
+        bootstrapFolder = started.bootstrapFolder
         launchedCommand = (started.executable, started.arguments)
         windowTitle.reset(session: started.session)
         remote.reset()
@@ -556,6 +558,13 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         frameLoop.suspendRendering()
         terminalView?.stopRendering()
         session?.stop()
+        removeBootstrapFolder()
+    }
+
+    /// The zsh wrappers the current session started from, gone with it.
+    private func removeBootstrapFolder() {
+        if let bootstrapFolder { ZshBootstrap.remove(bootstrapFolder) }
+        bootstrapFolder = nil
     }
 
     override func viewDidLayout() {
@@ -942,6 +951,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         frameLoop.detach()
         session?.stop()
         session = nil
+        removeBootstrapFolder()
         terminalRenderer = nil
         failureView?.removeFromSuperview()
         failureView = nil

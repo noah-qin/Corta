@@ -27,6 +27,8 @@ enum PaneSpawn {
         /// The rung that succeeded, for `PaneRemoteState` and Reconnect.
         let executable: String
         let arguments: [String]
+        /// The zsh wrapper folder the session started from, removed with it.
+        var bootstrapFolder: URL?
     }
 
     /// Degrades rather than fails: `$SHELL` and the directory can each be stale
@@ -79,24 +81,25 @@ enum PaneSpawn {
             // Identical rungs only delay the failure view.
             guard attempted.insert("\(attempt.shell)\u{0}\(attempt.directory)").inserted
             else { continue }
+            // Only for the preset's own shell; a fallback may not understand them.
+            let attemptArguments = attempt.shell == configured ? arguments : ["-l"]
+            let attemptEnvironment = directoryCompletion
+                ? ZshBootstrap.environment(environment, executable: attempt.shell, arguments: attemptArguments)
+                : environment
+            let folder = ZshBootstrap.folder(of: attemptEnvironment)
             do {
                 let session = try TerminalSession(
-                    executable: attempt.shell,
-                    // Only for the preset's own shell; a fallback may not understand them.
-                    arguments: attempt.shell == configured ? arguments : ["-l"],
-                    environment: directoryCompletion
-                        ? ZshBootstrap.environment(environment, executable: attempt.shell,
-                            arguments: attempt.shell == configured ? arguments : ["-l"])
-                        : environment, size: size,
+                    executable: attempt.shell, arguments: attemptArguments,
+                    environment: attemptEnvironment, size: size,
                     workingDirectory: attempt.directory,
                     // Applies to new sessions: shrinking a live one would drop lines.
                     scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit,
                     imageBudget: .app)
                 return Started(
                     session: session, notice: attempt.notice,
-                    executable: attempt.shell,
-                    arguments: attempt.shell == configured ? arguments : ["-l"])
+                    executable: attempt.shell, arguments: attemptArguments, bootstrapFolder: folder)
             } catch {
+                if let folder { ZshBootstrap.remove(folder) }
                 lastError = error
             }
         }
@@ -109,19 +112,30 @@ enum PaneSpawn {
         _ command: (executable: String, arguments: [String]),
         size: TerminalSize, configuration: Configuration, preset: Preset?,
         workingDirectory: String?
-    ) throws(PTYError) -> TerminalSession {
+    ) throws(PTYError) -> Started {
         var environment = ChildEnvironment.default()
         for (key, value) in preset?.environment ?? [:] { environment[key] = value }
-        // A local cwd for the launcher; the remote side lands where it lands.
-        return try TerminalSession(
-            executable: command.executable, arguments: command.arguments,
-            environment: configuration.directoryCompletion
-                ? ZshBootstrap.environment(environment, executable: command.executable, arguments: command.arguments)
-                : environment, size: size,
-            workingDirectory: usableDirectory(preset?.directory ?? workingDirectory),
-            scrollbackLimit: configuration.scrollbackLines,
-            commandHistoryLimit: configuration.commandHistoryLimit,
-            imageBudget: .app)
+        if configuration.directoryCompletion {
+            environment = ZshBootstrap.environment(
+                environment, executable: command.executable, arguments: command.arguments)
+        }
+        let folder = ZshBootstrap.folder(of: environment)
+        do {
+            // A local cwd for the launcher; the remote side lands where it lands.
+            let session = try TerminalSession(
+                executable: command.executable, arguments: command.arguments,
+                environment: environment, size: size,
+                workingDirectory: usableDirectory(preset?.directory ?? workingDirectory),
+                scrollbackLimit: configuration.scrollbackLines,
+                commandHistoryLimit: configuration.commandHistoryLimit,
+                imageBudget: .app)
+            return Started(
+                session: session, notice: nil, executable: command.executable,
+                arguments: command.arguments, bootstrapFolder: folder)
+        } catch {
+            if let folder { ZshBootstrap.remove(folder) }
+            throw error
+        }
     }
 
     /// `directory` if it answers as one within the check's bound, else home:
