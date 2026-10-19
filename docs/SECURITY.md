@@ -462,9 +462,13 @@ storage policy and intentionally shared export destinations still matter.
 
 An upload writes a partial and renames it over the destination, so the
 partial's mode is the file's from then on. A replaced regular file keeps its
-own mode, set-id bits included; a new name takes the source's permission bits.
-While it fills, the partial grants group and others no more than the result
-and the owner read and write; the exact mode is set before the commit.
+own mode, set-id bits included, and its group where the server lets the owner
+set it; a symbolic link that the upload replaces passes on its target's mode.
+A new name asks for the source's permission bits at creation and the server's
+umask narrows them, so a 0777 file from a FAT volume does not land
+world-writable. While it fills, the partial grants group and others no more
+than the result and the owner read and write; a replaced file's exact mode is
+set by handle after the last write, never by a path that could be swapped.
 
 Upload prompts bind to a SHA-256 digest of the edit. Upload sends a private
 snapshot matching that digest, so an edit after the prompt needs another

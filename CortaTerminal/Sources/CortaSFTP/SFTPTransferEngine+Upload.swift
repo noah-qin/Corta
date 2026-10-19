@@ -105,12 +105,15 @@ extension SFTPTransferEngine {
                 abort.set()
             }
             try Self.verifySourceUnchanged(descriptor: descriptor, path: sourcePath, opened: source)
+            // By handle, after the last acknowledged write (which clears a
+            // set-id bit) and before CLOSE: a path could be swapped for a
+            // link meanwhile. Failing leaves the filling mode, which grants
+            // group and others no more than this one.
+            if let final = target.finalPermissions {
+                try? await session.fsetStat(handle: target.handle, attributes: SFTPAttributes(permissions: final))
+            }
             handleOpen = false
             try await session.close(target.handle)
-            // After the last write, which would clear a set-id bit. Failing
-            // leaves the filling mode: never more for group and others.
-            try? await session.setStat(
-                path: target.partialPath, attributes: SFTPAttributes(permissions: target.permissions))
             try await commitUpload(
                 session: session, partialPath: target.partialPath, destinationPath: remotePath,
                 mayReplace: target.resolution != .fail)
@@ -144,8 +147,26 @@ extension SFTPTransferEngine {
         let resolution: ConflictResolution
         let offset: UInt64
         let handle: SFTPHandle
-        /// The mode the committed file must have.
-        let permissions: UInt32
+        /// The exact mode to set before the commit, when the filling mode is
+        /// not already it; nil for a new name, which the server's umask
+        /// narrows as it would any new file.
+        let finalPermissions: UInt32?
+    }
+
+    /// The mode an upload leaves at its destination.
+    enum UploadMode: Equatable {
+        /// Replacing a file: exactly its mode, set-id bits included.
+        case keep(UInt32)
+        /// A new name: the source's permission bits, asked for at creation
+        /// and narrowed by the server's umask — a 0777 file from a FAT
+        /// volume must not land world-writable.
+        case create(UInt32)
+
+        var bits: UInt32 {
+            switch self {
+            case .keep(let bits), .create(let bits): bits
+            }
+        }
     }
 
     /// Resolves the conflict at `remotePath`, opens the partial and stamps
@@ -176,29 +197,48 @@ extension SFTPTransferEngine {
             ? Self.uploadResumeOffset(partial: partialAttributes, source: source, recordKey: recordKey)
             : 0
         // The partial is renamed over the destination, so its mode is the
-        // one the file ends with: a replaced file keeps its own, a new one
-        // takes the source's. While it fills it has no more for group and
-        // others than the result will, plus the owner's read and write —
-        // a resume reopens it for writing — and no set-id bit, which a
-        // write would clear anyway; the exact mode is set before the commit.
-        let permissions = Self.uploadPermissions(destination: destinationAttributes, stamp: stamp)
-        let fillingPermissions = permissions & 0o777 | 0o600
+        // one the file ends with: a replaced file keeps its own (a link's
+        // target's, for a link the upload replaces), a new one takes the
+        // source's. While it fills it has no more for group and others than
+        // the result will, plus the owner's read and write — a resume
+        // reopens it for writing — and no set-id bit, which a write would
+        // clear anyway.
+        let linkTarget =
+            destinationAttributes.map(Self.isSymbolicLink) == true
+            ? try? await session.stat(path: remotePath) : nil
+        let mode = Self.uploadMode(destination: destinationAttributes, linkTarget: linkTarget, stamp: stamp)
+        let fillingPermissions = mode.bits & 0o777 | 0o600
         let handle = try await openUploadPartial(
             partialPath, fresh: offset == 0, replacing: partialAttributes != nil,
             permissions: fillingPermissions, session: session)
         Self.uploadResumeRecords.withLock {
             $0[recordKey] = UploadResumeRecord(source: source, confirmedOffset: offset)
         }
-        // Again after the open: the server's umask narrows what OPEN asks for,
-        // and a resumed partial still has the mode it was created with.
+        // The times alone, so a server that refuses a chmod still keeps the
+        // mtime a later resume matches on.
         try? await session.fsetStat(
             handle: handle,
             attributes: SFTPAttributes(
-                permissions: fillingPermissions, accessTime: stamp.accessTime,
-                modificationTime: source.sftpModificationTime))
+                accessTime: stamp.accessTime, modificationTime: source.sftpModificationTime))
+        var finalPermissions: UInt32?
+        if case .keep(let bits) = mode {
+            // A replaced file keeps its group where the server lets the
+            // owner choose it — before the mode, since a chown clears set-id
+            // bits — and its mode exactly, past the umask OPEN went through.
+            let kept = linkTarget ?? destinationAttributes
+            if let group = kept?.groupID,
+                let own = try? await session.lstat(path: partialPath), let owner = own.userID,
+                own.groupID != group
+            {
+                try? await session.fsetStat(
+                    handle: handle, attributes: SFTPAttributes(userID: owner, groupID: group))
+            }
+            try? await session.fsetStat(handle: handle, attributes: SFTPAttributes(permissions: fillingPermissions))
+            if bits != fillingPermissions { finalPermissions = bits }
+        }
         return UploadTarget(
             partialPath: partialPath, recordKey: recordKey, resolution: resolution,
-            offset: offset, handle: handle, permissions: permissions)
+            offset: offset, handle: handle, finalPermissions: finalPermissions)
     }
 
     /// The upload's source, opened. The descriptor, not the name, is what is
@@ -234,15 +274,27 @@ extension SFTPTransferEngine {
         return partial.modificationTime == source.sftpModificationTime ? partialSize : 0
     }
 
-    /// The permission bits an upload to a destination with `destination`'s
-    /// attributes leaves: a regular file's own, set-id and sticky bits
-    /// included, or the source's for a new name. A symlink's 0777 is not a
-    /// file's mode — the upload replaces the link with a file of the source's.
-    static func uploadPermissions(destination: SFTPAttributes?, stamp: LocalSourceStamp) -> UInt32 {
-        if let mode = destination?.permissions, mode & UInt32(S_IFMT) == UInt32(S_IFREG) {
-            return mode & 0o7777
+    /// The mode an upload to a destination with `destination`'s attributes
+    /// leaves. A regular file keeps its own, as does one whose server sends
+    /// no type bits; a symbolic link's 0777 is not a file's mode, so a link
+    /// to a regular file passes on its target's; anything else, or nothing
+    /// there, is a new name with the source's bits.
+    static func uploadMode(
+        destination: SFTPAttributes?, linkTarget: SFTPAttributes?, stamp: LocalSourceStamp
+    ) -> UploadMode {
+        func regularBits(_ attributes: SFTPAttributes?) -> UInt32? {
+            guard let mode = attributes?.permissions else { return nil }
+            let type = mode & UInt32(S_IFMT)
+            return type == 0 || type == UInt32(S_IFREG) ? mode & 0o7777 : nil
         }
-        return stamp.permissions
+        if let destination, isSymbolicLink(destination) {
+            return regularBits(linkTarget).map(UploadMode.keep) ?? .create(stamp.permissions)
+        }
+        return regularBits(destination).map(UploadMode.keep) ?? .create(stamp.permissions)
+    }
+
+    static func isSymbolicLink(_ attributes: SFTPAttributes) -> Bool {
+        (attributes.permissions ?? 0) & UInt32(S_IFMT) == UInt32(S_IFLNK)
     }
 
     /// Opens the remote partial for writing. From zero, the partial is this

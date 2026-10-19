@@ -85,8 +85,12 @@ struct NativeIntegrationTests {
         "\u{301}", "\u{200D}", "\u{FE0F}",
     ])
     func shellQuotingEscapesJoinedQuotes(mark: String) {
-        #expect(PaneCommands.shellQuoted("/tmp/a'\(mark)b") == "'/tmp/a'\"'\"'\(mark)b'")
-        #expect(PaneCommands.shellQuoted("/tmp/a\\\(mark)b") == "'/tmp/a'\"\\\\\"'\(mark)b'")
+        // Bytes, not `String ==`: canonical equivalence would accept a
+        // reordered or normalised result the shell reads differently.
+        let quote = Array(PaneCommands.shellQuoted("/tmp/a'\(mark)b").utf8)
+        #expect(quote == Array("'/tmp/a'\"'\"'\(mark)b'".utf8))
+        let backslash = Array(PaneCommands.shellQuoted("/tmp/a\\\(mark)b").utf8)
+        #expect(backslash == Array("'/tmp/a'\"\\\\\"'\(mark)b'".utf8))
     }
 
     /// The quoting is read by whatever shell the pane runs. fish's single
