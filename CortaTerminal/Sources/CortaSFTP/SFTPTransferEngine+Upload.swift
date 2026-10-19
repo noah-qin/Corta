@@ -43,6 +43,21 @@ extension SFTPTransferEngine {
         var sftpModificationTime: UInt32 { UInt32(clamping: modificationSeconds) }
     }
 
+    /// What the upload stamps on the remote file besides the mtime. Kept out
+    /// of `LocalSourceIdentity`: reading the source moves its atime, and a
+    /// chmod while it uploads changes nothing the transfer checks.
+    struct LocalSourceStamp: Sendable {
+        /// The permission bits a new remote file gets: the source's, without
+        /// set-id bits.
+        let permissions: UInt32
+        let accessTime: UInt32
+
+        init(_ info: Darwin.stat) {
+            permissions = UInt32(info.st_mode) & 0o777
+            accessTime = UInt32(clamping: Int(info.st_atimespec.tv_sec))
+        }
+    }
+
     /// Which source each remote upload partial was written from, for the
     /// partials this process wrote. Every WRITE moves a real server's mtime
     /// on, so the stamp the upload set when it opened the partial is gone
@@ -65,10 +80,10 @@ extension SFTPTransferEngine {
         progress: ProgressHandler?,
         session: SFTPSession
     ) async throws(SFTPError) -> SFTPTransferReceipt {
-        let (descriptor, source) = try Self.openUploadSource(sourcePath)
+        let (descriptor, source, stamp) = try Self.openUploadSource(sourcePath)
         defer { Darwin.close(descriptor) }
         let target = try await prepareUploadTarget(
-            remotePath: remotePath, source: source, policy: policy, session: session)
+            remotePath: remotePath, source: source, stamp: stamp, policy: policy, session: session)
 
         let abort = AbortFlag()
         let confirmedOffset = Mutex(target.offset)
@@ -92,6 +107,10 @@ extension SFTPTransferEngine {
             try Self.verifySourceUnchanged(descriptor: descriptor, path: sourcePath, opened: source)
             handleOpen = false
             try await session.close(target.handle)
+            // After the last write, which would clear a set-id bit. Failing
+            // leaves the filling mode: never more for group and others.
+            try? await session.setStat(
+                path: target.partialPath, attributes: SFTPAttributes(permissions: target.permissions))
             try await commitUpload(
                 session: session, partialPath: target.partialPath, destinationPath: remotePath,
                 mayReplace: target.resolution != .fail)
@@ -110,7 +129,7 @@ extension SFTPTransferEngine {
                 handle: handleOpen ? target.handle : nil, partialPath: target.partialPath,
                 keep: Self.keepsPartial(partialDisposition, keepForResume: target.resolution == .resume),
                 confirmedOffset: { confirmedOffset.withLock { $0 } }, source: source,
-                recordKey: target.recordKey, session: session)
+                accessTime: stamp.accessTime, recordKey: target.recordKey, session: session)
             if let failure, !abort.isSet { throw failure }
             throw .cancelled
         }
@@ -125,13 +144,17 @@ extension SFTPTransferEngine {
         let resolution: ConflictResolution
         let offset: UInt64
         let handle: SFTPHandle
+        /// The mode the committed file must have.
+        let permissions: UInt32
     }
 
     /// Resolves the conflict at `remotePath`, opens the partial and stamps
-    /// it with the source's mtime, recording it for a later resume.
+    /// it with the source's times and the mode the result must keep,
+    /// recording it for a later resume.
     private func prepareUploadTarget(
         remotePath: String,
         source: LocalSourceIdentity,
+        stamp: LocalSourceStamp,
         policy: ConflictPolicy,
         session: SFTPSession
     ) async throws(SFTPError) -> UploadTarget {
@@ -152,16 +175,30 @@ extension SFTPTransferEngine {
             resolution == .resume
             ? Self.uploadResumeOffset(partial: partialAttributes, source: source, recordKey: recordKey)
             : 0
+        // The partial is renamed over the destination, so its mode is the
+        // one the file ends with: a replaced file keeps its own, a new one
+        // takes the source's. While it fills it has no more for group and
+        // others than the result will, plus the owner's read and write —
+        // a resume reopens it for writing — and no set-id bit, which a
+        // write would clear anyway; the exact mode is set before the commit.
+        let permissions = Self.uploadPermissions(destination: destinationAttributes, stamp: stamp)
+        let fillingPermissions = permissions & 0o777 | 0o600
         let handle = try await openUploadPartial(
-            partialPath, fresh: offset == 0, replacing: partialAttributes != nil, session: session)
+            partialPath, fresh: offset == 0, replacing: partialAttributes != nil,
+            permissions: fillingPermissions, session: session)
         Self.uploadResumeRecords.withLock {
             $0[recordKey] = UploadResumeRecord(source: source, confirmedOffset: offset)
         }
+        // Again after the open: the server's umask narrows what OPEN asks for,
+        // and a resumed partial still has the mode it was created with.
         try? await session.fsetStat(
-            handle: handle, attributes: SFTPAttributes(modificationTime: source.sftpModificationTime))
+            handle: handle,
+            attributes: SFTPAttributes(
+                permissions: fillingPermissions, accessTime: stamp.accessTime,
+                modificationTime: source.sftpModificationTime))
         return UploadTarget(
             partialPath: partialPath, recordKey: recordKey, resolution: resolution,
-            offset: offset, handle: handle)
+            offset: offset, handle: handle, permissions: permissions)
     }
 
     /// The upload's source, opened. The descriptor, not the name, is what is
@@ -169,7 +206,7 @@ extension SFTPTransferEngine {
     /// checked against.
     private static func openUploadSource(
         _ path: String
-    ) throws(SFTPError) -> (descriptor: Int32, identity: LocalSourceIdentity) {
+    ) throws(SFTPError) -> (descriptor: Int32, identity: LocalSourceIdentity, stamp: LocalSourceStamp) {
         let descriptor = Darwin.open(path, O_RDONLY | O_CLOEXEC)
         guard descriptor >= 0 else {
             let code = errno
@@ -181,7 +218,7 @@ extension SFTPTransferEngine {
             Darwin.close(descriptor)
             throw .localIOFailed(operation: "fstat", code: code)
         }
-        return (descriptor, LocalSourceIdentity(openedStat))
+        return (descriptor, LocalSourceIdentity(openedStat), LocalSourceStamp(openedStat))
     }
 
     /// Where an upload the user chose to resume picks up: the remote partial
@@ -197,12 +234,24 @@ extension SFTPTransferEngine {
         return partial.modificationTime == source.sftpModificationTime ? partialSize : 0
     }
 
+    /// The permission bits an upload to a destination with `destination`'s
+    /// attributes leaves: a regular file's own, set-id and sticky bits
+    /// included, or the source's for a new name. A symlink's 0777 is not a
+    /// file's mode — the upload replaces the link with a file of the source's.
+    static func uploadPermissions(destination: SFTPAttributes?, stamp: LocalSourceStamp) -> UInt32 {
+        if let mode = destination?.permissions, mode & UInt32(S_IFMT) == UInt32(S_IFREG) {
+            return mode & 0o7777
+        }
+        return stamp.permissions
+    }
+
     /// Opens the remote partial for writing. From zero, the partial is this
     /// transfer's own file: the old name goes, and the new one is created
     /// exclusively. A handle another process still holds then writes into a
     /// file nobody commits — never into this one after it is renamed into place.
     private func openUploadPartial(
-        _ partialPath: String, fresh: Bool, replacing: Bool, session: SFTPSession
+        _ partialPath: String, fresh: Bool, replacing: Bool, permissions: UInt32,
+        session: SFTPSession
     ) async throws(SFTPError) -> SFTPHandle {
         var flags: SFTPOpenFlags = [.write]
         if fresh {
@@ -210,7 +259,8 @@ extension SFTPTransferEngine {
             flags.formUnion([.create, .exclude])
         }
         do throws(SFTPError) {
-            return try await session.open(path: partialPath, flags: flags)
+            return try await session.open(
+                path: partialPath, flags: flags, attributes: SFTPAttributes(permissions: permissions))
         } catch {
             // OpenSSH answers an exclusive create of an existing name with
             // a plain FAILURE: someone else made the partial since the check.
@@ -223,7 +273,7 @@ extension SFTPTransferEngine {
     /// the partial at a safe resume point or remove it.
     private func cleanUpFailedUpload(
         handle: SFTPHandle?, partialPath: String, keep: Bool, confirmedOffset: () -> UInt64,
-        source: LocalSourceIdentity, recordKey: String, session: SFTPSession
+        source: LocalSourceIdentity, accessTime: UInt32, recordKey: String, session: SFTPSession
     ) async {
         let handleClosed = Mutex(handle == nil)
         if let handle {
@@ -250,7 +300,8 @@ extension SFTPTransferEngine {
             do {
                 try await session.setStat(
                     path: partialPath,
-                    attributes: SFTPAttributes(size: prefix, modificationTime: modificationTime))
+                    attributes: SFTPAttributes(
+                        size: prefix, accessTime: accessTime, modificationTime: modificationTime))
                 Self.uploadResumeRecords.withLock {
                     $0[recordKey] = UploadResumeRecord(source: source, confirmedOffset: prefix)
                 }

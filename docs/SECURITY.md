@@ -460,6 +460,12 @@ symlink. Download files and managed directories/files have inherited ACLs
 cleared before use. This does not exclude administrators or backups; parent
 storage policy and intentionally shared export destinations still matter.
 
+An upload writes a partial and renames it over the destination, so the
+partial's mode is the file's from then on. A replaced regular file keeps its
+own mode, set-id bits included; a new name takes the source's permission bits.
+While it fills, the partial grants group and others no more than the result
+and the owner read and write; the exact mode is set before the commit.
+
 Upload prompts bind to a SHA-256 digest of the edit. Upload sends a private
 snapshot matching that digest, so an edit after the prompt needs another
 approval and an edit during transfer cannot replace the approved bytes.

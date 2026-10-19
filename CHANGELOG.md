@@ -69,6 +69,11 @@ Versioning for compatibility changes.
   Go to Project Root, is quoted by Unicode scalar. An apostrophe or backslash
   joined to a combining mark in a file or folder name was written unescaped,
   which closed the quotes and let the rest of the name run as a command.
+- An SFTP upload, including saving a remote edit, keeps the mode of the file
+  it replaces, and a new remote file takes the local file's permissions.
+  Replacing a file used to leave it at the server's default mode, so a
+  private (0600) file such as `.env` could become readable by other users on
+  the host. Uploaded files also keep a real access time instead of 1970.
 
 ## [1.2.2] - 2026-10-15
 
