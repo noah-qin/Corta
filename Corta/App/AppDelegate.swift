@@ -193,7 +193,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         windowControllers.removeAll { $0.window === window }
         for name in [
             NSWindow.willCloseNotification, NSWindow.didResizeNotification,
-            NSWindow.didMoveNotification,
+            NSWindow.didMoveNotification, NSWindow.didBecomeMainNotification,
         ] {
             NotificationCenter.default.removeObserver(self, name: name, object: window)
         }
