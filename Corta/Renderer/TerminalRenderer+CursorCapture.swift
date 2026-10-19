@@ -45,7 +45,8 @@ nonisolated extension TerminalRenderer {
             descriptor.storageMode = .shared
             descriptor.usage = [.renderTarget, .shaderRead]
             if captureBackend?.requiresRecovery == true { captureBackend = nil }
-            if captureBackend == nil { captureBackend = try? Metal4Backend(device: backend.device) }
+            let freshBackend = captureBackend == nil
+            if freshBackend { captureBackend = try? Metal4Backend(device: backend.device) }
             guard let target = backend.device.makeTexture(descriptor: descriptor),
                 let capture = captureBackend
             else { return nil }
@@ -58,7 +59,11 @@ nonisolated extension TerminalRenderer {
                 framePalette = previousPalette
             }
             let quads = cursorCellInstances(line: line, row: row, column: column, graphemes: grid.graphemes)
-            guard drawCapture(quads, into: target, with: capture, clearColor: framePalette.cursor) else { return nil }
+            guard
+                drawCapture(
+                    quads, into: target, with: capture, clearColor: framePalette.cursor,
+                    waitLimit: freshBackend ? Self.firstCaptureWaitLimit : Self.captureWaitLimit)
+            else { return nil }
             return Self.image(of: target).map { ($0, column, columns) }
         }
     }
@@ -88,7 +93,8 @@ nonisolated extension TerminalRenderer {
     private func drawCapture(
         _ quads: (backgrounds: ContiguousArray<QuadInstance>, glyphs: ContiguousArray<QuadInstance>,
             colors: ContiguousArray<QuadInstance>),
-        into target: MTLTexture, with capture: Metal4Backend, clearColor color: SIMD4<Float>
+        into target: MTLTexture, with capture: Metal4Backend, clearColor color: SIMD4<Float>,
+        waitLimit: DispatchTimeInterval
     ) -> Bool {
         let size = CGSize(width: target.width, height: target.height)
         let rect = CGRect(origin: .zero, size: size)
@@ -120,13 +126,16 @@ nonisolated extension TerminalRenderer {
         // On the main thread, so a busy GPU — a large image upload on the
         // same device — costs at most this, not seconds per parked cursor;
         // without a capture the pane keeps drawing its cursor live.
-        return done.wait(timeout: .now() + Self.captureWaitLimit) == .success
+        return done.wait(timeout: .now() + waitLimit) == .success
             && succeeded.load(ordering: .acquiring)
     }
 
     /// One cell is a trivial frame; a GPU that has not drawn it in this long
     /// is busy with something else.
     static let captureWaitLimit: DispatchTimeInterval = .milliseconds(100)
+    /// A queue's first frame also pays for its setup — after launch, or
+    /// when a failed capture queue was replaced — so it gets longer, once.
+    static let firstCaptureWaitLimit: DispatchTimeInterval = .milliseconds(500)
 
     /// A finished `bgra8Unorm` target's pixels as an sRGB image.
     private static func image(of target: MTLTexture) -> CGImage? {
