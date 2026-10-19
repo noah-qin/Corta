@@ -83,10 +83,9 @@ enum PaneSpawn {
             else { continue }
             // Only for the preset's own shell; a fallback may not understand them.
             let attemptArguments = attempt.shell == configured ? arguments : ["-l"]
-            let attemptEnvironment = directoryCompletion
-                ? ZshBootstrap.environment(environment, executable: attempt.shell, arguments: attemptArguments)
-                : environment
-            let folder = ZshBootstrap.folder(of: attemptEnvironment)
+            let (attemptEnvironment, folder) = directoryCompletion
+                ? ZshBootstrap.prepare(environment, executable: attempt.shell, arguments: attemptArguments)
+                : (environment, nil)
             do {
                 let session = try TerminalSession(
                     executable: attempt.shell, arguments: attemptArguments,
@@ -115,11 +114,11 @@ enum PaneSpawn {
     ) throws(PTYError) -> Started {
         var environment = ChildEnvironment.default()
         for (key, value) in preset?.environment ?? [:] { environment[key] = value }
+        var folder: URL?
         if configuration.directoryCompletion {
-            environment = ZshBootstrap.environment(
+            (environment, folder) = ZshBootstrap.prepare(
                 environment, executable: command.executable, arguments: command.arguments)
         }
-        let folder = ZshBootstrap.folder(of: environment)
         do {
             // A local cwd for the launcher; the remote side lands where it lands.
             let session = try TerminalSession(

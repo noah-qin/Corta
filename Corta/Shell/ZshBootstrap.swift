@@ -25,12 +25,6 @@ enum ZshBootstrap {
         folders.removeAll()
     }
 
-    /// The wrapper folder `environment` points zsh at, if this run made it.
-    static func folder(of environment: [String: String]) -> URL? {
-        guard let path = environment["ZDOTDIR"] else { return nil }
-        return folders.first { $0.path == path }
-    }
-
     /// One session's folder, once its shell no longer needs it: a spawn
     /// that failed, or a session that ended. Every tab, fallback rung and
     /// reconnect makes one, and a long-running app kept them all until quit.
@@ -61,8 +55,17 @@ enum ZshBootstrap {
     nonisolated static let folderPrefix = "corta-zsh-"
     nonisolated static let staleAge: TimeInterval = 24 * 3600
     static func environment(_ original: [String: String], executable: String, arguments: [String]) -> [String: String] {
+        prepare(original, executable: executable, arguments: arguments).environment
+    }
+
+    /// The child's environment, and the wrapper folder it points zsh at —
+    /// nil when the shell is not a login zsh or the folder could not be
+    /// written — for `remove(_:)` once the session no longer needs it.
+    static func prepare(
+        _ original: [String: String], executable: String, arguments: [String]
+    ) -> (environment: [String: String], folder: URL?) {
         guard (executable as NSString).lastPathComponent == "zsh",
-            arguments == ["-l"] || arguments.isEmpty else { return original }
+            arguments == ["-l"] || arguments.isEmpty else { return (original, nil) }
         let fm = FileManager.default
         let folder = fm.temporaryDirectory.appendingPathComponent(folderPrefix + UUID().uuidString)
         let userDirectory = original["ZDOTDIR"] ?? original["HOME"] ?? NSHomeDirectory()
@@ -90,10 +93,10 @@ enum ZshBootstrap {
             env["CORTA_USER_ZDOTDIR"] = userDirectory
             env["CORTA_USER_ZDOTDIR_SET"] = original["ZDOTDIR"] == nil ? "0" : "1"
             env["ZDOTDIR"] = folder.path
-            return env
+            return (env, folder)
         } catch {
             try? fm.removeItem(at: folder)
-            return original
+            return (original, nil)
         }
     }
 }

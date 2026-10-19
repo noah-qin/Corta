@@ -113,10 +113,10 @@ struct DirectoryCompletionSessionTests {
         let choice = chosen.map { "HISTFILE='\(home.appendingPathComponent($0).path)'\n" } ?? ""
         try (choice + "print -r -- $HISTFILE > '\(seen.path)'\n")
             .write(to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
-        let env = ZshBootstrap.environment(
+        let (env, made) = ZshBootstrap.prepare(
             ["HOME": home.path, "PATH": "/bin:/usr/bin", "TERM": "xterm-256color", "LANG": "en_US.UTF-8"],
             executable: "/bin/zsh", arguments: ["-l"])
-        let folder = try #require(ZshBootstrap.folder(of: env))
+        let folder = try #require(made)
         defer { ZshBootstrap.remove(folder) }
         let session = try TerminalSession(executable: "/bin/zsh", arguments: ["-l"], environment: env,
             size: TerminalSize(rows: 30, columns: 100), workingDirectory: home.path)
