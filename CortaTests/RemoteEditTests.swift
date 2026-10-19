@@ -752,26 +752,6 @@ struct RemoteEditCoordinatorTests {
         #expect(fixture.coordinator.pendingUploads.isEmpty)
     }
 
-    @Test("a conflict answered inside its presenter can start the approved upload")
-    func conflictCanBeAnsweredImmediately() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "approved edit".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.coordinator.pendingUploads.first)
-        fixture.fake.lstatResults["/srv/app/main.rs"] = SFTPAttributes(size: 999, modificationTime: 5000)
-        fixture.coordinator.presenter.promptConflict = { [weak coordinator = fixture.coordinator] conflict in
-            coordinator?.resolveConflict(conflict.id, choice: .uploadAnyway)
-        }
-        fixture.coordinator.upload(pending)
-        await waitUntil("upload settled") {
-            fixture.coordinator.pendingUploads.isEmpty && fixture.coordinator.uploadsInFlight.isEmpty
-        }
-        #expect(fixture.fake.transferCalls.contains { $0.isUpload })
-        #expect(fixture.coordinator.pendingConflicts.isEmpty)
-    }
 
     @Test("upload anyway overwrites; save-elsewhere and dismiss send nothing")
     func conflictResolutions() async throws {

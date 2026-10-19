@@ -149,7 +149,6 @@ final class RemoteEditCoordinator {
     var digests: [String: String] = [:]
     /// A newer check, re-baseline or watch teardown invalidates an older read.
     private var digestChecks: [String: UUID] = [:]
-    private let hashFile: @Sendable (URL) -> String?
     private var pendingChecks: [String: DispatchWorkItem] = [:]
     var uploadsInFlight: Set<String> = []
     var approvedSnapshots: [String: URL] = [:]
@@ -159,12 +158,10 @@ final class RemoteEditCoordinator {
         makeClient: ((String) -> any SFTPClient)? = nil,
         opener: (@MainActor (URL, Int, Int?) -> Bool)? = nil,
         presenter: RemoteEditPresenter? = nil,
-        connectTimeout: Duration = .seconds(30),
-        hashFile: @escaping @Sendable (URL) -> String? = RemoteEditStore.sha256Hex(ofFile:)
+        connectTimeout: Duration = .seconds(30)
     ) {
         self.store = store
         self.connectTimeout = connectTimeout
-        self.hashFile = hashFile
         self.makeClient = makeClient ?? {
             SFTPConnection.forApp(key: $0, maximumDownloadBytes: RemoteEditCoordinator.maximumCopyBytes)
         }
@@ -489,9 +486,9 @@ final class RemoteEditCoordinator {
     }
 
     /// File content I/O never inherits the UI actor, even with approachable
-    /// concurrency enabled. The synchronous reader is injected for testing.
+    /// concurrency enabled.
     @concurrent nonisolated func readDigest(at url: URL) async -> String? {
-        hashFile(url)
+        RemoteEditStore.sha256Hex(ofFile: url)
     }
 
     func setDigest(_ digest: String?, for copyID: String) {

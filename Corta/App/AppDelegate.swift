@@ -122,9 +122,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             let splits = (members + [window]).compactMap { $0.contentViewController as? SplitViewController }
             for split in splits { split.isJoiningTabGroup = true }
             window.setFrame(frame, display: false)
-            keyWindow.addTabbedWindow(window, ordered: .above)
+            // Queued toolbar clicks may still name an earlier tab while
+            // AppKit selects the previous addition. Append to the group
+            // explicitly instead of inserting relative to that stale tab.
+            if let group = keyWindow.tabGroup {
+                group.insertWindow(window, at: group.windows.count)
+            } else {
+                keyWindow.addTabbedWindow(window, ordered: .above)
+            }
             controller.showWindow(sender)
             window.makeKeyAndOrderFront(sender)
+            window.tabGroup?.selectedWindow = window
             // Only the first tab bar adds chrome. New tabs' setup/layout must
             // not each absorb the same bar into the shared frame again.
             let delta = members.count == 1
