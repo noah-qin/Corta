@@ -109,12 +109,24 @@ nonisolated extension TerminalRenderer {
             rect: rect, drawableSize: size)
         let done = DispatchSemaphore(value: 0)
         let succeeded = Atomic<Bool>(false)
+        // The handler keeps `target` alive: a wait that gives up must not
+        // free a texture the GPU still writes. Only retained, never used.
+        nonisolated(unsafe) let retained = target
         capture.endFrame(presenting: nil) { error in
+            withExtendedLifetime(retained) {}
             succeeded.store(error == nil, ordering: .releasing)
             done.signal()
         }
-        return done.wait(timeout: .now() + 2) == .success && succeeded.load(ordering: .acquiring)
+        // On the main thread, so a busy GPU — a large image upload on the
+        // same device — costs at most this, not seconds per parked cursor;
+        // without a capture the pane keeps drawing its cursor live.
+        return done.wait(timeout: .now() + Self.captureWaitLimit) == .success
+            && succeeded.load(ordering: .acquiring)
     }
+
+    /// One cell is a trivial frame; a GPU that has not drawn it in this long
+    /// is busy with something else.
+    static let captureWaitLimit: DispatchTimeInterval = .milliseconds(100)
 
     /// A finished `bgra8Unorm` target's pixels as an sRGB image.
     private static func image(of target: MTLTexture) -> CGImage? {
