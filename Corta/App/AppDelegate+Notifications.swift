@@ -47,9 +47,13 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
             windowNumber: userInfo["windowNumber"] as? Int, paneID: userInfo["paneID"] as? String,
             sessionGeneration: userInfo["sessionGeneration"] as? Int,
             commandID: userInfo["commandID"] as? Int)
-        // The response is handled once read; the landing happens on main.
-        completionHandler()
-        Task { @MainActor in self.land(on: click) }
+        // Completed after the landing, on main, as when this ran there: the
+        // system orders its activation after the window is brought forward.
+        nonisolated(unsafe) let complete = completionHandler
+        Task { @MainActor in
+            self.land(on: click)
+            complete()
+        }
     }
 
     /// What a notification's click carries, read off its `userInfo`.
