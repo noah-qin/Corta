@@ -55,6 +55,11 @@ struct GlobalHotKeyTests {
         #expect(GlobalHotKey.isRegistrable(Shortcut.parse("ctrl+`")!))
         #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("space")!))
         #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("a")!))
+        // Shift alone is typing: a capital letter, a symbol, a selection.
+        #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("shift+a")!))
+        #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("shift+1")!))
+        #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("shift+space")!))
+        #expect(GlobalHotKey.isRegistrable(Shortcut.parse("ctrl+shift+a")!))
         #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("cmd+é")!))
     }
 

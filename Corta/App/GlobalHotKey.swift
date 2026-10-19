@@ -86,11 +86,12 @@ final class GlobalHotKey {
     }
 
     /// Whether a shortcut is one the system can sensibly hold: it needs a
-    /// key Carbon knows, and at least one modifier — a bare letter or the
-    /// space bar claimed in every application would swallow ordinary typing
-    /// everywhere.
+    /// key Carbon knows, and a modifier other than Shift — a bare letter or
+    /// the space bar claimed in every application would swallow ordinary
+    /// typing everywhere, and so would Shift-A (a capital A), Shift-1 or
+    /// Shift-arrow (extending a selection).
     nonisolated static func isRegistrable(_ shortcut: Shortcut) -> Bool {
-        let relevant: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
+        let relevant: NSEvent.ModifierFlags = [.command, .control, .option]
         guard !shortcut.modifiers.intersection(relevant).isEmpty else { return false }
         return keyCode(for: shortcut.key) != nil
     }
