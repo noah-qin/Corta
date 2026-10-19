@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-10-19
+
 ### Added
 
 - The user guide has a *Coming from another terminal* section: the Corta key
@@ -1950,7 +1952,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.2.2...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.2.3...main
+[1.2.3]: https://github.com/noah-qin/Corta/releases/tag/v1.2.3
 [1.2.2]: https://github.com/noah-qin/Corta/releases/tag/v1.2.2
 [1.2.1]: https://github.com/noah-qin/Corta/releases/tag/v1.2.1
 [1.2.0]: https://github.com/noah-qin/Corta/releases/tag/v1.2.0
