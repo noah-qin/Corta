@@ -296,7 +296,15 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
         /// suspended (`SFTPSubprocessChannel.spawn`'s `beforeStart`).
         func admit(_ pid: pid_t) {
             guard let started = record(pid)?.started else { return }
-            processes.withLock { $0[pid] = started }
+            // Every reconnect spawns another ssh; the ones that have exited
+            // since are let go here, so a long-lived connection's list stays
+            // as long as its live processes.
+            let admitted = processes.withLock { $0 }
+            let gone = admitted.filter { $0.key != pid && record($0.key)?.started != $0.value }.keys
+            processes.withLock { processes in
+                for stale in gone { processes[stale] = nil }
+                processes[pid] = started
+            }
         }
 
         /// That very process: alive, and started when it was admitted.
