@@ -20,6 +20,28 @@ Versioning for compatibility changes.
   connection. Remote-edit change detection, upload snapshots and saving a
   copy elsewhere process file contents off the main thread; an older change
   check cannot replace a newer edit or an approved baseline.
+- A pane no longer stops drawing for good after a few ordinary pauses. A frame
+  dropped just before the window was minimised, covered, moved to another
+  Space or put to sleep was taken for a stalled GPU when drawing resumed, and
+  the fourth time in a pane's life it showed the renderer failure. Only a
+  queue that finishes nothing for a second counts now, and a rebuilt one that
+  draws for ten seconds starts the count again.
+- Waits that end in a failure no longer count time the Mac spent asleep: a
+  shell starting, an image decoding or a remote file opening across a closed
+  lid is not reported as timed out on wake.
+- `quick-terminal-key` refuses a Shift-only key such as `shift+a`, which would
+  have taken capital A away from every application.
+- A connection that drops on its first request after connecting is reported
+  by its real cause, not as a lost connection. Closing an SFTP browser or
+  remote edit no longer waits on the main thread for ssh to exit, and a
+  dropped connection no longer ties up a thread per pending request while its
+  cause is read.
+- The idle block cursor gives up on a GPU busy with other work after 100 ms
+  instead of holding the window for up to two seconds.
+- Each zsh session's startup folder is removed when the session ends, not
+  only when Corta quits.
+- Clicking a task notification handles the click on the main thread whichever
+  thread the system delivers it on.
 
 ## [1.2.2] - 2026-10-15
 
