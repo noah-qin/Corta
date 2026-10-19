@@ -99,7 +99,7 @@ jobs:
 
       - name: Upload main's analysis for unchanged inputs
         if: env.AFFECTED != 'true' && github.event_name != 'push'
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: ${{ runner.temp }}/main-${{ matrix.language }}.sarif
           category: /language:${{ matrix.language }}
@@ -125,7 +125,7 @@ jobs:
 
       - name: Initialize CodeQL
         if: env.AFFECTED == 'true'
-        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -154,7 +154,7 @@ jobs:
 
       - name: Analyze and upload
         if: env.AFFECTED == 'true'
-        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           category: /language:${{ matrix.language }}
 
