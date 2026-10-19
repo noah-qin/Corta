@@ -383,7 +383,8 @@ for unsaved work before deleting application data:
    files under `~/Library/Caches/dev.noahqin.Corta/`; these can be removed.
 4. Move `Corta.app` to the Trash.
 
-Then, if you are willing, open an issue with the **Went back to my old
-terminal** template and say what sent you back. A missing feature, a
+Then, if you are willing, open an issue with the
+[**Went back to my old terminal**](https://github.com/noah-qin/Corta/issues/new?template=went_back.yml)
+form and say what sent you back. It needs no reproduction. A missing feature, a
 rendering bug and "it just felt slower" are all answers the project can
 act on.

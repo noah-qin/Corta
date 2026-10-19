@@ -19,9 +19,20 @@ first so contributors do not duplicate effort.
    toolchain: a 6.2 compiler builds in Swift 6 mode, so the two numbers do
    not disagree.
 3. Run `swift test --package-path CortaTerminal` for a first core check.
+   It builds and tests the terminal core without launching an app.
 4. Open `Corta.xcodeproj` to work on the app. It resolves Sparkle on the
-   first build. For builds without a developer account, use the ad-hoc
-   signing flags in [Testing](docs/TESTING.md).
+   first build. From the command line:
+
+   ```sh
+   # The release app, as users get it.
+   xcodebuild -project Corta.xcodeproj -scheme Corta build
+   # The development app — a separate application with its own
+   # configuration and state, which runs beside an installed Corta (D22).
+   xcodebuild -project Corta.xcodeproj -scheme 'Corta (Dev)' build
+   ```
+
+   For builds without a developer account, use the ad-hoc signing flags in
+   [Testing](docs/TESTING.md).
 5. Run the checks relevant to the change and open a pull request against
    `main`, including results and anything you could not verify.
 
@@ -55,6 +66,10 @@ A change to what a window looks like also refreshes the images in
 recipe, which never touches your own shell or configuration.
 
 Keep public guides in English and use relative links within the repository.
+The one exception is `README.zh-CN.md`, a Simplified Chinese summary of the
+README's first screen and installation steps; the English documents stay the
+source of truth, and a change to the README's install or requirements
+paragraphs updates it in the same pull request.
 Document defaults, units, prerequisites and limitations alongside examples.
 Keep release snapshots dated; do not present planned behaviour as shipped.
 Records from before 1.2.0 are preserved [at a commit](https://github.com/noah-qin/Corta/tree/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs) with their original findings; new evidence goes in the pull request.
@@ -280,6 +295,26 @@ the reviewer and scope in the PR, and record any human-only gaps.
 One problem per issue.
 An accepted idea becomes an issue in the outcome/scope/acceptance/dependencies
 shape, written by the maintainer.
+
+## Labels
+
+Every new issue carries one *kind* label — `bug`, `enhancement` or
+`documentation` — and as many of the others as apply, so a `roadmap` issue
+is also, say, an `enhancement`. The bug and feature forms set the kind;
+an issue from the installation-blocker or *Went back* form carries `install`
+or `retention` and gets its kind when it is triaged.
+
+| Label | Means |
+| :--- | :--- |
+| `bug` | Corta does something wrong. *Kind.* |
+| `enhancement` | Corta should do something new or better. *Kind.* |
+| `documentation` | The documents, forms or community files are wrong or missing. *Kind.* |
+| `roadmap` | Planned work in the outcome/scope/acceptance/dependencies shape. |
+| `batch` | A `roadmap` issue worked as one coherent batch. |
+| `help wanted` | The maintainer would welcome outside help: often a question only someone with other hardware or knowledge can answer. |
+| `good first issue` | Small, well-bounded, and needs no prior knowledge of the code. |
+| `install` | Filed with the installation-blocker form. |
+| `retention` | Filed with the *Went back* form. |
 
 ## Releases
 

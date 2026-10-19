@@ -21,8 +21,8 @@ contact_links:
   about: Installing, starting, behaviour that differs from other terminals, and uninstalling cleanly
     — check here before filing an install blocker.
 - name: What is planned
-  url: https://github.com/noah-qin/Corta/milestones
-  about: Planned work for upcoming versions.
+  url: https://github.com/noah-qin/Corta/issues
+  about: Open issues are the planned work; help wanted and good first issue mark where help is welcome.
 - name: Question about using Corta
   url: https://github.com/noah-qin/Corta/discussions/categories/q-a
   about: Ask for help using Corta.
@@ -34,6 +34,5 @@ contact_links:
   about: Report privately. Never open a public issue for a security problem.
 - name: Things Corta deliberately does not do
   url: https://github.com/noah-qin/Corta/blob/main/docs/DESIGN.md#6-non-goals
-  about: Built-in multiplexing, cross-platform support, tmux control mode, AI features, command blocks,
-    cloud sync, command-running automation, implementing SSH or git, RTL text and terminal title
-    queries. Read the reasons before requesting one.
+  about: Multiplexing, cross-platform support, tmux control mode, AI features and more. Read the reasons
+    before requesting one.

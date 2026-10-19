@@ -69,7 +69,7 @@ body:
   attributes:
     label: Corta version or commit
     description: Use Corta ▸ About Corta, or `git rev-parse --short HEAD` for a source build.
-    placeholder: 1.1.8
+    placeholder: x.y.z
   validations:
     required: true
 - type: input
