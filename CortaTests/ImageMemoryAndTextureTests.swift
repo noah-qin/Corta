@@ -19,6 +19,7 @@ import CoreText
 import CortaTerminal
 import Foundation
 import Metal
+import Synchronization
 import Testing
 
 @testable import Corta
@@ -41,10 +42,10 @@ import Testing
         global.markRetired(16)
         defer { global.release(16, retired: true) }
         let renderer = KittyImageRenderer(device: device, globalBudget: global)
-        var redraws = 0
-        renderer.onImagesReady = { redraws += 1 }
+        let redraws = Atomic(0)
+        renderer.onImagesReady = { redraws.add(1, ordering: .relaxed) }
         renderer.noteGPUCompletion()
-        #expect(redraws == 0)
+        #expect(redraws.load(ordering: .relaxed) == 0)
     }
 
     /// Transmits `payload` over the wire exactly like a real client and

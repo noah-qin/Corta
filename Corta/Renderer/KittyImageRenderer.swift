@@ -82,8 +82,14 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private static let textureLeaseKey = TextureLeaseKey()
 
     /// A background decode installed a texture; schedule a frame. Called on
-    /// the installing thread.
-    var onImagesReady: (() -> Void)?
+    /// the installing thread. Any pane's decode finishing calls it, from a
+    /// decode or GPU-completion thread, while the pane sets it on main: the
+    /// closure is read and written under its own lock.
+    var onImagesReady: (@Sendable () -> Void)? {
+        get { imagesReady.withLock { $0 } }
+        set { imagesReady.withLock { $0 = newValue } }
+    }
+    private let imagesReady = Mutex<(@Sendable () -> Void)?>(nil)
 
     private let lock = NSLock()
     private var textures: [KittyGraphics.ImageID: MTLTexture] = [:]
@@ -121,17 +127,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private var inFlight: [KittyGraphics.ImageID: UInt64] = [:]
     private var desiredGenerations: [KittyGraphics.ImageID: UInt64] = [:]
 
-    var textureCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return textures.count
-    }
+    var textureCount: Int { lock.withLock { textures.count } }
 
-    var cachedTextureBytes: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return textureBytesCached
-    }
+    var cachedTextureBytes: Int { lock.withLock { textureBytesCached } }
 
     init(
         device: MTLDevice,
@@ -174,24 +172,20 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     ) {
         let placements = table.orderedPlacements()
         let liveIDs = Set(placements.map(\.imageID))
-        var toSchedule: [DecodeJob] = []
-
-        lock.lock()
-        pruneLocked(keeping: liveIDs, table: table)
-        let visible = visibleImagesLocked(
-            placements, table: table, rows: rows, offset: offset,
-            scrollbackTotalPushed: scrollbackTotalPushed, cellHeight: cellHeight)
-        knownDecodedBytes = knownDecodedBytes.filter { liveIDs.contains($0.key) }
-        if visible != visibleIDs {
-            visibleIDs = visible
-            visibilityGeneration &+= 1
-        }
-        for placement in placements {
-            if let job = decodeJobLocked(for: placement.imageID, table: table, visible: visible) {
-                toSchedule.append(job)
+        let toSchedule: [DecodeJob] = lock.withLock {
+            pruneLocked(keeping: liveIDs, table: table)
+            let visible = visibleImagesLocked(
+                placements, table: table, rows: rows, offset: offset,
+                scrollbackTotalPushed: scrollbackTotalPushed, cellHeight: cellHeight)
+            knownDecodedBytes = knownDecodedBytes.filter { liveIDs.contains($0.key) }
+            if visible != visibleIDs {
+                visibleIDs = visible
+                visibilityGeneration &+= 1
+            }
+            return placements.compactMap {
+                decodeJobLocked(for: $0.imageID, table: table, visible: visible)
             }
         }
-        lock.unlock()
 
         for job in toSchedule {
             decodeScheduler { [weak self] in
@@ -326,39 +320,39 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         id: KittyGraphics.ImageID, generation: UInt64, data: KittyGraphics.ImageData
     ) {
         if generation != 0 {
-            lock.lock()
-            let relevant = desiredGenerations[id] == generation
-            if !relevant { inFlight[id] = nil }
-            lock.unlock()
+            let relevant = lock.withLock {
+                let relevant = desiredGenerations[id] == generation
+                if !relevant { inFlight[id] = nil }
+                return relevant
+            }
             guard relevant else { return }
         }
         let decoded = decodeImageImpl(data)
-        lock.lock()
-        guard isRelevantLocked(id: id, generation: generation) else {
-            if inFlight[id] == generation { inFlight[id] = nil }
-            lock.unlock()
-            return
+        let lease: TextureLease? = lock.withLock {
+            guard isRelevantLocked(id: id, generation: generation) else {
+                if inFlight[id] == generation { inFlight[id] = nil }
+                return nil
+            }
+            let lease = reserveLocked(id: id, generation: generation, decoded: decoded)
+            if lease == nil, inFlight[id] == generation { inFlight[id] = nil }
+            return lease
         }
-        let lease = reserveLocked(id: id, generation: generation, decoded: decoded)
-        if lease == nil, inFlight[id] == generation { inFlight[id] = nil }
-        lock.unlock()
         guard let decoded, let lease else { return }
         // Allocation and GPU completion must never hold the cache lock: a
         // hung upload cannot stall the main thread or bounded teardown.
         let made = makeTexture(from: decoded, lease: lease)
-        lock.lock()
-        let stillRelevant = isRelevantLocked(id: id, generation: generation)
-        if inFlight[id] == generation { inFlight[id] = nil }
-        var installed = false
-        if stillRelevant, case .made(let texture) = made {
-            releaseTextureLocked(id)
-            textures[id] = texture
-            textureBytes[id] = lease.bytes
-            textureGenerations[id] = generation
-            textureBytesCached += lease.bytes
-            textureAccessOrder.append(id)
-            installed = true
-        } else {
+        let installed = lock.withLock {
+            let stillRelevant = isRelevantLocked(id: id, generation: generation)
+            if inFlight[id] == generation { inFlight[id] = nil }
+            if stillRelevant, case .made(let texture) = made {
+                releaseTextureLocked(id)
+                textures[id] = texture
+                textureBytes[id] = lease.bytes
+                textureGenerations[id] = generation
+                textureBytesCached += lease.bytes
+                textureAccessOrder.append(id)
+                return true
+            }
             lease.retire()
             switch made {
             case .made: break
@@ -372,8 +366,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
                     generation, globalBudget.generation, paneBudget.generation, visibilityGeneration)
             default: break
             }
+            return false
         }
-        lock.unlock()
         if installed, generation == 0 { onImagesReady?() }
     }
 
@@ -520,26 +514,26 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// Test seam: decodes and installs inline at generation 0. Production
     /// uses `update`.
     func texture(for id: KittyGraphics.ImageID, data: KittyGraphics.ImageData) -> MTLTexture? {
-        lock.lock()
-        if let texture = textures[id], textureGenerations[id] == 0 {
-            textureAccessOrder.removeAll { $0 == id }
-            textureAccessOrder.append(id)
-            lock.unlock()
-            return texture
-        }
-        if failedGenerations[id] == 0 {
-            lock.unlock()
-            return nil
-        }
-        if let blocked = budgetBlocked[id], blocked.storeGeneration == 0 {
-            guard blocked.globalGeneration != globalBudget.generation
-                || blocked.paneGeneration != paneBudget.generation else {
-                lock.unlock()
-                return nil
+        enum Cached { case hit(MTLTexture), refused, decode }
+        let cached: Cached = lock.withLock {
+            if let texture = textures[id], textureGenerations[id] == 0 {
+                textureAccessOrder.removeAll { $0 == id }
+                textureAccessOrder.append(id)
+                return .hit(texture)
             }
-            budgetBlocked[id] = nil
+            if failedGenerations[id] == 0 { return .refused }
+            if let blocked = budgetBlocked[id], blocked.storeGeneration == 0 {
+                guard blocked.globalGeneration != globalBudget.generation
+                    || blocked.paneGeneration != paneBudget.generation else { return .refused }
+                budgetBlocked[id] = nil
+            }
+            return .decode
         }
-        lock.unlock()
+        switch cached {
+        case .hit(let texture): return texture
+        case .refused: return nil
+        case .decode: break
+        }
         decodeAndInstall(id: id, generation: 0, data: data)
         return texture(for: id)
     }
