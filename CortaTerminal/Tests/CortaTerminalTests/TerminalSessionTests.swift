@@ -83,8 +83,11 @@ import Testing
         defer { session.stop() }
         session.start()
 
-        let exit = session.pty.waitForExit(timeout: testTimeout(30))
-        #expect(exit != nil, "cat of a large file should finish well within 30s if the reader never stalls it")
+        // A stalled reader never lets `cat` finish; a slow runner only makes
+        // it late. CI's took 57–98 s against a 90 s ceiling (#368), so the
+        // ceiling separates the two with room, not a speed target.
+        let exit = session.pty.waitForExit(timeout: testTimeout(60))
+        #expect(exit != nil, "cat of a large file should finish if the reader never stalls it")
     }
 
     @Test func controlCStopsAFloodingChild() throws {
