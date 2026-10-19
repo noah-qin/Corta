@@ -152,15 +152,18 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
 
     /// Bounded, and for diagnostics only: turns a bare `.connectionLost` into
     /// the classification `classify(exit:)` gives. Never disturbs a live child.
-    public func awaitExit(timeout: Duration = .seconds(2)) -> ProcessExit? {
-        let deadline = ContinuousClock.now + timeout
+    /// Polls by suspending, not sleeping: a lost connection classifies every
+    /// in-flight request at once, and a blocked thread each was the
+    /// cooperative pool's whole width.
+    public func awaitExit(timeout: Duration = .seconds(2)) async -> ProcessExit? {
+        let deadline = SuspendingClock.now + timeout
         var exit: ProcessExit?
         while true {
             if exit == nil { exit = reap(blocking: false) }
             // Both the exit and stderr's EOF.
             if exit != nil, stderrDrained.withLock({ $0 }) { return exit }
-            if ContinuousClock.now >= deadline { return exit ?? state.withLock { $0.exit } }
-            Thread.sleep(forTimeInterval: 0.01)
+            if SuspendingClock.now >= deadline { return exit ?? state.withLock { $0.exit } }
+            try? await Task.sleep(for: .milliseconds(10), clock: .suspending)
         }
     }
 
@@ -189,12 +192,7 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         Darwin.close(stdinPipe[0])
         Darwin.close(stdoutPipe[1])
         Darwin.close(stderrPipe[1])
-        // The parent's ends stay out of every other child — a shell spawned
-        // later must not be able to write frames into this stream, or hold
-        // ssh's stdin open past `close()`.
-        for fd in [stdinPipe[1], stdoutPipe[0], stderrPipe[0]] {
-            _ = fcntl(fd, F_SETFD, FD_CLOEXEC)
-        }
+
         let pid: pid_t
         switch spawned {
         case .success(let spawnedPID):
@@ -230,6 +228,14 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
                 Darwin.close(fd)
             }
             throw .spawnFailed(code: code)
+        }
+        // Close-on-exec from creation, not after the spawn: the parent's ends
+        // stay out of every other child, even one spawned meanwhile — it must
+        // not be able to write frames into this stream, or hold ssh's stdin
+        // open past `close()`. The child's own ends are its stdio by `dup2`,
+        // which does not carry the flag.
+        for fd in stdinPipe + stdoutPipe + stderrPipe {
+            _ = fcntl(fd, F_SETFD, FD_CLOEXEC)
         }
         return (stdinPipe, stdoutPipe, stderrPipe)
     }
@@ -320,6 +326,9 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
 
     deinit {
         close()
+        // `close` leaves the reap to the exit source, which a weak reference
+        // can no longer reach: the child is killed, so this returns at once.
+        if state.withLock({ $0.exit == nil }) { _ = reap(blocking: true) }
         exitSource.cancel()
     }
 
@@ -379,19 +388,18 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         // to give a stranger. A reap in progress is waited out rather than
         // trusted — it may be `awaitExit`'s `WNOHANG` probe of a live child —
         // and neither kind blocks: the exit source reaps only an exited child.
+        // The killed child is reaped by the exit source, off this thread:
+        // `close` runs on the main actor, and a child slow to die must not
+        // hold it in `waitpid`.
         while true {
-            let killed = state.withLock { state -> Bool? in
+            let reaping = state.withLock { state -> Bool in
                 if state.exit != nil { return false }
-                if state.isReaping { return nil }
+                if state.isReaping { return true }
                 kill(processIdentifier, SIGKILL)
-                return true
+                return false
             }
-            guard let killed else {
-                Thread.sleep(forTimeInterval: 0.001)
-                continue
-            }
-            if killed { _ = reap(blocking: true) }
-            break
+            guard reaping else { break }
+            Thread.sleep(forTimeInterval: 0.001)
         }
         stdinWrite.close()
         stdoutRead.close()

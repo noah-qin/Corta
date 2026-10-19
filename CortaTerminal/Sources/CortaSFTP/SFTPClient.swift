@@ -253,7 +253,9 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
     }
 
     public func realPath(path: String) async throws(SFTPError) -> String {
-        String(decoding: try await engine().session.realPath(path: path), as: UTF8.self)
+        try await classify {
+            String(decoding: try await engine().session.realPath(path: path), as: UTF8.self)
+        }
     }
 
     public func listDirectory(path: String) async throws(SFTPError) -> [SFTPEntry] {
@@ -392,7 +394,7 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
     ) async -> SFTPError {
         guard case .transport(.connectionLost) = error,
             let channel = channel ?? state.withLock({ $0.channel }),
-            let exit = channel.awaitExit()
+            let exit = await channel.awaitExit()
         else { return error }
         return .transport(SFTPTransportError.classify(exit: exit, diagnostics: channel.diagnosticOutput))
     }
