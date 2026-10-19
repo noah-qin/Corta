@@ -38,8 +38,11 @@ Versioning for compatibility changes.
   cause is read.
 - The idle block cursor gives up on a GPU busy with other work after 100 ms
   instead of holding the window for up to two seconds.
-- Each zsh session's startup folder is removed when the session ends, not
-  only when Corta quits.
+- zsh history is saved to `~/.zsh_history` again with directory completion
+  on. macOS's `/etc/zshrc` set `HISTFILE` while `ZDOTDIR` still named Corta's
+  temporary startup folder, so history went there and was deleted with it.
+  Each zsh session's startup folder is now removed when the session ends,
+  not only when Corta quits.
 - Clicking a task notification handles the click on the main thread whichever
   thread the system delivers it on.
 

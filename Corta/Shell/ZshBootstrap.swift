@@ -78,7 +78,12 @@ enum ZshBootstrap {
                 let script = restore + "[[ -r ${ZDOTDIR:-$HOME}/\(file) ]] && source ${ZDOTDIR:-$HOME}/\(file)\n" + capture + "ZDOTDIR=\(quote(folder.path))\n"
                 try script.write(to: folder.appendingPathComponent(file), atomically: true, encoding: .utf8)
             }
-            let rc = restore + "unset CORTA_USER_ZDOTDIR CORTA_USER_ZDOTDIR_SET\n[[ -r ${ZDOTDIR:-$HOME}/.zshrc ]] && source ${ZDOTDIR:-$HOME}/.zshrc\nsource \(quote(hook.path))\n"
+            // macOS's /etc/zshrc runs between the wrappers, while ZDOTDIR
+            // still names this folder, and sets HISTFILE from it: history
+            // went here and was deleted with the folder. Pointed back at the
+            // user's directory unless their own files chose another.
+            let history = "[[ $HISTFILE == \(quote(folder.appendingPathComponent(".zsh_history").path)) ]] && HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history\n"
+            let rc = restore + history + "unset CORTA_USER_ZDOTDIR CORTA_USER_ZDOTDIR_SET\n[[ -r ${ZDOTDIR:-$HOME}/.zshrc ]] && source ${ZDOTDIR:-$HOME}/.zshrc\nsource \(quote(hook.path))\n"
             try rc.write(to: folder.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
             folders.append(folder)
             var env = original

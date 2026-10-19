@@ -100,6 +100,37 @@ struct DirectoryCompletionSessionTests {
         try wait { session.currentDirectory?.hasSuffix("/-dash") == true }
         #expect(try String(contentsOf: home.appendingPathComponent(".zshrc"), encoding: .utf8) == "PS1='READY> '\n")
     }
+    /// macOS's /etc/zshrc sets HISTFILE from ZDOTDIR while ZDOTDIR still
+    /// names the startup folder, so history was written there and deleted
+    /// with it. The user's own choice of HISTFILE is kept.
+    @Test(arguments: [nil, "custom_history"]) func historyStaysInTheUsersDirectory(chosen: String?) throws {
+        let fm = FileManager.default
+        let home = fm.temporaryDirectory.appendingPathComponent("corta-histfile-test-\(UUID().uuidString)")
+        try fm.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: home) }
+        let seen = home.appendingPathComponent("seen")
+        // In .zshrc, as on any Mac: /etc/zshrc overrides an earlier choice.
+        let choice = chosen.map { "HISTFILE='\(home.appendingPathComponent($0).path)'\n" } ?? ""
+        try (choice + "print -r -- $HISTFILE > '\(seen.path)'\n")
+            .write(to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+        let env = ZshBootstrap.environment(
+            ["HOME": home.path, "PATH": "/bin:/usr/bin", "TERM": "xterm-256color", "LANG": "en_US.UTF-8"],
+            executable: "/bin/zsh", arguments: ["-l"])
+        let folder = try #require(ZshBootstrap.folder(of: env))
+        defer { ZshBootstrap.remove(folder) }
+        let session = try TerminalSession(executable: "/bin/zsh", arguments: ["-l"], environment: env,
+            size: TerminalSize(rows: 30, columns: 100), workingDirectory: home.path)
+        defer { session.stop() }
+        session.start()
+        let end = SuspendingClock.now + .seconds(5 * Double(testTimeoutScale))
+        func reported() -> String? { try? String(contentsOf: seen, encoding: .utf8) }
+        while reported()?.hasSuffix("\n") != true && SuspendingClock.now < end { Thread.sleep(forTimeInterval: 0.01) }
+        let histfile = try #require(reported(), "Startup did not finish: \(session.snapshot().dump())")
+        // A system without /etc/zshrc's HISTFILE line sets none; that is fine.
+        if chosen == nil, histfile == "\n" { return }
+        #expect(histfile == home.appendingPathComponent(chosen ?? ".zsh_history").path + "\n")
+    }
+
     @Test(arguments: [false, true]) func startupPreservesUserDotDirectory(explicit: Bool) throws {
         let fm = FileManager.default
         let home = fm.temporaryDirectory.appendingPathComponent("corta-zdotdir-test-\(UUID().uuidString)")
