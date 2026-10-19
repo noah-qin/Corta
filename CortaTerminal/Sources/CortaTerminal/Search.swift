@@ -190,13 +190,13 @@ public enum Search {
             let regex = compileRegex(pattern, caseSensitive: caseSensitive)
         else { return RegexResult() }
         var result = RegexResult()
-        let deadline = ContinuousClock.now + timeBudget
+        let deadline = SuspendingClock.now + timeBudget
         lineLoop: for logicalLine in grid.reversedLogicalLines() {
             guard !shouldStop() else { break }
             let text = logicalLine.text
             guard !text.isEmpty else { continue }
             // Here too: a line with no match never calls the block.
-            if ContinuousClock.now >= deadline {
+            if SuspendingClock.now >= deadline {
                 result.timedOut = true
                 break
             }
@@ -215,7 +215,7 @@ public enum Search {
                     stop.pointee = true
                     return
                 }
-                if ContinuousClock.now >= deadline {
+                if SuspendingClock.now >= deadline {
                     result.timedOut = true
                     stop.pointee = true
                     return
@@ -236,14 +236,14 @@ public enum Search {
                             end: SelectionPoint(row: endPosition.row, column: endPosition.column)))
                 }
                 if result.matches.count + found.count >= maxMatches || shouldStop()
-                    || ContinuousClock.now >= deadline
+                    || SuspendingClock.now >= deadline
                 {
                     stop.pointee = true
                 }
             }
             result.matches.append(contentsOf: found.reversed())
             if result.matches.count >= maxMatches || shouldStop() { break lineLoop }
-            if ContinuousClock.now >= deadline {
+            if SuspendingClock.now >= deadline {
                 result.timedOut = true
                 break lineLoop
             }

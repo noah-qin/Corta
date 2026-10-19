@@ -297,12 +297,10 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
         func admit(_ pid: pid_t) {
             guard let started = record(pid)?.started else { return }
             // Every reconnect spawns another ssh; the ones that have exited
-            // since are let go here, so a long-lived connection's list stays
-            // as long as its live processes.
-            let admitted = processes.withLock { $0 }
-            let gone = admitted.filter { $0.key != pid && record($0.key)?.started != $0.value }.keys
+            // since are let go here, in the same pass, so a long-lived
+            // connection's list stays as long as its live processes.
             processes.withLock { processes in
-                for stale in gone { processes[stale] = nil }
+                processes = processes.filter { record($0.key)?.started == $0.value }
                 processes[pid] = started
             }
         }
