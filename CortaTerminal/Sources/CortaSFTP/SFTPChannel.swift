@@ -162,7 +162,10 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
             if exit == nil { exit = reap(blocking: false) }
             // Both the exit and stderr's EOF.
             if exit != nil, stderrDrained.withLock({ $0 }) { return exit }
-            if SuspendingClock.now >= deadline { return exit ?? state.withLock { $0.exit } }
+            // A cancelled task's sleep returns at once: stop rather than spin.
+            if SuspendingClock.now >= deadline || Task.isCancelled {
+                return exit ?? state.withLock { $0.exit }
+            }
             try? await Task.sleep(for: .milliseconds(10), clock: .suspending)
         }
     }
@@ -229,12 +232,14 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
             }
             throw .spawnFailed(code: code)
         }
-        // Close-on-exec from creation, not after the spawn: the parent's ends
-        // stay out of every other child, even one spawned meanwhile — it must
-        // not be able to write frames into this stream, or hold ssh's stdin
-        // open past `close()`. The child's own ends are its stdio by `dup2`,
-        // which does not carry the flag.
-        for fd in stdinPipe + stdoutPipe + stderrPipe {
+        // The parent's ends get close-on-exec as soon as they exist, not
+        // after the spawn: they stay out of every other child spawned
+        // meanwhile, which must not write frames into this stream or hold
+        // ssh's stdin open past `close()`. (A spawner without
+        // `POSIX_SPAWN_CLOEXEC_DEFAULT` in the gap between `pipe` and here
+        // still could; macOS has no `pipe2`.) Not the child's ends: one that
+        // is already 0, 1 or 2 is `dup2`ed onto itself, which keeps the flag.
+        for fd in [stdinPipe[1], stdoutPipe[0], stderrPipe[0]] {
             _ = fcntl(fd, F_SETFD, FD_CLOEXEC)
         }
         return (stdinPipe, stdoutPipe, stderrPipe)
@@ -325,10 +330,9 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     }
 
     deinit {
-        close()
-        // `close` leaves the reap to the exit source, which a weak reference
-        // can no longer reach: the child is killed, so this returns at once.
-        if state.withLock({ $0.exit == nil }) { _ = reap(blocking: true) }
+        // Reached unclosed only when nothing called `close`; a closed channel
+        // stays alive until its reap has run on `exitQueue`.
+        if shutDown() { _ = reap(blocking: true) }
         exitSource.cancel()
     }
 
@@ -376,26 +380,37 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
 
     /// Idempotent.
     public func close() {
+        // The killed child is reaped on `exitQueue`, not here: `close` runs on
+        // the main actor, and a child slow to die must not hold it in
+        // `waitpid`. The block retains the channel, so its last release —
+        // and `deinit` — come after the reap, off the main thread too.
+        guard shutDown() else { return }
+        exitQueue.async { _ = self.reap(blocking: true) }
+    }
+
+    /// Marks the channel closed, kills the child if it is unreaped and
+    /// closes the parent's ends. Whether it killed one, which then needs a
+    /// reap; false when already closed or already reaped.
+    private func shutDown() -> Bool {
         let shouldClose = state.withLock { state -> Bool in
             if state.isClosed { return false }
             state.isClosed = true
             return true
         }
-        guard shouldClose else { return }
+        guard shouldClose else { return false }
         // SIGKILL: this is cancellation, and a politely asked child may be stuck
         // in a socket read. Only while unreaped, and decided under the lock
         // `reap` claims: once `waitpid` has run the id is free for the system
         // to give a stranger. A reap in progress is waited out rather than
         // trusted — it may be `awaitExit`'s `WNOHANG` probe of a live child —
         // and neither kind blocks: the exit source reaps only an exited child.
-        // The killed child is reaped by the exit source, off this thread:
-        // `close` runs on the main actor, and a child slow to die must not
-        // hold it in `waitpid`.
+        var killed = false
         while true {
             let reaping = state.withLock { state -> Bool in
                 if state.exit != nil { return false }
                 if state.isReaping { return true }
                 kill(processIdentifier, SIGKILL)
+                killed = true
                 return false
             }
             guard reaping else { break }
@@ -403,6 +418,7 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         }
         stdinWrite.close()
         stdoutRead.close()
+        return killed
     }
 
     /// Only one `waitpid` ever runs for this child, as in `PTY.reap`.
