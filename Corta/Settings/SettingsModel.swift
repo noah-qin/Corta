@@ -536,7 +536,8 @@ extension SettingsModel {
 
     func setQuickTerminalKey(_ value: Shortcut?) {
         commit { configuration in
-            guard value == nil || !value!.modifiers.intersection([.command, .control, .option, .shift]).isEmpty else {
+            // The rule the hotkey registration and the config parser apply.
+            guard value.map(GlobalHotKey.isRegistrable) ?? true else {
                 return L10n.text("ui.shortcut.modifierRequired")
             }
             configuration.quickTerminalKey = value

@@ -26352,55 +26352,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A global shortcut must include a modifier key."
+            "value": "A global shortcut must include Command, Control or Option; Shift alone is not enough."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "全局快捷键必须包含修饰键。"
+            "value": "全局快捷键必须包含 Command、Control 或 Option；只有 Shift 不够。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
-            "state": "translated",
-            "value": "全域快速鍵必須包含修飾鍵。"
+            "state": "needs_review",
+            "value": "全域快速鍵必須包含 Command、Control 或 Option；只有 Shift 不夠。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "グローバルショートカットには修飾キーが必要です。"
+            "value": "グローバルショートカットには Command、Control、Option のいずれかが必要です。Shift だけでは使えません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "전역 단축키에는 보조 키가 필요합니다."
+            "value": "전역 단축키에는 Command, Control 또는 Option이 필요합니다. Shift만으로는 안 됩니다."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Ein globaler Kurzbefehl benötigt eine Sondertaste."
+            "value": "Ein globaler Kurzbefehl benötigt Befehl, Control oder Option; Umschalt allein genügt nicht."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Un raccourci global doit inclure une touche de modification."
+            "value": "Un raccourci global doit inclure Commande, Contrôle ou Option ; Maj seule ne suffit pas."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Un atajo global debe incluir una tecla modificadora."
+            "value": "Un atajo global debe incluir Comando, Control u Opción; Mayúsculas sola no basta."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Um atalho global deve incluir uma tecla modificadora."
+            "value": "Um atalho global deve incluir Command, Control ou Option; só Shift não basta."
           }
         }
       }
