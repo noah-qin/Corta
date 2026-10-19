@@ -185,7 +185,7 @@ class ScopeTests(unittest.TestCase):
             self.assertEqual(ci.scope_for_paths([path]), ci.full_scope(), path)
 
     def test_docs_and_configuration_reference(self):
-        docs = ci.scope_for_paths(["README.md", "docs/TESTING.md"])
+        docs = ci.scope_for_paths(["README.md", "README.zh-CN.md", "docs/TESTING.md"])
         self.assertFalse(any(docs[name] for name in ci.CHECKS))
         self.assertEqual(docs["languages"], [])
         reference = ci.scope_for_paths(["docs/CONFIGURATION.md"])

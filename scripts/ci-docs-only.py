@@ -29,8 +29,8 @@ import re
 import subprocess
 
 ROOT_DOCS = {
-    "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md",
-    "SECURITY.md", "CLAUDE.md",
+    "README.md", "README.zh-CN.md", "CHANGELOG.md", "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md", "SECURITY.md", "CLAUDE.md",
 }
 
 

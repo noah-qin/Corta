@@ -66,6 +66,13 @@ A manually chosen higher, not-yet-prepared project version is respected by
 the default patch route. Performance measurements and conformance records
 are added when measured; the automation does not invent evidence.
 
+Nothing else in the tree names the current version, so a release leaves no
+stale number behind: the issue and discussion forms use an `x.y.z`
+placeholder, and `CLAUDE.md`'s status line points at the latest release.
+The README's *Quality, with evidence* table names the release each figure
+was measured on; a re-measurement updates the figure and that column
+together, in its own pull request.
+
 ## Disk-image packaging (D26)
 
 Release notarises the Developer ID signed app using a temporary ZIP sent

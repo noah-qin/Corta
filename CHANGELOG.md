@@ -10,6 +10,23 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- The user guide has a *Coming from another terminal* section: the Corta key
+  for each habit carried over from iTerm2, Ghostty or Terminal.app (⌥ as
+  Meta, copy on select, a hotkey window, OSC 52 writes), and what has no
+  equivalent.
+- `README.zh-CN.md`, a Simplified Chinese summary of the README's first
+  screen and installation steps.
+- `docs/DECISIONS.md` opens with an index of every decision and its status.
+
+### Changed
+
+- The README is shorter: one table of measured figures, each naming the
+  release it was measured on, and the comparison with iTerm2 and Ghostty
+  moved to the feature reference. "What is planned" links to the open
+  issues instead of an empty milestones page.
+
 ### Fixed
 
 - Rapid clicks on New Tab always append and select the rightmost tab, even

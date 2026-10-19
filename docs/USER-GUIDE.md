@@ -8,6 +8,7 @@ that holds the details. Shortcuts are the defaults, and all but Find Next
 and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 
 - [Install and update](#install-and-update)
+- [Coming from another terminal](#coming-from-another-terminal)
 - [Windows, tabs and panes](#windows-tabs-and-panes)
 - [Text, fonts and themes](#text-fonts-and-themes)
 - [Personalizing the terminal](#personalizing-the-terminal)
@@ -51,6 +52,42 @@ move itself into `/Applications` (`suggest-applications-folder`).
 **Updates.** **Corta ▸ Check for Updates…** checks now; a background check
 runs once a day unless `update-auto-check = false`. An update is only
 installed when you say so.
+
+## Coming from another terminal
+
+Corta has no importer: it reads one text file, `~/.config/corta/config`, and
+the Settings window edits the same file. Most habits carry over through a
+handful of keys. The left column names where the habit lives elsewhere; the
+right is the Corta key ([Configuration](CONFIGURATION.md) has each one's
+values and when it applies).
+
+| If you relied on… | In Corta |
+| :--- | :--- |
+| ⌥ as Meta / Alt (iTerm2's *Left Option key: Esc+*, Ghostty's `macos-option-as-alt`) | `option-as-meta = true`. Off by default, so ⌥ types `é`, `ø` and `–` as macOS does. |
+| Copy on select | `copy-on-select`, **on** by default. Set `false` for ⌘C only. |
+| A hotkey window or quick terminal | `quick-terminal = true`; the key is `quick-terminal-key` (default ⌥Space). Off by default: a global hotkey is claimed in every application. [The Quick Terminal](#the-quick-terminal). |
+| Programs copying to the clipboard over `ssh` or from `tmux` (OSC 52) | `allow-clipboard-write = true`. Off by default; reading the clipboard is not possible under any setting. |
+| Being asked before closing a busy window | `confirm-close`, on by default. |
+| Windows reopening where you left them | `restore-windows`, on by default. Layouts, tabs and working directories come back; processes and terminal text do not. |
+| Your own colour scheme | A theme defined in the file (`theme.<name>.*`), or **View ▸ Theme editor…**. [Creating and editing themes](#creating-and-editing-themes). |
+| Your own key bindings | `bind.<command> = <shortcut>`. The command names are in [Keyboard shortcuts](#keyboard-shortcuts). |
+| A font of your choice, ligatures, transparency or per-profile settings | Not available. System Monospaced is the one primary font (D11); the rest are [not shipped](CONFIGURATION.md#6-what-is-deliberately-not-configurable) and each needs a decision first. Presets cover a shell, a directory and an environment ([Presets](CONFIGURATION.md#4a-presets)). |
+| `tmux -CC` control mode | Not supported (D09). Ordinary `tmux` runs inside Corta as any program does. |
+
+**Shell integration.** Standard local zsh sessions load Corta's hooks
+without touching your startup files. If your `~/.zshrc`, `~/.bashrc` or
+`config.fish` still sources another terminal's integration — iTerm2's,
+WezTerm's, Visual Studio Code's — **Settings ▸ Terminal ▸ Shell Integration**
+says it may conflict; the two can both emit prompt marks. See
+[Shell integration](#shell-integration).
+
+**`TERM`.** Corta announces `xterm-256color` (D08). A remote host that
+already works with iTerm2 or Terminal.app needs nothing new; one set up for
+`xterm-ghostty` or `xterm-kitty` gets the common value instead.
+
+Behaviour that differs in smaller ways — copying, closing, the Quick
+Terminal hotkey, remote badges — is collected in
+[Troubleshooting → Behaviour that differs](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals).
 
 ## Windows, tabs and panes
 

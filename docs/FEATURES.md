@@ -32,8 +32,6 @@ the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
 - Typing, paste and input-method text request the panel's maximum frame rate
   (120 Hz on ProMotion); Low Power Mode, an inactive window and thermal
   pressure lower it otherwise.
-- A full-screen window with one pane presents directly to the display: about
-  a frame less from keypress to glass.
 - An idle blinking cursor is animated by Core Animation; an idle shell causes
   no periodic wakeups; a hidden pane's reader runs at background priority
   after two seconds; an occluded window does not draw.
@@ -143,6 +141,46 @@ files, remote connections and child-process input.
   fallback for missing characters. Legacy font-family names migrate to system.
 - Cursor shapes are block, bar and underline, with independent blinking; the
   default is a nonblinking block. Programs retain temporary DECSCUSR control.
+
+## How Corta compares
+
+All three offer native macOS interfaces and GPU rendering. Corta combines
+a Swift terminal core, one shared configuration for text and GUI editing,
+and an integrated SSH, SFTP and remote-editing workflow. Here is how their
+implementation and integration choices compare.
+
+| | Corta | iTerm2 | Ghostty |
+| :--- | :--- | :--- | :--- |
+| Main implementation | Swift | Objective-C and Swift | Zig core; Swift on macOS, GTK on Linux |
+| App platforms | macOS | macOS | macOS and Linux |
+| Native UI | AppKit, with SwiftUI settings | Native macOS app | SwiftUI on macOS; GTK on Linux |
+| Rendering | Metal 4, with Core Text shaping and font fallback | Metal GPU renderer, configurable | Metal on macOS; OpenGL on Linux |
+| Settings | One text file, also edited by the native Settings window | Settings UI and profiles; dynamic profiles | Text configuration, with support for multiple files |
+| Integration examples | Shortcuts, OpenSSH, SFTP browser and managed remote editing | tmux control-mode integration, Python API and triggers | macOS Shortcuts and AppleScript; embeddable `libghostty` libraries |
+
+**Last checked 2026-10-13.** Other terminals change faster than this page;
+treat a row as a snapshot and follow the links for the current state. The
+competitor rows were checked against the official
+[iTerm2 repository](https://github.com/gnachman/iTerm2),
+[settings documentation](https://iterm2.com/documentation-preferences-general.html),
+[dynamic profiles](https://iterm2.com/documentation-dynamic-profiles.html),
+[tmux integration](https://iterm2.com/documentation-tmux-integration.html),
+[Python API](https://iterm2.com/python-api/) and
+[features](https://iterm2.com/features.html), and the official
+[Ghostty repository](https://github.com/ghostty-org/ghostty),
+[features](https://ghostty.org/docs/features),
+[configuration](https://ghostty.org/docs/config) and
+[AppleScript guide](https://ghostty.org/docs/features/applescript).
+
+For native `tmux -CC` integration or a Python scripting API, consider
+[iTerm2](https://iterm2.com/documentation-tmux-integration.html). For a
+terminal app that also runs on Linux, consider
+[Ghostty](https://ghostty.org/docs/features); its macOS app also offers
+[AppleScript automation](https://ghostty.org/docs/features/applescript)
+from 1.3.0. Corta's macOS-only scope and exclusion of tmux control mode,
+built-in AI and a scripting engine are
+[settled decisions](DECISIONS.md). Ordinary tmux sessions run inside
+Corta as terminal programs.
 
 ## Known limits
 

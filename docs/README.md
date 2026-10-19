@@ -15,6 +15,7 @@ change: in its pull request, and in the release notes.
 | [Features](FEATURES.md) | You want an overview of what the development tree does and its known limits. |
 | [Configuration](CONFIGURATION.md) | You want to change a setting, define a theme, rebind a key, add a preset, or find out when a change takes effect. Every key in `~/.config/corta/config`, in one table each. |
 | [Troubleshooting](TROUBLESHOOTING.md) | Corta will not install, will not start, or does something your last terminal did not. Ends with how to uninstall cleanly. |
+| [简体中文摘要](../README.zh-CN.md) | You read Chinese and want the requirements, installation and first steps; the English documents remain the reference. |
 | [Changelog](../CHANGELOG.md) | You want to know what changed in a release, or what has landed on `main` since the last one. |
 
 Start with the [personalization tutorial](USER-GUIDE.md#personalizing-the-terminal)

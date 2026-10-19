@@ -20,7 +20,8 @@ Metal 4 rendering · Native CJK / IME · SSH, SFTP and remote editing
 **[User guide](docs/USER-GUIDE.md)** ·
 [Documentation](docs/README.md) ·
 [Contribute](CONTRIBUTING.md) ·
-[Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml)
+[Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml) ·
+[简体中文](README.zh-CN.md)
 
 <img src="docs/brand/screenshot.png" width="960" alt="Corta with three split panes: a git log and a Chinese, Japanese, Korean and emoji alignment table; the pangolin mascot shown as an image in the terminal; and 24-bit colour ramps">
 
@@ -65,123 +66,26 @@ files only when you choose Install. If an installed integration is outdated,
 choose Update and open a new shell. See the
 [shell-integration guide](docs/USER-GUIDE.md#shell-integration) for details.
 
-## Built for speed
+## Why Corta
 
-Corta 1.2 made a big leap in speed and efficiency: more than double the
-core throughput, a frame less of full-screen input latency, and a fraction
-of the memory for long histories. Measured on one Apple M5 MacBook Air,
-before and after, with the same toolchain:
+| | |
+| :--- | :--- |
+| **Native Mac input** | CJK input and IME composition, Core Text font fallback, VoiceOver, Secure Keyboard Entry, Services, the Quick Terminal and Shortcuts actions — through AppKit, not around it. |
+| **Fast, with evidence** | 2.3× the core throughput of 1.1, a frame less of full-screen input latency, and 11 MiB instead of 185 MiB for 100,000 lines of history. Every figure is published with its method and its gaps (below). |
+| **Remote work built in** | System OpenSSH with your `~/.ssh/config`, a Finder-like SFTP browser with drag and drop, and remote files opened in your local editor with a conflict check before upload. |
+| **One settings file** | The native Settings window and `~/.config/corta/config` edit the same store; automated checks keep the documented keys and shortcuts aligned with the code. |
+| **Small core, serious safeguards** | A Swift terminal core with no third-party dependencies, resource limits for untrusted output, and a sandboxed image decoder; the app adds only [Sparkle](https://sparkle-project.org) for updates. Clipboard reads and title queries are deliberately absent ([security model](docs/SECURITY.md)). |
 
-- **2.3× the core throughput.** The parser and grid take **356 MiB/s**,
-  up from 158; the terminal core with scrollback takes **317 MiB/s**, up
-  from 137. These feed benchmarks exclude PTY I/O, rendering and display.
-- **A frame less while you type in full screen.** With a full-screen
-  window and exactly one pane, frames can be presented directly to the
-  display. On the measured 60 Hz panel, median keypress-to-glass latency
-  drops from 64–68 ms to **49–51 ms**, and p99 drops from 154–180 ms to
-  **83–84 ms**. Windowed and split panes keep the regular presentation path.
-- **Long histories. Small footprint.** A one-line region
-  scroll takes **5×** less CPU per frame; output arriving while you read
-  history takes **10×** less. Compressing cold history reduces the measured
-  memory increment for 100,000 lines of 120 columns from 185 to **11 MiB**.
-- **Responsive input and quieter idle sessions.** Typing, paste and input
-  methods request the panel's maximum frame rate — 120 Hz on ProMotion.
-  An idle blinking cursor is animated by the system, and an idle shell no
-  longer wakes its reader four times a second.
-
-Every figure is in [Performance](docs/PERFORMANCE.md), with its method and
-what it does not show. The [changelog](CHANGELOG.md) has the full list.
-
-## Made for macOS
-
-Corta puts serious terminal engineering behind a familiar Mac experience:
-a hand-written Swift VT engine, Metal 4 rendering, Core Text shaping and
-native AppKit input. Split your workspace, search long histories, compose
-Chinese, Japanese or Korean text, and edit remote files from the same app.
-The terminal core is a separate Swift package with no third-party
-dependencies. The app uses [Sparkle](https://sparkle-project.org) for updates.
-
-| Native interaction | Terminal fundamentals | Everyday workflow |
-| :--- | :--- | :--- |
-| CJK input and IME composition | True colour and Unicode text | Split panes and restored layouts |
-| Core Text font fallback | Reflow and scrollback search | Command palette and custom shortcuts |
-| Quick Terminal and Shortcuts | Bracketed paste and OSC 8 links | Shell integration and command history |
-| Secure Keyboard Entry | Kitty keyboard and direct graphics protocols | OpenSSH, SFTP and remote editing |
-| A System Settings–style Settings window | Kitty images in the scrollback | A Finder-like SFTP browser with drag and drop |
-
-Restoration keeps layouts and directory metadata, starts fresh processes,
-and does not restore terminal text.
-
-The table describes `main`; published releases may not include every feature.
-The [feature reference](docs/FEATURES.md) has the details, requirements and
-limitations, and the [design decisions](docs/DECISIONS.md) explain what
-Corta deliberately leaves out.
-
-## How is Corta different?
-
-All three offer native macOS interfaces and GPU rendering. Corta combines
-a Swift terminal core, one shared configuration for text and GUI editing,
-and an integrated SSH, SFTP and remote-editing workflow. Here is how their
-implementation and integration choices compare.
-
-| | Corta | iTerm2 | Ghostty |
-| :--- | :--- | :--- | :--- |
-| Main implementation | Swift | Objective-C and Swift | Zig core; Swift on macOS, GTK on Linux |
-| App platforms | macOS | macOS | macOS and Linux |
-| Native UI | AppKit, with SwiftUI settings | Native macOS app | SwiftUI on macOS; GTK on Linux |
-| Rendering | Metal 4, with Core Text shaping and font fallback | Metal GPU renderer, configurable | Metal on macOS; OpenGL on Linux |
-| Settings | One text file, also edited by the native Settings window | Settings UI and profiles; dynamic profiles | Text configuration, with support for multiple files |
-| Integration examples | Shortcuts, OpenSSH, SFTP browser and managed remote editing | tmux control-mode integration, Python API and triggers | macOS Shortcuts and AppleScript; embeddable `libghostty` libraries |
-
-Competitor information checked on **2026-10-13** against the official
-[iTerm2 repository](https://github.com/gnachman/iTerm2),
-[settings documentation](https://iterm2.com/documentation-preferences-general.html),
-[dynamic profiles](https://iterm2.com/documentation-dynamic-profiles.html),
-[tmux integration](https://iterm2.com/documentation-tmux-integration.html),
-[Python API](https://iterm2.com/python-api/) and
-[features](https://iterm2.com/features.html), and the official
-[Ghostty repository](https://github.com/ghostty-org/ghostty),
-[features](https://ghostty.org/docs/features),
-[configuration](https://ghostty.org/docs/config) and
-[AppleScript guide](https://ghostty.org/docs/features/applescript).
-
-**Why pick Corta.**
-
-- **A Mac workspace built around your hands.** Compose CJK text through
-  native IME input, summon the Quick Terminal, move between split panes,
-  and find commands from the palette. AppKit powers input, VoiceOver,
-  Secure Keyboard Entry and Services; App Intents connects your workspace
-  to Shortcuts.
-- **Small core, serious safeguards.** An independent Swift terminal core
-  has zero third-party dependencies and resource limits for untrusted
-  terminal output. Inline image decoding runs in a sandboxed helper;
-  clipboard-read and window-title queries are deliberately absent. The
-  [security model](docs/SECURITY.md) documents the trust boundaries.
-- **Point-and-click comfort. Text-file control.** Change themes and
-  shortcuts in the native Settings window or edit `~/.config/corta/config`
-  directly: both use the same settings store. Presets load from it too,
-  and automated checks keep documented keys and shortcut defaults aligned
-  with the code. See the [configuration reference](docs/CONFIGURATION.md).
-- **From SSH to a local editor, in one workflow.** Connect with system
-  OpenSSH using recent hosts or your `~/.ssh/config` aliases. Browse remote
-  files with breadcrumbs, sortable columns and drag and drop; track
-  transfers with speed and time remaining. Open a remote file in your local
-  editor, then approve its upload with a check for remote conflicts first.
-- **Performance you can inspect.** More than double the measured core
-  throughput, about 94% less memory for the measured 100,000-line history,
-  and lower full-screen input latency. The [evidence below](#quality-with-evidence)
-  publishes hardware, methods and results alongside the remaining gaps,
-  including windowed latency and incomplete VT conformance.
-
-For native `tmux -CC` integration or a Python scripting API, consider
-[iTerm2](https://iterm2.com/documentation-tmux-integration.html). For a
-terminal app that also runs on Linux, consider
-[Ghostty](https://ghostty.org/docs/features); its macOS app also offers
-[AppleScript automation](https://ghostty.org/docs/features/applescript)
-from 1.3.0. Corta's macOS-only scope and exclusion of tmux control mode,
-built-in AI and a scripting engine are
-[settled decisions](docs/DECISIONS.md). Ordinary tmux sessions run inside
-Corta as terminal programs.
+Split panes, scrollback search, true colour, OSC 8 links, the Kitty keyboard
+and graphics protocols, shell integration and restored layouts are all
+there; the [feature reference](docs/FEATURES.md) lists everything, with
+requirements and limitations, and describes `main` — a published release
+may not have every item yet. How Corta compares with iTerm2 and Ghostty,
+and when to pick one of them instead, is in
+[Features → How Corta compares](docs/FEATURES.md#how-corta-compares).
+Corta's macOS-only scope and its exclusion of tmux control mode, built-in
+AI and a scripting engine are [settled decisions](docs/DECISIONS.md);
+ordinary tmux sessions run inside Corta as terminal programs.
 
 ## Make it yours
 
@@ -211,53 +115,42 @@ The [configuration reference](docs/CONFIGURATION.md) lists every key, default
 and when changes take effect. The [user guide](docs/USER-GUIDE.md) walks
 through every feature and where to find it.
 
-## Build and test
-
-Use macOS 26.0 or later on Apple silicon and Xcode with Swift 6.2 or later. The exact
-Xcode CI and releases build with is in [`.xcode-version`](.xcode-version). The app resolves
-Sparkle on its first build; the terminal core has no external packages.
+## Build from source
 
 ```sh
-git clone https://github.com/noah-qin/Corta.git
-cd Corta
-
-# Build and test the terminal core without launching the app.
-swift test --package-path CortaTerminal
-
-# Build the macOS app.
-xcodebuild -project Corta.xcodeproj -scheme Corta build
-
-# Or build the development app — a separate application, with its own
-# configuration and state, that runs beside an installed Corta.
-xcodebuild -project Corta.xcodeproj -scheme 'Corta (Dev)' build
+git clone https://github.com/noah-qin/Corta.git && cd Corta
+swift test --package-path CortaTerminal                     # the terminal core, no app
+xcodebuild -project Corta.xcodeproj -scheme 'Corta (Dev)' build  # a development app beside your installed Corta
 ```
 
-Start with the [contributor guide](CONTRIBUTING.md) for local signing and
-repository orientation, and the [testing guide](docs/TESTING.md) for app
-tests, golden fixtures, fuzzing and manual verification.
+The [contributor guide](CONTRIBUTING.md) has the requirements (macOS 26,
+Apple silicon, the Xcode in [`.xcode-version`](.xcode-version)), local
+signing and a map of the repository; the [testing guide](docs/TESTING.md)
+says which check each change needs.
 
 ## Quality, with evidence
 
 Corta is under active development and has known issues. These measurements
-are snapshots, not guarantees for every machine or workload.
+are snapshots, not guarantees for every machine or workload. Each row says
+which release it was measured on.
 
-| Check | Recorded result | Evidence |
-| :--- | :--- | :--- |
-| Core feed throughput | **317.3 MiB/s** (137.2 before 1.2) | [Performance §5.14](docs/PERFORMANCE.md#514-scrolling-without-per-line-screen-allocation-281-283) |
-| Parser + grid throughput | **355.9 MiB/s** (158.0 before 1.2) | same |
-| Scrollback memory, 100k × 120 lines | **11.4 MiB** (185 MiB before 1.2) | [Performance §5.6](docs/PERFORMANCE.md#56-numbers-by-release) |
-| Region scroll, CPU a frame, p50 | **0.026 ms** (0.130 ms before 1.2) | [Performance §5.14](docs/PERFORMANCE.md#514-scrolling-without-per-line-screen-allocation-281-283) |
-| Frame CPU, 120 × 40 full rebuild, Release | **0.37–0.39 ms** | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
-| Keypress to glass, full screen, one pane, 60 Hz, a person typing | **49.1–50.8 ms** p50, 82.9–84.2 ms p99 | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
-| Idle CPU, Release, 20 seconds | 0.05% | [Performance](docs/PERFORMANCE.md) |
-| esctest2 | 131 passed, 334 known bugs, 102 failed; 567 total | [Raw results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-10-07-results.txt) |
+| Check | Recorded result | Measured on | Evidence |
+| :--- | :--- | :--- | :--- |
+| Core feed throughput (parser, grid and scrollback; no PTY or rendering) | **317.3 MiB/s**, up from 137.2 | 1.2 vs 1.1 | [Performance §5.14](docs/PERFORMANCE.md#514-scrolling-without-per-line-screen-allocation-281-283) |
+| Parser + grid throughput | **355.9 MiB/s**, up from 158.0 | 1.2 vs 1.1 | same |
+| Scrollback memory, 100k × 120 lines | **11.4 MiB**, down from 185 | 1.2 vs 1.1 | [Performance §5.6](docs/PERFORMANCE.md#56-numbers-by-release) |
+| Region scroll, CPU a frame, p50 | **0.026 ms**, down from 0.130 | 1.2 vs 1.1 | [Performance §5.14](docs/PERFORMANCE.md#514-scrolling-without-per-line-screen-allocation-281-283) |
+| Frame CPU, 120 × 40 full rebuild, Release | **0.37–0.39 ms** | 1.2 | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
+| Keypress to glass, full screen, one pane, 60 Hz, a person typing | **49.1–50.8 ms** p50, 82.9–84.2 ms p99 (was 64–68 ms p50) | 1.2 | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
+| Idle CPU, Release, 20 seconds | 0.05% | **1.0.0** (2026-09-18); not re-run since the idle-wakeup work in 1.2 | [Performance](docs/PERFORMANCE.md) |
+| esctest2 | 131 passed, 334 known bugs, 102 failed; 567 total | **1.1.5** (2026-10-07) | [Raw results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-10-07-results.txt) |
 
-Measured on an Apple M5 MacBook Air (macOS 27.0.1) between 2026-10-09 and
-2026-10-13, each before/after pair on the same machine and toolchain; the
-dated sections of [Performance](docs/PERFORMANCE.md) hold the conditions, every run and
-what a figure does not establish. Idle CPU is the 1.0.0 run's (2026-09-18),
-and esctest2 1.1.5's; its 82.0% figure counts passes **plus known bugs** and
-is not a pass rate. See [conformance](docs/CONFORMANCE.md) for interpretation.
+Measured on an Apple M5 MacBook Air (macOS 27.0.1); the 1.2 rows between
+2026-10-09 and 2026-10-13, each before/after pair on the same machine and
+toolchain. The dated sections of [Performance](docs/PERFORMANCE.md) hold the
+conditions, every run and what a figure does not establish. The esctest2
+82.0% figure sometimes quoted counts passes **plus known bugs** and is not a
+pass rate; see [conformance](docs/CONFORMANCE.md) for interpretation.
 
 Known limitations include keypress-to-glass latency above the one-frame
 target in a window (full screen with one pane comes closest), incomplete VT
@@ -273,7 +166,9 @@ direct-transmission-only Kitty graphics. The
 | Configure Corta | [Configuration](docs/CONFIGURATION.md) |
 | Understand a feature or limitation | [Features](docs/FEATURES.md) |
 | Diagnose a problem | [Troubleshooting](docs/TROUBLESHOOTING.md) |
-| See what is planned, or suggest something | [Milestones](https://github.com/noah-qin/Corta/milestones) · [Discussions → Ideas](https://github.com/noah-qin/Corta/discussions/categories/ideas) |
+| Move over from iTerm2, Ghostty or Terminal.app | [Coming from another terminal](docs/USER-GUIDE.md#coming-from-another-terminal) |
+| See what is planned, or suggest something | [Open issues](https://github.com/noah-qin/Corta/issues) · [Discussions → Ideas](https://github.com/noah-qin/Corta/discussions/categories/ideas) |
+| Find something to work on | [Good first issues](https://github.com/noah-qin/Corta/labels/good%20first%20issue) · [Help wanted](https://github.com/noah-qin/Corta/labels/help%20wanted) |
 | Make a first contribution | [Contributing](CONTRIBUTING.md) |
 | Run or add tests | [Testing](docs/TESTING.md) |
 | Understand the code | [Architecture](docs/DESIGN.md) · [Core API](CortaTerminal/Sources/CortaTerminal/CortaTerminal.docc/CortaTerminal.md) |
@@ -282,12 +177,20 @@ direct-transmission-only Kitty graphics. The
 ## Contribute
 
 Bug reproductions, documentation, translations, accessibility testing and
-code contributions are welcome. Pick a focused change and read
-[CONTRIBUTING.md](CONTRIBUTING.md) for setup and review expectations.
-Community participation follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+code contributions are welcome. Start from a
+[good first issue](https://github.com/noah-qin/Corta/labels/good%20first%20issue)
+or a [help wanted](https://github.com/noah-qin/Corta/labels/help%20wanted)
+one, and read [CONTRIBUTING.md](CONTRIBUTING.md) for setup and review
+expectations. Community participation follows the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+Tried Corta and went back to your old terminal? That is worth hearing too:
+the [Went back form](https://github.com/noah-qin/Corta/issues/new?template=went_back.yml)
+needs no reproduction, and "it just felt off" is an acceptable answer.
 
 Report vulnerabilities through the [private security channel](SECURITY.md).
-For usage questions, go to [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a).
+For usage questions, go to [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a);
+to share a theme or a setup, [Show and tell](https://github.com/noah-qin/Corta/discussions/categories/show-and-tell).
 For other problems, [open an issue](https://github.com/noah-qin/Corta/issues/new/choose).
 If you would like to support maintenance, [sponsor the project](https://github.com/sponsors/noah-qin).
 

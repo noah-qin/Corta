@@ -3,8 +3,10 @@
 A native macOS terminal emulator in pure Swift. Metal rendering, Core
 Text shaping, AppKit shell, a hand-written VT parser.
 
-**Status (2026-10-14): 1.2.1 is the current release; the next
-version's GitHub milestone is the working list.** A release is a
+**Status: the latest [GitHub release](https://github.com/noah-qin/Corta/releases/latest)
+is the current one, and the open GitHub issues are the working list** (a
+milestone, when one is open, groups the next version's). This line names
+no version on purpose: it would be stale after the next release. A release is a
 single manual `Release` run on `main` that versions, signs, notarises,
 publishes and signs `appcast.xml` (D20, amended) — `docs/RELEASING.md` has
 the steps. The `release` environment admits only `main` and has no
@@ -289,18 +291,9 @@ Deployment target is macOS 26.0, Swift 6, app sandbox disabled
 
 ## Commit Messages
 
-Full rules in `CONTRIBUTING.md`. In short —
 [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/),
-English:
-
-```
-<type>(<optional scope>): <description>
-```
-
-Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,
-`build`, `ci`, `chore`, `revert`.
-Scopes: `app`, `ui`, `tests`, `assets`, `project`, `docs`.
-
-Subject imperative, lowercase, no trailing period, ≤ 72 characters. Body
-wrapped at 72, explains *why*. One logical change per commit. No emoji,
-no advertising footers.
+English: `<type>(<optional scope>): <description>`. `CONTRIBUTING.md`
+→ *Commit messages* holds the types, scopes and rules and is the one copy
+to keep current; read it before the first commit. Subject imperative,
+lowercase, ≤ 72 characters, no trailing period; one logical change per
+commit; never a tool or session identifier (D18).

@@ -14,6 +14,37 @@ so the record stays the record.
 
 Status of every entry below is **accepted** unless it says otherwise.
 
+| | Decision | Status |
+| :--- | :--- | :--- |
+| [D01](#d01--macos-only) | macOS only | Accepted |
+| [D02](#d02--pure-swift-no-ffi) | Pure Swift, no FFI | Accepted |
+| [D03](#d03--lines-carry-a-wrapped-flag-from-the-first-commit) | Lines carry a `wrapped` flag | Accepted |
+| [D04](#d04--the-terminal-core-is-not-mainactor) | The terminal core is not `@MainActor` | Accepted |
+| [D05](#d05--cells-are-fixed-size-complex-graphemes-spill-to-a-side-table) | Cells are 16 bytes; anything else is a side table | Accepted |
+| [D06](#d06--selection-lives-in-the-core-and-is-document-anchored) | Selection lives in the core, document-anchored | Accepted |
+| [D07](#d07--multi-viewport-from-day-one) | Multi-viewport from day one; no singletons in the core | Accepted |
+| [D08](#d08--term-is-xterm-256color) | `$TERM` is `xterm-256color` | Accepted |
+| [D09](#d09--no-multiplexer-no-cross-platform-no-tmux-control-mode-no-ai-features) | No multiplexer, cross-platform, tmux control mode, AI features or command-running automation | Accepted |
+| [D10](#d10--one-config-file-is-the-only-settings-store) | The config file is the only settings store | Accepted |
+| [D11](#d11--curated-themes-and-one-primary-font) | Curated themes and one system monospaced primary font | Accepted |
+| [D12](#d12--a-font-family-is-verified-never-trusted) | A font family is verified, never trusted | Accepted |
+| [D13](#d13--never-change-the-machine-to-test) | Never change the machine to test | Accepted |
+| [D14](#d14--app-layer-changes-are-verified-by-launching-the-app) | App-layer changes are verified by launching the app | Accepted |
+| [D15](#d15--never-size-the-session-from-a-transient-layout-superseded) | Never size the session from a transient layout | **Superseded** 2026-10-06 |
+| [D16](#d16--window-setup-is-staged-before-the-storyboard-runs-superseded) | Window setup is staged before the storyboard runs | **Superseded** 2026-10-06 |
+| [D17](#d17--the-frame-cpu-baseline-is-re-measured-under-release-after-touching-the-render-loop) | Re-measure the frame-CPU baseline, under Release, after touching the render loop | Accepted |
+| [D18](#d18--no-tool-or-session-identifier-in-a-commit-message) | No tool or session identifier in a commit message | Accepted |
+| [D19](#d19--selection-is-hand-rolled-textkit-is-not-adopted) | Selection is hand-rolled; TextKit is not adopted | Accepted |
+| [D20](#d20--the-update-feed-is-signed-from-ci-with-the-key-in-a-reviewed-environment) | The update feed is signed from CI, with the key in the `release` environment | Accepted, amended 2026-10-06 and 2026-10-08 |
+| [D21](#d21--corta-builds-for-apple-silicon-only) | Apple silicon only; Intel Macs stay on 1.0.1 | Accepted |
+| [D22](#d22--the-development-build-is-a-separate-application) | The Debug build is a separate application | Accepted, amended 2026-10-02 |
+| [D23](#d23--sparkle-is-the-one-accepted-third-party-runtime-dependency) | Sparkle is the one accepted third-party runtime dependency | Accepted |
+| [D24](#d24--the-canvas-stays-below-the-titlebar-no-background-extension) | The canvas stays below an opaque titlebar | Accepted |
+| [D25](#d25--metal-frames-present-on-their-own-not-with-the-transaction) | Metal frames present on their own, not with the transaction | Accepted |
+| [D26](#d26--releases-ship-as-a-disk-image) | Releases ship as a signed, notarised disk image | Accepted |
+| [D27](#d27--sftp-asks-through-opensshs-own-askpass-answered-by-corta) | SFTP asks through OpenSSH's `SSH_ASKPASS`; nothing is stored | Accepted |
+| [D28](#d28--local-tools-are-swift-ci-only-glue-may-be-python) | Local tools are Swift; CI-only glue may be Python | Accepted |
+
 ---
 
 ## D01 — macOS only
@@ -223,7 +254,7 @@ view-hierarchy, orientation, startup-ordering or gesture defects.
 **Why.** Six such bugs shipped a blank or unusable window while every
 test stayed green.
 
-## D15 — Never size the session from a transient layout
+## D15 — Never size the session from a transient layout (superseded)
 
 **Status: superseded 2026-10-06** (#123). The window is now created in code
 with its final style mask, so there is no transient layout to wait out; the
@@ -247,7 +278,7 @@ window without `.fullSizeContentView`, and `viewWillAppear` inserted it.
 all followed from that insert. A window born with the flag has one chrome
 measurement from the start, and the gate had nothing left to guard.
 
-## D16 — Window setup is staged before the storyboard runs
+## D16 — Window setup is staged before the storyboard runs (superseded)
 
 **Status: superseded 2026-10-06** (#123). There is no storyboard window to
 stage for.
