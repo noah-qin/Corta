@@ -26,6 +26,7 @@ extension NSToolbarItem.Identifier {
 /// Native toolbar actions and a stable, window-local input-source status slot.
 extension SplitViewController: NSToolbarDelegate {
     func installToolbar(on window: NSWindow) {
+        toolbarWindow = window
         let toolbar = NSToolbar(identifier: "Corta.TerminalToolbar")
         toolbar.delegate = self
         toolbar.displayMode = .iconOnly
@@ -138,7 +139,8 @@ extension SplitViewController: NSToolbarDelegate {
     }
 
     @objc private func newTabInThisWindow(_ sender: Any?) {
-        (NSApp.delegate as? AppDelegate)?.newTab(beside: view.window, sender: sender)
+        guard let window = toolbarWindow else { return }
+        (NSApp.delegate as? AppDelegate)?.newTab(beside: window, sender: sender)
     }
 
     @objc private func connectSSH(_ sender: Any?) { RemoteConnectController.shared.show(.ssh, sender: sender) }

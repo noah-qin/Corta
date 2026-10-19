@@ -13,7 +13,8 @@ Versioning for compatibility changes.
 ### Fixed
 
 - Rapid clicks on New Tab always append and select the rightmost tab, even
-  while the previous tab's selection transition is still in progress.
+  while the previous tab's selection transition is still in progress;
+  toolbar actions keep their owning window throughout the transition.
 - SFTP rename, new-folder and upload dialogs keep the directory they opened
   for when navigation finishes behind them, and refuse a replacement
   connection. Remote-edit change detection, upload snapshots and saving a

@@ -47,6 +47,9 @@ final class SplitViewController: NSViewController {
     /// into the frame.
     private var lastChromeHeight: CGFloat?
     var isJoiningTabGroup = false
+    /// Toolbar actions can be queued while AppKit detaches the content view
+    /// during a tab switch. Its window remains the action's destination.
+    weak var toolbarWindow: NSWindow?
 
     var panes: [ViewController] { children.compactMap { $0 as? ViewController } }
     var hasMultiplePanes: Bool { tree?.leafCount ?? 1 > 1 }
