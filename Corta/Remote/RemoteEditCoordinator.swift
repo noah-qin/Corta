@@ -147,8 +147,13 @@ final class RemoteEditCoordinator {
     /// upload, or the previously-prompted edit) — the baseline the next
     /// change is measured against.
     var digests: [String: String] = [:]
-    /// A newer check, re-baseline or watch teardown invalidates an older read.
-    private var digestChecks: [String: UUID] = [:]
+    private struct DigestCheck {
+        let id: UUID
+        let task: Task<Void, Never>
+    }
+    /// Keep completion as well as identity: a caller displaced by a newer
+    /// check still waits until the replacement has applied its result.
+    private var digestChecks: [String: DigestCheck] = [:]
     private var pendingChecks: [String: DispatchWorkItem] = [:]
     var uploadsInFlight: Set<String> = []
     var approvedSnapshots: [String: URL] = [:]
@@ -410,7 +415,7 @@ final class RemoteEditCoordinator {
     // MARK: - Local change detection
 
     func watch(_ copy: RemoteEditStore.RemoteCopy) {
-        unwatch(copy.id)
+        unwatch(copy.id, invalidatingDigest: false)
         let url = store.localURL(for: copy)
         let descriptor = Darwin.open(url.path, O_EVTONLY | O_CLOEXEC)
         guard descriptor >= 0 else { return }
@@ -444,8 +449,8 @@ final class RemoteEditCoordinator {
         watch(copy)
     }
 
-    private func unwatch(_ copyID: String) {
-        digestChecks[copyID] = nil
+    private func unwatch(_ copyID: String, invalidatingDigest: Bool = true) {
+        if invalidatingDigest { digestChecks[copyID] = nil }
         pendingChecks[copyID]?.cancel()
         pendingChecks[copyID] = nil
         watches[copyID]?.cancel()
@@ -458,12 +463,33 @@ final class RemoteEditCoordinator {
     /// private, for exactly that reason.
     func noteLocalWrite(copyID: String) async {
         guard let copy = store.copies[copyID] else { return }
-        let url = store.localURL(for: copy)
         let check = UUID()
-        digestChecks[copyID] = check
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.checkLocalWrite(copyID: copyID, at: self.store.localURL(for: copy), check: check)
+        }
+        digestChecks[copyID] = DigestCheck(id: check, task: task)
+        await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        // A save event may have started a newer check while this one read.
+        // In particular, `open` must not return before an immediate editor
+        // save has reached the pending-decision state.
+        while !Task.isCancelled, let latest = digestChecks[copyID] {
+            await latest.task.value
+        }
+    }
+
+    private func checkLocalWrite(copyID: String, at url: URL, check: UUID) async {
+        defer {
+            if digestChecks[copyID]?.id == check { digestChecks[copyID] = nil }
+        }
         let result = await readDigest(at: url)
-        guard !Task.isCancelled, digestChecks[copyID] == check else { return }
-        digestChecks[copyID] = nil
+        guard !Task.isCancelled, digestChecks[copyID]?.id == check,
+            let copy = store.copies[copyID]
+        else { return }
         guard let digest = result else {
             // The copy was deleted underneath us: stop watching and drop
             // any pending decision about it.
