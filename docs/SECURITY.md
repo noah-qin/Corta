@@ -123,6 +123,12 @@ when the child has not enabled bracketed paste. A filename can contain a
 newline, so the earlier assumption that a dropped path never does is no
 longer relied on — quoting alone is not the whole defence.
 
+The quoting walks Unicode scalars, not Swift `Character`s. A shell reads
+bytes, and `'` or `\` followed by a combining mark or a joiner is one
+grapheme cluster that compares unequal to `"'"`; matched by `Character`, the
+quote was written raw and closed the quoted run. The app-typed `cd` of Go to
+Parent Directory and Go to Project Root uses the same quoting.
+
 ### 2.5 Bidirectional and invisible characters
 
 Corta does not implement RTL/bidi (`DESIGN.md` §6), which removes the
@@ -453,6 +459,16 @@ undecided edit is kept. A ⌘-click or Edit copies at most 64 MB. Downloads crea
 symlink. Download files and managed directories/files have inherited ACLs
 cleared before use. This does not exclude administrators or backups; parent
 storage policy and intentionally shared export destinations still matter.
+
+An upload writes a partial and renames it over the destination, so the
+partial's mode is the file's from then on. A replaced regular file keeps its
+own mode, set-id bits included, and its group where the server lets the owner
+set it; a symbolic link that the upload replaces passes on its target's mode.
+A new name asks for the source's permission bits at creation and the server's
+umask narrows them, so a 0777 file from a FAT volume does not land
+world-writable. While it fills, the partial grants group and others no more
+than the result and the owner read and write; a replaced file's exact mode is
+set by handle after the last write, never by a path that could be swapped.
 
 Upload prompts bind to a SHA-256 digest of the edit. Upload sends a private
 snapshot matching that digest, so an edit after the prompt needs another

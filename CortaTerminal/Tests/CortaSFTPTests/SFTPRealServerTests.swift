@@ -172,6 +172,90 @@ struct SFTPRealServerTests {
         #expect(!leftovers.contains { $0.contains(".corta-part") }, "\(leftovers)")
     }
 
+    /// The partial is renamed over the destination, so its mode is the file's
+    /// from then on: a replaced 0600 secret must not come back at the
+    /// server's umask default, and a new file takes the source's mode.
+    @Test("an upload keeps a replaced file's mode and gives a new file the source's")
+    func uploadKeepsModes() async throws {
+        let root = try Self.makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try await Self.connect(root: root)
+        defer { client.close() }
+        let app = root.appendingPathComponent("srv/app")
+        let local = root.appendingPathComponent("edited.env")
+        try Data("SECRET=2\n".utf8).write(to: local)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: local.path)
+        func mode(_ url: URL) throws -> Int? {
+            (try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber)?
+                .intValue
+        }
+
+        let secret = app.appendingPathComponent(".env")
+        try Data("SECRET=1\n".utf8).write(to: secret)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: secret.path)
+        _ = try await client.upload(
+            from: local, to: secret.path, policy: .overwrite, partialDisposition: .remove, progress: nil)
+        #expect(try Data(contentsOf: secret) == Data("SECRET=2\n".utf8))
+        #expect(try mode(secret) == 0o600)
+
+        let script = app.appendingPathComponent("run.sh")
+        try Data("#!/bin/sh\n".utf8).write(to: script)
+        try FileManager.default.setAttributes([.posixPermissions: 0o750], ofItemAtPath: script.path)
+        _ = try await client.upload(
+            from: local, to: script.path, policy: .overwrite, partialDisposition: .remove, progress: nil)
+        #expect(try mode(script) == 0o750)
+
+        // A new name asks for the source's bits and the server's umask
+        // narrows them, as for any file it creates: a 0777 file from a FAT
+        // volume does not land world-writable.
+        let mask = umask(0)
+        umask(mask)
+        try FileManager.default.setAttributes([.posixPermissions: 0o640], ofItemAtPath: local.path)
+        let fresh = app.appendingPathComponent("new.env")
+        _ = try await client.upload(
+            from: local, to: fresh.path, policy: .fail, partialDisposition: .remove, progress: nil)
+        #expect(try mode(fresh) == 0o640 & ~Int(mask))
+        try FileManager.default.setAttributes([.posixPermissions: 0o777], ofItemAtPath: local.path)
+        let open = app.appendingPathComponent("from-fat.txt")
+        _ = try await client.upload(
+            from: local, to: open.path, policy: .fail, partialDisposition: .remove, progress: nil)
+        #expect(try mode(open) == 0o777 & ~Int(mask))
+
+        // A link the upload replaces passes on its target's mode, not 0777
+        // and not the source's.
+        let target = app.appendingPathComponent("scripts-deploy.sh")
+        try Data("#!/bin/sh\n".utf8).write(to: target)
+        try FileManager.default.setAttributes([.posixPermissions: 0o750], ofItemAtPath: target.path)
+        let link = app.appendingPathComponent("deploy.sh")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        _ = try await client.upload(
+            from: local, to: link.path, policy: .overwrite, partialDisposition: .remove, progress: nil)
+        #expect(try mode(link) == 0o750)
+        // The atime travels with the mtime; it was once sent as 0 (1970).
+        var info = Darwin.stat()
+        #expect(stat(fresh.path, &info) == 0)
+        #expect(info.st_atimespec.tv_sec > 0)
+    }
+
+    /// A destination that is a symbolic link is replaced by a file; the
+    /// link's own 0777 is not a mode to give it, but its target's is. A
+    /// server that sends no type bits still names a file it replaces.
+    @Test("an upload's mode: a file's own, a link target's, or the source's for a new name")
+    func uploadModes() {
+        typealias Engine = SFTPTransferEngine
+        let stamp = Engine.LocalSourceStamp(
+            { var info = Darwin.stat(); info.st_mode = S_IFREG | 0o4755; return info }())
+        #expect(stamp.permissions == 0o755)
+        let link = SFTPAttributes(permissions: UInt32(S_IFLNK) | 0o777)
+        let file = SFTPAttributes(permissions: UInt32(S_IFREG) | 0o2640)
+        #expect(Engine.uploadMode(destination: link, linkTarget: nil, stamp: stamp) == .create(0o755))
+        #expect(Engine.uploadMode(destination: link, linkTarget: file, stamp: stamp) == .keep(0o2640))
+        #expect(Engine.uploadMode(destination: file, linkTarget: nil, stamp: stamp) == .keep(0o2640))
+        let typeless = SFTPAttributes(permissions: 0o600)
+        #expect(Engine.uploadMode(destination: typeless, linkTarget: nil, stamp: stamp) == .keep(0o600))
+        #expect(Engine.uploadMode(destination: nil, linkTarget: nil, stamp: stamp) == .create(0o755))
+    }
+
     /// A tree goes up and comes back: nested directories, an empty one,
     /// files of several sizes; a symbolic link and a socket-like special
     /// are skipped and *reported*, never followed; the result is

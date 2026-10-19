@@ -63,6 +63,20 @@ Versioning for compatibility changes.
 - Clicking a task notification handles the click on the main thread whichever
   thread the system delivers it on.
 
+### Security
+
+- A dropped file path, and the directory typed by Go to Parent Directory and
+  Go to Project Root, is quoted by Unicode scalar. An apostrophe or backslash
+  joined to a combining mark in a file or folder name was written unescaped,
+  which closed the quotes and let the rest of the name run as a command.
+- An SFTP upload, including saving a remote edit, keeps the mode of the file
+  it replaces — and its group where the server allows — and a file reached
+  through a symbolic link keeps its target's mode. Replacing a file used to
+  leave it at the server's default mode, so a private (0600) file such as
+  `.env` could become readable by other users on the host. A new remote file
+  asks for the local file's permissions, narrowed by the server's umask.
+  Uploaded files also keep a real access time instead of 1970.
+
 ## [1.2.2] - 2026-10-15
 
 ### Changed

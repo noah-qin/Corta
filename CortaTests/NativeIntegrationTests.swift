@@ -78,6 +78,21 @@ struct NativeIntegrationTests {
         #expect(PaneCommands.shellQuoted("/tmp/$(touch hacked)") == "'/tmp/$(touch hacked)'")
     }
 
+    /// `'` or `\` followed by a combining mark or a ZWJ is one `Character`
+    /// that is not `"'"`; the quote must still be escaped, since the shell
+    /// reads its byte.
+    @Test("a quote joined to a combining mark is still escaped", arguments: [
+        "\u{301}", "\u{200D}", "\u{FE0F}",
+    ])
+    func shellQuotingEscapesJoinedQuotes(mark: String) {
+        // Bytes, not `String ==`: canonical equivalence would accept a
+        // reordered or normalised result the shell reads differently.
+        let quote = Array(PaneCommands.shellQuoted("/tmp/a'\(mark)b").utf8)
+        #expect(quote == Array("'/tmp/a'\"'\"'\(mark)b'".utf8))
+        let backslash = Array(PaneCommands.shellQuoted("/tmp/a\\\(mark)b").utf8)
+        #expect(backslash == Array("'/tmp/a'\"\\\\\"'\(mark)b'".utf8))
+    }
+
     /// The quoting is read by whatever shell the pane runs. fish's single
     /// quotes treat `\'` and `\\` as escapes, so POSIX's `'\''` let
     /// `x\'; cmd; \'` out of the quotes there. Each installed shell must
@@ -93,6 +108,7 @@ struct NativeIntegrationTests {
         let names = [
             #"/tmp/x\'; echo CORTA-PWNED; echo \'/sub"#, #"a\"#, "John's Folder",
             "$(echo CORTA-PWNED)", "tick`echo CORTA-PWNED`", #"double"quote"#, "😀 中文",
+            "a'\u{301};echo CORTA-PWNED;'\u{301}", "a\\\u{301}'\u{200D};echo CORTA-PWNED;'\u{200D}",
         ]
         for name in names {
             let process = Process()
