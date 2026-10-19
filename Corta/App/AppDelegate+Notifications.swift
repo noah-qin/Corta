@@ -23,7 +23,11 @@ import UserNotifications
 extension AppDelegate: UNUserNotificationCenterDelegate {
     /// Show banners while Corta is frontmost: the build may be in another
     /// pane. Still no sound (`TaskNotifier.post`).
-    func userNotificationCenter(
+    ///
+    /// Both delegate methods are `nonisolated`: the SDK does not say which
+    /// thread calls them, and an isolated conformance's thunk traps when the
+    /// answer is not main.
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) ->
             Void
@@ -33,14 +37,31 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
 
     /// Brings the window forward and lands on the command; either may be
     /// gone (closed window, record past the store's bound), harmlessly.
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        defer { completionHandler() }
         let userInfo = response.notification.request.content.userInfo
-        guard let windowNumber = userInfo["windowNumber"] as? Int,
+        let click = NotificationClick(
+            windowNumber: userInfo["windowNumber"] as? Int, paneID: userInfo["paneID"] as? String,
+            sessionGeneration: userInfo["sessionGeneration"] as? Int,
+            commandID: userInfo["commandID"] as? Int)
+        // The response is handled once read; the landing happens on main.
+        completionHandler()
+        Task { @MainActor in self.land(on: click) }
+    }
+
+    /// What a notification's click carries, read off its `userInfo`.
+    nonisolated struct NotificationClick: Sendable {
+        var windowNumber: Int?
+        var paneID: String?
+        var sessionGeneration: Int?
+        var commandID: Int?
+    }
+
+    private func land(on click: NotificationClick) {
+        guard let windowNumber = click.windowNumber,
             let window = NSApp.window(withWindowNumber: windowNumber)
         else { return }
         window.makeKeyAndOrderFront(nil)
@@ -48,9 +69,9 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         let panes = split.panes
         guard
             let target = Self.notificationTarget(
-                paneID: userInfo["paneID"] as? String,
-                sessionGeneration: userInfo["sessionGeneration"] as? Int,
-                commandID: userInfo["commandID"] as? Int,
+                paneID: click.paneID,
+                sessionGeneration: click.sessionGeneration,
+                commandID: click.commandID,
                 panes: panes.map { pane in
                     NotificationCandidate(
                         paneID: pane.taskNotifier.paneID.uuidString,
