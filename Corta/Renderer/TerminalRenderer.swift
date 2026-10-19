@@ -62,7 +62,12 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     }
     private(set) var backend: Metal4Backend
     private(set) var backendGeneration = 0
+    /// Rebuilds since the queue last proved itself; see
+    /// `recoverBackendIfNeeded`.
     private var recoveryAttempts = 0
+    /// A rebuilt queue that completes this many frames (ten seconds at
+    /// 60 Hz) is healthy, and the next stall starts a fresh count.
+    private static let provenQueueFrames: UInt64 = 600
     /// Keep resources of old in-flight frames alive while the new queue draws.
     /// At most three replaced queues are retained per renderer.
     private var retiredBackends: [Metal4Backend] = []
@@ -299,12 +304,15 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         set { access.withLock { backend.presentsByCopy = newValue } }
     }
 
-    /// An unusable device cannot cause an unlimited reconstruction loop.
+    /// An unusable device cannot cause an unlimited reconstruction loop:
+    /// three rebuilds in a row that each fail before drawing for ten seconds
+    /// give up. Rebuilds a long-lived pane needed days apart do not add up.
     @discardableResult
     func recoverBackendIfNeeded() throws -> Bool {
         access.lock()
         defer { access.unlock() }
         retiredBackends.removeAll { !$0.hasFramesInFlight }
+        if backend.completedFrameCount >= Self.provenQueueFrames { recoveryAttempts = 0 }
         guard backend.requiresRecovery else { return false }
         guard recoveryAttempts < 3 else { throw Metal4BackendError.recoveryExhausted }
         recoveryAttempts += 1

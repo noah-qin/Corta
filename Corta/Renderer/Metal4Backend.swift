@@ -198,17 +198,28 @@ public nonisolated final class Metal4Backend {
     var currentSlot = 0
     /// Frames dropped in a row; while non-zero, the next frame does not wait.
     private var consecutiveDroppedFrames = 0
-    private var stallStarted: ContinuousClock.Instant?
+    /// When a dropped frame found the queue busy, and how far the GPU had
+    /// got then. On `SuspendingClock`: a lid closed with a frame in flight
+    /// is not a second of stalled GPU.
+    private var stall: (since: SuspendingClock.Instant, completed: UInt64)?
     private static let stalledQueueReportThreshold = 3
     private(set) var droppedFrameCount = 0
 
-    /// A few slow frames are not a failed queue. Read on the main thread.
+    /// A few slow frames are not a failed queue, and neither is a dropped
+    /// frame followed by a pause — an occluded or minimised window, a Space
+    /// switch, display sleep — while the GPU caught up: only a queue that
+    /// has completed nothing for a second while frames wait is stalled.
+    /// Read on the main thread.
     var requiresRecovery: Bool {
-        completion.failed.load(ordering: .acquiring)
-            || stallStarted.map { $0.duration(to: .now) >= .seconds(1) } == true
+        if completion.failed.load(ordering: .acquiring) { return true }
+        guard let stall, hasFramesInFlight, completion.completed == stall.completed else { return false }
+        return stall.since.duration(to: .now) >= .seconds(1)
     }
 
     var hasFramesInFlight: Bool { completion.completed < frameNumber }
+    /// Frames this queue has finished, for judging whether a rebuilt queue
+    /// has proved itself.
+    var completedFrameCount: UInt64 { completion.completed }
 
     /// Valid between `beginFrame` and `endFrame`; nil for a dropped frame.
     var encoder: (any MTL4RenderCommandEncoder)?
@@ -418,7 +429,7 @@ public nonisolated final class Metal4Backend {
         let slot = nextSlot
         let wait: DispatchTime = consecutiveDroppedFrames > 0 ? .now() : .now() + slotWaitLimit
         guard slotSemaphores[slot].wait(timeout: wait) == .success else {
-            if stallStarted == nil { stallStarted = .now }
+            if stall == nil { stall = (SuspendingClock.now, completion.completed) }
             consecutiveDroppedFrames += 1
             droppedFrameCount += 1
             if consecutiveDroppedFrames == Self.stalledQueueReportThreshold {
@@ -428,7 +439,7 @@ public nonisolated final class Metal4Backend {
             return false
         }
         consecutiveDroppedFrames = 0
-        stallStarted = nil
+        stall = nil
         frameNumber += 1
         currentSlot = slot
         nextSlot = (slot + 1) % Self.frameSlotCount

@@ -62,6 +62,37 @@ struct Metal4BackendTests {
         #expect(renderer.backend.renderFrameAndWait(into: target))
     }
 
+    /// A frame dropped just before the pane stopped drawing — occluded,
+    /// minimised, asleep — left the stall clock running, and the next frame
+    /// after a second rebuilt a healthy queue; the fourth time in a pane's
+    /// life, it stopped rendering. A queue that caught up is not stalled.
+    @Test func aDroppedFrameTheQueueCaughtUpWithIsNotAStall() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let font = CTFontCreateWithName("Menlo" as CFString, 12, nil)
+        let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
+        let target = MetalRenderTarget.make(device: device, width: Self.width, height: Self.height)
+        let backend = renderer.backend
+        let gate = try #require(device.makeSharedEvent())
+        defer { gate.signaledValue = 1 }
+        backend.holdQueue(until: gate, reaches: 1)
+        for _ in 0..<Metal4Backend.frameSlotCount {
+            #expect(backend.beginFrame(target: target, clearColor: MTLClearColorMake(0, 0, 0, 1), label: "busy"))
+            backend.endFrame(presenting: nil, onCompleted: nil)
+        }
+        #expect(!backend.beginFrame(target: target, clearColor: MTLClearColorMake(0, 0, 0, 1), label: "dropped"))
+        backend.endFrame(presenting: nil, onCompleted: nil)
+        gate.signaledValue = 1
+        let deadline = SuspendingClock.now + .seconds(5)
+        while backend.hasFramesInFlight, SuspendingClock.now < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        #expect(!backend.hasFramesInFlight)
+        Thread.sleep(forTimeInterval: 1.1)
+        #expect(!backend.requiresRecovery)
+        #expect(try !renderer.recoverBackendIfNeeded())
+        #expect(renderer.backend === backend)
+    }
+
     /// Reads back one BGRA8 pixel from `texture` at `x, y`.
     private static let width = 40
     private static let height = 20
