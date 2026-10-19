@@ -63,6 +63,13 @@ Versioning for compatibility changes.
 - Clicking a task notification handles the click on the main thread whichever
   thread the system delivers it on.
 
+### Security
+
+- A dropped file path, and the directory typed by Go to Parent Directory and
+  Go to Project Root, is quoted by Unicode scalar. An apostrophe or backslash
+  joined to a combining mark in a file or folder name was written unescaped,
+  which closed the quotes and let the rest of the name run as a command.
+
 ## [1.2.2] - 2026-10-15
 
 ### Changed

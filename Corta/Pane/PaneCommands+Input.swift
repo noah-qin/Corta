@@ -68,20 +68,27 @@ extension PaneCommands {
     /// are escapes, so `x\'; cmd; \'` broke out and ran `cmd`. `'` and `\`
     /// are each written double-quoted between single-quoted runs — `"'"` and
     /// `"\\"` read the same in sh, bash, zsh and fish.
+    ///
+    /// The walk is by scalar, not `Character`: a shell reads bytes, and `'`
+    /// followed by a combining mark (U+0301, a ZWJ) is one grapheme cluster
+    /// that compares unequal to `"'"` — matched by `Character`, its quote went
+    /// out raw and closed the run.
     static func shellQuoted(_ path: String) -> String {
         // A deliberately narrow set may go unquoted.
         let safe = CharacterSet(charactersIn:
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-/@:+")
         if !path.isEmpty, path.unicodeScalars.allSatisfy({ safe.contains($0) }) { return path }
-        var quoted = "'"
-        for character in path {
-            switch character {
-            case "'": quoted += #"'"'"'"#
-            case "\\": quoted += #"'"\\"'"#
-            default: quoted.append(character)
+        var quoted = String.UnicodeScalarView()
+        quoted.append("'")
+        for scalar in path.unicodeScalars {
+            switch scalar {
+            case "'": quoted.append(contentsOf: #"'"'"'"#.unicodeScalars)
+            case "\\": quoted.append(contentsOf: #"'"\\"'"#.unicodeScalars)
+            default: quoted.append(scalar)
             }
         }
-        return quoted + "'"
+        quoted.append("'")
+        return String(quoted)
     }
 
     /// Drops and Services go down the ⌘V path (`SECURITY.md` §2.3): C0

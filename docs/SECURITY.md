@@ -123,6 +123,12 @@ when the child has not enabled bracketed paste. A filename can contain a
 newline, so the earlier assumption that a dropped path never does is no
 longer relied on — quoting alone is not the whole defence.
 
+The quoting walks Unicode scalars, not Swift `Character`s. A shell reads
+bytes, and `'` or `\` followed by a combining mark or a joiner is one
+grapheme cluster that compares unequal to `"'"`; matched by `Character`, the
+quote was written raw and closed the quoted run. The app-typed `cd` of Go to
+Parent Directory and Go to Project Root uses the same quoting.
+
 ### 2.5 Bidirectional and invisible characters
 
 Corta does not implement RTL/bidi (`DESIGN.md` §6), which removes the
