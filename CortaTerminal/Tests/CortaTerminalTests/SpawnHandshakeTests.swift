@@ -35,7 +35,7 @@ import Testing
         close(ends.write)
 
         let status = Spawn.readHelperStatus(
-            from: ends.read, deadline: ContinuousClock.now + .seconds(5))
+            from: ends.read, deadline: SuspendingClock.now + .seconds(5))
         #expect(status == .execFailed(code: ENOENT))
     }
 
@@ -45,7 +45,7 @@ import Testing
         close(ends.write)  // FD_CLOEXEC closing on a successful execve
 
         let status = Spawn.readHelperStatus(
-            from: ends.read, deadline: ContinuousClock.now + .seconds(5))
+            from: ends.read, deadline: SuspendingClock.now + .seconds(5))
         #expect(status == .execSucceeded)
     }
 
@@ -60,7 +60,7 @@ import Testing
         close(ends.write)
 
         let status = Spawn.readHelperStatus(
-            from: ends.read, deadline: ContinuousClock.now + .seconds(5))
+            from: ends.read, deadline: SuspendingClock.now + .seconds(5))
         #expect(status == .truncated)
     }
 
@@ -71,10 +71,10 @@ import Testing
         defer { close(ends.write) }
         defer { close(ends.read) }
 
-        let deadline = ContinuousClock.now + .milliseconds(200)
+        let deadline = SuspendingClock.now + .milliseconds(200)
         let status = Spawn.readHelperStatus(from: ends.read, deadline: deadline)
         #expect(status == .timedOut)
-        #expect(ContinuousClock.now < deadline + .seconds(5))
+        #expect(SuspendingClock.now < deadline + .seconds(5))
     }
 
     @Test func failedExecReportsTheHelpersErrno() throws {

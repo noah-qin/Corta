@@ -79,7 +79,7 @@ enum Spawn {
         // Bounded: the UI calls this synchronously.
         let status = Self.readHelperStatus(
             from: readEnd,
-            deadline: ContinuousClock.now + Self.helperHandshakeTimeout
+            deadline: SuspendingClock.now + Self.helperHandshakeTimeout
         )
         let failure: Int32
         switch status {
@@ -155,13 +155,13 @@ enum Spawn {
     }
 
     static func readHelperStatus(
-        from readEnd: Int32, deadline: ContinuousClock.Instant
+        from readEnd: Int32, deadline: SuspendingClock.Instant
     ) -> HelperStatus {
         var reported: Int32 = 0
         let total = MemoryLayout<Int32>.size
         var filled = 0
         while filled < total {
-            let now = ContinuousClock.now
+            let now = SuspendingClock.now
             guard now < deadline else { return .timedOut }
             let remaining = now.duration(to: deadline)
             let milliseconds = Int32(

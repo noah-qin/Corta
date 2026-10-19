@@ -174,7 +174,7 @@ final class FileReferenceProbe {
         }
         let timeout = timeout
         Task { @MainActor [weak self] in
-            try? await Task.sleep(for: timeout)
+            try? await Task.sleep(for: timeout, clock: .suspending)
             // Late: answered "no" now; the real answer is cached when it comes.
             guard let self, self.waiting[path] != nil else { return }
             self.answer(path, isFile: false)

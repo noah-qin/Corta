@@ -223,7 +223,7 @@ nonisolated enum ImageDecoderProcess {
             input += (0..<4).map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) }
         }
         input += bytes
-        let deadline = ContinuousClock.now + timeout
+        let deadline = SuspendingClock.now + timeout
         let output = exchange(
             input: input, writeTo: toChild[1], readFrom: fromChild[0],
             limit: 8, deadline: deadline)
@@ -239,7 +239,7 @@ nonisolated enum ImageDecoderProcess {
     /// reaps it — one SIGKILL at the deadline, which it cannot ignore, so the
     /// blocking `waitpid` that follows always returns. Not a polling loop:
     /// that woke the decode thread every millisecond for every image.
-    private static func reap(_ pid: pid_t, deadline: ContinuousClock.Instant) -> Int32? {
+    private static func reap(_ pid: pid_t, deadline: SuspendingClock.Instant) -> Int32? {
         let queue = kqueue()
         if queue < 0 {
             kill(pid, SIGKILL)
@@ -251,7 +251,7 @@ nonisolated enum ImageDecoderProcess {
                 fflags: NOTE_EXIT, data: 0, udata: 0, ext: (0, 0))
             var event = kevent64_s()
             while true {
-                let remaining = max(.zero, ContinuousClock.now.duration(to: deadline))
+                let remaining = max(.zero, SuspendingClock.now.duration(to: deadline))
                 var timeout = timespec(
                     tv_sec: Int(remaining.components.seconds),
                     tv_nsec: Int(remaining.components.attoseconds / 1_000_000_000))
@@ -291,7 +291,7 @@ nonisolated enum ImageDecoderProcess {
     /// on a timeout, an error, or more output than `limit`.
     private static func exchange(
         input: [UInt8], writeTo writer: Int32, readFrom reader: Int32, limit: Int,
-        deadline: ContinuousClock.Instant
+        deadline: SuspendingClock.Instant
     ) -> [UInt8]? {
         _ = fcntl(writer, F_SETNOSIGPIPE, 1)
         _ = fcntl(writer, F_SETFL, fcntl(writer, F_GETFL) | O_NONBLOCK)
@@ -305,7 +305,7 @@ nonisolated enum ImageDecoderProcess {
         var output: [UInt8] = []
         var chunk = [UInt8](repeating: 0, count: 64 * 1024)
         while true {
-            let remaining = ContinuousClock.now.duration(to: deadline)
+            let remaining = SuspendingClock.now.duration(to: deadline)
             guard remaining > .zero else { return nil }
             let milliseconds = Int32(
                 clamping: remaining.components.seconds * 1000

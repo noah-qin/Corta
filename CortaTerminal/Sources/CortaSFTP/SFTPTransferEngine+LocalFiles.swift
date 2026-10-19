@@ -88,7 +88,7 @@ extension SFTPTransferEngine {
         let cleanup = Task { await operation() }
         let timeout = configuration.cleanupTimeout
         let timer = Task {
-            do { try await Task.sleep(for: timeout) } catch { return }
+            do { try await Task.sleep(for: timeout, clock: .suspending) } catch { return }
             cleanup.cancel()
         }
         await cleanup.value

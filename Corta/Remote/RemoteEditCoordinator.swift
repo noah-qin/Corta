@@ -338,7 +338,7 @@ final class RemoteEditCoordinator {
         }
         let timeout = connectTimeout
         attempt.deadline = Task { [weak self] in
-            do { try await Task.sleep(for: timeout) } catch { return }
+            do { try await Task.sleep(for: timeout, clock: .suspending) } catch { return }
             self?.abandon(
                 attempt, host: host,
                 error: .transport(.hostUnreachable(
