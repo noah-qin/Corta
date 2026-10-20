@@ -239,6 +239,15 @@ which left PingFang and every chosen family a step lighter beside it. No
 face is thickened: a stroke matching Medium's ink, and system font
 smoothing (1.38× the ink), both read heavier than the faces as drawn, and
 Ghostty leaves thickening off by default too.
+The typography preferences (2026-10-20) add a weight (Light, Regular,
+Medium; Regular where the family has no such face), a line spacing (1.0–1.4
+× the size, 1.18 by default, never below the face's own line), a switch for
+fallback, monochrome emoji where a text face has the glyph, and East Asian
+Ambiguous as two cells. The CJK fallback is no longer one fixed face: the
+system language puts PingFang SC, PingFang TC, Hiragino Sans or Apple SD
+Gothic Neo first for Han, and kana and Hangul always lead with their own
+script's face. The default size is 13 pt within 10–24, for a MacBook's
+built-in display. Ligatures stay off (DESIGN §7.3).
 Corta bundles no font and downloads none: the list is what macOS and the
 user have installed, grouped by where the file lives, with a line saying
 which and whether the family carries CJK. Bundling buys nothing on macOS,

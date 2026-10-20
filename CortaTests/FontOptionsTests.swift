@@ -90,7 +90,8 @@ import Testing
         #expect(CTFontGetSize(pinned) == 18)
         #expect(CTFontGetMatrix(pinned) == shear)
         let cascade = CTFontCopyAttribute(pinned, kCTFontCascadeListAttribute) as? [CTFontDescriptor]
-        #expect(cascade?.count == 2)
+        // A face per CJK script, then emoji.
+        #expect(cascade?.count == 5)
         var equals: UniChar = 0x3D
         var glyph = CGGlyph(0)
         #expect(CTFontGetGlyphsForCharacters(pinned, &equals, &glyph, 1))

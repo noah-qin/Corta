@@ -135,8 +135,31 @@ Terminal hotkey, remote badges — is collected in
   line under the menu says where the chosen font comes from and whether
   it brings its own CJK characters — such a family draws letters and
   symbols in its CJK design too, a raised `~` for example. `font-family`
-  in the config file is the same setting. `font-size` is 12 pt by default.
-  The page previews the font, colors and cursor.
+  in the config file is the same setting. `font-size` is 13 pt by default,
+  10–24 pt in whole points. The page previews the font, colors and cursor.
+- **Weight and line spacing.** Weight is Light, Regular (the default) or
+  Medium; a font without that weight uses its Regular, and bold text is
+  always the font's own bold. Line spacing is 1.0–1.4 times the font size,
+  1.18 by default; a font that needs a taller line keeps it, so nothing is
+  clipped. Every character in every language shares one cell size and one
+  baseline.
+- **Characters the font lacks.** Chinese, Japanese and Korean come from
+  macOS's own fonts: Han from PingFang SC, PingFang TC, Hiragino Sans or
+  Apple SD Gothic Neo by your system language, kana from Hiragino Sans and
+  Hangul from Apple SD Gothic Neo whatever the language. Emoji come from
+  Apple Color Emoji — or, with Emoji set to Monochrome Where Possible, as a
+  text glyph where Apple Symbols or Menlo has one. A wide character is
+  centred in its two cells. Turn off **Use other fonts for missing
+  characters** to see only the chosen font, with a box where it has no
+  glyph.
+- **Ambiguous-width characters.** Settings ▸ Terminal ▸ Ambiguous-Width
+  Characters makes `±`, `§`, Greek, Cyrillic and the other East Asian
+  Ambiguous characters two cells wide, for software written for CJK
+  terminals. It applies to output written afterwards; a shell or editor
+  that measures text itself may still count them as one.
+- **Underlines.** Programs can draw single, double (`SGR 21` or `4:2`) and
+  curly (`SGR 4:3`, Neovim's diagnostics) underlines; dotted and dashed draw
+  single. Blinking text (`SGR 5`) is kept but not animated.
 - **Zoom.** ⌘= / ⌘− / ⌘0 or a pinch make the text bigger, smaller or
   the configured size again, in the current window only. Zoom never
   changes the config file. Font changes never move or resize the window: the visible rows and

@@ -246,7 +246,9 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// - Throws: `Metal4BackendError.metal4Unsupported` on a GPU without
     ///   `MTLGPUFamily.metal4`. There is no other renderer to fall back to.
     public init(
-        device: MTLDevice, font: CTFont, scale scaleValue: CGFloat, atlasPixelSize: Int? = nil, atlasStorageMode: MTLStorageMode = .shared) throws {
+        device: MTLDevice, font: CTFont, scale scaleValue: CGFloat, options: TextOptions = TextOptions(),
+        atlasPixelSize: Int? = nil, atlasStorageMode: MTLStorageMode = .shared
+    ) throws {
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * scaleValue, nil, nil)
         self.backend = try Metal4Backend(device: device)
@@ -256,9 +258,10 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         // a prompt's atlas small; the ceiling is still about 20 MiB per pane.
         // A shared read-only ASCII layer would be a new design, not a lookup.
         self.glyphAtlas = try GlyphAtlas(
-            device: device, font: atlasFont, atlasPixelSize: atlasPixelSize ?? GlyphAtlas.atlasSize, storageMode: atlasStorageMode)
+            device: device, font: atlasFont, atlasPixelSize: atlasPixelSize ?? GlyphAtlas.atlasSize,
+            storageMode: atlasStorageMode, options: options)
         self.kittyImageRenderer = KittyImageRenderer(device: device)
-        let points = CellMetrics(font: font, scale: scaleValue)
+        let points = CellMetrics(font: font, scale: scaleValue, lineSpacing: options.lineSpacing)
         self.metricsValue = points.scaled(by: scaleValue)
         self.scaleValue = scaleValue
         self.geometry = Mutex(
@@ -277,13 +280,15 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
 
     /// Reuses pipelines and texture; a new renderer per keystroke stuttered
     /// under key repeat.
-    func setFont(_ font: CTFont, scale newScale: CGFloat) {
+    /// - Parameter options: nil keeps the current ones — a zoom or a new
+    ///   backing scale changes the font alone.
+    func setFont(_ font: CTFont, scale newScale: CGFloat, options: TextOptions? = nil) {
         access.lock()
         defer { access.unlock() }
         let atlasFont = CTFontCreateCopyWithAttributes(
             font, CTFontGetSize(font) * newScale, nil, nil)
-        glyphAtlas.reset(font: atlasFont)
-        let points = CellMetrics(font: font, scale: newScale)
+        glyphAtlas.reset(font: atlasFont, options: options)
+        let points = CellMetrics(font: font, scale: newScale, lineSpacing: glyphAtlas.options.lineSpacing)
         metricsValue = points.scaled(by: newScale)
         scaleValue = newScale
         geometry.withLock {

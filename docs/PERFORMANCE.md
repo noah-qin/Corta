@@ -284,7 +284,7 @@ against numbers taken the same way. Any run that is quoted must state:
 | Build             | Release (`-c release` / the Release scheme), never Debug |
 | Display           | Built-in panel, and its refresh rate — a 120 Hz panel halves the vsync quantum a 60 Hz one imposes, which moves every latency number in this table |
 | Scale factor      | The display's native backing scale (the atlas is rasterised per scale) |
-| Font              | System monospaced at 12 pt, the default |
+| Font              | System monospaced at 12 pt, the default when these figures were measured (13 pt since 2026-10-20) |
 | Window            | 120×30, one pane, not full screen, no tab bar |
 | Power             | Mains, not battery — the efficiency cores and a lowered display refresh rate are both on the table otherwise |
 | Other load        | No other application in the foreground; the app activated and its window frontmost |

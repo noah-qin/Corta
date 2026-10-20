@@ -20,13 +20,12 @@ import CoreText
 /// The cell box and baseline a monospaced font imposes, derived once per
 /// font.
 public nonisolated struct CellMetrics: Sendable {
-    /// The shortest line, as a multiple of the point size. CJK families
-    /// (BIZ UDGothic, SimSong, PCMyungjo) declare exactly one em with no
-    /// leading, made for apps that add their own spacing; at that height a
-    /// descender touches the next row's capitals and taller fallback glyphs
-    /// crowd the row. Below SF Mono's 1.18 and Menlo's 1.16, so terminal
-    /// faces keep their own metrics.
-    static let minimumLineHeight: CGFloat = 1.15
+    /// `line-spacing`'s default: the line as a multiple of the point size.
+    /// SF Mono declares 1.18 itself; CJK families (BIZ UDGothic, SimSong,
+    /// PCMyungjo) declare exactly one em with no leading, made for apps that
+    /// add their own spacing, and at that height a descender touched the
+    /// next row's capitals.
+    public static let defaultLineSpacing: CGFloat = 1.18
 
     public var cellWidth: CGFloat
     public var cellHeight: CGFloat
@@ -49,7 +48,9 @@ public nonisolated struct CellMetrics: Sendable {
     ///   pixels, not points: point snapping (SF Mono's 0.6 advance gave 9pt at
     ///   both 14pt and 15pt) made font steps change the window's aspect
     ///   unevenly.
-    init(font: CTFont, scale: CGFloat = 1) {
+    /// - Parameter lineSpacing: the line as a multiple of the point size; a
+    ///   face that declares a taller line keeps it, so nothing is clipped.
+    init(font: CTFont, scale: CGFloat = 1, lineSpacing: CGFloat = CellMetrics.defaultLineSpacing) {
         // Ask the font rather than assume: some are only mostly fixed.
         var glyph: CGGlyph = 0
         var mChar: UniChar = UniChar(UnicodeScalar("M").value)
@@ -67,7 +68,7 @@ public nonisolated struct CellMetrics: Sendable {
 
         let advanceWidth = advance.width > 0 ? advance.width : CTFontGetSize(font) * 0.6
         let declaredLine = ascent + descent + leading
-        let lineHeight = max(declaredLine, CTFontGetSize(font) * Self.minimumLineHeight)
+        let lineHeight = max(declaredLine, CTFontGetSize(font) * lineSpacing)
 
         // Snap down by at most a device pixel, matching Terminal.app's 7pt
         // column for SF Mono 12 (nominal 7.418pt); rounding up widened 120

@@ -96,7 +96,7 @@ final class SettingsModel {
 
     /// What `previewFont` was built for, so a change to any other setting
     /// does not rebuild the face.
-    private var previewedFont: (size: Double, family: String)?
+    private var previewedFont: (size: Double, style: FontStyle)?
 
     /// The family `fontStatus` was resolved for. Resolving measures four
     /// faces across printable ASCII (`MonospacedFontCatalog.isUsable`), so
@@ -171,7 +171,7 @@ final class SettingsModel {
         self.configuration = configuration
         listedThemes = Theme.all(in: configuration)
         previewTheme = Theme.named(configuration.theme, in: configuration) ?? .corta
-        if previewedFont?.size != configuration.fontSize || previewedFont?.family != configuration.fontFamily {
+        if previewedFont?.size != configuration.fontSize || previewedFont?.style != FontStyle(configuration) {
             refreshPreviewFont()
         }
         if configuration.fontFamily != resolvedFontFamily { refreshFontStatus() }
@@ -180,8 +180,8 @@ final class SettingsModel {
     }
 
     private func refreshPreviewFont() {
-        previewedFont = (configuration.fontSize, configuration.fontFamily)
-        previewFont = TerminalFont.primary(ofSize: configuration.fontSize, family: configuration.fontFamily)
+        previewedFont = (configuration.fontSize, FontStyle(configuration))
+        previewFont = FontStyle(configuration).font(ofSize: configuration.fontSize)
     }
 
     /// The rows whose ground truth is a file this page does not own —
@@ -253,6 +253,10 @@ final class SettingsModel {
             configuration.fontFamily = value
             return nil
         }
+    }
+
+    func setLineSpacing(_ value: Double) {
+        commit { $0.lineSpacing = Configuration.snappedLineSpacing(value); return nil }
     }
 
     func setFontSize(_ value: Double) {

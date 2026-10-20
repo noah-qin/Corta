@@ -75,12 +75,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// A temporary zoom, which `configurationChanged` leaves alone until
     /// `resetFontSize`.
     var isFontSizeZoomed = false
-    /// `Configuration.systemFontFamily` means System Monospaced. Kept to tell a
-    /// family swap from a size change.
-    var fontFamily: String = Configuration.systemFontFamily
+    /// Family, weight and drawing options. Kept to tell a style change from
+    /// a size change.
+    var fontStyle = FontStyle()
     let taskNotifier = TaskNotifier()
-    /// Terminal.app's stock profile, so TUIs keep the same proportions in both.
-    static let defaultFontSize: CGFloat = 12
+    /// `font-size`'s default, for a MacBook's built-in Retina display.
+    static let defaultFontSize: CGFloat = 13
     /// Set before the view loads for a split, so the shell's first output is
     /// laid out at the right width, not reflowed.
     var inheritedWorkingDirectory: String?
@@ -285,12 +285,15 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     private func setUpPane(strictRespawn: Bool = false) {
         let configuration = ConfigurationStore.shared.configuration
         fontSize = Configuration.fontSizeRange.clamped(configuration.fontSize)
-        fontFamily = configuration.fontFamily
+        fontStyle = FontStyle(configuration)
         guard prepareRenderer() else { return }
         let initialSize = initialTerminalSize()
         guard let started = startSession(strictRespawn: strictRespawn, size: initialSize, configuration: configuration)
         else { return }
         adopt(started, size: initialSize)
+        // Before the reader starts, so the shell's first output is measured
+        // the way the configuration says.
+        session.ambiguousWidthIsWide = configuration.ambiguousWidth == .wide
         installPaneViews()
         installSessionCallbacks()
         installTerminalCallbacks(on: terminalView)
@@ -525,7 +528,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 return NSFont.monospacedSystemFont(
                     ofSize: ViewController.defaultFontSize, weight: TerminalFont.systemWeight)
             }
-            return TerminalFont.primary(ofSize: fontSize, family: fontFamily) as NSFont
+            return fontStyle.font(ofSize: fontSize) as NSFont
         }
         view.onFocus = { [weak self] in
             guard let self else { return }
@@ -899,18 +902,18 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let renderer: TerminalRenderer
         do {
             renderer = try TerminalRenderer(
-                device: device,
-                font: TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
+                device: device, font: fontStyle.font(ofSize: fontSize), scale: scale,
+                options: fontStyle.options)
         } catch let error where error is GlyphAtlasError || error is Metal4BackendError {
             // The GPU, not the face: the default font would fail the same way,
             // and resetting to it lost the pane's size and family for good.
             throw error
         } catch {
             fontSize = Self.defaultFontSize
-            fontFamily = Configuration.systemFontFamily
+            fontStyle = FontStyle()
             renderer = try TerminalRenderer(
-                device: device,
-                font: TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
+                device: device, font: fontStyle.font(ofSize: fontSize), scale: scale,
+                options: fontStyle.options)
         }
         // A finished decode schedules a frame; otherwise it waits for unrelated
         // output.

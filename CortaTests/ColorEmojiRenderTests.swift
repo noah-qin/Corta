@@ -76,7 +76,7 @@ import Testing
         let attributes = CTFontDescriptorCopyAttributes(CTFontCopyFontDescriptor(primary))
             as? [CFString: Any]
         let cascade = attributes?[kCTFontCascadeListAttribute] as? [CTFontDescriptor]
-        #expect(cascade?.count == 2)
+        #expect(cascade?.count == 5)
     }
 
     /// The pinned cascade, asserted where it is assertable: shape 中 with the

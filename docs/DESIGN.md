@@ -420,6 +420,14 @@ eviction policy; those cells draw blank.
 
 ### 7.5 Text rendering weight
 
+The division of labour, which every typography change keeps: the font
+decides how a glyph looks, Unicode's width rules decide how many columns a
+character takes, and the grid decides where it goes. Every language shares
+one size, one line height, one cell and one baseline; a fallback face may
+only move its glyph within the cells the width rules gave it — centred
+horizontally, a standalone symbol centred on the primary's capital height
+— never change the layout.
+
 macOS has had no subpixel antialiasing
 since Mojave. Naively alpha-blending grayscale-AA glyphs makes light
 text on a dark background look visibly thinner than Terminal.app, which

@@ -156,11 +156,22 @@ nonisolated extension TerminalRenderer {
         else { return }
         let baseline = Float(metricsValue.baselineOffset)
         let thickness = max(1, Float(scaleValue).rounded(.down))
-        if attributes.contains(.underline) || !cell.hyperlink.isNone {
+        if attributes.contains(.curlyUnderline) {
+            appendWave(at: origin, cell: size, top: baseline + thickness, thickness: thickness, color: color, into: &background)
+        } else if attributes.contains(.underline) || !cell.hyperlink.isNone {
+            // Below the cell's bottom edge would draw on the next row.
+            let first = min(baseline + thickness, size.y - thickness)
             background.append(
                 QuadInstance(
-                    origin: .init(origin.x, origin.y + baseline + thickness),
+                    origin: .init(origin.x, origin.y + first),
                     size: .init(size.x, thickness), color: color))
+            if attributes.contains(.doubleUnderline) {
+                let second = min(first + thickness * 2, size.y - thickness)
+                background.append(
+                    QuadInstance(
+                        origin: .init(origin.x, origin.y + max(second, first + thickness)),
+                        size: .init(size.x, thickness), color: color))
+            }
         }
         if attributes.contains(.strikethrough) {
             background.append(
@@ -168,6 +179,33 @@ nonisolated extension TerminalRenderer {
                     // Roughly mid x-height; the real metric is per font.
                     origin: .init(origin.x, origin.y + baseline * 0.7),
                     size: .init(size.x, thickness), color: color))
+        }
+    }
+
+    /// A curly underline (`SGR 4:3`): one period of a sine per cell, so
+    /// neighbouring cells join, drawn as thin columns a stroke wide. Each
+    /// column spans the step to the next, so a steep stretch has no gaps.
+    @inline(__always)
+    private func appendWave(
+        at origin: SIMD2<Float>, cell size: SIMD2<Float>, top: Float, thickness: Float, color: SIMD4<Float>,
+        into background: inout ContiguousArray<QuadInstance>
+    ) {
+        let amplitude = max(thickness, (size.y * 0.06).rounded())
+        // Kept inside the cell: below its bottom is the next row's.
+        let centre = min(top + amplitude, size.y - amplitude - thickness)
+        let step = thickness
+        var x: Float = 0
+        while x < size.x {
+            let width = min(step, size.x - x)
+            let y0 = centre + amplitude * sin(2 * .pi * x / size.x)
+            let y1 = centre + amplitude * sin(2 * .pi * (x + width) / size.x)
+            let low = min(y0, y1).rounded(.down)
+            let high = max(y0, y1).rounded(.up)
+            background.append(
+                QuadInstance(
+                    origin: .init(origin.x + x, origin.y + low),
+                    size: .init(width, max(thickness, high - low + thickness)), color: color))
+            x += step
         }
     }
 
