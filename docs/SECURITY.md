@@ -452,7 +452,9 @@ terminal content; `applicationSupportsSecureRestorableState` is not the
 policy switch for Corta's own JSON metadata.
 
 **Notifications carry no terminal content.** The long-task notification
-(M6.3) reports a duration and the window title, never the command or any
+(M6.3) reports a duration under the tab's own name or its directory, never
+the window title — an OSC 0/2 title is a program's text, which macOS would
+show as Corta's own words, lock screen included — nor the command or any
 output: Notification Center is a second store, outside the app, with its
 own retention — and the grid is full of things that must not go there.
 

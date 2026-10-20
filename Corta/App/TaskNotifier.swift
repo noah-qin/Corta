@@ -49,8 +49,12 @@ final class TaskNotifier {
     private var lastExitStatus: Int?
     /// For jumping back on click; nil on the heuristic path.
     private var lastCommandID: Int?
-    /// Checked for key status, and the source of the title.
+    /// Checked for key status.
     private weak var window: NSWindow?
+    /// The notice's title, set by the pane: what Corta knows of it, never
+    /// the window title, which an OSC 0/2 sequence sets
+    /// (`PaneWindowTitle.notificationTitle`).
+    var title: () -> String = { "Corta" }
     /// Which pane posted, for the click. A command id alone named no pane:
     /// every session numbers its commands from zero, so two panes of one
     /// window had the same ids and the click landed on the first.
@@ -113,7 +117,7 @@ final class TaskNotifier {
     /// - Parameter commandID: the finished command, for the click; nil on a
     ///   start.
     /// - Parameter window: the pane's window: nothing is posted while it is
-    ///   key, and the notice carries its title.
+    ///   key.
     func noteCommandRunning(
         _ running: Bool, exitStatus: Int?, commandID: Int?, in window: NSWindow?
     ) {
@@ -195,7 +199,7 @@ final class TaskNotifier {
         let elapsed = Date().timeIntervalSince(startedAt) - Self.idleGrace
         guard elapsed >= configuration.notificationThreshold else { return }
         guard window?.isKeyWindow != true else { return }
-        post(elapsed: elapsed, title: window?.title ?? "Corta")
+        post(elapsed: elapsed, title: title())
     }
 
     /// The shell-integration path: the end is a fact, no grace.
@@ -207,7 +211,7 @@ final class TaskNotifier {
         let elapsed = Date().timeIntervalSince(startedAt)
         guard elapsed >= configuration.notificationThreshold else { return }
         guard window?.isKeyWindow != true else { return }
-        post(elapsed: elapsed, title: window?.title ?? "Corta")
+        post(elapsed: elapsed, title: title())
     }
 
     private func post(elapsed: TimeInterval, title: String) {

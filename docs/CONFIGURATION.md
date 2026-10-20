@@ -237,8 +237,9 @@ on, the command ran longer than the threshold, the window is **not** the
 key window, and macOS has granted notification permission. With shell
 integration (OSC 133) the boundaries are exact; without it, Return starts
 the timer and 1.5 s of output silence ends it — which is why the feature
-is off by default. The notification carries the pane's title and the exit
-status, never the command text (`SECURITY.md` §5).
+is off by default. The notification carries the tab's name you gave it,
+or else the pane's directory, and the exit status — never the command text
+or a title a program set (`SECURITY.md` §5).
 
 ### History
 

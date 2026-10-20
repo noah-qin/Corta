@@ -127,6 +127,17 @@ final class PaneWindowTitle {
         return parts.isEmpty ? "Corta" : parts.joined(separator: " — ")
     }
 
+    /// The finished-task notice's title: the user's own tab name, else the
+    /// directory the kernel confirms. Never the OSC 0/2 title or the remote
+    /// badge — a program's text, which macOS would show as Corta's own words
+    /// in a system notification, on the lock screen too.
+    var notificationTitle: String {
+        if let custom = (window()?.windowController as? TerminalWindowController)?.customTabTitle {
+            return custom
+        }
+        return Self.sanitizedTitleComponent(session?.currentDirectory.map(Self.abbreviated)) ?? "Corta"
+    }
+
     /// Applies the title to the window, plus the proxy icon for the working
     /// directory — the folder in the title bar, which makes the path
     /// draggable and ⌘-clickable the way every document window's is.

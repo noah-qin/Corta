@@ -78,6 +78,9 @@ Versioning for compatibility changes.
 - A keyboard-protocol pop (`CSI < n u`) costs the depth of the stack, not
   the `n` the program asked for: a stream of large pops kept the pane
   busy far beyond its size.
+- A long-task notification is titled with the tab's name you gave it, or
+  its directory. It used the window title, which a program sets with OSC
+  0 or 2, so any output could post a notification worded as Corta's own.
 
 ## [1.2.3] - 2026-10-19
 

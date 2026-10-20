@@ -411,6 +411,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         taskNotifier.sessionGeneration = generation
         let wake = frameLoop.outputWake
         taskNotifier.lastOutputUptimeNanoseconds = { wake.lastOutputUptimeNanoseconds }
+        taskNotifier.title = { [weak self] in self?.windowTitle.notificationTitle ?? "Corta" }
         session.onChildExit = { [weak self] childExit in
             Task(priority: .userInitiated) { @MainActor in
                 self?.noteChildExit(childExit, generation: generation)

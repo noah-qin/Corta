@@ -52,6 +52,26 @@ struct PaneWindowTitleTests {
         #expect(!title.composed.contains("80×24"))
     }
 
+    /// `cat` echoes the sequence back as output: the program's title.
+    @Test("the finished-task notice is titled by the directory, not by an OSC 2 title")
+    func notificationTitleIgnoresProgramTitle() async throws {
+        let session = try TerminalSession(
+            executable: "/bin/cat", arguments: [], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 24, columns: 80), workingDirectory: "/usr")
+        defer { session.stop() }
+        session.start()
+        let title = PaneWindowTitle()
+        defer { title.stop() }
+        title.reset(session: session)
+        session.write(Array("\u{1B}]2;Security update: run sudo fix\u{07}\n".utf8))
+        let deadline = SuspendingClock.now + .seconds(3) * testTimeoutScale
+        while session.windowTitle == nil, SuspendingClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(title.composed.contains("Security update"))
+        #expect(title.notificationTitle == "usr")
+    }
+
     /// Two probes stuck on a slow mount fill the admission; a third pane's
     /// probe is retried once there is room rather than dropped, so the pane
     /// gets its proxy icon without waiting for its next `cd`.
