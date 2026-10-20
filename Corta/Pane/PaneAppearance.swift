@@ -47,6 +47,7 @@ protocol PaneAppearanceHost: AnyObject {
 final class PaneAppearance: NSObject {
     weak var host: PaneAppearanceHost?
     private var isObserving = false
+    private var fontSetObserver: NSObjectProtocol?
 
     init(host: PaneAppearanceHost? = nil) {
         self.host = host
@@ -77,11 +78,28 @@ final class PaneAppearance: NSObject {
         NotificationCenter.default.addObserver(
             self, selector: #selector(appearanceChanged),
             name: AppearanceController.didChange, object: nil)
+        // Not a selector: AppKit does not say which thread posts it.
+        fontSetObserver = NotificationCenter.default.addObserver(
+            forName: NSFont.fontSetChangedNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.fontsChanged() }
+        }
+    }
+
+    /// A font installed or removed while Corta runs: a configured family
+    /// that was missing takes now, and one removed falls back, without a
+    /// relaunch. The verdicts cached since the last change are dropped first.
+    func fontsChanged() {
+        MonospacedFontCatalog.refresh()
+        guard fontFamily != Configuration.systemFontFamily else { return }
+        applyFont(size: fontSize, settle: true)
     }
 
     /// The pane closed.
     func stop() {
         NotificationCenter.default.removeObserver(self)
+        if let fontSetObserver { NotificationCenter.default.removeObserver(fontSetObserver) }
+        fontSetObserver = nil
         isObserving = false
     }
 

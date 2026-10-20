@@ -104,24 +104,36 @@ nonisolated extension GlyphAtlas {
         return (lighter, glyphs)
     }
 
-    /// The family's default face at the same size. Not
-    /// `CTFontCreateCopyWithSymbolicTraits`: a fallback run's font still
+    /// The family's face without bold, at the same size, italic and shear.
+    /// Not `CTFontCreateCopyWithSymbolicTraits`: a fallback run's font still
     /// carries the primary's descriptor, so dropping bold from Menlo Bold
     /// answered SF Mono Regular, which has no `❯`.
-    private static func lighter(than font: CTFont) -> CTFont {
+    static func lighter(than font: CTFont) -> CTFont {
+        let italic = CTFontGetSymbolicTraits(font).intersection(.traitItalic)
         let descriptor = CTFontDescriptorCreateWithAttributes(
-            [kCTFontFamilyNameAttribute: CTFontCopyFamilyName(font)] as CFDictionary)
-        return CTFontCreateWithFontDescriptor(descriptor, CTFontGetSize(font), nil)
+            [
+                kCTFontFamilyNameAttribute: CTFontCopyFamilyName(font),
+                kCTFontTraitsAttribute: [kCTFontSymbolicTrait: italic.rawValue],
+            ] as CFDictionary)
+        var matrix = CTFontGetMatrix(font)
+        return CTFontCreateWithFontDescriptor(descriptor, CTFontGetSize(font), &matrix)
     }
 
     /// Arrows, technical symbols, geometric shapes, miscellaneous symbols and
     /// dingbats: marks that stand on their own beside text. Not box drawing
     /// or blocks (drawn by `BoxDrawing`), braille (a graph's dots sit where
     /// the font puts them) or the private use area (Powerline and Nerd Font
-    /// icons are drawn to the cell).
+    /// icons are drawn to the cell). Nor pieces whose height is their
+    /// meaning: integral and bracket pieces, which join across rows; the
+    /// scan lines ncurses draws for `ACS_S1`–`ACS_S9`; top and bottom
+    /// brackets; quarter arcs, half circles and corner triangles, which
+    /// meet the cell's edges.
     static func isStandaloneSymbol(_ characters: [UniChar]) -> Bool {
         !characters.isEmpty && characters.allSatisfy { unit in
             switch unit {
+            case 0x2320...0x2321, 0x239B...0x23BD, 0x23DC...0x23E1,
+                0x25DC...0x25E5, 0x25F8...0x25FA, 0x25FF:
+                false
             case 0x2190...0x21FF, 0x2300...0x23FF, 0x25A0...0x25FF, 0x2600...0x27BF,
                 0x27F0...0x27FF, 0x2900...0x297F, 0x2B00...0x2BFF:
                 true

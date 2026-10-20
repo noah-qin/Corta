@@ -55,7 +55,7 @@ nonisolated enum TerminalFont {
     static func primary(ofSize size: CGFloat, family: String? = nil) -> CTFont {
         if let family, family != Configuration.systemFontFamily,
             MonospacedFontCatalog.isUsable(family: family),
-            let font = NSFont(name: family, size: size) ?? namedFamily(family, size: size)
+            let font = namedFamily(family, size: size)
         {
             return pinningCascadeList(font as CTFont, size: size)
         }
@@ -63,7 +63,8 @@ nonisolated enum TerminalFont {
         return pinningCascadeList(system, size: size)
     }
 
-    /// Resolves a family name ("Menlo"); `NSFont(name:)` wants a face.
+    /// Resolves a family name ("Menlo"). Not `NSFont(name:)`, which also
+    /// takes a face ("Menlo-Bold") that `isUsable` never measured.
     private static func namedFamily(_ family: String, size: CGFloat) -> NSFont? {
         let descriptor = NSFontDescriptor(fontAttributes: [.family: family])
         return NSFont(descriptor: descriptor, size: size)
@@ -81,10 +82,9 @@ nonisolated enum TerminalFont {
     static func resolution(forFamily family: String?) -> FontResolution {
         guard let family, family != Configuration.systemFontFamily else { return .resolved }
         // Not `namedFamily`: a descriptor for an unknown family still
-        // matches some other face, which would report "uneven" instead.
-        guard NSFontManager.shared.availableMembers(ofFontFamily: family) != nil
-            || NSFont(name: family, size: 12) != nil
-        else {
+        // matches some other face, which would report "uneven" instead. A
+        // face name ("JetBrainsMono-Regular") is not a family either.
+        guard NSFontManager.shared.availableMembers(ofFontFamily: family) != nil else {
             return .missing(requested: family)
         }
         guard MonospacedFontCatalog.isUsable(family: family) else {

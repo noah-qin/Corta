@@ -25,8 +25,9 @@ Versioning for compatibility changes.
   beside regular text, nor below the line: macOS answered SF Mono Medium
   with Menlo Bold. Arrows, dingbats, geometric and technical symbols from a
   fallback font are now drawn in its regular weight and centred where the
-  font centres its own; braille, Powerline and Nerd Font icons keep their
-  place.
+  font centres its own; braille, Powerline and Nerd Font icons, and pieces
+  whose height is their meaning (scan lines, bracket pieces, corner
+  triangles), keep their place.
 - System Monospaced is drawn in its Regular weight, as every other family
   and the CJK and symbol fallbacks are, so text and its fallbacks share one
   weight. It was Medium, which left Chinese and Japanese a step lighter
