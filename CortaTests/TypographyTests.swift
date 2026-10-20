@@ -114,8 +114,10 @@ struct TypographyConfigurationTests {
         #expect(!MonospacedFontCatalog.isUsableCJK(family: "Menlo"))
         #expect(!MonospacedFontCatalog.isUsableCJK(family: "Apple Color Emoji"))
         #expect(!MonospacedFontCatalog.isUsableCJK(family: "No Such Family At All"))
+        // Hiragino, not PingFang: PingFang is a downloaded asset that CI's
+        // runner matches by name but leaves out of the family list.
         let listed = MonospacedFontCatalog.cjkEntries().map(\.name)
-        #expect(listed.contains("PingFang SC"))
+        #expect(listed.contains("Hiragino Mincho ProN"))
         #expect(!listed.contains("Menlo"))
     }
 
@@ -186,6 +188,15 @@ struct TypographyAtlasTests {
         #expect(try Self.name(#require(atlas.shape("中", style: .regular).runs.first)).hasPrefix("HiraMinProN"))
         #expect(try Self.name(#require(atlas.shape("か", style: .regular).runs.first)).hasPrefix("HiraMinProN"))
         #expect(try Self.name(#require(atlas.shape("中", style: .bold).runs.first)) == "HiraMinProN-W6")
+        // Only CJK: a symbol the primary lacks goes where it would without
+        // the choice, not to a face never checked against the grid.
+        let automatic = try Self.atlas()
+        for symbol in ["★", "✓", "☀"] {
+            let chosenRun = try #require(atlas.shape(symbol, style: .regular).runs.first)
+            let automaticRun = try #require(automatic.shape(symbol, style: .regular).runs.first)
+            #expect(Self.name(chosenRun) == Self.name(automaticRun), "\(symbol)")
+            #expect(!Self.name(chosenRun).hasPrefix("HiraMinProN"), "\(symbol)")
+        }
         let latin = try #require(atlas.shape("é", style: .regular).runs.first)
         #expect(Self.name(latin) == (CTFontCopyPostScriptName(atlas.fonts[0]) as String))
         #expect(atlas.colorBox == (try Self.atlas()).colorBox)

@@ -80,23 +80,60 @@ nonisolated enum TerminalFont {
     private struct ChosenFaces: @unchecked Sendable {
         let regular: CTFontDescriptor
         let bold: CTFontDescriptor
+        /// The catalog's generation they were resolved in: a font install
+        /// or removal can rename or remove the faces.
+        let generation: Int
     }
 
-    /// Resolved once per family; only a usable family is kept, so one
-    /// installed later resolves on the next ask.
+    /// Resolved once per family and catalog generation; only a usable family
+    /// is kept, so one installed later resolves on the next ask.
     private static let chosenFaces = Mutex<[String: ChosenFaces]>([:])
 
+    /// What a chosen CJK family may draw: Han, kana, Hangul, bopomofo, CJK
+    /// punctuation and fullwidth forms. Without the limit it took every
+    /// character the primary lacks — a prompt's `★` or `✓`, an emoji's text
+    /// form — in a face never checked against the grid.
+    private nonisolated(unsafe) static let cjkCharacters: CFCharacterSet = {
+        let set = CFCharacterSetCreateMutable(nil)!
+        let ranges: [ClosedRange<Int>] = [
+            0x1100...0x11FF,  // Hangul Jamo
+            0x2E80...0x2FFF,  // CJK and Kangxi radicals, ideographic description
+            0x3000...0x303F,  // CJK symbols and punctuation
+            0x3040...0x31FF,  // kana, bopomofo, Hangul compatibility Jamo, kanbun, strokes
+            0x3200...0x33FF,  // enclosed CJK, CJK compatibility
+            0x3400...0x4DBF,  // extension A
+            0x4E00...0x9FFF,  // unified ideographs
+            0xA960...0xA97F,  // Hangul Jamo extended A
+            0xAC00...0xD7FF,  // Hangul syllables, Jamo extended B
+            0xF900...0xFAFF,  // compatibility ideographs
+            0xFE30...0xFE4F,  // CJK compatibility forms
+            0xFF00...0xFFEF,  // halfwidth and fullwidth forms
+            0x1B000...0x1B16F,  // kana supplement and extended
+            0x20000...0x323AF,  // extensions B to H, compatibility supplement
+        ]
+        for range in ranges {
+            CFCharacterSetAddCharactersInRange(
+                set, CFRange(location: range.lowerBound, length: range.count))
+        }
+        return set
+    }()
+
     private static func chosenCJKFaces(_ family: String) -> ChosenFaces? {
-        if let known = chosenFaces.withLock({ $0[family] }) { return known }
-        guard MonospacedFontCatalog.isUsableCJK(family: family) else { return nil }
-        let descriptor = CTFontDescriptorCreateWithAttributes([kCTFontFamilyNameAttribute: family] as CFDictionary)
-        let regular = CTFontCreateWithFontDescriptor(descriptor, 0, nil)
+        let generation = MonospacedFontCatalog.generation
+        if let known = chosenFaces.withLock({ $0[family] }), known.generation == generation { return known }
+        guard MonospacedFontCatalog.isUsableCJK(family: family),
+            let regular = MonospacedFontCatalog.font(ofFamily: family)
+        else { return nil }
         let bold = CTFontCreateCopyWithSymbolicTraits(regular, 0, nil, .traitBold, .traitBold)
             .flatMap { CTFontCopyFamilyName($0) as String == family ? $0 : nil } ?? regular
         func entry(_ font: CTFont) -> CTFontDescriptor {
-            CTFontDescriptorCreateWithNameAndSize(CTFontCopyPostScriptName(font), 0)
+            CTFontDescriptorCreateWithAttributes(
+                [
+                    kCTFontNameAttribute: CTFontCopyPostScriptName(font),
+                    kCTFontCharacterSetAttribute: cjkCharacters,
+                ] as CFDictionary)
         }
-        let faces = ChosenFaces(regular: entry(regular), bold: entry(bold))
+        let faces = ChosenFaces(regular: entry(regular), bold: entry(bold), generation: generation)
         chosenFaces.withLock { $0[family] = faces }
         return faces
     }

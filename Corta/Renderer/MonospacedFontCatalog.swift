@@ -109,13 +109,9 @@ nonisolated enum MonospacedFontCatalog {
         let key = "\u{1}" + family
         let (known, generation) = cache.withLock { ($0.usable[key], $0.generation) }
         if let known { return known }
-        let usable = font(ofFamily: family).map { font in
-            hasOutlines(font) && cjkProbes.contains { probe in
-                var character = probe
-                var glyph = CGGlyph(0)
-                return CTFontGetGlyphsForCharacters(font, &character, &glyph, 1) && glyph != 0
-            }
-        } ?? false
+        // The cheap probe first: most families have no CJK, and the outline
+        // check copies a whole glyph table.
+        let usable = font(ofFamily: family).map { hasCJK($0) && hasOutlines($0) } ?? false
         cache.withLock { if $0.generation == generation { $0.usable[key] = usable } }
         return usable
     }
@@ -127,13 +123,22 @@ nonisolated enum MonospacedFontCatalog {
         guard let font = font(ofFamily: family) else { return nil }
         let path = (CTFontCopyAttribute(font, kCTFontURLAttribute) as? URL)?.path ?? ""
         let origin: Origin = path.hasPrefix("/System/Library/") ? .apple : .user(path: path)
-        let hasCJK = cjkProbes.contains { probe in
+        return Entry(name: family, origin: origin, hasCJK: hasCJK(font))
+    }
+
+    /// Maps Han, kana or Hangul to a real glyph: the one CJK test, for the
+    /// picker's label and `isUsableCJK` alike.
+    private static func hasCJK(_ font: CTFont) -> Bool {
+        cjkProbes.contains { probe in
             var character = probe
             var glyph = CGGlyph(0)
-            return CTFontGetGlyphsForCharacters(font, &character, &glyph, 1)
+            return CTFontGetGlyphsForCharacters(font, &character, &glyph, 1) && glyph != 0
         }
-        return Entry(name: family, origin: origin, hasCJK: hasCJK)
     }
+
+    /// Changes with every `refresh()`, for caches built on the catalog's
+    /// answers (`TerminalFont`'s chosen CJK faces).
+    static var generation: Int { cache.withLock { $0.generation } }
 
     /// Forgets the list and the verdicts, for when the installed fonts change.
     static func refresh() {
@@ -182,7 +187,7 @@ nonisolated enum MonospacedFontCatalog {
     /// The family's default face, through Core Text: the catalog runs off
     /// the main thread. A descriptor for an unknown family still matches
     /// some other face, so the answer's family is checked.
-    private static func font(ofFamily family: String) -> CTFont? {
+    static func font(ofFamily family: String) -> CTFont? {
         let descriptor = CTFontDescriptorCreateWithAttributes(
             [kCTFontFamilyNameAttribute: family] as CFDictionary)
         let font = CTFontCreateWithFontDescriptor(descriptor, measurementSize, nil)

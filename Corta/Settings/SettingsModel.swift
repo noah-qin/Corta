@@ -72,25 +72,16 @@ final class SettingsModel {
     /// The families the font picker lists, from `MonospacedFontCatalog` —
     /// empty until `loadFonts()` has measured them off the main thread.
     private(set) var availableFonts: [MonospacedFontCatalog.Entry] = []
-    var appleFonts: [MonospacedFontCatalog.Entry] { availableFonts.filter { $0.origin == .apple } }
-    var userFonts: [MonospacedFontCatalog.Entry] { availableFonts.filter { $0.origin != .apple } }
 
     /// The families the CJK font picker lists (`MonospacedFontCatalog.cjkEntries`),
     /// loaded with `availableFonts`.
     private(set) var availableCJKFonts: [MonospacedFontCatalog.Entry] = []
-    var appleCJKFonts: [MonospacedFontCatalog.Entry] { availableCJKFonts.filter { $0.origin == .apple } }
-    var userCJKFonts: [MonospacedFontCatalog.Entry] { availableCJKFonts.filter { $0.origin != .apple } }
 
     /// Why the configured CJK family is not the one drawn, or empty: the
     /// cascade skips one that is not installed or has no CJK, and says so
-    /// here rather than silently.
-    var cjkFontNotice: String {
-        let family = configuration.cjkFontFamily
-        guard family != Configuration.automaticCJKFontFamily,
-            !MonospacedFontCatalog.isUsableCJK(family: family)
-        else { return "" }
-        return L10n.format("settings.status.cjkFontUnavailable", family)
-    }
+    /// here rather than silently. Stored, like `fontStatus`, so a body
+    /// evaluation never measures a font.
+    private(set) var cjkFontNotice = ""
 
     /// Where the chosen font comes from, and whether it brings its own CJK
     /// design — shown under the picker. Empty while `fontStatus` reports a
@@ -192,6 +183,7 @@ final class SettingsModel {
             refreshPreviewFont()
         }
         if configuration.fontFamily != resolvedFontFamily { refreshFontStatus() }
+        refreshCJKFontNotice()
         refreshQuickTerminalStatus()
         refreshNotificationPermissionNotice()
     }
@@ -474,8 +466,23 @@ final class SettingsModel {
     // MARK: - Font
 
     func loadFonts() async {
-        availableFonts = await Task.detached { MonospacedFontCatalog.entries() }.value
-        availableCJKFonts = await Task.detached { MonospacedFontCatalog.cjkEntries() }.value
+        // Side by side: the CJK list needs no grid measurement, so it does
+        // not wait for the monospace scan.
+        async let monospaced = Task.detached { MonospacedFontCatalog.entries() }.value
+        async let cjk = Task.detached { MonospacedFontCatalog.cjkEntries() }.value
+        (availableFonts, availableCJKFonts) = await (monospaced, cjk)
+    }
+
+    /// Empty while fallback is off: no CJK font is used then, chosen or not.
+    private func refreshCJKFontNotice() {
+        let family = configuration.cjkFontFamily
+        guard configuration.fontFallback, family != Configuration.automaticCJKFontFamily,
+            !MonospacedFontCatalog.isUsableCJK(family: family)
+        else {
+            cjkFontNotice = ""
+            return
+        }
+        cjkFontNotice = L10n.format("settings.status.cjkFontUnavailable", family)
     }
 
     /// A font installed or removed while this window is open: the list, the
@@ -483,6 +490,7 @@ final class SettingsModel {
     private func fontsDidChange() async {
         MonospacedFontCatalog.refresh()
         refreshFontStatus()
+        refreshCJKFontNotice()
         refreshPreviewFont()
         await loadFonts()
     }
