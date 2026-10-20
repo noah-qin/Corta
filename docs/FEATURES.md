@@ -141,7 +141,9 @@ files, remote connections and child-process input.
   every installed monospaced family whose four faces keep one width (D12),
   grouped as Apple's or the user's and labelled when it carries CJK,
   in Light, Regular or Medium, at 10–24 pt (13 by default) and a line
-  spacing of 1.0–1.4 (1.18). CJK fallback follows the system language
+  spacing of 1.0–1.4 (1.18). A CJK font of the user's choice can lead the
+  fallback (`font-family-cjk`), monospaced or not; otherwise CJK fallback
+  follows the system language
   (PingFang SC / TC, Hiragino Sans, Apple SD Gothic Neo; kana and Hangul
   always their own face), wide fallback glyphs are centred in their cells,
   emoji can draw monochrome where a text face has the glyph, fallback can

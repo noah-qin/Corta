@@ -29,6 +29,9 @@ Versioning for compatibility changes.
   language — PingFang SC, PingFang TC, Hiragino Sans or Apple SD Gothic Neo
   — and kana and Hangul always to their own script's face, so Japanese
   kanji are no longer drawn in Chinese forms on a Japanese Mac.
+- Settings ▸ Appearance ▸ CJK Font and `font-family-cjk` choose the font
+  Chinese, Japanese and Korean are drawn in — any installed font with CJK
+  characters, monospaced or not — ahead of the system language's (#374).
 - Double (`SGR 21`, `4:2`) and curly (`SGR 4:3`) underlines, and the ITU
   T.416 colon forms of SGR colours (`38:2::r:g:b`). Other sequences with a
   colon are still ignored whole. An underline colour (`SGR 58`) is

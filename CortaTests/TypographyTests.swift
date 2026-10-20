@@ -94,6 +94,47 @@ struct TypographyConfigurationTests {
         #expect(bold.first == "PingFangSC-Semibold")
     }
 
+    /// `font-family-cjk`: `auto` by default, a family kept as written.
+    @Test("the CJK font key reads, keeps its value and defaults to auto")
+    func cjkFontKey() {
+        #expect(Configuration().cjkFontFamily == Configuration.automaticCJKFontFamily)
+        let parsed = Configuration.parse("font-family-cjk = Hiragino Mincho ProN").configuration
+        #expect(parsed.cjkFontFamily == "Hiragino Mincho ProN")
+        #expect(parsed.serialized().contains("font-family-cjk = Hiragino Mincho ProN\n"))
+        #expect(Configuration.parse("font-family-cjk =").configuration.cjkFontFamily == "auto")
+        #expect(FontStyle(Configuration()).options.cjkFamily == nil)
+        #expect(FontStyle(parsed).options.cjkFamily == "Hiragino Mincho ProN")
+    }
+
+    /// Installed, outline, with Han, kana or Hangul — monospaced or not.
+    @Test("a CJK font must be installed and carry CJK")
+    func cjkFontIsVerified() {
+        #expect(MonospacedFontCatalog.isUsableCJK(family: "PingFang SC"))
+        #expect(MonospacedFontCatalog.isUsableCJK(family: "Hiragino Mincho ProN"))
+        #expect(!MonospacedFontCatalog.isUsableCJK(family: "Menlo"))
+        #expect(!MonospacedFontCatalog.isUsableCJK(family: "Apple Color Emoji"))
+        #expect(!MonospacedFontCatalog.isUsableCJK(family: "No Such Family At All"))
+        let listed = MonospacedFontCatalog.cjkEntries().map(\.name)
+        #expect(listed.contains("PingFang SC"))
+        #expect(!listed.contains("Menlo"))
+    }
+
+    /// A usable chosen family goes first, its bold under bold; an unusable
+    /// one leaves the language's cascade as it was.
+    @Test("a chosen CJK font leads the cascade")
+    func chosenCJKFontLeads() {
+        func names(_ list: [CTFontDescriptor]) -> [String] {
+            list.compactMap { CTFontDescriptorCopyAttribute($0, kCTFontNameAttribute) as? String }
+        }
+        let automatic = names(TerminalFont.cascade(lead: .simplifiedChinese, bold: false))
+        let chosen = names(TerminalFont.cascade(lead: .simplifiedChinese, bold: false, cjk: "Hiragino Mincho ProN"))
+        #expect(chosen.first?.hasPrefix("HiraMinProN") == true)
+        #expect(Array(chosen.dropFirst()) == automatic)
+        let bold = names(TerminalFont.cascade(lead: .simplifiedChinese, bold: true, cjk: "Hiragino Mincho ProN"))
+        #expect(bold.first == "HiraMinProN-W6")
+        #expect(names(TerminalFont.cascade(lead: .simplifiedChinese, bold: false, cjk: "Menlo")) == automatic)
+    }
+
     /// A weight the family lacks is its Regular, never a Bold standing in.
     @Test("the weight picks the face, or Regular where there is none")
     func weightPicksTheFace() {
@@ -135,6 +176,38 @@ struct TypographyAtlasTests {
         let atlas = try Self.atlas()
         let expected = TerminalFont.localeLead.faces.regular
         #expect(try Self.name(#require(atlas.shape("中", style: .regular).runs.first)) == expected)
+    }
+
+    /// A chosen CJK font draws Han, kana and bold Han; Latin stays the
+    /// primary's, and the cell does not change.
+    @Test("a chosen CJK font draws CJK, and only CJK")
+    func chosenCJKFontDraws() throws {
+        let atlas = try Self.atlas(TextOptions(cjkFamily: "Hiragino Mincho ProN"))
+        #expect(try Self.name(#require(atlas.shape("中", style: .regular).runs.first)).hasPrefix("HiraMinProN"))
+        #expect(try Self.name(#require(atlas.shape("か", style: .regular).runs.first)).hasPrefix("HiraMinProN"))
+        #expect(try Self.name(#require(atlas.shape("中", style: .bold).runs.first)) == "HiraMinProN-W6")
+        let latin = try #require(atlas.shape("é", style: .regular).runs.first)
+        #expect(Self.name(latin) == (CTFontCopyPostScriptName(atlas.fonts[0]) as String))
+        #expect(atlas.colorBox == (try Self.atlas()).colorBox)
+        // A reset carries it, as a settings change does.
+        let reset = try Self.atlas()
+        reset.reset(font: TerminalFont.primary(ofSize: 26), options: TextOptions(cjkFamily: "Hiragino Mincho ProN"))
+        #expect(try Self.name(#require(reset.shape("中", style: .regular).runs.first)).hasPrefix("HiraMinProN"))
+    }
+
+    /// The app's path: the configured style through a renderer at 2×.
+    @Test("a pane's renderer draws CJK in the configured CJK font")
+    func rendererUsesTheConfiguredCJKFont() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let configuration = Configuration.parse("""
+            font-family = Menlo
+            font-family-cjk = Hiragino Mincho ProN
+            """).configuration
+        let style = FontStyle(configuration)
+        let renderer = try TerminalRenderer(
+            device: device, font: style.font(ofSize: 18), scale: 2, options: style.options)
+        let run = try #require(renderer.glyphAtlas.shape("中", style: .regular).runs.first)
+        #expect(Self.name(run).hasPrefix("HiraMinProN"))
     }
 
     /// `font-fallback = false`: no other face, and a box rather than a blank.

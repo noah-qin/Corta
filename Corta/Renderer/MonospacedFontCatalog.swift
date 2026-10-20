@@ -58,6 +58,8 @@ nonisolated enum MonospacedFontCatalog {
 
     private struct Cache {
         var entries: [Entry]?
+        /// `cjkEntries()`, filled the same way.
+        var cjkEntries: [Entry]?
         /// `isUsable` by family: `primary` asks on every frame that draws a
         /// shell overlay, and a picker change asks once per pane.
         var usable: [String: Bool] = [:]
@@ -74,13 +76,48 @@ nonisolated enum MonospacedFontCatalog {
     static func entries() -> [Entry] {
         let (cached, generation) = cache.withLock { ($0.entries, $0.generation) }
         if let cached { return cached }
-        // Core Text, not `NSFontManager`, which is AppKit's to use on the
-        // main thread. Names starting with "." are private system faces.
-        let names = (CTFontManagerCopyAvailableFontFamilyNames() as? [String] ?? [])
-            .filter { !$0.hasPrefix(".") }
-        let entries = Set(names).sorted().filter(isUsable(family:)).compactMap(entry(for:))
+        let entries = installedFamilies().filter(isUsable(family:)).compactMap(entry(for:))
         cache.withLock { if $0.generation == generation { $0.entries = entries } }
         return entries
+    }
+
+    /// The installed families that can draw Chinese, Japanese or Korean for
+    /// `font-family-cjk`, sorted for a picker. Not held to the grid's check:
+    /// they draw only CJK, centred and fitted to their two cells, while the
+    /// primary keeps the cell size and baseline.
+    static func cjkEntries() -> [Entry] {
+        let (cached, generation) = cache.withLock { ($0.cjkEntries, $0.generation) }
+        if let cached { return cached }
+        let entries = installedFamilies().filter(isUsableCJK(family:)).compactMap(entry(for:))
+        cache.withLock { if $0.generation == generation { $0.cjkEntries = entries } }
+        return entries
+    }
+
+    /// Core Text, not `NSFontManager`, which is AppKit's to use on the main
+    /// thread. Names starting with "." are private system faces.
+    private static func installedFamilies() -> [String] {
+        let names = (CTFontManagerCopyAvailableFontFamilyNames() as? [String] ?? [])
+            .filter { !$0.hasPrefix(".") }
+        return Set(names).sorted()
+    }
+
+    /// An installed outline family with Han, kana or Hangul. One with only
+    /// some of them is fine: what it lacks falls through to the language's
+    /// default faces behind it.
+    static func isUsableCJK(family: String) -> Bool {
+        // Keyed apart from family names and faces (`isUsable(face:)`).
+        let key = "\u{1}" + family
+        let (known, generation) = cache.withLock { ($0.usable[key], $0.generation) }
+        if let known { return known }
+        let usable = font(ofFamily: family).map { font in
+            hasOutlines(font) && cjkProbes.contains { probe in
+                var character = probe
+                var glyph = CGGlyph(0)
+                return CTFontGetGlyphsForCharacters(font, &character, &glyph, 1) && glyph != 0
+            }
+        } ?? false
+        cache.withLock { if $0.generation == generation { $0.usable[key] = usable } }
+        return usable
     }
 
     static func families() -> [String] { entries().map(\.name) }

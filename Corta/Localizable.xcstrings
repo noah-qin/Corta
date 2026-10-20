@@ -38944,6 +38944,242 @@
           }
         }
       }
+    },
+    "settings.label.cjkFont": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CJK Font"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "中日韩字体"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "中日韓字型"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "CJK フォント"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "CJK 글꼴"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "CJK-Schrift"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Police CJK"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fuente CJK"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fonte CJK"
+          }
+        }
+      }
+    },
+    "settings.font.cjkAutomatic": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic (System Language)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "自动（跟随系统语言）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "自動（跟隨系統語言）"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "自動（システムの言語）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "자동(시스템 언어)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Automatisch (Systemsprache)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Automatique (langue du système)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Automático (idioma del sistema)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Automático (idioma do sistema)"
+          }
+        }
+      }
+    },
+    "settings.help.cjkFont": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chinese, Japanese and Korean characters the font lacks are drawn in this font. The font keeps the cell size and baseline."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "字体缺少的中文、日文和韩文字符用这款字体绘制。格子大小和基线仍由主字体决定。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "字型缺少的中文、日文與韓文字元以這款字型繪製。格子大小與基線仍由主字型決定。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "フォントにない中国語・日本語・韓国語の文字をこのフォントで表示します。セルの大きさとベースラインはメインのフォントに従います。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "글꼴에 없는 중국어, 일본어, 한국어 문자를 이 글꼴로 그립니다. 셀 크기와 기준선은 기본 글꼴을 따릅니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Chinesische, japanische und koreanische Zeichen, die der Schrift fehlen, werden in dieser Schrift gezeichnet. Zellgröße und Grundlinie bleiben die der Schrift."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Les caractères chinois, japonais et coréens absents de la police sont dessinés avec celle-ci. La taille des cellules et la ligne de base restent celles de la police."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Los caracteres chinos, japoneses y coreanos que le faltan a la fuente se dibujan con esta. El tamaño de celda y la línea base siguen siendo los de la fuente."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Caracteres chineses, japoneses e coreanos que faltam na fonte são desenhados com esta. O tamanho da célula e a linha de base continuam os da fonte."
+          }
+        }
+      }
+    },
+    "settings.status.cjkFontUnavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” isn’t installed or has no CJK characters — following the system language instead"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@”未安装或不含中日韩字符，改为跟随系统语言"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%@」未安裝或不含中日韓字元，改為跟隨系統語言"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%@」はインストールされていないか CJK 文字を含みません。システムの言語に従います"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@”이(가) 설치되지 않았거나 CJK 문자가 없습니다. 시스템 언어를 따릅니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„%@“ ist nicht installiert oder enthält keine CJK-Zeichen – stattdessen gilt die Systemsprache"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "« %@ » n’est pas installée ou ne contient aucun caractère CJK — la langue du système est utilisée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@” no está instalada o no tiene caracteres CJK; se usa el idioma del sistema"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@” não está instalada ou não tem caracteres CJK — usando o idioma do sistema"
+          }
+        }
+      }
     }
   }
 }

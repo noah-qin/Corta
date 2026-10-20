@@ -132,6 +132,9 @@ nonisolated struct Configuration: Equatable, Sendable {
     var cursorShape: CursorShape = .block
     var cursorBlink: Bool = false
     var fontFamily: String = Configuration.systemFontFamily
+    /// The family Chinese, Japanese and Korean are drawn in, first in the
+    /// fallback; `automaticCJKFontFamily` follows the system language.
+    var cjkFontFamily: String = Configuration.automaticCJKFontFamily
     var fontSize: Double = 13
     var fontWeight: FontWeight = .regular
     /// The line, as a multiple of the font size; a face that declares a
@@ -262,6 +265,9 @@ nonisolated struct Configuration: Equatable, Sendable {
 
     /// Means `NSFont.monospacedSystemFont`, tracking the OS.
     static let systemFontFamily = "system"
+
+    /// Means the CJK face for the system language (`TerminalFont.CJKLead`).
+    static let automaticCJKFontFamily = "auto"
 
     /// The default hotkey: ⌥Space, the Mac's usual launcher key.
     static let defaultQuickTerminalKey = "alt+space"

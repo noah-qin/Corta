@@ -248,6 +248,14 @@ system language puts PingFang SC, PingFang TC, Hiragino Sans or Apple SD
 Gothic Neo first for Han, and kana and Hangul always lead with their own
 script's face. The default size is 13 pt within 10–24, for a MacBook's
 built-in display. Ligatures stay off (DESIGN §7.3).
+A CJK family of the user's choice (`font-family-cjk`, #374) goes first in
+the cascade, ahead of the language's faces, for a Mac whose language is
+not the one being written and for the common pairing of a Latin
+programming font with a CJK one. It is not held to D12's grid check: it
+draws only CJK, which the renderer already centres and fits to two cells,
+and the primary keeps the cell and baseline. It must be installed and have
+Han, kana or Hangul in outline; otherwise the language's faces apply and
+Settings says so.
 Corta bundles no font and downloads none: the list is what macOS and the
 user have installed, grouped by where the file lives, with a line saying
 which and whether the family carries CJK. Bundling buys nothing on macOS,

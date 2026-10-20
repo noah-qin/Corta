@@ -185,6 +185,13 @@ shows a Font Status row saying which check failed. A font installed while
 Corta runs appears in the list straight away; Retry re-checks the
 configured one.
 
+Chinese, Japanese or Korean drawn in a different font from the one under
+**CJK Font** (`font-family-cjk`) means that family is not installed or has
+no CJK characters; the line under the menu says so, and the system
+language's font draws instead. A character the chosen font lacks also
+comes from the system language's font. The CJK font is unused while **Use
+other fonts for missing characters** is off.
+
 ### Images from `kitten icat` do not show, or show in the wrong place
 
 Corta implements the Kitty graphics protocol's direct (in-band)

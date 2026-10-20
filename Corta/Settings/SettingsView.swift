@@ -261,6 +261,36 @@ struct SettingsView: View {
                         })
                 }
             }
+            Picker(L10n.text("settings.label.cjkFont"), selection: bind(model.cjkFontFamily, model.setCJKFontFamily)) {
+                Text(L10n.text("settings.font.cjkAutomatic")).tag(Configuration.automaticCJKFontFamily)
+                // As for the font: a configured family the list lacks still
+                // shows as chosen.
+                if model.cjkFontFamily != Configuration.automaticCJKFontFamily
+                    && !model.availableCJKFonts.contains(where: { $0.name == model.cjkFontFamily })
+                {
+                    Text(model.cjkFontFamily).tag(model.cjkFontFamily)
+                }
+                if !model.appleCJKFonts.isEmpty {
+                    Section(L10n.text("settings.font.group.apple")) {
+                        ForEach(model.appleCJKFonts, id: \.name) { Text($0.name).tag($0.name) }
+                    }
+                }
+                if !model.userCJKFonts.isEmpty {
+                    Section(L10n.text("settings.font.group.user")) {
+                        ForEach(model.userCJKFonts, id: \.name) { Text($0.name).tag($0.name) }
+                    }
+                }
+            }
+            .accessibilityIdentifier("font-family-cjk")
+            .help(L10n.text("settings.help.cjkFont"))
+            // Fallback off draws only the font: the CJK font would never be used.
+            .disabled(!model.fontFallback)
+            if !model.cjkFontNotice.isEmpty {
+                Text(model.cjkFontNotice)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("cjk-font-notice")
+            }
             LabeledContent(L10n.text("settings.label.size")) {
                 Stepper(value: bind(model.fontSize, model.setFontSize), in: Configuration.fontSizeRange) {
                     Text(model.fontSize, format: .number)

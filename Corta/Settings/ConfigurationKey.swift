@@ -175,6 +175,15 @@ nonisolated extension Configuration {
                     return true
                 },
                 write: { $0.fontFamily }),
+            ConfigurationKey(
+                name: "font-family-cjk",
+                // Kept as written, like `font-family`: one not installed, or
+                // with no CJK, is skipped where the cascade is built.
+                read: { configuration, value in
+                    configuration.cjkFontFamily = value.isEmpty ? Configuration.automaticCJKFontFamily : value
+                    return true
+                },
+                write: { $0.cjkFontFamily }),
             // The ⌘+/⌘− clamp, in whole points.
             ConfigurationKey(
                 name: "font-size",

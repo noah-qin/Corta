@@ -91,7 +91,8 @@ final class PaneAppearance: NSObject {
     /// relaunch. The verdicts cached since the last change are dropped first.
     func fontsChanged() {
         MonospacedFontCatalog.refresh()
-        guard fontStyle.family != Configuration.systemFontFamily else { return }
+        guard fontStyle.family != Configuration.systemFontFamily || fontStyle.options.cjkFamily != nil
+        else { return }
         applyFont(size: fontSize, settle: true)
     }
 

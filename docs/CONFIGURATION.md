@@ -66,7 +66,8 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `status-network-interface` | `auto` or an interface name | `auto` | Auto selects one primary interface (physical fallback); names such as `en0` or `utun2` select exactly that interface. An unavailable explicit interface shows no rate. VPN and physical traffic are never summed. |
 | `cursor-shape` | `block`, `bar`, `underline` | `block` | Default cursor shape, applied live. Terminal programs can temporarily override it with DECSCUSR; parameter 0 or a terminal reset restores this default. |
 | `cursor-blink` | boolean | `false` | Blink the default cursor every half second while its pane has keyboard focus and is visible at the live screen. Terminal programs can temporarily override blinking with DECSCUSR. |
-| `font-family` | `system`, or an installed family name | `system` | `system` is the macOS system monospaced font. Any other value is a family name (`Menlo`, `JetBrains Mono`) and is kept as written; it is used only if it is installed and its regular, bold and italic faces share one advance across printable ASCII (D12), otherwise System Monospaced draws instead and Settings ▸ Appearance shows why. Settings lists only the families that pass. Characters the family lacks come from PingFang SC and Apple Color Emoji. |
+| `font-family` | `system`, or an installed family name | `system` | `system` is the macOS system monospaced font. Any other value is a family name (`Menlo`, `JetBrains Mono`) and is kept as written; it is used only if it is installed and its regular, bold and italic faces share one advance across printable ASCII (D12), otherwise System Monospaced draws instead and Settings ▸ Appearance shows why. Settings lists only the families that pass. Characters the family lacks come from `font-family-cjk` and the faces `font-fallback` lists. |
+| `font-family-cjk` | `auto`, or an installed family name | `auto` | The family Chinese, Japanese and Korean characters the font lacks are drawn in, first in the fallback. `auto` follows the system language (see `font-fallback`). Any other value is kept as written and used if it is installed and has Han, kana or Hangul in outline; it need not be monospaced, since it draws only CJK, centred and fitted to its cells, and the font keeps the cell size and baseline. What it lacks falls through to the `auto` faces. Otherwise `auto` applies and Settings ▸ Appearance says so. Unused while `font-fallback` is `false`. |
 | `font-size` | 10–24, whole points | `13` | Points; a fractional value rounds to the nearest whole point, applied immediately to panes without a temporary zoom and used by new windows and panes. Font changes never move or resize the window; they refit the terminal rows and columns to it, and what is left of a cell shows as background under the last row and past the last column. Very small windows remain subject to minimum-size constraints. ⌘+ / ⌘− / pinch (B09) are a *temporary*, per-window zoom that never writes here — zooming one window does not change this key, another open window, or what the next new window opens at; ⌘0 ends the zoom and returns to whatever this key currently says. New panes in the same window inherit its temporary zoom. A zoom does not survive quitting and relaunching Corta. |
 | `font-weight` | `light`, `regular`, `medium` | `regular` | The primary face's weight. A family without that face, or whose face fails the same width check as the family, draws its Regular (Menlo and PT Mono have only Regular and Bold; SF Mono and Fira Code have all three). Bold text is always the family's own bold. |
 | `line-spacing` | 1.0–1.4, in steps of 0.02 | `1.18` | The line's height as a multiple of the font size. A font that declares a taller line keeps it, so `1.0` never clips; CJK families that declare exactly one em get room between rows. Every cell in every language shares it. |
@@ -308,6 +309,7 @@ shown in their own sections.
 theme = corta
 appearance = auto
 font-family = system
+font-family-cjk = auto
 font-size = 14                     # default 13
 font-weight = regular
 line-spacing = 1.18
@@ -737,7 +739,7 @@ search away.
 
 | Change | Takes effect |
 | --- | --- |
-| `theme`, `appearance`, `font-family`, `font-weight`, `line-spacing`, `font-fallback`, `emoji-rendering`, `cursor-shape`, `cursor-blink` | Immediately, in every open pane; a change to the cell's size refits the rows and columns to the window. |
+| `theme`, `appearance`, `font-family`, `font-family-cjk`, `font-weight`, `line-spacing`, `font-fallback`, `emoji-rendering`, `cursor-shape`, `cursor-blink` | Immediately, in every open pane; a change to the cell's size refits the rows and columns to the window. |
 | `ambiguous-width` | Immediately, for output written afterwards; text already on screen keeps its width. |
 | `font-size` | Immediately in panes without temporary font zoom; zoomed windows keep their temporary size until Actual Size (⌘0). New windows use the configured size. |
 | `bell`, `option-as-meta`, `search-case-sensitive`, `search-regex`, `open-file-command`, `copy-on-select`, `mouse-override-modifier`, `link-activation`, `allow-clipboard-write`, `confirm-close`, `directory-history`, notification keys | Immediately — they are read when the behaviour happens. |

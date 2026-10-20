@@ -75,6 +75,23 @@ final class SettingsModel {
     var appleFonts: [MonospacedFontCatalog.Entry] { availableFonts.filter { $0.origin == .apple } }
     var userFonts: [MonospacedFontCatalog.Entry] { availableFonts.filter { $0.origin != .apple } }
 
+    /// The families the CJK font picker lists (`MonospacedFontCatalog.cjkEntries`),
+    /// loaded with `availableFonts`.
+    private(set) var availableCJKFonts: [MonospacedFontCatalog.Entry] = []
+    var appleCJKFonts: [MonospacedFontCatalog.Entry] { availableCJKFonts.filter { $0.origin == .apple } }
+    var userCJKFonts: [MonospacedFontCatalog.Entry] { availableCJKFonts.filter { $0.origin != .apple } }
+
+    /// Why the configured CJK family is not the one drawn, or empty: the
+    /// cascade skips one that is not installed or has no CJK, and says so
+    /// here rather than silently.
+    var cjkFontNotice: String {
+        let family = configuration.cjkFontFamily
+        guard family != Configuration.automaticCJKFontFamily,
+            !MonospacedFontCatalog.isUsableCJK(family: family)
+        else { return "" }
+        return L10n.format("settings.status.cjkFontUnavailable", family)
+    }
+
     /// Where the chosen font comes from, and whether it brings its own CJK
     /// design — shown under the picker. Empty while `fontStatus` reports a
     /// fallback, which says more.
@@ -251,6 +268,16 @@ final class SettingsModel {
                 return L10n.text("ui.font.invalid")
             }
             configuration.fontFamily = value
+            return nil
+        }
+    }
+
+    /// Refused unless the family can draw CJK, the rule the cascade applies.
+    func setCJKFontFamily(_ value: String) {
+        commit { configuration in
+            guard value == Configuration.automaticCJKFontFamily || MonospacedFontCatalog.isUsableCJK(family: value)
+            else { return L10n.text("ui.font.invalid") }
+            configuration.cjkFontFamily = value
             return nil
         }
     }
@@ -448,6 +475,7 @@ final class SettingsModel {
 
     func loadFonts() async {
         availableFonts = await Task.detached { MonospacedFontCatalog.entries() }.value
+        availableCJKFonts = await Task.detached { MonospacedFontCatalog.cjkEntries() }.value
     }
 
     /// A font installed or removed while this window is open: the list, the

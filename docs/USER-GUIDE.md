@@ -146,7 +146,12 @@ Terminal hotkey, remote badges — is collected in
 - **Characters the font lacks.** Chinese, Japanese and Korean come from
   macOS's own fonts: Han from PingFang SC, PingFang TC, Hiragino Sans or
   Apple SD Gothic Neo by your system language, kana from Hiragino Sans and
-  Hangul from Apple SD Gothic Neo whatever the language. Emoji come from
+  Hangul from Apple SD Gothic Neo whatever the language. To draw them in
+  a font of your own — Menlo for letters and Sarasa Gothic or LXGW WenKai
+  for Chinese, say — choose it under **CJK Font** (`font-family-cjk`). Any
+  installed font with Chinese, Japanese or Korean characters is listed,
+  monospaced or not: it draws only those characters, centred in their two
+  cells, and the main font keeps the cell size. Emoji come from
   Apple Color Emoji — or, with Emoji set to Monochrome Where Possible, as a
   text glyph where Apple Symbols or Menlo has one. A wide character is
   centred in its two cells. Turn off **Use other fonts for missing

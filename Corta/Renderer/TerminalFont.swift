@@ -16,13 +16,15 @@
 
 import AppKit
 import CoreText
+import Synchronization
 
 /// The font stack: System Monospaced (tracking the OS), then one CJK face
 /// per script — PingFang SC, PingFang TC, Hiragino Sans, Apple SD Gothic
 /// Neo, the user's language first — and Apple Color Emoji, pinned as
 /// `kCTFontCascadeListAttribute`, so fallback follows the language rather
 /// than whatever Core Text's own search reaches first. Kana and Hangul lead
-/// with their own face whatever the language (`GlyphAtlas.shape`).
+/// with their own face whatever the language (`GlyphAtlas.shape`). A CJK
+/// family the user chose (`font-family-cjk`) goes before all of them.
 ///
 /// `CTFontCreateCopyWithSymbolicTraits` drops the cascade list, while
 /// `CTFontCreateCopyWithAttributes` keeps it (observed, not documented),
@@ -63,12 +65,40 @@ nonisolated enum TerminalFont {
     /// relaunch, as it does for the rest of the app.
     static let localeLead = CJKLead.forLanguages(Locale.preferredLanguages)
 
-    /// The cascade, in order — `lead` first, the other scripts in
-    /// `CJKLead.allCases` order, then emoji. Fallbacks take the primary's
-    /// size.
-    static func cascade(lead: CJKLead, bold: Bool) -> [CTFontDescriptor] {
+    /// The cascade, in order — the chosen CJK family if it is usable, then
+    /// `lead`, the other scripts in `CJKLead.allCases` order, then emoji.
+    /// Fallbacks take the primary's size.
+    static func cascade(lead: CJKLead, bold: Bool, cjk: String? = nil) -> [CTFontDescriptor] {
         let lists = cascades[lead]!
-        return bold ? lists.bold : lists.regular
+        let base = bold ? lists.bold : lists.regular
+        guard let cjk, let chosen = chosenCJKFaces(cjk) else { return base }
+        return [bold ? chosen.bold : chosen.regular] + base
+    }
+
+    /// A chosen CJK family's regular and bold faces, as cascade entries. Its
+    /// own bold when it has one, else its regular: CJK is never stroked.
+    private struct ChosenFaces: @unchecked Sendable {
+        let regular: CTFontDescriptor
+        let bold: CTFontDescriptor
+    }
+
+    /// Resolved once per family; only a usable family is kept, so one
+    /// installed later resolves on the next ask.
+    private static let chosenFaces = Mutex<[String: ChosenFaces]>([:])
+
+    private static func chosenCJKFaces(_ family: String) -> ChosenFaces? {
+        if let known = chosenFaces.withLock({ $0[family] }) { return known }
+        guard MonospacedFontCatalog.isUsableCJK(family: family) else { return nil }
+        let descriptor = CTFontDescriptorCreateWithAttributes([kCTFontFamilyNameAttribute: family] as CFDictionary)
+        let regular = CTFontCreateWithFontDescriptor(descriptor, 0, nil)
+        let bold = CTFontCreateCopyWithSymbolicTraits(regular, 0, nil, .traitBold, .traitBold)
+            .flatMap { CTFontCopyFamilyName($0) as String == family ? $0 : nil } ?? regular
+        func entry(_ font: CTFont) -> CTFontDescriptor {
+            CTFontDescriptorCreateWithNameAndSize(CTFontCopyPostScriptName(font), 0)
+        }
+        let faces = ChosenFaces(regular: entry(regular), bold: entry(bold))
+        chosenFaces.withLock { $0[family] = faces }
+        return faces
     }
 
     /// Every lead's two lists, built once: `pinningCascadeList` runs for
@@ -99,17 +129,20 @@ nonisolated enum TerminalFont {
     ///   installed or that `MonospacedFontCatalog` rejects falls back to the
     ///   system font — the config file can name anything (D12).
     /// - Parameter weight: a family without that face draws its Regular.
+    /// - Parameter cjk: a CJK family to put first in the cascade; nil, or
+    ///   one that is not installed, follows the system language.
     static func primary(
-        ofSize size: CGFloat, family: String? = nil, weight: Configuration.FontWeight = .regular
+        ofSize size: CGFloat, family: String? = nil, weight: Configuration.FontWeight = .regular,
+        cjk: String? = nil
     ) -> CTFont {
         if let family, family != Configuration.systemFontFamily,
             MonospacedFontCatalog.isUsable(family: family),
             let font = weighted(family, weight, size: size) ?? namedFamily(family, size: size)
         {
-            return pinningCascadeList(font as CTFont, size: size)
+            return pinningCascadeList(font as CTFont, size: size, cjk: cjk)
         }
         let system = NSFont.monospacedSystemFont(ofSize: size, weight: weight.systemWeight) as CTFont
-        return pinningCascadeList(system, size: size)
+        return pinningCascadeList(system, size: size, cjk: cjk)
     }
 
     /// The family's face at exactly `weight`, or nil: `NSFontManager`
@@ -162,11 +195,11 @@ nonisolated enum TerminalFont {
     /// unchanged), and a missing bold is stroked at rasterisation, hence the
     /// flag. The trait copy drops the cascade, so it is re-pinned here, or
     /// bold CJK would skip PingFang SC.
-    static func variant(of font: CTFont, bold: Bool, italic: Bool)
+    static func variant(of font: CTFont, bold: Bool, italic: Bool, cjk: String? = nil)
         -> (font: CTFont, syntheticBold: Bool)
     {
         let size = CTFontGetSize(font)
-        guard bold || italic else { return (pinningCascadeList(font, size: size), false) }
+        guard bold || italic else { return (pinningCascadeList(font, size: size, cjk: cjk), false) }
 
         var desired: CTFontSymbolicTraits = []
         if bold { desired.insert(.traitBold) }
@@ -182,7 +215,7 @@ nonisolated enum TerminalFont {
             styled = CTFontCreateCopyWithAttributes(derived, 0, &matrix, nil)
         }
         return (
-            pinningCascadeList(styled, size: size),
+            pinningCascadeList(styled, size: size, cjk: cjk),
             bold && !actual.contains(.traitBold)
         )
     }
@@ -196,10 +229,12 @@ nonisolated enum TerminalFont {
     /// came back empty (the font database logging `MDB_MAP_FULL`) Core Text
     /// answered with LastResort — a face with no ASCII glyphs, for the
     /// session's whole life. The copy keeps the face and its matrix.
-    static func pinningCascadeList(_ font: CTFont, size: CGFloat, lead: CJKLead = localeLead) -> CTFont {
+    static func pinningCascadeList(
+        _ font: CTFont, size: CGFloat, lead: CJKLead = localeLead, cjk: String? = nil
+    ) -> CTFont {
         let isBold = CTFontGetSymbolicTraits(font).contains(.traitBold)
         let attributes = CTFontDescriptorCreateWithAttributes(
-            [kCTFontCascadeListAttribute: cascade(lead: lead, bold: isBold)] as CFDictionary)
+            [kCTFontCascadeListAttribute: cascade(lead: lead, bold: isBold, cjk: cjk)] as CFDictionary)
         return CTFontCreateCopyWithAttributes(font, size, nil, attributes)
     }
 }
@@ -212,13 +247,17 @@ public nonisolated struct TextOptions: Equatable, Sendable {
     public var fallback: Bool
     /// Emoji draw as text where another face has the scalar in outline.
     public var monochromeEmoji: Bool
+    /// The CJK family first in the cascade; nil follows the system language.
+    public var cjkFamily: String?
 
     public init(
-        lineSpacing: CGFloat = CellMetrics.defaultLineSpacing, fallback: Bool = true, monochromeEmoji: Bool = false
+        lineSpacing: CGFloat = CellMetrics.defaultLineSpacing, fallback: Bool = true, monochromeEmoji: Bool = false,
+        cjkFamily: String? = nil
     ) {
         self.lineSpacing = lineSpacing
         self.fallback = fallback
         self.monochromeEmoji = monochromeEmoji
+        self.cjkFamily = cjkFamily
     }
 }
 
@@ -235,10 +274,12 @@ nonisolated struct FontStyle: Equatable, Sendable {
         weight = configuration.fontWeight
         options = TextOptions(
             lineSpacing: configuration.lineSpacing, fallback: configuration.fontFallback,
-            monochromeEmoji: configuration.emojiRendering == .monochrome)
+            monochromeEmoji: configuration.emojiRendering == .monochrome,
+            cjkFamily: configuration.cjkFontFamily == Configuration.automaticCJKFontFamily
+                ? nil : configuration.cjkFontFamily)
     }
 
     func font(ofSize size: CGFloat) -> CTFont {
-        TerminalFont.primary(ofSize: size, family: family, weight: weight)
+        TerminalFont.primary(ofSize: size, family: family, weight: weight, cjk: options.cjkFamily)
     }
 }

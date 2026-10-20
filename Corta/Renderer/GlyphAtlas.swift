@@ -300,9 +300,9 @@ nonisolated final class GlyphAtlas {
         makeTexture: ((MTLTextureDescriptor) -> MTLTexture?)? = nil
     ) throws {
         // Pinned here too, so the atlas is the one choke point for the cascade.
-        let base = TerminalFont.pinningCascadeList(font, size: CTFontGetSize(font))
-        (self.fonts, self.isSyntheticBold) = Self.faces(of: base)
-        (self.kanaFonts, self.hangulFonts) = Self.scriptFaces(of: fonts)
+        let base = TerminalFont.pinningCascadeList(font, size: CTFontGetSize(font), cjk: options.cjkFamily)
+        (self.fonts, self.isSyntheticBold) = Self.faces(of: base, cjk: options.cjkFamily)
+        (self.kanaFonts, self.hangulFonts) = Self.scriptFaces(of: fonts, cjk: options.cjkFamily)
         self.options = options
         self.colorBox = Self.colorBox(for: base, lineSpacing: options.lineSpacing)
 
@@ -383,10 +383,10 @@ nonisolated final class GlyphAtlas {
     /// Re-points the atlas at a new font, shrinking textures and keeping pipelines:
     /// ⌘= / ⌘- call this per key repeat.
     func reset(font newFont: CTFont, options newOptions: TextOptions? = nil) {
-        let base = TerminalFont.pinningCascadeList(newFont, size: CTFontGetSize(newFont))
-        (fonts, isSyntheticBold) = Self.faces(of: base)
-        (kanaFonts, hangulFonts) = Self.scriptFaces(of: fonts)
         if let newOptions { options = newOptions }
+        let base = TerminalFont.pinningCascadeList(newFont, size: CTFontGetSize(newFont), cjk: options.cjkFamily)
+        (fonts, isSyntheticBold) = Self.faces(of: base, cjk: options.cjkFamily)
+        (kanaFonts, hangulFonts) = Self.scriptFaces(of: fonts, cjk: options.cjkFamily)
         colorBox = Self.colorBox(for: base, lineSpacing: options.lineSpacing)
         (asciiPage, shapedPage, colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize, font: base)
         asciiTable.update(repeating: nil)
@@ -406,13 +406,13 @@ nonisolated final class GlyphAtlas {
 
     /// The four faces of `base` and their synthetic-bold flags
     /// (`TerminalFont.variant`).
-    private static func faces(of base: CTFont) -> ([CTFont], [Bool]) {
+    private static func faces(of base: CTFont, cjk: String?) -> ([CTFont], [Bool]) {
         var fonts: [CTFont] = []
         var synthetic: [Bool] = []
         for rawValue in UInt8(0)...UInt8(3) {
             let style = Style(rawValue: rawValue)
             let derived = TerminalFont.variant(
-                of: base, bold: style.rawValue & 1 != 0, italic: style.rawValue & 2 != 0)
+                of: base, bold: style.rawValue & 1 != 0, italic: style.rawValue & 2 != 0, cjk: cjk)
             fonts.append(derived.font)
             synthetic.append(derived.syntheticBold)
         }
@@ -420,10 +420,11 @@ nonisolated final class GlyphAtlas {
     }
 
     /// Each face re-pinned with a kana or Hangul lead; the faces themselves,
-    /// and so their bold and italic, are unchanged.
-    private static func scriptFaces(of fonts: [CTFont]) -> ([CTFont], [CTFont]) {
+    /// and so their bold and italic, are unchanged. A chosen CJK family
+    /// still goes first: the user picked it for every script.
+    private static func scriptFaces(of fonts: [CTFont], cjk: String?) -> ([CTFont], [CTFont]) {
         func pinned(_ lead: TerminalFont.CJKLead) -> [CTFont] {
-            fonts.map { TerminalFont.pinningCascadeList($0, size: CTFontGetSize($0), lead: lead) }
+            fonts.map { TerminalFont.pinningCascadeList($0, size: CTFontGetSize($0), lead: lead, cjk: cjk) }
         }
         return (pinned(.japanese), pinned(.korean))
     }
