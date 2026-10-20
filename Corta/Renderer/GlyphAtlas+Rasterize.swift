@@ -38,18 +38,20 @@ nonisolated extension GlyphAtlas {
         let attributed = NSAttributedString(string: string, attributes: [.font: requested])
         let line = CTLineCreateWithAttributedString(attributed)
         guard let glyphRuns = CTLineGetGlyphRuns(line) as? [CTRun] else { return ([], false) }
+        let utf16 = Array(string.utf16)
         var runs: [ShapedRun] = []
         for run in glyphRuns {
             let count = CTRunGetGlyphCount(run)
             guard count > 0 else { continue }
             let attributes = CTRunGetAttributes(run) as? [CFString: Any]
-            let runFont: CTFont
+            var runFont: CTFont
             if let value = attributes?[kCTFontAttributeName] {
                 runFont = value as! CTFont
             } else {
                 runFont = requested
             }
-            if !CFEqual(runFont, requested) { fallbackHits += 1 }
+            let isFallback = !CFEqual(runFont, requested)
+            if isFallback { fallbackHits += 1 }
             // Bitmap fonts draw nothing through `CTFontDrawGlyphs`.
             let isColor = CTFontGetSymbolicTraits(runFont).contains(.traitColorGlyphs)
                 || (CTFontCopyPostScriptName(runFont) as String).hasPrefix("AppleColorEmoji")
@@ -57,6 +59,17 @@ nonisolated extension GlyphAtlas {
             var positions = [CGPoint](repeating: .zero, count: count)
             CTRunGetGlyphs(run, CFRange(location: 0, length: count), &glyphs)
             CTRunGetPositions(run, CFRange(location: 0, length: count), &positions)
+            if isFallback, !isColor {
+                let range = CTRunGetStringRange(run)
+                let characters = Array(utf16[range.location..<(range.location + range.length)])
+                if let lighter = Self.unbolded(runFont, under: requested, characters: characters, glyphCount: count) {
+                    runFont = lighter.font
+                    glyphs = lighter.glyphs
+                }
+                if Self.isStandaloneSymbol(characters) {
+                    Self.centre(&positions, glyphs: glyphs, of: runFont, on: requested)
+                }
+            }
             let kept = zip(glyphs, positions).filter { $0.0 != 0 }
             if kept.isEmpty, glyphs.contains(0) { sawNotdef = true }
             guard !kept.isEmpty else { continue }
@@ -65,6 +78,70 @@ nonisolated extension GlyphAtlas {
                  isColor ? run : nil, isColor ? line : nil))
         }
         return (runs, sawNotdef)
+    }
+
+    /// Core Text's own fallback answers a Medium primary (SF Mono's) with
+    /// Bold faces — Menlo Bold for `❯`, Lucida Grande Bold for `⎇` — so a
+    /// prompt's symbols drew heavier than its letters. A fallback that is
+    /// bold under a primary that is not is swapped for its family's regular
+    /// face, when that face has every character. BMP only: one UTF-16 unit
+    /// per glyph keeps the glyph lookup one to one.
+    static func unbolded(
+        _ font: CTFont, under requested: CTFont, characters: [UniChar], glyphCount: Int
+    ) -> (font: CTFont, glyphs: [CGGlyph])? {
+        guard CTFontGetSymbolicTraits(font).contains(.traitBold),
+            !CTFontGetSymbolicTraits(requested).contains(.traitBold),
+            characters.count == glyphCount,
+            !characters.contains(where: { UTF16.isLeadSurrogate($0) || UTF16.isTrailSurrogate($0) })
+        else { return nil }
+        let lighter = lighter(than: font)
+        guard !CTFontGetSymbolicTraits(lighter).contains(.traitBold) else { return nil }
+        var characters = characters
+        var glyphs = [CGGlyph](repeating: 0, count: characters.count)
+        guard CTFontGetGlyphsForCharacters(lighter, &characters, &glyphs, characters.count),
+            !glyphs.contains(0)
+        else { return nil }
+        return (lighter, glyphs)
+    }
+
+    /// The family's default face at the same size. Not
+    /// `CTFontCreateCopyWithSymbolicTraits`: a fallback run's font still
+    /// carries the primary's descriptor, so dropping bold from Menlo Bold
+    /// answered SF Mono Regular, which has no `❯`.
+    private static func lighter(than font: CTFont) -> CTFont {
+        let descriptor = CTFontDescriptorCreateWithAttributes(
+            [kCTFontFamilyNameAttribute: CTFontCopyFamilyName(font)] as CFDictionary)
+        return CTFontCreateWithFontDescriptor(descriptor, CTFontGetSize(font), nil)
+    }
+
+    /// Arrows, technical symbols, geometric shapes, miscellaneous symbols and
+    /// dingbats: marks that stand on their own beside text. Not box drawing
+    /// or blocks (drawn by `BoxDrawing`), braille (a graph's dots sit where
+    /// the font puts them) or the private use area (Powerline and Nerd Font
+    /// icons are drawn to the cell).
+    static func isStandaloneSymbol(_ characters: [UniChar]) -> Bool {
+        !characters.isEmpty && characters.allSatisfy { unit in
+            switch unit {
+            case 0x2190...0x21FF, 0x2300...0x23FF, 0x25A0...0x25FF, 0x2600...0x27BF,
+                0x27F0...0x27FF, 0x2900...0x297F, 0x2B00...0x2BFF:
+                true
+            default: false
+            }
+        }
+    }
+
+    /// Moves a fallback symbol's ink to half the primary's cap height, where
+    /// SF Mono centres its own (`●` and `→` sit within a unit of it). Each
+    /// font places its symbols on its own axis: Menlo's `❯` sat 0.07 em
+    /// below SF Mono's `~` beside it.
+    static func centre(_ positions: inout [CGPoint], glyphs: [CGGlyph], of font: CTFont, on requested: CTFont) {
+        var glyphs = glyphs
+        var rects = [CGRect](repeating: .zero, count: glyphs.count)
+        CTFontGetBoundingRectsForGlyphs(font, .horizontal, &glyphs, &rects, glyphs.count)
+        let ink = zip(rects, positions).reduce(CGRect.null) { $0.union($1.0.offsetBy(dx: $1.1.x, dy: $1.1.y)) }
+        guard !ink.isNull, !ink.isEmpty else { return }
+        let shift = CTFontGetCapHeight(requested) / 2 - ink.midY
+        for index in positions.indices { positions[index].y += shift }
     }
 
     /// Rasterises runs into `page`, caching inkless results too. A color run

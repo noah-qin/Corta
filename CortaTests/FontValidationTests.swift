@@ -154,4 +154,57 @@ import Testing
         let info = try #require(atlas.glyph(shaping: 0x00A0, style: .regular))  // NBSP
         #expect(!info.isMissing)
     }
+
+    // MARK: - Fallback symbols
+
+    /// SF Mono Medium, as the app builds it, with the pinned cascade.
+    private static func systemAtlas() throws -> GlyphAtlas? {
+        guard let device = makeDevice() else {
+            Issue.record("No Metal device available in this environment")
+            return nil
+        }
+        return try GlyphAtlas(device: device, font: TerminalFont.primary(ofSize: 24))
+    }
+
+    private static func inkMidY(_ runs: [GlyphAtlas.ShapedRun]) -> CGFloat {
+        runs.reduce(CGRect.null) { bounds, run in
+            var glyphs = run.glyphs
+            var rects = [CGRect](repeating: .zero, count: glyphs.count)
+            CTFontGetBoundingRectsForGlyphs(run.font, .horizontal, &glyphs, &rects, glyphs.count)
+            return zip(rects, run.positions).reduce(bounds) { $0.union($1.0.offsetBy(dx: $1.1.x, dy: $1.1.y)) }
+        }.midY
+    }
+
+    /// Core Text answers SF Mono Medium's missing `❯` with Menlo Bold; the
+    /// prompt's chevron drew heavier than the `~` beside it.
+    @Test func aFallbackSymbolIsNoBolderThanItsText() throws {
+        guard let atlas = try Self.systemAtlas() else { return }
+        let regular = try #require(atlas.shape("❯", style: .regular).runs.first)
+        #expect(!CTFontGetSymbolicTraits(regular.font).contains(.traitBold))
+        #expect(!regular.glyphs.contains(0))
+        // Bold text keeps a bold fallback.
+        let bold = try #require(atlas.shape("❯", style: .bold).runs.first)
+        #expect(CTFontGetSymbolicTraits(bold.font).contains(.traitBold))
+    }
+
+    /// A fallback symbol sits where SF Mono centres its own: half its cap
+    /// height. Menlo's `❯` was 0.07 em below that.
+    @Test func aFallbackSymbolIsCentredOnThePrimary() throws {
+        guard let atlas = try Self.systemAtlas() else { return }
+        let capMid = CTFontGetCapHeight(atlas.fonts[0]) / 2
+        for symbol in ["❯", "◆", "⇒"] {
+            let runs = atlas.shape(symbol, style: .regular).runs
+            #expect(abs(Self.inkMidY(runs) - capMid) < 0.5, "\(symbol)")
+        }
+    }
+
+    /// Braille dots and the primary's own symbols stay where their font put
+    /// them: a graph needs its dots in place.
+    @Test func brailleAndThePrimarysOwnGlyphsAreNotMoved() throws {
+        guard let atlas = try Self.systemAtlas() else { return }
+        for text in ["⠁", "→", "中"] {
+            let runs = atlas.shape(text, style: .regular).runs
+            #expect(runs.allSatisfy { $0.positions.allSatisfy { $0.y == 0 } }, "\(text)")
+        }
+    }
 }

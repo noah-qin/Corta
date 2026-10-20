@@ -21,6 +21,12 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- A symbol the font lacks, such as a prompt's `❯`, is no longer drawn bold
+  beside regular text, nor below the line: macOS answered SF Mono Medium
+  with Menlo Bold. Arrows, dingbats, geometric and technical symbols from a
+  fallback font are now drawn in its regular weight and centred where the
+  font centres its own; braille, Powerline and Nerd Font icons keep their
+  place.
 - `font-family` in the config file is no longer replaced with `system`. A
   family that is not installed, or not one width, draws as System
   Monospaced and Settings shows a Font Status row saying why (#372).
