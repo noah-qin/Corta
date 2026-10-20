@@ -80,12 +80,12 @@ nonisolated extension GlyphAtlas {
         return (runs, sawNotdef)
     }
 
-    /// Core Text's own fallback answers a Medium primary (SF Mono's) with
-    /// Bold faces — Menlo Bold for `❯`, Lucida Grande Bold for `⎇` — so a
-    /// prompt's symbols drew heavier than its letters. A fallback that is
-    /// bold under a primary that is not is swapped for its family's regular
-    /// face, when that face has every character. BMP only: one UTF-16 unit
-    /// per glyph keeps the glyph lookup one to one.
+    /// Core Text's own fallback can answer a primary that is not bold with
+    /// Bold faces — SF Mono Medium got Menlo Bold for `❯` and Lucida Grande
+    /// Bold for `⎇` — so a prompt's symbols drew heavier than its letters.
+    /// A fallback that is bold under a primary that is not is swapped for
+    /// its family's regular face, when that face has every character. BMP
+    /// only: one UTF-16 unit per glyph keeps the glyph lookup one to one.
     static func unbolded(
         _ font: CTFont, under requested: CTFont, characters: [UniChar], glyphCount: Int
     ) -> (font: CTFont, glyphs: [CGGlyph])? {

@@ -27,6 +27,10 @@ Versioning for compatibility changes.
   fallback font are now drawn in its regular weight and centred where the
   font centres its own; braille, Powerline and Nerd Font icons keep their
   place.
+- System Monospaced is drawn in its Regular weight, as every other family
+  and the CJK and symbol fallbacks are, so text and its fallbacks share one
+  weight. It was Medium, which left Chinese and Japanese a step lighter
+  beside it.
 - CJK in bold text is bold: it was drawn in PingFang SC Regular whatever
   the style, and now uses PingFang SC Semibold under a bold face.
 - `font-family` in the config file is no longer replaced with `system`. A

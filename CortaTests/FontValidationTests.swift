@@ -157,7 +157,7 @@ import Testing
 
     // MARK: - Fallback symbols
 
-    /// SF Mono Medium, as the app builds it, with the pinned cascade.
+    /// System Monospaced, as the app builds it, with the pinned cascade.
     private static func systemAtlas() throws -> GlyphAtlas? {
         guard let device = makeDevice() else {
             Issue.record("No Metal device available in this environment")
@@ -175,7 +175,7 @@ import Testing
         }.midY
     }
 
-    /// Core Text answers SF Mono Medium's missing `❯` with Menlo Bold; the
+    /// Core Text answered SF Mono Medium's missing `❯` with Menlo Bold; the
     /// prompt's chevron drew heavier than the `~` beside it.
     @Test func aFallbackSymbolIsNoBolderThanItsText() throws {
         guard let atlas = try Self.systemAtlas() else { return }

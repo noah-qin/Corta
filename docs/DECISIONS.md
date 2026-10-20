@@ -233,6 +233,12 @@ the grid cannot use, and duplicates the size control. A cell is at least
 1.15 em tall (`CellMetrics.minimumLineHeight`): CJK families such as BIZ
 UDGothic and SimSong declare a one-em line with no leading, and at that
 height rows touch. SF Mono and Menlo declare more and are unaffected.
+Every face is drawn in its Regular weight, and bold in its own Bold (SF
+Mono's Semibold); SF Mono had been Medium to look as dense as Terminal.app,
+which left PingFang and every chosen family a step lighter beside it. No
+face is thickened: a stroke matching Medium's ink, and system font
+smoothing (1.38× the ink), both read heavier than the faces as drawn, and
+Ghostty leaves thickening off by default too.
 Corta bundles no font and downloads none: the list is what macOS and the
 user have installed, grouped by where the file lives, with a line saying
 which and whether the family carries CJK. Bundling buys nothing on macOS,

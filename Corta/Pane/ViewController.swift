@@ -203,7 +203,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             let metrics = terminalRenderer.pointMetrics
             return (metrics.cellWidth, metrics.cellHeight)
         }
-        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .medium)
+        let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: TerminalFont.systemWeight)
         return (
             cellWidth: font.maximumAdvancement.width,
             cellHeight: (font.ascender - font.descender + font.leading).rounded(.up)
@@ -523,7 +523,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         view.preeditFontProvider = { [weak self] in
             guard let self else {
                 return NSFont.monospacedSystemFont(
-                    ofSize: ViewController.defaultFontSize, weight: .medium)
+                    ofSize: ViewController.defaultFontSize, weight: TerminalFont.systemWeight)
             }
             return TerminalFont.primary(ofSize: fontSize, family: fontFamily) as NSFont
         }

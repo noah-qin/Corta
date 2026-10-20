@@ -38,8 +38,15 @@ nonisolated enum TerminalFont {
         CTFontDescriptorCreateWithNameAndSize("AppleColorEmoji" as CFString, 0),
     ]
 
-    /// The primary font, cascade pinned. `.medium` matches Terminal.app's stem
-    /// density at 12pt; `.regular` reads soft through the grayscale atlas.
+    /// System Monospaced's weight: Regular, like every other family and the
+    /// fallbacks, so text and its CJK and symbol fallbacks share one weight.
+    /// SF Mono alone was once Medium, to look as dense as Terminal.app; that
+    /// left PingFang and every chosen family a step lighter beside it. No face
+    /// is thickened: a stroke matching Medium's ink, or system font smoothing
+    /// (heavier still), read heavier than the faces as drawn.
+    static let systemWeight: NSFont.Weight = .regular
+
+    /// The primary font, cascade pinned.
     ///
     /// - Parameter size: in points.
     /// - Parameter family: nil for System Monospaced. A family that isn't
@@ -52,7 +59,7 @@ nonisolated enum TerminalFont {
         {
             return pinningCascadeList(font as CTFont, size: size)
         }
-        let system = NSFont.monospacedSystemFont(ofSize: size, weight: .medium) as CTFont
+        let system = NSFont.monospacedSystemFont(ofSize: size, weight: systemWeight) as CTFont
         return pinningCascadeList(system, size: size)
     }
 

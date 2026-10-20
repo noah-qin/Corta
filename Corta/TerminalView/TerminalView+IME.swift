@@ -226,7 +226,7 @@ final class MarkedTextOverlayView: NSView {
     /// Re-pointed at the current size on each `show`
     /// (`TerminalView.preeditFontProvider`).
     var font = NSFont.monospacedSystemFont(
-        ofSize: ViewController.defaultFontSize, weight: .medium)
+        ofSize: ViewController.defaultFontSize, weight: TerminalFont.systemWeight)
 
     /// The renderer's text colour, read live so it follows theme and
     /// appearance.
