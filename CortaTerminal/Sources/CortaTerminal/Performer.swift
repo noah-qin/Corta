@@ -193,22 +193,27 @@ struct Performer: ParserPerformer, Sendable {
         var index = 0
         while index < parameters.count {
             let code = parameters[index]
+            // The colon-joined parameters after `code`, which belong to it.
+            var subparameterCount = 0
+            while parameters.isSubparameter(index + 1 + subparameterCount) { subparameterCount += 1 }
             switch code {
             case 0: grid.pen.reset()
             case 1: grid.pen.attributes.insert(.bold)
             case 2: grid.pen.attributes.insert(.dim)
             case 3: grid.pen.attributes.insert(.italic)
-            case 4: grid.pen.attributes.insert(.underline)
+            case 4 where subparameterCount > 0:
+                Self.setUnderline(style: parameters[index + 1], on: &grid.pen.attributes)
+            case 4: Self.setUnderline(style: 1, on: &grid.pen.attributes)
             case 5, 6: grid.pen.attributes.insert(.blink)
             case 7: grid.pen.attributes.insert(.reverse)
             case 8: grid.pen.attributes.insert(.invisible)
             case 9: grid.pen.attributes.insert(.strikethrough)
-            // 21 is doubly-underlined in ECMA-48 and "not bold" in some
-            // terminals. Neither reading is safe to guess, so it is ignored
-            // until there is a double underline to turn on.
+            // Doubly underlined, as ECMA-48, xterm, VTE and kitty read it;
+            // "not bold" is the older Linux-console reading.
+            case 21: Self.setUnderline(style: 2, on: &grid.pen.attributes)
             case 22: grid.pen.attributes.subtract([.bold, .dim])
             case 23: grid.pen.attributes.remove(.italic)
-            case 24: grid.pen.attributes.remove(.underline)
+            case 24: grid.pen.attributes.subtract(.anyUnderline)
             case 25: grid.pen.attributes.remove(.blink)
             case 27: grid.pen.attributes.remove(.reverse)
             case 28: grid.pen.attributes.remove(.invisible)
@@ -219,6 +224,16 @@ struct Performer: ParserPerformer, Sendable {
             case 49: grid.pen.background = .default
             case 90...97: grid.pen.foreground = .indexed(UInt8(code - 90 + 8))
             case 100...107: grid.pen.background = .indexed(UInt8(code - 100 + 8))
+            // A `where` binds to one pattern only; each needs its own.
+            case 38 where subparameterCount > 0, 48 where subparameterCount > 0:
+                if let color = Self.extendedColor(subparameters: parameters, after: index, count: subparameterCount) {
+                    if code == 38 { grid.pen.foreground = color } else { grid.pen.background = color }
+                }
+            // The underline's colour: not drawn, but its operands must not be
+            // read as attributes — `58;2;r;g;b` would turn on dim.
+            case 58 where subparameterCount == 0:
+                guard let (_, consumed) = Self.extendedColor(parameters, at: index) else { return }
+                index += consumed - 1
             case 38, 48:
                 guard let (color, consumed) = Self.extendedColor(parameters, at: index) else {
                     // Malformed: the parameters that would say which colour
@@ -230,15 +245,43 @@ struct Performer: ParserPerformer, Sendable {
                 index += consumed - 1
             default: break
             }
-            index += 1
+            index += 1 + subparameterCount
+        }
+    }
+
+    /// `SGR 4:n`: 0 none, 1 single, 2 double, 3 curly; 4 (dotted) and 5
+    /// (dashed) draw single.
+    private static func setUnderline(style: UInt16, on attributes: inout CellAttributes) {
+        attributes.subtract(.anyUnderline)
+        switch style {
+        case 0: break
+        case 2: attributes.formUnion([.underline, .doubleUnderline])
+        case 3: attributes.formUnion([.underline, .curlyUnderline])
+        default: attributes.insert(.underline)
+        }
+    }
+
+    /// The colon forms, ITU T.416: `38:5:n`, `38:2:r:g:b` and
+    /// `38:2:id:r:g:b` with its colour-space id, empty or not.
+    private static func extendedColor(subparameters parameters: Parameters, after index: Int, count: Int) -> Color? {
+        switch parameters[index + 1] {
+        case 5 where count >= 2:
+            return .indexed(UInt8(min(parameters[index + 2], 255)))
+        case 2 where count >= 4:
+            let first = index + (count >= 5 ? 3 : 2)
+            return .rgb(
+                UInt8(min(parameters[first], 255)),
+                UInt8(min(parameters[first + 1], 255)),
+                UInt8(min(parameters[first + 2], 255)))
+        default:
+            return nil
         }
     }
 
     /// Reads `38;5;n` or `38;2;r;g;b` (and the `48` background forms),
     /// returning the colour and how many parameters it spanned.
     ///
-    /// The colon-separated form `38:2::r:g:b` needs sub-parameters, which the
-    /// parser does not implement: it ignores the whole sequence.
+    /// The colon-separated forms are `extendedColor(subparameters:after:count:)`.
     private static func extendedColor(_ parameters: Parameters, at index: Int) -> (Color, Int)? {
         switch parameters[index + 1] {
         case 5 where index + 2 < parameters.count:

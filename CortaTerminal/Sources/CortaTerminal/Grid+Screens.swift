@@ -143,6 +143,7 @@ extension Grid {
         main.cursorStyle = cursorStyle  // the style is global, not per screen
         main.cursorStyleIsExplicit = cursorStyleIsExplicit
         main.cellPixelHeight = cellPixelHeight  // a property of the window
+        main.ambiguousIsWide = ambiguousIsWide  // a setting of the window
         main.cellPixelWidth = cellPixelWidth
         // Terminal-wide, not per screen: `self = main` would restore the old
         // value.

@@ -26,7 +26,7 @@ protocol PaneShellIntegrationHost: AnyObject {
     var isFocusedPane: Bool { get }
     var topInset: CGFloat { get }
     var fontSize: CGFloat { get }
-    var fontFamily: String { get }
+    var fontStyle: FontStyle { get }
     /// Rows above the live bottom; a jump scrolls it.
     var scrollOffset: Int { get set }
     var search: PaneSearch { get }
@@ -440,8 +440,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
             y: content.minY + CGFloat(grid.cursor.row) * metrics.cellHeight,
             width: metrics.cellWidth, height: metrics.cellHeight)
         overlay.showCompletion(completion, anchor: anchor,
-            font: TerminalFont.primary(
-                ofSize: host?.fontSize ?? ViewController.defaultFontSize, family: host?.fontFamily)
+            font: (host?.fontStyle ?? FontStyle()).font(ofSize: host?.fontSize ?? ViewController.defaultFontSize)
                 as NSFont,
             baseline: metrics.baselineOffset, colors: canvas)
     }

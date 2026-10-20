@@ -31,7 +31,7 @@ nonisolated extension GlyphAtlas {
     func shape(_ string: String, style: Style)
         -> (runs: [ShapedRun], sawNotdef: Bool)
     {
-        let requested = fonts[Int(style.rawValue)]
+        let requested = requestedFont(for: string, style: style)
         var sawNotdef = false
         // Use the typed Foundation key instead of bridging a CFString-keyed
         // Swift dictionary (the historical nil-attribute exception site).
@@ -53,16 +53,27 @@ nonisolated extension GlyphAtlas {
             let isFallback = !CFEqual(runFont, requested)
             if isFallback { fallbackHits += 1 }
             // Bitmap fonts draw nothing through `CTFontDrawGlyphs`.
-            let isColor = CTFontGetSymbolicTraits(runFont).contains(.traitColorGlyphs)
+            var isColor = CTFontGetSymbolicTraits(runFont).contains(.traitColorGlyphs)
                 || (CTFontCopyPostScriptName(runFont) as String).hasPrefix("AppleColorEmoji")
             var glyphs = [CGGlyph](repeating: 0, count: count)
             var positions = [CGPoint](repeating: .zero, count: count)
             CTRunGetGlyphs(run, CFRange(location: 0, length: count), &glyphs)
             CTRunGetPositions(run, CFRange(location: 0, length: count), &positions)
+            let range = CTRunGetStringRange(run)
+            let characters = Array(utf16[range.location..<(range.location + range.length)])
+            // `font-fallback = false`: only the primary draws. A cluster it
+            // cannot draw whole is the missing-glyph box, never a part of one.
+            if isFallback, !options.fallback { return ([], true) }
+            if isColor, options.monochromeEmoji,
+                let mono = Self.monochrome(characters, size: CTFontGetSize(requested), primary: requested)
+            {
+                runFont = mono.font
+                glyphs = [mono.glyph]
+                positions = [.zero]
+                isColor = false
+            }
             if isFallback, !isColor {
-                let range = CTRunGetStringRange(run)
-                let characters = Array(utf16[range.location..<(range.location + range.length)])
-                if let lighter = Self.unbolded(runFont, under: requested, characters: characters, glyphCount: count) {
+                if let lighter = Self.unbolded(runFont, under: requested, characters: characters, glyphCount: glyphs.count) {
                     runFont = lighter.font
                     glyphs = lighter.glyphs
                 }
@@ -78,6 +89,39 @@ nonisolated extension GlyphAtlas {
                  isColor ? run : nil, isColor ? line : nil))
         }
         return (runs, sawNotdef)
+    }
+
+    /// The style's face, with kana or Hangul's own face leading the cascade
+    /// when the text starts with one: Japanese kana read as Japanese in a
+    /// Chinese locale too.
+    private func requestedFont(for string: String, style: Style) -> CTFont {
+        let index = Int(style.rawValue)
+        guard let first = string.unicodeScalars.first?.value else { return fonts[index] }
+        switch first {
+        case 0x3040...0x30FF, 0x31F0...0x31FF, 0xFF66...0xFF9F: return kanaFonts[index]
+        case 0x1100...0x11FF, 0x3130...0x318F, 0xA960...0xA97F, 0xAC00...0xD7FF: return hangulFonts[index]
+        default: return fonts[index]
+        }
+    }
+
+    /// Text faces, in order, that draw an emoji as a single outline glyph
+    /// for `emoji-rendering = monochrome`. The primary first, so a family
+    /// with its own symbols keeps them.
+    private static let monochromeFaces = ["AppleSymbols", "Menlo-Regular", ".AppleSystemUIFont"]
+
+    /// One scalar, its presentation selector dropped, as an outline glyph,
+    /// or nil, and the emoji keeps its colour: "when supported".
+    static func monochrome(_ characters: [UniChar], size: CGFloat, primary: CTFont) -> (font: CTFont, glyph: CGGlyph)? {
+        var units = characters.filter { $0 != 0xFE0F && $0 != 0xFE0E }
+        guard units.count == 1 || (units.count == 2 && UTF16.isLeadSurrogate(units[0])) else { return nil }
+        let faces = [primary] + monochromeFaces.map { CTFontCreateWithName($0 as CFString, size, nil) }
+        for face in faces where !CTFontGetSymbolicTraits(face).contains(.traitColorGlyphs) {
+            var glyphs = [CGGlyph](repeating: 0, count: units.count)
+            if CTFontGetGlyphsForCharacters(face, &units, &glyphs, units.count), glyphs[0] != 0 {
+                return (face, glyphs[0])
+            }
+        }
+        return nil
     }
 
     /// Core Text's own fallback can answer a primary that is not bold with

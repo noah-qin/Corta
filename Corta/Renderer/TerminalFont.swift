@@ -17,26 +17,72 @@
 import AppKit
 import CoreText
 
-/// The font stack: System Monospaced (tracking the OS), then PingFang SC
-/// and Apple Color Emoji pinned as `kCTFontCascadeListAttribute`, so
-/// fallback is deterministic rather than locale-dependent.
+/// The font stack: System Monospaced (tracking the OS), then one CJK face
+/// per script — PingFang SC, PingFang TC, Hiragino Sans, Apple SD Gothic
+/// Neo, the user's language first — and Apple Color Emoji, pinned as
+/// `kCTFontCascadeListAttribute`, so fallback follows the language rather
+/// than whatever Core Text's own search reaches first. Kana and Hangul lead
+/// with their own face whatever the language (`GlyphAtlas.shape`).
 ///
 /// `CTFontCreateCopyWithSymbolicTraits` drops the cascade list, while
 /// `CTFontCreateCopyWithAttributes` keeps it (observed, not documented),
 /// so every derivation that matters re-pins it.
 nonisolated enum TerminalFont {
-    /// The cascade, in order; fallbacks take the primary's size. Immutable,
-    /// hence `nonisolated(unsafe)` for the non-`Sendable` descriptors.
-    private nonisolated(unsafe) static let cascadeList: [CTFontDescriptor] = [
-        CTFontDescriptorCreateWithNameAndSize("PingFangSC-Regular" as CFString, 0),
-        CTFontDescriptorCreateWithNameAndSize("AppleColorEmoji" as CFString, 0),
-    ]
-    /// Under a real bold face: CJK in bold text was PingFang Regular, so
-    /// `SGR 1` left 粗体 as light as the text around it.
-    private nonisolated(unsafe) static let boldCascadeList: [CTFontDescriptor] = [
-        CTFontDescriptorCreateWithNameAndSize("PingFangSC-Semibold" as CFString, 0),
-        CTFontDescriptorCreateWithNameAndSize("AppleColorEmoji" as CFString, 0),
-    ]
+    /// The CJK face that leads the cascade. Han characters are shared across
+    /// the four scripts and drawn differently in each, so which face comes
+    /// first decides the shape of 直 or 骨.
+    enum CJKLead: CaseIterable, Sendable {
+        case simplifiedChinese, traditionalChinese, japanese, korean
+
+        /// From the first preferred language: Traditional for zh-Hant and
+        /// the regions that write it, Japanese for ja, Korean for ko,
+        /// Simplified Chinese otherwise.
+        static func forLanguages(_ languages: [String]) -> CJKLead {
+            guard let first = languages.first?.lowercased() else { return .simplifiedChinese }
+            if first.hasPrefix("ja") { return .japanese }
+            if first.hasPrefix("ko") { return .korean }
+            if first.hasPrefix("zh-hant") || ["zh-tw", "zh-hk", "zh-mo"].contains(where: first.hasPrefix) {
+                return .traditionalChinese
+            }
+            return .simplifiedChinese
+        }
+
+        /// PostScript names: regular, and the face under a real bold.
+        /// Semibold, not Bold, beside SF Mono's Semibold bold.
+        var faces: (regular: String, bold: String) {
+            switch self {
+            case .simplifiedChinese: ("PingFangSC-Regular", "PingFangSC-Semibold")
+            case .traditionalChinese: ("PingFangTC-Regular", "PingFangTC-Semibold")
+            case .japanese: ("HiraginoSans-W3", "HiraginoSans-W6")
+            case .korean: ("AppleSDGothicNeo-Regular", "AppleSDGothicNeo-SemiBold")
+            }
+        }
+    }
+
+    /// The user's language's lead, read once: a language change takes a
+    /// relaunch, as it does for the rest of the app.
+    static let localeLead = CJKLead.forLanguages(Locale.preferredLanguages)
+
+    /// The cascade, in order — `lead` first, the other scripts in
+    /// `CJKLead.allCases` order, then emoji. Fallbacks take the primary's
+    /// size.
+    static func cascade(lead: CJKLead, bold: Bool) -> [CTFontDescriptor] {
+        let lists = cascades[lead]!
+        return bold ? lists.bold : lists.regular
+    }
+
+    /// Every lead's two lists, built once: `pinningCascadeList` runs for
+    /// each style on every ⌘= / ⌘- repeat. Immutable, hence
+    /// `nonisolated(unsafe)` for the non-`Sendable` descriptors.
+    private nonisolated(unsafe) static let cascades: [CJKLead: (regular: [CTFontDescriptor], bold: [CTFontDescriptor])] =
+        Dictionary(uniqueKeysWithValues: CJKLead.allCases.map { lead in
+            let order = [lead] + CJKLead.allCases.filter { $0 != lead }
+            func list(bold: Bool) -> [CTFontDescriptor] {
+                (order.map { bold ? $0.faces.bold : $0.faces.regular } + ["AppleColorEmoji"])
+                    .map { CTFontDescriptorCreateWithNameAndSize($0 as CFString, 0) }
+            }
+            return (lead, (list(bold: false), list(bold: true)))
+        })
 
     /// System Monospaced's weight: Regular, like every other family and the
     /// fallbacks, so text and its CJK and symbol fallbacks share one weight.
@@ -52,15 +98,33 @@ nonisolated enum TerminalFont {
     /// - Parameter family: nil for System Monospaced. A family that isn't
     ///   installed or that `MonospacedFontCatalog` rejects falls back to the
     ///   system font — the config file can name anything (D12).
-    static func primary(ofSize size: CGFloat, family: String? = nil) -> CTFont {
+    /// - Parameter weight: a family without that face draws its Regular.
+    static func primary(
+        ofSize size: CGFloat, family: String? = nil, weight: Configuration.FontWeight = .regular
+    ) -> CTFont {
         if let family, family != Configuration.systemFontFamily,
             MonospacedFontCatalog.isUsable(family: family),
-            let font = namedFamily(family, size: size)
+            let font = weighted(family, weight, size: size) ?? namedFamily(family, size: size)
         {
             return pinningCascadeList(font as CTFont, size: size)
         }
-        let system = NSFont.monospacedSystemFont(ofSize: size, weight: systemWeight) as CTFont
+        let system = NSFont.monospacedSystemFont(ofSize: size, weight: weight.systemWeight) as CTFont
         return pinningCascadeList(system, size: size)
+    }
+
+    /// The family's face at exactly `weight`, or nil: `NSFontManager`
+    /// answers the nearest face, and a Bold for "medium" is not one. The
+    /// face is verified as the family was (D12): passing for Regular says
+    /// nothing about a Light's advances.
+    private static func weighted(_ family: String, _ weight: Configuration.FontWeight, size: CGFloat) -> NSFont? {
+        guard weight != .regular,
+            let font = NSFontManager.shared.font(
+                withFamily: family, traits: [], weight: weight.managerWeight, size: size),
+            font.familyName == family,
+            NSFontManager.shared.weight(of: font) == weight.managerWeight,
+            MonospacedFontCatalog.isUsable(face: font as CTFont)
+        else { return nil }
+        return font
     }
 
     /// Resolves a family name ("Menlo"). Not `NSFont(name:)`, which also
@@ -132,10 +196,49 @@ nonisolated enum TerminalFont {
     /// came back empty (the font database logging `MDB_MAP_FULL`) Core Text
     /// answered with LastResort — a face with no ASCII glyphs, for the
     /// session's whole life. The copy keeps the face and its matrix.
-    static func pinningCascadeList(_ font: CTFont, size: CGFloat) -> CTFont {
+    static func pinningCascadeList(_ font: CTFont, size: CGFloat, lead: CJKLead = localeLead) -> CTFont {
         let isBold = CTFontGetSymbolicTraits(font).contains(.traitBold)
         let attributes = CTFontDescriptorCreateWithAttributes(
-            [kCTFontCascadeListAttribute: isBold ? boldCascadeList : cascadeList] as CFDictionary)
+            [kCTFontCascadeListAttribute: cascade(lead: lead, bold: isBold)] as CFDictionary)
         return CTFontCreateCopyWithAttributes(font, size, nil, attributes)
+    }
+}
+
+/// How text draws beyond its face: line spacing, fallback, emoji. Carried
+/// from the configuration to the renderer and its atlas.
+public nonisolated struct TextOptions: Equatable, Sendable {
+    public var lineSpacing: CGFloat
+    /// Off, a character the primary lacks draws as the missing-glyph box.
+    public var fallback: Bool
+    /// Emoji draw as text where another face has the scalar in outline.
+    public var monochromeEmoji: Bool
+
+    public init(
+        lineSpacing: CGFloat = CellMetrics.defaultLineSpacing, fallback: Bool = true, monochromeEmoji: Bool = false
+    ) {
+        self.lineSpacing = lineSpacing
+        self.fallback = fallback
+        self.monochromeEmoji = monochromeEmoji
+    }
+}
+
+/// The configured text, except its size, which a window can zoom alone.
+nonisolated struct FontStyle: Equatable, Sendable {
+    var family = Configuration.systemFontFamily
+    var weight: Configuration.FontWeight = .regular
+    var options = TextOptions()
+
+    init() {}
+
+    init(_ configuration: Configuration) {
+        family = configuration.fontFamily
+        weight = configuration.fontWeight
+        options = TextOptions(
+            lineSpacing: configuration.lineSpacing, fallback: configuration.fontFallback,
+            monochromeEmoji: configuration.emojiRendering == .monochrome)
+    }
+
+    func font(ofSize size: CGFloat) -> CTFont {
+        TerminalFont.primary(ofSize: size, family: family, weight: weight)
     }
 }

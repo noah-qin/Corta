@@ -27,8 +27,8 @@ protocol PaneAppearanceHost: AnyObject {
     var didSizeWindow: Bool { get }
     /// A change rebuilds the atlas, rasterised for one size.
     var fontSize: CGFloat { get set }
-    /// `Configuration.systemFontFamily` means System Monospaced.
-    var fontFamily: String { get set }
+    /// Family, weight and drawing options; the size is `fontSize`.
+    var fontStyle: FontStyle { get set }
     /// A temporary zoom, which a configuration change leaves alone.
     var isFontSizeZoomed: Bool { get }
     func resizeSessionToFitView(coalesce: Bool)
@@ -62,9 +62,9 @@ final class PaneAppearance: NSObject {
         get { host?.fontSize ?? ViewController.defaultFontSize }
         set { host?.fontSize = newValue }
     }
-    private var fontFamily: String {
-        get { host?.fontFamily ?? Configuration.systemFontFamily }
-        set { host?.fontFamily = newValue }
+    private var fontStyle: FontStyle {
+        get { host?.fontStyle ?? FontStyle() }
+        set { host?.fontStyle = newValue }
     }
     private var isFontSizeZoomed: Bool { host?.isFontSizeZoomed ?? false }
     private func invalidateDisplay() { host?.invalidateDisplay() }
@@ -91,7 +91,7 @@ final class PaneAppearance: NSObject {
     /// relaunch. The verdicts cached since the last change are dropped first.
     func fontsChanged() {
         MonospacedFontCatalog.refresh()
-        guard fontFamily != Configuration.systemFontFamily else { return }
+        guard fontStyle.family != Configuration.systemFontFamily else { return }
         applyFont(size: fontSize, settle: true)
     }
 
@@ -106,14 +106,16 @@ final class PaneAppearance: NSObject {
     @objc func configurationChanged() {
         let configuration = ConfigurationStore.shared.configuration
         terminalView?.mouseOverrideModifier = configuration.mouseOverrideModifier
-        // A zoom survives config changes; `resetFontSize` ends it. Family
+        // A zoom survives config changes; `resetFontSize` ends it. Style
         // and size apply together, so a reload that changes both re-points
         // the renderer, fits the window and resizes the child once.
         let size = isFontSizeZoomed ? fontSize : Configuration.fontSizeRange.clamped(configuration.fontSize)
-        if configuration.fontFamily != fontFamily || size != fontSize {
-            fontFamily = configuration.fontFamily
-            applyFont(size: size, settle: true)
+        let style = FontStyle(configuration)
+        if style != fontStyle || size != fontSize {
+            fontStyle = style
+            applyFont(size: size, settle: true, options: style.options)
         }
+        session?.ambiguousWidthIsWide = configuration.ambiguousWidth == .wide
         invalidateDisplay()
     }
 
@@ -145,11 +147,7 @@ final class PaneAppearance: NSObject {
     /// snaps to device pixels, so this uses the `setFont` path and refits.
     func rebuildAtlas(forBackingScale scale: CGFloat) {
         guard let terminalRenderer, scale > 0, scale != terminalRenderer.scale else { return }
-        terminalRenderer.setFont(
-            TerminalFont.primary(
-                ofSize: fontSize,
-                family: fontFamily),
-            scale: scale)
+        terminalRenderer.setFont(fontStyle.font(ofSize: fontSize), scale: scale)
         applyCellMetrics(settle: true)
     }
 
@@ -175,15 +173,14 @@ final class PaneAppearance: NSObject {
 
     /// Re-points the renderer at `size` in the current family — rather than
     /// rebuilding it, which made key repeat stutter — and follows with the
-    /// cell metrics. Below ~8pt the cell degenerates; above 64pt it outgrows
-    /// the minimum window.
-    private func applyFont(size: CGFloat, settle: Bool) {
+    /// cell metrics, within `Configuration.fontSizeRange` (10–24 pt).
+    private func applyFont(size: CGFloat, settle: Bool, options: TextOptions? = nil) {
         fontSize = Configuration.fontSizeRange.clamped(size)
         // A failed pane has no renderer; its retry builds one at the
         // configured size.
         guard let terminalRenderer else { return }
         let scale = host?.view.window?.backingScaleFactor ?? terminalRenderer.scale
-        terminalRenderer.setFont(TerminalFont.primary(ofSize: fontSize, family: fontFamily), scale: scale)
+        terminalRenderer.setFont(fontStyle.font(ofSize: fontSize), scale: scale, options: options)
         applyCellMetrics(settle: settle)
     }
 

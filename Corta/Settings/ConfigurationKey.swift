@@ -105,7 +105,16 @@ nonisolated struct ConfigurationKey: Sendable {
 }
 
 nonisolated extension Configuration {
-    static let fontSizeRange: ClosedRange<Double> = 8...64
+    static let fontSizeRange: ClosedRange<Double> = 10...24
+    static let lineSpacingRange: ClosedRange<Double> = 1.0...1.4
+    /// The settings page's step, and the grid the file's value snaps to.
+    static let lineSpacingStep = 0.02
+
+    /// Clamped and on the 0.02 grid. 59 / 50 is 1.18 exactly as written;
+    /// 59 * 0.02 is 1.1800000000000002.
+    static func snappedLineSpacing(_ value: Double) -> Double {
+        (lineSpacingRange.clamped(value) / lineSpacingStep).rounded() / (1 / lineSpacingStep)
+    }
     static let columnsRange = 20...500
     static let rowsRange = 5...300
     static let scrollbackLinesRange = 0...1_000_000
@@ -166,13 +175,32 @@ nonisolated extension Configuration {
                     return true
                 },
                 write: { $0.fontFamily }),
-            // The ⌘+/⌘− clamp: below ~8pt the cell degenerates.
-            .number("font-size", \.fontSize, in: fontSizeRange),
+            // The ⌘+/⌘− clamp, in whole points.
+            ConfigurationKey(
+                name: "font-size",
+                read: { configuration, value in
+                    guard let parsed = Double(value) else { return false }
+                    configuration.fontSize = fontSizeRange.clamped(parsed.rounded())
+                    return true
+                },
+                write: { ConfigurationKey.number($0.fontSize) }),
+            .choice("font-weight", \.fontWeight),
+            ConfigurationKey(
+                name: "line-spacing",
+                read: { configuration, value in
+                    guard let parsed = Double(value) else { return false }
+                    configuration.lineSpacing = snappedLineSpacing(parsed)
+                    return true
+                },
+                write: { ConfigurationKey.number($0.lineSpacing) }),
+            .flag("font-fallback", \.fontFallback),
+            .choice("emoji-rendering", \.emojiRendering),
         ]),
         ("# Terminal", [
             .integer("columns", \.columns, in: columnsRange),
             .integer("rows", \.rows, in: rowsRange),
             .integer("scrollback-lines", \.scrollbackLines, in: scrollbackLinesRange),
+            .choice("ambiguous-width", \.ambiguousWidth),
             .integer("command-history-limit", \.commandHistoryLimit, in: commandHistoryLimitRange),
             .choice("bell", \.bell),
             .flag("copy-on-select", \.copyOnSelect),

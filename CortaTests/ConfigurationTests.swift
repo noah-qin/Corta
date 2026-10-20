@@ -78,9 +78,11 @@ struct ConfigurationTests {
     @Test("a value outside the supported range is clamped, not rejected")
     func clampsOutOfRangeValues() {
         let (tiny, _) = Configuration.parse("font-size = 2")
-        #expect(tiny.fontSize == 8)
+        #expect(tiny.fontSize == 10)
         let (huge, _) = Configuration.parse("font-size = 400")
-        #expect(huge.fontSize == 64)
+        #expect(huge.fontSize == 24)
+        // Whole points: the step is 1.
+        #expect(Configuration.parse("font-size = 13.4").configuration.fontSize == 13)
         let (negative, _) = Configuration.parse("scrollback-lines = -5")
         #expect(negative.scrollbackLines == 0)
         let (hugeHistory, _) = Configuration.parse("command-history-limit = 999999")
@@ -162,7 +164,7 @@ struct ConfigurationTests {
     @Test("a clamped value is recognised, not preserved verbatim")
     func clampedValueIsRecognised() {
         let (parsed, unknown) = Configuration.parse("font-size = 400")
-        #expect(parsed.fontSize == 64)
+        #expect(parsed.fontSize == 24)
         #expect(unknown.isEmpty)
     }
 
@@ -355,8 +357,8 @@ struct ConfigurationStoreTests {
         // Immediately after the store's own write — where a write-suppression
         // window would hide it — an editor replaces the file. The
         // file is the source of truth, so this edit must be seen.
-        try writeFile("font-size = 33\n")
-        #expect(await waitUpTo(5) { store.configuration.fontSize == 33 })
+        try writeFile("font-size = 23\n")
+        #expect(await waitUpTo(5) { store.configuration.fontSize == 23 })
     }
 
     /// One byte that is not UTF-8 made the whole file read as absent: the

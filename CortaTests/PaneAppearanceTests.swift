@@ -36,7 +36,7 @@ struct PaneAppearanceTests {
         var splitController: SplitViewController? { nil }
         var didSizeWindow: Bool { true }
         var fontSize: CGFloat = 13
-        var fontFamily = Configuration.systemFontFamily
+        var fontStyle = FontStyle()
         var isFontSizeZoomed: Bool { false }
         var focusRefreshes = 0
         func resizeSessionToFitView(coalesce: Bool) {}

@@ -81,31 +81,42 @@ struct CellMetricsTests {
     }
 }
 
-/// A family whose line metrics are one em gets room between rows; one with
-/// its own spacing keeps it.
+/// `line-spacing`: the line is the spacing times the size, or the face's
+/// own line where that is taller, so nothing is clipped.
 struct CellMetricsLineHeightTests {
-    /// Andale Mono ships with macOS and declares 1.125 em — under the floor.
-    @Test("a tight face is raised to the minimum line height, centred")
+    private static func declared(_ font: CTFont) -> CGFloat {
+        CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)
+    }
+
+    /// Andale Mono ships with macOS and declares 1.125 em — under 1.18.
+    @Test("a tight face is raised to the line spacing, centred")
     func aTightFaceIsRaisedAndCentred() throws {
         let font = CTFontCreateWithName("Andale Mono" as CFString, 20, nil)
-        let declared = CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)
-        try #require(declared < 20 * CellMetrics.minimumLineHeight)
+        try #require(Self.declared(font) < 20 * CellMetrics.defaultLineSpacing)
         let metrics = CellMetrics(font: font, scale: 2)
-        #expect(metrics.cellHeight >= 20 * CellMetrics.minimumLineHeight)
+        #expect(metrics.cellHeight >= 20 * CellMetrics.defaultLineSpacing)
         // The extra room is split, so the glyph sits mid-row, not on top.
         let above = metrics.baselineOffset - CTFontGetAscent(font)
         let below = metrics.cellHeight - metrics.baselineOffset - CTFontGetDescent(font)
         #expect(abs(above - below) <= 0.5)
     }
 
-    @Test("the default face keeps its own line height")
-    func theDefaultFaceIsUnchanged() {
-        for size in stride(from: CGFloat(8), through: 32, by: 1) {
+    @Test("the line is the larger of the spacing and the face's own")
+    func theLineIsTheLargerOfTheTwo() {
+        for size in stride(from: CGFloat(10), through: 24, by: 1) {
             let font = TerminalFont.primary(ofSize: size)
-            let declared = CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)
-            #expect(declared >= size * CellMetrics.minimumLineHeight)
-            #expect(CellMetrics(font: font, scale: 2).cellHeight == (declared * 2).rounded(.up) / 2)
+            for spacing in [CGFloat(1.0), 1.18, 1.4] {
+                let line = max(Self.declared(font), size * spacing)
+                #expect(CellMetrics(font: font, scale: 2, lineSpacing: spacing).cellHeight == (line * 2).rounded(.up) / 2)
+            }
         }
+    }
+
+    /// 1.0 is a request, not a squeeze: a face that needs more keeps it.
+    @Test("a spacing below the face's line never clips it")
+    func aSmallSpacingNeverClips() {
+        let font = TerminalFont.primary(ofSize: 13)
+        #expect(CellMetrics(font: font, scale: 2, lineSpacing: 1.0).cellHeight >= Self.declared(font))
     }
 }
 

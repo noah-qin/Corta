@@ -84,17 +84,17 @@ struct SettingsModelTests {
         #expect(ConfigurationStore.shared.configuration.quickTerminalKey == Shortcut.parse("ctrl+shift+a"))
     }
 
-    @Test("a font size outside 8...64 is clamped")
+    @Test("a font size outside 10...24 is clamped")
     func fontSizeIsClamped() {
         let model = SettingsModel()
         let original = model.fontSize
         defer { model.setFontSize(original) }
 
         model.setFontSize(2)
-        #expect(model.fontSize == 8)
+        #expect(model.fontSize == 10)
 
         model.setFontSize(200)
-        #expect(model.fontSize == 64)
+        #expect(model.fontSize == 24)
     }
 
     @Test("columns and rows are clamped to their grid bounds")

@@ -25,10 +25,11 @@ nonisolated enum TerminalLayout {
     static let titlebarHeight: CGFloat = 28
     /// The window's own curvature.
     static let windowCornerRadius: CGFloat = 12
-    /// Padding only, or the left column clips. Chrome (titlebar, tab bar) is
-    /// measured at runtime from `contentLayoutRect` and added; a fixed value
-    /// hid the first row under a tab bar.
-    static let insets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 10)
+    /// Padding only, or the left column clips: 8 pt above and below, 10 pt
+    /// at each side. Chrome (titlebar, tab bar) is measured at runtime from
+    /// `contentLayoutRect` and added; a fixed value hid the first row under
+    /// a tab bar. The status rule fits in the left 10 (`statusRuleOffset`).
+    static let insets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
     static var insetWidth: CGFloat { insets.left + insets.right }
     static var insetHeight: CGFloat { insets.top + insets.bottom }
     /// A command-status rule: this far left of the grid, and this wide, in

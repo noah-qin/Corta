@@ -77,6 +77,41 @@ nonisolated struct Configuration: Equatable, Sendable {
         }
     }
 
+    /// The primary face's weight. A family without the face asked for draws
+    /// its Regular; bold is always a step heavier (`TerminalFont.variant`).
+    enum FontWeight: String, CaseIterable, Sendable {
+        case light, regular, medium
+
+        var systemWeight: NSFont.Weight {
+            switch self {
+            case .light: .light
+            case .regular: .regular
+            case .medium: .medium
+            }
+        }
+
+        /// `NSFontManager`'s 0–15 scale: 3 light, 5 regular, 6 medium.
+        var managerWeight: Int {
+            switch self {
+            case .light: 3
+            case .regular: 5
+            case .medium: 6
+            }
+        }
+    }
+
+    /// East Asian Ambiguous scalars (UAX #11) — `±`, `§`, Greek and Cyrillic,
+    /// box drawing — as one cell or two.
+    enum AmbiguousWidth: String, CaseIterable, Sendable {
+        case narrow, wide
+    }
+
+    /// Whether emoji draw from Apple Color Emoji or, where another installed
+    /// face has the scalar, as monochrome text.
+    enum EmojiRendering: String, CaseIterable, Sendable {
+        case color, monochrome
+    }
+
     enum InputSourceIndicatorMode: String, CaseIterable, Sendable {
         case auto, always, off
     }
@@ -97,7 +132,16 @@ nonisolated struct Configuration: Equatable, Sendable {
     var cursorShape: CursorShape = .block
     var cursorBlink: Bool = false
     var fontFamily: String = Configuration.systemFontFamily
-    var fontSize: Double = 12
+    var fontSize: Double = 13
+    var fontWeight: FontWeight = .regular
+    /// The line, as a multiple of the font size; a face that declares a
+    /// taller one keeps it (`CellMetrics`).
+    var lineSpacing: Double = Double(CellMetrics.defaultLineSpacing)
+    /// Characters the font lacks come from other fonts; off, they draw as
+    /// the missing-glyph box.
+    var fontFallback: Bool = true
+    var ambiguousWidth: AmbiguousWidth = .narrow
+    var emojiRendering: EmojiRendering = .color
     var theme: String = Theme.corta.name
     var appearance: Appearance = .auto
     var scrollbackLines: Int = 10_000

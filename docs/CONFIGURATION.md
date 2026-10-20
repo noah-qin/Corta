@@ -67,7 +67,11 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `cursor-shape` | `block`, `bar`, `underline` | `block` | Default cursor shape, applied live. Terminal programs can temporarily override it with DECSCUSR; parameter 0 or a terminal reset restores this default. |
 | `cursor-blink` | boolean | `false` | Blink the default cursor every half second while its pane has keyboard focus and is visible at the live screen. Terminal programs can temporarily override blinking with DECSCUSR. |
 | `font-family` | `system`, or an installed family name | `system` | `system` is the macOS system monospaced font. Any other value is a family name (`Menlo`, `JetBrains Mono`) and is kept as written; it is used only if it is installed and its regular, bold and italic faces share one advance across printable ASCII (D12), otherwise System Monospaced draws instead and Settings ▸ Appearance shows why. Settings lists only the families that pass. Characters the family lacks come from PingFang SC and Apple Color Emoji. |
-| `font-size` | 8–64 | `12` | Points, applied immediately to panes without a temporary zoom and used by new windows and panes. Font changes never move or resize the window; they refit the terminal rows and columns to it, and what is left of a cell shows as background under the last row and past the last column. Very small windows remain subject to minimum-size constraints. ⌘+ / ⌘− / pinch (B09) are a *temporary*, per-window zoom that never writes here — zooming one window does not change this key, another open window, or what the next new window opens at; ⌘0 ends the zoom and returns to whatever this key currently says. New panes in the same window inherit its temporary zoom. A zoom does not survive quitting and relaunching Corta. |
+| `font-size` | 10–24, whole points | `13` | Points; a fractional value rounds to the nearest whole point, applied immediately to panes without a temporary zoom and used by new windows and panes. Font changes never move or resize the window; they refit the terminal rows and columns to it, and what is left of a cell shows as background under the last row and past the last column. Very small windows remain subject to minimum-size constraints. ⌘+ / ⌘− / pinch (B09) are a *temporary*, per-window zoom that never writes here — zooming one window does not change this key, another open window, or what the next new window opens at; ⌘0 ends the zoom and returns to whatever this key currently says. New panes in the same window inherit its temporary zoom. A zoom does not survive quitting and relaunching Corta. |
+| `font-weight` | `light`, `regular`, `medium` | `regular` | The primary face's weight. A family without that face, or whose face fails the same width check as the family, draws its Regular (Menlo and PT Mono have only Regular and Bold; SF Mono and Fira Code have all three). Bold text is always the family's own bold. |
+| `line-spacing` | 1.0–1.4, in steps of 0.02 | `1.18` | The line's height as a multiple of the font size. A font that declares a taller line keeps it, so `1.0` never clips; CJK families that declare exactly one em get room between rows. Every cell in every language shares it. |
+| `font-fallback` | boolean | `true` | Characters the font lacks come from other fonts: PingFang SC or TC, Hiragino Sans and Apple SD Gothic Neo by the user's language (kana always Hiragino Sans, Hangul always Apple SD Gothic Neo), then Apple Color Emoji, then whatever macOS finds. `false` draws them as the missing-glyph box. |
+| `emoji-rendering` | `color`, `monochrome` | `color` | `monochrome` draws an emoji as a text glyph where the primary font, Apple Symbols or Menlo has one; an emoji none of them has stays in colour. Width follows the terminal's width rules either way. |
 
 ### Window
 
@@ -100,6 +104,7 @@ into another application hides it without moving focus again.
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
 | `scrollback-lines` | 0–1000000 | `10000` | Lines of history per session. **Applies to sessions opened afterwards**: a running child's history cannot be re-limited without discarding lines. |
+| `ambiguous-width` | `narrow`, `wide` | `narrow` | East Asian Ambiguous characters (Unicode UAX #11, version 17.0) — `±`, `§`, `é`, Greek, Cyrillic, box drawing among them — take one cell or two; wide box drawing spans both cells. **Applies to output written after the change**; what is already on screen keeps its width. Programs that measure text themselves (shells, editors) count by their own rules, so `wide` can misalign them. |
 | `command-history-limit` | 0–10000 | `512` | How many completed/running commands a session's structured command history (jumping, copy/export by identity, Command History search) keeps at once — separate from `scrollback-lines`, which bounds visible text, not command records. **Applies to sessions opened afterwards**, same reason as `scrollback-lines`. |
 | `bell` | `visual`, `audible`, `muted` | `visual` | `visual` flashes the pane; `audible` is `NSSound.beep()`. |
 | `input-source-indicator` | `auto`, `always`, `off` | `auto` | A persistent input-source badge in the window toolbar by default. `auto` enables it only when the user has enabled a non-Latin keyboard layout or an IME; `always` shows it for any input source. Every mode hides it in unfocused panes. In the toolbar it stays while a program runs, since it covers no output. With prompt placement, `auto` shows it at a ready shell prompt (without OSC 133 shell integration it falls back to the focused pane), `always` also during command output, and both hide it in scrollback and alternate-screen programs. With prompt placement, long input moves it downward without changing the grid; if no safe space remains it hides until the next prompt. Toolbar placement stays fixed. Applies immediately. Settings ▸ Keyboard & Mouse. |
@@ -302,7 +307,11 @@ shown in their own sections.
 theme = corta
 appearance = auto
 font-family = system
-font-size = 13                     # default 12
+font-size = 14                     # default 13
+font-weight = regular
+line-spacing = 1.18
+font-fallback = true
+emoji-rendering = color
 cursor-shape = block
 cursor-blink = false
 status-bar = false
@@ -323,6 +332,7 @@ quick-terminal-screen = mouse
 
 # Terminal
 scrollback-lines = 50000           # default 10000
+ambiguous-width = narrow
 command-history-limit = 512
 bell = visual
 input-source-indicator = auto
@@ -726,7 +736,8 @@ search away.
 
 | Change | Takes effect |
 | --- | --- |
-| `theme`, `appearance`, `font-family`, `cursor-shape`, `cursor-blink` | Immediately, in every open pane. |
+| `theme`, `appearance`, `font-family`, `font-weight`, `line-spacing`, `font-fallback`, `emoji-rendering`, `cursor-shape`, `cursor-blink` | Immediately, in every open pane; a change to the cell's size refits the rows and columns to the window. |
+| `ambiguous-width` | Immediately, for output written afterwards; text already on screen keeps its width. |
 | `font-size` | Immediately in panes without temporary font zoom; zoomed windows keep their temporary size until Actual Size (⌘0). New windows use the configured size. |
 | `bell`, `option-as-meta`, `search-case-sensitive`, `search-regex`, `open-file-command`, `copy-on-select`, `mouse-override-modifier`, `link-activation`, `allow-clipboard-write`, `confirm-close`, `directory-history`, notification keys | Immediately — they are read when the behaviour happens. |
 | `status-bar`, `status-items`, `status-network-interface`, input-source indicator keys | Immediately; polling follows visible enabled bars. |

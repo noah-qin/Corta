@@ -134,7 +134,7 @@ struct DocumentationDriftTests {
         let (parsed, unknown) = Configuration.parse(example)
         #expect(unknown.isEmpty)
         var expected = Configuration()
-        expected.fontSize = 13
+        expected.fontSize = 14
         expected.scrollbackLines = 50_000
         expected.notifyOnLongTask = true
         expected.notificationThreshold = 60

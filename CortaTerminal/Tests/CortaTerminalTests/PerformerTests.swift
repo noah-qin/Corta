@@ -220,6 +220,44 @@ struct SGRTests {
         #expect(partial.attributes == .bold)
     }
 
+    /// `4:n` picks the underline's style; `21` is double; `24` clears any.
+    @Test("underline styles: single, double, curly, and off")
+    func underlineStyles() throws {
+        #expect(try cell("\\e[4:1mx").attributes == .underline)
+        #expect(try cell("\\e[4:2mx").attributes == [.underline, .doubleUnderline])
+        #expect(try cell("\\e[21mx").attributes == [.underline, .doubleUnderline])
+        #expect(try cell("\\e[4:3mx").attributes == [.underline, .curlyUnderline])
+        // Dotted and dashed draw single.
+        #expect(try cell("\\e[4:4mx").attributes == .underline)
+        #expect(try cell("\\e[4:3m\\e[4:0mx").attributes == [])
+        #expect(try cell("\\e[4:3m\\e[24mx").attributes == [])
+        // A plain 4 after a curly one is single again.
+        #expect(try cell("\\e[4:3m\\e[4mx").attributes == .underline)
+        // Sub-parameters belong to their code: 1 after `4:3` is bold.
+        #expect(try cell("\\e[4:3;1mx").attributes == [.underline, .curlyUnderline, .bold])
+    }
+
+    /// The ITU T.416 colon forms, with and without a colour-space id.
+    @Test("colon colour forms set the exact colour")
+    func colonColours() throws {
+        #expect(try cell("\\e[38:5:208mx").foreground == .indexed(208))
+        #expect(try cell("\\e[38:2::10:20:30mx").foreground == .rgb(10, 20, 30))
+        #expect(try cell("\\e[48:2:10:20:30mx").background == .rgb(10, 20, 30))
+        // A malformed one sets nothing and the codes after it still apply.
+        let malformed = try cell("\\e[38:2:1;1mx")
+        #expect(malformed.foreground == .default)
+        #expect(malformed.attributes == .bold)
+    }
+
+    /// The underline colour is not drawn, but its operands must not be read
+    /// as attributes: `58;2;r;g;b` once turned on dim.
+    @Test("an underline colour is consumed, not read as attributes")
+    func underlineColourIsConsumed() throws {
+        #expect(try cell("\\e[58;2;1;2;3;4mx").attributes == .underline)
+        #expect(try cell("\\e[58;5;2;1mx").attributes == .bold)
+        #expect(try cell("\\e[58:2::1:2:3;1mx").attributes == .bold)
+    }
+
     @Test("several codes in one sequence apply left to right")
     func codesApplyInOrder() throws {
         let cell = try cell("\\e[31;1;38;5;99;4mx")

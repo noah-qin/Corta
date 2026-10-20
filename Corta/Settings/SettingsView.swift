@@ -266,6 +266,30 @@ struct SettingsView: View {
                     Text(model.fontSize, format: .number)
                 }
             }
+            Picker(L10n.text("settings.label.fontWeight"), selection: bind(\.fontWeight)) {
+                ForEach(Configuration.FontWeight.allCases, id: \.self) { weight in
+                    Text(L10n.text("settings.fontWeight.\(weight.rawValue)")).tag(weight)
+                }
+            }
+            .accessibilityIdentifier("font-weight")
+            .help(L10n.text("settings.help.fontWeight"))
+            LabeledContent(L10n.text("settings.label.lineSpacing")) {
+                Stepper(
+                    value: bind(model.lineSpacing, model.setLineSpacing), in: Configuration.lineSpacingRange,
+                    step: Configuration.lineSpacingStep
+                ) {
+                    Text(model.lineSpacing, format: .number.precision(.fractionLength(2)))
+                }
+            }
+            .accessibilityIdentifier("line-spacing")
+            Toggle(L10n.text("settings.label.fontFallback"), isOn: bind(\.fontFallback))
+                .accessibilityIdentifier("font-fallback")
+            Picker(L10n.text("settings.label.emojiRendering"), selection: bind(\.emojiRendering)) {
+                ForEach(Configuration.EmojiRendering.allCases, id: \.self) { mode in
+                    Text(L10n.text("settings.emojiRendering.\(mode.rawValue)")).tag(mode)
+                }
+            }
+            .accessibilityIdentifier("emoji-rendering")
             Section(L10n.text("settings.section.cursor")) {
                 Picker(L10n.text("settings.label.cursorShape"), selection: bind(\.cursorShape)) {
                     ForEach(Configuration.CursorShape.allCases, id: \.self) { shape in
@@ -317,6 +341,13 @@ struct SettingsView: View {
                     numberField(bind(model.commandHistoryLimit, model.setCommandHistoryLimit), width: 92)
                 }
                 .help(L10n.text("ui.history.newSessions"))
+                Picker(L10n.text("settings.label.ambiguousWidth"), selection: bind(\.ambiguousWidth)) {
+                    ForEach(Configuration.AmbiguousWidth.allCases, id: \.self) { width in
+                        Text(L10n.text("settings.ambiguousWidth.\(width.rawValue)")).tag(width)
+                    }
+                }
+                .accessibilityIdentifier("ambiguous-width")
+                .help(L10n.text("settings.help.ambiguousWidth"))
                 Picker(L10n.text("settings.label.bell"), selection: bind(\.bell)) {
                     ForEach(SettingsModel.bellModes, id: \.self) { mode in
                         Text(mode.displayName).tag(mode)

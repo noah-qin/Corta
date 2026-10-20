@@ -24,7 +24,7 @@ measured. Priorities:
 | Capability                                              | Tier | Notes                                                   |
 | ------------------------------------------------------- | ---- | ------------------------------------------------------- |
 | UTF-8 byte stream decoding                              | P0   | The foundation                                          |
-| SGR: ANSI / 256 / 24-bit true colour, bold, underline, reverse | P0 |                                                  |
+| SGR: ANSI / 256 / 24-bit true colour (semicolon and ITU T.416 colon forms), bold, underline (single, double `21` / `4:2`, curly `4:3`), reverse | P0 |                                                  |
 | Cursor movement, absolute positioning, save/restore     | P0   |                                                         |
 | CHA / HPA / HPR / VPA / VPR — absolute and relative position | P0 | A TUI that lays a line out in segments jumps between columns rather than writing spaces; without these the whole screen collapses |
 | Erase display / line, insert / delete lines and columns | P0   |                                                         |

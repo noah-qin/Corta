@@ -41,6 +41,10 @@ public struct Parameters: Equatable, Sendable {
     /// True once a sequence tried to supply more than `maxCount`.
     public private(set) var didOverflow = false
 
+    /// Bit `i` set: parameter `i` followed a colon, a sub-parameter of the
+    /// one before it (`SGR 4:3`, ITU T.416's `38:2::r:g:b`).
+    private var subparameterMask: UInt16 = 0
+
     public init() {}
 
     public init(_ values: [UInt16]) {
@@ -54,6 +58,22 @@ public struct Parameters: Equatable, Sendable {
             if count == 0 { count = 1 }
         }
     }
+
+    /// Parameters given with colons and the indices that followed one, for
+    /// tests: `Parameters([4, 3], subparameters: [1])` is `4:3`.
+    public init(_ values: [UInt16], subparameters: Set<Int>) {
+        self.init(values)
+        for index in subparameters where index > 0 && index < count {
+            subparameterMask |= 1 << UInt16(index)
+        }
+    }
+
+    /// Whether parameter `index` followed a colon.
+    public func isSubparameter(_ index: Int) -> Bool {
+        index > 0 && index < min(count, Self.maxCount) && subparameterMask & (1 << UInt16(index)) != 0
+    }
+
+    public var hasSubparameters: Bool { subparameterMask != 0 }
 
     public subscript(index: Int) -> UInt16 {
         guard index >= 0, index < count, index < Self.maxCount else { return 0 }
@@ -89,12 +109,22 @@ public struct Parameters: Equatable, Sendable {
         values[count - 1] = 0
     }
 
+    /// A colon: a separator whose next parameter belongs to this one.
+    mutating func separateSubparameter() {
+        separate()
+        // Past the last slot the colon is still recorded, as bit 0 (which no
+        // index reads), so a non-SGR sequence carrying it is still dropped.
+        subparameterMask |= didOverflow ? 1 : 1 << UInt16(count - 1)
+    }
+
     mutating func reset() {
         self = Parameters()
     }
 
     public static func == (lhs: Parameters, rhs: Parameters) -> Bool {
-        guard lhs.count == rhs.count, lhs.didOverflow == rhs.didOverflow else { return false }
+        guard lhs.count == rhs.count, lhs.didOverflow == rhs.didOverflow,
+            lhs.subparameterMask == rhs.subparameterMask
+        else { return false }
         for index in 0..<min(lhs.count, maxCount) where lhs.values[index] != rhs.values[index] {
             return false
         }

@@ -20,8 +20,11 @@ import Testing
 
 struct CortaTests {
 
-    @MainActor @Test func defaultFontMatchesTerminalProfile() {
-        #expect(ViewController.defaultFontSize == CGFloat(12))
+    /// 13 pt: the size the configuration defaults to, for a MacBook's
+    /// built-in Retina display.
+    @MainActor @Test func defaultFontMatchesTheConfiguration() {
+        #expect(ViewController.defaultFontSize == CGFloat(13))
+        #expect(Configuration().fontSize == 13)
     }
 
     /// The live palette follows the theme and the system appearance now,

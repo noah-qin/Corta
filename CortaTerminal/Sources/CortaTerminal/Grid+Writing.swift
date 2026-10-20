@@ -53,11 +53,32 @@ extension Grid {
             writeZeroWidth(scalar)
         case 2 where columns >= 2:
             writeWide(scalar)
+        case 1 where ambiguousIsWide && columns >= 2 && Self.isAmbiguous(scalar):
+            writeWide(scalar)
         default:
             // A one-column screen cannot hold a pair; the wide scalar falls
             // back to a single cramped cell rather than vanishing.
             writeNarrow(scalar)
         }
+    }
+
+    /// East Asian Ambiguous (`ambiguousWidthRanges`), by binary search; read
+    /// only with `ambiguousIsWide` on, never for ASCII.
+    static func isAmbiguous(_ scalar: UInt32) -> Bool {
+        var low = 0
+        var high = ambiguousWidthRanges.count
+        while low < high {
+            let mid = (low + high) / 2
+            let range = ambiguousWidthRanges[mid]
+            if scalar < range.lowerBound {
+                high = mid
+            } else if scalar > range.upperBound {
+                low = mid + 1
+            } else {
+                return true
+            }
+        }
+        return false
     }
 
     /// A ground-state ASCII run, already validated by the parser.

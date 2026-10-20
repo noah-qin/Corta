@@ -213,6 +213,13 @@ nonisolated final class GlyphAtlas {
     /// Indexed by `Style.rawValue`, with whether each bold is synthetic.
     var fonts: [CTFont]
     var isSyntheticBold: [Bool]
+    /// `fonts` with Hiragino Sans, then Apple SD Gothic Neo, leading the
+    /// cascade: kana and Hangul take their own script's face whatever the
+    /// user's language, which only decides the face for Han.
+    var kanaFonts: [CTFont]
+    var hangulFonts: [CTFont]
+    /// Line spacing, fallback and emoji, as the configuration says.
+    var options: TextOptions
     /// The two-cell box a color glyph is rasterised to fit, in pixels.
     var colorBox: CGSize
 
@@ -289,12 +296,15 @@ nonisolated final class GlyphAtlas {
     init(
         device: MTLDevice, font: CTFont, atlasPixelSize: Int = GlyphAtlas.atlasSize,
         storageMode: MTLStorageMode = .shared,
+        options: TextOptions = TextOptions(),
         makeTexture: ((MTLTextureDescriptor) -> MTLTexture?)? = nil
     ) throws {
         // Pinned here too, so the atlas is the one choke point for the cascade.
         let base = TerminalFont.pinningCascadeList(font, size: CTFontGetSize(font))
         (self.fonts, self.isSyntheticBold) = Self.faces(of: base)
-        self.colorBox = Self.colorBox(for: base)
+        (self.kanaFonts, self.hangulFonts) = Self.scriptFaces(of: fonts)
+        self.options = options
+        self.colorBox = Self.colorBox(for: base, lineSpacing: options.lineSpacing)
 
         let allocate = makeTexture ?? { device.makeTexture(descriptor: $0) }
         self.allocateTexture = allocate
@@ -344,8 +354,8 @@ nonisolated final class GlyphAtlas {
     /// Two cells of `font`, which is already in pixels: the renderer's box
     /// for a wide glyph, so an emoji drawn to fit it is never scaled on the
     /// GPU.
-    static func colorBox(for font: CTFont) -> CGSize {
-        let metrics = CellMetrics(font: font)
+    static func colorBox(for font: CTFont, lineSpacing: CGFloat) -> CGSize {
+        let metrics = CellMetrics(font: font, lineSpacing: lineSpacing)
         return CGSize(width: metrics.cellWidth * 2, height: metrics.cellHeight)
     }
 
@@ -372,10 +382,12 @@ nonisolated final class GlyphAtlas {
 
     /// Re-points the atlas at a new font, shrinking textures and keeping pipelines:
     /// ⌘= / ⌘- call this per key repeat.
-    func reset(font newFont: CTFont) {
+    func reset(font newFont: CTFont, options newOptions: TextOptions? = nil) {
         let base = TerminalFont.pinningCascadeList(newFont, size: CTFontGetSize(newFont))
         (fonts, isSyntheticBold) = Self.faces(of: base)
-        colorBox = Self.colorBox(for: base)
+        (kanaFonts, hangulFonts) = Self.scriptFaces(of: fonts)
+        if let newOptions { options = newOptions }
+        colorBox = Self.colorBox(for: base, lineSpacing: options.lineSpacing)
         (asciiPage, shapedPage, colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize, font: base)
         asciiTable.update(repeating: nil)
         evictionCount += 1
@@ -405,6 +417,15 @@ nonisolated final class GlyphAtlas {
             synthetic.append(derived.syntheticBold)
         }
         return (fonts, synthetic)
+    }
+
+    /// Each face re-pinned with a kana or Hangul lead; the faces themselves,
+    /// and so their bold and italic, are unchanged.
+    private static func scriptFaces(of fonts: [CTFont]) -> ([CTFont], [CTFont]) {
+        func pinned(_ lead: TerminalFont.CJKLead) -> [CTFont] {
+            fonts.map { TerminalFont.pinningCascadeList($0, size: CTFontGetSize($0), lead: lead) }
+        }
+        return (pinned(.japanese), pinned(.korean))
     }
 
     /// ASCII fast path — see the type comment. The renderer passes only

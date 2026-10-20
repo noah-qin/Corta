@@ -155,13 +155,29 @@ struct ParserTests {
                 ])
     }
 
-    /// Sub-parameters are P2. Until they exist, the whole sequence is
-    /// ignored rather than half-read — and the stream resynchronises on the
-    /// final byte, so the text after it still prints.
-    @Test("a colon sends the sequence to the ignore state")
-    func colonIsIgnored() throws {
-        let result = try actions("\\e[38:2:1:2:3mX")
-        #expect(result == [.print(0x58)])
+    /// A colon joins a sub-parameter to the one before it, and SGR gets
+    /// them marked (`4:3` is a curly underline, `38:2::r:g:b` a colour).
+    @Test("a colon is a sub-parameter of SGR")
+    func colonIsASubparameterOfSGR() throws {
+        let result = try actions("\\e[38:2::1:2:3mX")
+        #expect(
+            result == [
+                .csi(CSISequence(
+                    parameters: Parameters([38, 2, 0, 1, 2, 3], subparameters: [1, 2, 3, 4, 5]), final: 0x6D)),
+                .print(0x58),
+            ])
+    }
+
+    /// Anything but plain SGR with a colon is ignored whole, as every colon
+    /// once was — and the stream resynchronises on the final byte, so the
+    /// text after it still prints.
+    @Test("a colon outside SGR drops the sequence")
+    func colonOutsideSGRIsIgnored() throws {
+        #expect(try actions("\\e[1:2HX") == [.print(0x58)])
+        #expect(try actions("\\e[?4:3mX") == [.print(0x58)])
+        // A colon past the last parameter slot still counts.
+        let past = String(repeating: "1;", count: 20) + "5:9"
+        #expect(try actions("\\e[\(past)HX") == [.print(0x58)])
     }
 
     /// Williams' diagram: C0 controls inside a sequence are executed where
