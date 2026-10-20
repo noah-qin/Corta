@@ -40,5 +40,13 @@ public struct CellAttributes: OptionSet, Hashable, Sendable {
     /// Either half of a wide pair.
     @inlinable public static var widePair: CellAttributes { [.wide, .wideSpacer] }
 
-    /// Bits 10–15 remain reserved.
+    /// The underline's style, beside `.underline`: two rules (`SGR 21`,
+    /// `4:2`) or a wave (`4:3`). At most one is set, and only with
+    /// `.underline`.
+    @inlinable public static var doubleUnderline: CellAttributes { CellAttributes(rawValue: 1 << 10) }
+    @inlinable public static var curlyUnderline: CellAttributes { CellAttributes(rawValue: 1 << 11) }
+    /// Every underline bit, for `SGR 24` and a style change.
+    @inlinable public static var anyUnderline: CellAttributes { [.underline, .doubleUnderline, .curlyUnderline] }
+
+    /// Bits 12–15 remain reserved.
 }

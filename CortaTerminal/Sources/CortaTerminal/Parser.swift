@@ -303,9 +303,10 @@ public struct Parser: Sendable {
             parameters.separate()
             state = .csiParam
         case 0x3A:
-            // Sub-parameters (`SGR 38:2::r:g:b`) are not implemented;
-            // ignoring the whole sequence is the safe reading.
-            state = .csiIgnore
+            // A sub-parameter (`SGR 4:3`); only SGR reads them, and any other
+            // sequence carrying one is dropped (`dispatchCSI`).
+            parameters.separateSubparameter()
+            state = .csiParam
         case 0x3C...0x3F:
             privateMarker = byte
             state = .csiParam
@@ -324,10 +325,12 @@ public struct Parser: Sendable {
             parameters.accumulate(byte - UInt8(ascii: "0"))
         case 0x3B:
             parameters.separate()
+        case 0x3A:
+            parameters.separateSubparameter()
         case 0x20...0x2F:
             collectIntermediate(byte)
             if state == .csiParam { state = .csiIntermediate }
-        case 0x3A, 0x3C...0x3F:
+        case 0x3C...0x3F:
             state = .csiIgnore
         case 0x7F:
             break
@@ -442,6 +445,15 @@ public struct Parser: Sendable {
     }
 
     private mutating func dispatchCSI<P: ParserPerformer>(final: UInt8, performer: inout P) {
+        // Sub-parameters mean something only to plain SGR here. Anywhere else
+        // the whole sequence is ignored, as every colon once was: reading
+        // `CSI 1:2 H` as a cursor position would be a guess.
+        let isSGR = final == UInt8(ascii: "m") && privateMarker == 0 && intermediates.count == 0
+        guard !parameters.hasSubparameters || isSGR else {
+            state = .ground
+            clear()
+            return
+        }
         performer.csiDispatch(
             CSISequence(
                 parameters: parameters,

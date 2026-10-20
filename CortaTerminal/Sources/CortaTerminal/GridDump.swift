@@ -196,6 +196,7 @@ private struct StyleLegend {
             (.bold, "bold"), (.dim, "dim"), (.italic, "italic"),
             (.underline, "underline"), (.blink, "blink"), (.reverse, "reverse"),
             (.invisible, "invisible"), (.strikethrough, "strikethrough"),
+            (.doubleUnderline, "double-underline"), (.curlyUnderline, "curly-underline"),
         ]
         let names = all.filter { attributes.contains($0.0) }.map(\.1)
         return names.isEmpty ? "none" : names.joined(separator: ",")
