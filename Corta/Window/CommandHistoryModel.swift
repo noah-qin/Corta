@@ -59,7 +59,12 @@ final class CommandHistoryModel {
         let accessibilityLabel: String
     }
 
-    weak var pane: ViewController? { didSet { refresh() } }
+    weak var pane: ViewController? {
+        didSet {
+            shownCommandWidths = [:]
+            refresh()
+        }
+    }
     var directoryOnly = false
     var projectOnly = false
     var exitFilter: ExitFilter = .any
@@ -101,6 +106,10 @@ final class CommandHistoryModel {
     private var currentDirectory: String?
     private var projectRoots: [String: String] = [:]
     @ObservationIgnored private var snapshotStamp: [UInt64] = []
+    /// Each row's command text as laid out, by record id: what Run compares
+    /// the command's own width against. Not observed — the view reports it
+    /// while drawing.
+    @ObservationIgnored private var shownCommandWidths: [Int: CGFloat] = [:]
 
     /// Rebuild formatted rows only when the session changes, never from a body getter.
     func refresh() {
@@ -265,14 +274,17 @@ final class CommandHistoryModel {
         onDismiss?()
     }
 
-    func run(id: Int) {
+    /// - Parameter shown: the text the row drew. The grid is read again
+    ///   here, and output can have rewritten the record's row since the
+    ///   list last refreshed.
+    func run(id: Int, shown: String?) {
         guard let pane, let record = record(id: id), let text = pane.shell.commandLineText(for: record)
         else { return }
         // The row shows one line, truncated, and a record is OSC 133 marks
         // that any output can forge: what was never on show is filled, read
         // at the prompt, and run by the user's Return.
         let written =
-            Self.runsAsShown(text)
+            Self.runs(text, shown: shown, shownWidth: shownCommandWidths[id])
             ? pane.shell.fillAndRunPrompt(with: text) : pane.shell.fillPrompt(with: text)
         guard written else {
             pane.terminalView?.showToast(L10n.text("toast.cannotFillPrompt"), kind: .warning)
@@ -281,16 +293,38 @@ final class CommandHistoryModel {
         onDismiss?()
     }
 
-    /// One line short enough that the row showed all of it. Longer, the row's
-    /// tail truncation hid the end — `make test` padded out to a payload — so
-    /// it is filled instead. A tab is not shown as what it sends either.
-    nonisolated static func runsAsShown(_ text: String) -> Bool {
-        text.unicodeScalars.count <= maximumRunLength
-            && !text.unicodeScalars.contains { $0.value == 0x0A || $0.value == 0x0D || $0.value == 0x09 }
+    /// Whether Run may send Return after `text`: the row drew this very
+    /// text, and all of it.
+    nonisolated static func runs(_ text: String, shown: String?, shownWidth: CGFloat?) -> Bool {
+        text == shown && runsAsShown(text, shownWidth: shownWidth)
     }
 
-    /// What the history window's command column shows at its default width.
-    nonisolated static let maximumRunLength = 80
+    /// One line that fit where the row drew it. Wider, the row's tail
+    /// truncation hid the end — `make test` padded out to a payload — so it
+    /// is filled instead. Measured, not counted: a wide character takes two
+    /// columns, and the column is as wide as the window leaves it. No width
+    /// reported yet is not shown. A tab is not shown as what it sends either.
+    nonisolated static func runsAsShown(_ text: String, shownWidth: CGFloat?) -> Bool {
+        guard let shownWidth,
+            !text.unicodeScalars.contains(where: { $0.value == 0x0A || $0.value == 0x0D || $0.value == 0x09 })
+        else { return false }
+        return commandWidth(text) <= shownWidth
+    }
+
+    /// The row's command text width, as `commandFont` lays it out.
+    nonisolated static func commandWidth(_ text: String) -> CGFloat {
+        NSAttributedString(string: text, attributes: [.font: commandFont()]).size().width
+    }
+
+    /// The command column's font, one for drawing and measuring.
+    nonisolated static func commandFont() -> NSFont {
+        .monospacedSystemFont(ofSize: 12, weight: .regular)
+    }
+
+    /// The row's command text, as laid out; see `shownCommandWidths`.
+    func noteShownCommandWidth(_ width: CGFloat, id: Int) {
+        shownCommandWidths[id] = width
+    }
 
     private func record(id: Int) -> CommandRecord? {
         pane?.session?.commandRecords.records.first { $0.id == id }

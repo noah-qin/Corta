@@ -64,6 +64,12 @@ Versioning for compatibility changes.
 
 ### Security
 
+- Command History's **Run** sends Return only for a command its row showed
+  whole, measured as drawn. The check counted up to 80 characters, more
+  than the column shows at the window's default width, and a wide
+  character counted as one: a forged history entry could hide the end of
+  the command it ran. Run also fills, rather than runs, a command whose
+  row output rewrote after the list last showed it.
 - Hovering a line built of combining-mark clusters no longer freezes the
   window: joining a row's text took time in the square of its width, and
   a link or file-reference check on such a line ran for seconds on every

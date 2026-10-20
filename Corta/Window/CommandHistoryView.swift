@@ -103,10 +103,15 @@ private struct CommandHistoryRowView: View {
             // record whose prompt line has scrolled away says so rather
             // than showing a blank — the timestamp and status still stand.
             Text(row.commandText ?? L10n.text("commandHistory.textGone"))
-                .font(.system(size: 12, design: .monospaced))
+                .font(Font(CommandHistoryModel.commandFont()))
                 .foregroundStyle(row.commandText == nil ? .tertiary : .primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
+                // Run compares the command's width with this one: narrower
+                // than the text, the tail was cut.
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+                    model.noteShownCommandWidth(width, id: row.id)
+                }
                 .help(row.commandText ?? "")
             Text(row.directoryText)
                 .font(.system(size: 12))
@@ -118,7 +123,7 @@ private struct CommandHistoryRowView: View {
             Button(L10n.text("commandHistory.find")) { model.find(id: row.id) }
             Button(L10n.text("commandHistory.fill")) { model.fill(id: row.id) }
                 .disabled(!row.canFillOrRun)
-            Button(L10n.text("commandHistory.run")) { model.run(id: row.id) }
+            Button(L10n.text("commandHistory.run")) { model.run(id: row.id, shown: row.commandText) }
                 .disabled(!row.canFillOrRun)
         }
         .accessibilityElement(children: .ignore)

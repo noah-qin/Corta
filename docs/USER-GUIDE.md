@@ -383,9 +383,10 @@ With the hooks loaded, automatically or through startup-file installation:
 - **Command History.** **Search Command History…** lists every command
   with its time, exit status and directory; **Fill** puts one back at the
   prompt and **Run** runs it again (`command-history-limit`). A command the
-  list cannot show whole — more than one line, longer than 80 characters, or
-  holding a tab — is filled rather than run, so all of it is at the prompt
-  and runs on your Return.
+  list cannot show whole — more than one line, cut off at the row's edge, or
+  holding a tab — or one whose text changed since the list showed it is
+  filled rather than run, so all of it is at the prompt and runs on your
+  Return.
 - **Long-task notifications.** With `notify-on-long-task = true`, a command
   that ran longer than `notification-threshold` seconds (30) posts a
   notification when it finishes **while its window is not key**, provided
