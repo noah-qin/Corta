@@ -168,13 +168,22 @@ sequences and the remaining failures.
 
 ### A glyph is drawn smaller than its neighbours
 
-Corta uses System Monospaced as its only primary font, with Core Text
-fallback for missing characters. A fallback glyph can be scaled to stay
-inside its terminal cells, so its visible size can differ from neighbouring
-glyphs. Adjust the font size in **Settings ▸ Appearance** and compare the
-preview. Legacy `font-family` values migrate to `system`; there is no font
-family picker or Font status row. If a glyph is clipped or misaligned,
-report its text, font size, display scale and a screenshot.
+A character the chosen font lacks comes from PingFang SC or Apple Color
+Emoji. A fallback glyph can be scaled to stay inside its terminal cells, so
+its visible size can differ from neighbouring glyphs. Adjust the font size
+in **Settings ▸ Appearance** and compare the preview. If a glyph is clipped
+or misaligned, report its text, font, font size, display scale and a
+screenshot.
+
+### The font I set is not the one drawn
+
+`font-family` names a family, not a face (`JetBrains Mono`, not
+`JetBrainsMono-Regular`). Corta uses it only if it is installed and its
+regular, bold and italic faces advance the same width across printable
+ASCII; otherwise it draws System Monospaced and **Settings ▸ Appearance**
+shows a Font Status row saying which check failed. A font installed while
+Corta runs appears in the list straight away; Retry re-checks the
+configured one.
 
 ### Images from `kitten icat` do not show, or show in the wrong place
 

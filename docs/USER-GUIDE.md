@@ -71,7 +71,8 @@ values and when it applies).
 | Windows reopening where you left them | `restore-windows`, on by default. Layouts, tabs and working directories come back; processes and terminal text do not. |
 | Your own colour scheme | A theme defined in the file (`theme.<name>.*`), or **View ▸ Theme editor…**. [Creating and editing themes](#creating-and-editing-themes). |
 | Your own key bindings | `bind.<command> = <shortcut>`. The command names are in [Keyboard shortcuts](#keyboard-shortcuts). |
-| A font of your choice, ligatures, transparency or per-profile settings | Not available. System Monospaced is the one primary font (D11); the rest are [not shipped](CONFIGURATION.md#6-what-is-deliberately-not-configurable) and each needs a decision first. Presets cover a shell, a directory and an environment ([Presets](CONFIGURATION.md#4a-presets)). |
+| A font of your choice | **Settings ▸ Appearance ▸ Font**, or `font-family`. Only monospaced families Corta can lay out on its grid are offered. |
+| Ligatures, transparency or per-profile settings | Not available; they are [not shipped](CONFIGURATION.md#6-what-is-deliberately-not-configurable), and each needs a decision first. Presets cover a shell, a directory and an environment ([Presets](CONFIGURATION.md#4a-presets)). |
 | `tmux -CC` control mode | Not supported (D09). Ordinary `tmux` runs inside Corta as any program does. |
 
 **Shell integration.** Standard local zsh sessions load Corta's hooks
@@ -127,9 +128,10 @@ Terminal hotkey, remote badges — is collected in
 
 ## Text, fonts and themes
 
-- **Font.** `font-family = system` (the only supported primary font) and
-  `font-size` (12 pt). Settings ▸ Appearance previews the font, colors and cursor. Legacy font
-  family names migrate to the system face.
+- **Font.** Settings ▸ Appearance ▸ Font lists System Monospaced (the
+  default) and every installed monospaced family Corta can lay out on its
+  grid; `font-family` in the config file is the same setting. `font-size`
+  is 12 pt by default. The page previews the font, colors and cursor.
 - **Zoom.** ⌘= / ⌘− / ⌘0 or a pinch make the text bigger, smaller or
   the configured size again, in the current window only. Zoom never
   changes the config file. Font changes never move or resize the window: the visible rows and

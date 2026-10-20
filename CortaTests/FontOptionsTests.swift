@@ -173,16 +173,61 @@ import Testing
         #expect(equals.uvRect != greater.uvRect, "\(family) ligated across two cells")
     }
 
-    // MARK: - Single supported family
+    // MARK: - A family from the config file
 
-    @Test func legacyConfiguredFamiliesUseTheSystemMonospacedFace() {
-        for family in ["PT Mono", "Menlo", "Missing-Font"] {
-            let parsed = Configuration.parse("font-family = \(family)\nfont-size = 13\n")
-            #expect(parsed.configuration.fontFamily == Configuration.systemFontFamily)
-            #expect(parsed.unknown.isEmpty)
-            let font = TerminalFont.primary(ofSize: parsed.configuration.fontSize, family: parsed.configuration.fontFamily)
-            let system = TerminalFont.primary(ofSize: 13)
-            #expect(CTFontCopyPostScriptName(font) == CTFontCopyPostScriptName(system))
+    /// Monospaced families a Mac may have; Andale Mono and PT Mono ship with
+    /// macOS, so this finds one on a clean machine.
+    private static let thirdPartyCandidates = [
+        "Fira Code", "JetBrains Mono", "Cascadia Code", "IBM Plex Mono",
+        "Source Code Pro", "Hack", "Iosevka", "Andale Mono", "PT Mono",
+    ]
+
+    private static func installedCandidate() -> String? {
+        let installed = Set(NSFontManager.shared.availableFontFamilies)
+        return thirdPartyCandidates.first { installed.contains($0) }
+    }
+
+    /// `font-family` naming an installed, verified family has to survive
+    /// parsing *and* resolve to a face of that family — the regression in
+    /// #372 was the parser replacing it with `system`.
+    @Test func aVerifiedFamilyResolvesFromTheConfigFile() throws {
+        let family = try #require(Self.installedCandidate(), "no candidate monospaced family installed")
+        guard Self.fontSubsystemResolves(family) else {
+            print("note: the font subsystem is not resolving \(family) right now; see fontSubsystemResolves")
+            return
         }
+        let parsed = Configuration.parse("font-family = \(family)\nfont-size = 13\n")
+        #expect(parsed.configuration.fontFamily == family)
+        #expect(parsed.unknown.isEmpty)
+        #expect(TerminalFont.resolution(forFamily: family) == .resolved)
+
+        let font = TerminalFont.primary(ofSize: parsed.configuration.fontSize, family: parsed.configuration.fontFamily)
+        #expect(CTFontCopyFamilyName(font) as String == family)
+        let system = TerminalFont.primary(ofSize: 13)
+        #expect(CTFontCopyPostScriptName(font) as String != CTFontCopyPostScriptName(system) as String)
+        // The catalog is what the settings page lists from.
+        #expect(MonospacedFontCatalog.families().contains(family))
+    }
+
+    /// A family that is not installed is kept as written — installing it
+    /// later makes it take — and is drawn in the system face meanwhile.
+    @Test func aMissingFamilyIsKeptAndFallsBackToTheSystemFace() {
+        let family = "No Such Family At All"
+        let parsed = Configuration.parse("font-family = \(family)\n")
+        #expect(parsed.configuration.fontFamily == family)
+        #expect(TerminalFont.resolution(forFamily: family) == .missing(requested: family))
+        let font = TerminalFont.primary(ofSize: 12, family: family)
+        #expect(CTFontCopyPostScriptName(font) == CTFontCopyPostScriptName(TerminalFont.primary(ofSize: 12)))
+    }
+
+    /// Installed but not one width: reported as such, not as missing.
+    @Test func aProportionalFamilyIsReportedAsUnfitForTheGrid() {
+        #expect(TerminalFont.resolution(forFamily: "Helvetica") == .invalidForGrid(requested: "Helvetica"))
+        #expect(!MonospacedFontCatalog.families().contains("Helvetica"))
+    }
+
+    @Test func anEmptyFamilyMeansTheSystemFace() {
+        #expect(Configuration.parse("font-family =\n").configuration.fontFamily == Configuration.systemFontFamily)
+        #expect(TerminalFont.resolution(forFamily: Configuration.systemFontFamily) == .resolved)
     }
 }

@@ -37469,6 +37469,301 @@
           }
         }
       }
+    },
+    "settings.label.fontStatus": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Font Status"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字体状态"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "字型狀態"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "フォントの状態"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "글꼴 상태"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Schriftstatus"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "État de la police"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Estado de la fuente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Status da fonte"
+          }
+        }
+      }
+    },
+    "settings.status.fontMissing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” isn't installed — using System Monospaced instead"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未安装“%@”——已改用系统等宽字体"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未安裝「%@」——已改用系統等寬字體"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%@」はインストールされていません — 代わりにシステム等幅フォントを使用しています"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@”이(가) 설치되어 있지 않습니다 — 대신 시스템 고정폭 글꼴을 사용합니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„%@“ ist nicht installiert – stattdessen wird die System-Festbreitenschrift verwendet"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "« %@ » n'est pas installée — utilisation de la police à chasse fixe du système à la place"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@” no está instalada; se usa la fuente monoespaciada del sistema en su lugar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@” não está instalada — usando a fonte monoespaçada do sistema"
+          }
+        }
+      }
+    },
+    "settings.status.fontInvalidForGrid": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” doesn't advance evenly and can't be used — using System Monospaced instead"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”字宽不均匀，无法使用——已改用系统等宽字体"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%@」字寬不均，無法使用——已改用系統等寬字體"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%@」は文字送りが均一でないため使用できません — 代わりにシステム等幅フォントを使用しています"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@”은(는) 글자 폭이 균일하지 않아 사용할 수 없습니다 — 대신 시스템 고정폭 글꼴을 사용합니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„%@“ hat keinen gleichmäßigen Zeichenabstand und kann nicht verwendet werden – stattdessen wird die System-Festbreitenschrift verwendet"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "« %@ » n'avance pas de façon régulière et ne peut pas être utilisée — utilisation de la police à chasse fixe du système à la place"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@” no avanza de forma uniforme y no se puede usar; se usa la fuente monoespaciada del sistema en su lugar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@” não avança de forma uniforme e não pode ser usada — usando a fonte monoespaçada do sistema"
+          }
+        }
+      }
+    },
+    "ui.font.invalid": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a verified monospaced font."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择经过验证的等宽字体。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請選擇經過驗證的等寬字體。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "検証済みの等幅フォントを選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "검증된 고정폭 글꼴을 선택하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Wähle eine geprüfte Festbreitenschrift."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Choisissez une police à chasse fixe vérifiée."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Elige una fuente monoespaciada verificada."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Escolha uma fonte monoespaçada verificada."
+          }
+        }
+      }
+    },
+    "settings.help.font": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only monospaced families whose regular, bold and italic faces share one width are listed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "只列出常规、粗体和斜体字宽一致的等宽字体。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "只列出一般、粗體和斜體字寬一致的等寬字型。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "標準・太字・斜体の文字幅がそろった等幅フォントだけを表示します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "보통, 굵게, 기울임 서체의 글자 폭이 같은 고정폭 글꼴만 표시합니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Angezeigt werden nur Festbreitenschriften, deren normale, fette und kursive Schnitte dieselbe Breite haben."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Seules les polices à chasse fixe dont les styles normal, gras et italique ont la même largeur sont proposées."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Solo se muestran fuentes monoespaciadas cuyos estilos normal, negrita y cursiva tienen el mismo ancho."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Só aparecem fontes monoespaçadas cujos estilos normal, negrito e itálico têm a mesma largura."
+          }
+        }
+      }
     }
   }
 }

@@ -69,9 +69,14 @@ final class SettingsModel {
     /// rename or remove a theme while this window is open.
     var listedThemes: [Theme] = []
 
+    /// The families the font picker lists, from `MonospacedFontCatalog` —
+    /// empty until `loadFonts()` has measured them off the main thread.
+    private(set) var availableFonts: [String] = []
+
     // MARK: - Status rows
 
     var saveStatus = RowStatus()
+    var fontStatus = RowStatus()
     var shellIntegrationStatus = RowStatus()
     var directoryHistoryStatus = RowStatus()
     var recentHostsStatus = RowStatus()
@@ -85,6 +90,11 @@ final class SettingsModel {
     /// What `previewFont` was built for, so a change to any other setting
     /// does not rebuild the face.
     private var previewedFont: (size: Double, family: String)?
+
+    /// The family `fontStatus` was resolved for. Resolving measures four
+    /// faces across printable ASCII (`MonospacedFontCatalog.isUsable`), so
+    /// it is redone only when the family or the installed fonts change.
+    private var resolvedFontFamily: String?
 
     init() {
         refresh()
@@ -114,6 +124,11 @@ final class SettingsModel {
             forName: QuickTerminalController.hotKeyStatusDidChange, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in self?.refreshQuickTerminalStatus() }
+        })
+        notificationObservers.append(NotificationCenter.default.addObserver(
+            forName: NSFont.fontSetChangedNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in await self?.fontsDidChange() }
         })
     }
 
@@ -152,6 +167,7 @@ final class SettingsModel {
         if previewedFont?.size != configuration.fontSize || previewedFont?.family != configuration.fontFamily {
             refreshPreviewFont()
         }
+        if configuration.fontFamily != resolvedFontFamily { refreshFontStatus() }
         refreshQuickTerminalStatus()
         refreshNotificationPermissionNotice()
     }
@@ -215,6 +231,19 @@ final class SettingsModel {
             }
             if direct { configuration.inputSourceDirectColor = normalized }
             else { configuration.inputSourceIMEColor = normalized }
+            return nil
+        }
+    }
+
+    /// Refused unless the grid can lay the family out, the rule
+    /// `TerminalFont.primary` applies: writing one it would not use would
+    /// make the file say something the app will not do.
+    func setFontFamily(_ value: String) {
+        commit { configuration in
+            guard value == Configuration.systemFontFamily || MonospacedFontCatalog.isUsable(family: value) else {
+                return L10n.text("ui.font.invalid")
+            }
+            configuration.fontFamily = value
             return nil
         }
     }
@@ -402,6 +431,44 @@ final class SettingsModel {
             return
         }
         NSWorkspace.shared.activateFileViewerSelecting([ConfigurationStore.fileURL])
+    }
+
+    // MARK: - Font
+
+    func loadFonts() async {
+        availableFonts = await Task.detached { MonospacedFontCatalog.families() }.value
+    }
+
+    /// A font installed or removed while this window is open: the list, the
+    /// row and the preview all follow without a relaunch.
+    private func fontsDidChange() async {
+        MonospacedFontCatalog.refresh()
+        refreshFontStatus()
+        refreshPreviewFont()
+        await loadFonts()
+    }
+
+    /// Tells a family AppKit does not know from one that exists but fails
+    /// the grid's check — both fall back to System Monospaced, and neither
+    /// should do it silently.
+    private func refreshFontStatus() {
+        resolvedFontFamily = configuration.fontFamily
+        switch TerminalFont.resolution(forFamily: configuration.fontFamily) {
+        case .resolved:
+            fontStatus = RowStatus()
+        case .missing(let requested):
+            fontStatus = RowStatus(
+                kind: .failed, message: L10n.format("settings.status.fontMissing", requested),
+                actionTitle: L10n.text("settings.status.retry"))
+        case .invalidForGrid(let requested):
+            fontStatus = RowStatus(
+                kind: .failed, message: L10n.format("settings.status.fontInvalidForGrid", requested),
+                actionTitle: L10n.text("settings.status.retry"))
+        }
+    }
+
+    func retryFontResolution() {
+        Task { await fontsDidChange() }
     }
 
     // MARK: - Shell integration

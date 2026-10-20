@@ -158,9 +158,11 @@ nonisolated extension Configuration {
             .flag("cursor-blink", \.cursorBlink),
             ConfigurationKey(
                 name: "font-family",
-                // Legacy family names migrate to the single supported face.
-                read: { configuration, _ in
-                    configuration.fontFamily = Configuration.systemFontFamily
+                // Kept as written: whether the family is installed and fits
+                // the grid is decided where the font is built (D12), so a
+                // family installed after this read still takes.
+                read: { configuration, value in
+                    configuration.fontFamily = value.isEmpty ? Configuration.systemFontFamily : value
                     return true
                 },
                 write: { $0.fontFamily }),

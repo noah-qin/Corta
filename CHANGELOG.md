@@ -10,6 +10,19 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- Settings ▸ Appearance ▸ Font chooses the terminal font again: System
+  Monospaced, or any installed monospaced family whose regular, bold and
+  italic faces keep one width. The list follows fonts installed while Corta
+  runs (#372).
+
+### Fixed
+
+- `font-family` in the config file is no longer replaced with `system`. A
+  family that is not installed, or not one width, draws as System
+  Monospaced and Settings shows a Font Status row saying why (#372).
+
 ## [1.2.3] - 2026-10-19
 
 ### Added

@@ -137,8 +137,11 @@ files, remote connections and child-process input.
   supported. Built-ins are copied, while custom themes can be edited.
 - View → Local host details and Terminal settings expose host configuration
   even with the bar disabled. View → Theme editor opens color editing directly.
-- System Monospaced is the primary font, with configurable size and system
-  fallback for missing characters. Legacy font-family names migrate to system.
+- System Monospaced is the default font; Settings ▸ Appearance also lists
+  every installed monospaced family whose four faces keep one width (D12),
+  with configurable size and fixed fallback for missing characters. A
+  configured family that is missing or uneven draws as System Monospaced,
+  and the Font Status row says why.
 - Cursor shapes are block, bar and underline, with independent blinking; the
   default is a nonblinking block. Programs retain temporary DECSCUSR control.
 

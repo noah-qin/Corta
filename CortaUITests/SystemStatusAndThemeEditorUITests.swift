@@ -116,7 +116,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         XCTAssertTrue(app.textFields["theme-name"].waitForExistence(timeout: 3))
         app.buttons["Cancel"].click()
         let settings = app.windows["Corta.Settings"]
-        XCTAssertTrue(settings.staticTexts["supported-font"].exists)
+        XCTAssertTrue(settings.popUpButtons["font-family"].exists)
         let mode = settings.popUpButtons["appearance-mode"]
         let preview = settings.descendants(matching: .any).matching(identifier: "appearance-preview").firstMatch
         mode.click()

@@ -25,7 +25,7 @@ import Testing
 /// they change.
 @MainActor
 struct SettingsModelTests {
-    @Test func explicitAppearanceImmediatelyUpdatesPreviewAndFontIsFixed() {
+    @Test func explicitAppearanceImmediatelyUpdatesPreview() {
         let model = SettingsModel()
         let original = model.appearance
         defer { model.set(\.appearance, original) }
@@ -33,6 +33,25 @@ struct SettingsModelTests {
         #expect(model.previewIsDark)
         model.set(\.appearance, .light)
         #expect(!model.previewIsDark)
+    }
+
+    /// The picker writes only what the grid can lay out (D12), and the
+    /// preview follows the family it wrote.
+    @Test func aFontFamilyIsWrittenOnlyWhenVerified() {
+        let model = SettingsModel()
+        let original = model.fontFamily
+        defer { model.setFontFamily(original) }
+
+        model.setFontFamily("Menlo")
+        #expect(model.fontFamily == "Menlo")
+        #expect(model.fontStatus.kind == .none)
+        #expect(CTFontCopyFamilyName(model.previewFont) as String == "Menlo")
+
+        model.setFontFamily("Helvetica")
+        #expect(model.fontFamily == "Menlo")
+        #expect(model.saveStatus.kind == .adjusted)
+
+        model.setFontFamily(Configuration.systemFontFamily)
         #expect(model.fontFamily == Configuration.systemFontFamily)
     }
 

@@ -26,7 +26,7 @@ Status of every entry below is **accepted** unless it says otherwise.
 | [D08](#d08--term-is-xterm-256color) | `$TERM` is `xterm-256color` | Accepted |
 | [D09](#d09--no-multiplexer-no-cross-platform-no-tmux-control-mode-no-ai-features) | No multiplexer, cross-platform, tmux control mode, AI features or command-running automation | Accepted |
 | [D10](#d10--one-config-file-is-the-only-settings-store) | The config file is the only settings store | Accepted |
-| [D11](#d11--curated-themes-and-one-primary-font) | Curated themes and one system monospaced primary font | Accepted |
+| [D11](#d11--curated-themes-and-verified-font-families) | Curated themes; System Monospaced by default, verified families offered | Accepted, amended 2026-10-20 |
 | [D12](#d12--a-font-family-is-verified-never-trusted) | A font family is verified, never trusted | Accepted |
 | [D13](#d13--never-change-the-machine-to-test) | Never change the machine to test | Accepted |
 | [D14](#d14--app-layer-changes-are-verified-by-launching-the-app) | App-layer changes are verified by launching the app | Accepted |
@@ -198,7 +198,7 @@ file could carry. A key added to `Configuration` without a row in
 arrangement, directory history) lives in its own files and is not a
 setting — `CONFIGURATION.md` §8 draws the line.
 
-## D11 — Curated themes and one primary font
+## D11 — Curated themes and verified font families
 
 **Decision.** Settings and View offer Corta, Solarized and Mono alongside
 user-defined themes, with a color editor. Issue #213 exposed that existing
@@ -216,6 +216,20 @@ predictable. Settings no longer scans installed fonts.
 **Consequence.** Show the resolved font and preview the selected appearance
 and cursor immediately. The catalog validation utilities remain available for
 font/rendering diagnostics, without exposing additional families in the app.
+
+**Amended 2026-10-20 — a verified family is the user's choice again.**
+Issue #372: a user's `font-family = Anito` was silently replaced with
+`system`, and Settings offered no way to choose. For a terminal the face is
+the interface, and the single-font rule had turned D12's check — which
+already decides whether a family can be laid out — into a refusal to ask.
+System Monospaced stays the default; `font-family` is kept as written, and
+Settings ▸ Appearance lists the installed families `MonospacedFontCatalog`
+verifies (D12), refreshed when the installed fonts change. A family that is
+missing or fails the check draws in System Monospaced, and a Font Status row
+says which and why. The fallback cascade (PingFang SC, Apple Color Emoji) is
+unchanged: a family's own CJK glyphs are used when it has them. The picker
+is a list, not `NSFontPanel`: the panel offers every face, most of which
+the grid cannot use, and duplicates the size control.
 
 ## D12 — A font family is verified, never trusted
 
