@@ -233,6 +233,11 @@ the grid cannot use, and duplicates the size control. A cell is at least
 1.15 em tall (`CellMetrics.minimumLineHeight`): CJK families such as BIZ
 UDGothic and SimSong declare a one-em line with no leading, and at that
 height rows touch. SF Mono and Menlo declare more and are unaffected.
+Corta bundles no font and downloads none: the list is what macOS and the
+user have installed, grouped by where the file lives, with a line saying
+which and whether the family carries CJK. Bundling buys nothing on macOS,
+where SF Mono is always present; a CJK family would multiply the 6 MB
+disk image and every update, and still fix one locale's glyph forms.
 
 ## D12 — A font family is verified, never trusted
 

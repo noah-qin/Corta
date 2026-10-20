@@ -227,15 +227,31 @@ struct SettingsView: View {
                 Text(L10n.text("settings.font.systemMonospaced")).tag(Configuration.systemFontFamily)
                 // A configured family the list lacks — not installed, not
                 // verified, or not measured yet — still shows as chosen.
-                if model.fontFamily != Configuration.systemFontFamily && !model.availableFonts.contains(model.fontFamily) {
+                if model.fontFamily != Configuration.systemFontFamily
+                    && !model.availableFonts.contains(where: { $0.name == model.fontFamily })
+                {
                     Text(model.fontFamily).tag(model.fontFamily)
                 }
-                if !model.availableFonts.isEmpty { Divider() }
-                ForEach(model.availableFonts, id: \.self) { Text($0).tag($0) }
+                if !model.appleFonts.isEmpty {
+                    Section(L10n.text("settings.font.group.apple")) {
+                        ForEach(model.appleFonts, id: \.name) { Text($0.name).tag($0.name) }
+                    }
+                }
+                if !model.userFonts.isEmpty {
+                    Section(L10n.text("settings.font.group.user")) {
+                        ForEach(model.userFonts, id: \.name) { Text($0.name).tag($0.name) }
+                    }
+                }
             }
             .accessibilityIdentifier("font-family")
             .help(L10n.text("settings.help.font"))
             .task { await model.loadFonts() }
+            if !model.fontDetail.isEmpty {
+                Text(model.fontDetail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("font-detail")
+            }
             if model.fontStatus.kind != .none {
                 LabeledContent(L10n.text("settings.label.fontStatus")) {
                     StatusRowView(

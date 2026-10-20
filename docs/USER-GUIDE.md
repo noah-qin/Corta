@@ -130,8 +130,13 @@ Terminal hotkey, remote badges — is collected in
 
 - **Font.** Settings ▸ Appearance ▸ Font lists System Monospaced (the
   default) and every installed monospaced family Corta can lay out on its
-  grid; `font-family` in the config file is the same setting. `font-size`
-  is 12 pt by default. The page previews the font, colors and cursor.
+  grid, in two groups: Apple Fonts (shipped with macOS, or Apple's
+  on-demand fonts once downloaded in Font Book) and Installed by You. The
+  line under the menu says where the chosen font comes from and whether
+  it brings its own CJK characters — such a family draws letters and
+  symbols in its CJK design too, a raised `~` for example. `font-family`
+  in the config file is the same setting. `font-size` is 12 pt by default.
+  The page previews the font, colors and cursor.
 - **Zoom.** ⌘= / ⌘− / ⌘0 or a pinch make the text bigger, smaller or
   the configured size again, in the current window only. Zoom never
   changes the config file. Font changes never move or resize the window: the visible rows and

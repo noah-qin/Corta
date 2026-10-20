@@ -14,8 +14,9 @@ Versioning for compatibility changes.
 
 - Settings ▸ Appearance ▸ Font chooses the terminal font again: System
   Monospaced, or any installed monospaced family whose regular, bold and
-  italic faces keep one width. The list follows fonts installed while Corta
-  runs (#372). A family whose rows are one em tall, as many CJK families
+  italic faces keep one width, grouped as Apple's or yours, with a line
+  saying where the chosen font comes from and whether it carries its own
+  CJK design. The list follows fonts installed while Corta runs (#372). A family whose rows are one em tall, as many CJK families
   declare, gets a line height of at least 1.15 em, so rows no longer touch.
 
 ### Fixed

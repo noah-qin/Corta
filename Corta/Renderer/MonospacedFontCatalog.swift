@@ -28,6 +28,23 @@ import Synchronization
 /// on the faces Corta uses. Measuring hundreds is slow, so the list is
 /// cached; `refresh()` drops it.
 nonisolated enum MonospacedFontCatalog {
+    /// Where a family's file lives, which is what the picker groups by.
+    enum Origin: Sendable, Equatable {
+        /// Under `/System/Library`: shipped with macOS, or one of Apple's
+        /// on-demand fonts already downloaded.
+        case apple
+        /// Anywhere else — `~/Library/Fonts`, `/Library/Fonts`.
+        case user(path: String)
+    }
+
+    struct Entry: Sendable, Equatable {
+        let name: String
+        let origin: Origin
+        /// Carries its own Han, kana or Hangul, so its letters and symbols
+        /// follow a CJK design (a raised `~`, curly quotes).
+        let hasCJK: Bool
+    }
+
     /// Advances scale linearly; this only sets the tolerance's units.
     private static let measurementSize: CGFloat = 12
     /// True monospace varies far less; "mostly fixed" misses by tenths.
@@ -36,17 +53,41 @@ nonisolated enum MonospacedFontCatalog {
     /// Printable ASCII: prompts, borders and numbers.
     private static let measuredCharacters: [UniChar] = (0x20...0x7E).map(UniChar.init)
 
+    /// 日, あ, 한: one each of Han, kana and Hangul.
+    private static let cjkProbes: [UniChar] = [0x65E5, 0x3042, 0xD55C]
+
     /// Filled off the main thread by the settings page, read by tests.
-    private static let cache = Mutex<[String]?>(nil)
+    private static let cache = Mutex<[Entry]?>(nil)
 
     /// The installed families the grid can lay out, sorted for a picker.
-    static func families() -> [String] {
+    static func entries() -> [Entry] {
         cache.withLock { cached in
             if let cached { return cached }
-            let families = NSFontManager.shared.availableFontFamilies.filter(isUsable(family:)).sorted()
-            cached = families
-            return families
+            let entries = NSFontManager.shared.availableFontFamilies.sorted()
+                .filter(isUsable(family:)).compactMap(entry(for:))
+            cached = entries
+            return entries
         }
+    }
+
+    static func families() -> [String] { entries().map(\.name) }
+
+    /// Describes an installed family; nil when none is.
+    static func entry(for family: String) -> Entry? {
+        guard
+            let font = NSFont(
+                descriptor: NSFontDescriptor(fontAttributes: [.family: family]),
+                size: measurementSize),
+            font.familyName == family
+        else { return nil }
+        let path = (CTFontCopyAttribute(font as CTFont, kCTFontURLAttribute) as? URL)?.path ?? ""
+        let origin: Origin = path.hasPrefix("/System/Library/") ? .apple : .user(path: path)
+        let hasCJK = cjkProbes.contains { probe in
+            var character = probe
+            var glyph = CGGlyph(0)
+            return CTFontGetGlyphsForCharacters(font as CTFont, &character, &glyph, 1)
+        }
+        return Entry(name: family, origin: origin, hasCJK: hasCJK)
     }
 
     /// Forgets the list, for when the installed fonts change.

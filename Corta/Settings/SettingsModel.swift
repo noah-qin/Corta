@@ -71,7 +71,14 @@ final class SettingsModel {
 
     /// The families the font picker lists, from `MonospacedFontCatalog` —
     /// empty until `loadFonts()` has measured them off the main thread.
-    private(set) var availableFonts: [String] = []
+    private(set) var availableFonts: [MonospacedFontCatalog.Entry] = []
+    var appleFonts: [MonospacedFontCatalog.Entry] { availableFonts.filter { $0.origin == .apple } }
+    var userFonts: [MonospacedFontCatalog.Entry] { availableFonts.filter { $0.origin != .apple } }
+
+    /// Where the chosen font comes from, and whether it brings its own CJK
+    /// design — shown under the picker. Empty while `fontStatus` reports a
+    /// fallback, which says more.
+    private(set) var fontDetail = ""
 
     // MARK: - Status rows
 
@@ -436,7 +443,7 @@ final class SettingsModel {
     // MARK: - Font
 
     func loadFonts() async {
-        availableFonts = await Task.detached { MonospacedFontCatalog.families() }.value
+        availableFonts = await Task.detached { MonospacedFontCatalog.entries() }.value
     }
 
     /// A font installed or removed while this window is open: the list, the
@@ -453,9 +460,12 @@ final class SettingsModel {
     /// should do it silently.
     private func refreshFontStatus() {
         resolvedFontFamily = configuration.fontFamily
+        fontDetail = ""
         switch TerminalFont.resolution(forFamily: configuration.fontFamily) {
         case .resolved:
             fontStatus = RowStatus()
+            fontDetail = Self.detail(forFamily: configuration.fontFamily)
+            return
         case .missing(let requested):
             fontStatus = RowStatus(
                 kind: .failed, message: L10n.format("settings.status.fontMissing", requested),
@@ -465,6 +475,19 @@ final class SettingsModel {
                 kind: .failed, message: L10n.format("settings.status.fontInvalidForGrid", requested),
                 actionTitle: L10n.text("settings.status.retry"))
         }
+    }
+
+    private static func detail(forFamily family: String) -> String {
+        guard family != Configuration.systemFontFamily else { return L10n.text("settings.font.origin.system") }
+        guard let entry = MonospacedFontCatalog.entry(for: family) else { return "" }
+        var lines: [String] = []
+        switch entry.origin {
+        case .apple: lines.append(L10n.text("settings.font.origin.apple"))
+        case .user(let path):
+            lines.append(L10n.format("settings.font.origin.user", (path as NSString).abbreviatingWithTildeInPath))
+        }
+        if entry.hasCJK { lines.append(L10n.text("settings.font.cjk")) }
+        return lines.joined(separator: "\n")
     }
 
     func retryFontResolution() {

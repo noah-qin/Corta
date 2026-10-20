@@ -226,6 +226,20 @@ import Testing
         #expect(!MonospacedFontCatalog.families().contains("Helvetica"))
     }
 
+    /// The picker groups by where the file lives and flags a family that
+    /// brings its own CJK design.
+    @Test func anEntryKnowsItsOriginAndCJKCoverage() throws {
+        let menlo = try #require(MonospacedFontCatalog.entry(for: "Menlo"))
+        #expect(menlo.origin == .apple)
+        #expect(!menlo.hasCJK)
+        let pingFang = try #require(MonospacedFontCatalog.entry(for: "PingFang SC"))
+        #expect(pingFang.hasCJK)
+        #expect(MonospacedFontCatalog.entry(for: "No Such Family At All") == nil)
+        // Every listed family describes itself, so none drops out of the picker.
+        let names = NSFontManager.shared.availableFontFamilies.filter(MonospacedFontCatalog.isUsable(family:))
+        #expect(MonospacedFontCatalog.families() == names.sorted())
+    }
+
     @Test func anEmptyFamilyMeansTheSystemFace() {
         #expect(Configuration.parse("font-family =\n").configuration.fontFamily == Configuration.systemFontFamily)
         #expect(TerminalFont.resolution(forFamily: Configuration.systemFontFamily) == .resolved)

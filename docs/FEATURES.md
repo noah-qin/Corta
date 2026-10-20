@@ -139,6 +139,7 @@ files, remote connections and child-process input.
   even with the bar disabled. View → Theme editor opens color editing directly.
 - System Monospaced is the default font; Settings ▸ Appearance also lists
   every installed monospaced family whose four faces keep one width (D12),
+  grouped as Apple's or the user's and labelled when it carries CJK,
   with configurable size and fixed fallback for missing characters. A
   configured family that is missing or uneven draws as System Monospaced,
   and the Font Status row says why.
