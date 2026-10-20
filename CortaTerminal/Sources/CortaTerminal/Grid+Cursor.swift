@@ -149,9 +149,11 @@ extension Grid {
     public mutating func resetToInitialState() {
         let cellPixelHeight = cellPixelHeight
         let cellPixelWidth = cellPixelWidth
+        let ambiguousIsWide = ambiguousIsWide
         self = Grid(rows: rows, columns: columns, scrollbackLimit: scrollback.limit)
         self.cellPixelHeight = cellPixelHeight
         self.cellPixelWidth = cellPixelWidth
+        self.ambiguousIsWide = ambiguousIsWide
     }
 
     /// Erases the screen and homes the cursor, keeping the scrollback. Not

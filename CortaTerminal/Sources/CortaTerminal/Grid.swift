@@ -151,6 +151,12 @@ public struct Grid: Sendable {
         imagePlacements.storedBytes + (suspendedMain?.grid.imagePlacements.storedBytes ?? 0)
     }
 
+    /// `ambiguous-width = wide`: East Asian Ambiguous scalars take two
+    /// cells. A setting of the window, like `cellPixelHeight`, so it
+    /// survives the alternate screen and a full reset. Applies to what is
+    /// written after it changes; what is on screen keeps its width.
+    public var ambiguousIsWide = false
+
     /// True while the alternate screen is live.
     public internal(set) var isAlternateScreenActive: Bool = false
 

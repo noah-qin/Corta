@@ -82,6 +82,12 @@ extension TerminalSession {
         registerStateWaiter { state.withLock { $0.terminal.indexedPalette.updateDefaults(to: newDefaults) } }
     }
 
+    /// `ambiguous-width`, for output written from now on.
+    public var ambiguousWidthIsWide: Bool {
+        get { registerStateWaiter { state.withLock { $0.terminal.grid.ambiguousIsWide } } }
+        set { registerStateWaiter { state.withLock { $0.terminal.grid.ambiguousIsWide = newValue } } }
+    }
+
     public var keyboardEnhancements: KeyboardEnhancementFlags {
         registerStateWaiter { state.withLock { $0.terminal.keyboardEnhancements } }
     }
