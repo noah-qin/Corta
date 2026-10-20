@@ -210,8 +210,8 @@ extension Grid {
             }
             // One pass once the row is built. Counting the string at every
             // cluster made a row of combining marks quadratic — on the main
-            // thread, per hover — and a cluster that joined the character
-            // before it got no position, shifting every one after it.
+            // thread, per hover — and a character that joined two cells got
+            // a position from each, shifting every one after it.
             var rowPositions: [(row: Int, column: Int)] = []
             rowPositions.reserveCapacity(scalarColumns.count)
             var scalarOffset = 0
