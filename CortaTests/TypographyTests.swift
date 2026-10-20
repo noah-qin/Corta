@@ -109,13 +109,13 @@ struct TypographyConfigurationTests {
     /// Installed, outline, with Han, kana or Hangul — monospaced or not.
     @Test("a CJK font must be installed and carry CJK")
     func cjkFontIsVerified() {
-        #expect(MonospacedFontCatalog.isUsableCJK(family: "PingFang SC"))
+        // Hiragino, not PingFang: PingFang is a downloaded asset that some
+        // CI runners lack and others match by name but leave unlisted.
+        #expect(MonospacedFontCatalog.isUsableCJK(family: "Hiragino Sans"))
         #expect(MonospacedFontCatalog.isUsableCJK(family: "Hiragino Mincho ProN"))
         #expect(!MonospacedFontCatalog.isUsableCJK(family: "Menlo"))
         #expect(!MonospacedFontCatalog.isUsableCJK(family: "Apple Color Emoji"))
         #expect(!MonospacedFontCatalog.isUsableCJK(family: "No Such Family At All"))
-        // Hiragino, not PingFang: PingFang is a downloaded asset that CI's
-        // runner matches by name but leaves out of the family list.
         let listed = MonospacedFontCatalog.cjkEntries().map(\.name)
         #expect(listed.contains("Hiragino Mincho ProN"))
         #expect(!listed.contains("Menlo"))
