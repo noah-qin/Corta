@@ -64,6 +64,11 @@ Versioning for compatibility changes.
 
 ### Security
 
+- Hovering a line built of combining-mark clusters no longer freezes the
+  window: joining a row's text took time in the square of its width, and
+  a link or file-reference check on such a line ran for seconds on every
+  mouse move. Such a cluster also no longer shifts where a match on the
+  rest of the line is drawn.
 - A keyboard-protocol pop (`CSI < n u`) costs the depth of the stack, not
   the `n` the program asked for: a stream of large pops kept the pane
   busy far beyond its size.

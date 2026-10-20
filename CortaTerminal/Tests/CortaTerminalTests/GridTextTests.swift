@@ -65,6 +65,19 @@ struct GridTextTests {
         #expect(position?.column == 0)
     }
 
+    /// U+0600 is a zero-width prepend mark: it rides in the first cell's
+    /// cluster but joins the next cell's `y` into one character.
+    @Test("a cluster that joins the next cell's character does not shift the positions after it")
+    func joiningClusterKeepsPositionsAligned() {
+        var terminal = Terminal(rows: 2, columns: 10)
+        terminal.feed(Array("x\u{0600}y z".utf8))
+        let logical = terminal.grid.logicalLine(containing: 0)
+        let last = logical.text.count - 1
+        #expect(logical.text.last == "z")
+        #expect(logical.position(at: last)?.column == 3)
+        #expect(logical.position(at: last + 1) == nil, "one position per character")
+    }
+
     @Test("a logical line spanning scrollback and screen uses document row numbering")
     func spansScrollbackAndScreen() {
         var terminal = Terminal(rows: 3, columns: 10, scrollbackLimit: 100)

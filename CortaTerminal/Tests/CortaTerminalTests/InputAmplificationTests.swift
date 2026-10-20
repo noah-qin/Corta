@@ -111,6 +111,25 @@ struct InputAmplificationTests {
         #expect(terminal.keyboardEnhancements.isEmpty)
     }
 
+    /// Hover joins the line under the pointer on the main thread, up to
+    /// `LinkDetection.maxPatternScanCells`; counting the row's characters at
+    /// every cluster made a row of combining marks quadratic in its width.
+    @Test("joining rows of full combining clusters is linear in the text")
+    func combiningRowJoinIsLinear() {
+        // Wide and short: the cost was the square of a row's width.
+        let columns = 1_000
+        let rows = 8
+        var terminal = Terminal(rows: rows, columns: columns)
+        let cell = "a" + String(repeating: "\u{0301}", count: GraphemeTable.maximumClusterScalars - 1)
+        terminal.feed(Array(String(repeating: cell, count: columns * rows - 1).utf8))
+        let start = SuspendingClock.now
+        let line = terminal.grid.logicalLine(containing: rows - 1)
+        #expect(SuspendingClock.now - start < .seconds(1))
+        #expect(line.text.count == columns * rows - 1)
+        #expect(line.position(at: columns)?.row == 1)
+        #expect(line.position(at: columns)?.column == 0)
+    }
+
     @Test("a hyperlink table full of live links is not rescanned for every new link")
     func futileHyperlinkSweepsAreRationed() {
         // Every link on its own scrollback row, so all stay live.

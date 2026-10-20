@@ -189,24 +189,35 @@ extension Grid {
         while row <= lastRow {
             let currentLine = documentLine(row)
             var rowText = ""
-            var rowPositions: [(row: Int, column: Int)] = []
+            // Each scalar's cell; a character takes its first scalar's.
+            var scalarColumns: [Int] = []
             var column = 0
             while column < currentLine.count {
                 let cell = currentLine[column]
                 defer { column += 1 }
                 if cell.attributes.contains(.wideSpacer) { continue }
                 if let cluster = graphemes.scalars(for: cell.grapheme) {
-                    let before = rowText.count
                     for scalar in cluster {
                         if let scalar = Unicode.Scalar(scalar) {
                             rowText.unicodeScalars.append(scalar)
+                            scalarColumns.append(column)
                         }
                     }
-                    for _ in before..<rowText.count { rowPositions.append((row, column)) }
                 } else if let scalar = Unicode.Scalar(cell.scalar) {
                     rowText.unicodeScalars.append(scalar)
-                    rowPositions.append((row, column))
+                    scalarColumns.append(column)
                 }
+            }
+            // One pass once the row is built. Counting the string at every
+            // cluster made a row of combining marks quadratic — on the main
+            // thread, per hover — and a cluster that joined the character
+            // before it got no position, shifting every one after it.
+            var rowPositions: [(row: Int, column: Int)] = []
+            rowPositions.reserveCapacity(scalarColumns.count)
+            var scalarOffset = 0
+            for character in rowText {
+                rowPositions.append((row, scalarColumns[scalarOffset]))
+                scalarOffset += character.unicodeScalars.count
             }
             let continuesToNext = row != lastRow && currentLine.wrapped
             if !continuesToNext {
