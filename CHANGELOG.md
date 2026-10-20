@@ -12,11 +12,19 @@ Versioning for compatibility changes.
 
 ### Added
 
+- Settings ▸ Appearance ▸ Font chooses the terminal font again: System
+  Monospaced, or any installed monospaced family whose regular, bold and
+  italic faces keep one width, grouped as Apple's or yours, with a line
+  saying where the chosen font comes from and whether it carries its own
+  CJK design. The list follows fonts installed while Corta runs (#372). A
+  family whose rows are one em tall, as many CJK families declare, gets at
+  least the configured line spacing, so rows no longer touch.
 - Typography preferences in Settings ▸ Appearance and the config file:
   `font-weight` (`light`, `regular`, `medium`), `line-spacing` (1.0–1.4,
   default 1.18), `font-fallback` and `emoji-rendering` (`color`,
   `monochrome`); and in Settings ▸ Terminal, `ambiguous-width` (`narrow`,
-  `wide`) for East Asian Ambiguous characters.
+  `wide`) for East Asian Ambiguous characters, where box drawing then spans
+  both its cells.
 - Chinese, Japanese and Korean fall back to the face for the system
   language — PingFang SC, PingFang TC, Hiragino Sans or Apple SD Gothic Neo
   — and kana and Hangul always to their own script's face, so Japanese
@@ -31,20 +39,9 @@ Versioning for compatibility changes.
 - **Config file:** `font-size` now defaults to 13 and takes 10–24 in whole
   points; a value outside that range is clamped to it the next time Corta
   writes the file. Set it again if you used a size above 24 or below 10.
-- A wide character from a fallback font is centred in its two cells, not
-  set at their left.
 - The terminal's side padding is 10 pt on each side (the left was 14).
 - `SGR 21` turns on a double underline, as xterm, VTE and kitty read it,
   instead of being ignored.
-
-### Added
-
-- Settings ▸ Appearance ▸ Font chooses the terminal font again: System
-  Monospaced, or any installed monospaced family whose regular, bold and
-  italic faces keep one width, grouped as Apple's or yours, with a line
-  saying where the chosen font comes from and whether it carries its own
-  CJK design. The list follows fonts installed while Corta runs (#372). A family whose rows are one em tall, as many CJK families
-  declare, gets a line height of at least 1.15 em, so rows no longer touch.
 
 ### Fixed
 

@@ -160,16 +160,14 @@ struct TypographyAtlasTests {
         #expect(rocket.isColor)
     }
 
-    /// PingFang's one-em 中 sits in the middle of its two cells.
-    @Test("a wide fallback glyph is centred in its two cells")
-    func wideGlyphIsCentred() throws {
-        let atlas = try Self.atlas()
-        let run = try #require(atlas.shape("中", style: .regular).runs.first)
-        var glyphs = run.glyphs
-        var advances = [CGSize](repeating: .zero, count: glyphs.count)
-        let advance = CTFontGetAdvancesForGlyphs(run.font, .horizontal, &glyphs, &advances, glyphs.count)
-        let expected = (2 * atlas.cellWidth - advance) / 2
-        #expect(abs(run.positions[0].x - expected) < 0.01)
-        #expect(expected > 0)
+    /// With fallback off, a cluster the primary draws only part of is the
+    /// missing-glyph box, not the part: a base letter with a mark only a
+    /// fallback has.
+    @Test("with fallback off, a part-drawable cluster is the missing box")
+    func partialClusterWithoutFallback() throws {
+        let shaped = try Self.atlas(TextOptions(fallback: false)).shape("a\u{3099}", style: .regular)
+        #expect(shaped.runs.isEmpty)
+        #expect(shaped.sawNotdef)
+        #expect(try !Self.atlas().shape("a\u{3099}", style: .regular).runs.isEmpty)
     }
 }

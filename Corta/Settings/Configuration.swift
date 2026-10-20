@@ -136,7 +136,7 @@ nonisolated struct Configuration: Equatable, Sendable {
     var fontWeight: FontWeight = .regular
     /// The line, as a multiple of the font size; a face that declares a
     /// taller one keeps it (`CellMetrics`).
-    var lineSpacing: Double = 1.18
+    var lineSpacing: Double = Double(CellMetrics.defaultLineSpacing)
     /// Characters the font lacks come from other fonts; off, they draw as
     /// the missing-glyph box.
     var fontFallback: Bool = true

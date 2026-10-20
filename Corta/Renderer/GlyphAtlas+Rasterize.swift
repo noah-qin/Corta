@@ -61,12 +61,9 @@ nonisolated extension GlyphAtlas {
             CTRunGetPositions(run, CFRange(location: 0, length: count), &positions)
             let range = CTRunGetStringRange(run)
             let characters = Array(utf16[range.location..<(range.location + range.length)])
-            // `font-fallback = false`: only the primary draws; the rest is the
-            // missing-glyph box, never a blank.
-            if isFallback, !options.fallback {
-                sawNotdef = true
-                continue
-            }
+            // `font-fallback = false`: only the primary draws. A cluster it
+            // cannot draw whole is the missing-glyph box, never a part of one.
+            if isFallback, !options.fallback { return ([], true) }
             if isColor, options.monochromeEmoji,
                 let mono = Self.monochrome(characters, size: CTFontGetSize(requested), primary: requested)
             {
@@ -83,7 +80,6 @@ nonisolated extension GlyphAtlas {
                 if Self.isStandaloneSymbol(characters) {
                     Self.centre(&positions, glyphs: glyphs, of: runFont, on: requested)
                 }
-                Self.centreHorizontally(&positions, glyphs: glyphs, of: runFont, cellWidth: cellWidth)
             }
             let kept = zip(glyphs, positions).filter { $0.0 != 0 }
             if kept.isEmpty, glyphs.contains(0) { sawNotdef = true }
@@ -126,20 +122,6 @@ nonisolated extension GlyphAtlas {
             }
         }
         return nil
-    }
-
-    /// Centres a fallback glyph in the cells it takes — one, or two for a
-    /// wide one — instead of leaving it at the left: PingFang's one-em 中 in
-    /// two SF Mono cells left the gap all on its right.
-    static func centreHorizontally(_ positions: inout [CGPoint], glyphs: [CGGlyph], of font: CTFont, cellWidth: CGFloat) {
-        guard cellWidth > 0 else { return }
-        var glyphs = glyphs
-        var advances = [CGSize](repeating: .zero, count: glyphs.count)
-        let advance = CTFontGetAdvancesForGlyphs(font, .horizontal, &glyphs, &advances, glyphs.count)
-        guard advance > 0 else { return }
-        let cells = min(2, max(1, (advance / cellWidth).rounded()))
-        let shift = (cells * cellWidth - advance) / 2
-        for index in positions.indices { positions[index].x += shift }
     }
 
     /// Core Text's own fallback can answer a primary that is not bold with

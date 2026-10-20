@@ -175,6 +175,9 @@ struct ParserTests {
     func colonOutsideSGRIsIgnored() throws {
         #expect(try actions("\\e[1:2HX") == [.print(0x58)])
         #expect(try actions("\\e[?4:3mX") == [.print(0x58)])
+        // A colon past the last parameter slot still counts.
+        let past = String(repeating: "1;", count: 20) + "5:9"
+        #expect(try actions("\\e[\(past)HX") == [.print(0x58)])
     }
 
     /// Williams' diagram: C0 controls inside a sequence are executed where

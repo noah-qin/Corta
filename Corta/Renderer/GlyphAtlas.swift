@@ -218,8 +218,6 @@ nonisolated final class GlyphAtlas {
     /// user's language, which only decides the face for Han.
     var kanaFonts: [CTFont]
     var hangulFonts: [CTFont]
-    /// One cell's width in pixels, which a fallback glyph is centred in.
-    var cellWidth: CGFloat
     /// Line spacing, fallback and emoji, as the configuration says.
     var options: TextOptions
     /// The two-cell box a color glyph is rasterised to fit, in pixels.
@@ -305,7 +303,6 @@ nonisolated final class GlyphAtlas {
         let base = TerminalFont.pinningCascadeList(font, size: CTFontGetSize(font))
         (self.fonts, self.isSyntheticBold) = Self.faces(of: base)
         (self.kanaFonts, self.hangulFonts) = Self.scriptFaces(of: fonts)
-        self.cellWidth = CellMetrics(font: base).cellWidth
         self.options = options
         self.colorBox = Self.colorBox(for: base, lineSpacing: options.lineSpacing)
 
@@ -389,7 +386,6 @@ nonisolated final class GlyphAtlas {
         let base = TerminalFont.pinningCascadeList(newFont, size: CTFontGetSize(newFont))
         (fonts, isSyntheticBold) = Self.faces(of: base)
         (kanaFonts, hangulFonts) = Self.scriptFaces(of: fonts)
-        cellWidth = CellMetrics(font: base).cellWidth
         if let newOptions { options = newOptions }
         colorBox = Self.colorBox(for: base, lineSpacing: options.lineSpacing)
         (asciiPage, shapedPage, colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize, font: base)

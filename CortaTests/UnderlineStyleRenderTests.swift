@@ -61,4 +61,46 @@ struct UnderlineStyleRenderTests {
         let fallingTop = try #require(falling.first?.lowerBound)
         #expect(risingTop != fallingTop, "a curly underline must not be flat")
     }
+
+    /// The wave is built once per metrics and stays inside the cell, joining
+    /// the next cell at the same height.
+    @Test("the curly wave stays inside its cell")
+    func waveStaysInTheCell() {
+        for size in [CGFloat(10), 13, 24] {
+            let font = TerminalFont.primary(ofSize: size)
+            for lineSpacing in [CGFloat(1.0), 1.18, 1.4] {
+                let metrics = CellMetrics(font: font, scale: 2, lineSpacing: lineSpacing).scaled(by: 2)
+                let wave = TerminalRenderer.curlyWave(for: metrics, scale: 2)
+                #expect(!wave.isEmpty)
+                #expect(wave.allSatisfy { $0.y >= 0 && $0.y + $0.w <= Float(metrics.cellHeight) }, "\(size) \(lineSpacing)")
+                let right = wave.map { $0.x + $0.z }.max() ?? 0
+                #expect(abs(right - Float(metrics.cellWidth)) < 0.001)
+            }
+        }
+    }
+
+    /// With `ambiguous-width = wide`, `─` takes two cells and its rule spans
+    /// both, rather than half of them and a gap.
+    @Test("a wide box-drawing character spans both cells")
+    func wideBoxDrawingSpansBothCells() throws {
+        guard let fixture = try RenderFixture(columns: 4, rows: 1) else {
+            Issue.record("No Metal device available in this environment")
+            return
+        }
+        fixture.renderer.themeVariant = Theme.corta.dark
+        var terminal = Terminal(rows: 1, columns: 4)
+        terminal.grid.ambiguousIsWide = true
+        terminal.feed(Array("\u{2500}".utf8))
+        #expect(terminal.grid[0, 0].attributes.contains(.wide))
+        let texture = MetalRenderTarget.make(
+            device: fixture.renderer.backend.device, width: fixture.width, height: fixture.height)
+        fixture.renderer.renderAndWait(
+            grid: terminal.grid, rect: CGRect(x: 0, y: 0, width: fixture.width, height: fixture.height),
+            drawableSize: CGSize(width: fixture.width, height: fixture.height),
+            cursorVisible: false, selection: nil, target: texture)
+        let cell = Int(fixture.renderer.metrics.cellWidth)
+        #expect(!Self.inkRuns(in: texture, x: cell / 2, height: fixture.height).isEmpty)
+        #expect(!Self.inkRuns(in: texture, x: cell + cell / 2, height: fixture.height).isEmpty)
+        #expect(Self.inkRuns(in: texture, x: 2 * cell + cell / 2, height: fixture.height).isEmpty)
+    }
 }

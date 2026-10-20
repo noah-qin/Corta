@@ -31,6 +31,7 @@ nonisolated extension TerminalRenderer {
         let cell = SIMD2<Float>(Float(metricsValue.cellWidth), Float(metricsValue.cellHeight))
         // Once per row: the property retains the ANSI array on every touch.
         let palette = framePalette
+        let wave = curlyWave
         let cursor = blockCursorColumns(in: line, row: row, cell: cell, palette: palette, into: &background)
         var colors = CellColors()
         for column in 0..<line.count {
@@ -43,9 +44,12 @@ nonisolated extension TerminalRenderer {
             if underCursor || !(reversed ? current.foreground : current.background).isDefault || reversed {
                 background.append(QuadInstance(origin: origin, size: cell, rgba: colors.packedBackground))
             }
-            appendRules(for: current, at: origin, cell: cell, color: colors.foreground, into: &background)
+            appendRules(for: current, at: origin, cell: cell, color: colors.foreground, wave: wave, into: &background)
             guard !attributes.contains(.invisible), !attributes.contains(.wideSpacer) else { continue }
-            if appendGeometry(for: current.scalar, at: origin, cell: cell, colors: colors, into: &background) {
+            // A wide box-drawing character (`ambiguous-width = wide`) spans
+            // both its cells, as CJK terminals draw it.
+            let geometryCell = attributes.contains(.wide) ? SIMD2<Float>(cell.x * 2, cell.y) : cell
+            if appendGeometry(for: current.scalar, at: origin, cell: geometryCell, colors: colors, into: &background) {
                 continue
             }
             let found: GlyphAtlas.GlyphInfo?
@@ -147,7 +151,7 @@ nonisolated extension TerminalRenderer {
     @inline(__always)
     private func appendRules(
         for cell: Cell, at origin: SIMD2<Float>, cell size: SIMD2<Float>, color: SIMD4<Float>,
-        into background: inout ContiguousArray<QuadInstance>
+        wave: ContiguousArray<SIMD4<Float>>, into background: inout ContiguousArray<QuadInstance>
     ) {
         let attributes = cell.attributes
         // One test for the group, the common case.
@@ -157,21 +161,29 @@ nonisolated extension TerminalRenderer {
         let baseline = Float(metricsValue.baselineOffset)
         let thickness = max(1, Float(scaleValue).rounded(.down))
         if attributes.contains(.curlyUnderline) {
-            appendWave(at: origin, cell: size, top: baseline + thickness, thickness: thickness, color: color, into: &background)
+            for piece in wave {
+                background.append(
+                    QuadInstance(
+                        origin: .init(origin.x + piece.x, origin.y + piece.y),
+                        size: .init(piece.z, piece.w), color: color))
+            }
         } else if attributes.contains(.underline) || !cell.hyperlink.isNone {
-            // Below the cell's bottom edge would draw on the next row.
-            let first = min(baseline + thickness, size.y - thickness)
+            // Below the cell's bottom edge would draw on the next row, so a
+            // double rule short of room moves its first rule up, not its
+            // second one down.
+            var first = min(baseline + thickness, size.y - thickness)
+            if attributes.contains(.doubleUnderline) {
+                let second = min(first + thickness * 2, size.y - thickness)
+                first = max(0, min(first, second - thickness * 2))
+                background.append(
+                    QuadInstance(
+                        origin: .init(origin.x, origin.y + second),
+                        size: .init(size.x, thickness), color: color))
+            }
             background.append(
                 QuadInstance(
                     origin: .init(origin.x, origin.y + first),
                     size: .init(size.x, thickness), color: color))
-            if attributes.contains(.doubleUnderline) {
-                let second = min(first + thickness * 2, size.y - thickness)
-                background.append(
-                    QuadInstance(
-                        origin: .init(origin.x, origin.y + max(second, first + thickness)),
-                        size: .init(size.x, thickness), color: color))
-            }
         }
         if attributes.contains(.strikethrough) {
             background.append(
@@ -183,30 +195,28 @@ nonisolated extension TerminalRenderer {
     }
 
     /// A curly underline (`SGR 4:3`): one period of a sine per cell, so
-    /// neighbouring cells join, drawn as thin columns a stroke wide. Each
-    /// column spans the step to the next, so a steep stretch has no gaps.
-    @inline(__always)
-    private func appendWave(
-        at origin: SIMD2<Float>, cell size: SIMD2<Float>, top: Float, thickness: Float, color: SIMD4<Float>,
-        into background: inout ContiguousArray<QuadInstance>
-    ) {
+    /// neighbouring cells join, drawn as thin columns a stroke wide, as
+    /// (x, y, width, height) from the cell's origin. Each column spans the
+    /// step to the next, so a steep stretch has no gaps.
+    static func curlyWave(for metrics: CellMetrics, scale: CGFloat) -> ContiguousArray<SIMD4<Float>> {
+        let size = SIMD2<Float>(Float(metrics.cellWidth), Float(metrics.cellHeight))
+        let thickness = max(1, Float(scale).rounded(.down))
+        guard size.x > 0 else { return [] }
         let amplitude = max(thickness, (size.y * 0.06).rounded())
         // Kept inside the cell: below its bottom is the next row's.
-        let centre = min(top + amplitude, size.y - amplitude - thickness)
-        let step = thickness
+        let centre = min(Float(metrics.baselineOffset) + thickness + amplitude, size.y - amplitude - thickness)
+        var pieces = ContiguousArray<SIMD4<Float>>()
         var x: Float = 0
         while x < size.x {
-            let width = min(step, size.x - x)
+            let width = min(thickness, size.x - x)
             let y0 = centre + amplitude * sin(2 * .pi * x / size.x)
             let y1 = centre + amplitude * sin(2 * .pi * (x + width) / size.x)
             let low = min(y0, y1).rounded(.down)
             let high = max(y0, y1).rounded(.up)
-            background.append(
-                QuadInstance(
-                    origin: .init(origin.x + x, origin.y + low),
-                    size: .init(width, max(thickness, high - low + thickness)), color: color))
-            x += step
+            pieces.append(SIMD4(x, low, width, max(thickness, high - low + thickness)))
+            x += thickness
         }
+        return pieces
     }
 
     /// Box drawing and block elements as geometry, not glyphs: glyphs fall

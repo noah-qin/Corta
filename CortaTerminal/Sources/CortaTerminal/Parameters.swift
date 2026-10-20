@@ -112,8 +112,9 @@ public struct Parameters: Equatable, Sendable {
     /// A colon: a separator whose next parameter belongs to this one.
     mutating func separateSubparameter() {
         separate()
-        guard !didOverflow else { return }
-        subparameterMask |= 1 << UInt16(count - 1)
+        // Past the last slot the colon is still recorded, as bit 0 (which no
+        // index reads), so a non-SGR sequence carrying it is still dropped.
+        subparameterMask |= didOverflow ? 1 : 1 << UInt16(count - 1)
     }
 
     mutating func reset() {

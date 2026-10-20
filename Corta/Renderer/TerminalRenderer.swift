@@ -85,6 +85,9 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     }
     private let geometry: Mutex<Geometry>
     var metricsValue: CellMetrics
+    /// A curly underline's quads for one cell, built with the metrics so a
+    /// frame does no trigonometry (`curlyWave(for:scale:)`).
+    var curlyWave: ContiguousArray<SIMD4<Float>> = []
     /// Its own texture cache: images share no eviction policy with glyphs.
     let kittyImageRenderer: KittyImageRenderer
     /// Cached because `draw` takes no `Grid`.
@@ -264,6 +267,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         let points = CellMetrics(font: font, scale: scaleValue, lineSpacing: options.lineSpacing)
         self.metricsValue = points.scaled(by: scaleValue)
         self.scaleValue = scaleValue
+        self.curlyWave = Self.curlyWave(for: metricsValue, scale: scaleValue)
         self.geometry = Mutex(
             Geometry(metrics: metricsValue, points: points, scale: scaleValue))
         // A reset or eviction while a frame is queued moves the atlas to
@@ -291,6 +295,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         let points = CellMetrics(font: font, scale: newScale, lineSpacing: glyphAtlas.options.lineSpacing)
         metricsValue = points.scaled(by: newScale)
         scaleValue = newScale
+        curlyWave = Self.curlyWave(for: metricsValue, scale: newScale)
         geometry.withLock {
             $0 = Geometry(metrics: metricsValue, points: points, scale: scaleValue)
         }
