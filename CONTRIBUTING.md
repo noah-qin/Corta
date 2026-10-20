@@ -284,6 +284,7 @@ the reviewer and scope in the PR, and record any human-only gaps.
 ## Reporting problems
 
 - **Usage questions** — [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a).
+- **Chat** — the [Discord](https://discord.gg/QNdWfdwr7j), for real-time conversation and quick questions. Anything that needs a record goes to an issue or Discussions.
 - **Early ideas and preferences** — [Discussions → Ideas](https://github.com/noah-qin/Corta/discussions/categories/ideas).
 - **Concrete feature requests** — the [feature request form](https://github.com/noah-qin/Corta/issues/new?template=feature_request.yml).
 - **Bugs** — the [bug report form](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml). Include a reproducer when possible.

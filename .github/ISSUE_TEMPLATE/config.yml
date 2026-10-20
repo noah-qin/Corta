@@ -26,6 +26,9 @@ contact_links:
 - name: Question about using Corta
   url: https://github.com/noah-qin/Corta/discussions/categories/q-a
   about: Ask for help using Corta.
+- name: Chat on Discord
+  url: https://discord.gg/QNdWfdwr7j
+  about: Talk with other users and the maintainer in real time. Bugs still go to an issue.
 - name: An idea that is not yet a concrete request
   url: https://github.com/noah-qin/Corta/discussions/categories/ideas
   about: Discuss early ideas and preferences about appearance or layout.

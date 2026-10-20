@@ -15,11 +15,13 @@ Metal 4 rendering · Native CJK / IME · SSH, SFTP and remote editing
 ![Platform](https://img.shields.io/badge/macOS_26.0%2B-Apple_silicon-4d4d4d?style=flat-square)
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](LICENSE)
+[![Discord](https://img.shields.io/badge/Discord-join-5865f2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/QNdWfdwr7j)
 
 **[↓ Download](https://github.com/noah-qin/Corta/releases/latest)** ·
 **[User guide](docs/USER-GUIDE.md)** ·
 [Documentation](docs/README.md) ·
 [Contribute](CONTRIBUTING.md) ·
+[Discord](https://discord.gg/QNdWfdwr7j) ·
 [Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml) ·
 [简体中文](README.zh-CN.md)
 
@@ -189,7 +191,8 @@ the [Went back form](https://github.com/noah-qin/Corta/issues/new?template=went_
 needs no reproduction, and "it just felt off" is an acceptable answer.
 
 Report vulnerabilities through the [private security channel](SECURITY.md).
-For usage questions, go to [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a);
+To chat with other users and the maintainer, join the [Discord](https://discord.gg/QNdWfdwr7j).
+For usage questions whose answers others should be able to find, go to [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a);
 to share a theme or a setup, [Show and tell](https://github.com/noah-qin/Corta/discussions/categories/show-and-tell).
 For other problems, [open an issue](https://github.com/noah-qin/Corta/issues/new/choose).
 If you would like to support maintenance, [sponsor the project](https://github.com/sponsors/noah-qin).

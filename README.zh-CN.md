@@ -11,7 +11,8 @@ Metal 4 渲染 · 原生中日韩输入法 · SSH、SFTP 与远程编辑
 [English](README.md) ·
 **[↓ 下载](https://github.com/noah-qin/Corta/releases/latest)** ·
 [用户指南（英文）](docs/USER-GUIDE.md) ·
-[报告问题](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml)
+[报告问题](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml) ·
+[Discord](https://discord.gg/QNdWfdwr7j)
 
 <img src="docs/brand/screenshot.png" width="960" alt="Corta 的三个分屏：git log 与中日韩及 emoji 对齐表、在终端中显示的穿山甲图片、24 位色彩渐变">
 
@@ -75,7 +76,7 @@ shasum -a 256 -c Corta-x.y.z.dmg.sha256
 [good first issue](https://github.com/noah-qin/Corta/labels/good%20first%20issue) 开始，
 先读 [CONTRIBUTING.md](CONTRIBUTING.md)。使用问题请到
 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a)，
-中文提问同样欢迎。试用后换回了原来的终端？欢迎用
+中文提问同样欢迎；想和其他用户及维护者实时交流，欢迎加入 [Discord](https://discord.gg/QNdWfdwr7j)。试用后换回了原来的终端？欢迎用
 [Went back 表单](https://github.com/noah-qin/Corta/issues/new?template=went_back.yml)
 告诉我们原因，不需要复现步骤。安全漏洞请通过 [SECURITY.md](SECURITY.md) 私下报告。
 
