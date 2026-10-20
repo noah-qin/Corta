@@ -109,14 +109,26 @@ nonisolated enum MonospacedFontCatalog {
     static func isUsable(family: String) -> Bool {
         let (known, generation) = cache.withLock { ($0.usable[family], $0.generation) }
         if let known { return known }
-        let usable = measure(family: family)
+        let usable = font(ofFamily: family).map(measure(base:)) ?? false
         cache.withLock { if $0.generation == generation { $0.usable[family] = usable } }
         return usable
     }
 
-    private static func measure(family: String) -> Bool {
-        guard let base = font(ofFamily: family), let advance = uniformAdvance(of: base)
-        else { return false }
+    /// The same check for one face of a family — a Light or Medium that
+    /// `font-weight` picks, with the bold and italic derived from it.
+    static func isUsable(face: CTFont) -> Bool {
+        // Keyed apart from family names: a PostScript name has no spaces,
+        // but a family may be called anything.
+        let key = "\u{0}" + (CTFontCopyPostScriptName(face) as String)
+        let (known, generation) = cache.withLock { ($0.usable[key], $0.generation) }
+        if let known { return known }
+        let usable = measure(base: CTFontCreateCopyWithAttributes(face, measurementSize, nil, nil))
+        cache.withLock { if $0.generation == generation { $0.usable[key] = usable } }
+        return usable
+    }
+
+    private static func measure(base: CTFont) -> Bool {
+        guard let advance = uniformAdvance(of: base) else { return false }
         let derivations: [CTFontSymbolicTraits] = [
             .traitBold, .traitItalic, [.traitBold, .traitItalic],
         ]

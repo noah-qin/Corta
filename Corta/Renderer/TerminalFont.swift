@@ -67,10 +67,22 @@ nonisolated enum TerminalFont {
     /// `CJKLead.allCases` order, then emoji. Fallbacks take the primary's
     /// size.
     static func cascade(lead: CJKLead, bold: Bool) -> [CTFontDescriptor] {
-        let order = [lead] + CJKLead.allCases.filter { $0 != lead }
-        let faces = order.map { bold ? $0.faces.bold : $0.faces.regular } + ["AppleColorEmoji"]
-        return faces.map { CTFontDescriptorCreateWithNameAndSize($0 as CFString, 0) }
+        let lists = cascades[lead]!
+        return bold ? lists.bold : lists.regular
     }
+
+    /// Every lead's two lists, built once: `pinningCascadeList` runs for
+    /// each style on every ⌘= / ⌘- repeat. Immutable, hence
+    /// `nonisolated(unsafe)` for the non-`Sendable` descriptors.
+    private nonisolated(unsafe) static let cascades: [CJKLead: (regular: [CTFontDescriptor], bold: [CTFontDescriptor])] =
+        Dictionary(uniqueKeysWithValues: CJKLead.allCases.map { lead in
+            let order = [lead] + CJKLead.allCases.filter { $0 != lead }
+            func list(bold: Bool) -> [CTFontDescriptor] {
+                (order.map { bold ? $0.faces.bold : $0.faces.regular } + ["AppleColorEmoji"])
+                    .map { CTFontDescriptorCreateWithNameAndSize($0 as CFString, 0) }
+            }
+            return (lead, (list(bold: false), list(bold: true)))
+        })
 
     /// System Monospaced's weight: Regular, like every other family and the
     /// fallbacks, so text and its CJK and symbol fallbacks share one weight.
@@ -101,13 +113,16 @@ nonisolated enum TerminalFont {
     }
 
     /// The family's face at exactly `weight`, or nil: `NSFontManager`
-    /// answers the nearest face, and a Bold for "medium" is not one.
+    /// answers the nearest face, and a Bold for "medium" is not one. The
+    /// face is verified as the family was (D12): passing for Regular says
+    /// nothing about a Light's advances.
     private static func weighted(_ family: String, _ weight: Configuration.FontWeight, size: CGFloat) -> NSFont? {
         guard weight != .regular,
             let font = NSFontManager.shared.font(
                 withFamily: family, traits: [], weight: weight.managerWeight, size: size),
             font.familyName == family,
-            NSFontManager.shared.weight(of: font) == weight.managerWeight
+            NSFontManager.shared.weight(of: font) == weight.managerWeight,
+            MonospacedFontCatalog.isUsable(face: font as CTFont)
         else { return nil }
         return font
     }

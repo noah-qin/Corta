@@ -93,6 +93,15 @@ import Testing
         #expect(MonospacedFontCatalog.families() == names)
     }
 
+    /// A Light or Medium face is measured as the family's Regular was: a
+    /// pass for one face is not a pass for another.
+    @Test func aWeightedFaceIsVerifiedOnItsOwn() {
+        let light = CTFontCreateWithName("Menlo-Regular" as CFString, 12, nil)
+        #expect(MonospacedFontCatalog.isUsable(face: light))
+        let proportional = CTFontCreateWithName("Helvetica-Light" as CFString, 12, nil)
+        #expect(!MonospacedFontCatalog.isUsable(face: proportional))
+    }
+
     // MARK: - Styles
 
     /// A family with real italics must use them; the four styles must be four
