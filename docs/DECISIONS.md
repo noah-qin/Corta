@@ -229,7 +229,10 @@ missing or fails the check draws in System Monospaced, and a Font Status row
 says which and why. The fallback cascade (PingFang SC, Apple Color Emoji) is
 unchanged: a family's own CJK glyphs are used when it has them. The picker
 is a list, not `NSFontPanel`: the panel offers every face, most of which
-the grid cannot use, and duplicates the size control.
+the grid cannot use, and duplicates the size control. A cell is at least
+1.15 em tall (`CellMetrics.minimumLineHeight`): CJK families such as BIZ
+UDGothic and SimSong declare a one-em line with no leading, and at that
+height rows touch. SF Mono and Menlo declare more and are unaffected.
 
 ## D12 — A font family is verified, never trusted
 

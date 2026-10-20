@@ -20,6 +20,14 @@ import CoreText
 /// The cell box and baseline a monospaced font imposes, derived once per
 /// font.
 public nonisolated struct CellMetrics: Sendable {
+    /// The shortest line, as a multiple of the point size. CJK families
+    /// (BIZ UDGothic, SimSong, PCMyungjo) declare exactly one em with no
+    /// leading, made for apps that add their own spacing; at that height a
+    /// descender touches the next row's capitals and taller fallback glyphs
+    /// crowd the row. Below SF Mono's 1.18 and Menlo's 1.16, so terminal
+    /// faces keep their own metrics.
+    static let minimumLineHeight: CGFloat = 1.15
+
     public var cellWidth: CGFloat
     public var cellHeight: CGFloat
     /// From the cell's top down to the baseline.
@@ -58,7 +66,8 @@ public nonisolated struct CellMetrics: Sendable {
         func snapNearest(_ points: CGFloat) -> CGFloat { (points * pixels).rounded() / pixels }
 
         let advanceWidth = advance.width > 0 ? advance.width : CTFontGetSize(font) * 0.6
-        let lineHeight = ascent + descent + leading
+        let declaredLine = ascent + descent + leading
+        let lineHeight = max(declaredLine, CTFontGetSize(font) * Self.minimumLineHeight)
 
         // Snap down by at most a device pixel, matching Terminal.app's 7pt
         // column for SF Mono 12 (nominal 7.418pt); rounding up widened 120
@@ -68,7 +77,8 @@ public nonisolated struct CellMetrics: Sendable {
         // Height follows the font's line metrics, independent of width. Never
         // zero: empty metrics once trapped `gridSize(fitting:)` with `inf`.
         self.cellHeight = max(1 / pixels, snapUp(lineHeight))
-        // Split the leading evenly, keeping the glyph centred.
-        self.baselineOffset = snapNearest(ascent + (cellHeight - lineHeight) / 2)
+        // Split the leading and any raised height evenly, keeping the glyph
+        // centred.
+        self.baselineOffset = snapNearest(ascent + (cellHeight - declaredLine) / 2)
     }
 }

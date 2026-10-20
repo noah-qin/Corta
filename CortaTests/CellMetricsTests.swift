@@ -81,6 +81,34 @@ struct CellMetricsTests {
     }
 }
 
+/// A family whose line metrics are one em gets room between rows; one with
+/// its own spacing keeps it.
+struct CellMetricsLineHeightTests {
+    /// Andale Mono ships with macOS and declares 1.125 em — under the floor.
+    @Test("a tight face is raised to the minimum line height, centred")
+    func aTightFaceIsRaisedAndCentred() throws {
+        let font = CTFontCreateWithName("Andale Mono" as CFString, 20, nil)
+        let declared = CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)
+        try #require(declared < 20 * CellMetrics.minimumLineHeight)
+        let metrics = CellMetrics(font: font, scale: 2)
+        #expect(metrics.cellHeight >= 20 * CellMetrics.minimumLineHeight)
+        // The extra room is split, so the glyph sits mid-row, not on top.
+        let above = metrics.baselineOffset - CTFontGetAscent(font)
+        let below = metrics.cellHeight - metrics.baselineOffset - CTFontGetDescent(font)
+        #expect(abs(above - below) <= 0.5)
+    }
+
+    @Test("the default face keeps its own line height")
+    func theDefaultFaceIsUnchanged() {
+        for size in stride(from: CGFloat(8), through: 32, by: 1) {
+            let font = TerminalFont.primary(ofSize: size)
+            let declared = CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)
+            #expect(declared >= size * CellMetrics.minimumLineHeight)
+            #expect(CellMetrics(font: font, scale: 2).cellHeight == (declared * 2).rounded(.up) / 2)
+        }
+    }
+}
+
 /// The two cell dimensions are divisors in `ViewController.gridSize
 /// (fitting:)`; a zero from a degenerate face would make that quotient
 /// infinite. Both are floored at one device pixel, whatever the font says.
