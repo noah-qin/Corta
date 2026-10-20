@@ -207,4 +207,14 @@ import Testing
             #expect(runs.allSatisfy { $0.positions.allSatisfy { $0.y == 0 } }, "\(text)")
         }
     }
+
+    /// CJK in bold text is bold: the cascade under a real bold face is
+    /// PingFang Semibold, not the Regular that drew 粗体 light.
+    @Test func boldCJKUsesABoldFallback() throws {
+        guard let atlas = try Self.systemAtlas() else { return }
+        let regular = try #require(atlas.shape("粗", style: .regular).runs.first)
+        let bold = try #require(atlas.shape("粗", style: .bold).runs.first)
+        #expect(CTFontCopyPostScriptName(regular.font) as String == "PingFangSC-Regular")
+        #expect(CTFontCopyPostScriptName(bold.font) as String == "PingFangSC-Semibold")
+    }
 }

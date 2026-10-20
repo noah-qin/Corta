@@ -27,6 +27,8 @@ Versioning for compatibility changes.
   fallback font are now drawn in its regular weight and centred where the
   font centres its own; braille, Powerline and Nerd Font icons keep their
   place.
+- CJK in bold text is bold: it was drawn in PingFang SC Regular whatever
+  the style, and now uses PingFang SC Semibold under a bold face.
 - `font-family` in the config file is no longer replaced with `system`. A
   family that is not installed, or not one width, draws as System
   Monospaced and Settings shows a Font Status row saying why (#372).

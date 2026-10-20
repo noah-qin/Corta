@@ -31,6 +31,12 @@ nonisolated enum TerminalFont {
         CTFontDescriptorCreateWithNameAndSize("PingFangSC-Regular" as CFString, 0),
         CTFontDescriptorCreateWithNameAndSize("AppleColorEmoji" as CFString, 0),
     ]
+    /// Under a real bold face: CJK in bold text was PingFang Regular, so
+    /// `SGR 1` left 粗体 as light as the text around it.
+    private nonisolated(unsafe) static let boldCascadeList: [CTFontDescriptor] = [
+        CTFontDescriptorCreateWithNameAndSize("PingFangSC-Semibold" as CFString, 0),
+        CTFontDescriptorCreateWithNameAndSize("AppleColorEmoji" as CFString, 0),
+    ]
 
     /// The primary font, cascade pinned. `.medium` matches Terminal.app's stem
     /// density at 12pt; `.regular` reads soft through the grayscale atlas.
@@ -110,7 +116,9 @@ nonisolated enum TerminalFont {
         )
     }
 
-    /// Re-applies the pinned cascade; idempotent.
+    /// Re-applies the pinned cascade, the bold one under a real bold face;
+    /// idempotent. A synthetic bold keeps the regular cascade: its stroke
+    /// already thickens the fallback glyphs too.
     ///
     /// A copy of the font in hand, not a font resolved again from its
     /// descriptor: that lookup goes through the font daemon, and when it
@@ -118,8 +126,9 @@ nonisolated enum TerminalFont {
     /// answered with LastResort — a face with no ASCII glyphs, for the
     /// session's whole life. The copy keeps the face and its matrix.
     static func pinningCascadeList(_ font: CTFont, size: CGFloat) -> CTFont {
+        let isBold = CTFontGetSymbolicTraits(font).contains(.traitBold)
         let attributes = CTFontDescriptorCreateWithAttributes(
-            [kCTFontCascadeListAttribute: cascadeList] as CFDictionary)
+            [kCTFontCascadeListAttribute: isBold ? boldCascadeList : cascadeList] as CFDictionary)
         return CTFontCreateCopyWithAttributes(font, size, nil, attributes)
     }
 }
