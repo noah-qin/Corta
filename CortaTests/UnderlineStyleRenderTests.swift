@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CoreGraphics
 import CortaTerminal
 import Metal
 import Testing
