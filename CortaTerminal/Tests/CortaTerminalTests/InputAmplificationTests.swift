@@ -100,6 +100,17 @@ struct InputAmplificationTests {
         #expect(indicators == 17, "the flag after a full cluster was dropped")
     }
 
+    @Test("popping far past the keyboard-protocol stack costs the stack, not the count")
+    func keyboardPopFloodIsCheap() {
+        var terminal = Terminal(rows: 2, columns: 20)
+        let input = Array(String(repeating: "\u{1B}[<65535u", count: 2_000).utf8)
+        let start = SuspendingClock.now
+        terminal.feed(input)
+        // Iterating the count, this was 131 million loop steps.
+        #expect(SuspendingClock.now - start < .seconds(1))
+        #expect(terminal.keyboardEnhancements.isEmpty)
+    }
+
     @Test("a hyperlink table full of live links is not rescanned for every new link")
     func futileHyperlinkSweepsAreRationed() {
         // Every link on its own scrollback row, so all stay live.

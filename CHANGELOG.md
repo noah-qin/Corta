@@ -62,6 +62,12 @@ Versioning for compatibility changes.
   family that is not installed, or not one width, draws as System
   Monospaced and Settings shows a Font Status row saying why (#372).
 
+### Security
+
+- A keyboard-protocol pop (`CSI < n u`) costs the depth of the stack, not
+  the `n` the program asked for: a stream of large pops kept the pane
+  busy far beyond its size.
+
 ## [1.2.3] - 2026-10-19
 
 ### Added

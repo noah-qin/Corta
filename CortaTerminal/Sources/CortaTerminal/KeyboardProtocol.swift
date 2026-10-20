@@ -59,9 +59,10 @@ struct KeyboardProtocolStack: Sendable, Equatable {
         if stack.count > Self.maximumDepth { stack.removeFirst() }
     }
 
-    /// `CSI < number u`, default 1.
+    /// `CSI < number u`, default 1. Bounded by the depth, not the count: a
+    /// `where` filter still ran all 65 535 iterations a stream may ask for.
     mutating func pop(_ count: Int) {
-        for _ in 0..<max(1, count) where stack.count > 1 { stack.removeLast() }
+        stack.removeLast(min(max(1, count), stack.count - 1))
     }
 
     /// `CSI = flags ; mode u` — 1 sets, 2 adds, 3 removes.

@@ -82,6 +82,11 @@ struct KeyboardProtocolTests {
         #expect(response(to: "\u{1B}[<99u\u{1B}[?u") == "\u{1B}[?0u")
     }
 
+    @Test("a pop of several entries stops at the one below them")
+    func popSeveral() {
+        #expect(response(to: "\u{1B}[>1u\u{1B}[>3u\u{1B}[>2u\u{1B}[<2u\u{1B}[?u") == "\u{1B}[?1u")
+    }
+
     @Test("the set form's three modes replace, add and remove")
     func setModes() {
         #expect(response(to: "\u{1B}[=1;1u\u{1B}[?u") == "\u{1B}[?1u")
