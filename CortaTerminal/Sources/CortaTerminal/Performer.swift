@@ -37,6 +37,16 @@ struct Performer: ParserPerformer, Sendable {
     /// report; nil believes none. Outside `state`, so a reset keeps it.
     var directoryCompletionToken: [UInt8]?
 
+    /// Large image transmissions stop the parse instead of decoding in it
+    /// (`DeferredImageTransmission`); set only for the session's feed.
+    var defersLargeImageDecoding = false
+
+    /// Bumped by RIS, so a decode finished after a reset is dropped rather
+    /// than placed on the screen the reset cleared.
+    var resetCount = 0
+
+    var requestsStopAfterAPC: Bool { state.deferredImage != nil }
+
     init(grid: Grid) {
         self.grid = grid
     }

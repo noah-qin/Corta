@@ -37,6 +37,7 @@ let modes: [(flag: String, run: () -> Void)] = [
     ("--scroll-allocations", profileSteadyScrolling),
     ("--memory-only", benchmarkScrollbackMemory),
     ("--reflow-only", benchmarkReflowCost),
+    ("--image-stall", benchmarkSnapshotLatencyUnderImage),
 ]
 if let mode = modes.first(where: { arguments.contains($0.flag) }) {
     mode.run()
@@ -53,6 +54,7 @@ let suite: [(historyOnly: Bool, run: () -> Void)] = [
     (false, benchmarkResizeStrategies),
     (false, benchmarkSearchCost),
     (false, benchmarkSnapshotLatencyUnderFlood),
+    (false, benchmarkSnapshotLatencyUnderImage),
     (false, benchmarkFeedUnderSnapshotter),
     (false, benchmarkOutputWakesUnderFlood),
     (false, benchmarkWriteBackpressure),

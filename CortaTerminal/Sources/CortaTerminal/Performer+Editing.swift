@@ -117,6 +117,7 @@ extension Performer {
         let imageByteAllowance = state.imageByteAllowance
         grid.resetToInitialState()
         state = PerformerState()
+        resetCount &+= 1
         state.synchronizedOutputEpisode = synchronizedOutputEpisode
         state.imageByteAllowance = imageByteAllowance
         state.hostnamesAtStart = hostnames

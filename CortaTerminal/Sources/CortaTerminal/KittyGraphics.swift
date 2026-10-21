@@ -186,6 +186,11 @@ public enum KittyGraphics {
     /// Decoded bytes per image — about two 4K RGBA frames.
     public static let maximumImageBytes = 64 * 1024 * 1024
 
+    /// Base64 bytes from which a session decodes a transmission outside its
+    /// lock. Below it the decode is shorter than the extra lock round trip
+    /// is worth; one `kitten icat` chunk (128 KiB) is past it.
+    static let deferredDecodeThreshold = 64 * 1024
+
     /// Per axis; every Metal feature set on macOS supports 8192² textures.
     public static let maximumImageDimension = 8192
 
