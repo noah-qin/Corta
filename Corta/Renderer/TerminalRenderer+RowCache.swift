@@ -31,15 +31,18 @@ nonisolated extension TerminalRenderer {
         cachedBackground.reserveCapacity(grid.rows * grid.columns / 4 + 2)
         cachedGlyphs.reserveCapacity(grid.rows * grid.columns / 2)
         let liveScreen = offset == 0
+        deferredRows.removeAll(keepingCapacity: true)
         for row in 0..<grid.rows {
             let line = Self.visibleLine(grid: grid, row: row, offset: offset)
             let backgroundStart = cachedBackground.count
             let glyphStart = cachedGlyphs.count
             let colorGlyphStart = cachedColorGlyphs.count
+            let deferrals = glyphAtlas.deferralCount
             appendRowInstances(
                 line: line, row: row, graphemes: grid.graphemes,
                 background: &cachedBackground, glyphs: &cachedGlyphs,
                 colorGlyphs: &cachedColorGlyphs)
+            if glyphAtlas.deferralCount != deferrals { deferredRows.append(row) }
             backgroundCounts.append(cachedBackground.count - backgroundStart)
             glyphCounts.append(cachedGlyphs.count - glyphStart)
             colorGlyphCounts.append(cachedColorGlyphs.count - colorGlyphStart)
@@ -68,6 +71,7 @@ nonisolated extension TerminalRenderer {
         grid: Grid, offset: Int, previousBlockCursor: BlockCursor?
     ) -> Bool {
         let liveScreen = offset == 0
+        deferredRows.removeAll(keepingCapacity: true)
         let moved = shiftRetainedRows(grid: grid, offset: offset, previousBlockCursor: previousBlockCursor)
         forcedRowA = -1
         forcedRowB = -1
@@ -177,9 +181,11 @@ nonisolated extension TerminalRenderer {
         cachedStarts: (background: Int, glyphs: Int, colorGlyphs: Int)
     ) {
         let starts = (rowBackground.count, rowGlyphs.count, rowColorGlyphs.count)
+        let deferrals = glyphAtlas.deferralCount
         appendRowInstances(
             line: line, row: row, graphemes: graphemes,
             background: &rowBackground, glyphs: &rowGlyphs, colorGlyphs: &rowColorGlyphs)
+        if glyphAtlas.deferralCount != deferrals { deferredRows.append(row) }
         rebuiltRows.append(
             RebuiltRow(
                 row: row, background: starts.0..<rowBackground.count,

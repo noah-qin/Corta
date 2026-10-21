@@ -265,36 +265,104 @@ nonisolated final class GlyphAtlas {
     /// window shares — so a frame shapes at most this many and leaves the
     /// rest for the next (`deferredShaping`).
     private var shapingAllowance = Int.max
-    /// When this frame's shaping time runs out; nil outside a frame or for
-    /// a count-only budget.
-    private var shapingDeadline: SuspendingClock.Instant?
+    /// The shaping time this frame may draw on, counted across every atlas
+    /// (`ShapingLedger`); nil outside a frame or for a count-only budget.
+    private var shapingTimeBudget: Duration?
     private var shapedThisFrame = 0
     /// A lookup this frame missed the cache with no allowance left and drew
     /// nothing; the caller decides whether another frame is worth asking for.
     private(set) var deferredShaping = false
+    /// Every deferral so far, so a caller can tell which of its rows lost a
+    /// glyph to the budget.
+    private(set) var deferralCount = 0
+
+    /// Time spent shaping by every atlas for the current display refresh.
+    /// The panes draw on one main thread, so a budget per atlas let four
+    /// panes of new CJK spend four budgets in one frame; shared, they spend
+    /// one between them, and the next refresh starts afresh.
+    private struct ShapingLedger {
+        var refresh: UInt64 = 0
+        var windowStart = SuspendingClock.now
+        var spent: Duration = .zero
+    }
+    private static let ledger = Mutex(ShapingLedger())
+    /// The refresh being drawn (`noteRefresh`); 0 when no display link said.
+    private static let currentRefresh = Atomic<UInt64>(0)
+    /// Without a refresh to go by — a test, a capture — the ledger restarts
+    /// after one 60 Hz frame.
+    static let fallbackShapingWindow: Duration = .microseconds(16_667)
+
+    /// Called by `FrameScheduler` before a frame's work, with the display
+    /// link's target timestamp: panes on one display share it per refresh.
+    static func noteRefresh(_ targetTimestamp: Double) {
+        currentRefresh.store(targetTimestamp.bitPattern, ordering: .relaxed)
+    }
+
+    /// The ledger at `now`, restarted for a new refresh or an elapsed window.
+    private static func advancedLedger(_ ledger: inout ShapingLedger, at now: SuspendingClock.Instant) {
+        let refresh = currentRefresh.load(ordering: .relaxed)
+        if ledger.refresh != refresh || ledger.windowStart.duration(to: now) >= fallbackShapingWindow {
+            ledger = ShapingLedger(refresh: refresh, windowStart: now)
+        }
+    }
+
+    static func shapingTimeSpent(at now: SuspendingClock.Instant) -> Duration {
+        ledger.withLock { ledger in
+            advancedLedger(&ledger, at: now)
+            return ledger.spent
+        }
+    }
 
     /// Starts a frame's shaping budget: at most `shapingBudget` shapes, and
-    /// with a `timeBudget` none begun once it has passed.
+    /// with a `timeBudget` none begun once shaping across every atlas has
+    /// spent that much of the current window.
     func beginFrame(shapingBudget: Int, timeBudget: Duration? = nil) {
         shapingAllowance = max(0, shapingBudget)
-        shapingDeadline = timeBudget.map { SuspendingClock.now + $0 }
+        shapingTimeBudget = timeBudget
         shapedThisFrame = 0
         deferredShaping = false
     }
 
+    /// Unlimited again: a lookup between frames (a cursor capture, a test)
+    /// never inherits a spent budget.
+    func endFrame() {
+        shapingAllowance = .max
+        shapingTimeBudget = nil
+    }
+
     /// One shape from the frame's budget, or `false` (and a deferral) once
-    /// it is spent. The first shape of a frame is always allowed, so a
-    /// screen that rebuilds slowly still fills in.
+    /// it is spent. The first shape of a frame is always allowed, so every
+    /// pane still fills in.
     private func takeShapingAllowance() -> Bool {
-        let outOfTime =
-            shapedThisFrame > 0 && shapingDeadline.map { SuspendingClock.now >= $0 } == true
-        guard shapingAllowance > 0, !outOfTime else {
+        if shapingAllowance > 0, shapedThisFrame > 0, let budget = shapingTimeBudget,
+            Self.shapingTimeSpent(at: .now) >= budget
+        {
+            // Spent for the rest of this frame: later misses are one compare.
+            shapingAllowance = 0
+        }
+        guard shapingAllowance > 0 else {
             deferredShaping = true
+            deferralCount &+= 1
             return false
         }
         shapingAllowance -= 1
         shapedThisFrame += 1
         return true
+    }
+
+    /// Runs one shape, charging its time to the ledger when the frame has a
+    /// time budget.
+    private func charged<T>(_ shape: () -> T) -> T {
+        guard shapingTimeBudget != nil else { return shape() }
+        let start = SuspendingClock.now
+        let result = shape()
+        let end = SuspendingClock.now
+        let elapsed = start.duration(to: end)
+        Self.ledger.withLock { ledger in
+            Self.advancedLedger(&ledger, at: start)
+            ledger.spent += elapsed
+        }
+        return result
     }
 
     /// - Parameter device: the GPU the atlas texture lives on.
@@ -488,13 +556,15 @@ nonisolated final class GlyphAtlas {
         if let cached = shapedPage.cache[key] ?? colorPage.cache[key] { return cached }
         guard let scalarValue = Unicode.Scalar(scalar), takeShapingAllowance() else { return nil }
         shapingHits += 1
-        let shaped = shape(String(Character(scalarValue)), style: style)
-        let page = cachePage(for: shaped.runs)
-        prepareCache(page)
-        var info = rasterize(shaped.runs, style: style, page: shapedPage)
-        if shaped.runs.isEmpty, shaped.sawNotdef { info.isMissing = true }
-        page.cache[key] = info
-        return info
+        return charged {
+            let shaped = shape(String(Character(scalarValue)), style: style)
+            let page = cachePage(for: shaped.runs)
+            prepareCache(page)
+            var info = rasterize(shaped.runs, style: style, page: shapedPage)
+            if shaped.runs.isEmpty, shaped.sawNotdef { info.isMissing = true }
+            page.cache[key] = info
+            return info
+        }
     }
 
     /// Shapes the whole cluster as one string, so ZWJ sequences and combining
@@ -503,20 +573,23 @@ nonisolated final class GlyphAtlas {
         guard scalars.count <= GraphemeTable.maximumClusterScalars else { return nil }
         let key = ClusterKey(scalars: scalars, style: style)
         if let cached = shapedPage.clusterCache[key] ?? colorPage.clusterCache[key] { return cached }
+        // Validated before the budget, built after it: a deferred cluster
+        // allocates nothing.
+        guard !scalars.isEmpty, scalars.allSatisfy({ Unicode.Scalar($0) != nil }),
+            takeShapingAllowance()
+        else { return nil }
         var view = String.UnicodeScalarView()
-        for scalar in scalars {
-            guard let value = Unicode.Scalar(scalar) else { return nil }
-            view.append(value)
-        }
-        guard !view.isEmpty, takeShapingAllowance() else { return nil }
+        for scalar in scalars { view.append(Unicode.Scalar(scalar)!) }
         shapingHits += 1
-        let shaped = shape(String(view), style: style)
-        let page = cachePage(for: shaped.runs)
-        prepareCache(page)
-        var info = rasterize(shaped.runs, style: style, page: shapedPage)
-        if shaped.runs.isEmpty, shaped.sawNotdef { info.isMissing = true }
-        page.clusterCache[key] = info
-        return info
+        return charged {
+            let shaped = shape(String(view), style: style)
+            let page = cachePage(for: shaped.runs)
+            prepareCache(page)
+            var info = rasterize(shaped.runs, style: style, page: shapedPage)
+            if shaped.runs.isEmpty, shaped.sawNotdef { info.isMissing = true }
+            page.clusterCache[key] = info
+            return info
+        }
     }
 
     /// Inkless/notdef results consume no shelf space, so also bound keys.

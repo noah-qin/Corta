@@ -41,14 +41,48 @@ import Testing
         // 2,400 first draws take longer than one frame's shaping time; each
         // frame shapes a share and asks for the next, until none is left.
         var frames = 0
+        var rebuiltRows: [Int] = []
         repeat {
             _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
             frames += 1
+            rebuiltRows.append(renderer.lastRebuiltRowCount)
         } while renderer.glyphAtlas.deferredShaping && frames < 2_400
+        // A follow-up frame rebuilds only the rows still missing a glyph.
+        #expect(rebuiltRows.count > 2)
+        #expect(rebuiltRows.dropFirst().allSatisfy { $0 < 40 })
         #expect(requests > 0)
         #expect(requests == frames - 1)
         #expect(!renderer.glyphAtlas.deferredShaping)
         #expect(renderer.glyphAtlas.evictionCount == 0)
+        #expect(renderer.cachedInstances[1].count == 2400)
+    }
+
+    @Test("a page that evicts a nearly full atlas once still fills in completely")
+    func singleEvictionStillFills() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let renderer = try TerminalRenderer(
+            device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil), scale: 2)
+        // Two screens of 2,400 distinct Han: each fits the atlas, both pass
+        // its 4,096-key cap, so the second evicts once along the way.
+        func show(_ base: Int) -> Int {
+            var terminal = Terminal(rows: 40, columns: 120)
+            for row in 0..<40 {
+                let text = (0..<60).map { String(Unicode.Scalar(base + row * 60 + $0)!) }.joined()
+                terminal.feed(Array("\u{1B}[\(row + 1);1H\(text)".utf8))
+            }
+            var frames = 0
+            repeat {
+                _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+                frames += 1
+            } while (renderer.glyphAtlas.deferredShaping || renderer.cachedInstances[1].count < 2400)
+                && frames < 2_400
+            return frames
+        }
+        _ = show(0x4E00)
+        #expect(renderer.glyphAtlas.evictionCount == 0)
+        let frames = show(0x6000)
+        #expect(renderer.glyphAtlas.evictionCount > 0)
+        #expect(frames < 2_400, "the second page must not stall blank after its eviction")
         #expect(renderer.cachedInstances[1].count == 2400)
     }
 
@@ -62,18 +96,27 @@ import Testing
             let text = (0..<60).map { String(Unicode.Scalar(0x4E00 + row * 60 + $0)!) }.joined()
             terminal.feed(Array("\u{1B}[\(row + 1);1H\(text)".utf8))
         }
-        // Shaping is time-bounded per frame, so the overflow takes a few.
+        var requests = 0
+        renderer.onGlyphsDeferred = { requests += 1 }
+        // Shaping is time-bounded per frame, so the overflow takes a few; then
+        // the follow-ups it asks for must stop, not run for as long as it
+        // stays on screen.
         var frames = 0
-        repeat {
+        var asked = true
+        while (renderer.glyphAtlas.evictionCount == 0 || asked) && frames < 2_400 {
+            let before = requests
             _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+            asked = requests > before
             frames += 1
-        } while renderer.glyphAtlas.evictionCount == 0 && frames < 2_400
+        }
+        #expect(frames < 2_400, "an overflowing screen must stop asking for frames")
         #expect(renderer.glyphAtlas.evictionCount > 0)
         let hits = renderer.glyphAtlas.shapingHits
         terminal.feed(Array("\u{1B}[1;1Hx".utf8))
         _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
         #expect(renderer.lastRebuiltRowCount == 1)
-        #expect(renderer.glyphAtlas.shapingHits - hits < TerminalRenderer.shapingBudgetPerFrame)
+        // One row of 60 cells, not the screen.
+        #expect(renderer.glyphAtlas.shapingHits - hits <= 60)
     }
 
     @Test func cursorBlockRendersAtTheCursorCell() throws {

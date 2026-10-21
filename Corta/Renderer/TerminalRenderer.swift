@@ -139,13 +139,18 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// over a few frames.
     static let shapingBudgetPerFrame = 1024
 
-    /// The time those shapes may take, which binds first for CJK: a Han
-    /// character's first draw costs Core Text 40–60 µs at Retina 14 pt, so
-    /// 1024 of them held the main thread every window shares for ~65 ms —
-    /// on a new pane, a zoom step or a page of new text. One 120 Hz frame:
-    /// a tighter cap stalls no less than a dropped frame but takes twice as
-    /// long to fill a page in (`PERFORMANCE.md` §5.21).
+    /// The time those shapes may take per display refresh, shared by every
+    /// pane, which binds first for CJK: a Han character's first draw costs
+    /// Core Text 40–60 µs at Retina 14 pt, so 1024 of them held the main
+    /// thread every window shares for 50–90 ms — on a new pane, a zoom step
+    /// or a page of new text. One 120 Hz frame: a tighter cap stalls no
+    /// less than a dropped frame but takes twice as long to fill a page in
+    /// (`PERFORMANCE.md` §5.21).
     static let shapingTimePerFrame: Duration = .milliseconds(8)
+
+    /// Rows this frame drew without some glyph for want of budget; the
+    /// next frame rebuilds them alone (`invalidRows`), not every row.
+    var deferredRows: [Int] = []
 
     /// Called when a frame left glyphs unshaped for want of budget and the
     /// atlas still has room for them: draw again soon, or they wait for the
@@ -403,7 +408,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
             cursorStyle: effectiveCursorStyle, cursorVisible: cursorVisible, selection: selection,
             searchMatches: searchMatches, currentSearchMatchIndex: currentSearchMatchIndex,
             hoveredLink: hoveredLink)
-        requestRebuildForDeferredGlyphs(atlasGeneration: atlasGeneration)
+        requestRebuildForDeferredGlyphs(frameGeneration: atlasGeneration)
         // Not on a cursor blink or a selection drag: only the rows carry marks.
         if rowsChanged || marksAreStale {
             changed = changed || marksAreStale
@@ -421,6 +426,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         atlasGeneration: Int
     ) -> Bool {
         glyphAtlas.beginFrame(shapingBudget: Self.shapingBudgetPerFrame, timeBudget: Self.shapingTimePerFrame)
+        defer { glyphAtlas.endFrame() }
         var changed = fullRebuild
         if fullRebuild {
             rebuildAllRows(grid: grid, offset: offset)
@@ -428,12 +434,21 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
             changed = rebuildDamagedRows(
                 grid: grid, offset: offset, previousBlockCursor: previousBlockCursor)
         }
+        lastBuildAtlasGeneration = atlasGeneration
         if glyphAtlas.generation != atlasGeneration {
+            // What the second build defers is judged by its own generation:
+            // the eviction before it must not stop the follow-up frames.
+            lastBuildAtlasGeneration = glyphAtlas.generation
             rebuildAllRows(grid: grid, offset: offset)
             changed = true
         }
         return changed
     }
+
+    /// The atlas generation the frame's last row build began with.
+    private var lastBuildAtlasGeneration = 0
+    /// Evictions since a frame last deferred nothing: the current fill-in's.
+    private var fillEvictions = 0
 
     /// Hands the placements to the image renderer and reports whether they
     /// changed. Decodes are scheduled here, never in `draw`; an image delete
@@ -447,15 +462,26 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         return changed
     }
 
-    /// Rows that drew without some glyph are rebuilt next frame. Asked for
-    /// only while nothing was evicted: past that the content overflows the
-    /// atlas, and re-asking would shape a budget's worth every frame for as
-    /// long as it stays on screen.
-    private func requestRebuildForDeferredGlyphs(atlasGeneration: Int) {
-        needsFullRebuild = glyphAtlas.deferredShaping && glyphAtlas.generation == atlasGeneration
-        if needsFullRebuild {
-            onGlyphsDeferred?()
+    /// Rows that drew without some glyph are rebuilt next frame, those rows
+    /// alone. Not after a build that itself evicted, nor once a fill-in has
+    /// evicted twice: that content overflows the atlas, and re-asking would
+    /// shape a budget's worth every frame for as long as it stays on screen.
+    /// One eviction — a page that was nearly full — still fills in, or the
+    /// rest of the screen would wait for output.
+    private func requestRebuildForDeferredGlyphs(frameGeneration: Int) {
+        needsFullRebuild = false
+        if glyphAtlas.generation != frameGeneration { fillEvictions += 1 }
+        guard glyphAtlas.deferredShaping else {
+            fillEvictions = 0
+            return
         }
+        guard glyphAtlas.generation == lastBuildAtlasGeneration, fillEvictions <= 1 else {
+            // Given up until output asks again; that frame starts a new count.
+            fillEvictions = 0
+            return
+        }
+        for row in deferredRows where invalidRows.indices.contains(row) { invalidRows[row] = true }
+        onGlyphsDeferred?()
     }
 
     /// Whether every row must be rebuilt: the grid's shape or lines were

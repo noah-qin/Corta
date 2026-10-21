@@ -1348,27 +1348,41 @@ A glyph not yet in the atlas is shaped and rasterised on the main thread.
 The per-frame cap was 1024 such shapes, taken to be about 20 ms; a Han
 character's first draw costs Core Text 40–60 µs at Retina 14 pt, most of it
 loading the outline (a second draw of the same glyph costs ~2 µs), so a page
-of new CJK text held every window for tens of milliseconds. `GlyphAtlas.beginFrame`
-now also takes a time budget, 8 ms from the renderer
-(`TerminalRenderer.shapingTimePerFrame`); a frame always gets one shape, and
-the rest fill in on the frames `onGlyphsDeferred` asks for.
+of new CJK text held every window for 50–90 ms — on a new pane, a zoom step,
+a first `cat` of a document.
 
-A 30×100 screen of 1,500 Han characters the atlas has not seen, `updateInstances`
-called until nothing is deferred, three blocks of characters, Debug test host:
+Now the time spent shaping is counted, around each shape alone, in a ledger
+every atlas shares, and a frame begins no new shape once 8 ms of it is spent
+(`TerminalRenderer.shapingTimePerFrame`). The ledger restarts with each
+display refresh — `FrameScheduler` notes the display link's target timestamp
+— so the panes drawing in one refresh share one budget and each refresh gets
+a fresh one. A frame always gets one shape. The rows that lost a glyph are
+marked and rebuilt alone on the frames `onGlyphsDeferred` asks for. A fill-in
+that evicts the atlas once (a page that was nearly full) keeps going; a
+second eviction in the same fill-in means the content overflows the atlas,
+and it stops until output asks again.
 
-| Cap | Frames to fill | Worst frame | Total |
+A 30×100 screen of 1,500 Han characters the atlas has not seen,
+`updateInstances` per refresh until nothing is deferred, three blocks of
+characters, Debug test host:
+
+| | Frames to fill | Worst frame | Total |
 | --- | --- | --- | --- |
 | 1024 shapes (before) | 2 | 52.3–56.3 ms | 76.7–81.0 ms |
-| 4 ms | 23–24 | 5.2–5.6 ms | 104.1–109.1 ms |
-| 8 ms (chosen) | 11–14 | 9.2 ms (one 18.0 ms) | 92.8–128.0 ms |
+| 4 ms per pane, every row rebuilt per deferred frame (first try) | 23–24 | 5.2–5.6 ms | 104.1–109.1 ms |
+| 8 ms per pane, every row rebuilt (second try) | 11–14 | 9.2 ms (one 18.0 ms) | 92.8–128.0 ms |
+| 8 ms per refresh, shared, deferred rows only (chosen) | 9–10 | 9.3–10.3 ms (one 15.5 ms) | 79.1–83.5 ms |
 
-In the launched Debug app (`CORTA_RENDER_METRICS`, a scratch `ZDOTDIR`
-whose shell prints 30 rows of new Han text at launch), two runs each, the
-slowest `cpuFrame`s were 86.8 / 90.1 ms and 20.5 ms before and 16.1–17.5 ms
-after, every other frame ≤ 15.4 ms.
+Four panes each showing such a page in the same refreshes fill in over 37
+refreshes, the worst 13.8–14.3 ms; with a budget per pane that refresh would
+have cost four.
 
-Each deferred frame rebuilds every row, so a page costs more in all and fills
-in over about 100 ms at 120 Hz instead of appearing after one long frame; 4 ms
-doubled that for a stall a dropped frame already hides. Apple M5, macOS 27.0.1
-(26A434), Xcode 27.1 (27A9275).
+In the launched Debug app (`CORTA_RENDER_METRICS`, a scratch `ZDOTDIR` whose
+shell prints 30 rows of new Han text at launch), the slowest `cpuFrame`s were
+86.8 / 90.1 ms before and 14.9–15.6 ms after, every other frame ≤ 13.1 ms.
+D17 stayed inside its spread (0.646 / 0.721 ms against 0.657 / 0.697 ms).
 
+A page now appears over about 80 ms rather than after one long frame; a 4 ms
+budget doubled that for a stall a dropped frame already hides. Holding ⌘= over
+CJK text resets the atlas each step, so each step fills in rather than
+stalling. Apple M5, macOS 27.0.1 (26A434), Xcode 27.1 (27A9275).

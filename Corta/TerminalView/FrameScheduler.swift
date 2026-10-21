@@ -155,6 +155,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
                 maximumFPS: echoMaximumFPS, isPaused: isPaused)
         else { return false }
         return RenderMetrics.measure(.cpuFrame) {
+            GlyphAtlas.noteRefresh(now)
             guard shouldRenderFrame?() == true else { return true }
             previousPresentationTimestamp = nil
             resumedAt = nil
@@ -202,6 +203,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         RenderMetrics.measure(.cpuFrame) {
             let now = CACurrentMediaTime()
             if RenderMetrics.isEnabled { recordTick(target: pacing.targetTimestamp, now: now) }
+            GlyphAtlas.noteRefresh(pacing.targetTimestamp)
             let pending = shouldRenderFrame?() == true
             guard pending || owesDraw else { isPaused = true; return }
             guard let drawable = RenderMetrics.measure(.drawableWait, { metalLayer.nextDrawable() })
@@ -271,6 +273,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
             let latenessMS = (CACurrentMediaTime() - update.targetTimestamp) * 1000
             RenderMetrics.record(.drawableWait, milliseconds: max(0, latenessMS))
         }
+        GlyphAtlas.noteRefresh(update.targetPresentationTimestamp)
         let stillPending = shouldRenderFrame?() ?? true
         // The drawable's own size: the layer's can already be a resize ahead.
         let drawn = draw(
