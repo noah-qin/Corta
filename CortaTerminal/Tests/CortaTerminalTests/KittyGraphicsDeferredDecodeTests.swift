@@ -141,7 +141,25 @@ struct KittyGraphicsDeferredDecodeTests {
         #expect(!terminal.grid.dump().contains("\\"))
     }
 
-    @Test("a decode completed after a reset is dropped, unanswered")
+    @Test("a decode in the pause still counts against the image budget")
+    func decodeInThePauseIsCharged() throws {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let stream = try Self.transmission(id: 3, width: 256, height: 256)
+        // Up to the final chunk's terminator: still pending.
+        _ = terminal.feedDeferringImageDecode(stream[..<(stream.count - 2)])
+        let pending = terminal.retainedImageBytes
+        #expect(pending > 0)
+        _ = terminal.feedDeferringImageDecode(stream[(stream.count - 2)...])
+        let taken = terminal.takeDeferredImage()
+        let deferred = try #require(taken)
+        // The whole transmission now, final chunk included.
+        #expect(terminal.retainedImageBytes == deferred.decodedByteEstimate, "taking the decode out of the parse must not uncharge it")
+        #expect(terminal.retainedImageBytes > pending)
+        terminal.completeDeferredImage(deferred.decode())
+        #expect(terminal.retainedImageBytes == terminal.grid.retainedImageBytes)
+    }
+
+    @Test("a decode completed after a reset is answered but not stored")
     func resetDropsAPendingDecode() throws {
         var terminal = Terminal(rows: 10, columns: 40)
         let stream = try Self.transmission(id: 3, width: 256, height: 256)
@@ -152,7 +170,8 @@ struct KittyGraphicsDeferredDecodeTests {
         _ = terminal.takeOutput()
         terminal.completeDeferredImage(deferred.decode())
         #expect(terminal.grid.imagePlacements.imageCount == 0)
-        #expect(terminal.takeOutput().isEmpty)
+        // The OK an inline decode sent before the reset cleared the image.
+        #expect(terminal.takeOutput() == Array("\u{1B}_Gi=3;OK\u{1B}\\".utf8))
     }
 
     @Test("through a session, the image is placed and the text after it lands where it would inline")

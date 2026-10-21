@@ -118,8 +118,10 @@ public struct Terminal: Sendable {
     }
 
     mutating func takeDeferredImage() -> DeferredImageTransmission? {
-        defer { performer.state.deferredImage = nil }
-        return performer.state.deferredImage
+        guard let deferred = performer.state.deferredImage else { return nil }
+        performer.state.deferredImage = nil
+        performer.state.decodingImageBytes = deferred.decodedByteEstimate
+        return deferred
     }
 
     /// Stores and places a deferred transmission, and queues its reply, as
@@ -261,6 +263,8 @@ public struct Terminal: Sendable {
     public var retainedImageBytes: Int {
         performer.grid.retainedImageBytes
             + (performer.state.pendingImageTransmission?.base64.count ?? 0) / 4 * 3
+            + (performer.state.deferredImage?.decodedByteEstimate ?? 0)
+            + performer.state.decodingImageBytes
     }
 
     /// Query responses; `TerminalSession` writes them to the PTY after every

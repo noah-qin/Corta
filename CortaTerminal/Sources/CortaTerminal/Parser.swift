@@ -134,6 +134,8 @@ public struct Parser: Sendable {
         performer: inout P,
         stoppingAfterAPC: Bool
     ) -> Int {
+        // Set by any parse; only this one reads it, and only for its own bytes.
+        if stoppingAfterAPC { dispatchedAPC = false }
         let span = bytes.span
         var offset = 0
         while offset < span.count {

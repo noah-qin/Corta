@@ -1324,7 +1324,10 @@ after a transmission of 64 KiB of base64 or more, the session decodes it with
 the lock released, and the next acquisition stores, places and answers it
 before feeding on: no byte after the image is applied before it, so the
 placement, the cursor and the reply are the ones an inline decode gives
-(`KittyGraphicsDeferredDecodeTests`). A RIS in between drops the decode.
+(`KittyGraphicsDeferredDecodeTests`). A clear, resize or reset the user makes
+in the pause applies first, as if it came a moment earlier; after a RIS the
+image is answered but not stored. The decode stays charged to the image
+budget while it runs.
 
 `corta-bench --image-stall`: a 3840×2160 RGBA image, `o=z`, in 128 KiB
 chunks (32 MiB of stream) through `/bin/cat` and a real PTY, a

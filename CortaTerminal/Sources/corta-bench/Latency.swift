@@ -178,6 +178,10 @@ func benchmarkSnapshotLatencyUnderImage() {
     var deflated = [UInt8](repeating: 0, count: pixels.count + 1024)
     let deflatedCount = compression_encode_buffer(
         &deflated, deflated.count, pixels, pixels.count, nil, COMPRESSION_ZLIB)
+    guard deflatedCount > 0 else {
+        print("snapshot latency under a 4K image: SKIPPED (zlib encoding failed)")
+        return
+    }
     var a: UInt32 = 1, b: UInt32 = 0
     for byte in pixels { a = (a + UInt32(byte)) % 65_521; b = (b + a) % 65_521 }
     let adler = b << 16 | a
@@ -211,6 +215,10 @@ func benchmarkSnapshotLatencyUnderImage() {
     }
     let exited = Mutex(false)
     session.onChildExit = { _ in exited.withLock { $0 = true } }
+    // `onChildExit` never comes after an I/O failure; the deadline is the
+    // backstop for anything else that keeps it away.
+    session.onIOFailure = { _ in exited.withLock { $0 = true } }
+    let deadline = SuspendingClock.now + .seconds(60)
     session.start()
     defer { session.stop() }
     let samples = Mutex([UInt64]())
@@ -226,9 +234,15 @@ func benchmarkSnapshotLatencyUnderImage() {
         }
     }
     sampler.start()
-    while !exited.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.005) }
+    while !exited.withLock({ $0 }), SuspendingClock.now < deadline { Thread.sleep(forTimeInterval: 0.005) }
+    let timedOut = !exited.withLock { $0 }
+    exited.withLock { $0 = true }
     Thread.sleep(forTimeInterval: 0.05)
     let placed = session.snapshot().imagePlacements.placementCount
+    guard !timedOut, placed == 1 else {
+        print("snapshot latency under a 4K image: NO DATA (\(timedOut ? "timed out" : "image not placed"))")
+        return
+    }
     guard let distribution = LatencyDistribution(samplesNanoseconds: samples.withLock { $0 }) else {
         print("snapshot latency under a 4K image: NO DATA")
         return

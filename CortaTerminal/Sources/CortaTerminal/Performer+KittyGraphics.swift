@@ -118,23 +118,27 @@ extension Performer {
     /// dispatch, so nothing later in the stream is applied before
     /// `completeDeferredImage` stores and places it.
     private mutating func finishTransmission(_ pending: PendingImageTransmission) {
+        let deferred = DeferredImageTransmission(pending: pending, resetCount: resetCount)
         if defersLargeImageDecoding, pending.base64.count >= KittyGraphics.deferredDecodeThreshold {
-            state.deferredImage = DeferredImageTransmission(pending: pending, resetCount: resetCount)
+            state.deferredImage = deferred
             return
         }
-        let decoded: Result<KittyGraphics.ImageData, TransmissionRefusal>
-        do throws(TransmissionRefusal) {
-            decoded = .success(try Self.transmittedImage(pending))
-        } catch {
-            decoded = .failure(error)
-        }
-        completeTransmission(pending, decoded: decoded)
+        let decoded = deferred.decode()
+        completeTransmission(decoded.pending, decoded: decoded.result)
     }
 
     /// Stores and places a transmission decoded outside the parse. One from
-    /// before a RIS is dropped unanswered: its screen is gone.
+    /// before a RIS is answered, as an inline decode answered before the
+    /// RIS cleared it, but not stored: its screen is gone.
     mutating func completeDeferredImage(_ decoded: DecodedImageTransmission) {
-        guard decoded.resetCount == resetCount else { return }
+        state.decodingImageBytes = 0
+        guard decoded.resetCount == resetCount else {
+            let header = decoded.pending.header
+            respond(
+                imageID: header.imageID, placementID: nil, quiet: header.quiet,
+                error: decoded.result.failure?.message)
+            return
+        }
         if let imageAllowanceProvider { state.imageByteAllowance = imageAllowanceProvider() }
         completeTransmission(decoded.pending, decoded: decoded.result)
     }
@@ -326,6 +330,10 @@ struct DeferredImageTransmission: Sendable {
     let pending: PendingImageTransmission
     let resetCount: Int
 
+    /// The bytes the decode will hold, charged to the image budget while it
+    /// runs (`Terminal.retainedImageBytes`).
+    var decodedByteEstimate: Int { pending.base64.count / 4 * 3 }
+
     func decode() -> DecodedImageTransmission {
         let result: Result<KittyGraphics.ImageData, Performer.TransmissionRefusal>
         do throws(Performer.TransmissionRefusal) {
@@ -333,7 +341,18 @@ struct DeferredImageTransmission: Sendable {
         } catch {
             result = .failure(error)
         }
-        return DecodedImageTransmission(pending: pending, resetCount: resetCount, result: result)
+        // Completion needs the header and display alone; the base64 (up to
+        // ~85 MiB) goes now, not after another lock round trip.
+        var settled = pending
+        settled.base64 = []
+        return DecodedImageTransmission(pending: settled, resetCount: resetCount, result: result)
+    }
+}
+
+extension Result {
+    var failure: Failure? {
+        if case .failure(let error) = self { return error }
+        return nil
     }
 }
 

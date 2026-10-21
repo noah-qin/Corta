@@ -75,14 +75,19 @@ extension TerminalSession {
     /// (`Terminal.feedDeferringImageDecode`): the decode runs here, with
     /// the lock released, and the next acquisition stores and places it
     /// before feeding on — the order the bytes arrived in, with no frame
-    /// waiting ~100 ms behind a 4K image's base64 and zlib.
+    /// waiting ~100 ms behind a 4K image's base64 and zlib. A clear, resize
+    /// or reset the user makes in the pause applies first, as if it had come
+    /// a moment before the image's last chunk.
     private func apply(_ batch: [UInt8]) {
         var responses: [UInt8] = []
         var episode: Int?
         var offset = 0
         var decoded: DecodedImageTransmission?
         while offset < batch.count || decoded != nil {
-            let end = min(offset + Self.feedLockSliceSize, batch.count)
+            var end = min(offset + Self.feedLockSliceSize, batch.count)
+            // Never end a slice on an ESC: a deferred image's ST must stop
+            // the parse in ground, or a RIS in the pause strands its `\`.
+            if end < batch.count, batch[end - 1] == 0x1B { end += 1 }
             let slice = batch[offset..<end]
             let finished = decoded
             decoded = nil

@@ -95,6 +95,9 @@ struct PerformerState: Sendable {
     /// A finished transmission waiting for its decode outside the parse;
     /// taken by `Terminal.takeDeferredImage()` before the lock is released.
     var deferredImage: DeferredImageTransmission?
+    /// A taken `deferredImage`'s decoded size while its decode runs, so the
+    /// image budget does not lose sight of it in the pause.
+    var decodingImageBytes = 0
     /// Image bytes this terminal may retain across both screens, from the
     /// session's `ImageMemoryBudget`; unlimited (the pane cap alone) without one.
     var imageByteAllowance = Int.max
