@@ -55,6 +55,61 @@ import Testing
         #expect(atlas.glyph(shaping: 0x4E01, style: .regular) != nil, "a deferred glyph was not cached as missing")
     }
 
+    @Test("a frame's shaping time defers the rest once spent, after at least one shape")
+    func shapingTimeDefers() throws {
+        let device = try #require(Self.makeDevice())
+        let atlas = try GlyphAtlas(device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil))
+        atlas.beginFrame(shapingBudget: .max, timeBudget: .zero)
+        #expect(atlas.glyph(shaping: 0x4E00, style: .regular) != nil, "a frame always gets one shape")
+        #expect(!atlas.deferredShaping)
+        #expect(atlas.glyph(shaping: 0x4E01, style: .regular) == nil)
+        #expect(atlas.deferredShaping)
+        #expect(atlas.glyph(shaping: 0x4E00, style: .regular) != nil, "a cached glyph costs no time")
+        atlas.beginFrame(shapingBudget: .max, timeBudget: .seconds(60))
+        #expect(atlas.glyph(shaping: 0x4E01, style: .regular) != nil)
+        #expect(atlas.glyph(shaping: 0x4E02, style: .regular) != nil)
+        #expect(!atlas.deferredShaping)
+    }
+
+    @Test("every atlas draws on one shaping budget per refresh, and a new refresh restarts it")
+    func shapingTimeIsSharedPerRefresh() throws {
+        let device = try #require(Self.makeDevice())
+        let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+        let first = try GlyphAtlas(device: device, font: font)
+        let second = try GlyphAtlas(device: device, font: font)
+        GlyphAtlas.noteRefresh(1)
+        first.beginFrame(shapingBudget: .max, timeBudget: .seconds(60))
+        for scalar in UInt32(0x4E00)..<0x4E10 { #expect(first.glyph(shaping: scalar, style: .regular) != nil) }
+        first.endFrame()
+        let spent = GlyphAtlas.shapingTimeSpent(at: .now)
+        #expect(spent > .zero)
+        // Sixteen shapes' worth: one of its own cannot have spent it, so the
+        // deferral is the other atlas's spending.
+        second.beginFrame(shapingBudget: .max, timeBudget: spent)
+        #expect(second.glyph(shaping: 0x4E20, style: .regular) != nil, "a frame always gets one shape")
+        #expect(second.glyph(shaping: 0x4E21, style: .regular) == nil)
+        #expect(second.deferredShaping)
+        second.endFrame()
+        GlyphAtlas.noteRefresh(2)
+        second.beginFrame(shapingBudget: .max, timeBudget: spent)
+        #expect(second.glyph(shaping: 0x4E21, style: .regular) != nil)
+        #expect(second.glyph(shaping: 0x4E22, style: .regular) != nil, "a new refresh starts the budget afresh")
+        second.endFrame()
+        GlyphAtlas.noteRefresh(0)
+    }
+
+    @Test("between frames a lookup is unlimited, whatever the last frame spent")
+    func endFrameRestoresUnlimitedShaping() throws {
+        let device = try #require(Self.makeDevice())
+        let atlas = try GlyphAtlas(device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil))
+        atlas.beginFrame(shapingBudget: 1)
+        _ = atlas.glyph(shaping: 0x4E30, style: .regular)
+        #expect(atlas.glyph(shaping: 0x4E31, style: .regular) == nil)
+        atlas.endFrame()
+        #expect(atlas.glyph(shaping: 0x4E31, style: .regular) != nil)
+        #expect(atlas.glyph(shaping: 0x4E32, style: .regular) != nil)
+    }
+
     @Test("color-page eviction invalidates emoji keys and preserves shaped keys")
     func emojiCacheFollowsOwningPage() throws {
         let device = try #require(Self.makeDevice())

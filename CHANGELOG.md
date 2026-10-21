@@ -17,6 +17,12 @@ Versioning for compatibility changes.
   locked, and each frame waits for that lock: a 4K `kitten icat` held
   the whole app for about 110 ms. The decode now runs with the lock
   released, and the image is placed at the same point in the output.
+- A screen of Chinese, Japanese or Korean text Corta has not drawn
+  before — a new tab, a zoom step, a page of new output — no longer holds
+  every window for tens of milliseconds while its characters are drawn
+  for the first time. New characters are drawn about 8 ms' worth per
+  screen refresh, shared by every pane, and the rest appear over the next
+  few frames.
 
 ### Security
 
