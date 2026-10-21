@@ -188,6 +188,18 @@ struct ExportWriteTests {
         #expect(mode == 0o600)
     }
 
+    @Test("an export into a folder with an inherited read ACL stays private")
+    func exportDropsInheritedACL() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-export-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try OpenFileCommandTests.grantInheritedRead(on: directory)
+        let url = directory.appendingPathComponent("History.txt")
+        try PaneCommands.write("TOKEN=fake\n", to: url)
+        #expect(OpenFileCommandTests.hasExtendedACL(url) == false)
+    }
+
     /// Atomic: a failed write leaves the previous file intact rather than a
     /// truncated one, which matters when the export is over a file the user
     /// already keeps.

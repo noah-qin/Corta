@@ -173,6 +173,41 @@ struct OpenFileCommandTests {
             "no temporary left behind")
     }
 
+    /// `0600` is the mode bits only: an entry the folder marks
+    /// `file_inherit` landed on the file too, and kept granting read access
+    /// through the rename.
+    @Test("a private file drops the ACL its folder hands down")
+    func privateFilesDropInheritedACL() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-private-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Self.grantInheritedRead(on: directory)
+        let url = directory.appendingPathComponent("state.json")
+        try PrivateFile.write(Data("secret".utf8), to: url)
+        #expect(Self.hasExtendedACL(url) == false)
+        let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
+        #expect(mode == 0o600)
+    }
+
+    /// `everyone allow read`, inherited by every file created inside.
+    static func grantInheritedRead(on directory: URL) throws {
+        let chmod = Process()
+        chmod.executableURL = URL(fileURLWithPath: "/bin/chmod")
+        chmod.arguments = ["+a", "everyone allow read,file_inherit,directory_inherit", directory.path]
+        try chmod.run()
+        chmod.waitUntilExit()
+        try #require(chmod.terminationStatus == 0)
+    }
+
+    static func hasExtendedACL(_ url: URL) -> Bool? {
+        guard let acl = acl_get_file(url.path, ACL_TYPE_EXTENDED) else {
+            return errno == ENOENT ? false : nil
+        }
+        acl_free(UnsafeMutableRawPointer(acl))
+        return true
+    }
+
     @Test("a link opens, and is shown as, the URL the browser receives")
     func linkTargets() {
         #expect(PanePointer.target(of: "https://\u{0430}pple.com/login")?.absoluteString

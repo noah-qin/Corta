@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import CryptoKit
 import Darwin
 import Foundation
@@ -262,13 +263,8 @@ final class RemoteEditStore {
         }
     }
 
-    /// Clears any extended ACL. A volume without ACL support (ENOTSUP) has
-    /// none to inherit, so that counts as cleared rather than as a failure.
     nonisolated private static func removeACL(at url: URL) -> Bool {
-        guard let acl = acl_init(0) else { return false }
-        defer { acl_free(UnsafeMutableRawPointer(acl)) }
-        if acl_set_file(url.path, ACL_TYPE_EXTENDED, acl) == 0 { return true }
-        return errno == ENOTSUP || errno == EOPNOTSUPP
+        clearExtendedACL(path: url.path) == 0
     }
 
     // MARK: - Persistence
@@ -327,8 +323,9 @@ final class RemoteEditStore {
         guard !preservesNewerManifest else { return }
         let persisted = Persisted(version: Persisted.currentVersion, copies: Array(copies.values))
         guard let data = try? JSONEncoder().encode(persisted) else { return }
+        // The manifest names hosts and paths: owner-only from its first
+        // byte, not `chmod`ed after an `.atomic` write at the umask.
         try? secureCopy(at: manifestURL)
-        try? data.write(to: manifestURL, options: .atomic)
-        try? secureCopy(at: manifestURL)
+        try? PrivateFile.write(data, to: manifestURL)
     }
 }

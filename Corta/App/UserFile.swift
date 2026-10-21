@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
 import Foundation
 
 /// Writes a user-owned file (rc file, config) without changing what the
@@ -31,12 +32,19 @@ nonisolated enum UserFile {
     static func write(_ text: String, to url: URL) throws {
         let target = resolvingLinks(url)
         let manager = FileManager.default
-        let permissions = (try? manager.attributesOfItem(atPath: target.path))?[.posixPermissions]
+        let permissions = (try? manager.attributesOfItem(atPath: target.path))?[.posixPermissions] as? Int
         try manager.createDirectory(
             at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try text.write(to: target, atomically: true, encoding: .utf8)
-        if let permissions {
-            try manager.setAttributes([.posixPermissions: permissions], ofItemAtPath: target.path)
+        guard let permissions else {
+            try text.write(to: target, atomically: true, encoding: .utf8)
+            return
+        }
+        // The kept mode from the first byte: an `.atomic` write at the umask
+        // and a `chmod` after left a `0600` rc file holding exported tokens
+        // world-readable in between, and for good if the `chmod` failed.
+        let mode = mode_t(permissions & 0o777)
+        try PrivateFile.replace(at: target, with: Data(text.utf8)) { descriptor in
+            fchmod(descriptor, mode) == 0 ? 0 : errno
         }
     }
 
@@ -97,19 +105,31 @@ nonisolated enum UserFile {
 }
 
 /// Corta's own state files that say where the user works — recent hosts,
-/// directory history, window state. Owner-only from the first byte: written
-/// at the default umask and `chmod`ed after, each was readable by others for
-/// a moment, and stayed so if the second step never ran.
+/// directory history, window state — and exported terminal text. Owner-only
+/// from the first byte: written at the default umask and `chmod`ed after,
+/// each was readable by others for a moment, and stayed so if the second
+/// step never ran.
 nonisolated enum PrivateFile {
-    /// Atomic: a `0600` temporary beside `url`, renamed over it.
+    /// Atomic: a `0600` temporary beside `url`, stripped of any ACL the
+    /// folder hands down before a byte is written, renamed over it.
     static func write(_ data: Data, to url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try replace(at: url, with: data) { makeOwnerOnly(descriptor: $0) }
+    }
+
+    /// A temporary beside `url`, created `0600`, given its final permissions
+    /// by `prepare` (0 or an `errno`) before a byte is written, renamed over
+    /// `url`.
+    static func replace(at url: URL, with data: Data, prepare: (Int32) -> Int32) throws {
         let directory = url.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let temporary = directory.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString)")
         let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
         guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         do {
+            let code = prepare(descriptor)
+            guard code == 0 else { throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO) }
             try handle.write(contentsOf: data)
             try handle.close()
             guard rename(temporary.path, url.path) == 0 else {

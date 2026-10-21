@@ -10,6 +10,18 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Security
+
+- Exported terminal text and Corta's private state — recent hosts,
+  directory history, window state, the remote-edit manifest — drop any ACL
+  entry the folder hands down before a byte is written. `0600` set the mode
+  bits only: a folder granting another account inherited read access passed
+  it on to each file, and the rename and `chmod` kept it.
+- Updating a shell rc file or the config file keeps its permissions from
+  the first byte. The new copy was written at the umask and `chmod`ed
+  after, so a private `~/.zshrc` holding exported tokens was readable by
+  other accounts for a moment, and for good if the `chmod` failed.
+
 ## [1.3.0] - 2026-10-21
 
 ### Added
