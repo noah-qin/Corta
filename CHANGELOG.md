@@ -20,7 +20,7 @@ Versioning for compatibility changes.
 - A screen of Chinese, Japanese or Korean text Corta has not drawn
   before — a new tab, a zoom step, a page of new output — no longer holds
   every window for tens of milliseconds while its characters are drawn
-  for the first time. A frame spends at most 4 ms on new characters, and
+  for the first time. A frame spends at most 8 ms on new characters, and
   the rest appear over the next few frames.
 
 ### Security

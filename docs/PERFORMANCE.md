@@ -1342,4 +1342,33 @@ Release, alternating builds:
 `--unicode` feed throughput did not move (ASCII 323–329 MiB/s, CJK
 85.9–86.7 MiB/s on both sides). Apple M5, macOS 27.0.1 (26A434),
 Xcode 27.1 (27A9275), on AC power.
+### 5.21 First draws of CJK text bounded by time (2026-10-21)
+
+A glyph not yet in the atlas is shaped and rasterised on the main thread.
+The per-frame cap was 1024 such shapes, taken to be about 20 ms; a Han
+character's first draw costs Core Text 40–60 µs at Retina 14 pt, most of it
+loading the outline (a second draw of the same glyph costs ~2 µs), so a page
+of new CJK text held every window for tens of milliseconds. `GlyphAtlas.beginFrame`
+now also takes a time budget, 8 ms from the renderer
+(`TerminalRenderer.shapingTimePerFrame`); a frame always gets one shape, and
+the rest fill in on the frames `onGlyphsDeferred` asks for.
+
+A 30×100 screen of 1,500 Han characters the atlas has not seen, `updateInstances`
+called until nothing is deferred, three blocks of characters, Debug test host:
+
+| Cap | Frames to fill | Worst frame | Total |
+| --- | --- | --- | --- |
+| 1024 shapes (before) | 2 | 52.3–56.3 ms | 76.7–81.0 ms |
+| 4 ms | 23–24 | 5.2–5.6 ms | 104.1–109.1 ms |
+| 8 ms (chosen) | 11–14 | 9.2 ms (one 18.0 ms) | 92.8–128.0 ms |
+
+In the launched Debug app (`CORTA_RENDER_METRICS`, a scratch `ZDOTDIR`
+whose shell prints 30 rows of new Han text at launch), two runs each, the
+slowest `cpuFrame`s were 86.8 / 90.1 ms and 20.5 ms before and 16.1–17.5 ms
+after, every other frame ≤ 15.4 ms.
+
+Each deferred frame rebuilds every row, so a page costs more in all and fills
+in over about 100 ms at 120 Hz instead of appearing after one long frame; 4 ms
+doubled that for a stall a dropped frame already hides. Apple M5, macOS 27.0.1
+(26A434), Xcode 27.1 (27A9275).
 

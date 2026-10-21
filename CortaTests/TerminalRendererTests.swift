@@ -62,7 +62,12 @@ import Testing
             let text = (0..<60).map { String(Unicode.Scalar(0x4E00 + row * 60 + $0)!) }.joined()
             terminal.feed(Array("\u{1B}[\(row + 1);1H\(text)".utf8))
         }
-        _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+        // Shaping is time-bounded per frame, so the overflow takes a few.
+        var frames = 0
+        repeat {
+            _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+            frames += 1
+        } while renderer.glyphAtlas.evictionCount == 0 && frames < 2_400
         #expect(renderer.glyphAtlas.evictionCount > 0)
         let hits = renderer.glyphAtlas.shapingHits
         terminal.feed(Array("\u{1B}[1;1Hx".utf8))

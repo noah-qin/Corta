@@ -142,9 +142,10 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// The time those shapes may take, which binds first for CJK: a Han
     /// character's first draw costs Core Text 40–60 µs at Retina 14 pt, so
     /// 1024 of them held the main thread every window shares for ~65 ms —
-    /// on a new pane, a zoom step or a page of new text. The frame CPU
-    /// target (`PERFORMANCE.md` §1) is the budget.
-    static let shapingTimePerFrame: Duration = .milliseconds(4)
+    /// on a new pane, a zoom step or a page of new text. One 120 Hz frame:
+    /// a tighter cap stalls no less than a dropped frame but takes twice as
+    /// long to fill a page in (`PERFORMANCE.md` §5.21).
+    static let shapingTimePerFrame: Duration = .milliseconds(8)
 
     /// Called when a frame left glyphs unshaped for want of budget and the
     /// atlas still has room for them: draw again soon, or they wait for the
