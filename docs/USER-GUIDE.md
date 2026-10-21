@@ -444,8 +444,9 @@ While a suggestion is visible:
 
 You can filter relative paths, subdirectories and `~/` paths. Hidden folders
 appear when you type a dot prefix. Complex shell expressions keep native
-completion. Bash and fish retain their own completion; this feature does not
-automatically install hooks on remote machines or in custom shell commands.
+completion. Bash and fish retain their own completion; suggestions appear
+only in a shell Corta started with its automatic zsh hooks, never on remote
+machines or in custom shell commands, even with Shell Integration installed.
 
 **Optional: turn it off.** In **Settings ▸ Terminal ▸ Shell**, turn off
 **Directory suggestions (zsh)**, or set this in your config file:

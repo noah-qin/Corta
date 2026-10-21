@@ -353,12 +353,14 @@ public final class TerminalSession: @unchecked Sendable {
         workingDirectory: String? = nil,
         scrollbackLimit: Int = Scrollback.defaultLimit,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity,
-        imageBudget: ImageMemoryBudget? = nil
+        imageBudget: ImageMemoryBudget? = nil,
+        directoryCompletionToken: String? = nil
     ) throws(PTYError) {
         try self.init(
             executable: executable, arguments: arguments, environment: environment, size: size,
             workingDirectory: workingDirectory, scrollbackLimit: scrollbackLimit,
-            commandHistoryLimit: commandHistoryLimit, imageBudget: imageBudget, seams: Seams())
+            commandHistoryLimit: commandHistoryLimit, imageBudget: imageBudget,
+            directoryCompletionToken: directoryCompletionToken, seams: Seams())
     }
 
     init(
@@ -370,6 +372,7 @@ public final class TerminalSession: @unchecked Sendable {
         scrollbackLimit: Int = Scrollback.defaultLimit,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity,
         imageBudget: ImageMemoryBudget? = nil,
+        directoryCompletionToken: String? = nil,
         seams: Seams
     ) throws(PTYError) {
         self.imageBudget = imageBudget
@@ -393,6 +396,7 @@ public final class TerminalSession: @unchecked Sendable {
         )
         terminal.grid.cellPixelHeight = size.cellPixelHeight
         terminal.grid.cellPixelWidth = size.cellPixelWidth
+        terminal.directoryCompletionToken = directoryCompletionToken
         self.state = Mutex(State(terminal: terminal))
         if let imageBudget {
             state.withLock { current in

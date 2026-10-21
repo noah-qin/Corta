@@ -238,6 +238,9 @@ enum ShellIntegrationScript {
             setopt extendedglob
             local prefix raw directory leaf candidatePath name packet='' encodedPrefix='' REPLY
             local -a words paths
+            # Corta believes only a report carrying its pane's secret, which
+            # the bootstrap's own .zshrc set; without it there is no overlay.
+            [[ -n $__corta_cd_token ]] || return 0
             (( ++__corta_cd_revision ))
             [[ $BUFFER != $__corta_cd_dismissed ]] && __corta_cd_dismissed=''
             # Only a single cd argument, with the insertion point at the end.
@@ -281,9 +284,9 @@ enum ShellIntegrationScript {
             fi
             (( __corta_cd_index > ${#__corta_cd_paths} )) && __corta_cd_index=1
             if (( ${#__corta_cd_paths} )); then
-              print -rn -- $'\e]134;'"$__corta_cd_revision;$((__corta_cd_index-1));p=$encodedPrefix$packet"$'\a'
+              print -rn -- $'\e]134;'"$__corta_cd_token;$__corta_cd_revision;$((__corta_cd_index-1));p=$encodedPrefix$packet"$'\a'
             else
-              print -rn -- $'\e]134;'"$__corta_cd_revision;0"$'\a'
+              print -rn -- $'\e]134;'"$__corta_cd_token;$__corta_cd_revision;0"$'\a'
             fi
           }
 

@@ -194,6 +194,17 @@ eval or accept-line. Reports are ignored during commands and alternate-screen
 applications. Startup wrappers are private temporary files, restore ZDOTDIR,
 and source the user's existing startup files without modifying them.
 
+While it shows, the overlay takes Tab, Left/Right and Esc, so a report is
+believed only from the pane's own shell. The automatic zsh bootstrap writes a
+random per-session token into its wrapper `.zshrc` as an unexported shell
+variable; the widget puts it before every report, and the core drops a report
+without it (`DirectoryCompletion.untokened`). Output can forge `133;D` and a
+prompt, but a `cat`ted file or a remote shell over `ssh` cannot know the
+token, so it can no longer take those keys or draw a fake suggestion at the
+cursor. The token survives a terminal reset; a shell started some other way
+has none and shows no suggestions. Labels show `ConcealingScalars` as U+FFFD,
+as the grid does (§2.5).
+
 ### 2.8 Working-directory reports name a host, never a spawn target
 
 OSC 7's payload is a `file://host/path` URL, and a shell reached over `ssh`

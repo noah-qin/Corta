@@ -58,14 +58,16 @@ enum ZshBootstrap {
         prepare(original, executable: executable, arguments: arguments).environment
     }
 
-    /// The child's environment, and the wrapper folder it points zsh at —
-    /// nil when the shell is not a login zsh or the folder could not be
-    /// written — for `remove(_:)` once the session no longer needs it.
+    /// The child's environment; the wrapper folder it points zsh at, for
+    /// `remove(_:)` once the session no longer needs it; and the token the
+    /// directory-completion widget puts before its reports, for the
+    /// session's `Terminal`. Both nil when the shell is not a login zsh or
+    /// the folder could not be written.
     static func prepare(
         _ original: [String: String], executable: String, arguments: [String]
-    ) -> (environment: [String: String], folder: URL?) {
+    ) -> (environment: [String: String], folder: URL?, token: String?) {
         guard (executable as NSString).lastPathComponent == "zsh",
-            arguments == ["-l"] || arguments.isEmpty else { return (original, nil) }
+            arguments == ["-l"] || arguments.isEmpty else { return (original, nil, nil) }
         let fm = FileManager.default
         let folder = fm.temporaryDirectory.appendingPathComponent(folderPrefix + UUID().uuidString)
         let userDirectory = original["ZDOTDIR"] ?? original["HOME"] ?? NSHomeDirectory()
@@ -86,17 +88,21 @@ enum ZshBootstrap {
             // went here and was deleted with the folder. Pointed back at the
             // user's directory unless their own files chose another.
             let history = "[[ $HISTFILE == \(quote(folder.appendingPathComponent(".zsh_history").path)) ]] && HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history\n"
-            let rc = restore + history + "unset CORTA_USER_ZDOTDIR CORTA_USER_ZDOTDIR_SET\n[[ -r ${ZDOTDIR:-$HOME}/.zshrc ]] && source ${ZDOTDIR:-$HOME}/.zshrc\nsource \(quote(hook.path))\n"
+            // A shell variable, never exported: no command the shell runs,
+            // and nothing a remote host prints, can learn it.
+            let token = UUID().uuidString
+            let secret = "typeset -g __corta_cd_token=\(token)\n"
+            let rc = restore + history + secret + "unset CORTA_USER_ZDOTDIR CORTA_USER_ZDOTDIR_SET\n[[ -r ${ZDOTDIR:-$HOME}/.zshrc ]] && source ${ZDOTDIR:-$HOME}/.zshrc\nsource \(quote(hook.path))\n"
             try rc.write(to: folder.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
             folders.append(folder)
             var env = original
             env["CORTA_USER_ZDOTDIR"] = userDirectory
             env["CORTA_USER_ZDOTDIR_SET"] = original["ZDOTDIR"] == nil ? "0" : "1"
             env["ZDOTDIR"] = folder.path
-            return (env, folder)
+            return (env, folder, token)
         } catch {
             try? fm.removeItem(at: folder)
-            return (original, nil)
+            return (original, nil, nil)
         }
     }
 }

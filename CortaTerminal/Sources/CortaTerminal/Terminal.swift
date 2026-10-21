@@ -26,6 +26,12 @@ public struct Terminal: Sendable {
         set { performer.imageAllowanceProvider = newValue }
     }
 
+    /// See `DirectoryCompletion`. Set before the shell's first prompt.
+    public var directoryCompletionToken: String? {
+        get { performer.directoryCompletionToken.map { String(decoding: $0, as: UTF8.self) } }
+        set { performer.directoryCompletionToken = newValue.map { Array($0.utf8) } }
+    }
+
     public init(
         rows: Int = 24,
         columns: Int = 80,

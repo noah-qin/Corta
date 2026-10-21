@@ -31,19 +31,52 @@ struct DirectoryCompletionTests {
     }
     @Test func runningAndAlternateScreenCannotOfferDirectories() {
         var terminal = Terminal(rows: 5, columns: 60)
-        terminal.feed(Array("\u{1b}]133;A\u{7}\u{1b}]133;B\u{7}\u{1b}]134;1;0;Alpha/\u{7}".utf8))
+        terminal.directoryCompletionToken = "k"
+        terminal.feed(Array("\u{1b}]133;A\u{7}\u{1b}]133;B\u{7}\u{1b}]134;k;1;0;Alpha/\u{7}".utf8))
         #expect(terminal.directoryCompletion?.candidates == ["Alpha/"])
-        terminal.feed(Array("\u{1b}]133;C\u{7}\u{1b}]134;2;0;Other/\u{7}".utf8))
+        terminal.feed(Array("\u{1b}]133;C\u{7}\u{1b}]134;k;2;0;Other/\u{7}".utf8))
         #expect(terminal.directoryCompletion == nil)
     }
     @Test func interruptionSurvivesDisabledHistoryAndScreenChanges() {
         var terminal = Terminal(rows: 5, columns: 60, commandHistoryLimit: 0)
+        terminal.directoryCompletionToken = "k"
         terminal.feed(Array("\u{1b}]133;A\u{7}$ \u{1b}]133;B\u{7}sleep 10\r\n\u{1b}]133;C\u{7}\u{1b}]133;D;130\u{7}".utf8))
         #expect(terminal.grid.line(0).mark == .promptInterrupted)
-        terminal.feed(Array("\u{1b}]133;A\u{7}\u{1b}]133;B\u{7}\u{1b}]134;1;0;Alpha/\u{7}".utf8))
+        terminal.feed(Array("\u{1b}]133;A\u{7}\u{1b}]133;B\u{7}\u{1b}]134;k;1;0;Alpha/\u{7}".utf8))
         #expect(terminal.directoryCompletion?.candidates == ["Alpha/"])
-        terminal.feed(Array("\u{1b}[?1049h\u{1b}]134;2;0;Other/\u{7}\u{1b}[?1049l".utf8))
+        terminal.feed(Array("\u{1b}[?1049h\u{1b}]134;k;2;0;Other/\u{7}\u{1b}[?1049l".utf8))
         #expect(terminal.directoryCompletion == nil)
+    }
+
+    /// Output — a `cat`ted file, a remote shell over ssh — can forge the
+    /// prompt marks but not the pane's token, and the overlay it would show
+    /// takes Tab and the arrows.
+    @Test func onlyTheShellsOwnReportIsBelieved() {
+        func report(_ token: String) -> [UInt8] {
+            Array("\u{1b}]133;D;0\u{7}\u{1b}]133;A\u{7}\u{1b}]133;B\u{7}\u{1b}]134;\(token)1;0;p=;Alpha/\u{7}".utf8)
+        }
+        var untrusting = Terminal(rows: 5, columns: 60)
+        untrusting.feed(report(""))
+        #expect(untrusting.directoryCompletion == nil)
+        var terminal = Terminal(rows: 5, columns: 60)
+        terminal.directoryCompletionToken = "secret"
+        terminal.feed(report(""))
+        #expect(terminal.directoryCompletion == nil)
+        terminal.feed(report("guess;"))
+        #expect(terminal.directoryCompletion == nil)
+        terminal.feed(report("secre;"))
+        #expect(terminal.directoryCompletion == nil)
+        terminal.feed(report("secret;"))
+        #expect(terminal.directoryCompletion?.candidates == ["Alpha/"])
+        terminal.feed(Array("\u{1b}c".utf8))
+        terminal.feed(report("secret;"))
+        #expect(terminal.directoryCompletion?.candidates == ["Alpha/"], "a reset keeps the token")
+    }
+
+    @Test func concealingScalarsInNamesAreShown() {
+        let state = DirectoryCompletion(payload: "1;0;p=a%E2%80%AE;a%E2%80%AEb%E2%80%8B/")
+        #expect(state?.candidates == ["a\u{FFFD}b\u{FFFD}/"])
+        #expect(state?.previewSuffix == "b\u{FFFD}/")
     }
 
     @Test func ghostPreviewOnlyContainsTheUnwrittenSuffix() {

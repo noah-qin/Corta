@@ -174,6 +174,8 @@ editing startup files. Custom zsh arguments, bash, fish and remote shells
 need explicit installation or their own compatible OSC 133 hooks. Disabling
 directory suggestions in a live shell does not unload hooks already sourced;
 new sessions with the setting off do not use the automatic zsh bootstrap.
+Directory suggestions come only from that automatic bootstrap: installed
+hooks give a shell the OSC 133 marks, not suggestions.
 
 Startup-file installation is not a config-file key — it edits the login
 shell's startup files, which only

@@ -47,8 +47,10 @@ extension Performer {
         case 133:
             shellIntegration(payload)
         case 134:
-            guard !grid.isAlternateScreenActive, !state.isCommandRunning else { return }
-            state.directoryCompletion = DirectoryCompletion(payload: String(decoding: payload, as: UTF8.self))
+            guard !grid.isAlternateScreenActive, !state.isCommandRunning,
+                let token = directoryCompletionToken,
+                let report = DirectoryCompletion.untokened(payload, expected: token) else { return }
+            state.directoryCompletion = DirectoryCompletion(payload: String(decoding: report, as: UTF8.self))
         case 8:
             setHyperlink(payload)
         case 4:

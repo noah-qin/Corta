@@ -33,6 +33,10 @@ struct Performer: ParserPerformer, Sendable {
 
     var imageAllowanceProvider: (@Sendable () -> Int)?
 
+    /// The secret the pane's own zsh widget puts before each OSC 134
+    /// report; nil believes none. Outside `state`, so a reset keeps it.
+    var directoryCompletionToken: [UInt8]?
+
     init(grid: Grid) {
         self.grid = grid
     }

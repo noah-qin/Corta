@@ -21,6 +21,13 @@ Versioning for compatibility changes.
   the first byte. The new copy was written at the umask and `chmod`ed
   after, so a private `~/.zshrc` holding exported tokens was readable by
   other accounts for a moment, and for good if the `chmod` failed.
+- Directory suggestions believe only the pane's own zsh. Any output — a
+  `cat`ted file, a remote shell over `ssh` — could forge the prompt marks
+  and a suggestion report, and the overlay that appeared took Tab,
+  Left/Right and Esc from every prompt after it and drew the attacker's
+  text beside the cursor as if typed. The automatic zsh bootstrap now signs
+  each report with a per-session secret. A folder name's bidi overrides and
+  zero-width characters show as U+FFFD, as in the terminal itself.
 
 ## [1.3.0] - 2026-10-21
 

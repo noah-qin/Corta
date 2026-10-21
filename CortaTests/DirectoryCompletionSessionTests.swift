@@ -51,9 +51,12 @@ struct DirectoryCompletionSessionTests {
         try fm.createSymbolicLink(at: home.appendingPathComponent("Linked"), withDestinationURL: home.appendingPathComponent("Alpha"))
         try "not a directory".write(to: home.appendingPathComponent("file"), atomically: true, encoding: .utf8)
         try "PS1='READY> '\n".write(to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
-        let env = ZshBootstrap.environment(["HOME": home.path, "ZDOTDIR": home.path, "PATH": "/bin:/usr/bin", "TERM": "xterm-256color", "LANG": "en_US.UTF-8", "TERM_PROGRAM": "Corta"], executable: "/bin/zsh", arguments: ["-l"])
+        let (env, made, token) = ZshBootstrap.prepare(["HOME": home.path, "ZDOTDIR": home.path, "PATH": "/bin:/usr/bin", "TERM": "xterm-256color", "LANG": "en_US.UTF-8", "TERM_PROGRAM": "Corta"], executable: "/bin/zsh", arguments: ["-l"])
+        let folder = try #require(made)
+        defer { ZshBootstrap.remove(folder) }
         let session = try TerminalSession(executable: "/bin/zsh", arguments: ["-l"], environment: env,
-            size: TerminalSize(rows: 40, columns: 120), workingDirectory: home.path)
+            size: TerminalSize(rows: 40, columns: 120), workingDirectory: home.path,
+            directoryCompletionToken: try #require(token))
         defer { session.stop() }
         session.start()
         func wait(_ predicate: () -> Bool) throws {
@@ -113,7 +116,7 @@ struct DirectoryCompletionSessionTests {
         let choice = chosen.map { "HISTFILE='\(home.appendingPathComponent($0).path)'\n" } ?? ""
         try (choice + "print -r -- $HISTFILE > '\(seen.path)'\n")
             .write(to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
-        let (env, made) = ZshBootstrap.prepare(
+        let (env, made, _) = ZshBootstrap.prepare(
             ["HOME": home.path, "PATH": "/bin:/usr/bin", "TERM": "xterm-256color", "LANG": "en_US.UTF-8"],
             executable: "/bin/zsh", arguments: ["-l"])
         let folder = try #require(made)

@@ -17,6 +17,11 @@
 import Foundation
 
 /// Display-only names. Acceptance sends fixed widget keys, never these strings.
+///
+/// A report is believed only with the pane's token in front of it
+/// (`Terminal.directoryCompletionToken`): the overlay takes Tab, ←/→ and Esc
+/// while it shows, and `ESC]133;D` followed by an untokened report in a
+/// `cat`ted file or an `ssh` session's output used to show it on demand.
 public struct DirectoryCompletion: Equatable, Sendable {
     // periphery:ignore - compared by ==, so a new report re-presents even with the same labels
     public let revision: Int
@@ -50,9 +55,30 @@ public struct DirectoryCompletion: Equatable, Sendable {
             names.append(name)
         }
         guard names.isEmpty ? selected == 0 : selected < names.count else { return nil }
-        typedPrefix = prefix
+        typedPrefix = Self.revealed(prefix)
         self.revision = revision
         selectedIndex = selected
-        candidates = names
+        candidates = names.map(Self.revealed)
+    }
+
+    /// `payload` without its `token;` field, or nil when the token is not
+    /// `expected`.
+    static func untokened(_ payload: ArraySlice<UInt8>, expected: [UInt8]) -> ArraySlice<UInt8>? {
+        guard !expected.isEmpty, payload.count > expected.count,
+            payload.starts(with: expected),
+            payload[payload.startIndex + expected.count] == UInt8(ascii: ";") else { return nil }
+        return payload.dropFirst(expected.count + 1)
+    }
+
+    /// A folder's name is its own, but drawn as the grid would draw it: a
+    /// bidi override or a zero-width character shows as U+FFFD, not as
+    /// nothing (`SECURITY.md` §2.5).
+    private static func revealed(_ text: String) -> String {
+        guard text.unicodeScalars.contains(where: { ConcealingScalars.contains($0.value) }) else { return text }
+        var scalars = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            scalars.append(ConcealingScalars.contains(scalar.value) ? "\u{FFFD}" : scalar)
+        }
+        return String(scalars)
     }
 }

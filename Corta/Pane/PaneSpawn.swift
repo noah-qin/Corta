@@ -83,9 +83,9 @@ enum PaneSpawn {
             else { continue }
             // Only for the preset's own shell; a fallback may not understand them.
             let attemptArguments = attempt.shell == configured ? arguments : ["-l"]
-            let (attemptEnvironment, folder) = directoryCompletion
+            let (attemptEnvironment, folder, token) = directoryCompletion
                 ? ZshBootstrap.prepare(environment, executable: attempt.shell, arguments: attemptArguments)
-                : (environment, nil)
+                : (environment, nil, nil)
             do {
                 let session = try TerminalSession(
                     executable: attempt.shell, arguments: attemptArguments,
@@ -93,7 +93,7 @@ enum PaneSpawn {
                     workingDirectory: attempt.directory,
                     // Applies to new sessions: shrinking a live one would drop lines.
                     scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit,
-                    imageBudget: .app)
+                    imageBudget: .app, directoryCompletionToken: token)
                 return Started(
                     session: session, notice: attempt.notice,
                     executable: attempt.shell, arguments: attemptArguments, bootstrapFolder: folder)
@@ -115,8 +115,9 @@ enum PaneSpawn {
         var environment = ChildEnvironment.default()
         for (key, value) in preset?.environment ?? [:] { environment[key] = value }
         var folder: URL?
+        var token: String?
         if configuration.directoryCompletion {
-            (environment, folder) = ZshBootstrap.prepare(
+            (environment, folder, token) = ZshBootstrap.prepare(
                 environment, executable: command.executable, arguments: command.arguments)
         }
         do {
@@ -127,7 +128,7 @@ enum PaneSpawn {
                 workingDirectory: usableDirectory(preset?.directory ?? workingDirectory),
                 scrollbackLimit: configuration.scrollbackLines,
                 commandHistoryLimit: configuration.commandHistoryLimit,
-                imageBudget: .app)
+                imageBudget: .app, directoryCompletionToken: token)
             return Started(
                 session: session, notice: nil, executable: command.executable,
                 arguments: command.arguments, bootstrapFolder: folder)
