@@ -38,10 +38,15 @@ import Testing
         }
         var requests = 0
         renderer.onGlyphsDeferred = { requests += 1 }
-        for _ in 0..<4 {
+        // 2,400 first draws take longer than one frame's shaping time; each
+        // frame shapes a share and asks for the next, until none is left.
+        var frames = 0
+        repeat {
             _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
-        }
+            frames += 1
+        } while renderer.glyphAtlas.deferredShaping && frames < 2_400
         #expect(requests > 0)
+        #expect(requests == frames - 1)
         #expect(!renderer.glyphAtlas.deferredShaping)
         #expect(renderer.glyphAtlas.evictionCount == 0)
         #expect(renderer.cachedInstances[1].count == 2400)

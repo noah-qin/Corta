@@ -133,11 +133,18 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     private var cachedHoveredLink: TerminalSelection?
     private var needsFullRebuild = true
 
-    /// Non-ASCII shapes one frame may run (`GlyphAtlas.beginFrame`): about
-    /// 20 ms of Core Text at the slowest measured rate, so a hostile screen of
-    /// distinct clusters cannot hold the main thread for a whole screen's
-    /// worth each frame. A first paint of more fills in over a few frames.
+    /// Non-ASCII shapes one frame may run (`GlyphAtlas.beginFrame`), so a
+    /// hostile screen of distinct clusters cannot hold the main thread for
+    /// a whole screen's worth each frame. A first paint of more fills in
+    /// over a few frames.
     static let shapingBudgetPerFrame = 1024
+
+    /// The time those shapes may take, which binds first for CJK: a Han
+    /// character's first draw costs Core Text 40–60 µs at Retina 14 pt, so
+    /// 1024 of them held the main thread every window shares for ~65 ms —
+    /// on a new pane, a zoom step or a page of new text. The frame CPU
+    /// target (`PERFORMANCE.md` §1) is the budget.
+    static let shapingTimePerFrame: Duration = .milliseconds(4)
 
     /// Called when a frame left glyphs unshaped for want of budget and the
     /// atlas still has room for them: draw again soon, or they wait for the
@@ -412,7 +419,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         grid: Grid, offset: Int, fullRebuild: Bool, previousBlockCursor: BlockCursor?,
         atlasGeneration: Int
     ) -> Bool {
-        glyphAtlas.beginFrame(shapingBudget: Self.shapingBudgetPerFrame)
+        glyphAtlas.beginFrame(shapingBudget: Self.shapingBudgetPerFrame, timeBudget: Self.shapingTimePerFrame)
         var changed = fullRebuild
         if fullRebuild {
             rebuildAllRows(grid: grid, offset: offset)

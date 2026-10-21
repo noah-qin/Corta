@@ -265,24 +265,35 @@ nonisolated final class GlyphAtlas {
     /// window shares — so a frame shapes at most this many and leaves the
     /// rest for the next (`deferredShaping`).
     private var shapingAllowance = Int.max
+    /// When this frame's shaping time runs out; nil outside a frame or for
+    /// a count-only budget.
+    private var shapingDeadline: SuspendingClock.Instant?
+    private var shapedThisFrame = 0
     /// A lookup this frame missed the cache with no allowance left and drew
     /// nothing; the caller decides whether another frame is worth asking for.
     private(set) var deferredShaping = false
 
-    /// Starts a frame's shaping budget.
-    func beginFrame(shapingBudget: Int) {
+    /// Starts a frame's shaping budget: at most `shapingBudget` shapes, and
+    /// with a `timeBudget` none begun once it has passed.
+    func beginFrame(shapingBudget: Int, timeBudget: Duration? = nil) {
         shapingAllowance = max(0, shapingBudget)
+        shapingDeadline = timeBudget.map { SuspendingClock.now + $0 }
+        shapedThisFrame = 0
         deferredShaping = false
     }
 
     /// One shape from the frame's budget, or `false` (and a deferral) once
-    /// it is spent.
+    /// it is spent. The first shape of a frame is always allowed, so a
+    /// screen that rebuilds slowly still fills in.
     private func takeShapingAllowance() -> Bool {
-        guard shapingAllowance > 0 else {
+        let outOfTime =
+            shapedThisFrame > 0 && shapingDeadline.map { SuspendingClock.now >= $0 } == true
+        guard shapingAllowance > 0, !outOfTime else {
             deferredShaping = true
             return false
         }
         shapingAllowance -= 1
+        shapedThisFrame += 1
         return true
     }
 
