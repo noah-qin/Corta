@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-21
+
 ### Added
 
 - Settings ▸ Appearance ▸ Font chooses the terminal font again: System
@@ -2027,7 +2029,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.2.3...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.3.0...main
+[1.3.0]: https://github.com/noah-qin/Corta/releases/tag/v1.3.0
 [1.2.3]: https://github.com/noah-qin/Corta/releases/tag/v1.2.3
 [1.2.2]: https://github.com/noah-qin/Corta/releases/tag/v1.2.2
 [1.2.1]: https://github.com/noah-qin/Corta/releases/tag/v1.2.1
