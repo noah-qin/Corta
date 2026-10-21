@@ -197,6 +197,13 @@ to share a theme or a setup, [Show and tell](https://github.com/noah-qin/Corta/d
 For other problems, [open an issue](https://github.com/noah-qin/Corta/issues/new/choose).
 If you would like to support maintenance, [sponsor the project](https://github.com/sponsors/noah-qin).
 
+### Contributors
+
+Thank you to everyone who has contributed to Corta.
+
+<a href="https://github.com/noah-qin"><img src="https://github.com/noah-qin.png?size=96" width="48" height="48" alt="noah-qin" title="noah-qin"></a>
+<a href="https://github.com/FrankChen-CLC"><img src="https://github.com/FrankChen-CLC.png?size=96" width="48" height="48" alt="FrankChen-CLC" title="FrankChen-CLC"></a>
+
 ## License and identity
 
 Source code is licensed under [Apache 2.0](LICENSE). The Corta name,
