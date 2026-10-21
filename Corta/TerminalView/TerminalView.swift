@@ -216,7 +216,8 @@ final class TerminalView: NSView, CALayerDelegate {
         // Tag the drawable sRGB; untagged it is read as Display P3 and every
         // colour renders oversaturated. `.bgra8Unorm`, not `_srgb`: the values
         // are already sRGB-encoded (see `QuadPipelineCache`).
-        metalLayer.framebufferOnly = true
+        // macOS 26's compatibility present copies into this drawable.
+        metalLayer.framebufferOnly = !DirectFullScreen.presentsByCopy([])
         // Double buffering, opt-in for measurement. Two drawables can save a
         // frame of latency or add it (`nextDrawable` blocks more), depending on
         // the machine; the default 3 is what was measured (`PERFORMANCE.md`
@@ -351,7 +352,7 @@ final class TerminalView: NSView, CALayerDelegate {
         didSet {
             guard directPresentation != oldValue else { return }
             // A copy into the drawable needs a texture that is not framebuffer-only.
-            metalLayer.framebufferOnly = !directPresentation.contains(.present)
+            metalLayer.framebufferOnly = !DirectFullScreen.presentsByCopy(directPresentation)
             applyDirectColorSpace()
             updateExteriorCornerMask()
         }

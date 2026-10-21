@@ -310,8 +310,9 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     }
 
     /// Reconstructs a faulted/stalled queue, preserving the session and caches.
-    /// Present each frame by copy through a classic queue, so a full-screen
-    /// pane can reach the display directly (`Metal4Backend.presentsByCopy`).
+    /// Present each frame by copy through a classic queue. This lets a
+    /// full-screen pane reach the display directly on macOS 27 and keeps
+    /// Metal 4-written drawables out of the macOS 26 compositor (#380).
     public var presentsByCopy: Bool {
         get { access.withLock { backend.presentsByCopy } }
         set { access.withLock { backend.presentsByCopy = newValue } }

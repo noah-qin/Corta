@@ -916,6 +916,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 device: device, font: fontStyle.font(ofSize: fontSize), scale: scale,
                 options: fontStyle.options)
         }
+        // Set before the pane can draw, including after a renderer retry.
+        // SplitViewController may later add the full-screen option.
+        renderer.presentsByCopy = DirectFullScreen.presentsByCopy([])
         // A finished decode schedules a frame; otherwise it waits for unrelated
         // output.
         renderer.kittyImageRenderer.onImagesReady = { [weak self] in

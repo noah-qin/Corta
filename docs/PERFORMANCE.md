@@ -1219,6 +1219,20 @@ renders into a staging texture and presents by copy
 (`Metal4Backend.presentsByCopy`), and drops its canvas corner mask; nothing
 visible changes. Windowed and split panes keep the plain Metal 4 path.
 
+On macOS 26 *every* window presents by copy: that system's WindowServer
+was seen to abort while compositing a drawable presented from the Metal 4
+queue ([#380](https://github.com/noah-qin/Corta/issues/380)). macOS 27 and
+later keep the full-screen-only behaviour measured below.
+
+What the copy costs on macOS 26, measured on the affected Mac (M4 Pro,
+Xcode 26.2) as an alternating A/B in one optimized build: 60 full rebuild
+frames per path into a 2940×1846 texture, to GPU completion. Direct averaged
+**0.358 ms** (p50 0.345, p95 0.398); by copy **0.555 ms** (p50 0.558, p95
+0.616), about **0.20 ms** more per rendered frame, plus one staging texture
+per pane (about 21.7 MB at that size). Composition, keypress-to-glass latency
+and energy are not included and have not been measured on macOS 26. An idle
+pane submits no frames, so it pays nothing.
+
 Measured on the M5 Air's built-in 60 Hz panel, Benchmark `-O`, full screen,
 one pane:
 

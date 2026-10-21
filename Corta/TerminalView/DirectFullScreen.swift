@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Foundation
+
 /// What a full-screen window with exactly one pane changes so the window
 /// server can present its canvas directly instead of compositing it — a
 /// frame less from keypress to glass (#285, `PERFORMANCE.md` §5.17).
@@ -40,7 +42,26 @@ nonisolated struct DirectFullScreen: OptionSet, Sendable {
     /// command buffer wrote is never presented directly.
     static let present = DirectFullScreen(rawValue: 1 << 4)
 
-    static let shipped: DirectFullScreen = [.mask, .present]
+    /// `.present` was measured on macOS 27 only; on macOS 26 every window
+    /// presents by copy anyway (`presentsByCopy`), so only `.mask` remains.
+    static var shipped: DirectFullScreen {
+        shipped(onOSMajorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion)
+    }
+
+    static func shipped(onOSMajorVersion major: Int) -> DirectFullScreen {
+        major >= 27 ? [.mask, .present] : [.mask]
+    }
+
+    /// Whether a pane presents by copy through a classic queue. Always on
+    /// macOS 26, whose WindowServer was seen to abort compositing a drawable
+    /// presented from the Metal 4 queue (#380); elsewhere only for `.present`.
+    static func presentsByCopy(_ active: DirectFullScreen, onOSMajorVersion major: Int) -> Bool {
+        major == 26 || active.contains(.present)
+    }
+
+    static func presentsByCopy(_ active: DirectFullScreen) -> Bool {
+        presentsByCopy(active, onOSMajorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion)
+    }
 
     static let all: DirectFullScreen = [.toolbar, .mask, .overlays, .colorspace, .present]
 

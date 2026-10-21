@@ -77,7 +77,14 @@ struct DiagnosticsEnvironmentTests {
     /// Shipped direct presentation changes nothing visible: no chrome,
     /// overlay or colour change, only the corner mask full screen lacks.
     @Test func shippedDirectPresentationIsInvisible() {
-        #expect(DirectFullScreen.shipped == [.mask, .present])
+        #expect(DirectFullScreen.shipped(onOSMajorVersion: 26) == [.mask])
+        #expect(DirectFullScreen.shipped(onOSMajorVersion: 27) == [.mask, .present])
+        #expect(DirectFullScreen.shipped == DirectFullScreen.shipped(
+            onOSMajorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion))
+        #expect(DirectFullScreen.presentsByCopy([], onOSMajorVersion: 26))
+        #expect(DirectFullScreen.presentsByCopy([.mask], onOSMajorVersion: 26))
+        #expect(!DirectFullScreen.presentsByCopy([], onOSMajorVersion: 27))
+        #expect(DirectFullScreen.presentsByCopy([.mask, .present], onOSMajorVersion: 27))
     }
 
     @Test func directFullScreenAppliesOnlyToOneFullScreenPane() {

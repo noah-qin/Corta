@@ -599,12 +599,16 @@ what it does, so you know what to expect.
   last key. Low Power Mode, an inactive window and thermal pressure lower the
   ceiling again when you are not typing; critical thermal pressure always
   does.
-- **Full screen with one pane is the lowest-latency layout.** Corta then
-  presents its frames straight to the display, skipping the window server's
-  compositor: about one frame less from keypress to glass. A split, the find
-  bar or anything else drawn over the text brings the compositor back while
-  it shows. (`CORTA_DIRECT_FULLSCREEN=0` in the launch environment turns this
-  off, to compare.)
+- **Full screen with one pane can reduce latency on macOS 27 or later.** Corta
+  then presents its frames straight to the display, skipping the window
+  server's compositor: about one frame less from keypress to glass on the
+  measured Mac. A split, the find bar or anything else drawn over the text
+  brings the compositor back while it shows. On macOS 26, every window uses
+  the classic-queue copy path as a compatibility measure for a WindowServer
+  crash (#380); the latency figures above were not
+  measured on that OS. (`CORTA_DIRECT_FULLSCREEN=0` in the launch
+  environment disables the full-screen changes, but not the macOS 26
+  compatibility path.)
 - **Output reading and display have separate paces.** The PTY reader
   continues parsing while the screen presents the latest state at the
   display's pace. A measured core-feed benchmark reached 317.3 MiB/s;

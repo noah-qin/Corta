@@ -227,14 +227,14 @@ final class SplitViewController: NSViewController {
 
     /// With the window full screen and one pane, lets the window server
     /// present the canvas directly (`DirectFullScreen`, #285): no corner mask,
-    /// frames presented by copy. Called on entering and leaving full screen
-    /// and when the root changes, which is when the pane count crosses one.
+    /// frames presented by copy. On macOS 26 the classic-queue copy is also
+    /// used for ordinary windows (#380). Called on entering and leaving full
+    /// screen and when the root changes, when the pane count crosses one.
     /// Anything AppKit draws over the canvas — the search bar, a split's
     /// divider — brings composition back for as long as it shows; that is
     /// the system's per-frame decision, not this one.
     func updateDirectPresentation() {
         let requested = DirectFullScreen.requested
-        guard !requested.isEmpty else { return }
         let active = requested.active(
             isFullScreen: view.window?.styleMask.contains(.fullScreen) ?? false,
             paneCount: panes.count)
@@ -243,7 +243,7 @@ final class SplitViewController: NSViewController {
         for pane in panes {
             guard let terminalView = pane.terminalView else { continue }
             terminalView.directPresentation = active
-            pane.terminalRenderer?.presentsByCopy = active.contains(.present)
+            pane.terminalRenderer?.presentsByCopy = DirectFullScreen.presentsByCopy(active)
         }
         // Experimental only (Debug / Benchmark): hiding what draws over the canvas.
         guard requested.contains(.overlays) else { return }
