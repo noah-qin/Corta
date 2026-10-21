@@ -74,8 +74,8 @@ struct KittyGraphicsDeferredDecodeTests {
         let image = try Self.transmission(id: 3, width: 256, height: 256)
         let stream = Self.before + image + Self.after
         let consumed = terminal.feedDeferringImageDecode(stream[...])
-        // Right after the final chunk's dispatch, at its terminator's ESC.
-        #expect(consumed == Self.before.count + image.count - 1)
+        // Right after the final chunk's terminator, in ground.
+        #expect(consumed == Self.before.count + image.count)
         #expect(terminal.grid.imagePlacements.imageCount == 0)
         #expect(!terminal.grid.dump().contains("after"))
         #expect(terminal.takeDeferredImage() != nil)
@@ -127,6 +127,18 @@ struct KittyGraphicsDeferredDecodeTests {
         #expect(terminal.feedDeferringImageDecode(stream[...]) == stream.count)
         #expect(terminal.takeDeferredImage() == nil)
         #expect(terminal.grid.imagePlacements.imageCount == 1)
+    }
+
+    @Test("a reset in the pause leaves nothing of the stopped sequence on screen")
+    func resetInThePauseStrandsNothing() throws {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let stream = (try Self.transmission(id: 3, width: 256, height: 256)) + Array("after".utf8)
+        let consumed = terminal.feedDeferringImageDecode(stream[...])
+        _ = terminal.takeDeferredImage()
+        terminal.reset()
+        _ = terminal.feedDeferringImageDecode(stream[consumed...])
+        #expect(terminal.grid.dump().contains("after"))
+        #expect(!terminal.grid.dump().contains("\\"))
     }
 
     @Test("a decode completed after a reset is dropped, unanswered")

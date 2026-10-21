@@ -153,7 +153,15 @@ public struct Parser: Sendable {
                 offset += 1
                 if stoppingAfterAPC, dispatchedAPC {
                     dispatchedAPC = false
-                    if performer.requestsStopAfterAPC { return offset }
+                    if performer.requestsStopAfterAPC {
+                        // The ST's `\` too, when it is here: stopped in ground,
+                        // a RIS fed in the pause cannot strand it as text.
+                        if offset < span.count, span[offset] == 0x5C, case .escape = state {
+                            advance(span[offset], performer: &performer)
+                            offset += 1
+                        }
+                        return offset
+                    }
                 }
             }
         }
