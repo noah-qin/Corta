@@ -23,6 +23,12 @@ Versioning for compatibility changes.
   for the first time. New characters are drawn about 8 ms' worth per
   screen refresh, shared by every pane, and the rest appear over the next
   few frames.
+- On macOS 26, every terminal window now renders offscreen and presents its
+  drawable through a classic Metal queue. This avoids the normal Metal 4
+  drawable presentation path suspected in the repeated WindowServer crashes
+  of #380. The reporter confirmed a diagnostic build launches normally
+  on the affected Mac; macOS 27 keeps its measured presentation behavior.
+  Thanks to @FrankChen-CLC for the investigation and the fix (#386).
 
 ### Security
 
@@ -42,15 +48,6 @@ Versioning for compatibility changes.
   text beside the cursor as if typed. The automatic zsh bootstrap now signs
   each report with a per-session secret. A folder name's bidi overrides and
   zero-width characters show as U+FFFD, as in the terminal itself.
-
-### Fixed
-
-- On macOS 26, every terminal window now renders offscreen and presents its
-  drawable through a classic Metal queue. This avoids the normal Metal 4
-  drawable presentation path suspected in the repeated WindowServer crashes
-  of #380. The reporter confirmed a diagnostic build launches normally
-  on the affected Mac; macOS 27 keeps its measured presentation behavior.
-  Thanks to @FrankChen-CLC for the investigation and the fix (#386).
 
 ## [1.3.0] - 2026-10-21
 
