@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Compression
 import CortaTerminal
 import Darwin
 import Dispatch
@@ -158,6 +159,83 @@ func benchmarkSnapshotLatencyUnderFlood() {
     print(
         "snapshot latency, quiet control: \(controlDistribution.description) "
             + "(same machine, same run — the ambient-preemption baseline)")
+}
+
+/// What a frame waits for while a large Kitty image arrives: a 3840x2160
+/// RGBA transmission, zlib-compressed in `kitten icat`'s 128 KiB chunks,
+/// cat'ed through a real PTY while a `.userInteractive` thread takes the
+/// frame's reads at 240 Hz. Its base64 and zlib once ran under the session
+/// lock and held a snapshot for ~95 ms; they run with it released now.
+func benchmarkSnapshotLatencyUnderImage() {
+    let width = 3840, height = 2160
+    var seed: UInt32 = 1
+    var pixels = [UInt8](repeating: 0, count: width * height * 4)
+    for index in pixels.indices {
+        // A gradient with noise: compresses about as well as a photograph.
+        seed = seed &* 1_664_525 &+ 1_013_904_223
+        pixels[index] = UInt8(truncatingIfNeeded: (index / 4 % width) * 255 / width) &+ UInt8(seed >> 29)
+    }
+    var deflated = [UInt8](repeating: 0, count: pixels.count + 1024)
+    let deflatedCount = compression_encode_buffer(
+        &deflated, deflated.count, pixels, pixels.count, nil, COMPRESSION_ZLIB)
+    var a: UInt32 = 1, b: UInt32 = 0
+    for byte in pixels { a = (a + UInt32(byte)) % 65_521; b = (b + a) % 65_521 }
+    let adler = b << 16 | a
+    let zlib = [0x78, 0x9C] + deflated[..<deflatedCount]
+        + [UInt8(adler >> 24), UInt8(adler >> 16 & 0xFF), UInt8(adler >> 8 & 0xFF), UInt8(adler & 0xFF)]
+    let base64 = Array(Data(zlib).base64EncodedString().utf8)
+    var stream = Array("before\r\n".utf8)
+    var offset = 0
+    while offset < base64.count {
+        let end = min(offset + 128 * 1024, base64.count)
+        let more = end < base64.count ? 1 : 0
+        let control = offset == 0 ? "a=T,f=32,o=z,s=\(width),v=\(height),i=7,q=2,m=\(more)" : "m=\(more)"
+        stream += Array("\u{1B}_G\(control);".utf8) + base64[offset..<end] + Array("\u{1B}\\".utf8)
+        offset = end
+    }
+    stream += Array("\r\nafter\r\n".utf8)
+    let file = FileManager.default.temporaryDirectory
+        .appendingPathComponent("corta-bench-image-\(getpid()).bin")
+    guard (try? Data(stream).write(to: file)) != nil else {
+        print("snapshot latency under a 4K image: SKIPPED (could not write the stream)")
+        return
+    }
+    defer { try? FileManager.default.removeItem(at: file) }
+    let session: TerminalSession
+    do {
+        session = try TerminalSession(
+            executable: "/bin/cat", arguments: [file.path], size: TerminalSize(rows: 50, columns: 200))
+    } catch {
+        print("snapshot latency under a 4K image: SKIPPED (could not spawn /bin/cat: \(error))")
+        return
+    }
+    let exited = Mutex(false)
+    session.onChildExit = { _ in exited.withLock { $0 = true } }
+    session.start()
+    defer { session.stop() }
+    let samples = Mutex([UInt64]())
+    let sampler = Thread {
+        pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
+        while !exited.withLock({ $0 }) {
+            let start = DispatchTime.now().uptimeNanoseconds
+            _ = session.takeBell()
+            _ = session.snapshot()
+            let elapsed = DispatchTime.now().uptimeNanoseconds - start
+            samples.withLock { $0.append(elapsed) }
+            Thread.sleep(forTimeInterval: 1.0 / 240)
+        }
+    }
+    sampler.start()
+    while !exited.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.005) }
+    Thread.sleep(forTimeInterval: 0.05)
+    let placed = session.snapshot().imagePlacements.placementCount
+    guard let distribution = LatencyDistribution(samplesNanoseconds: samples.withLock { $0 }) else {
+        print("snapshot latency under a 4K image: NO DATA")
+        return
+    }
+    print(
+        "snapshot latency under a 4K image: \(distribution.description) "
+            + "(a frame's bell + snapshot read while \(stream.count >> 20) MiB of o=z RGBA arrives; placed \(placed))")
 }
 
 /// The reader-side cost of a snapshot that outlives its frame. A `Grid`

@@ -10,6 +10,14 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- A large Kitty graphics image no longer freezes every window while it
+  arrives. Its base64 and zlib were decoded while the pane's state was
+  locked, and each frame waits for that lock: a 4K `kitten icat` held
+  the whole app for about 110 ms. The decode now runs with the lock
+  released, and the image is placed at the same point in the output.
+
 ### Security
 
 - Exported terminal text and Corta's private state — recent hosts,

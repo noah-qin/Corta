@@ -85,6 +85,9 @@ public struct Parser: Sendable {
     private var privateMarker: UInt8 = 0
     private var stringBuffer: [UInt8] = []
     private var decoder = UTF8Decoder()
+    /// An APC string was dispatched by the byte just advanced; read and
+    /// cleared only by the stopping parse.
+    private var dispatchedAPC = false
 
     public init() {
         stringBuffer.reserveCapacity(256)
@@ -118,6 +121,19 @@ public struct Parser: Sendable {
         _ bytes: ArraySlice<UInt8>,
         performer: inout P
     ) {
+        _ = parse(bytes, performer: &performer, stoppingAfterAPC: false)
+    }
+
+    /// As `parse(_:performer:)`, but with `stoppingAfterAPC` it returns
+    /// right after an APC dispatch the performer answered with
+    /// `requestsStopAfterAPC`. Returns how many bytes were consumed; the
+    /// rest are the caller's to feed, and the parser's state carries over
+    /// exactly as at any chunk boundary.
+    public mutating func parse<P: ParserPerformer>(
+        _ bytes: ArraySlice<UInt8>,
+        performer: inout P,
+        stoppingAfterAPC: Bool
+    ) -> Int {
         let span = bytes.span
         var offset = 0
         while offset < span.count {
@@ -135,8 +151,13 @@ public struct Parser: Sendable {
             } else {
                 advance(span[offset], performer: &performer)
                 offset += 1
+                if stoppingAfterAPC, dispatchedAPC {
+                    dispatchedAPC = false
+                    if performer.requestsStopAfterAPC { return offset }
+                }
             }
         }
+        return offset
     }
 
     @inline(__always)
@@ -474,6 +495,7 @@ public struct Parser: Sendable {
     private mutating func dispatchAPCString<P: ParserPerformer>(performer: inout P) {
         performer.apcDispatch(stringBuffer[...])
         stringBuffer.removeAll(keepingCapacity: true)
+        dispatchedAPC = true
     }
 
     private mutating func clear() {

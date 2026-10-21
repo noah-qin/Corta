@@ -42,9 +42,16 @@ public protocol ParserPerformer {
     /// Raw bytes, bounded by `Parser.maxAPCStringLength`; Kitty graphics is
     /// the one user.
     mutating func apcDispatch(_ bytes: ArraySlice<UInt8>)
+
+    /// Asked right after an APC dispatch by `Parser.parse(_:performer:stoppingAfterAPC:)`:
+    /// true stops the parse there, so the caller can finish what the
+    /// dispatch began before any later byte is applied.
+    var requestsStopAfterAPC: Bool { get }
 }
 
 extension ParserPerformer {
+    public var requestsStopAfterAPC: Bool { false }
+
     public mutating func printASCII(_ bytes: ArraySlice<UInt8>) {
         for byte in bytes { print(UInt32(byte)) }
     }

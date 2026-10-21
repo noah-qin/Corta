@@ -70,16 +70,31 @@ extension TerminalSession {
     /// Feeds one batch to the terminal under the lock, in slices, so a
     /// snapshot or resize never waits behind a whole batch; then sends the
     /// replies, arms a `?2026` timeout for a new episode and signals output.
+    ///
+    /// A large Kitty image stops its slice where the transmission ends
+    /// (`Terminal.feedDeferringImageDecode`): the decode runs here, with
+    /// the lock released, and the next acquisition stores and places it
+    /// before feeding on — the order the bytes arrived in, with no frame
+    /// waiting ~100 ms behind a 4K image's base64 and zlib.
     private func apply(_ batch: [UInt8]) {
         var responses: [UInt8] = []
         var episode: Int?
         var offset = 0
-        while offset < batch.count {
+        var decoded: DecodedImageTransmission?
+        while offset < batch.count || decoded != nil {
             let end = min(offset + Self.feedLockSliceSize, batch.count)
             let slice = batch[offset..<end]
-            let applied = state.withLock { current -> (responses: [UInt8], episode: Int?, compress: Bool) in
+            let finished = decoded
+            decoded = nil
+            let applied = state.withLock {
+                current -> (
+                    responses: [UInt8], episode: Int?, compress: Bool, consumed: Int,
+                    deferred: DeferredImageTransmission?
+                ) in
                 let episodeBefore = current.terminal.synchronizedOutputEpisode
-                current.terminal.feed(slice)
+                if let finished { current.terminal.completeDeferredImage(finished) }
+                let consumed = current.terminal.feedDeferringImageDecode(slice)
+                let deferred = current.terminal.takeDeferredImage()
                 reportImageBytes(current.terminal)
                 let sliceResponses = current.terminal.takeOutput()
                 // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
@@ -88,20 +103,23 @@ extension TerminalSession {
                 let episodeAfter = current.terminal.synchronizedOutputEpisode
                 // An integer compare: a pass is queued only once a batch seals.
                 let compress = current.terminal.hasCompressionWork
-                guard episodeAfter != episodeBefore else { return (sliceResponses, nil, compress) }
+                guard episodeAfter != episodeBefore else {
+                    return (sliceResponses, nil, compress, consumed, deferred)
+                }
                 current.synchronizedOutputEpisode = episodeAfter
-                return (sliceResponses, episodeAfter, compress)
+                return (sliceResponses, episodeAfter, compress, consumed, deferred)
             }
             if responses.count + applied.responses.count <= Self.maxResponseBytesPerBatch {
                 responses.append(contentsOf: applied.responses)
             }
             if let newEpisode = applied.episode { episode = newEpisode }
-            offset = end
+            offset += applied.consumed
             if applied.compress { scheduleCompression() }
             // After the last slice too: the next batch's first slice is
             // one `read(2)` away, sooner than a waiter's wake, so a flood
             // of one-slice batches would never leave a gap.
             yieldToStateWaiters()
+            decoded = applied.deferred?.decode()
         }
         // Fixed-format only (`SECURITY.md` §2.1); same queue as input.
         if !responses.isEmpty {

@@ -111,12 +111,43 @@ extension Performer {
         finishTransmission(pending)
     }
 
+    /// Decodes inline, or — for a large transmission when the session asks
+    /// (`defersLargeImageDecoding`) — parks it for a decode outside the
+    /// session's lock: base64 and zlib over up to 64 MiB held every frame's
+    /// snapshot for ~100 ms at 4K. The parse stops right after this
+    /// dispatch, so nothing later in the stream is applied before
+    /// `completeDeferredImage` stores and places it.
     private mutating func finishTransmission(_ pending: PendingImageTransmission) {
+        if defersLargeImageDecoding, pending.base64.count >= KittyGraphics.deferredDecodeThreshold {
+            state.deferredImage = DeferredImageTransmission(pending: pending, resetCount: resetCount)
+            return
+        }
+        let decoded: Result<KittyGraphics.ImageData, TransmissionRefusal>
+        do throws(TransmissionRefusal) {
+            decoded = .success(try Self.transmittedImage(pending))
+        } catch {
+            decoded = .failure(error)
+        }
+        completeTransmission(pending, decoded: decoded)
+    }
+
+    /// Stores and places a transmission decoded outside the parse. One from
+    /// before a RIS is dropped unanswered: its screen is gone.
+    mutating func completeDeferredImage(_ decoded: DecodedImageTransmission) {
+        guard decoded.resetCount == resetCount else { return }
+        if let imageAllowanceProvider { state.imageByteAllowance = imageAllowanceProvider() }
+        completeTransmission(decoded.pending, decoded: decoded.result)
+    }
+
+    private mutating func completeTransmission(
+        _ pending: PendingImageTransmission,
+        decoded: Result<KittyGraphics.ImageData, TransmissionRefusal>
+    ) {
         let imageID = pending.header.imageID
         let quiet = pending.header.quiet
         let storedID: KittyGraphics.ImageID
         do throws(TransmissionRefusal) {
-            let data = try Self.transmittedImage(pending)
+            let data = try decoded.get()
             storedID = try store(data, as: imageID)
         } catch {
             respond(imageID: imageID, placementID: nil, quiet: quiet, error: error.message)
@@ -136,7 +167,7 @@ extension Performer {
     }
 
     /// Why a transmission was not stored, in the protocol's `CODE:text` form.
-    private struct TransmissionRefusal: Error {
+    struct TransmissionRefusal: Error {
         let message: String
     }
 
@@ -144,7 +175,7 @@ extension Performer {
     /// declared size: exactly `width * height * bytesPerPixel`, or refused —
     /// never padded. A PNG is decoded (and validated) by the app layer,
     /// which owns ImageIO.
-    private static func transmittedImage(
+    static func transmittedImage(
         _ pending: PendingImageTransmission
     ) throws(TransmissionRefusal) -> KittyGraphics.ImageData {
         guard let decoded = Data(base64Encoded: Data(padded(pending.base64))) else {
@@ -287,4 +318,28 @@ extension Performer {
         guard remainder != 0 else { return base64 }
         return base64 + Array(repeating: UInt8(ascii: "="), count: 4 - remainder)
     }
+}
+
+/// A finished transmission whose decode runs outside the session's lock:
+/// pure work on its own bytes, safe on any thread.
+struct DeferredImageTransmission: Sendable {
+    let pending: PendingImageTransmission
+    let resetCount: Int
+
+    func decode() -> DecodedImageTransmission {
+        let result: Result<KittyGraphics.ImageData, Performer.TransmissionRefusal>
+        do throws(Performer.TransmissionRefusal) {
+            result = .success(try Performer.transmittedImage(pending))
+        } catch {
+            result = .failure(error)
+        }
+        return DecodedImageTransmission(pending: pending, resetCount: resetCount, result: result)
+    }
+}
+
+/// `DeferredImageTransmission.decode()`'s result, for `Terminal.completeDeferredImage`.
+struct DecodedImageTransmission: Sendable {
+    let pending: PendingImageTransmission
+    let resetCount: Int
+    let result: Result<KittyGraphics.ImageData, Performer.TransmissionRefusal>
 }

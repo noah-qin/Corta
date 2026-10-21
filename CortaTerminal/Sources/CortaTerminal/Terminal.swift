@@ -106,6 +106,28 @@ public struct Terminal: Sendable {
         parser.parse(bytes, performer: &performer)
     }
 
+    /// As `feed(_: ArraySlice)`, but a large image transmission is not
+    /// decoded in the parse: the feed stops right after it and returns how
+    /// many bytes it consumed. The caller takes the transmission
+    /// (`takeDeferredImage`), decodes it without holding whatever guards
+    /// this terminal, completes it, and feeds the rest.
+    mutating func feedDeferringImageDecode(_ bytes: ArraySlice<UInt8>) -> Int {
+        performer.defersLargeImageDecoding = true
+        defer { performer.defersLargeImageDecoding = false }
+        return parser.parse(bytes, performer: &performer, stoppingAfterAPC: true)
+    }
+
+    mutating func takeDeferredImage() -> DeferredImageTransmission? {
+        defer { performer.state.deferredImage = nil }
+        return performer.state.deferredImage
+    }
+
+    /// Stores and places a deferred transmission, and queues its reply, as
+    /// an inline decode would have at the point the feed stopped.
+    mutating func completeDeferredImage(_ decoded: DecodedImageTransmission) {
+        performer.completeDeferredImage(decoded)
+    }
+
     /// `Grid.resize`, keeping command records on their rows through a reflow.
     /// Resize through this, not `grid`, or the records point where the rows
     /// used to be.

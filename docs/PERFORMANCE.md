@@ -1313,3 +1313,30 @@ allocation count not to grow with damage. Metal's own bookkeeping makes
 that count drift between 17 and 20 a frame, so the check allows 16 over the
 idle frame — one allocation per row would add 40.
 
+### 5.20 A large image decoded outside the session lock (2026-10-21)
+
+The reader feeds under the session lock, and every frame takes that lock for
+its bell, synchronized-output and snapshot reads. A Kitty transmission's
+last chunk used to decode inside the feed — base64, then zlib, over up to
+64 MiB — so the frame waited out the whole decode, on the main thread every
+window shares. Now `Terminal.feedDeferringImageDecode` stops the feed right
+after a transmission of 64 KiB of base64 or more, the session decodes it with
+the lock released, and the next acquisition stores, places and answers it
+before feeding on: no byte after the image is applied before it, so the
+placement, the cursor and the reply are the ones an inline decode gives
+(`KittyGraphicsDeferredDecodeTests`). A RIS in between drops the decode.
+
+`corta-bench --image-stall`: a 3840×2160 RGBA image, `o=z`, in 128 KiB
+chunks (32 MiB of stream) through `/bin/cat` and a real PTY, a
+`.userInteractive` thread reading the bell and a snapshot at 240 Hz.
+Release, alternating builds:
+
+| | p95 | max |
+| --- | --- | --- |
+| Decoded in the feed | 0.007–0.867 ms | 110.2–112.9 ms |
+| Decoded outside the lock | 0.006–0.007 ms | 0.008–1.256 ms |
+
+`--unicode` feed throughput did not move (ASCII 323–329 MiB/s, CJK
+85.9–86.7 MiB/s on both sides). Apple M5, macOS 27.0.1 (26A434),
+Xcode 27.1 (27A9275), on AC power.
+
