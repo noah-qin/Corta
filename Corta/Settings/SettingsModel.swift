@@ -467,9 +467,15 @@ final class SettingsModel {
 
     private var fontLoadGeneration = 0
 
+    func loadFonts() async {
+        await loadFonts(
+            monospaced: MonospacedFontCatalog.loadEntries,
+            cjk: MonospacedFontCatalog.loadCJKEntries)
+    }
+
     func loadFonts(
-        monospaced: @Sendable () async -> [MonospacedFontCatalog.Entry] = MonospacedFontCatalog.loadEntries,
-        cjk: @Sendable () async -> [MonospacedFontCatalog.Entry] = MonospacedFontCatalog.loadCJKEntries
+        monospaced: @Sendable () async -> [MonospacedFontCatalog.Entry],
+        cjk: @Sendable () async -> [MonospacedFontCatalog.Entry]
     ) async {
         fontLoadGeneration &+= 1
         let generation = fontLoadGeneration
