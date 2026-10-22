@@ -263,11 +263,44 @@ class CodeQLBaselineTests(DiffTests):
         analyse, reused = ci.select_languages("pull_request", ["python"], reusable)
         self.assertEqual(analyse, ["python"])
         self.assertEqual(reused, {"swift": 1, "c-cpp": 2, "actions": 4})
-        # Routing changes still validate every lane, and a missing baseline is scanned.
+        # Routing changes validate every lane but the deferred ones, which a
+        # pipeline change scans; a missing baseline is scanned.
         self.assertEqual(ci.select_languages("pull_request", list(ci.LANGUAGES), reusable),
+                         (["python", "actions"], {"swift": 1, "c-cpp": 2}))
+        self.assertEqual(ci.select_languages("pull_request", list(ci.LANGUAGES), reusable, pipeline_changed=True),
                          (list(ci.LANGUAGES), {}))
         self.assertEqual(ci.select_languages("pull_request", [], {"python": 3}),
                          (["swift", "c-cpp", "actions"], {"python": 3}))
+
+    def test_pull_request_defers_the_macos_languages_to_main(self):
+        latest = {"swift": 1, "c-cpp": 2, "python": 3, "actions": 4}
+        # A Swift change: main's latest Swift analysis is uploaded, not rescanned.
+        analyse, reused = ci.select_languages("pull_request", ["swift"], {"python": 3, "actions": 4}, latest)
+        self.assertEqual(analyse, [])
+        self.assertEqual(reused, {"swift": 1, "c-cpp": 2, "python": 3, "actions": 4})
+        # Other languages are scanned as before.
+        analyse, reused = ci.select_languages("pull_request", ["swift", "python"], {"actions": 4}, latest)
+        self.assertEqual(analyse, ["python"])
+        self.assertEqual(reused, {"swift": 1, "c-cpp": 2, "actions": 4})
+        # A change to how CodeQL builds is scanned before merging.
+        analyse, _ = ci.select_languages("pull_request", ["swift"], {"python": 3, "actions": 4}, latest,
+                                         pipeline_changed=True)
+        self.assertEqual(analyse, ["swift", "c-cpp"])
+        # A language main has never analysed has nothing to upload.
+        analyse, _ = ci.select_languages("pull_request", ["swift"], {}, {"python": 3})
+        self.assertEqual(analyse, ["swift", "c-cpp", "python", "actions"])
+        # Main still scans what the merge changed.
+        analyse, _ = ci.select_languages("push", ["swift"], {"python": 3, "actions": 4}, latest)
+        self.assertEqual(analyse, ["swift", "c-cpp"])
+
+    def test_the_analysis_pipeline(self):
+        self.assertTrue(ci.changes_analysis_pipeline([".github/workflows/codeql.yml"]))
+        self.assertTrue(ci.changes_analysis_pipeline(["scripts/codeql-extract.py"]))
+        self.assertTrue(ci.changes_analysis_pipeline([".xcode-version"]))
+        self.assertTrue(ci.changes_analysis_pipeline([".github/actions/select-xcode/action.yml"]))
+        self.assertTrue(ci.changes_analysis_pipeline(["Corta.xcodeproj/project.pbxproj"]))
+        self.assertTrue(ci.changes_analysis_pipeline(["CortaTerminal/Package.resolved"]))
+        self.assertFalse(ci.changes_analysis_pipeline(["Corta/Pane/ViewController.swift", "README.md"]))
 
     def test_main_push_rescans_changed_inputs_only(self):
         reusable = {"swift": 1, "c-cpp": 2, "python": 3}
