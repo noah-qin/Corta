@@ -26,13 +26,67 @@ nonisolated extension TerminalRenderer {
     /// Uses the very same row instances, atlas and Metal shader as the live
     /// block cursor, including wide glyphs, emoji, rules and box drawing.
     /// The small offscreen target is read only after GPU completion.
-    func cursorImage(grid: Grid) -> (image: CGImage, column: Int, columns: Int)? {
+    struct CursorImage: Sendable {
+        let image: CGImage
+        let column: Int
+        let columns: Int
+    }
+
+    /// One completion wins, including cancellation before registration.
+    final class CursorCaptureCompletion: Sendable {
+        private struct State {
+            var continuation: CheckedContinuation<CursorImage?, Never>?
+            var finished = false
+        }
+        private let state = Mutex(State())
+
+        func install(_ continuation: CheckedContinuation<CursorImage?, Never>) -> Bool {
+            state.withLock {
+                guard !$0.finished else { return false }
+                $0.continuation = continuation
+                return true
+            }
+        }
+        func finish(_ image: CursorImage?) {
+            let continuation = state.withLock { value -> CheckedContinuation<CursorImage?, Never>? in
+                guard !value.finished else { return nil }
+                value.finished = true
+                defer { value.continuation = nil }
+                return value.continuation
+            }
+            continuation?.resume(returning: image)
+        }
+    }
+
+    /// Submission is synchronous on the render owner; GPU completion or
+    /// cancellation resumes the caller. No lock spans the suspension.
+    func cursorImageAsync(grid: Grid) async -> CursorImage? {
+        let completion = CursorCaptureCompletion()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                guard completion.install(continuation) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                guard !Task.isCancelled else { completion.finish(nil); return }
+                if !submitCursorCapture(grid: grid, completed: { completion.finish($0) }) {
+                    completion.finish(nil)
+                }
+            }
+        } onCancel: {
+            completion.finish(nil)
+        }
+    }
+
+    private func submitCursorCapture(
+        grid: Grid, completed: @escaping @Sendable (CursorImage?) -> Void
+    ) -> Bool {
         return withExclusiveAccess {
             let row = grid.cursor.row
             var column = grid.cursor.column
-            guard row >= 0, row < grid.rows, column >= 0, column < grid.columns else { return nil }
+            guard row >= 0, row < grid.rows, column >= 0, column < grid.columns else { return false }
             guard let line = grid.line(atAbsoluteRow: grid.scrollback.totalPushed + row) else {
-                return nil
+                return false
             }
             if column < line.count, line[column].attributes.contains(.wideSpacer), column > 0 {
                 column -= 1
@@ -44,12 +98,16 @@ nonisolated extension TerminalRenderer {
                 pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
             descriptor.storageMode = .shared
             descriptor.usage = [.renderTarget, .shaderRead]
-            if captureBackend?.requiresRecovery == true { captureBackend = nil }
-            let freshBackend = captureBackend == nil
-            if freshBackend { captureBackend = try? Metal4Backend(device: backend.device) }
+            if captureBackend?.requiresRecovery == true {
+                // Teardown can wait for GPU work. Keep a hung queue parked;
+                // the live cursor keeps blinking until its frames complete.
+                guard captureBackend?.hasFramesInFlight == false else { return false }
+                captureBackend = nil
+            }
+            if captureBackend == nil { captureBackend = try? Metal4Backend(device: backend.device) }
             guard let target = backend.device.makeTexture(descriptor: descriptor),
                 let capture = captureBackend
-            else { return nil }
+            else { return false }
             let previousCursor = blockCursor
             let previousPalette = framePalette
             blockCursor = BlockCursor(row: row, column: column)
@@ -59,12 +117,9 @@ nonisolated extension TerminalRenderer {
                 framePalette = previousPalette
             }
             let quads = cursorCellInstances(line: line, row: row, column: column, graphemes: grid.graphemes)
-            guard
-                drawCapture(
-                    quads, into: target, with: capture, clearColor: framePalette.cursor,
-                    waitLimit: freshBackend ? Self.firstCaptureWaitLimit : Self.captureWaitLimit)
-            else { return nil }
-            return Self.image(of: target).map { ($0, column, columns) }
+            return drawCapture(
+                quads, into: target, with: capture, clearColor: framePalette.cursor,
+                column: column, columns: columns, completed: completed)
         }
     }
 
@@ -89,12 +144,12 @@ nonisolated extension TerminalRenderer {
         return (backgrounds, glyphs, colors)
     }
 
-    /// One frame of `quads` into `target` on the capture queue, waited for.
+    /// Submits one frame; the callback runs after the GPU releases its writes.
     private func drawCapture(
         _ quads: (backgrounds: ContiguousArray<QuadInstance>, glyphs: ContiguousArray<QuadInstance>,
             colors: ContiguousArray<QuadInstance>),
         into target: MTLTexture, with capture: Metal4Backend, clearColor color: SIMD4<Float>,
-        waitLimit: DispatchTimeInterval
+        column: Int, columns: Int, completed: @escaping @Sendable (CursorImage?) -> Void
     ) -> Bool {
         let size = CGSize(width: target.width, height: target.height)
         let rect = CGRect(origin: .zero, size: size)
@@ -113,29 +168,15 @@ nonisolated extension TerminalRenderer {
             quads.colors, atlas: glyphAtlas.colorTexture, atlasRects: glyphAtlas.atlasRects,
             atlasRectsVersion: glyphAtlas.atlasRectsVersion,
             rect: rect, drawableSize: size)
-        let done = DispatchSemaphore(value: 0)
-        let succeeded = Atomic<Bool>(false)
-        // The handler keeps `target` alive: a wait that gives up must not
-        // free a texture the GPU still writes. Only retained, never used.
+        // Metal owns writes until this callback; afterwards this target is
+        // immutable. Retain it across GPU completion even if the pane closes.
         nonisolated(unsafe) let retained = target
         capture.endFrame(presenting: nil) { error in
-            withExtendedLifetime(retained) {}
-            succeeded.store(error == nil, ordering: .releasing)
-            done.signal()
+            let image = error == nil ? Self.image(of: retained) : nil
+            completed(image.map { CursorImage(image: $0, column: column, columns: columns) })
         }
-        // On the main thread, so a busy GPU — a large image upload on the
-        // same device — costs at most this, not seconds per parked cursor;
-        // without a capture the pane keeps drawing its cursor live.
-        return done.wait(timeout: .now() + waitLimit) == .success
-            && succeeded.load(ordering: .acquiring)
+        return true
     }
-
-    /// One cell is a trivial frame; a GPU that has not drawn it in this long
-    /// is busy with something else.
-    static let captureWaitLimit: DispatchTimeInterval = .milliseconds(100)
-    /// A queue's first frame also pays for its setup — after launch, or
-    /// when a failed capture queue was replaced — so it gets longer, once.
-    static let firstCaptureWaitLimit: DispatchTimeInterval = .milliseconds(500)
 
     /// A finished `bgra8Unorm` target's pixels as an sRGB image.
     private static func image(of target: MTLTexture) -> CGImage? {
