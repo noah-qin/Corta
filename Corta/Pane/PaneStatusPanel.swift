@@ -59,11 +59,15 @@ final class PaneStatusPanel: NSView {
         wantsLayer = true
         identifier = NSUserInterfaceItemIdentifier("Corta.StatusPanel")
         layer?.cornerRadius = 16
-        layer?.borderWidth = 0.5
-        layer?.shadowColor = NSColor.black.cgColor
-        layer?.shadowOpacity = 0.16
-        layer?.shadowRadius = 14
-        layer?.shadowOffset = CGSize(width: 0, height: -4)
+        layer?.borderWidth = 1
+        // Through `NSView.shadow`: AppKit owns a layer-backed view's layer
+        // shadow and dropped one set there, leaving a white card with no edge
+        // on a light terminal.
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.22)
+        shadow.shadowBlurRadius = 18
+        shadow.shadowOffset = NSSize(width: 0, height: -6)
+        self.shadow = shadow
 
         let icon = NSImageView()
         icon.image = NSImage(systemSymbolName: content.symbol, accessibilityDescription: nil)
@@ -186,8 +190,9 @@ final class PaneStatusPanel: NSView {
     /// it takes the process's, and a dark window got a white card.
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
+            let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-            layer?.borderColor = NSColor.separatorColor.cgColor
+            layer?.borderColor = (dark ? NSColor(white: 1, alpha: 0.14) : NSColor(white: 0, alpha: 0.14)).cgColor
             detailsBox?.layer?.backgroundColor = NSColor.quaternarySystemFill.cgColor
         }
     }
@@ -273,8 +278,10 @@ final class PaneStatusOverlay: NSView {
             switch backdrop {
             case .dim:
                 let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                // Darker, never lighter: a white veil on a light terminal
+                // left the white card nothing to stand out from.
                 layer?.backgroundColor =
-                    (dark ? NSColor(white: 0, alpha: 0.35) : NSColor(white: 1, alpha: 0.45)).cgColor
+                    (dark ? NSColor(white: 0, alpha: 0.40) : NSColor(white: 0, alpha: 0.08)).cgColor
             case .opaque:
                 layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
             }

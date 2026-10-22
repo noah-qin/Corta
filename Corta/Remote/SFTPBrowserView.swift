@@ -171,9 +171,10 @@ struct SFTPBrowserView: View {
                 .frame(width: 340)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 20)
+                // `PaneStatusPanel`'s card: the same edge and shadow.
                 .background(.background, in: .rect(cornerRadius: 16))
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.separator))
-                .shadow(color: .black.opacity(0.12), radius: 14, y: 4)
+                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.primary.opacity(0.14), lineWidth: 1))
+                .shadow(color: .black.opacity(0.22), radius: 9, y: 6)
                 .accessibilityElement(children: .contain)
                 .frame(maxWidth: .infinity, minHeight: geometry.size.height)
             }
