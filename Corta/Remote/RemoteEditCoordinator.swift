@@ -137,6 +137,9 @@ final class RemoteEditCoordinator {
     /// whose subsystem never answers would otherwise hold every operation
     /// on that host until the app quit.
     private let connectTimeout: Duration
+    /// A connected subsystem can keep ssh alive without answering requests.
+    /// Retire that connection so continuations unwind and Upload can retry.
+    private let operationTimeout: Duration
 
     var pendingUploads: [PendingUpload] = []
     var pendingConflicts: [UploadConflict] = []
@@ -163,12 +166,16 @@ final class RemoteEditCoordinator {
         makeClient: ((String) -> any SFTPClient)? = nil,
         opener: (@MainActor (URL, Int, Int?) -> Bool)? = nil,
         presenter: RemoteEditPresenter? = nil,
-        connectTimeout: Duration = .seconds(30)
+        connectTimeout: Duration = .seconds(30),
+        operationTimeout: Duration = .seconds(120)
     ) {
         self.store = store
         self.connectTimeout = connectTimeout
-        self.makeClient = makeClient ?? {
-            SFTPConnection.forApp(key: $0, maximumDownloadBytes: RemoteEditCoordinator.maximumCopyBytes)
+        self.operationTimeout = operationTimeout
+        self.makeClient =
+            makeClient ?? {
+                SFTPConnection.forApp(
+                    key: $0, maximumDownloadBytes: RemoteEditCoordinator.maximumCopyBytes)
         }
         self.opener = opener ?? PanePointer.openRemoteFileAt(url:line:column:)
         self.presenter = presenter ?? RemoteEditPresenter(
@@ -245,6 +252,8 @@ final class RemoteEditCoordinator {
     func materialize(host: String, remotePath: String) async throws(SFTPError)
         -> RemoteEditStore.RemoteCopy
     {
+        await store.finishMaintenance()
+        guard !Task.isCancelled else { throw .cancelled }
         if let copy = store.copy(host: host, remotePath: remotePath),
             FileManager.default.fileExists(atPath: store.localURL(for: copy).path)
         {
@@ -396,10 +405,28 @@ final class RemoteEditCoordinator {
         operation: (any SFTPClient) async throws -> T
     ) async throws(SFTPError) -> T {
         let client = try await client(for: host)
+        var timedOut = false
+        let timeout = operationTimeout
+        let deadline = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: timeout, clock: .suspending) } catch { return }
+            timedOut = true
+            if self?.clients[host] === client { self?.clients[host] = nil }
+            // close resumes in-flight protocol requests, including cleanup.
+            client.close()
+        }
+        defer { deadline.cancel() }
+        func timeoutError() -> SFTPError {
+            .transport(
+                .hostUnreachable(
+                    diagnostics:
+                        "no completed SFTP operation within \(timeout.components.seconds) seconds"))
+        }
         do {
-            return try await operation(client)
+            let result = try await operation(client)
+            guard !timedOut else { throw timeoutError() }
+            return result
         } catch {
-            let error = Self.sftpError(error)
+            let error = timedOut ? timeoutError() : Self.sftpError(error)
             switch error {
             case .transport, .protocolViolation:
                 if clients[host] === client {

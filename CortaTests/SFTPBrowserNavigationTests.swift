@@ -61,11 +61,13 @@ struct SFTPBrowserSortingTests {
 
         model.sortColumn = .size
         model.sortAscending = false
+        await model.entryPreparation?.value
         // Equal sizes (the folders have none) keep the name order.
         #expect(model.entries.map(\.name) == ["adir", "zdir", "b.txt", "a.txt", "c.txt"])
 
         model.sortColumn = .modified
         model.sortAscending = true
+        await model.entryPreparation?.value
         #expect(model.entries.map(\.name).suffix(3) == ["a.txt", "c.txt", "b.txt"])
     }
 
@@ -78,13 +80,38 @@ struct SFTPBrowserSortingTests {
         #expect(model.hiddenEntryCount == 2)
 
         model.showsHiddenFiles = true
+        await model.entryPreparation?.value
         #expect(model.entries.map(\.name) == [".git", ".env", "app.py"])
         #expect(model.hiddenEntryCount == 0)
         model.selection = [".env", "app.py"]
 
         model.showsHiddenFiles = false
+        await model.entryPreparation?.value
         #expect(model.selection == ["app.py"], "a hidden row cannot stay selected")
     }
+    @Test("superseded background sorts and disconnected listings never publish")
+    func supersededPreparation() async {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv"] = (0..<10_000).reversed().map { entry("item-\($0)") }
+        let model = await connected(fake)
+        defer { model.disconnect() }
+        model.sortAscending = false
+        let old = model.entryPreparation
+        model.sortAscending = true
+        model.showsHiddenFiles = true
+        await model.entryPreparation?.value
+        await old?.value
+        #expect(model.entries.first?.name == "item-0")
+        #expect(model.entries.last?.name == "item-9999")
+
+        let before = model.entries
+        model.sortAscending = false
+        let disconnected = model.entryPreparation
+        model.disconnect()
+        await disconnected?.value
+        #expect(model.entries == before)
+    }
+
 }
 
 @MainActor
@@ -117,7 +144,7 @@ struct SFTPPathResourceTests {
         fake.realPathResult = "/srv"
         fake.listings["/srv"] = []
         model.connect()
-        await waitUntil("normal reconnection") { model.currentPath == "/srv" }
+        await waitUntil("normal reconnection") { model.currentPath == "/srv" && !model.isLoading }
     }
 
     @Test("slash-heavy canonical paths normalize in one walk")
@@ -144,26 +171,26 @@ struct SFTPBrowserHistoryTests {
         #expect(!model.canGoBack && !model.canGoForward)
 
         model.navigateInto(model.entries[0])
-        await waitUntil("in app") { model.currentPath == "/srv/app" }
+        await waitUntil("in app") { model.currentPath == "/srv/app" && !model.isLoading }
         model.navigateInto(model.entries[0])
-        await waitUntil("in src") { model.currentPath == "/srv/app/src" }
+        await waitUntil("in src") { model.currentPath == "/srv/app/src" && !model.isLoading }
         model.refresh()
         await waitUntil("refreshed") { !model.isLoading }
         #expect(model.backStack == ["/srv", "/srv/app"])
 
         model.navigateBack()
-        await waitUntil("back to app") { model.currentPath == "/srv/app" }
+        await waitUntil("back to app") { model.currentPath == "/srv/app" && !model.isLoading }
         #expect(model.canGoForward)
         model.navigateBack()
-        await waitUntil("back to srv") { model.currentPath == "/srv" }
+        await waitUntil("back to srv") { model.currentPath == "/srv" && !model.isLoading }
         #expect(!model.canGoBack)
         #expect(model.forwardStack == ["/srv/app/src", "/srv/app"])
 
         model.navigateForward()
-        await waitUntil("forward to app") { model.currentPath == "/srv/app" }
+        await waitUntil("forward to app") { model.currentPath == "/srv/app" && !model.isLoading }
         // A new visit from the middle of the history drops what was ahead.
         model.navigate(to: "/srv")
-        await waitUntil("visited srv") { model.currentPath == "/srv" }
+        await waitUntil("visited srv") { model.currentPath == "/srv" && !model.isLoading }
         #expect(!model.canGoForward)
     }
 
@@ -183,7 +210,7 @@ struct SFTPBrowserHistoryTests {
         await waitUntil("error shown") { model.listingError != nil }
         #expect(model.backStack == ["/srv"], "the dead step is gone; the one before it is next")
         model.navigateBack()
-        await waitUntil("back at srv") { model.currentPath == "/srv" }
+        await waitUntil("back at srv") { model.currentPath == "/srv" && !model.isLoading }
     }
 
     @Test("another host, or a reconnect, starts a new history")
@@ -193,7 +220,7 @@ struct SFTPBrowserHistoryTests {
         fake.listings["/srv/app"] = []
         let model = await connected(fake)
         model.navigateInto(model.entries[0])
-        await waitUntil("in app") { model.currentPath == "/srv/app" }
+        await waitUntil("in app") { model.currentPath == "/srv/app" && !model.isLoading }
         #expect(model.canGoBack)
         model.changeHost()
         #expect(!model.canGoBack && !model.canGoForward)

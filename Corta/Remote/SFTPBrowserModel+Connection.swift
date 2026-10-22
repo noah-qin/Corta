@@ -91,15 +91,19 @@ extension SFTPBrowserModel {
                 path = try await client.realPath(path: ".")
             }
             let listing = try await client.listDirectory(path: path)
-            guard generation == connectionGeneration else { client.close(); return }
-            connectionState = .connected
-            // A new connection starts a new walk: folders visited on another
-            // host, or before a reconnect, are not steps back on this one.
-            backStack.removeAll()
-            forwardStack.removeAll()
-            currentPath = Self.normalized(path: path)
-            pathField = currentPath
-            applyEntries(listing)
+            guard generation == connectionGeneration else {
+                client.close()
+                return
+            }
+            await applyEntries(listing) {
+                // Publish the directory and its rows together.
+                backStack.removeAll()
+                forwardStack.removeAll()
+                currentPath = Self.normalized(path: path)
+                pathField = currentPath
+                connectionState = .connected
+            }
+            guard generation == connectionGeneration else { return }
             onConnected?(name)
             await refreshVolume()
         } catch {
@@ -122,6 +126,9 @@ extension SFTPBrowserModel {
         connectionGeneration += 1
         directoryGeneration += 1
         isLoading = false
+        entryPreparation?.cancel()
+        entryPreparation = nil
+        entryGeneration &+= 1
         transferQueue.disconnect()
         client?.close()
         client = nil

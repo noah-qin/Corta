@@ -138,6 +138,7 @@ final class PaneFocus: NSObject {
 
     private var cursorCaptureTask: Task<Void, Never>?
     private var cursorCaptureGeneration: UInt64 = 0
+    private var cursorCaptureRetryAfter: ContinuousClock.Instant?
 
     private func cancelCursorCapture() {
         cursorCaptureGeneration &+= 1
@@ -147,7 +148,8 @@ final class PaneFocus: NSObject {
 
     private func prepareIdleCursorLayer() {
         guard cursorCaptureTask == nil,
-            handoff.snapshot.outputRevision == lastCursorOutputRevision else { return }
+            handoff.snapshot.outputRevision == lastCursorOutputRevision,
+            cursorCaptureRetryAfter.map({ ContinuousClock.now >= $0 }) ?? true else { return }
         guard lastBlinkStyle == .blinkingBlock else {
             if let layer = makeIdleCursorLayer() { installIdleCursorLayer(layer) }
             return
@@ -162,8 +164,12 @@ final class PaneFocus: NSObject {
             self.cursorCaptureTask = nil
             guard self.canBlinkCursor, self.lastBlinkStyle == .blinkingBlock,
                 self.lastCursorOutputRevision == revision,
-                self.handoff.snapshot.outputRevision == revision, self.handoff.phase == .metal,
-                let capture, let layer = self.makeIdleCursorLayer(capture: capture) else { return }
+                self.handoff.snapshot.outputRevision == revision, self.handoff.phase == .metal else { return }
+            guard let capture, let layer = self.makeIdleCursorLayer(capture: capture) else {
+                self.cursorCaptureRetryAfter = .now.advanced(by: .seconds(5))
+                return
+            }
+            self.cursorCaptureRetryAfter = nil
             self.installIdleCursorLayer(layer)
         }
     }
@@ -174,7 +180,9 @@ final class PaneFocus: NSObject {
         pendingCursorLayer = layer
         cursorBlinkTimer?.invalidate()
         cursorBlinkTimer = nil
+        blinkIsInvalidating = true
         host?.invalidateDisplay()
+        blinkIsInvalidating = false
     }
 
     private var cursorBlinkTimer: Timer?

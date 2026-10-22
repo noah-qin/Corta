@@ -77,6 +77,8 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// The idle cursor's one-cell captures, kept: a queue and its frame
     /// slots per capture was a fresh allocation every time a cursor parked.
     var captureBackend: Metal4Backend?
+    /// Test barrier in GPU completion, after releasing renderer access.
+    var cursorCaptureWaitGate: (@Sendable () -> Void)?
     let glyphAtlas: GlyphAtlas
     private struct Geometry: Sendable {
         var metrics: CellMetrics

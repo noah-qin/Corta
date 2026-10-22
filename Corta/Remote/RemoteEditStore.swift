@@ -84,49 +84,80 @@ final class RemoteEditStore {
         AppPaths.applicationSupportDirectory.appendingPathComponent("RemoteEdit", isDirectory: true)
     }
 
+    private(set) var maintenanceTask: Task<Void, Never>?
+
     init(rootURL: URL) {
         self.rootURL = rootURL
         // Approval snapshots and content probes belong to one run: the
         // decisions they back are in memory and do not survive a relaunch,
         // so whatever a quit left behind is only a stale copy of a file.
-        try? FileManager.default.removeItem(at: approvalsURL)
+        let abandoned = rootURL.appendingPathComponent("Abandoned-" + UUID().uuidString)
+        let moved = (try? FileManager.default.moveItem(at: approvalsURL, to: abandoned)) != nil
         load()
-        pruneStaleCopies()
         try? secureCopy(at: manifestURL)
-        for copy in copies.values { try? secureCopy(at: localURL(for: copy)) }
+        let candidates = Array(copies.values)
+        maintenanceTask = Task { [weak self] in
+            if moved { await Self.removeAbandonedApprovals(at: abandoned) }
+            await self?.pruneStaleCopies(candidates: candidates)
+        }
+        // Reused copies are tightened on materialize, rather than walking
+        // every cached directory on the main actor during initialization.
     }
 
     // MARK: - Retention
 
     /// How long a copy nobody opens or edits is kept.
-    static let retention: TimeInterval = 30 * 24 * 60 * 60
+    nonisolated static let retention: TimeInterval = 30 * 24 * 60 * 60
 
-    /// Removes copies left alone for `retention`: a remote `.env` opened once
-    /// was otherwise kept for good, and backed up with Application Support.
-    /// Only a copy whose content is what was last decided on — downloaded,
-    /// uploaded or dismissed — so an edit never uploaded waits for its
-    /// decision however old it is. Copies set aside beside it stay too.
-    func pruneStaleCopies(now: Date = Date()) {
+    /// Maintenance has a per-run count and byte budget. Opening a file waits
+    /// asynchronously for this pass, so it cannot race deletion of its copy.
+    func finishMaintenance() async {
+        await maintenanceTask?.value
+    }
+
+    @concurrent
+    private static func removeAbandonedApprovals(at url: URL) async {
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    /// Retire only unchanged, approved copies past retention. Bound maintenance
+    /// to 32 candidates and 256 MiB; undecided edits and excess work stay.
+    func pruneStaleCopies(now: Date = Date(), candidates: [RemoteCopy]? = nil) async {
         guard !preservesNewerManifest else { return }
+        var remainingBytes = 256 * 1024 * 1024
+        var checked = 0
         var pruned = false
-        for (id, copy) in copies {
+        for copy in candidates ?? Array(copies.values) {
+            guard !Task.isCancelled, checked < 32, remainingBytes > 0 else { break }
+            checked += 1
             let url = localURL(for: copy)
-            guard
-                let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[
-                    .modificationDate] as? Date,
-                now.timeIntervalSince(max(copy.lastOpenedAt, modified)) > Self.retention,
-                let baseline = copy.approvedDigest ?? copy.remoteDigest,
-                Self.sha256Hex(ofFile: url) == baseline
+            let result = await Self.staleCopy(
+                copy, at: url, now: now, byteLimit: remainingBytes)
+            remainingBytes -= result.bytesRead
+            guard let modified = result.modified, copies[copy.id] == copy,
+                (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate]
+                    as? Date
+                    == modified
             else { continue }
             guard (try? FileManager.default.removeItem(at: url)) != nil else { continue }
-            let folder = url.deletingLastPathComponent()
-            if (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?.isEmpty == true {
-                try? FileManager.default.removeItem(at: folder)
-            }
-            copies[id] = nil
+            copies[copy.id] = nil
             pruned = true
         }
         if pruned { save() }
+    }
+
+    @concurrent
+    private static func staleCopy(
+        _ copy: RemoteCopy, at url: URL, now: Date, byteLimit: Int
+    ) async -> (modified: Date?, bytesRead: Int) {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+            let modified = attributes[.modificationDate] as? Date,
+            now.timeIntervalSince(max(copy.lastOpenedAt, modified)) > Self.retention,
+            let baseline = copy.approvedDigest ?? copy.remoteDigest,
+            let size = attributes[.size] as? NSNumber, size.uint64Value <= UInt64(byteLimit)
+        else { return (nil, 0) }
+        let result = Self.hashFile(at: url, byteLimit: byteLimit)
+        return (result.digest == baseline ? modified : nil, result.bytesRead)
     }
 
     // MARK: - Naming (pure)
@@ -166,16 +197,28 @@ final class RemoteEditStore {
     /// The digest of a file's contents, or `nil` if it cannot be read.
     /// This is the local-change signal: compared against the digest
     /// approved at download/upload time, a difference is an edit.
-    nonisolated static func sha256Hex(ofFile url: URL) -> String? {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+    nonisolated static func sha256Hex(ofFile url: URL, byteLimit: Int = .max) -> String? {
+        hashFile(at: url, byteLimit: byteLimit).digest
+    }
+
+    nonisolated private static func hashFile(at url: URL, byteLimit: Int)
+        -> (digest: String?, bytesRead: Int)
+    {
+        guard byteLimit >= 0, let handle = try? FileHandle(forReadingFrom: url) else { return (nil, 0) }
         defer { try? handle.close() }
         var hash = SHA256()
+        var remaining = byteLimit
         do {
-            while let chunk = try handle.read(upToCount: 64 * 1024), !chunk.isEmpty {
+            // One extra byte distinguishes exact EOF from a file that grew
+            // past its stat size. Charge actual reads, not that stale size.
+            while let chunk = try handle.read(upToCount: min(64 * 1024, max(1, remaining))), !chunk.isEmpty {
+                guard chunk.count <= remaining else { return (nil, byteLimit) }
+                remaining -= chunk.count
+                guard !Task.isCancelled else { return (nil, byteLimit - remaining) }
                 hash.update(data: chunk)
             }
-            return hash.finalize().map { String(format: "%02x", $0) }.joined()
-        } catch { return nil }
+            return (hash.finalize().map { String(format: "%02x", $0) }.joined(), byteLimit - remaining)
+        } catch { return (nil, byteLimit - remaining) }
     }
 
     // MARK: - Queries and updates

@@ -70,6 +70,7 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
     @Guarded var transferCalls: [TransferCall] = []
     @Guarded var onTransfer: ((TransferCall, SFTPTransferEngine.ProgressHandler?) async throws -> Void)? = nil
     @Guarded var closed = false
+    @Guarded var lstatHangs = false
 
     @Guarded var capabilities: SFTPServerCapabilities? = nil
 
@@ -107,6 +108,12 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
     }
 
     func lstat(path: String) async throws(SFTPError) -> SFTPAttributes {
+        if lstatHangs {
+            while !closed {
+                do { try await Task.sleep(for: .milliseconds(5)) } catch { throw .cancelled }
+            }
+            throw .transport(.closed)
+        }
         if let error = lstatErrors[path] { throw error }
         if let attributes = lstatResults[path] { return attributes }
         throw .server(SFTPStatus(code: .noSuchFile))

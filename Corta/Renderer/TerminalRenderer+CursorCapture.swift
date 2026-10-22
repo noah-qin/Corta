@@ -117,9 +117,13 @@ nonisolated extension TerminalRenderer {
                 framePalette = previousPalette
             }
             let quads = cursorCellInstances(line: line, row: row, column: column, graphemes: grid.graphemes)
+            let completionGate = cursorCaptureWaitGate
             return drawCapture(
                 quads, into: target, with: capture, clearColor: framePalette.cursor,
-                column: column, columns: columns, completed: completed)
+                column: column, columns: columns, completed: { image in
+                    completionGate?()
+                    completed(image)
+                })
         }
     }
 

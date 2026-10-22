@@ -45,11 +45,17 @@ Versioning for compatibility changes.
 
 ### Fixed
 
-- Keep cursor capture off synchronous GPU waits, and discard cancelled or
-  superseded font scans and SSH host suggestions.
+- Discard cancelled or superseded font scans and SSH host suggestions.
+- Large SFTP listings convert and sort in the background; superseded work
+  cannot replace a newer directory or sort order.
+- Opening remote editing no longer hashes the old cache on the main thread.
+  Cleanup runs in the background with a per-run work budget.
+- Remote-edit operations time out after 120 seconds once connected, releasing
+  a stuck upload and offering its approval again for retry.
+- Idle block-cursor capture resumes from GPU completion without blocking
+  the main thread or holding the renderer lock; failed captures back off.
 - Release SFTP stderr listeners with their channels and prevent PTY signals
   from racing child-process reaping.
-
 - Cancelling an SFTP password prompt no longer opens it again. OpenSSH
   read the cancelled prompt as an empty password, tried it and asked again,
   up to three times or more; Cancel now ends that connection attempt.
