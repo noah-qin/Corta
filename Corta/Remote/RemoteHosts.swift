@@ -62,6 +62,12 @@ nonisolated enum SSHConfigHosts {
     /// The aliases a connect dialog offers, and the git hosts it leaves out:
     /// a `Host` whose `User` is `git`, or whose name or `HostName` is a git
     /// hosting service, takes git commands only — never a shell or files.
+    /// Runs file reads outside the UI actor while retaining task cancellation.
+    @concurrent static func loadSuggestions() async -> (hosts: [String], hiddenGitHosts: [String]) {
+        guard !Task.isCancelled else { return ([], []) }
+        return suggestions()
+    }
+
     static func suggestions(
         home: URL = FileManager.default.homeDirectoryForCurrentUser
     ) -> (hosts: [String], hiddenGitHosts: [String]) {
@@ -167,6 +173,7 @@ nonisolated enum SSHConfigHosts {
         }
 
         mutating func read(_ file: URL, depth: Int) {
+            guard !Task.isCancelled else { return }
             // Followed, because dotfile managers (stow, home-manager, chezmoi)
             // make `~/.ssh/config` a link; the checks below apply to the
             // file it points at.

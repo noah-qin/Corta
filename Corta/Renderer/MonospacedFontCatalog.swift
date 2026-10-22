@@ -72,11 +72,26 @@ nonisolated enum MonospacedFontCatalog {
     /// does not wait out a scan.
     private static let cache = Mutex(Cache())
 
+    /// Structured callers cancel these scans with their own lifetime.
+    @concurrent static func loadEntries() async -> [Entry] {
+        guard !Task.isCancelled else { return [] }
+        return entries()
+    }
+
+    @concurrent static func loadCJKEntries() async -> [Entry] {
+        guard !Task.isCancelled else { return [] }
+        return cjkEntries()
+    }
+
     /// The installed families the grid can lay out, sorted for a picker.
     static func entries() -> [Entry] {
         let (cached, generation) = cache.withLock { ($0.entries, $0.generation) }
         if let cached { return cached }
-        let entries = installedFamilies().filter(isUsable(family:)).compactMap(entry(for:))
+        var entries: [Entry] = []
+        for family in installedFamilies() {
+            guard !Task.isCancelled else { return [] }
+            if isUsable(family: family), let entry = entry(for: family) { entries.append(entry) }
+        }
         cache.withLock { if $0.generation == generation { $0.entries = entries } }
         return entries
     }
@@ -88,7 +103,11 @@ nonisolated enum MonospacedFontCatalog {
     static func cjkEntries() -> [Entry] {
         let (cached, generation) = cache.withLock { ($0.cjkEntries, $0.generation) }
         if let cached { return cached }
-        let entries = installedFamilies().filter(isUsableCJK(family:)).compactMap(entry(for:))
+        var entries: [Entry] = []
+        for family in installedFamilies() {
+            guard !Task.isCancelled else { return [] }
+            if isUsableCJK(family: family), let entry = entry(for: family) { entries.append(entry) }
+        }
         cache.withLock { if $0.generation == generation { $0.cjkEntries = entries } }
         return entries
     }

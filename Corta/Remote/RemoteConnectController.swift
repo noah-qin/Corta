@@ -317,7 +317,8 @@ struct RemoteConnectForm: View {
         .task(id: focusGeneration) {
             recents = RecentHostsStore.shared.targets
             // A file read, off the main actor; small, bounded, read-only.
-            let found = await Task.detached(priority: .userInitiated) { SSHConfigHosts.suggestions() }.value
+            let found = await SSHConfigHosts.loadSuggestions()
+            guard !Task.isCancelled else { return }
             aliases = found.hosts
             hiddenGitHosts = found.hiddenGitHosts
         }
