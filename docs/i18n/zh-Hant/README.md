@@ -32,7 +32,7 @@ Metal 4 算繪 · 原生中日韓輸入法 · SSH、SFTP 與遠端編輯
 </div>
 
 > 本文譯自英文版 [README.md](../../../README.md)，對應提交
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/README.md)。
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md)。
 > 此後英文版如有更新，或兩者有出入，以英文版為準。
 
 ## 安裝

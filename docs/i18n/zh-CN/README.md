@@ -32,7 +32,7 @@ Metal 4 渲染 · 原生中日韩输入法 · SSH、SFTP 与远程编辑
 </div>
 
 > 本文译自英文版 [README.md](../../../README.md)，对应提交
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/README.md)。
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md)。
 > 此后英文版如有更新，或两者有出入，以英文版为准。
 
 ## 安装

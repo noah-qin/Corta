@@ -32,7 +32,7 @@ Renderização com Metal 4 · Entrada CJK / IME nativa · SSH, SFTP e edição r
 </div>
 
 > Esta página é uma tradução do [README.md](../../../README.md) em inglês, no estado do commit
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/README.md).
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md).
 > Se a versão em inglês mudou desde então, ou se as duas divergirem, vale a versão em inglês.
 
 ## Instalação

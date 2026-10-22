@@ -32,7 +32,7 @@ Rendu Metal 4 · Saisie CJK / IME native · SSH, SFTP et édition à distance
 </div>
 
 > Cette page est une traduction du [README.md](../../../README.md) anglais, dans son état au commit
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/README.md).
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md).
 > Si la version anglaise a changé depuis, ou si les deux diffèrent, la version anglaise fait foi.
 
 ## Installation

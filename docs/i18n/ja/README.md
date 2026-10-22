@@ -32,7 +32,7 @@ Metal 4 レンダリング · ネイティブな CJK / IME · SSH、SFTP、リ�
 </div>
 
 > このページは英語版 [README.md](../../../README.md) のコミット
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/README.md)
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md)
 > 時点の翻訳です。その後英語版が更新された場合や内容に食い違いがある場合は、英語版が正となります。
 
 ## インストール

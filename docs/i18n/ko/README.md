@@ -32,7 +32,7 @@ Metal 4 렌더링 · 네이티브 CJK / IME · SSH, SFTP, 원격 편집
 </div>
 
 > 이 문서는 영어판 [README.md](../../../README.md)의 커밋
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/README.md)
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md)
 > 시점을 번역한 것입니다. 이후 영어판이 바뀌었거나 내용이 다르면 영어판을 따릅니다.
 
 ## 설치
