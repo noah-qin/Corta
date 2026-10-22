@@ -28,10 +28,13 @@ what you could not verify; an unchecked item is not a passing result.
 
 PRs validate source changes; metadata edits run only the title checker in
 `pr-title.yml`. Reopen a PR or push a commit after changing its base branch
-to validate the new merge base. Main pushes update CodeQL baselines without
-repeating app/core tests or dependency review, and rescan only the languages
-whose analysed inputs changed (below). Scheduled CodeQL and Nightly remain
-full scans. CI uses the complete merge-base diff for PRs and all
+to validate the new merge base. A PR need not be up to date with main to
+merge: main tests each merge instead. Main pushes run the core and app tests
+for what the push changed — the Release-only hot-path allocations among them
+— without dependency review, update CodeQL baselines, and rescan only the
+languages whose analysed inputs changed (below). Each main push runs to the
+end; only a PR's newer push cancels its older one. Scheduled CodeQL and
+Nightly remain full scans. CI uses the complete merge-base diff for PRs and all
 commits in a main push, selecting the union of affected checks:
 
 | Changes | CI checks beyond the common checks |
@@ -64,8 +67,14 @@ package manifests, `project.pbxproj` and `.xcconfig` count for Swift and
 C/C++, and `codeql.yml` or `scripts/codeql-extract.py` for every language.
 On a PR an unaffected language uploads main's analysis under its own category
 from a lightweight Linux job: the inputs are the same, so the results are
-too, and the scanning rule sees every main configuration. A PR still scans
-every language its routing selects (the table above). A main push scans only
+too, and the scanning rule sees every main configuration. A PR scans every
+language its routing selects (the table above) except Swift and C/C++: those
+are built on macOS under the tracer — the Swift scan took ~31 minutes of
+every PR and raised no alert — so a PR uploads main's latest analysis for
+them even when it changes them, and main scans the change after the merge.
+A PR that changes the analysis pipeline — `codeql.yml`,
+`scripts/codeql-extract.py`, the `select-xcode` action, package manifests,
+`project.pbxproj`, `.xcconfig` — still scans them before merging. A main push scans only
 the changed languages, so a docs or workflow merge does not repeat the Swift
 extraction. Comparing against the analysis rather than the push means a
 cancelled or failed main scan is retried by the next push, and a language
@@ -225,8 +234,9 @@ credentials: use the fixture, or another account, for anything that signs in.
 
 `HotPathAllocationTests` holds parse → grid to zero heap allocations once
 warm, counted through libmalloc's `malloc_logger`. Unoptimised generics
-allocate everywhere, so the suite disables itself in Debug; run it the way
-CI does:
+allocate everywhere, so the suite disables itself in Debug. CI runs it on
+main pushes and manual runs — a Release rebuild of the core, ~7 minutes —
+not on every PR; run it the same way:
 
 ```sh
 swift test --package-path CortaTerminal -c release --filter HotPathAllocationTests

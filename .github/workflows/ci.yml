@@ -16,10 +16,13 @@
 
 name: CI
 
-# PRs validate source; main pushes update CodeQL baselines without repeating
-# app/core tests, and only for languages whose analysed inputs changed since
-# main's last analysis of them. A PR uploads that analysis for a language it
-# leaves unchanged. Metadata edits have a separate, read-only title workflow.
+# PRs validate source; main pushes test what each merge changed, run the
+# Release-only hot-path allocation suite, and update CodeQL baselines for
+# languages whose analysed inputs changed since main's last analysis of them.
+# A PR uploads that analysis for a language it leaves unchanged — and for
+# Swift and C/C++, built on macOS, even one it changes, unless it changes the
+# analysis pipeline (`scripts/ci-docs-only.py`): main scans them after the
+# merge. Metadata edits have a separate, read-only title workflow.
 
 # Verified 2026-09-05: both the macos-26 runner label and ad-hoc signing of
 # the test host work on a hosted runner (workflow_dispatch run 33895022048,
@@ -39,9 +42,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# A newer push to a PR supersedes the older one. Main's pushes each run to the
+# end: the next one tests and scans only its own diff, so a cancelled push's
+# changes would never be checked.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 # Read-only is all either job needs. Without this the workflow inherits the
 # repository default, which is broader than a build has any use for.
@@ -137,8 +143,9 @@ jobs:
   core:
     name: Terminal core (SwiftPM)
     needs: changes
-    # Always retain the repository license check; compile/test the core only when affected.
-    if: ${{ !cancelled() && github.event_name != 'push' }}
+    # Always retain the repository license check on a PR; compile/test the
+    # core only when affected. On main, only a push that changed the core.
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.changes.outputs.core == 'true') }}
     runs-on: macos-26
     # A hung test otherwise holds a runner for the six-hour default.
     timeout-minutes: 30
@@ -182,8 +189,10 @@ jobs:
 
       # The allocation counts only mean something optimised: in Debug every
       # unspecialised generic allocates, so the suite disables itself there.
+      # A Release rebuild of the core, ~7 minutes: on main and manual runs,
+      # not on every PR.
       - name: Hot-path allocations
-        if: needs.changes.outputs.core == 'true'
+        if: needs.changes.outputs.core == 'true' && github.event_name != 'pull_request'
         run: swift test --package-path CortaTerminal -c release --filter HotPathAllocationTests
 
       # The step above skips the real-OpenSSH suite: it needs an sshd. This
@@ -240,7 +249,7 @@ jobs:
     # waits for a check that will never report again.
     name: App, tests and the update feed
     needs: changes
-    if: ${{ !cancelled() && github.event_name != 'push' && (needs.changes.result != 'success' || needs.changes.outputs.app == 'true' || needs.changes.outputs.feed == 'true') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.app == 'true' || needs.changes.outputs.feed == 'true') }}
     runs-on: macos-26
     timeout-minutes: 45
     steps:

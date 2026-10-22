@@ -101,6 +101,18 @@ TEST_ROOTS = ("CortaTests/", "CortaUITests/", "CortaPerformanceTests/")
 BUILD_INPUTS = ("Package.swift", "Package.resolved", "project.pbxproj", ".xcode-version")
 TOOLCHAIN_ACTION = ".github/actions/select-xcode/"
 ANALYSIS_INPUTS = (".github/workflows/codeql.yml", "scripts/codeql-extract.py")
+# Built on macOS under the tracer: the Swift scan alone took half an hour of
+# every PR's wait and has never raised an alert. A PR uploads main's latest
+# analysis for these; main scans its own changes after the merge.
+DEFERRED_ON_PULL_REQUEST = ("swift", "c-cpp")
+
+
+def changes_analysis_pipeline(paths):
+    """The PR changes how CodeQL builds or runs — the workflow, the extraction,
+    the toolchain or the build settings: it is scanned before merging."""
+    return any(path in ANALYSIS_INPUTS or path.startswith(TOOLCHAIN_ACTION)
+               or path.rsplit("/", 1)[-1] in BUILD_INPUTS or path.endswith(".xcconfig")
+               for path in paths)
 
 
 def analysed_languages(path):
@@ -155,10 +167,22 @@ def reusable_baselines(baselines, head, git):
     return reusable
 
 
-def select_languages(event_name, routed, reusable):
-    """Languages to analyse, and the main analyses a PR uploads for the rest."""
+def select_languages(event_name, routed, reusable, latest=None, pipeline_changed=False):
+    """Languages to analyse, and the main analyses a PR uploads for the rest.
+
+    `latest` is main's newest analysis per language, current or not: a PR
+    uploads it for a deferred language instead of scanning, unless it changes
+    the analysis pipeline. A language main has never analysed is scanned.
+    """
     if event_name == "push":
         routed = ()  # The PR ran the routed analyses; main rescans changed inputs only.
+    reusable = dict(reusable)
+    if event_name == "pull_request" and not pipeline_changed:
+        for language in DEFERRED_ON_PULL_REQUEST:
+            if language in (latest or {}):
+                reusable.setdefault(language, latest[language])
+        routed = [language for language in routed
+                  if language not in DEFERRED_ON_PULL_REQUEST or language not in reusable]
     analyse = [language for language in LANGUAGES if language in routed or language not in reusable]
     return analyse, {language: reusable[language] for language in LANGUAGES if language not in analyse}
 
@@ -201,15 +225,18 @@ def main():
     except (KeyError, ValueError, OSError, subprocess.CalledProcessError) as error:
         print(f"Cannot classify changes; running full CI: {error}")
         paths, scope, only_docs = [], full_scope(), False
-    reusable = {}
+    reusable, latest = {}, {}
     if paths:  # An unknown diff analyses every language.
         try:
             def git(args):
                 return subprocess.check_output(["git", *args], stderr=subprocess.DEVNULL)
-            reusable = reusable_baselines(main_baselines(), os.environ["GITHUB_SHA"], git)
+            baselines = main_baselines()
+            latest = {language: analysis_id for language, (analysis_id, _) in baselines.items()}
+            reusable = reusable_baselines(baselines, os.environ["GITHUB_SHA"], git)
         except (KeyError, ValueError, OSError, subprocess.CalledProcessError) as error:
             print(f"Cannot read main's CodeQL analyses; analysing every language: {error}")
-    scope["languages"], baselines = select_languages(event_name, scope["languages"], reusable)
+    scope["languages"], baselines = select_languages(
+        event_name, scope["languages"], reusable, latest, changes_analysis_pipeline(paths))
     value = str(only_docs).lower()
     with open(os.environ["GITHUB_OUTPUT"], "a") as output:
         output.write(f"docs_only={value}\n")
