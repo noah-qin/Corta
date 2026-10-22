@@ -1,11 +1,11 @@
 # 使用者指南
 
-[文件索引（英文）](README.md) · [專案概覽](../README.zh-Hant.md)
+[文件索引（英文）](../../README.md) · [專案概覽](README.md)
 
-🇺🇸 [English](USER-GUIDE.md) · 🇨🇳 [简体中文](USER-GUIDE.zh-CN.md) · 🇭🇰 [繁體中文](USER-GUIDE.zh-Hant.md) · 🇯🇵 [日本語](USER-GUIDE.ja.md) · 🇰🇷 [한국어](USER-GUIDE.ko.md) · 🇩🇪 [Deutsch](USER-GUIDE.de.md) · 🇫🇷 [Français](USER-GUIDE.fr.md) · 🇪🇸 [Español](USER-GUIDE.es.md) · 🇧🇷 [Português](USER-GUIDE.pt-BR.md)
+🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
-> 本文譯自英文版 [USER-GUIDE.md](USER-GUIDE.md)，對應提交
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/USER-GUIDE.md)。
+> 本文譯自英文版 [USER-GUIDE.md](../../USER-GUIDE.md)，對應提交
+> [`6d71b21`](https://github.com/noah-qin/Corta/blob/6d71b211e36e977f9250f45df1ccf10dde8fde2f/docs/USER-GUIDE.md)。
 > 此後英文版如有更新，或兩者有出入，以英文版為準。介面名稱依 Corta 的繁體中文介面書寫；
 > 設定項目、命令和程式碼保持原文。
 
@@ -51,7 +51,7 @@ open Corta-x.y.z.dmg
 把 Corta 拖進「應用程式」，然後退出映像檔。1.1.9 起的版本都是磁碟映像檔；1.1.8 及更早的版本保留原本的 ZIP。
 
 正式版本都經過 Developer ID 簽署和公證。如果 macOS 拒絕打開下載的檔案，請依照
-[疑難排解](TROUBLESHOOTING.zh-Hant.md#installing)操作。從其他位置啟動時，Corta 會提議把自己移到
+[疑難排解](TROUBLESHOOTING.md#installing)操作。從其他位置啟動時，Corta 會提議把自己移到
 `/Applications`（`suggest-applications-folder`）。
 
 **更新。** **Corta ▸ 檢查更新…** 會立即檢查；除非設定了 `update-auto-check = false`，
@@ -63,7 +63,7 @@ open Corta-x.y.z.dmg
 
 Corta 沒有匯入工具：它只讀一個文字檔 `~/.config/corta/config`，設定視窗編輯的也是這個檔案。
 多數習慣透過幾個設定項目就能延續。左欄是這個習慣在別的終端機裡的位置，右欄是 Corta 對應的設定項目
-（每一項的取值和生效時機見 [Configuration](CONFIGURATION.md)，英文）。
+（每一項的取值和生效時機見 [Configuration](../../CONFIGURATION.md)，英文）。
 
 | 如果你習慣… | 在 Corta 裡 |
 | :--- | :--- |
@@ -76,7 +76,7 @@ Corta 沒有匯入工具：它只讀一個文字檔 `~/.config/corta/config`，�
 | 自己的配色 | 在檔案裡定義主題（`theme.<name>.*`），或用 **檢視 ▸ 主題編輯器…**。見[建立和編輯主題](#creating-and-editing-themes)。 |
 | 自己的按鍵綁定 | `bind.<command> = <shortcut>`。命令名稱見[鍵盤快速鍵](#keyboard-shortcuts)。 |
 | 自選字型 | **設定 ▸ 外觀 ▸ 字型**，或 `font-family`。只提供 Corta 能在網格上排版的等寬字型。 |
-| 連字、透明或依設定檔區分的設定 | 不提供；它們[沒有發布](CONFIGURATION.md#6-what-is-deliberately-not-configurable)，每一項都要先做決策。預設集可以指定 shell、目錄和環境變數（[Presets](CONFIGURATION.md#4a-presets)）。 |
+| 連字、透明或依設定檔區分的設定 | 不提供；它們[沒有發布](../../CONFIGURATION.md#6-what-is-deliberately-not-configurable)，每一項都要先做決策。預設集可以指定 shell、目錄和環境變數（[Presets](../../CONFIGURATION.md#4a-presets)）。 |
 | `tmux -CC` 控制模式 | 不支援（D09）。一般的 `tmux` 和其他程式一樣在 Corta 裡執行。 |
 
 **Shell 整合。** 標準的本機 zsh 工作階段無需改動啟動檔案就會載入 Corta 的掛鉤。如果你的 `~/.zshrc`、
@@ -87,7 +87,7 @@ Corta 沒有匯入工具：它只讀一個文字檔 `~/.config/corta/config`，�
 運作的遠端主機無需任何改動；為 `xterm-ghostty` 或 `xterm-kitty` 設定的主機則會拿到這個通用值。
 
 複製、關閉、快捷終端機熱鍵、遠端標記等細節上的不同，集中在
-[疑難排解 → 與其他終端機不同的行為](TROUBLESHOOTING.zh-Hant.md#behaviour-that-differs-from-other-terminals)。
+[疑難排解 → 與其他終端機不同的行為](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals)。
 
 <a id="windows-tabs-and-panes"></a>
 
@@ -116,7 +116,7 @@ Corta 沒有匯入工具：它只讀一個文字檔 `~/.config/corta/config`，�
   （`restore-windows`，預設開啟）。每個窗格都會啟動新的程序；終端機文字和正在執行的工作不會還原。
   快捷終端機不在還原之列。
 - **預設集。** 預設集是在設定檔中定義的一組具名的 shell、目錄和環境變數。**Shell ▸ 使用預設集新增窗格**
-  會打開一個預設集；按住 ⌥ 則在單獨的視窗中打開（[Presets](CONFIGURATION.md#4a-presets)）。
+  會打開一個預設集；按住 ⌥ 則在單獨的視窗中打開（[Presets](../../CONFIGURATION.md#4a-presets)）。
 - 新視窗依 `columns` × `rows` 個字元格打開（預設 120 × 30）。
 
 <a id="text-fonts-and-themes"></a>
@@ -148,7 +148,7 @@ Corta 沒有匯入工具：它只讀一個文字檔 `~/.config/corta/config`，�
   剩餘不足一格的空間在最後一列下方顯示為背景。
 - **主題。** 內建三個主題 `corta`、`solarized` 和 `mono`，各有淺色和深色變體；`appearance = auto`
   會跟隨 macOS 的切換。你可以透過 **檢視 ▸ 主題編輯器…** 或在設定檔中定義自己的主題，
-  也可以繼承某個主題、只改幾個顏色（[Themes](CONFIGURATION.md#4-themes)）。
+  也可以繼承某個主題、只改幾個顏色（[Themes](../../CONFIGURATION.md#4-themes)）。
 - **Unicode。** 中文、日文和韓文文字佔兩欄，並與其他內容對齊；emoji、組合符號、旗幟和 emoji 序列
   各算一個字元叢集。字型缺少的字元來自系統的遞補字型。標準化的 emoji 呈現序列（文字字元後接 VS16，
   如 ⚠️ 或 ✍️）佔兩欄；文字呈現保持窄寬度。
@@ -188,13 +188,13 @@ Corta 沒有匯入工具：它只讀一個文字檔 `~/.config/corta/config`，�
 因為它不會遮住任何輸出。放在命令列右側時，在 **自動** 模式下，shell 整合會在命令執行期間把它隱藏；
 **始終** 模式可以在命令輸出期間保留它。兩種提示符號模式在查看捲動記錄或使用替代畫面程式時都會把它隱藏。
 
-**位置** 設定可選 **視窗工具列**（預設）或 **命令列右側**。工具列中的標記獨立於網路和檔案按鈕，
+**位置** 設定可選 **視窗工具列**（預設）或 **命令列右側**。工具列中的標記獨立於連線和新增標籤頁按鈕，
 命令變長或換行時位置不變。關閉它或選擇命令列位置，會移除它在工具列中的位置和分隔間距。
 選擇命令列位置時，長命令會把標記移到下方的空位，使其保持在右側；沒有安全的列時它會隱藏，
 絕不會插入新行或讓子程序捲動。直接輸入和輸入法的顏色可以填十六進位值；清空欄位即使用預設的低調樣式。
 
-[中文輸入法標記](brand/input-source-indicator.png) ·
-[避開長命令](brand/input-source-long-command.png)
+[中文輸入法標記](../../brand/input-source-indicator.png) ·
+[避開長命令](../../brand/input-source-long-command.png)
 
 <a id="optional-local-system-status"></a>
 
@@ -246,12 +246,16 @@ App 跟隨 macOS 為 Corta 選擇的偏好語言：英文、簡體中文、繁�
 
 ## 工作階段結束時
 
-shell 結束後，窗格會保留它的輸出，並顯示一張 **工作階段已結束** 卡片，上面有結束代碼或終止訊號。
-游標會消失，但捲動、選取、複製和 ⌘F 搜尋仍然可用。**新增工作階段** 在取代保留的輸出之前會請你確認；
-**關閉窗格** 會關閉該窗格。直接連線的 SSH 工作階段會提供 **重新連線**，以建立新的連線。
-從 Python 或其他程式回到仍在執行的 shell，不算終端機工作階段結束。
+shell 結束後，窗格會保留它的輸出：輸出會稍微變暗，上面出現一個面板，用一句話說明什麼結束了、怎麼結束的——
+結束代碼，或終止它的訊號。游標會消失，但面板周圍的捲動、選取、複製和 ⌘F 搜尋仍然可用。**新增工作階段** 會在窗格裡
+重新啟動 shell 或預設集；**關閉窗格** 會關閉它。直接連線的 SSH 工作階段會說明它連線的是哪部主機，並提供 **重新連線**
+來建立新的連線；ssh 的結束代碼 255 會被解釋為網路中斷或主機沒有回應。兩個按鈕都會清除上方的輸出——面板上會寫明——
+新的工作階段沿用窗格目前的尺寸和字級。從 Python 或其他程式回到仍在執行的 shell，不算終端機工作階段結束。
 
-![工作階段結束後保留最終輸出和復原操作](brand/session-ended.png)
+工作階段的輸入或輸出出錯，或者窗格停止繪製時，同樣的面板會提供 **重試**，連線則提供 **重新連線**；
+系統給出的原始錯誤在 **詳細資訊** 裡。
+
+![工作階段結束後保留最終輸出和復原操作](../../brand/session-ended.png)
 
 <a id="scrollback-search-and-selection"></a>
 
@@ -291,7 +295,7 @@ shell 結束後，窗格會保留它的輸出，並顯示一張 **工作階段�
 - **檔案參照。** 程式輸出中的 `path:line:column`——編譯錯誤、測試失敗——用 ⌘ 點按即可在你的編輯器中打開。
   透過 `open-file-command` 告訴 Corta 用哪個編輯器，以編輯器的完整路徑開頭，例如
   `open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}`
-  （[Following a file reference](CONFIGURATION.md#following-a-file-reference)）。
+  （[Following a file reference](../../CONFIGURATION.md#following-a-file-reference)）。
 
 打開任何檔案參照都需要先設定 `open-file-command`。Corta 從不用系統預設的 App 打開來自輸出的檔案：
 有些檔案類型一打開就會執行程式碼。
@@ -348,7 +352,7 @@ Corta 內建目錄補全，在標準的本機 zsh 工作階段中預設開啟。
 繼續輸入可以篩選資料夾；游標旁會出現淡色的後綴。例如，`cd De` 可能會補全為 `Developer/`。
 補全只是預覽：在被接受之前，它們不是命令的一部分。
 
-![cd 下方的目錄補全，以及成功、失敗和被中斷的命令標記](brand/directory-suggestions.png)
+![cd 下方的目錄補全，以及成功、失敗和被中斷的命令標記](../../brand/directory-suggestions.png)
 
 補全可見時：
 
@@ -385,22 +389,26 @@ Corta 使用系統的 OpenSSH——你的 `~/.ssh/config`、金鑰、代理程�
   （那裡安裝了 shell 整合），標記會顯示它們；連線來自連線面板時，顯示你輸入的目標；否則只說明這個窗格是遠端的，
   但不知道是哪台主機。
 - **重新連線。** `ssh` 或 `mosh` 工作階段結束時，**重新連線到主機** 會以新連線再次執行同一條命令。
-- **連線。** 工具列的地球和資料夾按鈕會打開一個面板，用於 SSH 終端機或 SFTP 瀏覽器，兩者的欄位相同：
-  主機（名稱、位址或 SSH 別名）、使用者、連接埠和私密金鑰。後三項任意留空，就由你的 `~/.ssh/config` 和 OpenSSH 的預設值決定；
-  選中的金鑰會最先提供，`ssh-agent` 中的其他金鑰不會嘗試。面板列出你最近建立的連線（連同當時用的使用者、連接埠和金鑰）
-  以及 `~/.ssh/config` 中的 `Host` 名稱；輸入可以縮小清單，按一下一項（或在主機欄中用 ↑ 和 ↓）填入欄位，
-  按兩下或按 Return 連線。設定 ▸ 隱私權與安全性 ▸ 最近連線的主機 可以清除最近的記錄。
+- **連線。** 工具列的地球按鈕會打開 **連線到主機** 面板，頂部可以切換 **終端機 / 檔案 (SFTP)**：透過 SSH 打開終端機，
+  或者打開檔案瀏覽器。輸入主機——名稱、位址、`user@host` 或 SSH 別名。**進階選項** 裡是使用者、連接埠和私密金鑰；
+  留空就由你的 `~/.ssh/config` 和 OpenSSH 的預設值決定。選中的金鑰會最先提供，`ssh-agent` 中的其他金鑰不會嘗試。
+  面板列出你最近建立的連線（連同連接埠、金鑰和上次使用的時間）以及 `~/.ssh/config` 中的 `Host` 名稱。
+  只用於 git 的主機（`github.com`，或帶 `User git` 的 `Host`）不會列出，清單會註明隱藏了哪些。輸入可以縮小清單，
+  按一下一項（或在主機欄中用 ↑ 和 ↓）填入欄位，按兩下或按 Return 連線。終端機連線要真正建立後才會加入最近清單——
+  拒絕你的主機或沒有 shell 的主機不會加入。把指標移到最近的主機上按 ✕，或按右鍵點按它，就能忘掉它；
+  設定 ▸ 隱私權與安全性 ▸ 最近連線的主機 可以全部清除。
+- **目前窗格的檔案。** 從連線著另一部機器的窗格打開時，面板會先提供那部主機的檔案；按 Return 或按 **瀏覽檔案** 即可打開。
 - **瀏覽遠端檔案…** 為窗格所在的主機打開 SFTP 瀏覽器：列出、上傳、下載、重新命名和刪除。
   第一次連線某台主機時會請你確認主機名稱。傳輸在中斷後會續傳，覆蓋檔案前一定會詢問。
   下載資料夾時，如果某個名稱與 `.corta-part` 暫存檔衝突，下載會停止，保留現有檔案。
   請選擇另一個目標位置，或單獨處理那個檔案；整個資料夾的覆蓋不會吞掉部分檔案。
 - **在瀏覽器中**，和 Finder 一樣：⌘[ 和 ⌘] 上一頁和下一頁，⌘↑ 到上層資料夾，⌘R 重新整理，⇧⌘G（或按一下路徑）輸入路徑，
   ⇧⌘N 新增資料夾，⇧⌘. 顯示隱藏檔案。按一下欄位標題排序。按右鍵點按一列查看它的操作；按兩下資料夾打開它。
-  從 Finder 把檔案拖到清單上——或拖到某個資料夾列上——即可上傳，把檔案拖到 Finder 即可下載。
+  從 Finder 把檔案拖到清單上——或拖到某個資料夾列上——即可上傳；拖曳時清單（或那一列）會加上外框，並寫明檔案會傳到哪裡。把檔案拖到 Finder 即可下載。
   傳輸在工具列的箭頭按鈕下，顯示速度、剩餘時間和「在 Finder 中顯示」。
 - **編輯遠端檔案。** 瀏覽器中的 **編輯**——或在遠端窗格中 ⌘ 點按 `path:line`——會下載一份副本並在你的編輯器中打開。
   請先設定 **設定 ▸ 終端機 ▸ 打開檔案方式**，使用編輯器執行檔的絕對路徑以及 `{file}`、`{line}`、`{column}` 預留位置
-  （[範例](CONFIGURATION.md#following-a-file-reference)）。上傳你的修改是一個單獨的、明確的步驟，
+  （[範例](../../CONFIGURATION.md#following-a-file-reference)）。上傳你的修改是一個單獨的、明確的步驟，
   Corta 會先檢查遠端檔案在此期間是否被改過。超過 64 MiB 的檔案不會以這種方式複製；請從瀏覽器下載它們，
   瀏覽器會顯示進度並可以取消。30 天沒人打開或修改過的副本，會在下次使用遠端編輯時被刪除；
   帶有你尚未上傳或放棄的修改的副本會保留。
@@ -409,13 +417,17 @@ Corta 使用系統的 OpenSSH——你的 `~/.ssh/config`、金鑰、代理程�
 
 伺服器要求輸入密碼、金鑰密語或一次性驗證碼時，或者主機是新的、需要你決定是否信任它的金鑰時，
 瀏覽器會在它的視窗上彈出對話框詢問，並把你的回答交給 OpenSSH；不會儲存任何內容，所以重新連線時會再次詢問。
-主機金鑰對話框會顯示指紋，預設按鈕是「取消」。由 `ssh-agent` 或鑰匙圈持有的金鑰，或者你終端機中已有的
-`ControlMaster` 連線，會直接登入而不詢問。
+密碼對話框中的 **取消連線** 會中止這次連線並回到主機欄——不會當作空密碼送出。金鑰密語對話框中的 **取消**
+只會跳過那把金鑰，ssh 會繼續嘗試下一種登入方式。主機金鑰對話框會顯示指紋，預設按鈕是「取消」。
+由 `ssh-agent` 或鑰匙圈持有的金鑰，或者你終端機中已有的 `ControlMaster` 連線，會直接登入而不詢問。
+
+連線失敗時會用一句話說明原因——密碼或金鑰不被接受、主機沒有回應、主機金鑰未知或已變更、伺服器不提供 SFTP——
+ssh 的原話在 **詳細資訊** 裡，並提供 **重試** 或 **修改連線資訊**。
 
 遠端編輯上傳時，除了大小和修改時間，還會比較遠端內容，並送出你批准的那份私有快照。
 如果你在批准提示之後又儲存了一次本機編輯，Corta 會請你重新決定；上傳過程中的儲存會保持待處理狀態。
 連線失敗後，下一次編輯或上傳會重新連線，失敗的上傳會保留其待處理的決定。刪除 App 資料前，
-請先保存尚未決定的本機編輯。見[靜態資料政策](SECURITY.md#5-data-at-rest)（英文）。
+請先保存尚未決定的本機編輯。見[靜態資料政策](../../SECURITY.md#5-data-at-rest)（英文）。
 
 <a id="images-in-the-terminal"></a>
 
@@ -494,7 +506,7 @@ Corta 會自己選擇更快的做法；這裡的一切都不需要設定。下�
 - **隱藏的窗格會讓路。** 窗格被隱藏兩秒後——切到另一個標籤頁、視窗縮到最小——它的輸出以背景優先權讀取，
   不會和你正在看的內容爭搶資源。不會遺失任何內容，向它輸入或貼上會立即恢復完整的優先權。
 
-[Performance](PERFORMANCE.md)（英文）記錄了量測結果和量測方法。
+[Performance](../../PERFORMANCE.md)（英文）記錄了量測結果和量測方法。
 
 <a id="settings-and-the-config-file"></a>
 
@@ -512,14 +524,14 @@ Corta 會自己選擇更快的做法；這裡的一切都不需要設定。下�
   以及輸入法狀態提示的模式和顏色。
 - **快速鍵** —— 每個命令的按鍵；改過的快速鍵旁會出現一個重置箭頭。
 - **快捷終端機** —— 全域熱鍵、位置和螢幕。
-- **連線** —— 連線 SSH，以及已儲存的預設集。
+- **連線** —— 連線到主機，以及已儲存的預設集。
 - **隱私權與安全性** —— 程式寫入剪貼簿（OSC 52）、安全鍵盤輸入、目錄歷史和最近連線的主機。
 
 這些控制項編輯的都是同一個設定檔。自訂主題的顏色可以圖形化編輯，也可以透過檔案編輯。
 
-視窗工具列還提供 SSH 和 SFTP。兩者都會在視窗上打開一個面板，包含主機、使用者、連接埠和私密金鑰欄位——主機可以是設定中的別名——
-並推薦最近和設定過的主機；使用者、連接埠或金鑰留空則遵循 OpenSSH 的設定。SFTP 會打開遠端窗格的瀏覽器；
-窗格是本機的時，則請你輸入主機（[遠端工作](#remote-work-ssh-and-sftp)）。
+視窗工具列的地球按鈕用於連線主機，可以打開終端機，也可以瀏覽它的檔案：在視窗上打開一個面板，填寫主機——可以是設定中的別名——
+使用者、連接埠和私密金鑰在 **進階選項** 裡，並推薦最近和設定過的主機；使用者、連接埠或金鑰留空則遵循 OpenSSH 的設定。
+從遠端窗格打開時，會先提供那部主機的檔案（[遠端工作](#remote-work-ssh-and-sftp)）。
 
 ```ini
 theme = corta
@@ -531,7 +543,7 @@ bind.equalize-panes = ctrl+cmd+e
 ```
 
 多數設定立即生效；少數幾項（視窗大小、捲動記錄長度）作用於下一個視窗或工作階段。
-[Configuration](CONFIGURATION.md)（英文）列出了每個設定項目、預設值以及何時生效。
+[Configuration](../../CONFIGURATION.md)（英文）列出了每個設定項目、預設值以及何時生效。
 
 <a id="keyboard-shortcuts"></a>
 
@@ -550,7 +562,7 @@ bind.close =
 **Shell** 選單直接提供分割、重新打開和清除畫面。其他工具歸在 **移動焦點**、**指令與輸出**、**工作目錄**、
 **窗格佈局** 以及 **終端機與連線** 之下。
 
-以下是本版本的預設值——[Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)（英文）是權威清單：
+以下是本版本的預設值——[Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts)（英文）是權威清單：
 
 | 命令 | 快速鍵 |
 | --- | --- |
@@ -573,15 +585,15 @@ bind.close =
 | 命令面板… | ⇧⌘P |
 
 其他所有命令——平均分配窗格、清除歷史記錄、重置終端機、瀏覽遠端檔案…、命令輸出和工作目錄相關的命令——
-都沒有預設按鍵，在命令面板裡一搜就到。[Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)（英文）
+都沒有預設按鍵，在命令面板裡一搜就到。[Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts)（英文）
 有完整的表格，列出每個命令的 `bind.` 名稱。
 
 <a id="when-something-goes-wrong"></a>
 
 ## 出問題時
 
-[疑難排解](TROUBLESHOOTING.zh-Hant.md)介紹出問題時你會看到什麼以及如何修復——macOS 打不開的下載、被拒絕的字型、
-沒有反應的快速鍵。[Features and limitations](FEATURES.md)（英文）列出了 Corta 目前還做不到的事。
+[疑難排解](TROUBLESHOOTING.md)介紹出問題時你會看到什麼以及如何修復——macOS 打不開的下載、被拒絕的字型、
+沒有反應的快速鍵。[Features and limitations](../../FEATURES.md)（英文）列出了 Corta 目前還做不到的事。
 其他問題請在 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose) 回報。
 使用問題請到 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a)，
 或在 [Discord](https://discord.gg/QNdWfdwr7j) 的 `#help` 頻道提問。

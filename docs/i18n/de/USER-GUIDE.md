@@ -1,11 +1,11 @@
 # Benutzerhandbuch
 
-[Dokumentationsindex (Englisch)](README.md) · [Projektübersicht](../README.de.md)
+[Dokumentationsindex (Englisch)](../../README.md) · [Projektübersicht](README.md)
 
-🇺🇸 [English](USER-GUIDE.md) · 🇨🇳 [简体中文](USER-GUIDE.zh-CN.md) · 🇭🇰 [繁體中文](USER-GUIDE.zh-Hant.md) · 🇯🇵 [日本語](USER-GUIDE.ja.md) · 🇰🇷 [한국어](USER-GUIDE.ko.md) · 🇩🇪 [Deutsch](USER-GUIDE.de.md) · 🇫🇷 [Français](USER-GUIDE.fr.md) · 🇪🇸 [Español](USER-GUIDE.es.md) · 🇧🇷 [Português](USER-GUIDE.pt-BR.md)
+🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
-> Diese Seite ist eine Übersetzung von [USER-GUIDE.md](USER-GUIDE.md) mit dem Stand von Commit
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/USER-GUIDE.md).
+> Diese Seite ist eine Übersetzung von [USER-GUIDE.md](../../USER-GUIDE.md) mit dem Stand von Commit
+> [`6d71b21`](https://github.com/noah-qin/Corta/blob/6d71b211e36e977f9250f45df1ccf10dde8fde2f/docs/USER-GUIDE.md).
 > Wurde die englische Fassung seitdem geändert oder weichen die beiden ab, gilt die englische.
 > Namen in der Oberfläche folgen Cortas deutscher Oberfläche; Konfigurationsschlüssel, Befehle und Code bleiben im Original.
 
@@ -52,7 +52,7 @@ Ziehe Corta in „Programme“ und wirf das Image dann aus. Releases ab 1.1.9 si
 ihre ursprünglichen ZIPs.
 
 Offizielle Releases sind mit Developer ID signiert und notarisiert. Lehnt macOS einen Download ab, folge der
-[Fehlerbehebung](TROUBLESHOOTING.de.md#installing). Von einem anderen Ort gestartet, bietet Corta an, sich nach
+[Fehlerbehebung](TROUBLESHOOTING.md#installing). Von einem anderen Ort gestartet, bietet Corta an, sich nach
 `/Applications` zu verschieben (`suggest-applications-folder`).
 
 **Updates.** **Corta ▸ Nach Updates suchen…** prüft sofort; eine Hintergrundprüfung läuft einmal am Tag, sofern nicht
@@ -64,7 +64,7 @@ Offizielle Releases sind mit Developer ID signiert und notarisiert. Lehnt macOS 
 
 Corta hat keinen Import: Es liest eine Textdatei, `~/.config/corta/config`, und das Einstellungsfenster bearbeitet
 dieselbe Datei. Die meisten Gewohnheiten lassen sich mit einer Handvoll Schlüssel übernehmen. Die linke Spalte nennt,
-wo die Gewohnheit anderswo zu Hause ist; die rechte den Corta-Schlüssel ([Configuration](CONFIGURATION.md), Englisch,
+wo die Gewohnheit anderswo zu Hause ist; die rechte den Corta-Schlüssel ([Configuration](../../CONFIGURATION.md), Englisch,
 hat die Werte und wann sie gelten).
 
 | Wenn du dich verlassen hast auf … | In Corta |
@@ -78,7 +78,7 @@ hat die Werte und wann sie gelten).
 | Dein eigenes Farbschema | Ein in der Datei definiertes Thema (`theme.<name>.*`) oder **Darstellung ▸ Themeneditor…**. [Themen erstellen und bearbeiten](#creating-and-editing-themes). |
 | Deine eigenen Tastenbelegungen | `bind.<command> = <shortcut>`. Die Befehlsnamen stehen unter [Tastaturkurzbefehle](#keyboard-shortcuts). |
 | Eine Schrift deiner Wahl | **Einstellungen ▸ Erscheinungsbild ▸ Schrift** oder `font-family`. Angeboten werden nur Festbreitenschriften, die Corta in sein Raster setzen kann. |
-| Ligaturen, Transparenz oder profilbezogene Einstellungen | Nicht verfügbar; sie werden [nicht ausgeliefert](CONFIGURATION.md#6-what-is-deliberately-not-configurable), und jede braucht zuerst eine Entscheidung. Voreinstellungen decken Shell, Verzeichnis und Umgebung ab ([Presets](CONFIGURATION.md#4a-presets)). |
+| Ligaturen, Transparenz oder profilbezogene Einstellungen | Nicht verfügbar; sie werden [nicht ausgeliefert](../../CONFIGURATION.md#6-what-is-deliberately-not-configurable), und jede braucht zuerst eine Entscheidung. Voreinstellungen decken Shell, Verzeichnis und Umgebung ab ([Presets](../../CONFIGURATION.md#4a-presets)). |
 | `tmux -CC`-Steuermodus | Nicht unterstützt (D09). Gewöhnliches `tmux` läuft in Corta wie jedes andere Programm. |
 
 **Shell-Integration.** Standardmäßige lokale zsh-Sitzungen laden Cortas Hooks, ohne deine Startdateien anzufassen.
@@ -91,7 +91,7 @@ funktioniert, braucht nichts Neues; einer, der für `xterm-ghostty` oder `xterm-
 stattdessen den gängigen Wert.
 
 Kleinere Unterschiede im Verhalten – Kopieren, Schließen, der Hotkey des Schnellterminals, Remote-Kennzeichen – sind unter
-[Fehlerbehebung → Verhalten, das sich von anderen Terminals unterscheidet](TROUBLESHOOTING.de.md#behaviour-that-differs-from-other-terminals)
+[Fehlerbehebung → Verhalten, das sich von anderen Terminals unterscheidet](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals)
 gesammelt.
 
 <a id="windows-tabs-and-panes"></a>
@@ -126,7 +126,7 @@ gesammelt.
   Das Schnellterminal ist ausgenommen.
 - **Voreinstellungen.** Eine Voreinstellung ist eine benannte Kombination aus Shell, Verzeichnis und Umgebung, definiert
   in der Konfigurationsdatei. **Shell ▸ Neuer Bereich mit Voreinstellung** öffnet eine; halte ⌥ gedrückt, um sie in
-  einem eigenen Fenster zu öffnen ([Presets](CONFIGURATION.md#4a-presets)).
+  einem eigenen Fenster zu öffnen ([Presets](../../CONFIGURATION.md#4a-presets)).
 - Neue Fenster öffnen sich mit `columns` × `rows` Zellen (standardmäßig 120 × 30).
 
 <a id="text-fonts-and-themes"></a>
@@ -168,7 +168,7 @@ gesammelt.
 - **Thema.** Drei eingebaute Themen, `corta`, `solarized` und `mono`, jeweils mit heller und dunkler Variante;
   `appearance = auto` folgt macOS beim Umschalten. Über **Darstellung ▸ Themeneditor…** oder in der
   Konfigurationsdatei kannst du ein eigenes Thema definieren oder von einem erben und ein paar Farben ändern
-  ([Themes](CONFIGURATION.md#4-themes)).
+  ([Themes](../../CONFIGURATION.md#4-themes)).
 - **Unicode.** Chinesischer, japanischer und koreanischer Text belegt zwei Spalten und richtet sich mit allem anderen aus;
   Emoji, kombinierende Zeichen, Flaggen und Emoji-Sequenzen sind jeweils ein Cluster. Zeichen, die der Schrift fehlen,
   kommen aus den Ersatzschriften des Systems. Standardisierte Emoji-Darstellungssequenzen (ein Textzeichen gefolgt von
@@ -217,14 +217,14 @@ es während der Befehlsausgabe behalten. Beide Prompt-Modi blenden es aus, währ
 mit alternativem Bildschirm verwendest.
 
 Die Einstellung **Position** wählt **Fenster-Symbolleiste** (Standard) oder **Rechter Rand der Befehlszeile**. Das
-Kennzeichen in der Symbolleiste steht unabhängig von den Netzwerk- und Dateitasten und bleibt an seinem Platz, wenn
+Kennzeichen in der Symbolleiste steht unabhängig von den Tasten zum Verbinden und für einen neuen Tab und bleibt an seinem Platz, wenn
 Befehle länger werden oder umbrechen. Ausschalten oder die Platzierung an der Befehlszeile entfernt seinen Platz und
 seinen Abstand in der Symbolleiste. An der Befehlszeile verschieben lange Befehle das Kennzeichen nach unten in freien
 Platz, am rechten Rand; es verschwindet, wenn keine sichere Zeile bleibt, und fügt nie eine Zeile ein oder lässt das
 Kindprogramm scrollen. Farben für direkte Eingabe und IME akzeptieren Hex-Werte; leere ein Feld für die dezente Standardgestaltung.
 
-[Kennzeichen für chinesische Eingabequelle](brand/input-source-indicator.png) ·
-[Ausweichen bei langen Befehlen](brand/input-source-long-command.png)
+[Kennzeichen für chinesische Eingabequelle](../../brand/input-source-indicator.png) ·
+[Ausweichen bei langen Befehlen](../../brand/input-source-long-command.png)
 
 <a id="optional-local-system-status"></a>
 
@@ -284,13 +284,19 @@ nachdem du seine App-Sprache in macOS geändert hast. Zahlenformate folgen der a
 
 ## Wenn eine Sitzung endet
 
-Ein Bereich behält seine Ausgabe, nachdem die Shell beendet wurde, und zeigt eine Karte **Sitzung beendet** mit ihrem
-Exit-Code oder dem beendenden Signal. Der Cursor verschwindet, aber Scrollen, Auswählen, Kopieren und die Suche mit ⌘F
-funktionieren weiter. **Neue Sitzung** fragt nach, bevor die erhaltene Ausgabe ersetzt wird; **Bereich schließen**
-schließt diesen Bereich. Eine direkt verbundene SSH-Sitzung bietet **Neu verbinden**, um eine neue Verbindung aufzubauen.
-Wer Python oder ein anderes Programm verlässt und in eine laufende Shell zurückkehrt, beendet die Terminalsitzung nicht.
+Ein Bereich behält seine Ausgabe, nachdem die Shell beendet wurde: Die Ausgabe wird leicht abgedunkelt, und ein Feld
+sagt in einem Satz, was wie geendet hat – mit dem Exit-Code oder dem Signal, das es beendet hat. Der Cursor verschwindet,
+aber Scrollen, Auswählen, Kopieren und die Suche mit ⌘F funktionieren rund um das Feld weiter. **Neue Sitzung** startet
+die Shell oder Vorgabe im Bereich neu; **Bereich schließen** schließt ihn. Eine direkt verbundene SSH-Sitzung nennt den
+Host, mit dem sie verbunden war, und bietet **Neu verbinden** für eine neue Verbindung; den Exit-Code 255 von ssh erklärt
+sie als abgerissenes Netzwerk oder einen Host, der nicht mehr antwortet. Beide Tasten löschen die Ausgabe darüber – das
+Feld sagt es –, und die neue Sitzung beginnt in der Größe und Schriftgröße des Bereichs. Wer Python oder ein anderes
+Programm verlässt und in eine laufende Shell zurückkehrt, beendet die Terminalsitzung nicht.
 
-![Beendete Sitzung mit ihrer letzten Ausgabe und Aktionen zur Wiederherstellung](brand/session-ended.png)
+Scheitern Ein- oder Ausgabe einer Sitzung oder zeichnet ein Bereich nicht mehr, bietet dasselbe Feld **Erneut versuchen**
+oder, bei einer Verbindung, **Neu verbinden**; der Fehlertext des Systems steht unter **Details**.
+
+![Beendete Sitzung mit ihrer letzten Ausgabe und Aktionen zur Wiederherstellung](../../brand/session-ended.png)
 
 <a id="scrollback-search-and-selection"></a>
 
@@ -335,7 +341,7 @@ Wer Python oder ein anderes Programm verlässt und in eine laufende Shell zurüc
   öffnet sich per ⌘-Klick in deinem Editor. Sag Corta mit `open-file-command`, welcher Editor, beginnend mit seinem
   vollständigen Pfad, zum Beispiel
   `open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}`
-  ([Following a file reference](CONFIGURATION.md#following-a-file-reference)).
+  ([Following a file reference](../../CONFIGURATION.md#following-a-file-reference)).
 
 Das Öffnen eines Dateiverweises setzt ein konfiguriertes `open-file-command` voraus. Corta öffnet aus der Ausgabe
 abgeleitete Dateien nie in ihrer Standard-App des Systems: Manche Dateitypen führen beim Öffnen Code aus.
@@ -404,7 +410,7 @@ Ordner im aktuellen Verzeichnis als blassen Text unter deiner Eingabe zu sehen. 
 neben dem Cursor erscheint ein blasses Suffix. So kann `cd De` zum Beispiel `Developer/` vorschlagen. Vorschläge sind
 Vorschauen: Sie gehören nicht zu deinem Befehl, bevor du sie übernimmst.
 
-![Verzeichnisvorschläge unter cd, mit Markierungen für erfolgreiche, fehlgeschlagene und abgebrochene Befehle](brand/directory-suggestions.png)
+![Verzeichnisvorschläge unter cd, mit Markierungen für erfolgreiche, fehlgeschlagene und abgebrochene Befehle](../../brand/directory-suggestions.png)
 
 Solange ein Vorschlag sichtbar ist:
 
@@ -447,14 +453,19 @@ keine eigene SSH-Implementierung.
   der Bereich entfernt ist, ohne zu wissen, welcher Host.
 - **Neu verbinden.** Endet eine `ssh`- oder `mosh`-Sitzung, führt **Erneut mit Host verbinden** denselben Befehl als neue
   Verbindung noch einmal aus.
-- **Verbinden.** Die Globus- und Ordnertasten der Symbolleiste öffnen einen Dialog für ein SSH-Terminal oder einen
-  SFTP-Browser, mit denselben Feldern für beide: der Host (ein Name, eine Adresse oder ein SSH-Alias), der Benutzer, der
-  Port und ein privater Schlüssel. Lass eines der letzten drei leer, und deine `~/.ssh/config` sowie die Standardwerte von
-  OpenSSH entscheiden; ein gewählter Schlüssel wird zuerst angeboten, und andere Schlüssel im `ssh-agent` werden nicht
-  versucht. Der Dialog listet deine jüngsten Verbindungen – mit dem Benutzer, Port und Schlüssel, den sie verwendeten – und
-  die `Host`-Namen aus deiner `~/.ssh/config`; tippe, um die Liste einzugrenzen, klicke auf einen Eintrag (oder nutze ↑
-  und ↓ im Host-Feld), um die Felder zu füllen, und doppelklicke oder drücke Return, um zu verbinden.
-  Einstellungen ▸ Datenschutz & Sicherheit ▸ Zuletzt verbundene Hosts löscht die jüngsten.
+- **Verbinden.** Die Globustaste der Symbolleiste öffnet **Mit Host verbinden**, einen Dialog mit einem Umschalter
+  **Terminal / Dateien (SFTP)**: ein Terminal über SSH oder der Datei-Browser. Tippe den Host – einen Namen, eine Adresse,
+  `user@host` oder einen SSH-Alias. **Erweitert** enthält Benutzer, Port und privaten Schlüssel; leer entscheiden deine
+  `~/.ssh/config` und die Standardwerte von OpenSSH. Ein gewählter Schlüssel wird zuerst angeboten, und andere Schlüssel
+  im `ssh-agent` werden nicht versucht. Der Dialog listet deine jüngsten Verbindungen – mit Port, Schlüssel und wann du
+  sie zuletzt genutzt hast – und die `Host`-Namen aus deiner `~/.ssh/config`. Hosts, die nur Git annehmen (`github.com`
+  oder ein `Host` mit `User git`), fehlen, und die Liste sagt, welche. Tippe, um die Liste einzugrenzen, klicke auf einen
+  Eintrag (oder nutze ↑ und ↓ im Host-Feld), um die Felder zu füllen, und doppelklicke oder drücke Return, um zu
+  verbinden. Eine Terminalverbindung kommt erst in die Liste, wenn sie steht – ein Host, der dich abweist oder keine
+  Shell hat, nicht. Fahre mit dem Zeiger über einen jüngsten Host und klicke ✕, oder rechtsklicke ihn, um ihn zu
+  vergessen; Einstellungen ▸ Datenschutz & Sicherheit ▸ Zuletzt verbundene Hosts löscht alle.
+- **Dateien dieses Bereichs.** Aus einem Bereich geöffnet, der mit einem anderen Rechner verbunden ist, bietet der Dialog
+  zuerst die Dateien dieses Hosts an; drücke Return oder **Dateien durchsuchen**, um sie zu öffnen.
 - **Entfernte Dateien durchsuchen …** öffnet einen SFTP-Browser für den Host des Bereichs: auflisten, hochladen,
   herunterladen, umbenennen und löschen. Die erste Verbindung zu einem Host bittet dich, den Hostnamen zu bestätigen.
   Übertragungen werden nach einer Unterbrechung fortgesetzt und überschreiben nie ohne Nachfrage eine Datei.
@@ -463,13 +474,12 @@ keine eigene SSH-Implementierung.
 - **Im Browser**, wie im Finder: ⌘[ und ⌘] gehen zurück und vor, ⌘↑ zum übergeordneten Ordner, ⌘R aktualisiert,
   ⇧⌘G (oder ein Klick auf den Pfad) tippt einen Pfad, ⇧⌘N legt einen Ordner an und ⇧⌘. zeigt unsichtbare Dateien.
   Klicke auf einen Spaltentitel zum Sortieren. Rechtsklicke eine Zeile für ihre Aktionen; doppelklicke einen Ordner, um
-  ihn zu öffnen. Lege Dateien aus dem Finder auf der Liste ab – oder auf einer Ordnerzeile –, um sie hochzuladen, und
-  ziehe eine Datei in den Finder, um sie herunterzuladen. Übertragungen findest du unter der Pfeiltaste der
+  ihn zu öffnen. Lege Dateien aus dem Finder auf der Liste ab – oder auf einer Ordnerzeile –, um sie hochzuladen; beim Ziehen wird die Liste (oder die Zeile) umrandet und nennt das Ziel. Ziehe eine Datei in den Finder, um sie herunterzuladen. Übertragungen findest du unter der Pfeiltaste der
   Symbolleiste, mit Geschwindigkeit, Restzeit und „Im Finder zeigen“.
 - **Eine entfernte Datei bearbeiten.** **Bearbeiten** im Browser – oder ein ⌘-Klick auf ein `path:line` in einem
   entfernten Bereich – lädt eine Kopie herunter und öffnet sie in deinem Editor. Lege zuerst
   **Einstellungen ▸ Terminal ▸ Datei öffnen mit** fest, mit einem absoluten Pfad zum Editor und den Platzhaltern
-  `{file}`, `{line}`, `{column}` ([Beispiele](CONFIGURATION.md#following-a-file-reference)). Das Hochladen deiner
+  `{file}`, `{line}`, `{column}` ([Beispiele](../../CONFIGURATION.md#following-a-file-reference)). Das Hochladen deiner
   Änderungen ist ein eigener, ausdrücklicher Schritt, und Corta prüft zuerst, ob sich die entfernte Datei inzwischen
   geändert hat. Dateien über 64 MiB werden nicht auf diese Weise kopiert; lade sie über den Browser herunter, der den
   Fortschritt zeigt und abbrechen kann. Eine Kopie, die 30 Tage lang niemand geöffnet oder geändert hat, wird bei der
@@ -479,16 +489,23 @@ keine eigene SSH-Implementierung.
 
 Fragt der Server nach einem Passwort, einer Schlüssel-Passphrase oder einem Einmalcode, oder ist ein Host neu und sein
 Schlüssel braucht deine Entscheidung, fragt der Browser in einem Dialog auf seinem Fenster und reicht deine Antwort an
-OpenSSH weiter; nichts wird gespeichert, sodass ein erneutes Verbinden wieder fragt. Der Hostschlüssel-Dialog zeigt den
-Fingerabdruck und hat „Abbrechen“ als Standard. Ein Schlüssel im `ssh-agent` oder im Schlüsselbund, oder eine bestehende
-`ControlMaster`-Verbindung aus deinem Terminal, meldet sich ohne Nachfrage an.
+OpenSSH weiter; nichts wird gespeichert, sodass ein erneutes Verbinden wieder fragt. **Verbindung abbrechen** im
+Passwort-Dialog beendet diesen Verbindungsversuch und kehrt zum Host-Feld zurück – es wird nicht als leeres Passwort
+gesendet. **Abbrechen** bei der Passphrase eines Schlüssels überspringt nur diesen Schlüssel, und ssh versucht die
+nächste Anmeldeart. Der Hostschlüssel-Dialog zeigt den Fingerabdruck und hat „Abbrechen“ als Standard. Ein Schlüssel im
+`ssh-agent` oder im Schlüsselbund, oder eine bestehende `ControlMaster`-Verbindung aus deinem Terminal, meldet sich ohne
+Nachfrage an.
+
+Scheitert eine Verbindung, sagt sie in einem Satz, warum – Passwort oder Schlüssel nicht angenommen, Host antwortet
+nicht, Hostschlüssel unbekannt oder geändert, der Server bietet kein SFTP –, mit den Worten von ssh unter **Details**,
+und bietet **Erneut versuchen** oder **Verbindung bearbeiten**.
 
 Uploads aus der Remote-Bearbeitung vergleichen neben Größe und Änderungszeit auch den entfernten Inhalt und senden den
 privaten Schnappschuss, den du bestätigt hast. Sicherst du nach der Bestätigung eine weitere lokale Änderung, fragt Corta
 erneut nach einer Entscheidung; Sicherungen während eines Uploads bleiben ausstehend. Nach einem Verbindungsfehler
 verbindet die nächste Bearbeitung oder der nächste Upload neu, und ein fehlgeschlagener Upload behält seine ausstehende
 Entscheidung. Bewahre unentschiedene lokale Änderungen auf, bevor du App-Daten löschst. Siehe die
-[Richtlinie zu gespeicherten Daten](SECURITY.md#5-data-at-rest) (Englisch).
+[Richtlinie zu gespeicherten Daten](../../SECURITY.md#5-data-at-rest) (Englisch).
 
 <a id="images-in-the-terminal"></a>
 
@@ -579,7 +596,7 @@ erwarten kannst.
   minimiertes Fenster –, wird seine Ausgabe mit Hintergrundpriorität gelesen, damit sie nicht mit dem konkurriert, was du
   gerade ansiehst. Nichts geht verloren, und Tippen oder Einfügen darin stellt sofort die volle Priorität wieder her.
 
-[Performance](PERFORMANCE.md) (Englisch) enthält die Messungen und wie sie entstanden sind.
+[Performance](../../PERFORMANCE.md) (Englisch) enthält die Messungen und wie sie entstanden sind.
 
 <a id="settings-and-the-config-file"></a>
 
@@ -600,17 +617,17 @@ Die Einstellungen sind eine Seitenleiste mit Kategorien, aufgebaut wie die Syste
   Programm die Maus belegt, Kopieren beim Auswählen sowie Modi und Farben der Eingabequellenanzeige.
 - **Tastaturkurzbefehle** – die Taste jedes Befehls; neben einer geänderten erscheint ein Pfeil zum Zurücksetzen.
 - **Schnellterminal** – der systemweite Hotkey, Position und Bildschirm.
-- **Verbindungen** – Per SSH verbinden und gespeicherte Vorgaben.
+- **Verbindungen** – Mit Host verbinden und gespeicherte Vorgaben.
 - **Datenschutz & Sicherheit** – Schreiben in die Zwischenablage durch Programme (OSC 52), Sichere Tastatureingabe, der
   Verzeichnisverlauf und zuletzt verbundene Hosts.
 
 Diese Bedienelemente bearbeiten dieselbe Konfigurationsdatei. Farben eigener Themen lassen sich grafisch oder über die
 Datei bearbeiten.
 
-Die Symbolleiste des Fensters ergänzt SSH und SFTP. Beide öffnen einen Dialog auf dem Fenster mit Feldern für Host,
-Benutzer, Port und privaten Schlüssel – der Host darf ein Alias aus der Konfiguration sein – und schlagen zuletzt
-verwendete und konfigurierte Hosts vor; ein leerer Benutzer, Port oder Schlüssel folgt der OpenSSH-Konfiguration. SFTP
-öffnet den Browser des entfernten Bereichs oder fragt nach einem Host, wenn der Bereich lokal ist
+Die Globustaste in der Symbolleiste des Fensters verbindet mit einem Host, für ein Terminal oder für seine Dateien: ein
+Dialog auf dem Fenster mit dem Host – er darf ein Alias aus der Konfiguration sein – und Benutzer, Port und privatem
+Schlüssel unter **Erweitert**; er schlägt zuletzt verwendete und konfigurierte Hosts vor, und ein leerer Benutzer, Port
+oder Schlüssel folgt der OpenSSH-Konfiguration. Aus einem entfernten Bereich bietet er zuerst die Dateien dieses Hosts an
 ([Arbeiten aus der Ferne](#remote-work-ssh-and-sftp)).
 
 ```ini
@@ -623,7 +640,7 @@ bind.equalize-panes = ctrl+cmd+e
 ```
 
 Die meisten Einstellungen gelten sofort; einige wenige (Fenstergröße, Länge des Verlaufs) gelten für das nächste Fenster
-oder die nächste Sitzung. [Configuration](CONFIGURATION.md) (Englisch) listet jeden Schlüssel, seinen Standardwert und
+oder die nächste Sitzung. [Configuration](../../CONFIGURATION.md) (Englisch) listet jeden Schlüssel, seinen Standardwert und
 wann er wirksam wird.
 
 <a id="keyboard-shortcuts"></a>
@@ -645,7 +662,7 @@ Das Menü **Shell** hält Teilen, Wiederöffnen und Bildschirm löschen direkt b
 **Fokus verschieben**, **Befehle und Ausgabe**, **Arbeitsverzeichnis**, **Bereichslayout** und
 **Terminal und Verbindung** gruppiert.
 
-Die Standardwerte, Stand dieser Version – [Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts) (Englisch) ist die
+Die Standardwerte, Stand dieser Version – [Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts) (Englisch) ist die
 maßgebliche Liste:
 
 | Befehl | Kurzbefehl |
@@ -670,16 +687,16 @@ maßgebliche Liste:
 
 Jeder andere Befehl – Bereiche gleichmäßig aufteilen, Verlauf löschen, Terminal zurücksetzen, Entfernte Dateien
 durchsuchen …, die Befehle zu Befehlsausgabe und Arbeitsverzeichnis – hat keine Standardtaste und ist in der
-Befehlspalette nur eine Suche entfernt. [Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts) (Englisch) hat die
+Befehlspalette nur eine Suche entfernt. [Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts) (Englisch) hat die
 vollständige Tabelle mit dem `bind.`-Namen jedes Befehls.
 
 <a id="when-something-goes-wrong"></a>
 
 ## Wenn etwas schiefgeht
 
-Die [Fehlerbehebung](TROUBLESHOOTING.de.md) behandelt, was du siehst, wenn etwas fehlschlägt, und wie du es behebst – ein
+Die [Fehlerbehebung](TROUBLESHOOTING.md) behandelt, was du siehst, wenn etwas fehlschlägt, und wie du es behebst – ein
 Download, den macOS nicht öffnet, eine abgelehnte Schrift, ein Kurzbefehl, der nichts tut.
-[Features and limitations](FEATURES.md) (Englisch) listet, was Corta noch nicht kann. Melde alles andere über
+[Features and limitations](../../FEATURES.md) (Englisch) listet, was Corta noch nicht kann. Melde alles andere über
 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose). Für Fragen zur Nutzung geh zu
 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a) oder frag in `#help` im
 [Discord](https://discord.gg/QNdWfdwr7j).

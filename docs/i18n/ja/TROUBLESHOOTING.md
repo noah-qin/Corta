@@ -1,10 +1,10 @@
 # トラブルシューティング
 
-[ドキュメント索引（英語）](README.md) · [プロジェクト概要](../README.ja.md)
+[ドキュメント索引（英語）](../../README.md) · [プロジェクト概要](README.md)
 
-🇺🇸 [English](TROUBLESHOOTING.md) · 🇨🇳 [简体中文](TROUBLESHOOTING.zh-CN.md) · 🇭🇰 [繁體中文](TROUBLESHOOTING.zh-Hant.md) · 🇯🇵 [日本語](TROUBLESHOOTING.ja.md) · 🇰🇷 [한국어](TROUBLESHOOTING.ko.md) · 🇩🇪 [Deutsch](TROUBLESHOOTING.de.md) · 🇫🇷 [Français](TROUBLESHOOTING.fr.md) · 🇪🇸 [Español](TROUBLESHOOTING.es.md) · 🇧🇷 [Português](TROUBLESHOOTING.pt-BR.md)
+🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
-> このページは英語版 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) のコミット
+> このページは英語版 [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md) のコミット
 > [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md)
 > 時点の翻訳です。その後英語版が更新された場合や内容に食い違いがある場合は、英語版が正となります。
 > macOS のメッセージは英語の原文を併記しています。
@@ -146,7 +146,7 @@ Corta は、自分が起動された環境の `$SHELL`（なければ `/bin/zsh`
 
 Corta は意図的に `TERM=xterm-256color` を名乗ります（`docs/DECISIONS.md` D08）。その TERM の値を共有していることは、
 xterm と完全に互換であることを意味しません。`printf '%s\n' "$TERM"` でリモートの環境を確認し、最小の再現例と比べてください。
-[Conformance](CONFORMANCE.md#42-external-suites)（英語）に、対応しているシーケンスと残っている失敗が記録されています。
+[Conformance](../../CONFORMANCE.md#42-external-suites)（英語）に、対応しているシーケンスと残っている失敗が記録されています。
 
 ### ある文字が隣の文字より小さく描かれる
 
@@ -245,7 +245,7 @@ SFTP の接続は、パスワードや鍵のパスフレーズをそのウイン
 上限より古い出力は、新しい出力が来るたびに破棄されます。上部のピルに、表示がどれだけさかのぼっているかが出ます。
 上限は引き上げられます（最大 1,000,000。圧縮された古い履歴のメモリ量はテキストと負荷によります）。保存される 1 セルは圧縮前で
 16 バイトですが、これは常駐メモリの見積もりではありません。120 桁 100,000 行の負荷を測ったところ、常駐メモリの増加は約 11 MiB でした。
-[Performance](PERFORMANCE.md#56-numbers-by-release)（英語）を参照してください。設定した上限を超えて残したい出力は書き出してください。
+[Performance](../../PERFORMANCE.md#56-numbers-by-release)（英語）を参照してください。設定した上限を超えて残したい出力は書き出してください。
 
 ### セキュリティキーボード入力がオンなのに、マクロツールが動く
 

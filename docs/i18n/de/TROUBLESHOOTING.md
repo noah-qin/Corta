@@ -1,10 +1,10 @@
 # Fehlerbehebung
 
-[Dokumentationsindex (Englisch)](README.md) · [Projektübersicht](../README.de.md)
+[Dokumentationsindex (Englisch)](../../README.md) · [Projektübersicht](README.md)
 
-🇺🇸 [English](TROUBLESHOOTING.md) · 🇨🇳 [简体中文](TROUBLESHOOTING.zh-CN.md) · 🇭🇰 [繁體中文](TROUBLESHOOTING.zh-Hant.md) · 🇯🇵 [日本語](TROUBLESHOOTING.ja.md) · 🇰🇷 [한국어](TROUBLESHOOTING.ko.md) · 🇩🇪 [Deutsch](TROUBLESHOOTING.de.md) · 🇫🇷 [Français](TROUBLESHOOTING.fr.md) · 🇪🇸 [Español](TROUBLESHOOTING.es.md) · 🇧🇷 [Português](TROUBLESHOOTING.pt-BR.md)
+🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
-> Diese Seite ist eine Übersetzung von [TROUBLESHOOTING.md](TROUBLESHOOTING.md) mit dem Stand von Commit
+> Diese Seite ist eine Übersetzung von [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md) mit dem Stand von Commit
 > [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md).
 > Wurde die englische Fassung seitdem geändert oder weichen die beiden ab, gilt die englische.
 > Meldungen von macOS stehen zusätzlich im englischen Original.
@@ -156,7 +156,7 @@ die Alt-Taste einer PC-Tastatur. Sondertasten (Pfeile, Funktionstasten) tragen �
 
 Corta meldet bewusst `TERM=xterm-256color` (`docs/DECISIONS.md` D08). Denselben TERM-Wert zu teilen bedeutet keine
 vollständige xterm-Kompatibilität. Prüfe die entfernte Umgebung mit `printf '%s\n' "$TERM"` und vergleiche einen
-minimalen Reproduktionsfall; [Conformance](CONFORMANCE.md#42-external-suites) (Englisch) hält unterstützte Sequenzen und
+minimalen Reproduktionsfall; [Conformance](../../CONFORMANCE.md#42-external-suites) (Englisch) hält unterstützte Sequenzen und
 die verbleibenden Fehlschläge fest.
 
 ### Eine Glyphe wird kleiner gezeichnet als ihre Nachbarn
@@ -267,7 +267,7 @@ die Pille oben zeigt, wie weit die Ansicht zurückliegt. Erhöhe die Grenze (bis
 komprimierte ältere Verlauf belegt, hängt von Text und Arbeitslast ab). Eine gespeicherte Zelle hat vor der Kompression
 16 Byte; das ist keine Schätzung des belegten Arbeitsspeichers. Eine gemessene Arbeitslast mit 100.000 Zeilen und 120
 Spalten belegte etwa 11 MiB zusätzlichen Arbeitsspeicher; siehe
-[Performance](PERFORMANCE.md#56-numbers-by-release) (Englisch). Exportiere Ausgabe, die du über die konfigurierte Grenze
+[Performance](../../PERFORMANCE.md#56-numbers-by-release) (Englisch). Exportiere Ausgabe, die du über die konfigurierte Grenze
 hinaus behalten musst.
 
 ### Sichere Tastatureingabe ist an, aber mein Makrowerkzeug funktioniert trotzdem

@@ -1,10 +1,10 @@
 # Solución de problemas
 
-[Índice de la documentación (inglés)](README.md) · [Presentación del proyecto](../README.es.md)
+[Índice de la documentación (inglés)](../../README.md) · [Presentación del proyecto](README.md)
 
-🇺🇸 [English](TROUBLESHOOTING.md) · 🇨🇳 [简体中文](TROUBLESHOOTING.zh-CN.md) · 🇭🇰 [繁體中文](TROUBLESHOOTING.zh-Hant.md) · 🇯🇵 [日本語](TROUBLESHOOTING.ja.md) · 🇰🇷 [한국어](TROUBLESHOOTING.ko.md) · 🇩🇪 [Deutsch](TROUBLESHOOTING.de.md) · 🇫🇷 [Français](TROUBLESHOOTING.fr.md) · 🇪🇸 [Español](TROUBLESHOOTING.es.md) · 🇧🇷 [Português](TROUBLESHOOTING.pt-BR.md)
+🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
-> Esta página es una traducción de [TROUBLESHOOTING.md](TROUBLESHOOTING.md), tal como estaba en el commit
+> Esta página es una traducción de [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md), tal como estaba en el commit
 > [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md).
 > Si la versión en inglés ha cambiado desde entonces, o si ambas difieren, prevalece la versión en inglés.
 > Los mensajes de macOS van acompañados de su texto original en inglés.
@@ -153,7 +153,7 @@ modificador de xterm en cualquier caso.
 
 Corta anuncia `TERM=xterm-256color` a propósito (`docs/DECISIONS.md` D08). Compartir ese valor de TERM no implica una
 compatibilidad total con xterm. Comprueba el entorno remoto con `printf '%s\n' "$TERM"` y compara un caso mínimo de
-reproducción; [Conformance](CONFORMANCE.md#42-external-suites) (en inglés) recoge las secuencias admitidas y los fallos
+reproducción; [Conformance](../../CONFORMANCE.md#42-external-suites) (en inglés) recoge las secuencias admitidas y los fallos
 pendientes.
 
 ### Un glifo se dibuja más pequeño que los de alrededor
@@ -261,7 +261,7 @@ partida a 100 columnas son dos. La salida más antigua que el límite se descart
 indica cuánto ha retrocedido la vista. Sube el límite (hasta 1.000.000; la memoria que ocupa el historial antiguo
 comprimido depende del texto y de la carga). Una celda guardada ocupa 16 bytes antes de la compresión, lo cual no es una
 estimación de la memoria residente. Una carga medida de 100.000 líneas de 120 columnas añadió unos 11 MiB de memoria
-residente; consulta [Performance](PERFORMANCE.md#56-numbers-by-release) (en inglés). Exporta la salida que necesites
+residente; consulta [Performance](../../PERFORMANCE.md#56-numbers-by-release) (en inglés). Exporta la salida que necesites
 conservar más allá del límite configurado.
 
 ### La Entrada de teclado segura está activada pero mi herramienta de macros sigue funcionando

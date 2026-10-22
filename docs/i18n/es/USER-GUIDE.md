@@ -1,11 +1,11 @@
 # Guía de uso
 
-[Índice de la documentación (inglés)](README.md) · [Presentación del proyecto](../README.es.md)
+[Índice de la documentación (inglés)](../../README.md) · [Presentación del proyecto](README.md)
 
-🇺🇸 [English](USER-GUIDE.md) · 🇨🇳 [简体中文](USER-GUIDE.zh-CN.md) · 🇭🇰 [繁體中文](USER-GUIDE.zh-Hant.md) · 🇯🇵 [日本語](USER-GUIDE.ja.md) · 🇰🇷 [한국어](USER-GUIDE.ko.md) · 🇩🇪 [Deutsch](USER-GUIDE.de.md) · 🇫🇷 [Français](USER-GUIDE.fr.md) · 🇪🇸 [Español](USER-GUIDE.es.md) · 🇧🇷 [Português](USER-GUIDE.pt-BR.md)
+🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
-> Esta página es una traducción de [USER-GUIDE.md](USER-GUIDE.md), tal como estaba en el commit
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/USER-GUIDE.md).
+> Esta página es una traducción de [USER-GUIDE.md](../../USER-GUIDE.md), tal como estaba en el commit
+> [`6d71b21`](https://github.com/noah-qin/Corta/blob/6d71b211e36e977f9250f45df1ccf10dde8fde2f/docs/USER-GUIDE.md).
 > Si la versión en inglés ha cambiado desde entonces, o si ambas difieren, prevalece la versión en inglés.
 > Los nombres de la interfaz siguen la interfaz en español de Corta; las claves de configuración, los comandos y el código se mantienen en el original.
 
@@ -52,7 +52,7 @@ Arrastra Corta a Aplicaciones y después expulsa la imagen. Las versiones desde 
 anteriores conservan sus ZIP originales.
 
 Las versiones oficiales están firmadas con Developer ID y notarizadas. Si macOS rechaza una descarga, sigue la
-[Solución de problemas](TROUBLESHOOTING.es.md#installing). Si se abre desde cualquier otro lugar, Corta ofrece moverse a
+[Solución de problemas](TROUBLESHOOTING.md#installing). Si se abre desde cualquier otro lugar, Corta ofrece moverse a
 `/Applications` (`suggest-applications-folder`).
 
 **Actualizaciones.** **Corta ▸ Buscar actualizaciones…** comprueba al momento; una comprobación en segundo plano se
@@ -64,7 +64,7 @@ ejecuta una vez al día salvo que `update-auto-check = false`. Una actualizació
 
 Corta no tiene importador: lee un único archivo de texto, `~/.config/corta/config`, y la ventana de Ajustes edita ese
 mismo archivo. La mayoría de las costumbres se trasladan con unas pocas claves. La columna izquierda indica dónde vive la
-costumbre en otros terminales; la derecha, la clave de Corta ([Configuration](CONFIGURATION.md), en inglés, tiene los
+costumbre en otros terminales; la derecha, la clave de Corta ([Configuration](../../CONFIGURATION.md), en inglés, tiene los
 valores de cada una y cuándo se aplica).
 
 | Si dependías de… | En Corta |
@@ -78,7 +78,7 @@ valores de cada una y cuándo se aplica).
 | Tu propio esquema de colores | Un tema definido en el archivo (`theme.<name>.*`), o **Visualización ▸ Editor de temas…**. [Crear y editar temas](#creating-and-editing-themes). |
 | Tus propios atajos | `bind.<command> = <shortcut>`. Los nombres de los comandos están en [Atajos de teclado](#keyboard-shortcuts). |
 | Una fuente a tu elección | **Ajustes ▸ Apariencia ▸ Fuente**, o `font-family`. Solo se ofrecen familias monoespaciadas que Corta puede colocar en su cuadrícula. |
-| Ligaduras, transparencia o ajustes por perfil | No disponibles; [no se incluyen](CONFIGURATION.md#6-what-is-deliberately-not-configurable), y cada uno requiere antes una decisión. Los preajustes cubren un shell, un directorio y un entorno ([Presets](CONFIGURATION.md#4a-presets)). |
+| Ligaduras, transparencia o ajustes por perfil | No disponibles; [no se incluyen](../../CONFIGURATION.md#6-what-is-deliberately-not-configurable), y cada uno requiere antes una decisión. Los preajustes cubren un shell, un directorio y un entorno ([Presets](../../CONFIGURATION.md#4a-presets)). |
 | El modo de control `tmux -CC` | No compatible (D09). Un `tmux` normal se ejecuta dentro de Corta como cualquier programa. |
 
 **Integración del shell.** Las sesiones locales estándar de zsh cargan los hooks de Corta sin tocar tus archivos de inicio.
@@ -91,7 +91,7 @@ necesita nada nuevo; uno configurado para `xterm-ghostty` o `xterm-kitty` recibe
 
 Los comportamientos que difieren en cosas más pequeñas — copiar, cerrar, el atajo del Terminal rápido, las insignias
 remotas — están reunidos en
-[Solución de problemas → Comportamientos distintos de otros terminales](TROUBLESHOOTING.es.md#behaviour-that-differs-from-other-terminals).
+[Solución de problemas → Comportamientos distintos de otros terminales](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals).
 
 <a id="windows-tabs-and-panes"></a>
 
@@ -124,7 +124,7 @@ remotas — están reunidos en
   proceso nuevo; el texto del terminal y los trabajos en ejecución no se restauran. El Terminal rápido queda excluido.
 - **Preajustes.** Un preajuste es un shell, un directorio y un entorno con nombre, definidos en el archivo de
   configuración. **Shell ▸ Panel nuevo con preajuste** abre uno; mantén ⌥ para abrirlo en una ventana aparte
-  ([Presets](CONFIGURATION.md#4a-presets)).
+  ([Presets](../../CONFIGURATION.md#4a-presets)).
 - Las ventanas nuevas se abren con `columns` × `rows` celdas (120 × 30 por defecto).
 
 <a id="text-fonts-and-themes"></a>
@@ -163,7 +163,7 @@ remotas — están reunidos en
 - **Tema.** Tres temas integrados, `corta`, `solarized` y `mono`, cada uno con variante clara y oscura;
   `appearance = auto` sigue a macOS cuando cambia. Puedes definir tu propio tema con
   **Visualización ▸ Editor de temas…** o en el archivo de configuración, o heredar de uno y cambiar unos pocos colores
-  ([Themes](CONFIGURATION.md#4-themes)).
+  ([Themes](../../CONFIGURATION.md#4-themes)).
 - **Unicode.** El texto chino, japonés y coreano ocupa dos columnas y se alinea con todo lo demás; los emoji, las marcas
   combinantes, las banderas y las secuencias de emoji son un grupo cada uno. Los caracteres que le faltan a la fuente
   salen de las fuentes de respaldo del sistema. Las secuencias estandarizadas de presentación emoji (un carácter de texto
@@ -212,15 +212,14 @@ ejecución de comandos en modo **Automático**. **Siempre** puede mantenerla dur
 de prompt la ocultan mientras lees el historial o usas un programa de pantalla alternativa.
 
 El ajuste **Posición** permite elegir **Barra de herramientas de la ventana** (predeterminado) o
-**Borde derecho de la línea de comandos**. La insignia de la barra de herramientas es independiente de los botones de red
-y de archivos y se queda fija aunque los comandos crezcan o se partan en varias líneas. Desactivarla o elegir la línea de
+**Borde derecho de la línea de comandos**. La insignia de la barra de herramientas es independiente de los botones de conexión y de nueva pestaña y se queda fija aunque los comandos crezcan o se partan en varias líneas. Desactivarla o elegir la línea de
 comandos elimina su hueco y su espacio de separación en la barra de herramientas. En la línea de comandos, los comandos
 largos mueven la insignia hacia abajo a un espacio libre, manteniéndola en el borde derecho; se oculta cuando no queda una
 fila segura y nunca inserta una línea ni hace desplazarse al proceso hijo. Los colores de entrada directa y de IME aceptan
 valores hexadecimales; vacía un campo para el estilo discreto predeterminado.
 
-[Insignia de fuente de entrada china](brand/input-source-indicator.png) ·
-[Cómo esquiva los comandos largos](brand/input-source-long-command.png)
+[Insignia de fuente de entrada china](../../brand/input-source-indicator.png) ·
+[Cómo esquiva los comandos largos](../../brand/input-source-long-command.png)
 
 <a id="optional-local-system-status"></a>
 
@@ -279,13 +278,19 @@ de los números sigue la región actual.
 
 ## Cuando termina una sesión
 
-Un panel conserva su salida cuando el shell termina y muestra una tarjeta **Sesión finalizada** con su código de salida o
-la señal que la terminó. El cursor desaparece, pero el desplazamiento, la selección, la copia y la búsqueda con ⌘F siguen
-funcionando. **Nueva sesión** pide confirmación antes de sustituir la salida conservada; **Cerrar panel** cierra ese panel.
-Una sesión SSH conectada directamente ofrece **Reconectar** para iniciar una conexión nueva. Salir de Python u otro
-programa de vuelta a un shell activo no termina la sesión del terminal.
+Un panel conserva su salida cuando el shell termina: la salida se oscurece un poco y un recuadro dice en una frase qué
+terminó y cómo — el código de salida, o la señal que lo detuvo. El cursor desaparece, pero el desplazamiento, la
+selección, la copia y la búsqueda con ⌘F siguen funcionando alrededor del recuadro. **Nueva sesión** vuelve a iniciar el
+shell o el preajuste en el panel; **Cerrar panel** lo cierra. Una sesión SSH conectada directamente indica a qué host
+estaba conectada y ofrece **Reconectar** para iniciar una conexión nueva; el código de salida 255 de ssh se explica como
+una red caída o un host que dejó de responder. Ambos botones borran la salida anterior — el recuadro lo dice — y la sesión
+nueva empieza con el tamaño y el tamaño de letra del panel. Salir de Python u otro programa de vuelta a un shell activo no
+termina la sesión del terminal.
 
-![Sesión finalizada que conserva su última salida y las acciones de recuperación](brand/session-ended.png)
+Cuando falla la entrada o la salida de una sesión, o un panel deja de dibujarse, el mismo recuadro ofrece **Reintentar**
+o, para una conexión, **Reconectar**; el texto de error del sistema está en **Detalles**.
+
+![Sesión finalizada que conserva su última salida y las acciones de recuperación](../../brand/session-ended.png)
 
 <a id="scrollback-search-and-selection"></a>
 
@@ -330,7 +335,7 @@ programa de vuelta a un shell activo no termina la sesión del terminal.
   fallida — se abre en tu editor con ⌘-clic. Indica a Corta qué editor con `open-file-command`, empezando por la ruta
   completa del editor, por ejemplo
   `open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}`
-  ([Following a file reference](CONFIGURATION.md#following-a-file-reference)).
+  ([Following a file reference](../../CONFIGURATION.md#following-a-file-reference)).
 
 Abrir cualquier referencia a un archivo requiere un `open-file-command` configurado. Corta nunca abre archivos derivados
 de la salida con su aplicación predeterminada del sistema: algunos tipos de archivo ejecutan código al abrirse.
@@ -399,7 +404,7 @@ ver las carpetas del directorio actual como texto tenue bajo tu entrada. Sigue e
 junto al cursor aparece un sufijo tenue. Por ejemplo, `cd De` puede sugerir `Developer/`. Las sugerencias son vistas
 previas: no forman parte de tu comando hasta que las aceptas.
 
-![Sugerencias de carpetas bajo cd, con marcas de comandos correctos, fallidos e interrumpidos](brand/directory-suggestions.png)
+![Sugerencias de carpetas bajo cd, con marcas de comandos correctos, fallidos e interrumpidos](../../brand/directory-suggestions.png)
 
 Mientras hay una sugerencia visible:
 
@@ -442,13 +447,19 @@ una implementación propia de SSH.
   qué host.
 - **Reconectar.** Cuando termina una sesión `ssh` o `mosh`, **Reconectar al host** vuelve a ejecutar el mismo comando como
   una conexión nueva.
-- **Conectar.** Los botones de globo y de carpeta de la barra de herramientas abren una hoja para un terminal SSH o un
-  explorador SFTP, con los mismos campos para ambos: el host (un nombre, una dirección o un alias de SSH), el usuario, el
-  puerto y una clave privada. Deja vacío cualquiera de los tres últimos y lo deciden tu `~/.ssh/config` y los valores
-  predeterminados de OpenSSH; una clave elegida se ofrece primero, y no se prueban otras claves de `ssh-agent`. La hoja
-  muestra las conexiones recientes — con el usuario, el puerto y la clave que usaron — y los nombres `Host` de tu
-  `~/.ssh/config`; escribe para acotar la lista, haz clic en uno (o usa ↑ y ↓ desde el campo del host) para rellenar los
-  campos, y haz doble clic o pulsa Retorno para conectar. Ajustes ▸ Privacidad y seguridad ▸ Hosts recientes borra las recientes.
+- **Conectar.** El botón de globo de la barra de herramientas abre **Conectar con un host**, una hoja con un selector
+  **Terminal / Archivos (SFTP)**: un terminal por SSH o el explorador de archivos. Escribe el host — un nombre, una
+  dirección, `user@host` o un alias de SSH. **Avanzado** contiene el usuario, el puerto y una clave privada; vacíos, los
+  deciden tu `~/.ssh/config` y los valores predeterminados de OpenSSH. Una clave elegida se ofrece primero, y no se prueban
+  otras claves de `ssh-agent`. La hoja muestra las conexiones recientes — con el puerto, la clave y cuándo las usaste por
+  última vez — y los nombres `Host` de tu `~/.ssh/config`. Los hosts que solo aceptan git (`github.com`, o un `Host` con
+  `User git`) no aparecen, y la lista indica cuáles. Escribe para acotar la lista, haz clic en uno (o usa ↑ y ↓ desde el
+  campo del host) para rellenar los campos, y haz doble clic o pulsa Retorno para conectar. Una conexión de terminal entra
+  en la lista reciente cuando se establece — un host que te rechaza o no tiene shell, no. Pasa el puntero sobre un host
+  reciente y haz clic en ✕, o haz clic derecho, para olvidarlo; Ajustes ▸ Privacidad y seguridad ▸ Hosts recientes los
+  borra todos.
+- **Los archivos de este panel.** Abierta desde un panel conectado a otra máquina, la hoja ofrece primero los archivos de
+  ese host; pulsa Retorno o **Explorar archivos** para abrirlos.
 - **Explorar archivos remotos…** abre un explorador SFTP para el host del panel: listar, subir, descargar, renombrar y
   eliminar. La primera conexión a un host te pide confirmar su nombre. Las transferencias se reanudan tras una
   interrupción y nunca sobrescriben un archivo sin preguntar. La descarga de una carpeta se detiene si un nombre entra en
@@ -457,13 +468,12 @@ una implementación propia de SSH.
 - **En el explorador**, como en el Finder: ⌘[ y ⌘] van atrás y adelante, ⌘↑ a la carpeta superior, ⌘R actualiza, ⇧⌘G (o
   un clic en la ruta) permite escribir una ruta, ⇧⌘N crea una carpeta y ⇧⌘. muestra los archivos ocultos. Haz clic en el
   título de una columna para ordenar. Haz clic derecho en una fila para ver sus acciones; doble clic en una carpeta para
-  abrirla. Suelta archivos desde el Finder sobre la lista — o sobre una fila de carpeta — para subirlos, y arrastra un
-  archivo al Finder para descargarlo. Las transferencias están bajo el botón de flechas de la barra de herramientas, con
+  abrirla. Suelta archivos desde el Finder sobre la lista — o sobre una fila de carpeta — para subirlos; mientras arrastras, la lista (o la fila) se enmarca e indica adónde irán. Arrastra un archivo al Finder para descargarlo. Las transferencias están bajo el botón de flechas de la barra de herramientas, con
   la velocidad, el tiempo restante y Mostrar en el Finder.
 - **Editar un archivo remoto.** **Editar** en el explorador — o un ⌘-clic en un `path:line` de un panel remoto — descarga
   una copia y la abre en tu editor. Configura primero **Ajustes ▸ Terminal ▸ Abrir archivo con**, con la ruta absoluta de
   un ejecutable de editor y los marcadores `{file}`, `{line}`, `{column}`
-  ([ejemplos](CONFIGURATION.md#following-a-file-reference)). Subir tus cambios es un paso aparte y explícito, y Corta
+  ([ejemplos](../../CONFIGURATION.md#following-a-file-reference)). Subir tus cambios es un paso aparte y explícito, y Corta
   comprueba antes si el archivo remoto cambió mientras tanto. Los archivos de más de 64 MiB no se copian de esta forma;
   descárgalos desde el explorador, que muestra el progreso y permite cancelar. Una copia que nadie ha abierto ni
   modificado en 30 días se elimina la siguiente vez que se usa la edición remota; una con cambios que no has subido ni
@@ -473,15 +483,21 @@ una implementación propia de SSH.
 
 Cuando el servidor pide una contraseña, una frase de contraseña de clave o un código de un solo uso, o cuando un host es
 nuevo y su clave necesita tu decisión, el explorador pregunta en un cuadro de diálogo sobre su ventana y entrega tu
-respuesta a OpenSSH; no se guarda nada, así que al reconectar vuelve a preguntar. El cuadro de diálogo de la clave del
-host muestra la huella y tiene Cancelar como opción predeterminada. Una clave en `ssh-agent` o en el llavero, o una
-conexión `ControlMaster` existente desde tu terminal, inicia sesión sin preguntar.
+respuesta a OpenSSH; no se guarda nada, así que al reconectar vuelve a preguntar. **Cancelar conexión** en el cuadro de
+la contraseña termina ese intento de conexión y vuelve al campo del host — no se envía como contraseña vacía. **Cancelar**
+en la frase de contraseña de una clave solo omite esa clave, y ssh pasa a la siguiente forma de iniciar sesión. El cuadro
+de diálogo de la clave del host muestra la huella y tiene Cancelar como opción predeterminada. Una clave en `ssh-agent`
+o en el llavero, o una conexión `ControlMaster` existente desde tu terminal, inicia sesión sin preguntar.
+
+Una conexión que falla dice por qué en una frase — contraseña o clave no aceptada, host que no responde, clave del host
+desconocida o cambiada, servidor sin SFTP —, con las palabras de ssh en **Detalles**, y ofrece **Reintentar** o
+**Editar conexión**.
 
 Las subidas de la edición remota comparan el contenido remoto además del tamaño y la fecha de modificación, y envían la
 instantánea privada que aprobaste. Si guardas otra edición local después del aviso de aprobación, Corta pide una nueva
 decisión; los guardados durante una subida quedan pendientes. Tras un fallo de conexión, la siguiente edición o subida
 vuelve a conectar, y una subida fallida conserva su decisión pendiente. Conserva las ediciones locales sin decidir antes
-de eliminar los datos de la app. Consulta la [política de datos en reposo](SECURITY.md#5-data-at-rest) (en inglés).
+de eliminar los datos de la app. Consulta la [política de datos en reposo](../../SECURITY.md#5-data-at-rest) (en inglés).
 
 <a id="images-in-the-terminal"></a>
 
@@ -571,7 +587,7 @@ Corta hace por su cuenta lo que es rápido; nada aquí necesita un ajuste. Esto 
   minimizada —, su salida se lee con prioridad de segundo plano, para que no compita con lo que estás mirando. No se
   pierde nada, y escribir o pegar en él restaura al momento la prioridad completa.
 
-[Performance](PERFORMANCE.md) (en inglés) tiene las mediciones y cómo se hicieron.
+[Performance](../../PERFORMANCE.md) (en inglés) tiene las mediciones y cómo se hicieron.
 
 <a id="settings-and-the-config-file"></a>
 
@@ -592,17 +608,17 @@ Los Ajustes son una barra lateral de categorías, con la misma disposición que 
   programa controla el ratón, copiar al seleccionar, y los modos y colores del indicador de fuente de entrada.
 - **Atajos** — la tecla de cada comando; aparece una flecha de restablecer junto a los que has cambiado.
 - **Terminal rápido** — el atajo global, la posición y la pantalla.
-- **Conexiones** — Conectar por SSH y los preajustes guardados.
+- **Conexiones** — Conectar con un host y los preajustes guardados.
 - **Privacidad y seguridad** — la escritura en el portapapeles desde programas (OSC 52), la Entrada de teclado segura, el
   historial de directorios y los hosts recientes.
 
 Estos controles editan el mismo archivo de configuración. Los colores de los temas personalizados se pueden editar de
 forma gráfica o mediante el archivo.
 
-La barra de herramientas de la ventana añade SSH y SFTP. Ambos abren una hoja en la ventana con campos de host, usuario,
-puerto y clave privada — el host puede ser un alias de la configuración — y sugieren hosts recientes y configurados; un
-usuario, puerto o clave vacíos respetan la configuración de OpenSSH. SFTP abre el explorador del panel remoto, o pide un
-host cuando el panel es local ([Trabajo remoto](#remote-work-ssh-and-sftp)).
+El botón de globo de la barra de herramientas de la ventana conecta con un host, para un terminal o para sus archivos: una
+hoja en la ventana con el host — puede ser un alias de la configuración — y el usuario, el puerto y la clave privada en
+**Avanzado**; sugiere hosts recientes y configurados, y un usuario, puerto o clave vacíos respetan la configuración de
+OpenSSH. Desde un panel remoto ofrece primero los archivos de ese host ([Trabajo remoto](#remote-work-ssh-and-sftp)).
 
 ```ini
 theme = corta
@@ -614,7 +630,7 @@ bind.equalize-panes = ctrl+cmd+e
 ```
 
 La mayoría de los ajustes se aplican al instante; unos pocos (tamaño de ventana, longitud del historial) se aplican a la
-siguiente ventana o sesión. [Configuration](CONFIGURATION.md) (en inglés) enumera cada clave, su valor predeterminado y
+siguiente ventana o sesión. [Configuration](../../CONFIGURATION.md) (en inglés) enumera cada clave, su valor predeterminado y
 cuándo surte efecto.
 
 <a id="keyboard-shortcuts"></a>
@@ -635,7 +651,7 @@ como **Sin configurar**. El menú contextual del terminal muestra los mismos ata
 El menú **Shell** mantiene a mano dividir, reabrir y Borrar pantalla. Las demás herramientas están agrupadas en
 **Mover el foco**, **Comandos y salida**, **Directorio de trabajo**, **Distribución de paneles** y **Terminal y conexión**.
 
-Los valores predeterminados, a fecha de esta versión — [Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)
+Los valores predeterminados, a fecha de esta versión — [Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts)
 (en inglés) es la lista de referencia:
 
 | Comando | Atajo |
@@ -660,15 +676,15 @@ Los valores predeterminados, a fecha de esta versión — [Keyboard shortcuts](C
 
 Todos los demás comandos — Igualar paneles, Borrar historial, Restablecer terminal, Explorar archivos remotos…, los
 comandos de salida y de directorio de trabajo — no tienen tecla predeterminada y están a una búsqueda en la paleta de
-comandos. [Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts) (en inglés) tiene la tabla completa con el nombre
+comandos. [Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts) (en inglés) tiene la tabla completa con el nombre
 `bind.` de cada comando.
 
 <a id="when-something-goes-wrong"></a>
 
 ## Cuando algo va mal
 
-La [Solución de problemas](TROUBLESHOOTING.es.md) cubre lo que ves cuando algo falla y cómo arreglarlo — una descarga que
-macOS no abre, una fuente rechazada, un atajo que no hace nada. [Features and limitations](FEATURES.md) (en inglés)
+La [Solución de problemas](TROUBLESHOOTING.md) cubre lo que ves cuando algo falla y cómo arreglarlo — una descarga que
+macOS no abre, una fuente rechazada, un atajo que no hace nada. [Features and limitations](../../FEATURES.md) (en inglés)
 enumera lo que Corta todavía no hace. Informa de cualquier otra cosa en
 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose). Para preguntas de uso, ve a
 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a) o pregunta en `#help` en el

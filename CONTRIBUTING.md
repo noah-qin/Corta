@@ -65,11 +65,9 @@ A change to what a window looks like also refreshes the images in
 `docs/brand/` that show it; [the brand guide](docs/brand/README.md) has the
 recipe, which never touches your own shell or configuration.
 
-Keep public guides in English and use relative links within the repository.
-The one exception is `README.zh-CN.md`, a Simplified Chinese summary of the
-README's first screen and installation steps; the English documents stay the
-source of truth, and a change to the README's install or requirements
-paragraphs updates it in the same pull request.
+Write public guides in English and use relative links within the repository.
+The English documents are the source of truth; the translations below follow
+them.
 Document defaults, units, prerequisites and limitations alongside examples.
 Keep release snapshots dated; do not present planned behaviour as shipped.
 Records from before 1.2.0 are preserved [at a commit](https://github.com/noah-qin/Corta/tree/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs) with their original findings; new evidence goes in the pull request.
@@ -263,10 +261,11 @@ Do not infer native-speaker verification from catalog state alone; describe
 the reviewer and scope in the PR, and record any human-only gaps.
 
 Three documents are translated into the same eight languages:
-`README.md`, `docs/USER-GUIDE.md` and `docs/TROUBLESHOOTING.md`. A
-translation sits beside its source with the language before `.md`
-(`README.ja.md`, `docs/USER-GUIDE.zh-CN.md`; `zh-CN` is Simplified and
-`zh-Hant` Traditional Chinese), uses the app's own localized names for menus
+`README.md`, `docs/USER-GUIDE.md` and `docs/TROUBLESHOOTING.md`. Each
+language's three sit together in `docs/i18n/<language>/` under the source's
+own name (`docs/i18n/ja/README.md`, `docs/i18n/zh-CN/USER-GUIDE.md`;
+`zh-CN` is Simplified and `zh-Hant` Traditional Chinese), with relative
+links rewritten for that folder. A translation uses the app's own localized names for menus
 and settings, and keeps each section's English anchor as an
 `<a id="…"></a>` so links between the documents work in every language. Its
 header names the English commit it was translated from; a change to the

@@ -1,10 +1,10 @@
 # Solução de problemas
 
-[Índice da documentação (inglês)](README.md) · [Visão geral do projeto](../README.pt-BR.md)
+[Índice da documentação (inglês)](../../README.md) · [Visão geral do projeto](README.md)
 
-🇺🇸 [English](TROUBLESHOOTING.md) · 🇨🇳 [简体中文](TROUBLESHOOTING.zh-CN.md) · 🇭🇰 [繁體中文](TROUBLESHOOTING.zh-Hant.md) · 🇯🇵 [日本語](TROUBLESHOOTING.ja.md) · 🇰🇷 [한국어](TROUBLESHOOTING.ko.md) · 🇩🇪 [Deutsch](TROUBLESHOOTING.de.md) · 🇫🇷 [Français](TROUBLESHOOTING.fr.md) · 🇪🇸 [Español](TROUBLESHOOTING.es.md) · 🇧🇷 [Português](TROUBLESHOOTING.pt-BR.md)
+🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](TROUBLESHOOTING.md)
 
-> Esta página é uma tradução de [TROUBLESHOOTING.md](TROUBLESHOOTING.md), no estado do commit
+> Esta página é uma tradução de [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md), no estado do commit
 > [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md).
 > Se a versão em inglês mudou desde então, ou se as duas divergirem, vale a versão em inglês.
 > As mensagens do macOS vêm acompanhadas do texto original em inglês.
@@ -150,7 +150,7 @@ Alt de um teclado de PC. Teclas especiais (setas, teclas de função) levam o �
 
 O Corta anuncia `TERM=xterm-256color` de propósito (`docs/DECISIONS.md` D08). Compartilhar esse valor de TERM não implica
 compatibilidade total com o xterm. Confira o ambiente remoto com `printf '%s\n' "$TERM"` e compare um caso mínimo de
-reprodução; [Conformance](CONFORMANCE.md#42-external-suites) (em inglês) registra as sequências compatíveis e as falhas
+reprodução; [Conformance](../../CONFORMANCE.md#42-external-suites) (em inglês) registra as sequências compatíveis e as falhas
 restantes.
 
 ### Um glifo é desenhado menor que os vizinhos
@@ -257,7 +257,7 @@ em 100 colunas conta como duas. A saída mais antiga que o limite é descartada 
 a visualização voltou. Aumente o limite (até 1.000.000; quanta memória o histórico antigo comprimido ocupa depende do texto
 e da carga). Uma célula armazenada tem 16 bytes antes da compressão, o que não é uma estimativa de memória residente. Uma
 carga medida de 100.000 linhas de 120 colunas acrescentou cerca de 11 MiB de memória residente; veja
-[Performance](PERFORMANCE.md#56-numbers-by-release) (em inglês). Exporte a saída que você precisa guardar além do limite
+[Performance](../../PERFORMANCE.md#56-numbers-by-release) (em inglês). Exporte a saída que você precisa guardar além do limite
 configurado.
 
 ### A Entrada de teclado segura está ativada, mas minha ferramenta de macros ainda funciona

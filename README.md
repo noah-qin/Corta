@@ -24,7 +24,7 @@ Metal 4 rendering · Native CJK / IME · SSH, SFTP and remote editing
 [Discord](https://discord.gg/QNdWfdwr7j) ·
 [Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml)
 
-🇺🇸 [English](README.md) · 🇨🇳 [简体中文](README.zh-CN.md) · 🇭🇰 [繁體中文](README.zh-Hant.md) · 🇯🇵 [日本語](README.ja.md) · 🇰🇷 [한국어](README.ko.md) · 🇩🇪 [Deutsch](README.de.md) · 🇫🇷 [Français](README.fr.md) · 🇪🇸 [Español](README.es.md) · 🇧🇷 [Português](README.pt-BR.md)
+🇺🇸 [English](README.md) · 🇨🇳 [简体中文](docs/i18n/zh-CN/README.md) · 🇭🇰 [繁體中文](docs/i18n/zh-Hant/README.md) · 🇯🇵 [日本語](docs/i18n/ja/README.md) · 🇰🇷 [한국어](docs/i18n/ko/README.md) · 🇩🇪 [Deutsch](docs/i18n/de/README.md) · 🇫🇷 [Français](docs/i18n/fr/README.md) · 🇪🇸 [Español](docs/i18n/es/README.md) · 🇧🇷 [Português](docs/i18n/pt-BR/README.md)
 
 <img src="docs/brand/screenshot.png" width="960" alt="Corta with three split panes: a git log and a Chinese, Japanese, Korean and emoji alignment table; the pangolin mascot shown as an image in the terminal; and 24-bit colour ramps">
 

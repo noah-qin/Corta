@@ -2,7 +2,7 @@
 
 [Documentation index](README.md) · [Project overview](../README.md)
 
-🇺🇸 [English](USER-GUIDE.md) · 🇨🇳 [简体中文](USER-GUIDE.zh-CN.md) · 🇭🇰 [繁體中文](USER-GUIDE.zh-Hant.md) · 🇯🇵 [日本語](USER-GUIDE.ja.md) · 🇰🇷 [한국어](USER-GUIDE.ko.md) · 🇩🇪 [Deutsch](USER-GUIDE.de.md) · 🇫🇷 [Français](USER-GUIDE.fr.md) · 🇪🇸 [Español](USER-GUIDE.es.md) · 🇧🇷 [Português](USER-GUIDE.pt-BR.md)
+🇺🇸 [English](USER-GUIDE.md) · 🇨🇳 [简体中文](i18n/zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](i18n/zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](i18n/ja/USER-GUIDE.md) · 🇰🇷 [한국어](i18n/ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](i18n/de/USER-GUIDE.md) · 🇫🇷 [Français](i18n/fr/USER-GUIDE.md) · 🇪🇸 [Español](i18n/es/USER-GUIDE.md) · 🇧🇷 [Português](i18n/pt-BR/USER-GUIDE.md)
 
 Everything Corta does, and how to reach it. Each section says where the
 feature lives — a menu, a shortcut, a setting — and links to the reference
