@@ -539,15 +539,15 @@ a dialog on its window and hands your answer to OpenSSH; nothing is saved,
 so a reconnect asks again. **Cancel Connection** in the password dialog
 ends that connection attempt and returns to the host field — it is not
 sent as an empty password. **Cancel** on a key's passphrase skips that key,
-and ssh goes on to the next way of signing in. The host-key dialog shows the fingerprint and
-defaults to Cancel.
+and ssh goes on to the next way of signing in. The host-key dialog shows
+the fingerprint and defaults to Cancel. A key held by `ssh-agent` or the
+keychain, or an existing `ControlMaster` connection from your terminal,
+signs in without asking.
 
 A connection that fails says why in a sentence — the password or key was
 not accepted, the host did not answer, its host key is unknown or changed,
 the server offers no SFTP — with ssh's own words under **Details**, and
-offers **Retry** or **Edit Connection**. A key held by `ssh-agent` or the keychain, or an
-existing `ControlMaster` connection from your terminal, signs in without
-asking.
+offers **Try Again** or **Edit Connection**.
 
 Remote-edit uploads compare remote content as well as size and modification
 time and send the private snapshot you approved. If you save another local

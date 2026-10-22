@@ -37,7 +37,7 @@ Versioning for compatibility changes.
 - The SFTP password dialog says once whom it is for, names what the field
   wants (password, passphrase or answer), and its Cancel reads **Cancel
   Connection**. A failed SFTP connection says why — sign-in refused, host
-  unreachable, host key unknown or changed, no SFTP — with **Retry** and
+  unreachable, host key unknown or changed, no SFTP — with **Try Again** and
   **Edit Connection**, and ssh's output under Details.
 
 ### Fixed
