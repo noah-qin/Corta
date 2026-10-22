@@ -99,14 +99,14 @@ struct SessionLifecycleTests {
     }
 
     /// A toast said "exited" for two seconds; after that a dead pane looked
-    /// like a live one not answering. The bar stays until a new session
+    /// like a live one not answering. The panel stays until a new session
     /// starts, and says how the session ended.
     @Test(arguments: [
         ("exit 0", ProcessExit.exited(code: 0)),
         ("exit 3", ProcessExit.exited(code: 3)),
         ("kill -TERM $$", ProcessExit.signalled(signal: SIGTERM)),
     ])
-    func childExitOnItsOwnShowsTheEndedBar(script: String, expected: ProcessExit) async throws {
+    func childExitOnItsOwnShowsTheEndedPanel(script: String, expected: ProcessExit) async throws {
         // A shell that exits the moment it starts, rather than the default
         // login shell plus a typed `exit\n`: real dotfiles can fork
         // long-lived children that keep the pty's slave side open well past
@@ -125,18 +125,77 @@ struct SessionLifecycleTests {
             },
             "the shell should exit on its own")
         #expect(
-            await waitUntilTrue(timeout: .seconds(10)) { pane.sessionEndedBar != nil },
-            "expected the bar once the reader loop observes the exit")
-        let bar = try #require(pane.sessionEndedBar)
-        #expect(bar.message == SessionEndedBar.message(for: expected, isConnection: false))
-        #expect(bar.accessibilityLabel() == bar.message)
+            await waitUntilTrue(timeout: .seconds(10)) { pane.sessionEndedPanel != nil },
+            "expected the panel once the reader loop observes the exit")
+        let overlay = try #require(pane.sessionEndedPanel)
+        let expectedContent = SessionEnded.content(
+            for: expected, isConnection: false, host: nil, program: "sh")
+        #expect(overlay.panel.content.title == expectedContent.title)
+        #expect(overlay.panel.content.body == expectedContent.body)
+        #expect(overlay.panel.accessibilityLabel()?.contains(expectedContent.body) == true)
+        // It never takes the keyboard: a key pressed in a dead pane starts
+        // nothing.
+        #expect(overlay.panel.buttons.allSatisfy { $0.keyEquivalent.isEmpty })
         // Still there later: it is not a toast.
         try await Task.sleep(for: .seconds(3))
-        #expect(pane.sessionEndedBar === bar && bar.superview != nil)
+        #expect(pane.sessionEndedPanel === overlay && overlay.superview != nil)
         // A new session takes it away.
         pane.rebuildPane(strictRespawn: false)
-        #expect(pane.sessionEndedBar == nil && bar.superview == nil)
+        #expect(pane.sessionEndedPanel == nil && overlay.superview == nil)
         #expect(pane.session !== session)
+    }
+
+    /// Reconnect respawned at the configured grid and font size, so the
+    /// remote banner and prompt were laid out at the wrong width before the
+    /// resize, and a ⌘+ zoom was lost. A rebuild keeps both.
+    @Test func aRebuildKeepsTheGridAndAZoomedFontSize() throws {
+        var preset = Preset(name: "rebuild")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", "exec /bin/cat"]
+        let pane = makePane(preset: preset)
+        defer { pane.teardown() }
+        pane.didSizeWindow = true
+        pane.lastRequestedSize = TerminalSize(rows: 31, columns: 97)
+        pane.fontSize = 17
+        pane.isFontSizeZoomed = true
+        let old = try #require(pane.session)
+        pane.rebuildPane(strictRespawn: false)
+        let session = try #require(pane.session)
+        #expect(session !== old)
+        let size = try session.pty.size()
+        #expect(size.rows == 31 && size.columns == 97)
+        #expect(pane.fontSize == 17)
+    }
+
+    /// The connect dialog's host became a recent one on Connect, before
+    /// anything connected — a refused host, or one with no shell (a git
+    /// host), was offered again. It is recorded once ssh has a terminal on
+    /// the server, which it shows by putting this one in raw mode; a
+    /// password prompt turns echo off and is not that.
+    @Test(arguments: [
+        ("stty raw -echo; exec /bin/cat", true),
+        ("stty -echo; exec /bin/cat", false),
+    ])
+    func aConnectionIsRecordedOnceEstablished(script: String, records: Bool) async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-established-\(UUID().uuidString)")
+            .appendingPathComponent("recent-hosts.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let store = RecentHostsStore(fileURL: url)
+        var preset = Preset(name: "box")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", script]
+        preset.connectTarget = try SSHTarget.parse(host: "box", user: "deploy", port: "").get()
+        let pane = makePane(preset: preset)
+        defer { pane.teardown() }
+        pane.remote.recentHosts = store
+        if records {
+            #expect(await waitUntilTrue(timeout: .seconds(5)) { !store.targets.isEmpty })
+            #expect(store.targets.map(\.displayName) == ["deploy@box"])
+        } else {
+            try await Task.sleep(for: .milliseconds(2500))
+            #expect(store.targets.isEmpty)
+        }
     }
 
     @Test func childExitDuringTeardownShowsNoToast() async throws {
@@ -155,7 +214,7 @@ struct SessionLifecycleTests {
         // landed on a pane the user already closed.
         try await Task.sleep(for: .milliseconds(200))
         #expect(toastText(in: pane) == nil, "teardown must not surface a toast for its own pane")
-        #expect(pane.sessionEndedBar == nil, "nor the ended bar")
+        #expect(pane.sessionEndedPanel == nil, "nor the ended panel")
     }
 
     /// `await Task.sleep` between checks, not `Thread.sleep`: the suite is

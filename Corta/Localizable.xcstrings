@@ -26057,55 +26057,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "SFTP uses system OpenSSH, with its configuration and keys. When ssh needs a password, a key passphrase or a new host key accepted, Corta asks you; nothing is saved."
+            "value": "Uses your OpenSSH configuration and keys; Corta asks for passwords and keeps none."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "SFTP 使用系统 OpenSSH 及其配置和密钥。ssh 需要密码、密钥口令或确认新的主机密钥时，Corta 会询问你，且不保存任何内容。"
+            "value": "使用 OpenSSH 的配置和密钥；需要密码时 Corta 会询问，不保存。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP 使用系統 OpenSSH 及其設定和金鑰。ssh 需要密碼、金鑰密語或確認新的主機金鑰時，Corta 會詢問你，且不儲存任何內容。"
+            "value": "使用 OpenSSH 的設定和金鑰；需要密碼時 Corta 會詢問，不保存。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP はシステムの OpenSSH とその設定・鍵を使います。ssh がパスワード、鍵のパスフレーズ、新しいホスト鍵の承認を必要とするときは Corta が尋ね、何も保存しません。"
+            "value": "OpenSSH の設定と鍵を使います。パスワードは Corta が尋ね、保存しません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP는 시스템 OpenSSH와 그 설정 및 키를 사용합니다. ssh에 암호, 키 암호 구문 또는 새 호스트 키 승인이 필요하면 Corta가 묻고, 아무것도 저장하지 않습니다."
+            "value": "OpenSSH 설정과 키를 사용합니다. 암호는 Corta가 물어보며 저장하지 않습니다."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP verwendet das System-OpenSSH mit seiner Konfiguration und seinen Schlüsseln. Braucht ssh ein Passwort, eine Schlüssel-Passphrase oder die Zustimmung zu einem neuen Host-Schlüssel, fragt Corta Sie; nichts wird gespeichert."
+            "value": "Nutzt deine OpenSSH-Konfiguration und -Schlüssel; Corta fragt nach Passwörtern und speichert keine."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP utilise l'OpenSSH du système, avec sa configuration et ses clés. Quand ssh a besoin d'un mot de passe, d'une phrase secrète ou de l'acceptation d'une nouvelle clé d'hôte, Corta vous le demande ; rien n'est enregistré."
+            "value": "Utilise votre configuration et vos clés OpenSSH ; Corta demande les mots de passe et n’en garde aucun."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "SFTP usa el OpenSSH del sistema, con su configuración y sus claves. Cuando ssh necesita una contraseña, la frase de una clave o aceptar una nueva clave de host, Corta te lo pregunta; no se guarda nada."
+            "value": "Usa tu configuración y tus claves de OpenSSH; Corta pide las contraseñas y no guarda ninguna."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "O SFTP usa o OpenSSH do sistema, com sua configuração e suas chaves. Quando o ssh precisa de uma senha, da frase-secreta de uma chave ou da aceitação de uma nova chave de host, o Corta pergunta a você; nada é salvo."
+            "value": "Usa sua configuração e suas chaves do OpenSSH; o Corta pede as senhas e não guarda nenhuma."
           }
         }
       }
@@ -26647,55 +26647,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uses system OpenSSH configuration and keys. Passwords and host verification appear in the terminal."
+            "value": "Uses your OpenSSH configuration and keys; passwords and host checks happen in the terminal."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用系统 OpenSSH 配置与密钥。密码和主机验证会在终端中完成。"
+            "value": "使用 OpenSSH 的配置和密钥；密码和主机验证在终端里完成。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
-            "state": "translated",
-            "value": "使用系統 OpenSSH 設定與金鑰。密碼及主機驗證會在終端機中完成。"
+            "state": "needs_review",
+            "value": "使用 OpenSSH 的設定和金鑰；密碼和主機驗證在終端機中完成。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "システムのOpenSSH設定と鍵を使用します。パスワードとホスト確認はターミナルで行います。"
+            "value": "OpenSSH の設定と鍵を使います。パスワードとホストの確認はターミナルで行います。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "시스템 OpenSSH 설정과 키를 사용합니다. 암호와 호스트 확인은 터미널에서 진행됩니다."
+            "value": "OpenSSH 설정과 키를 사용합니다. 암호와 호스트 확인은 터미널에서 이루어집니다."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Verwendet OpenSSH-Konfiguration und Schlüssel des Systems. Passwort und Hostprüfung erfolgen im Terminal."
+            "value": "Nutzt deine OpenSSH-Konfiguration und -Schlüssel; Passwörter und Hostprüfung erfolgen im Terminal."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Utilise la configuration et les clés OpenSSH. Le mot de passe et la vérification de l’hôte apparaissent dans le terminal."
+            "value": "Utilise votre configuration et vos clés OpenSSH ; mots de passe et vérification de l’hôte se font dans le terminal."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Usa la configuración y claves OpenSSH. La contraseña y verificación del host aparecen en el terminal."
+            "value": "Usa tu configuración y tus claves de OpenSSH; las contraseñas y la verificación del host ocurren en el terminal."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Usa as configurações e chaves OpenSSH. A senha e a verificação do host aparecem no terminal."
+            "value": "Usa sua configuração e suas chaves do OpenSSH; senhas e verificação do host acontecem no terminal."
           }
         }
       }
@@ -26932,124 +26932,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Conectar…"
-          }
-        }
-      }
-    },
-    "ui.toolbar.files": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remote Files"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "远程文件"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "遠端檔案"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "リモートファイル"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "원격 파일"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Remote-Dateien"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Fichiers distants"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Archivos remotos"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Arquivos remotos"
-          }
-        }
-      }
-    },
-    "ui.toolbar.filesHelp": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Browse files for the selected remote pane. Connect with SSH first."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "浏览当前远程窗格的文件。需先连接 SSH。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "瀏覽目前遠端窗格的檔案。須先連線 SSH。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "選択中のリモートペインのファイルを表示します。先にSSHで接続してください。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "선택한 원격 창의 파일을 봅니다. SSH로 먼저 연결하세요."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Dateien des ausgewählten Remote-Bereichs anzeigen. Zuerst per SSH verbinden."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Parcourir les fichiers du volet distant sélectionné. Connectez-vous d’abord en SSH."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Explora los archivos del panel remoto seleccionado. Conecta primero por SSH."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Navegue pelos arquivos do painel remoto selecionado. Conecte primeiro por SSH."
           }
         }
       }
@@ -34284,65 +34166,6 @@
         }
       }
     },
-    "failure.runtimeHint": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Try Again or Reconnect starts a new session and closes the current session."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重试或重新连接会关闭当前会话并启动新会话。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重試或重新連線會關閉目前的工作階段並啟動新的工作階段。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "再試行または再接続すると、現在のセッションを閉じて新しいセッションを開始します。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "다시 시도하거나 다시 연결하면 현재 세션을 닫고 새 세션을 시작합니다."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Erneut versuchen oder Neu verbinden schließt die aktuelle Sitzung und startet eine neue."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Réessayer ou reconnecter ferme la session actuelle et en ouvre une nouvelle."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Reintentar o reconectar cierra la sesión actual e inicia una nueva."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Tentar novamente ou reconectar fecha a sessão atual e inicia uma nova."
-          }
-        }
-      }
-    },
     "toast.inputBackpressured": {
       "extractionState": "manual",
       "localizations": {
@@ -35464,242 +35287,6 @@
         }
       }
     },
-    "session.ended.exited": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Session ended · exit code %1$ld"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "会话已结束 · 退出码 %1$ld"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "工作階段已結束 · 結束代碼 %1$ld"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "セッションは終了しました · 終了コード %1$ld"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "세션이 종료됨 · 종료 코드 %1$ld"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Sitzung beendet · Exit-Code %1$ld"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Session terminée · code de sortie %1$ld"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Sesión finalizada · código de salida %1$ld"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Sessão encerrada · código de saída %1$ld"
-          }
-        }
-      }
-    },
-    "session.ended.signalled": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Session ended by %1$@ (signal %2$ld)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "会话已被 %1$@ 终止（信号 %2$ld）"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "工作階段已被 %1$@ 終止（訊號 %2$ld）"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "セッションは %1$@ により終了しました（シグナル %2$ld）"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "세션이 %1$@에 의해 종료됨 (시그널 %2$ld)"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Sitzung durch %1$@ beendet (Signal %2$ld)"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Session terminée par %1$@ (signal %2$ld)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Sesión finalizada por %1$@ (señal %2$ld)"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Sessão encerrada por %1$@ (sinal %2$ld)"
-          }
-        }
-      }
-    },
-    "session.ended.connection.exited": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Connection ended · exit code %1$ld"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "连接已结束 · 退出码 %1$ld"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "連線已結束 · 結束代碼 %1$ld"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "接続は終了しました · 終了コード %1$ld"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "연결이 종료됨 · 종료 코드 %1$ld"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Verbindung beendet · Exit-Code %1$ld"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Connexion terminée · code de sortie %1$ld"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Conexión finalizada · código de salida %1$ld"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Conexão encerrada · código de saída %1$ld"
-          }
-        }
-      }
-    },
-    "session.ended.connection.signalled": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Connection ended by %1$@ (signal %2$ld)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "连接已被 %1$@ 终止（信号 %2$ld）"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "連線已被 %1$@ 終止（訊號 %2$ld）"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "接続は %1$@ により終了しました（シグナル %2$ld）"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "연결이 %1$@에 의해 종료됨 (시그널 %2$ld)"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Verbindung durch %1$@ beendet (Signal %2$ld)"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Connexion terminée par %1$@ (signal %2$ld)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Conexión finalizada por %1$@ (señal %2$ld)"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Conexão encerrada por %1$@ (sinal %2$ld)"
-          }
-        }
-      }
-    },
     "session.ended.newSession": {
       "extractionState": "manual",
       "localizations": {
@@ -35755,242 +35342,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Nova sessão"
-          }
-        }
-      }
-    },
-    "session.ended.confirm.title": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start a new session in this pane?"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "要在此窗格中启动新会话吗？"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "要在此窗格中啟動新的工作階段嗎？"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "このペインで新しいセッションを開始しますか？"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "이 패널에서 새 세션을 시작할까요?"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Eine neue Sitzung in diesem Bereich starten?"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Démarrer une nouvelle session dans ce panneau ?"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "¿Iniciar una nueva sesión en este panel?"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Iniciar uma nova sessão neste painel?"
-          }
-        }
-      }
-    },
-    "session.ended.confirm.message": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A new shell starts here. The output above is cleared, and what was running before does not come back."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "这里会启动一个新的 shell。上方的输出将被清除，之前运行的内容不会恢复。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "這裡會啟動一個新的 shell。上方的輸出將被清除，先前執行的內容不會恢復。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "ここで新しいシェルが起動します。上の出力は消去され、以前に実行していたものは戻りません。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "여기에서 새 셸이 시작됩니다. 위의 출력은 지워지며 이전에 실행 중이던 것은 돌아오지 않습니다."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Hier startet eine neue Shell. Die Ausgabe oben wird gelöscht, und was vorher lief, kommt nicht zurück."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Un nouveau shell démarre ici. La sortie ci-dessus est effacée et ce qui s’exécutait auparavant ne revient pas."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Aquí se inicia una nueva shell. La salida de arriba se borra y lo que se ejecutaba antes no vuelve."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Um novo shell é iniciado aqui. A saída acima é apagada, e o que estava em execução antes não volta."
-          }
-        }
-      }
-    },
-    "session.ended.confirm.remoteMessage": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The command runs again as a new connection. The output above is cleared, and the previous session does not come back."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "该命令将作为新连接再次运行。上方的输出将被清除，之前的会话不会恢复。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "該指令將以新連線再次執行。上方的輸出將被清除，先前的工作階段不會恢復。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "コマンドは新しい接続として再実行されます。上の出力は消去され、以前のセッションは戻りません。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "명령이 새 연결로 다시 실행됩니다. 위의 출력은 지워지며 이전 세션은 돌아오지 않습니다."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Der Befehl läuft erneut als neue Verbindung. Die Ausgabe oben wird gelöscht, und die vorherige Sitzung kommt nicht zurück."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "La commande s’exécute à nouveau dans une nouvelle connexion. La sortie ci-dessus est effacée et la session précédente ne revient pas."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "El comando se ejecuta de nuevo como una conexión nueva. La salida de arriba se borra y la sesión anterior no vuelve."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "O comando é executado novamente como uma nova conexão. A saída acima é apagada, e a sessão anterior não volta."
-          }
-        }
-      }
-    },
-    "session.ended.confirm.start": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "启动"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "啟動"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "開始"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "시작"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Starten"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Démarrer"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Iniciar"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Iniciar"
           }
         }
       }
@@ -39177,6 +38528,3361 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "“%@” não está instalada ou não tem caracteres CJK — usando o idioma do sistema"
+          }
+        }
+      }
+    },
+    "panel.details": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Details"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "详细信息"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "詳細資訊"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "詳細"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "세부 정보"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Details"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Détails"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Detalles"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Detalhes"
+          }
+        }
+      }
+    },
+    "session.ended.local.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ exited"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 已退出"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ 已結束"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ が終了しました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@이(가) 종료됨"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ wurde beendet"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ s’est terminé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ terminó"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ foi encerrado"
+          }
+        }
+      }
+    },
+    "session.ended.local.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Session runs it again here; the output above is cleared."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新会话会在这里重新运行它，上面的输出会被清空。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新工作階段會在這裡重新執行，上方的輸出會被清除。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新規セッションはここでもう一度実行します。上の出力は消去されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "새 세션은 여기서 다시 실행하며, 위의 출력은 지워집니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„Neue Sitzung“ startet es hier erneut; die Ausgabe oben wird gelöscht."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nouvelle session le relance ici ; la sortie ci-dessus est effacée."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nueva sesión lo vuelve a ejecutar aquí; la salida anterior se borra."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nova sessão o executa novamente aqui; a saída acima é apagada."
+          }
+        }
+      }
+    },
+    "session.ended.local.normal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It ended normally (exit code 0)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正常结束（退出码 0）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正常結束（結束代碼 0）。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正常に終了しました（終了コード 0）。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "정상적으로 종료되었습니다(종료 코드 0)."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Es wurde normal beendet (Exit-Code 0)."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Il s’est terminé normalement (code de sortie 0)."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Terminó con normalidad (código de salida 0)."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Terminou normalmente (código de saída 0)."
+          }
+        }
+      }
+    },
+    "session.ended.local.code": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It exited with code %ld."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出码 %ld。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "結束代碼 %ld。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "終了コード %ld で終了しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "종료 코드 %ld(으)로 종료되었습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Es wurde mit Code %ld beendet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Il s’est terminé avec le code %ld."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Terminó con el código %ld."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Terminou com o código %ld."
+          }
+        }
+      }
+    },
+    "session.ended.local.signal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It was stopped by %1$@ (signal %2$ld)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "被 %1$@ 终止（信号 %2$ld）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "被 %1$@ 終止（訊號 %2$ld）。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ で停止されました（シグナル %2$ld）。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@(으)로 중지되었습니다(시그널 %2$ld)."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Es wurde durch %1$@ gestoppt (Signal %2$ld)."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Il a été arrêté par %1$@ (signal %2$ld)."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Lo detuvo %1$@ (señal %2$ld)."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Foi interrompido por %1$@ (sinal %2$ld)."
+          }
+        }
+      }
+    },
+    "session.ended.connection.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnect starts a new connection here; the output above is cleared."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新连接会在这里建立新连接，上面的输出会被清空。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重新連線會在這裡建立新連線，上方的輸出會被清除。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "再接続はここで新しい接続を開始します。上の出力は消去されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "다시 연결은 여기서 새 연결을 시작하며, 위의 출력은 지워집니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„Neu verbinden“ baut hier eine neue Verbindung auf; die Ausgabe oben wird gelöscht."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Reconnecter ouvre ici une nouvelle connexion ; la sortie ci-dessus est effacée."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Reconectar abre aquí una conexión nueva; la salida anterior se borra."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Reconectar abre uma nova conexão aqui; a saída acima é apagada."
+          }
+        }
+      }
+    },
+    "session.ended.connection.closed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection closed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接已关闭"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連線已關閉"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続が閉じられました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결이 닫힘"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung geschlossen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Connexion fermée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexión cerrada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexão encerrada"
+          }
+        }
+      }
+    },
+    "session.ended.connection.closed.host": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection to %@ closed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "与 %@ 的连接已关闭"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "與 %@ 的連線已關閉"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ との接続が閉じられました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ 연결이 닫힘"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung zu %@ geschlossen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Connexion à %@ fermée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexión con %@ cerrada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexão com %@ encerrada"
+          }
+        }
+      }
+    },
+    "session.ended.connection.normal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The remote session ended normally."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "远程会话已正常结束。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "遠端工作階段已正常結束。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "リモートセッションは正常に終了しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "원격 세션이 정상적으로 종료되었습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die entfernte Sitzung wurde normal beendet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La session distante s’est terminée normalement."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La sesión remota terminó con normalidad."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A sessão remota terminou normalmente."
+          }
+        }
+      }
+    },
+    "session.ended.connection.ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection ended"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接已断开"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連線已中斷"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続が切断されました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결이 끊김"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung beendet"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Connexion interrompue"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexión terminada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexão encerrada"
+          }
+        }
+      }
+    },
+    "session.ended.connection.ended.host": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection to %@ ended"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "与 %@ 的连接已断开"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "與 %@ 的連線已中斷"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ との接続が切断されました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ 연결이 끊김"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung zu %@ beendet"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Connexion à %@ interrompue"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexión con %@ terminada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexão com %@ encerrada"
+          }
+        }
+      }
+    },
+    "session.ended.connection.ssh255": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh exited with code 255 — usually the network dropped or the host stopped answering."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh 已退出（退出码 255），通常是网络中断或主机无响应。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh 已結束（結束代碼 255），通常是網路中斷或主機沒有回應。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh が終了コード 255 で終了しました。通常はネットワークの切断か、ホストが応答しなくなったためです。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh가 종료 코드 255로 종료되었습니다. 대개 네트워크가 끊겼거나 호스트가 응답하지 않을 때입니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh wurde mit Code 255 beendet – meist ist das Netzwerk weg oder der Host antwortet nicht mehr."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh s’est terminé avec le code 255 — en général, le réseau a été coupé ou l’hôte ne répond plus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh terminó con el código 255: normalmente se cortó la red o el host dejó de responder."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O ssh terminou com o código 255 — geralmente a rede caiu ou o host parou de responder."
+          }
+        }
+      }
+    },
+    "session.ended.connection.code": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ exited with code %2$ld."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 已退出（退出码 %2$ld）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ 已結束（結束代碼 %2$ld）。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ が終了コード %2$ld で終了しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@이(가) 종료 코드 %2$ld(으)로 종료되었습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ wurde mit Code %2$ld beendet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ s’est terminé avec le code %2$ld."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ terminó con el código %2$ld."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ terminou com o código %2$ld."
+          }
+        }
+      }
+    },
+    "session.ended.connection.terminated": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection terminated"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接已终止"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連線已終止"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続が終了されました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결이 종료됨"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung abgebrochen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Connexion arrêtée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexión finalizada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexão finalizada"
+          }
+        }
+      }
+    },
+    "session.ended.connection.terminated.host": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection to %@ was terminated"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "与 %@ 的连接已终止"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "與 %@ 的連線已終止"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ との接続が終了されました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ 연결이 종료됨"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung zu %@ abgebrochen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Connexion à %@ arrêtée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexión con %@ finalizada"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexão com %@ finalizada"
+          }
+        }
+      }
+    },
+    "session.ended.connection.signal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ was stopped by %2$@ (signal %3$ld)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 被 %2$@ 终止（信号 %3$ld）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ 被 %2$@ 終止（訊號 %3$ld）。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ が %2$@ で停止されました（シグナル %3$ld）。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@이(가) %2$@(으)로 중지되었습니다(시그널 %3$ld)."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ wurde durch %2$@ gestoppt (Signal %3$ld)."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ a été arrêté par %2$@ (signal %3$ld)."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@ detuvo %1$@ (señal %3$ld)."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ foi interrompido por %2$@ (sinal %3$ld)."
+          }
+        }
+      }
+    },
+    "failure.title.connectionLost": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection lost"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接中断"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連線中斷"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続が失われました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결이 끊어짐"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung verloren"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Connexion perdue"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexión perdida"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conexão perdida"
+          }
+        }
+      }
+    },
+    "failure.title.connectionLost.host": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection to %@ was lost"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "与 %@ 的连接中断"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "與 %@ 的連線中斷"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ との接続が失われました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ 연결이 끊어짐"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung zu %@ verloren"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Connexion à %@ perdue"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Se perdió la conexión con %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A conexão com %@ foi perdida"
+          }
+        }
+      }
+    },
+    "failure.runtimeSession.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta can no longer read this session’s output."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终端无法再读取这个会话的输出。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "終端機無法再讀取這個工作階段的輸出。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このセッションの出力を読み取れなくなりました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 세션의 출력을 더 이상 읽을 수 없습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta kann die Ausgabe dieser Sitzung nicht mehr lesen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta ne peut plus lire la sortie de cette session."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta ya no puede leer la salida de esta sesión."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O Corta não consegue mais ler a saída desta sessão."
+          }
+        }
+      }
+    },
+    "failure.runtimeRenderer.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The pane stopped drawing. The program in it is still running."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "窗格停止了绘制，里面的程序仍在运行。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "窗格停止繪製，裡面的程式仍在執行。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ペインの描画が止まりました。中のプログラムは動作を続けています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "창 영역의 그리기가 멈췄습니다. 안의 프로그램은 계속 실행 중입니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Der Bereich zeichnet nicht mehr. Das Programm darin läuft weiter."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La sous-fenêtre ne s’affiche plus. Le programme qu’elle contient tourne toujours."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El panel dejó de dibujarse. El programa sigue en ejecución."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O painel parou de desenhar. O programa nele continua em execução."
+          }
+        }
+      }
+    },
+    "failure.retryHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Again starts a new session here and closes this one."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试会在这里开始新会话，并关闭当前会话。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重試會在這裡開始新工作階段，並關閉目前的工作階段。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "再試行するとここで新しいセッションを開始し、このセッションを閉じます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "다시 시도하면 여기서 새 세션을 시작하고 이 세션은 닫습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„Erneut versuchen“ startet hier eine neue Sitzung und schließt diese."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Réessayer ouvre ici une nouvelle session et ferme celle-ci."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Reintentar abre aquí una sesión nueva y cierra esta."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Tentar novamente abre uma nova sessão aqui e fecha esta."
+          }
+        }
+      }
+    },
+    "askpass.source.short": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asked by OpenSSH; Corta keeps no copy."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来自 OpenSSH 的提问；Corta 不保存任何副本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "來自 OpenSSH 的提問；Corta 不保存任何副本。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "OpenSSH からの質問です。Corta は回答を保存しません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "OpenSSH의 질문입니다. Corta는 답을 저장하지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Frage von OpenSSH; Corta speichert keine Kopie."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Question posée par OpenSSH ; Corta n’en garde aucune copie."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Lo pregunta OpenSSH; Corta no guarda ninguna copia."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Pergunta do OpenSSH; o Corta não guarda nenhuma cópia."
+          }
+        }
+      }
+    },
+    "askpass.cancelConnection": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel Connection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消连接"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "取消連線"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続をキャンセル"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결 취소"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung abbrechen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Annuler la connexion"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Cancelar conexión"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Cancelar conexão"
+          }
+        }
+      }
+    },
+    "askpass.placeholder.password": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密码"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "密碼"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "パスワード"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "암호"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Passwort"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Mot de passe"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Contraseña"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Senha"
+          }
+        }
+      }
+    },
+    "askpass.placeholder.passphrase": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passphrase"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密钥密码"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "金鑰密語"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "パスフレーズ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "암호 문구"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Passphrase"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Phrase secrète"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Frase de contraseña"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Frase secreta"
+          }
+        }
+      }
+    },
+    "askpass.placeholder.answer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回答"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "回答"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "回答"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "답변"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Antwort"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Réponse"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Respuesta"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Resposta"
+          }
+        }
+      }
+    },
+    "sftp.failure.unopened.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not open files on %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开 %@ 上的文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "無法開啟 %@ 上的檔案"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ のファイルを開けませんでした"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@의 파일을 열 수 없음"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dateien auf %@ konnten nicht geöffnet werden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Impossible d’ouvrir les fichiers de %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudieron abrir los archivos de %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não foi possível abrir os arquivos de %@"
+          }
+        }
+      }
+    },
+    "sftp.failure.auth.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not sign in to %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法登录 %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "無法登入 %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ にサインインできませんでした"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@에 로그인할 수 없음"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anmeldung bei %@ fehlgeschlagen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Impossible de se connecter à %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudo iniciar sesión en %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não foi possível entrar em %@"
+          }
+        }
+      }
+    },
+    "sftp.failure.auth.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The password or key was not accepted, or this account cannot sign in this way."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密码或密钥不正确，或者这个账号不允许这样登录。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "密碼或金鑰不正確，或這個帳號不允許以這種方式登入。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "パスワードまたは鍵が受け付けられなかったか、このアカウントはこの方法でサインインできません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "암호나 키가 받아들여지지 않았거나, 이 계정은 이 방법으로 로그인할 수 없습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Passwort oder Schlüssel wurde nicht akzeptiert, oder dieses Konto kann sich so nicht anmelden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le mot de passe ou la clé n’a pas été accepté, ou ce compte ne peut pas se connecter ainsi."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se aceptó la contraseña o la clave, o esta cuenta no puede iniciar sesión así."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A senha ou a chave não foi aceita, ou esta conta não pode entrar dessa forma."
+          }
+        }
+      }
+    },
+    "sftp.failure.unreachable.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not reach %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法连接到 %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "無法連線到 %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ に接続できませんでした"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@에 연결할 수 없음"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ ist nicht erreichbar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Impossible de joindre %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudo contactar con %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não foi possível alcançar %@"
+          }
+        }
+      }
+    },
+    "sftp.failure.unreachable.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The host did not answer. Check its name, the network or a VPN."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主机没有响应。请检查主机名、网络或 VPN。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "主機沒有回應。請檢查主機名稱、網路或 VPN。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ホストが応答しませんでした。名前、ネットワーク、VPN を確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "호스트가 응답하지 않았습니다. 이름, 네트워크 또는 VPN을 확인하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Der Host hat nicht geantwortet. Prüfe den Namen, das Netzwerk oder ein VPN."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "L’hôte n’a pas répondu. Vérifiez son nom, le réseau ou un VPN."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El host no respondió. Revisa el nombre, la red o una VPN."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O host não respondeu. Verifique o nome, a rede ou uma VPN."
+          }
+        }
+      }
+    },
+    "sftp.failure.hostKey.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not verify %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法验证 %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "無法驗證 %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ を検証できませんでした"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@을(를) 확인할 수 없음"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ konnte nicht überprüft werden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Impossible de vérifier %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudo verificar %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não foi possível verificar %@"
+          }
+        }
+      }
+    },
+    "sftp.failure.hostKey.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its host key is unknown or has changed since it was trusted. Check with the server’s administrator before you trust it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "它的主机密钥未知，或与之前信任的不一致。信任之前请先向服务器管理员确认。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "它的主機金鑰未知，或與先前信任的不一致。信任之前請先向伺服器管理員確認。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ホスト鍵が不明か、信頼したときから変わっています。信頼する前にサーバの管理者に確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "호스트 키를 알 수 없거나 신뢰한 이후 바뀌었습니다. 신뢰하기 전에 서버 관리자에게 확인하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sein Hostschlüssel ist unbekannt oder hat sich seit dem Vertrauen geändert. Frag den Serveradministrator, bevor du ihm vertraust."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sa clé d’hôte est inconnue ou a changé depuis qu’elle a été approuvée. Vérifiez auprès de l’administrateur du serveur avant de lui faire confiance."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Su clave de host es desconocida o cambió desde que se confió en ella. Consulta al administrador del servidor antes de confiar en ella."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A chave do host é desconhecida ou mudou desde que foi confiada. Confirme com o administrador do servidor antes de confiar nela."
+          }
+        }
+      }
+    },
+    "sftp.failure.subprocess.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh ended before the file session started (exit code %ld). The server may not offer SFTP."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件会话开始之前 ssh 就退出了（退出码 %ld）。服务器可能不提供 SFTP。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "檔案工作階段開始之前 ssh 就結束了（結束代碼 %ld）。伺服器可能不提供 SFTP。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ファイルセッションの開始前に ssh が終了しました（終了コード %ld）。サーバが SFTP を提供していない可能性があります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "파일 세션이 시작되기 전에 ssh가 종료되었습니다(종료 코드 %ld). 서버가 SFTP를 제공하지 않을 수 있습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh wurde vor Beginn der Dateisitzung beendet (Exit-Code %ld). Der Server bietet eventuell kein SFTP an."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh s’est terminé avant l’ouverture de la session de fichiers (code de sortie %ld). Le serveur ne propose peut-être pas SFTP."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh terminó antes de que empezara la sesión de archivos (código de salida %ld). Puede que el servidor no ofrezca SFTP."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O ssh terminou antes de a sessão de arquivos começar (código de saída %ld). O servidor pode não oferecer SFTP."
+          }
+        }
+      }
+    },
+    "sftp.failure.lost.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The connection closed while it was being set up."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接在建立过程中关闭了。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連線在建立過程中關閉了。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続は確立の途中で閉じられました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결을 설정하는 도중에 연결이 닫혔습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Verbindung wurde während des Aufbaus geschlossen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La connexion s’est fermée pendant son établissement."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La conexión se cerró mientras se establecía."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A conexão foi fechada enquanto era estabelecida."
+          }
+        }
+      }
+    },
+    "sftp.failure.spawn.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not start ssh"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法启动 ssh"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "無法啟動 ssh"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh を起動できませんでした"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh를 시작할 수 없음"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh konnte nicht gestartet werden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Impossible de lancer ssh"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudo iniciar ssh"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não foi possível iniciar o ssh"
+          }
+        }
+      }
+    },
+    "sftp.failure.spawn.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta could not run the system’s ssh."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta 无法运行系统的 ssh。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 無法執行系統的 ssh。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "システムの ssh を実行できませんでした。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "시스템의 ssh를 실행할 수 없습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta konnte das ssh des Systems nicht ausführen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta n’a pas pu exécuter le ssh du système."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta no pudo ejecutar el ssh del sistema."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O Corta não conseguiu executar o ssh do sistema."
+          }
+        }
+      }
+    },
+    "sftp.failure.server.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server did not open a file session."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器没有打开文件会话。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "伺服器沒有開啟檔案工作階段。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "サーバがファイルセッションを開きませんでした。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "서버가 파일 세션을 열지 않았습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Der Server hat keine Dateisitzung geöffnet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le serveur n’a pas ouvert de session de fichiers."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El servidor no abrió una sesión de archivos."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O servidor não abriu uma sessão de arquivos."
+          }
+        }
+      }
+    },
+    "sftp.failure.edit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit Connection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修改连接信息"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "修改連線資訊"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続を編集"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결 편집"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbindung bearbeiten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Modifier la connexion"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Editar conexión"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Editar conexão"
+          }
+        }
+      }
+    },
+    "sftp.drop.current": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drop to upload %#@items@ to %2$@"
+          },
+          "substitutions": {
+            "items": {
+              "argNum": 1,
+              "formatSpecifier": "ld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg item"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg items"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "松开以上传 %1$ld 个项目到 %2$@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "放開以上傳 %1$ld 個項目到 %2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ドロップして %1$ld 項目を %2$@ にアップロード"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "놓으면 %1$ld개 항목을 %2$@에 업로드"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Loslassen, um %#@items@ nach %2$@ hochzuladen"
+          },
+          "substitutions": {
+            "items": {
+              "argNum": 1,
+              "formatSpecifier": "ld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg Objekt"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg Objekte"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Déposer pour envoyer %#@items@ dans %2$@"
+          },
+          "substitutions": {
+            "items": {
+              "argNum": 1,
+              "formatSpecifier": "ld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg élément"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg éléments"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Suelta para subir %#@items@ a %2$@"
+          },
+          "substitutions": {
+            "items": {
+              "argNum": 1,
+              "formatSpecifier": "ld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg elemento"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg elementos"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Solte para enviar %#@items@ para %2$@"
+          },
+          "substitutions": {
+            "items": {
+              "argNum": 1,
+              "formatSpecifier": "ld",
+              "variations": {
+                "plural": {
+                  "one": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg item"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "needs_review",
+                      "value": "%arg itens"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "sftp.drop.folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upload to %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上传到 %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "上傳到 %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ にアップロード"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@에 업로드"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nach %@ hochladen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Envoyer dans %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Subir a %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Enviar para %@"
+          }
+        }
+      }
+    },
+    "ui.connect.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to Host"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接到主机"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連線到主機"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ホストに接続"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "호스트에 연결"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Mit Host verbinden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Se connecter à un hôte"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conectar con un host"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conectar a um host"
+          }
+        }
+      }
+    },
+    "ui.connect.modeLabel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect for"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接用途"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連線用途"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続の用途"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결 용도"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbinden für"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Se connecter pour"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conectar para"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conectar para"
+          }
+        }
+      }
+    },
+    "ui.connect.mode.terminal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终端"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "終端機"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ターミナル"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "터미널"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Terminal"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Terminal"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Terminal"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Terminal"
+          }
+        }
+      }
+    },
+    "ui.connect.mode.files": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files (SFTP)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件 (SFTP)"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "檔案 (SFTP)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ファイル (SFTP)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "파일 (SFTP)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dateien (SFTP)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fichiers (SFTP)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Archivos (SFTP)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Arquivos (SFTP)"
+          }
+        }
+      }
+    },
+    "ui.connect.thisPane": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This pane"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前窗格"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "目前的窗格"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このペイン"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "현재 창 영역"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dieser Bereich"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Cette sous-fenêtre"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Este panel"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Este painel"
+          }
+        }
+      }
+    },
+    "ui.connect.thisPaneUnknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A remote host"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一台远程主机"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "一部遠端主機"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "リモートホスト"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "원격 호스트"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ein entfernter Host"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Un hôte distant"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Un host remoto"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Um host remoto"
+          }
+        }
+      }
+    },
+    "ui.connect.browsePaneFiles": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Browse Files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浏览文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "瀏覽檔案"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ファイルを表示"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "파일 탐색"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dateien durchsuchen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Parcourir les fichiers"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Explorar archivos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Navegar nos arquivos"
+          }
+        }
+      }
+    },
+    "ui.connect.hostPrompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Host, user@host or SSH alias"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主机名、user@host 或 SSH 别名"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "主機名稱、user@host 或 SSH 別名"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ホスト、user@host、または SSH エイリアス"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "호스트, user@host 또는 SSH 별칭"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Host, user@host oder SSH-Alias"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hôte, user@host ou alias SSH"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Host, user@host o alias de SSH"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Host, user@host ou alias SSH"
+          }
+        }
+      }
+    },
+    "ui.connect.advanced": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advanced"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "高级选项"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "進階選項"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "詳細オプション"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "고급"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Erweitert"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Options avancées"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Avanzado"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Avançado"
+          }
+        }
+      }
+    },
+    "ui.connect.portValue": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Port %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "端口 %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連接埠 %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ポート %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "포트 %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Port %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Port %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Puerto %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Porta %@"
+          }
+        }
+      }
+    },
+    "ui.connect.gitHostsHidden": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Git hosts hidden: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已隐藏 git 托管主机：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已隱藏 git 託管主機：%@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "非表示の git ホスト：%@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "숨긴 git 호스트: %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ausgeblendete Git-Hosts: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hôtes git masqués : %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hosts de git ocultos: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hosts git ocultos: %@"
+          }
+        }
+      }
+    },
+    "ui.connect.userFromConfig": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "User from SSH config"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户取自 SSH 配置"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用者取自 SSH 設定"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ユーザは SSH 設定から"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "사용자는 SSH 설정에서"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Benutzer aus der SSH-Konfiguration"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Utilisateur de la configuration SSH"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Usuario de la configuración de SSH"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Usuário da configuração SSH"
+          }
+        }
+      }
+    },
+    "ui.toolbar.connectHelp": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to a host — a terminal or its files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接到主机——打开终端或浏览文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "連線到主機——開啟終端機或瀏覽檔案"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ホストに接続 — ターミナルまたはファイル"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "호스트에 연결 — 터미널 또는 파일"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Mit einem Host verbinden – Terminal oder Dateien"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Se connecter à un hôte — terminal ou fichiers"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conectar con un host: terminal o archivos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Conectar a um host — terminal ou arquivos"
           }
         }
       }

@@ -293,13 +293,21 @@ Numeric formatting follows the current locale.
 
 ## When a session ends
 
-A pane keeps its output after the shell exits and displays a **Session ended**
-card with its exit code or terminating signal. The cursor disappears, but
-scrolling, selection, copying and ⌘F search still work. **New Session** asks
-for confirmation before replacing the retained output; **Close Pane** closes
-that pane. A directly connected SSH session offers **Reconnect** to start a
-new connection. Exiting Python or another program back to a live shell does
-not end the terminal session.
+A pane keeps its output after the shell exits: the output is dimmed a
+little and a panel says what ended and how — the exit code, or the signal
+that stopped it, in a sentence. The cursor disappears, but scrolling,
+selection, copying and ⌘F search still work around the panel. **New
+Session** starts the shell or preset again in the pane; **Close Pane**
+closes it. A directly connected SSH session says which host it was
+connected to and offers **Reconnect** to start a new connection; ssh's exit
+code 255 is explained as the network dropping or the host not answering.
+Either button clears the output above — the panel says so — and the new
+session starts at the pane's size and font size. Exiting Python or another
+program back to a live shell does not end the terminal session.
+
+When a session's input or output fails, or a pane stops drawing, the same
+panel offers **Try Again** or, for a connection, **Reconnect**; the system's
+own error text is under **Details**.
 
 ![Ended session retaining its final output and recovery actions](brand/session-ended.png)
 
@@ -476,17 +484,25 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   sheet; otherwise it says the pane is remote without knowing which host.
 - **Reconnect.** When an `ssh` or `mosh` session ends, **Reconnect to Host**
   runs the same command again, as a new connection.
-- **Connecting.** The toolbar's globe and folder buttons open a sheet for an
-  SSH terminal or an SFTP browser, with the same fields for both: the host
-  (a name, an address or an SSH alias), the user, the port and a private
-  key. Leave any of the last three empty and your `~/.ssh/config` and
-  OpenSSH's defaults decide it; a chosen key is offered first, and other
-  keys in `ssh-agent` are not tried. The sheet lists the connections you made recently — with the
-  user, port and key they used — and the `Host` names in your
-  `~/.ssh/config`; type to narrow the list, click one (or use ↑ and ↓ from
-  the host field) to fill the fields, double-click or press Return to
-  connect. Settings ▸ Privacy & Security ▸ Recent Hosts clears the recent
-  ones.
+- **Connecting.** The toolbar's globe button opens **Connect to Host**, a
+  sheet with a **Terminal / Files (SFTP)** switch: a terminal over SSH, or
+  the file browser. Type the host — a name, an address, `user@host` or an
+  SSH alias. **Advanced** holds the user, the port and a private key;
+  leave them empty and your `~/.ssh/config` and OpenSSH's defaults decide
+  them. A chosen key is offered first, and other keys in `ssh-agent` are
+  not tried. The sheet lists the connections you made recently — with the
+  port, key and when you last used them — and the `Host` names in your
+  `~/.ssh/config`. Hosts that only take git (`github.com`, or a `Host`
+  with `User git`) are left out, and the list says which. Type to narrow
+  the list, click one (or use ↑ and ↓ from the host field) to fill the
+  fields, double-click or press Return to connect. A terminal connection
+  joins the recent list once it is established — a host that refuses you,
+  or has no shell, does not. Hover over a recent host and click ✕, or
+  right-click it, to forget it; Settings ▸ Privacy & Security ▸ Recent
+  Hosts clears them all.
+- **This pane's files.** Opened from a pane connected to another machine,
+  the sheet offers that host's files first; press Return or **Browse
+  Files** to open them.
 - **Browse Remote Files…** opens an SFTP browser for the pane's host: list,
   upload, download, rename and delete. The first connection to a host asks
   you to confirm the host name. Transfers resume after an interruption and
@@ -499,7 +515,8 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   path, ⇧⌘N makes a folder and ⇧⌘. shows hidden files. Click a column title
   to sort. Right-click a row for its actions; double-click a folder to open
   it. Drop files from Finder on the listing — or on a folder row — to upload
-  them, and drag a file out to Finder to download it. Transfers are under
+  them; while you drag, the listing (or the row) is outlined and says where
+  the files will go. Drag a file out to Finder to download it. Transfers are under
   the toolbar's arrows button, with speed, time left and Show in Finder.
 - **Editing a remote file.** **Edit** in the browser — or ⌘-clicking a
   `path:line` in a remote pane — downloads a copy and opens it in your
@@ -519,8 +536,15 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
 When the server asks for a password, a key passphrase or a one-time code,
 or when a host is new and its key needs your decision, the browser asks in
 a dialog on its window and hands your answer to OpenSSH; nothing is saved,
-so a reconnect asks again. The host-key dialog shows the fingerprint and
-defaults to Cancel. A key held by `ssh-agent` or the keychain, or an
+so a reconnect asks again. **Cancel Connection** in the password dialog
+ends that connection attempt and returns to the host field — it is not
+sent as an empty password. The host-key dialog shows the fingerprint and
+defaults to Cancel.
+
+A connection that fails says why in a sentence — the password or key was
+not accepted, the host did not answer, its host key is unknown or changed,
+the server offers no SFTP — with ssh's own words under **Details**, and
+offers **Retry** or **Edit Connection**. A key held by `ssh-agent` or the keychain, or an
 existing `ControlMaster` connection from your terminal, signs in without
 asking.
 
@@ -653,18 +677,19 @@ Settings is a sidebar of categories, the way System Settings is laid out:
 - **Shortcuts** — every command's key; a reset arrow appears beside one you
   have changed.
 - **Quick Terminal** — the system-wide hotkey, position and screen.
-- **Connections** — Connect with SSH, and saved presets.
+- **Connections** — Connect to Host, and saved presets.
 - **Privacy & Security** — clipboard writes from programs (OSC 52), Secure
   Keyboard Entry, the directory history and recent hosts.
 
 These controls edit the same config file. Custom theme colors can be edited
 graphically or through the file.
 
-The window toolbar adds SSH and SFTP. Both open a sheet on the window with
-host, user, port and private-key fields — the host may be a config alias —
-and suggest recent and configured hosts; an empty user, port or key respects
-OpenSSH configuration. SFTP opens the remote pane's browser, or asks for a
-host when the pane is local ([Remote work](#remote-work-ssh-and-sftp)).
+The window toolbar's globe button connects to a host, for a terminal or
+for its files: a sheet on the window with the host — it may be a config
+alias — and the user, port and private key under Advanced, suggesting
+recent and configured hosts; an empty user, port or key respects OpenSSH
+configuration. From a remote pane it offers that host's files first
+([Remote work](#remote-work-ssh-and-sftp)).
 
 ```ini
 theme = corta

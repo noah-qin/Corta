@@ -412,6 +412,20 @@ public final class PTY: @unchecked Sendable {
         return kill(-group, SIGINT) == 0
     }
 
+    /// The line discipline has neither `ICANON` nor `ECHO`: a program has put
+    /// the terminal in raw mode. `ssh` does this once the server has given it
+    /// a terminal — after authentication, never while it asks for a password,
+    /// which turns echo off but keeps the line editing. False once exited or
+    /// when the terminal cannot answer.
+    public var isInRawMode: Bool {
+        guard state.withLock({ $0.exit == nil }) else { return false }
+        return descriptor.withNumber { fd -> Bool in
+            var attributes = termios()
+            guard tcgetattr(fd, &attributes) == 0 else { return false }
+            return attributes.c_lflag & tcflag_t(ICANON | ECHO) == 0
+        } ?? false
+    }
+
     @discardableResult
     public func terminate() -> Bool {
         signalProcessGroup(SIGHUP)

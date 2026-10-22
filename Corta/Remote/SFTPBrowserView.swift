@@ -35,6 +35,7 @@ struct SFTPBrowserView: View {
     @State private var showTransfers = false
     @State private var editingPath = false
     @State private var sortOrder = [KeyPathComparator(\SFTPBrowserModel.Entry.name)]
+    @State private var showFailureDetails = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,7 +45,11 @@ struct SFTPBrowserView: View {
             case .connecting:
                 connecting
             case .failed(let message):
-                hostEntry(error: message)
+                if let failure = model.connectFailure {
+                    failurePanel(failure)
+                } else {
+                    hostEntry(error: message)
+                }
             case .connected:
                 browser
             }
@@ -112,6 +117,70 @@ struct SFTPBrowserView: View {
                 .frame(maxWidth: .infinity)
         }
         .scrollBounceBehavior(.basedOnSize)
+    }
+
+    /// A connection that failed, said the way a pane says it stopped
+    /// (`PaneStatusPanel`): the kind of failure in a sentence, ssh's own
+    /// words behind Details, and the two ways on — the fields again, or the
+    /// same connection again.
+    private func failurePanel(_ failure: SFTPBrowserModel.ConnectFailure) -> some View {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 6) {
+                    Image(systemName: failure.symbol)
+                        .font(.system(size: 26, weight: .medium))
+                        .foregroundStyle(.orange)
+                        .padding(.bottom, 4)
+                        .accessibilityHidden(true)
+                    Text(failure.title)
+                        .font(.headline)
+                        .multilineTextAlignment(.center)
+                    Text(failure.body)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        showFailureDetails.toggle()
+                    } label: {
+                        Label(L10n.text("panel.details"),
+                              systemImage: showFailureDetails ? "chevron.down" : "chevron.right")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("sftp-failure-details")
+                    if showFailureDetails {
+                        Text(failure.details)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                            .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 6))
+                    }
+                    HStack(spacing: 10) {
+                        Button(L10n.text("sftp.failure.edit")) { model.cancelConnect() }
+                        Button(L10n.text("failure.button.retry")) { model.retry() }
+                            .keyboardShortcut(.defaultAction)
+                    }
+                    .controlSize(.large)
+                    .padding(.top, 10)
+                }
+                .frame(width: 340)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
+                .background(.background, in: .rect(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.separator))
+                .shadow(color: .black.opacity(0.12), radius: 14, y: 4)
+                .accessibilityElement(children: .contain)
+                .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .background(.windowBackground)
+        .onChange(of: failure) { showFailureDetails = false }
     }
 
     /// Progress with a way out: a host that never answers is cancelled
@@ -276,14 +345,7 @@ struct SFTPBrowserView: View {
             .width(min: 120, ideal: 170, max: 240)
         } rows: {
             ForEach(model.entries) { entry in
-                if entry.kind == .directory {
-                    // Dropped on a folder row, files go into that folder.
-                    TableRow(entry)
-                        .dropDestination(for: URL.self) { urls in
-                            model.upload(
-                                urls, into: SFTPBrowserModel.joinPath(model.currentPath, entry.name))
-                        }
-                } else if entry.kind == .file {
+                if entry.kind == .file {
                     // Dragged to Finder, a file is downloaded where it lands.
                     TableRow(entry)
                         .draggable(SFTPDragItem(name: SFTPBrowserModel.localFileName(entry.name)) { [model] in
@@ -295,8 +357,9 @@ struct SFTPBrowserView: View {
             }
         }
         .alternatingRowBackgrounds(.enabled)
-        // Dropped anywhere else on the listing, into the current directory.
-        .dropDestination(for: URL.self) { urls, _ in model.upload(urls) }
+        // Files from Finder: into the folder row they land on, or the
+        // folder shown (`SFTPDropTarget`).
+        .overlay { SFTPDropTarget(model: model) }
         // Double-click or Return opens a row anywhere in it, not only on its
         // name; the menu is the same actions the toolbar's ⋯ holds, on what
         // was clicked.

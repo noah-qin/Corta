@@ -120,9 +120,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// Non-nil exactly when `isOperable` is false.
     var failureView: PaneFailureView?
     /// Shown from the moment this pane's session ends until a new one
-    /// starts or the pane closes (`SessionEndedBar`).
+    /// starts or the pane closes (`SessionEnded`).
     private(set) lazy var sessionEnd = PaneSessionEnd(host: self)
-    var sessionEndedBar: SessionEndedBar? { sessionEnd.bar }
+    var sessionEndedPanel: PaneStatusOverlay? { sessionEnd.overlay }
     /// A fallback shell or directory, reported once the toast can be seen.
     private var pendingSessionNotice: String?
     /// The window is sized (`SplitViewController.prepareWindow`); until then a
@@ -282,23 +282,28 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     /// Builds a pane or retries a failed setup. Reconnect must reuse the exact
     /// recorded command; ordinary startup may fall back to a working shell.
-    private func setUpPane(strictRespawn: Bool = false) {
+    /// A rebuild keeps the pane's grid and font size: the new child is born
+    /// at the size it is shown at, and the window does not move.
+    private func setUpPane(strictRespawn: Bool = false, keeping grid: TerminalSize? = nil) {
         let configuration = ConfigurationStore.shared.configuration
-        fontSize = Configuration.fontSizeRange.clamped(configuration.fontSize)
+        if grid == nil || !isFontSizeZoomed {
+            fontSize = Configuration.fontSizeRange.clamped(configuration.fontSize)
+        }
         fontStyle = FontStyle(configuration)
         guard prepareRenderer() else { return }
-        let initialSize = initialTerminalSize()
+        let initialSize = initialTerminalSize(keeping: grid)
         guard let started = startSession(strictRespawn: strictRespawn, size: initialSize, configuration: configuration)
         else { return }
         adopt(started, size: initialSize)
         // Before the reader starts, so the shell's first output is measured
         // the way the configuration says.
         session.ambiguousWidthIsWide = configuration.ambiguousWidth == .wide
-        installPaneViews()
+        installPaneViews(sizingView: grid == nil)
         installSessionCallbacks()
         installTerminalCallbacks(on: terminalView)
         // The PTY reader must not run until all callbacks and views are ready.
         session.start()
+        remote.watchForEstablishedConnection()
     }
 
     /// A Metal 4 device and a renderer for it, or the failure view saying
@@ -332,8 +337,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     }
 
     /// The grid the child starts with, and its size in pixels.
-    private func initialTerminalSize() -> TerminalSize {
-        let size = initialGridSize ?? configuredGridSize
+    private func initialTerminalSize(keeping grid: TerminalSize? = nil) -> TerminalSize {
+        let size = grid ?? initialGridSize ?? configuredGridSize
         guard let terminalRenderer else { return size }
         let pixels = pixelSize(
             columns: Int(size.columns), rows: Int(size.rows), metrics: terminalRenderer.metrics)
@@ -383,9 +388,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         lastRequestedSize = size
     }
 
-    private func installPaneViews() {
-        let contentSize = initialWindowContentSize
-        self.view.setFrameSize(contentSize)
+    /// `sizingView` false on a rebuild: the view already has its place in
+    /// the window, and sizing it to the configured grid moved the pane.
+    private func installPaneViews(sizingView: Bool = true) {
+        let contentSize = sizingView ? initialWindowContentSize : view.bounds.size
+        if sizingView { self.view.setFrameSize(contentSize) }
 
         let view = TerminalView(frame: NSRect(origin: .zero, size: contentSize))
         self.view.addSubview(view)
@@ -425,9 +432,21 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 } ?? false
                 self.frameLoop.suspendRendering()
                 self.terminalView?.stopRendering()
-                self.presentFailure(title: L10n.text("failure.title.runtimeSession"),
-                    detail: "\(failure.description)\n\n\(L10n.text("failure.runtimeHint"))",
-                    canRetry: !reconnect, canReconnect: reconnect, takesFocus: self.isFocusedPane)
+                let title = reconnect
+                    ? self.remote.connectionHost.map { L10n.format("failure.title.connectionLost.host", $0) }
+                        ?? L10n.text("failure.title.connectionLost")
+                    : L10n.text("failure.title.runtimeSession")
+                // The last output stays readable behind it; the raw
+                // reason is the detail, not the sentence.
+                self.presentFailure(title: title,
+                    detail: L10n.text("failure.runtimeSession.body"),
+                    canRetry: !reconnect, canReconnect: reconnect,
+                    details: failure.description,
+                    note: L10n.text(reconnect ? "session.ended.connection.note" : "failure.retryHint"),
+                    showsSettings: false, backdrop: .dim,
+                    symbol: reconnect ? "bolt.horizontal.circle" : "exclamationmark.triangle",
+                    tint: reconnect ? .systemRed : .systemOrange,
+                    takesFocus: self.isFocusedPane)
             }
         }
     }
@@ -558,6 +577,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         commands.stop()
         taskNotifier.cancel()
         remote.cancelPendingOpens()
+        remote.stopWatchingConnection()
         appearance.stop()
         frameLoop.suspendRendering()
         terminalView?.stopRendering()
@@ -595,8 +615,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 PaneRemoteState.isRemoteLauncher(executable: $0.executable)
             } ?? false
             self.presentFailure(title: L10n.text("failure.title.runtimeRenderer"),
-                detail: L10n.text("failure.runtimeHint"),
-                canRetry: !reconnect, canReconnect: reconnect, takesFocus: self.isFocusedPane)
+                detail: L10n.text("failure.runtimeRenderer.body"),
+                canRetry: !reconnect, canReconnect: reconnect,
+                details: "\(error)",
+                note: L10n.text(reconnect ? "session.ended.connection.note" : "failure.retryHint"),
+                showsSettings: false, takesFocus: self.isFocusedPane)
         }
         loop.cursorHandoffSignal = focus.handoffSignal
         loop.onPresented = { [weak self] in
@@ -705,7 +728,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             scrollOffset: scrollOffset,
             cursorVisible: scrollOffset == 0 && isFocusedPane
                 && terminalView?.hasMarkedText() != true
-                && sessionEndedBar == nil,
+                && sessionEndedPanel == nil,
             cursorBlinkVisible: focus.cursorBlinkVisible,
             selection: selection,
             searchMatches: search.highlights,
@@ -763,7 +786,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let isConnection =
             launchedCommand.map { PaneRemoteState.isRemoteLauncher(executable: $0.executable) }
             ?? false
-        sessionEnd.present(exit, isConnection: isConnection)
+        let program = launchedCommand.map { ($0.executable as NSString).lastPathComponent } ?? "shell"
+        sessionEnd.present(
+            exit, isConnection: isConnection, remoteHost: isConnection ? remote.connectionHost : nil,
+            program: program)
     }
 
     func closeEndedPane() {
@@ -935,11 +961,16 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// `canReconnect` adds Reconnect, described as a new connection.
     private func presentFailure(
         title: String, detail: String, canRetry: Bool, canReconnect: Bool = false,
+        details: String? = nil, note: String? = nil, showsSettings: Bool = true,
+        backdrop: PaneStatusOverlay.Backdrop = .opaque,
+        symbol: String = "exclamationmark.triangle", tint: NSColor = .systemOrange,
         takesFocus: Bool = true
     ) {
         failureView?.removeFromSuperview()
         let failure = PaneFailureView(
-            title: title, detail: detail, canRetry: canRetry, canReconnect: canReconnect)
+            title: title, detail: detail, canRetry: canRetry, canReconnect: canReconnect,
+            details: details, note: note, showsSettings: showsSettings, backdrop: backdrop,
+            symbol: symbol, tint: tint)
         failure.onRetry = { [weak self] in self?.rebuildPane(strictRespawn: false) }
         // A runtime failure may leave a live child. This explicit recovery
         // button, with its new-session warning, can replace it too.
@@ -952,6 +983,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     /// Behind Try Again (the ladder) and Reconnect (the exact command).
     func rebuildPane(strictRespawn: Bool) {
+        // The grid it is shown at, while a session still says so; a pane
+        // that never built starts from the configured one.
+        let grid = didSizeWindow && session != nil ? lastRequestedSize : nil
         terminalView?.stopRendering()
         readerDemotion?.cancel()
         readerDemotion = nil
@@ -971,7 +1005,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         pointer.reset()
         selection = nil
         scrollOffset = 0
-        setUpPane(strictRespawn: strictRespawn)
+        setUpPane(strictRespawn: strictRespawn, keeping: grid)
         guard isOperable, let terminalView else { return }
         // The window settled long ago; this pane needs a real winsize now.
         didSizeWindow = true
@@ -979,7 +1013,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         // direct presentation (#285) applies to them as to the old ones.
         splitController?.updateDirectPresentation()
         view.window?.makeFirstResponder(terminalView)
-        resizeSessionToFitView()
+        resizeSessionToFitView(coalesce: false)
         invalidateDisplay()
         if strictRespawn {
             // Every time: a new connection; the old scrollback is gone.

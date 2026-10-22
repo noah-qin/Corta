@@ -88,20 +88,30 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 - Remote context reported by shell integration, a host indicator and reconnect
   action. SSH connections use system OpenSSH, including its configuration,
   agent and `ProxyJump`; Corta does not provide its own SSH implementation.
-- A connect sheet for SSH and SFTP with host, user, port and private-key
-  fields, each passed to OpenSSH as its own argument; empty ones fall to
-  `~/.ssh/config`. It suggests recent connections, with the fields they used,
-  and the `Host` names in `~/.ssh/config` (read, never executed). A pane
-  opened from it names that destination in its title until the remote shell
-  reports its own.
+- One connect sheet for a terminal (SSH) and for files (SFTP), behind one
+  toolbar button, with host, user, port and private-key fields, each passed
+  to OpenSSH as its own argument; empty ones fall to `~/.ssh/config`. It
+  suggests recent connections, with the fields they used and when, and the
+  `Host` names in `~/.ssh/config` (read, never executed), leaving out hosts
+  that only take git. A terminal connection is remembered once established —
+  ssh has a terminal on the server — not when Connect is pressed. From a
+  remote pane it offers that host's files first. A pane opened from it names
+  that destination in its title until the remote shell reports its own.
+- A session that ends, a connection that drops and a pane that fails show
+  one panel over the dimmed, still-selectable output: what ended, how, the
+  raw reason under Details, and Reconnect, New Session or Try Again — which
+  start at the pane's size and font size.
 - An SFTP browser for listing, transferring, renaming and deleting remote files
   and directories, with managed local copies for editing: Back and Forward, a
   breadcrumb path, sortable columns, hidden files on request, a row menu, drag
-  and drop to upload and to Finder, and transfers in a toolbar popover with
+  and drop to upload (the listing or folder row outlined, naming the
+  destination) and to Finder, and transfers in a toolbar popover with
   speed and time left. The first connection to a host in a run requires
   confirmation; a remote report alone cannot open it. Passwords, key
   passphrases, one-time codes and new host keys are asked in a dialog
-  through OpenSSH's `SSH_ASKPASS` and never saved.
+  through OpenSSH's `SSH_ASKPASS` and never saved; cancelling a password
+  ends the connection attempt. A failed connection says why in a sentence,
+  ssh's diagnostics under Details.
 - Optional OSC 52 clipboard writes, disabled by default. Clipboard reads from
   terminal output are not implemented.
 

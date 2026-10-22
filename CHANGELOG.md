@@ -18,6 +18,46 @@ Versioning for compatibility changes.
   language bar with flags at the top of each switches between them, and each
   translation says which English version it follows.
 
+### Changed
+
+- A pane whose session ended, whose connection dropped or that stopped
+  working now shows one panel over its dimmed output, which stays
+  readable and selectable: what ended and how in a sentence — a dropped
+  ssh connection names its host and explains exit code 255 — with the
+  raw reason under **Details**. **Reconnect** and **New Session** start at
+  once; the panel says the output is cleared, instead of asking again.
+  Settings… is offered only where a setting can be the cause.
+- **Connect to Host** replaces the separate SSH and Remote Files sheets:
+  one toolbar button, a Terminal / Files switch, the user, port and key
+  under Advanced, and recent hosts with their port, key and when they were
+  last used — forget one with its ✕ or its menu. Hosts that only take git
+  (`github.com`, a `Host` with `User git`) are no longer suggested. From a
+  remote pane the sheet offers that host's files first.
+- The SFTP password dialog says once whom it is for, names what the field
+  wants (password, passphrase or answer), and its Cancel reads **Cancel
+  Connection**. A failed SFTP connection says why — sign-in refused, host
+  unreachable, host key unknown or changed, no SFTP — with **Retry** and
+  **Edit Connection**, and ssh's output under Details.
+
+### Fixed
+
+- Cancelling an SFTP password prompt no longer opens it again. OpenSSH
+  read the cancelled prompt as an empty password, tried it and asked again,
+  up to three times or more; Cancel now ends that connection attempt.
+- Dropping files from Finder on the SFTP browser uploads them again — into
+  the folder shown, or the folder row they land on. The drop never reached
+  the listing.
+- A terminal connection made from the connect sheet is remembered as a
+  recent host once it is established, not when Connect is pressed: a host
+  that refused the connection, or offers no shell, no longer appears.
+- **Reconnect** and **New Session** start the new session at the pane's
+  size and font size. The child started at the configured window size and
+  was resized afterwards, so a remote banner and prompt were laid out at
+  the wrong width, and a ⌘+ zoom was lost.
+- A pane's failure page is no longer white in a dark window: its colours
+  were resolved against the app's appearance instead of the window's.
+- The failure page no longer mentions a Try Again button it does not show.
+
 ## [1.3.1] - 2026-10-21
 
 ### Fixed

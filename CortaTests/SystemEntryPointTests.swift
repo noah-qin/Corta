@@ -666,29 +666,56 @@ struct NotificationRoutingTests {
     }
 }
 
-/// What the ended-session bar says. The bar itself needs a pane, which needs
-/// Metal 4 (`SessionLifecycleTests`); the wording does not.
+/// What the session-ended panel says. The panel itself needs a pane, which
+/// needs Metal 4 (`SessionLifecycleTests`); the wording does not.
+@MainActor
 struct SessionEndedWordingTests {
-    @Test("an exit says its code, a signal its name, and a connection says connection")
+    private func content(_ exit: ProcessExit, connection: Bool, host: String? = nil, program: String = "zsh")
+        -> PaneStatusPanel.Content
+    {
+        SessionEnded.content(for: exit, isConnection: connection, host: host, program: program)
+    }
+
+    @Test("an exit says its code, a signal its name, and a connection names its host")
     func wordingFollowsTheExit() {
-        #expect(
-            SessionEndedBar.message(for: .exited(code: 0), isConnection: false)
-                == L10n.format("session.ended.exited", 0))
-        #expect(
-            SessionEndedBar.message(for: .exited(code: 1), isConnection: true)
-                == L10n.format("session.ended.connection.exited", 1))
-        #expect(
-            SessionEndedBar.message(for: .signalled(signal: SIGKILL), isConnection: false)
-                == L10n.format("session.ended.signalled", "SIGKILL", 9))
-        #expect(SessionEndedBar.signalName(SIGTERM) == "SIGTERM")
-        #expect(SessionEndedBar.signalName(77) == "signal 77")
+        #expect(content(.exited(code: 0), connection: false).title
+            == L10n.format("session.ended.local.title", "zsh"))
+        #expect(content(.exited(code: 3), connection: false).body == L10n.format("session.ended.local.code", 3))
+        #expect(content(.signalled(signal: SIGKILL), connection: false).body
+            == L10n.format("session.ended.local.signal", "SIGKILL", 9))
+        #expect(content(.exited(code: 255), connection: true, host: "deploy@box", program: "ssh").title
+            == L10n.format("session.ended.connection.ended.host", "deploy@box"))
+        #expect(content(.exited(code: 1), connection: true, program: "mosh").title
+            == L10n.text("session.ended.connection.ended"))
+        #expect(SessionEnded.signalName(SIGTERM) == "SIGTERM")
+        #expect(SessionEnded.signalName(77) == "signal 77")
         // Every case reads differently.
         let all = Set([
-            SessionEndedBar.message(for: .exited(code: 0), isConnection: false),
-            SessionEndedBar.message(for: .exited(code: 0), isConnection: true),
-            SessionEndedBar.message(for: .signalled(signal: 15), isConnection: false),
-            SessionEndedBar.message(for: .signalled(signal: 15), isConnection: true),
+            content(.exited(code: 0), connection: false).body,
+            content(.exited(code: 0), connection: true).body,
+            content(.signalled(signal: 15), connection: false).body,
+            content(.signalled(signal: 15), connection: true, program: "ssh").body,
+            content(.exited(code: 255), connection: true, program: "ssh").body,
+            content(.exited(code: 255), connection: true, program: "mosh").body,
         ])
-        #expect(all.count == 4)
+        #expect(all.count == 6)
+    }
+
+    /// 255 is ssh's own code for a connection that failed or dropped; said
+    /// as such for ssh alone, as a plain exit code for anything else.
+    @Test("ssh's 255 is explained, another launcher's is not")
+    func sshsOwnCodeIsExplained() {
+        #expect(content(.exited(code: 255), connection: true, program: "ssh").body
+            == L10n.text("session.ended.connection.ssh255"))
+        #expect(content(.exited(code: 255), connection: true, program: "et").body
+            == L10n.format("session.ended.connection.code", "et", 255))
+    }
+
+    /// Both say what starting again costs, and only the remote one is a
+    /// new connection.
+    @Test("the note says the output is cleared")
+    func theNoteNamesTheCost() {
+        #expect(content(.exited(code: 0), connection: true).note == L10n.text("session.ended.connection.note"))
+        #expect(content(.exited(code: 0), connection: false).note == L10n.text("session.ended.local.note"))
     }
 }

@@ -33,6 +33,7 @@ nonisolated enum SSHDestination {
 nonisolated enum RemoteConnectMode: Equatable, Sendable {
     case ssh, sftp
 
+    /// The file browser's own host step names itself by this.
     var title: String {
         switch self {
         case .ssh: L10n.text("ui.ssh.title")
@@ -40,18 +41,26 @@ nonisolated enum RemoteConnectMode: Equatable, Sendable {
         }
     }
 
-    /// The same symbols the window toolbar uses for the two buttons.
     var symbol: String {
         switch self {
-        case .ssh: "network"
+        case .ssh: "terminal"
         case .sftp: "folder"
         }
     }
 }
 
-/// The Connect dialog, for SSH and for SFTP.
+/// The focused pane's own host, offered first: what the toolbar's Files
+/// button did in one click, kept one Return away.
+struct RemoteConnectPaneFiles {
+    /// The host as Corta names it; nil when the pane is remote but no
+    /// honest source names it.
+    var host: String?
+    var open: () -> Void
+}
+
+/// The Connect dialog, for a terminal and for files.
 ///
-/// A sheet on the window it was asked from — the toolbar's buttons, or
+/// A sheet on the window it was asked from — the toolbar's button, or
 /// Settings ▸ Connections — so it reads as part of that window's task; a
 /// free-standing panel only when no window is key (the menu, with every
 /// window closed). A plain window background either way: Liquid Glass is
@@ -63,7 +72,7 @@ final class RemoteConnectController: NSWindowController {
 
     private init() {
         let window = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 260),
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 260),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         super.init(window: window)
@@ -77,7 +86,8 @@ final class RemoteConnectController: NSWindowController {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func show(_ mode: RemoteConnectMode, sender: Any?) {
+    /// - Parameter paneFiles: the focused pane's host, when it is remote.
+    func show(_ mode: RemoteConnectMode, sender: Any?, paneFiles: RemoteConnectPaneFiles? = nil) {
         guard let window else { return }
         if window.isVisible {
             (window.sheetParent ?? window).makeKeyAndOrderFront(sender)
@@ -85,8 +95,8 @@ final class RemoteConnectController: NSWindowController {
         }
         // A fresh dialog each time: a host left over from the last one is a
         // connection nobody asked for.
-        draft.reset(mode: mode)
-        window.title = mode.title
+        draft.reset(mode: mode, paneFiles: paneFiles)
+        window.title = L10n.text("ui.connect.title")
         if let parent = NSApp.keyWindow ?? NSApp.mainWindow, parent.isVisible,
             parent.attachedSheet == nil, !(parent is NSPanel)
         {
@@ -110,6 +120,11 @@ final class RemoteConnectController: NSWindowController {
     /// Validated here, at the boundary: a problem keeps the dialog open and
     /// is what it shows. Nil once the dialog may close.
     private func connect(mode: RemoteConnectMode, fields: SSHTargetFields) -> SSHTarget.Problem? {
+        if fields.isEmpty, let paneFiles = draft.paneFiles {
+            close()
+            paneFiles.open()
+            return nil
+        }
         let target: SSHTarget
         switch fields.target {
         case .success(let value): target = value
@@ -118,7 +133,8 @@ final class RemoteConnectController: NSWindowController {
         close()
         switch mode {
         case .ssh:
-            RecentHostsStore.shared.record(target)
+            // Recorded once the connection is established, by the pane
+            // (`PaneRemote.watchForEstablishedConnection`).
             (NSApp.delegate as? AppDelegate)?.launchPreset(
                 SSHDestination.preset(for: target), inNewWindow: true)
         case .sftp:
@@ -136,42 +152,50 @@ final class RemoteConnectDraft {
     var mode: RemoteConnectMode = .ssh
     var fields = SSHTargetFields()
     var problem: SSHTarget.Problem?
+    var paneFiles: RemoteConnectPaneFiles?
     /// Bumped on reset, so the host field takes focus again.
     var generation = 0
 
-    func reset(mode: RemoteConnectMode) {
+    func reset(mode: RemoteConnectMode, paneFiles: RemoteConnectPaneFiles? = nil) {
         self.mode = mode
+        self.paneFiles = paneFiles
         fields = SSHTargetFields()
         problem = nil
         generation += 1
     }
 }
 
-/// The dialog's content: the shared form, with Cancel.
+/// The dialog's content: the shared form, with the Terminal / Files switch
+/// and Cancel.
 private struct RemoteConnectSheet: View {
     @Bindable var draft: RemoteConnectDraft
     let connect: (RemoteConnectMode, SSHTargetFields) -> SSHTarget.Problem?
 
     var body: some View {
         RemoteConnectForm(
-            mode: draft.mode, fields: $draft.fields,
+            mode: draft.mode, modeSelection: $draft.mode, fields: $draft.fields,
+            paneFiles: draft.paneFiles,
             error: draft.problem.map(RemoteConnectForm.message),
             focusGeneration: draft.generation,
             onCancel: { RemoteConnectController.shared.close() },
             onConnect: { draft.problem = connect(draft.mode, draft.fields) })
             .onChange(of: draft.fields) { draft.problem = nil }
             .padding(20)
-            .frame(width: 460)
+            .frame(width: 480)
     }
 }
 
 
-/// The connect form both dialogs and the file browser's own host step use:
-/// a heading, the host, user, port and key, the hosts it can suggest, what
-/// went wrong if anything did, and what the connection relies on.
+/// The connect form the dialog and the file browser's own host step use: a
+/// heading, the host, the hosts it can suggest, the user, port and key
+/// under Advanced, what went wrong if anything did, and what the
+/// connection relies on.
 struct RemoteConnectForm: View {
     let mode: RemoteConnectMode
+    /// The dialog's Terminal / Files switch; the browser has none.
+    var modeSelection: Binding<RemoteConnectMode>?
     @Binding var fields: SSHTargetFields
+    var paneFiles: RemoteConnectPaneFiles?
     /// A line above the fields — where a prefilled name came from.
     var notice: String?
     var error: String?
@@ -181,8 +205,11 @@ struct RemoteConnectForm: View {
 
     @FocusState private var hostFocused: Bool
     @State private var aliases: [String] = []
+    @State private var hiddenGitHosts: [String] = []
     @State private var recents: [SSHTarget] = []
     @State private var picked: Suggestion?
+    @State private var hovered: Suggestion?
+    @State private var showsAdvanced = false
 
     /// A row in the suggestion well: a recent connection fills every
     /// field it was made with; an alias only the host, leaving the rest to
@@ -222,43 +249,32 @@ struct RemoteConnectForm: View {
         // Computed once per body: each keystroke narrows the lists.
         let shown = visibleSuggestions
         return VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                Image(systemName: mode.symbol)
-                    .font(.system(size: 22))
-                    .foregroundStyle(.tint)
-                    .accessibilityHidden(true)
-                Text(mode.title).font(.headline)
-            }
+            header
             if let notice {
                 Text(notice)
                     .font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Form {
-                TextField(L10n.text("ui.ssh.host"), text: $fields.host, prompt: Text(verbatim: "hostname"))
-                    .focused($hostFocused)
-                    .onSubmit(onConnect)
-                    // ↓ and ↑ walk the suggestions from the field, the way an
-                    // address bar's do; Return then connects to the one picked.
-                    .onKeyPress(.downArrow) { stepSuggestion(by: 1) }
-                    .onKeyPress(.upArrow) { stepSuggestion(by: -1) }
-                    .accessibilityIdentifier("connect-host")
-                TextField(L10n.text("ui.connect.user"), text: $fields.user,
-                          prompt: Text(L10n.text("ui.connect.fromConfig")))
-                    .onSubmit(onConnect)
-                    .accessibilityIdentifier("connect-user")
-                TextField(L10n.text("ui.ssh.port"), text: $fields.port, prompt: Text(verbatim: "22"))
-                    .frame(width: 90)
-                    .onSubmit(onConnect)
-                    .help(L10n.text("ui.ssh.portDefault"))
-                    .accessibilityIdentifier("connect-port")
-                LabeledContent(L10n.text("ui.connect.identity")) { identityRow }
+            if let paneFiles {
+                paneFilesRow(paneFiles)
             }
-            .formStyle(.columns)
-            .textFieldStyle(.roundedBorder)
+            TextField(L10n.text("ui.ssh.host"), text: $fields.host,
+                      prompt: Text(L10n.text("ui.connect.hostPrompt")))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.large)
+                .focused($hostFocused)
+                .onSubmit(onConnect)
+                // ↓ and ↑ walk the suggestions from the field, the way an
+                // address bar's do; Return then connects to the one picked.
+                .onKeyPress(.downArrow) { stepSuggestion(by: 1) }
+                .onKeyPress(.upArrow) { stepSuggestion(by: -1) }
+                .accessibilityLabel(L10n.text("ui.ssh.host"))
+                .accessibilityIdentifier("connect-host")
             if !shown.recents.isEmpty || !shown.aliases.isEmpty {
                 suggestions(shown)
             }
+            advanced
             if let error {
                 // Said in words with a symbol, never by colour alone.
                 Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -267,29 +283,145 @@ struct RemoteConnectForm: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text(help)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Spacer()
+            Divider()
+            HStack(alignment: .center, spacing: 12) {
+                Text(help)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
                 if let onCancel {
                     Button(L10n.text("common.cancel"), action: onCancel)
                         .keyboardShortcut(.cancelAction)
                 }
                 Button(L10n.text("sftp.host.connect"), action: onConnect)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(fields.isEmpty)
+                    // Empty, Return opens the focused pane's host's files.
+                    .disabled(fields.isEmpty && paneFiles == nil)
             }
             .controlSize(.large)
         }
         .onAppear { hostFocused = true }
-        .onChange(of: focusGeneration) { hostFocused = true }
+        .onChange(of: focusGeneration) {
+            hostFocused = true
+            showsAdvanced = false
+        }
+        // A picked recent made with a user, port or key shows them.
+        .onChange(of: fields) {
+            if !fields.user.isEmpty || !fields.port.isEmpty || !fields.identityFile.isEmpty,
+                picked != nil
+            {
+                showsAdvanced = true
+            }
+        }
         .task(id: focusGeneration) {
             recents = RecentHostsStore.shared.targets
             // A file read, off the main actor; small, bounded, read-only.
-            aliases = await Task.detached(priority: .userInitiated) { SSHConfigHosts.aliases() }.value
+            let found = await Task.detached(priority: .userInitiated) { SSHConfigHosts.suggestions() }.value
+            aliases = found.hosts
+            hiddenGitHosts = found.hiddenGitHosts
         }
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            Image(systemName: modeSelection == nil ? mode.symbol : "network")
+                .font(.system(size: 20))
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
+            Text(modeSelection == nil ? mode.title : L10n.text("ui.connect.title")).font(.headline)
+            Spacer()
+            if let modeSelection {
+                Picker(L10n.text("ui.connect.modeLabel"), selection: modeSelection) {
+                    Label(L10n.text("ui.connect.mode.terminal"), systemImage: "terminal").tag(RemoteConnectMode.ssh)
+                    Label(L10n.text("ui.connect.mode.files"), systemImage: "folder").tag(RemoteConnectMode.sftp)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .accessibilityIdentifier("connect-mode")
+            }
+        }
+    }
+
+    /// The focused pane's host, one Return away when the field is empty.
+    private func paneFilesRow(_ paneFiles: RemoteConnectPaneFiles) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "folder.badge.gearshape")
+                .foregroundStyle(.tint)
+                .frame(width: 18)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(L10n.text("ui.connect.thisPane"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(paneFiles.host ?? L10n.text("ui.connect.thisPaneUnknown"))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            Button(L10n.text("ui.connect.browsePaneFiles")) {
+                RemoteConnectController.shared.close()
+                paneFiles.open()
+            }
+            .accessibilityIdentifier("connect-pane-files")
+        }
+        .padding(10)
+        .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 10))
+    }
+
+    /// User, port and key: rarely changed, so out of the way, with what
+    /// they hold said on the closed row.
+    private var advanced: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                showsAdvanced.toggle()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: showsAdvanced ? "chevron.down" : "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .frame(width: 10)
+                    Text(L10n.text("ui.connect.advanced")).font(.callout.weight(.medium))
+                    if !showsAdvanced {
+                        Text(advancedSummary)
+                            .font(.callout)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                .foregroundStyle(.secondary)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("connect-advanced")
+            if showsAdvanced {
+                Form {
+                    TextField(L10n.text("ui.connect.user"), text: $fields.user,
+                              prompt: Text(L10n.text("ui.connect.fromConfig")))
+                        .onSubmit(onConnect)
+                        .accessibilityIdentifier("connect-user")
+                    TextField(L10n.text("ui.ssh.port"), text: $fields.port, prompt: Text(verbatim: "22"))
+                        .frame(width: 90)
+                        .onSubmit(onConnect)
+                        .help(L10n.text("ui.ssh.portDefault"))
+                        .accessibilityIdentifier("connect-port")
+                    LabeledContent(L10n.text("ui.connect.identity")) { identityRow }
+                }
+                .formStyle(.columns)
+                .textFieldStyle(.roundedBorder)
+                .padding(.leading, 16)
+            }
+        }
+    }
+
+    /// "User · Port · Private key", or what they are set to.
+    private var advancedSummary: String {
+        let user = fields.user.isEmpty ? L10n.text("ui.connect.user") : fields.user
+        let port = fields.port.isEmpty ? L10n.text("ui.ssh.port") : L10n.format("ui.connect.portValue", fields.port)
+        let key = fields.identityFile.isEmpty
+            ? L10n.text("ui.connect.identity") : (fields.identityFile as NSString).lastPathComponent
+        return [user, port, key].joined(separator: " · ")
     }
 
     /// The chosen key's path, or what applies without one, with Choose… and
@@ -361,12 +493,14 @@ struct RemoteConnectForm: View {
     }
 
     /// The suggestions the typed host leaves, recents first; an alias that
-    /// is also a recent is listed once, as the recent.
+    /// is also a recent is listed once, as the recent. A git host is never
+    /// offered — not even one recorded by an older build.
     private var visibleSuggestions: (recents: [Suggestion], aliases: [Suggestion]) {
         let filter = filter
-        let recentHosts = Set(recents.map(\.displayName))
+        let shownRecents = recents.filter { !SSHConfigHosts.isGitHost($0.host) }
+        let recentHosts = Set(shownRecents.map(\.displayName))
         return (
-            Self.matching(recents.map(Suggestion.recent), filter),
+            Self.matching(shownRecents.map(Suggestion.recent), filter),
             Self.matching(aliases.filter { !recentHosts.contains($0) }.map(Suggestion.alias), filter))
     }
 
@@ -392,15 +526,18 @@ struct RemoteConnectForm: View {
         return suggestions.filter { $0.name.localizedCaseInsensitiveContains(filter) }
     }
 
-    /// The suggestions, in a rounded well like the fields above: a click
-    /// fills the fields, a double-click connects, the menu forgets a recent
-    /// host. Drawn as plain rows — a `List` brought a square frame or its
+    /// The suggestions, in a rounded well: a click fills the fields, a
+    /// double-click connects; a recent host is forgotten from its ✕ or its
+    /// menu. Drawn as plain rows — a `List` brought a square frame or its
     /// own insets, and either sat badly in a rounded sheet.
     private func suggestions(_ shown: (recents: [Suggestion], aliases: [Suggestion])) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 1) {
                 suggestionSection(L10n.text("ui.connect.recent"), shown.recents, symbol: "clock")
-                suggestionSection(L10n.text("ui.connect.sshConfig"), shown.aliases, symbol: "doc.text")
+                suggestionSection(
+                    L10n.text("ui.connect.sshConfig"), shown.aliases, symbol: "doc.text",
+                    trailing: hiddenGitHosts.isEmpty
+                        ? nil : L10n.format("ui.connect.gitHostsHidden", hiddenGitHosts.joined(separator: ", ")))
             }
             .padding(6)
         }
@@ -411,13 +548,26 @@ struct RemoteConnectForm: View {
     }
 
     @ViewBuilder
-    private func suggestionSection(_ title: String, _ suggestions: [Suggestion], symbol: String) -> some View {
+    private func suggestionSection(
+        _ title: String, _ suggestions: [Suggestion], symbol: String, trailing: String? = nil
+    ) -> some View {
         if !suggestions.isEmpty {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .frame(height: Self.headerHeight, alignment: .bottomLeading)
+            HStack {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if let trailing {
+                    Text(trailing)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(trailing)
+                }
+            }
+            .padding(.horizontal, 8)
+            .frame(height: Self.headerHeight, alignment: .bottom)
             ForEach(suggestions, id: \.self) { suggestion in
                 suggestionRow(suggestion, symbol: symbol)
             }
@@ -426,57 +576,107 @@ struct RemoteConnectForm: View {
 
     private func suggestionRow(_ suggestion: Suggestion, symbol: String) -> some View {
         let isPicked = picked == suggestion && pickedIsCurrent
+        let detail = detail(for: suggestion)
         return Button {
             pick(suggestion)
         } label: {
-            Label(suggestion.name, systemImage: symbol)
-                .labelStyle(SuggestionLabelStyle(isPicked: isPicked))
-                .foregroundStyle(isPicked ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-                .padding(.horizontal, 8)
-                .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
-                .background(
-                    isPicked ? AnyShapeStyle(.tint) : AnyShapeStyle(.clear),
-                    in: .rect(cornerRadius: 6))
-                .contentShape(.rect)
+            HStack(spacing: 8) {
+                // White on the selection, or it vanished into the tint.
+                Image(systemName: symbol)
+                    .foregroundStyle(isPicked ? AnyShapeStyle(.white) : AnyShapeStyle(.tint))
+                    .frame(width: 16)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(suggestion.name).lineLimit(1).truncationMode(.middle)
+                    if let detail {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(isPicked ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(isPicked ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
+            .background(
+                isPicked ? AnyShapeStyle(.tint)
+                    : hovered == suggestion ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
+                in: .rect(cornerRadius: 6))
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isPicked ? .isSelected : [])
+        .overlay(alignment: .trailing) {
+            if case .recent(let target) = suggestion, hovered == suggestion {
+                Button {
+                    forget(target)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(isPicked ? AnyShapeStyle(.white) : AnyShapeStyle(.tertiary))
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 8)
+                .help(L10n.text("ui.connect.removeRecent"))
+                .accessibilityLabel(L10n.text("ui.connect.removeRecent"))
+            }
+        }
+        .onHover { inside in
+            if inside { hovered = suggestion } else if hovered == suggestion { hovered = nil }
+        }
         .simultaneousGesture(TapGesture(count: 2).onEnded {
             pick(suggestion)
             onConnect()
         })
         .contextMenu {
             if case .recent(let target) = suggestion {
-                Button(L10n.text("ui.connect.removeRecent")) {
-                    RecentHostsStore.shared.remove(target)
-                    recents = RecentHostsStore.shared.targets
-                }
+                Button(L10n.text("ui.connect.removeRecent")) { forget(target) }
             }
         }
     }
 
-    private struct SuggestionLabelStyle: LabelStyle {
-        let isPicked: Bool
+    private func forget(_ target: SSHTarget) {
+        RecentHostsStore.shared.remove(target)
+        recents = RecentHostsStore.shared.targets
+        if case .recent(let picked) = picked, picked == target { self.picked = nil }
+    }
 
-        func makeBody(configuration: LabelStyleConfiguration) -> some View {
-            HStack(spacing: 8) {
-                // White on the selection, or it vanished into the tint.
-                configuration.icon
-                    .foregroundStyle(isPicked ? AnyShapeStyle(.white) : AnyShapeStyle(.tint))
-                    .frame(width: 16)
-                configuration.title.lineLimit(1).truncationMode(.middle)
-            }
+    /// A recent's port, key and when it was last used.
+    private func detail(for suggestion: Suggestion) -> String? {
+        switch suggestion {
+        case .alias:
+            // The section's heading already says where it came from.
+            return nil
+        case .recent(let target):
+            return Self.recentDetail(
+                target, lastUsed: RecentHostsStore.shared.lastUsed(target), now: Date())
         }
     }
 
-    private static let rowHeight: CGFloat = 26
+    /// "Port 2222 · id_ed25519 · 2 hours ago", leaving out what is unset.
+    static func recentDetail(_ target: SSHTarget, lastUsed: Date?, now: Date) -> String {
+        var parts: [String] = []
+        if target.user == nil { parts.append(L10n.text("ui.connect.userFromConfig")) }
+        if let port = target.port { parts.append(L10n.format("ui.connect.portValue", String(port))) }
+        parts.append(target.identityFile.map { ($0 as NSString).lastPathComponent }
+            ?? L10n.text("ui.connect.identityDefault"))
+        if let lastUsed {
+            let formatter = RelativeDateTimeFormatter()
+            formatter.unitsStyle = .full
+            parts.append(formatter.localizedString(for: lastUsed, relativeTo: now))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private static let rowHeight: CGFloat = 36
     private static let headerHeight: CGFloat = 20
 
-    /// Exactly what there is, up to about six rows; then it scrolls.
+    /// Exactly what there is, up to about five rows; then it scrolls.
     private static func suggestionHeight(_ shown: (recents: [Suggestion], aliases: [Suggestion])) -> CGFloat {
         let rows = shown.recents.count + shown.aliases.count
         let headers = (shown.recents.isEmpty ? 0 : 1) + (shown.aliases.isEmpty ? 0 : 1)
         let content = CGFloat(rows) * (Self.rowHeight + 1) + CGFloat(headers) * (Self.headerHeight + 1) + 12
-        return min(190, content)
+        return min(220, content)
     }
 }

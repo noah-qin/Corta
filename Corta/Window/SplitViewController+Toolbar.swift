@@ -18,7 +18,6 @@ import AppKit
 
 extension NSToolbarItem.Identifier {
     static let cortaConnect = Self("corta.connect")
-    static let cortaFiles = Self("corta.files")
     static let cortaNewTab = Self("corta.new-tab")
     static let cortaInputSource = Self("corta.input-source")
 }
@@ -43,10 +42,10 @@ extension SplitViewController: NSToolbarDelegate {
         }
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .cortaConnect, .cortaFiles, .cortaNewTab]
+        [.flexibleSpace, .cortaConnect, .cortaNewTab]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .space, .cortaConnect, .cortaFiles, .cortaNewTab, .cortaInputSource]
+        [.flexibleSpace, .space, .cortaConnect, .cortaNewTab, .cortaInputSource]
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
@@ -77,14 +76,15 @@ extension SplitViewController: NSToolbarDelegate {
         let symbol: String
         let action: Selector
         switch identifier {
-        case .cortaConnect: key = "ui.toolbar.connect"; symbol = "network"; action = #selector(connectSSH(_:))
-        case .cortaFiles: key = "ui.toolbar.files"; symbol = "folder"; action = #selector(openRemoteFiles(_:))
+        // One button for a terminal and for files: the dialog switches
+        // between them, and offers a remote pane's own files first.
+        case .cortaConnect: key = "ui.toolbar.connect"; symbol = "network"; action = #selector(connectRemote(_:))
         default: return nil
         }
         let item = NSToolbarItem(itemIdentifier: identifier)
         item.label = L10n.text(key)
         item.paletteLabel = item.label
-        item.toolTip = identifier == .cortaFiles ? L10n.text("ui.toolbar.filesHelp") : item.label
+        item.toolTip = L10n.text("ui.toolbar.connectHelp")
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: item.label)
         item.target = self
         item.action = action
@@ -143,12 +143,15 @@ extension SplitViewController: NSToolbarDelegate {
         (NSApp.delegate as? AppDelegate)?.newTab(beside: window, sender: sender)
     }
 
-    @objc private func connectSSH(_ sender: Any?) { RemoteConnectController.shared.show(.ssh, sender: sender) }
-    /// A remote pane's own browser; from a local pane, the same connect
-    /// sheet as SSH, asking which host.
-    @objc private func openRemoteFiles(_ sender: Any?) {
-        guard let pane = focusedPane else { return }
-        if pane.remote.canBrowseFiles { pane.remote.browseRemoteFiles(sender); return }
-        RemoteConnectController.shared.show(.sftp, sender: sender)
+    /// The connect dialog; from a remote pane, with that host's files
+    /// offered first — Return opens them, as the old Files button did.
+    @objc private func connectRemote(_ sender: Any?) {
+        var paneFiles: RemoteConnectPaneFiles?
+        if let pane = focusedPane, pane.remote.canBrowseFiles {
+            paneFiles = RemoteConnectPaneFiles(
+                host: PaneRemote.browseHostName(state: pane.remote.state)
+            ) { [weak pane] in pane?.remote.browseRemoteFiles(nil) }
+        }
+        RemoteConnectController.shared.show(.ssh, sender: sender, paneFiles: paneFiles)
     }
 }

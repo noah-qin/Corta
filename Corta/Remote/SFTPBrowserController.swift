@@ -154,9 +154,21 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         return window
     }
 
+    private var refusalObserver: NSObjectProtocol?
+
     /// One window per host: the registry the model consults before and
     /// after it connects.
     private func installConnectionCallbacks() {
+        // A password refused in the dialog ends the attempt; this window
+        // goes back to its host field, not to a failure it did not have.
+        refusalObserver = NotificationCenter.default.addObserver(
+            forName: SSHAskpassPrompter.refusedNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            let host = notification.object as? String
+            MainActor.assumeIsolated {
+                if let host { self?.model.passwordRefused(host: host) }
+            }
+        }
         model.shouldStartConnection = { [weak self] host in
             guard let self else { return false }
             if let existing = Self.byHost[host], existing !== self {
@@ -225,6 +237,8 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        if let refusalObserver { NotificationCenter.default.removeObserver(refusalObserver) }
+        refusalObserver = nil
         model.disconnect()
         model.removeDragStaging()
         Self.unconnected.removeValue(forKey: ObjectIdentifier(self))
