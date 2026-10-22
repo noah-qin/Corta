@@ -164,7 +164,9 @@ struct SFTPDropDestinationTests {
     @Test("the listing says where the files will go")
     func prompt() {
         #expect(SFTPDropDestination.current(path: "/srv").prompt(count: 2)
-            == L10n.format("sftp.drop.current", 2, "/srv"))
+            == L10n.format("sftp.drop.current", 2, "srv"))
+        #expect(SFTPDropDestination.current(path: "/").prompt(count: 1)
+            == L10n.format("sftp.drop.current", 1, "/"))
         #expect(SFTPDropDestination.folder(path: "/srv/releases", name: "releases").prompt(count: 2)
             == L10n.format("sftp.drop.folder", "releases"))
     }

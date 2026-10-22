@@ -163,10 +163,21 @@ enum SSHAskpassPrompter {
 
     /// A symbol in the alert's icon place, instead of the app icon: the
     /// question is about a connection, not about Corta.
+    /// Drawn small in the middle of the alert's 64-point icon square: a
+    /// symbol handed over as it is was scaled up to fill it.
     private static func symbolIcon(_ name: String, tint: NSColor) -> NSImage? {
-        let configuration = NSImage.SymbolConfiguration(pointSize: 40, weight: .regular)
+        let configuration = NSImage.SymbolConfiguration(pointSize: 30, weight: .regular)
             .applying(.init(paletteColors: [tint]))
-        return NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
             .withSymbolConfiguration(configuration)
+        else { return nil }
+        let side: CGFloat = 64
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
+            let size = symbol.size
+            symbol.draw(in: NSRect(
+                x: (side - size.width) / 2, y: (side - size.height) / 2,
+                width: size.width, height: size.height))
+            return true
+        }
     }
 }

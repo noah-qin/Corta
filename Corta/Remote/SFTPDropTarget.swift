@@ -63,7 +63,10 @@ nonisolated enum SFTPDropDestination: Equatable {
     /// What the listing says while files are held over it.
     func prompt(count: Int) -> String {
         switch self {
-        case .current(let path): L10n.format("sftp.drop.current", count, path)
+        // The folder by name, as the path bar ends: a whole path ran out of
+        // room before the part that says where.
+        case .current(let path):
+            L10n.format("sftp.drop.current", count, path == "/" ? "/" : (path as NSString).lastPathComponent)
         case .folder(_, let name): L10n.format("sftp.drop.folder", name)
         }
     }
