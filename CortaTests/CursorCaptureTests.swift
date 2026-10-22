@@ -60,4 +60,27 @@ struct CursorCaptureTests {
         let actual = try #require(image.dataProvider?.data) as Data
         #expect(actual == Data(expected))
     }
+    @Test("cursor capture releases renderer access before waiting for the GPU")
+    func gpuWaitDoesNotHoldRendererLock() async throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let renderer = try TerminalRenderer(
+            device: device,
+            font: CTFontCreateWithName("Menlo" as CFString, 14, nil), scale: 1)
+        defer { renderer.cursorCaptureWaitGate = nil }
+        renderer.cursorCaptureWaitGate = {
+            let entered = DispatchSemaphore(value: 0)
+            let thread = Thread {
+                _ = renderer.withExclusiveAccess { entered.signal() }
+            }
+            thread.qualityOfService = .userInitiated
+            thread.start()
+            #expect(
+                entered.wait(timeout: .now() + 5) == .success,
+                "a GPU wait must not keep the live renderer locked")
+}
+        let terminal = Terminal(rows: 2, columns: 4)
+        let capture = await renderer.cursorImageInBackground(grid: terminal.grid)
+        #expect(capture != nil)
+    }
+
 }

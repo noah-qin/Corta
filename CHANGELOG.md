@@ -42,6 +42,14 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Large SFTP listings convert and sort in the background; superseded work
+  cannot replace a newer directory or sort order.
+- Opening remote editing no longer hashes the old cache on the main thread.
+  Cleanup runs in the background with a per-run work budget.
+- Remote-edit operations time out after 120 seconds once connected, releasing
+  a stuck upload and offering its approval again for retry.
+- Idle block-cursor capture waits for the GPU off the main thread without
+  holding the live renderer lock; failed captures back off before retrying.
 - Cancelling an SFTP password prompt no longer opens it again. OpenSSH
   read the cancelled prompt as an empty password, tried it and asked again,
   up to three times or more; Cancel now ends that connection attempt.

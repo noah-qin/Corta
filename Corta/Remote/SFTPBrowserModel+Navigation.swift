@@ -77,28 +77,30 @@ extension SFTPBrowserModel {
             do {
                 let listing = try await client.listDirectory(path: path)
                 guard generation == directoryGeneration else { return }
-                let destination = Self.normalized(path: path)
-                if destination != currentPath {
-                    switch history {
-                    case .visit:
-                        backStack.append(currentPath)
-                        forwardStack.removeAll()
-                    case .back:
-                        backStack.removeLast()
-                        forwardStack.append(currentPath)
-                    case .forward:
-                        forwardStack.removeLast()
-                        backStack.append(currentPath)
-                    case .none:
-                        break
+                await applyEntries(listing) {
+                    let destination = Self.normalized(path: path)
+                    if destination != currentPath {
+                        switch history {
+                        case .visit:
+                            backStack.append(currentPath)
+                            forwardStack.removeAll()
+                        case .back:
+                            backStack.removeLast()
+                            forwardStack.append(currentPath)
+                        case .forward:
+                            forwardStack.removeLast()
+                            backStack.append(currentPath)
+                        case .none:
+                            break
+                        }
+                        if backStack.count > Self.historyLimit {
+                            backStack.removeFirst(backStack.count - Self.historyLimit)
+                        }
                     }
-                    if backStack.count > Self.historyLimit {
-                        backStack.removeFirst(backStack.count - Self.historyLimit)
-                    }
+                    currentPath = destination
+                    pathField = currentPath
                 }
-                currentPath = destination
-                pathField = currentPath
-                applyEntries(listing)
+                guard generation == directoryGeneration else { return }
                 selection = []
                 updateTitle()
                 await refreshVolume()
@@ -198,35 +200,93 @@ extension SFTPBrowserModel {
             && !name.contains("\0")
     }
 
-    func applyEntries(_ listing: [SFTPEntry]) {
-        allEntries =
-            listing
-            // `.` and `..` are the server's bookkeeping, not content; a
-            // name that is not one component is not content either.
-            // Not valid UTF-8 is not addressable either: every path sent is
-            // a `String`'s UTF-8, and a lossy name names another file.
-            .compactMap { entry in
-                guard let name = entry.filenameIfUTF8, Self.isPlainEntryName(name) else { return nil }
-                let attributes = entry.attributes
-                return Entry(
-                    name: name,
-                    kind: Self.kind(ofPermissions: attributes.permissions),
+    /// Conversion and natural sorting can take hundreds of milliseconds for a
+    /// valid large listing. Only publication belongs on the main actor.
+    func applyEntries(_ listing: [SFTPEntry], commit: () -> Void = {}) async {
+        let connection = connectionGeneration
+        let directory = directoryGeneration
+        guard let converted = try? await Self.convertEntries(listing) else { return }
+        while !Task.isCancelled {
+            let hidden = showsHiddenFiles
+            let column = sortColumn
+            let ascending = sortAscending
+            guard
+                let result = try? await Self.prepareVisibleEntries(
+                    converted.entries, hidden: hidden, column: column, ascending: ascending),
+                connection == connectionGeneration, directory == directoryGeneration,
+                !Task.isCancelled
+            else { return }
+            // Sort controls can change during the background pass. Recompute
+            // with the newest controls before atomically publishing path + rows.
+            guard hidden == showsHiddenFiles, column == sortColumn, ascending == sortAscending
+            else { continue }
+            entryPreparation?.cancel()
+            entryPreparation = nil
+            entryGeneration &+= 1
+            allEntries = converted.entries
+            hiddenEntries = converted.hiddenCount
+            entries = result.entries
+            selection.formIntersection(result.names)
+            commit()
+            return
+        }
+    }
+
+    @concurrent
+    private static func convertEntries(_ listing: [SFTPEntry]) async throws
+        -> (entries: [Entry], hiddenCount: Int)
+    {
+        var entries: [Entry] = []
+        var hiddenCount = 0
+        for entry in listing {
+            try Task.checkCancellation()
+            guard let name = entry.filenameIfUTF8, Self.isPlainEntryName(name) else { continue }
+            let attributes = entry.attributes
+            entries.append(
+                Entry(
+                    name: name, kind: Self.kind(ofPermissions: attributes.permissions),
                     size: attributes.size,
                     modified: attributes.modificationTime.map {
                         Date(timeIntervalSince1970: TimeInterval($0))
                     },
-                    permissions: attributes.permissions.map(Self.permissionString))
-            }
-        applyVisibleEntries()
+                    permissions: attributes.permissions.map(Self.permissionString)))
+            if name.hasPrefix(".") { hiddenCount += 1 }
+        }
+        return (entries, hiddenCount)
     }
 
-    /// Filters and sorts `allEntries` into what the table shows, and drops
-    /// a selection the filter just hid.
+    /// Superseded sorts stop in the comparator; late results cannot replace
+    /// a newer directory, connection, hidden-file choice or sort order.
     func applyVisibleEntries() {
-        let visible = showsHiddenFiles ? allEntries : allEntries.filter { !$0.isHidden }
-        entries = Self.sorted(visible, by: sortColumn, ascending: sortAscending)
-        let shown = Set(entries.map(\.id))
-        if !selection.isSubset(of: shown) { selection.formIntersection(shown) }
+        entryPreparation?.cancel()
+        entryGeneration &+= 1
+        let generation = entryGeneration
+        let source = allEntries
+        let hidden = showsHiddenFiles
+        let column = sortColumn
+        let ascending = sortAscending
+        entryPreparation = Task { [weak self] in
+            guard
+                let result = try? await Self.prepareVisibleEntries(
+                    source, hidden: hidden, column: column, ascending: ascending),
+                !Task.isCancelled, let self, generation == self.entryGeneration
+            else { return }
+            self.entries = result.entries
+            self.selection.formIntersection(result.names)
+            self.entryPreparation = nil
+        }
+    }
+
+    @concurrent
+    private static func prepareVisibleEntries(
+        _ entries: [Entry], hidden: Bool, column: SortColumn, ascending: Bool
+    ) async throws -> (entries: [Entry], names: Set<String>) {
+        try Task.checkCancellation()
+        let visible = hidden ? entries : entries.filter { !$0.isHidden }
+        let sorted = try Self.sorted(
+            visible, by: column, ascending: ascending, checkCancellation: true)
+        try Task.checkCancellation()
+        return (sorted, Set(sorted.map(\.id)))
     }
 
     /// Folders first, then the column; ties fall back to the name, so the
@@ -234,7 +294,15 @@ extension SFTPBrowserModel {
     nonisolated static func sorted(
         _ entries: [Entry], by column: SortColumn, ascending: Bool
     ) -> [Entry] {
-        entries.sorted { lhs, rhs in
+        // Synchronous pure API retained for callers with small, already local data.
+        (try? sorted(entries, by: column, ascending: ascending, checkCancellation: false)) ?? []
+    }
+
+    nonisolated private static func sorted(
+        _ entries: [Entry], by column: SortColumn, ascending: Bool, checkCancellation: Bool
+    ) throws -> [Entry] {
+        try entries.sorted { lhs, rhs in
+            if checkCancellation { try Task.checkCancellation() }
             if (lhs.kind == .directory) != (rhs.kind == .directory) {
                 return lhs.kind == .directory
             }
