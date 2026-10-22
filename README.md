@@ -22,8 +22,9 @@ Metal 4 rendering · Native CJK / IME · SSH, SFTP and remote editing
 [Documentation](docs/README.md) ·
 [Contribute](CONTRIBUTING.md) ·
 [Discord](https://discord.gg/QNdWfdwr7j) ·
-[Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml) ·
-[简体中文](README.zh-CN.md)
+[Report a bug](https://github.com/noah-qin/Corta/issues/new?template=bug_report.yml)
+
+🇺🇸 [English](README.md) · 🇨🇳 [简体中文](README.zh-CN.md) · 🇭🇰 [繁體中文](README.zh-Hant.md) · 🇯🇵 [日本語](README.ja.md) · 🇰🇷 [한국어](README.ko.md) · 🇩🇪 [Deutsch](README.de.md) · 🇫🇷 [Français](README.fr.md) · 🇪🇸 [Español](README.es.md) · 🇧🇷 [Português](README.pt-BR.md)
 
 <img src="docs/brand/screenshot.png" width="960" alt="Corta with three split panes: a git log and a Chinese, Japanese, Korean and emoji alignment table; the pangolin mascot shown as an image in the terminal; and 24-bit colour ramps">
 

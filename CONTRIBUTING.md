@@ -262,6 +262,18 @@ until reviewed. That record is in
 Do not infer native-speaker verification from catalog state alone; describe
 the reviewer and scope in the PR, and record any human-only gaps.
 
+Three documents are translated into the same eight languages:
+`README.md`, `docs/USER-GUIDE.md` and `docs/TROUBLESHOOTING.md`. A
+translation sits beside its source with the language before `.md`
+(`README.ja.md`, `docs/USER-GUIDE.zh-CN.md`; `zh-CN` is Simplified and
+`zh-Hant` Traditional Chinese), uses the app's own localized names for menus
+and settings, and keeps each section's English anchor as an
+`<a id="…"></a>` so links between the documents work in every language. Its
+header names the English commit it was translated from; a change to the
+English text does not have to update the translations, but whoever
+refreshes one moves that commit forward. The first translations were made by
+an assistant on 2026-10-22, without a native-speaker review.
+
 ## Branches
 
 - `main` is always buildable.
