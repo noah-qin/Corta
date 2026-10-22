@@ -2,7 +2,7 @@
 
 [Documentation index](README.md) · [Project overview](../README.md)
 
-🇺🇸 [English](TROUBLESHOOTING.md) · 🇨🇳 [简体中文](TROUBLESHOOTING.zh-CN.md) · 🇭🇰 [繁體中文](TROUBLESHOOTING.zh-Hant.md) · 🇯🇵 [日本語](TROUBLESHOOTING.ja.md) · 🇰🇷 [한국어](TROUBLESHOOTING.ko.md) · 🇩🇪 [Deutsch](TROUBLESHOOTING.de.md) · 🇫🇷 [Français](TROUBLESHOOTING.fr.md) · 🇪🇸 [Español](TROUBLESHOOTING.es.md) · 🇧🇷 [Português](TROUBLESHOOTING.pt-BR.md)
+🇺🇸 [English](TROUBLESHOOTING.md) · 🇨🇳 [简体中文](i18n/zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](i18n/zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](i18n/ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](i18n/ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](i18n/de/TROUBLESHOOTING.md) · 🇫🇷 [Français](i18n/fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](i18n/es/TROUBLESHOOTING.md) · 🇧🇷 [Português](i18n/pt-BR/TROUBLESHOOTING.md)
 
 What to do when Corta will not install, will not start, or does something
 your previous terminal did not. Each entry says what you will see, why,

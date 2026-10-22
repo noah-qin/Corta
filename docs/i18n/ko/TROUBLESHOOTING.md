@@ -1,10 +1,10 @@
 # 문제 해결
 
-[문서 색인(영어)](README.md) · [프로젝트 개요](../README.ko.md)
+[문서 색인(영어)](../../README.md) · [프로젝트 개요](README.md)
 
-🇺🇸 [English](TROUBLESHOOTING.md) · 🇨🇳 [简体中文](TROUBLESHOOTING.zh-CN.md) · 🇭🇰 [繁體中文](TROUBLESHOOTING.zh-Hant.md) · 🇯🇵 [日本語](TROUBLESHOOTING.ja.md) · 🇰🇷 [한국어](TROUBLESHOOTING.ko.md) · 🇩🇪 [Deutsch](TROUBLESHOOTING.de.md) · 🇫🇷 [Français](TROUBLESHOOTING.fr.md) · 🇪🇸 [Español](TROUBLESHOOTING.es.md) · 🇧🇷 [Português](TROUBLESHOOTING.pt-BR.md)
+🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
-> 이 문서는 영어판 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)의 커밋
+> 이 문서는 영어판 [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md)의 커밋
 > [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md)
 > 시점을 번역한 것입니다. 이후 영어판이 바뀌었거나 내용이 다르면 영어판을 따릅니다.
 > macOS 메시지는 영어 원문을 함께 적었습니다.
@@ -143,7 +143,7 @@ Corta는 가진 설정을 유지하고 파일 쓰기를 거부합니다. 쓰면 
 
 Corta는 의도적으로 `TERM=xterm-256color`를 알립니다(`docs/DECISIONS.md` D08). 같은 TERM 값을 쓴다고 해서 xterm과 완전히
 호환된다는 뜻은 아닙니다. `printf '%s\n' "$TERM"`으로 원격 환경을 확인하고, 최소 재현 사례와 비교하세요.
-[Conformance](CONFORMANCE.md#42-external-suites)(영어)에 지원하는 시퀀스와 남은 실패가 기록되어 있습니다.
+[Conformance](../../CONFORMANCE.md#42-external-suites)(영어)에 지원하는 시퀀스와 남은 실패가 기록되어 있습니다.
 
 ### 어떤 글리프가 이웃보다 작게 그려짐
 
@@ -236,7 +236,7 @@ SFTP 연결은 그 윈도우의 대화상자에서 암호나 키 암호문을 �
 한도보다 오래된 출력은 새 출력이 올 때 버려집니다. 위쪽의 알약 모양 표시가 화면이 얼마나 거슬러 올라가 있는지 알려 줍니다. 한도를 올릴 수
 있습니다(최대 1,000,000. 압축된 오래된 기록의 메모리는 텍스트와 작업에 따라 다릅니다). 저장된 셀 하나는 압축 전 16바이트이며, 이것은
 상주 메모리 추정치가 아닙니다. 120열 100,000줄 작업을 측정했을 때 상주 메모리가 약 11 MiB 늘었습니다.
-[Performance](PERFORMANCE.md#56-numbers-by-release)(영어)를 보세요. 설정된 한도를 넘어 보관해야 하는 출력은 내보내세요.
+[Performance](../../PERFORMANCE.md#56-numbers-by-release)(영어)를 보세요. 설정된 한도를 넘어 보관해야 하는 출력은 내보내세요.
 
 ### 보안 키보드 입력이 켜져 있는데 매크로 도구가 여전히 동작함
 

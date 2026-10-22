@@ -1,10 +1,10 @@
 # 사용자 가이드
 
-[문서 색인(영어)](README.md) · [프로젝트 개요](../README.ko.md)
+[문서 색인(영어)](../../README.md) · [프로젝트 개요](README.md)
 
-🇺🇸 [English](USER-GUIDE.md) · 🇨🇳 [简体中文](USER-GUIDE.zh-CN.md) · 🇭🇰 [繁體中文](USER-GUIDE.zh-Hant.md) · 🇯🇵 [日本語](USER-GUIDE.ja.md) · 🇰🇷 [한국어](USER-GUIDE.ko.md) · 🇩🇪 [Deutsch](USER-GUIDE.de.md) · 🇫🇷 [Français](USER-GUIDE.fr.md) · 🇪🇸 [Español](USER-GUIDE.es.md) · 🇧🇷 [Português](USER-GUIDE.pt-BR.md)
+🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
-> 이 문서는 영어판 [USER-GUIDE.md](USER-GUIDE.md)의 커밋
+> 이 문서는 영어판 [USER-GUIDE.md](../../USER-GUIDE.md)의 커밋
 > [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/USER-GUIDE.md)
 > 시점을 번역한 것입니다. 이후 영어판이 바뀌었거나 내용이 다르면 영어판을 따릅니다.
 > 화면에 보이는 이름은 Corta의 한국어 UI를 따랐습니다. 설정 키, 명령, 코드는 원문 그대로 둡니다.
@@ -52,7 +52,7 @@ Corta를 응용 프로그램으로 끌어 놓은 다음 이미지를 추출하�
 1.1.8 이하는 원래의 ZIP을 유지합니다.
 
 공식 릴리스는 Developer ID로 서명되고 공증을 받았습니다. macOS가 내려받은 파일을 거부하면
-[문제 해결](TROUBLESHOOTING.ko.md#installing)을 따라 하세요. 다른 위치에서 실행하면 Corta는 스스로를
+[문제 해결](TROUBLESHOOTING.md#installing)을 따라 하세요. 다른 위치에서 실행하면 Corta는 스스로를
 `/Applications`로 옮기겠다고 제안합니다(`suggest-applications-folder`).
 
 **업데이트.** **Corta ▸ 업데이트 확인…**은 즉시 확인합니다. `update-auto-check = false`가 아니라면
@@ -64,7 +64,7 @@ Corta를 응용 프로그램으로 끌어 놓은 다음 이미지를 추출하�
 
 Corta에는 가져오기 기능이 없습니다. 읽는 것은 텍스트 파일 `~/.config/corta/config` 하나뿐이고, 설정 윈도우도 같은 파일을
 편집합니다. 대부분의 습관은 키 몇 개로 이어 갈 수 있습니다. 왼쪽 열은 다른 터미널에서 그 습관이 있던 곳, 오른쪽 열은
-해당하는 Corta 키입니다(각 키의 값과 적용 시점은 [Configuration](CONFIGURATION.md), 영어).
+해당하는 Corta 키입니다(각 키의 값과 적용 시점은 [Configuration](../../CONFIGURATION.md), 영어).
 
 | 이런 기능에 기대고 있었다면… | Corta에서는 |
 | :--- | :--- |
@@ -77,7 +77,7 @@ Corta에는 가져오기 기능이 없습니다. 읽는 것은 텍스트 파일 
 | 나만의 색 구성 | 파일에서 정의한 테마(`theme.<name>.*`), 또는 **보기 ▸ 테마 편집기…**. [테마 만들기와 편집](#creating-and-editing-themes). |
 | 나만의 키 바인딩 | `bind.<command> = <shortcut>`. 명령 이름은 [키보드 단축키](#keyboard-shortcuts)에 있습니다. |
 | 원하는 글꼴 | **설정 ▸ 모양 ▸ 글꼴**, 또는 `font-family`. Corta가 그리드에 배치할 수 있는 고정폭 글꼴만 표시됩니다. |
-| 합자, 투명도, 프로필별 설정 | 없습니다. [제공하지 않는 것](CONFIGURATION.md#6-what-is-deliberately-not-configurable)이며, 각각 먼저 결정이 필요합니다. 프리셋으로 셸, 디렉터리, 환경 변수를 지정할 수 있습니다([Presets](CONFIGURATION.md#4a-presets)). |
+| 합자, 투명도, 프로필별 설정 | 없습니다. [제공하지 않는 것](../../CONFIGURATION.md#6-what-is-deliberately-not-configurable)이며, 각각 먼저 결정이 필요합니다. 프리셋으로 셸, 디렉터리, 환경 변수를 지정할 수 있습니다([Presets](../../CONFIGURATION.md#4a-presets)). |
 | `tmux -CC` 제어 모드 | 지원하지 않습니다(D09). 일반 `tmux`는 다른 프로그램처럼 Corta 안에서 실행됩니다. |
 
 **셸 통합.** 표준 로컬 zsh 세션은 시작 파일을 건드리지 않고 Corta의 훅을 불러옵니다. `~/.zshrc`, `~/.bashrc`,
@@ -89,7 +89,7 @@ Corta에는 가져오기 기능이 없습니다. 읽는 것은 텍스트 파일 
 바꿀 것이 없습니다. `xterm-ghostty`나 `xterm-kitty`에 맞춰 설정된 호스트는 대신 이 일반적인 값을 받게 됩니다.
 
 복사, 닫기, 퀵 터미널 단축키, 원격 배지처럼 조금씩 다른 동작은
-[문제 해결 → 다른 터미널과 다른 동작](TROUBLESHOOTING.ko.md#behaviour-that-differs-from-other-terminals)에 모아 두었습니다.
+[문제 해결 → 다른 터미널과 다른 동작](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals)에 모아 두었습니다.
 
 <a id="windows-tabs-and-panes"></a>
 
@@ -118,7 +118,7 @@ Corta에는 가져오기 기능이 없습니다. 읽는 것은 텍스트 파일 
   (`restore-windows`, 기본값 켜짐). 각 페인은 새 프로세스를 시작하며, 터미널 텍스트와 실행 중이던 작업은 복원되지 않습니다.
   퀵 터미널은 제외됩니다.
 - **프리셋.** 프리셋은 설정 파일에 정의한, 이름이 붙은 셸·디렉터리·환경 변수 묶음입니다. **셸 ▸ 프리셋으로 새 페인**으로 열고,
-  ⌥를 누르고 있으면 별도의 윈도우에서 엽니다([Presets](CONFIGURATION.md#4a-presets)).
+  ⌥를 누르고 있으면 별도의 윈도우에서 엽니다([Presets](../../CONFIGURATION.md#4a-presets)).
 - 새 윈도우는 `columns` × `rows` 셀 크기로 열립니다(기본값 120 × 30).
 
 <a id="text-fonts-and-themes"></a>
@@ -151,7 +151,7 @@ Corta에는 가져오기 기능이 없습니다. 읽는 것은 텍스트 파일 
   윈도우에 맞춰 다시 정해지고, 셀에 못 미치는 나머지는 마지막 행 아래에 배경으로 보입니다.
 - **테마.** 내장 테마는 `corta`, `solarized`, `mono` 세 가지이며 각각 라이트와 다크가 있습니다. `appearance = auto`는
   macOS가 바뀌는 대로 따라갑니다. **보기 ▸ 테마 편집기…**나 설정 파일에서 직접 테마를 정의할 수도 있고, 기존 테마를 상속해
-  색 몇 개만 바꿀 수도 있습니다([Themes](CONFIGURATION.md#4-themes)).
+  색 몇 개만 바꿀 수도 있습니다([Themes](../../CONFIGURATION.md#4-themes)).
 - **유니코드.** 중국어, 일본어, 한국어 텍스트는 두 열을 차지하며 나머지와 줄이 맞습니다. 이모지, 결합 문자, 국기, 이모지 시퀀스는
   각각 하나의 클러스터입니다. 글꼴에 없는 문자는 시스템 대체 글꼴에서 옵니다. 표준화된 이모지 표현 시퀀스(텍스트 문자 뒤에 VS16,
   예: ⚠️, ✍️)는 두 열을 차지하고, 텍스트 표현은 좁게 유지됩니다.
@@ -197,8 +197,8 @@ Corta에는 가져오기 기능이 없습니다. 읽는 것은 텍스트 파일 
 명령줄 위치에서는 긴 명령이 들어오면 배지를 오른쪽 끝에 둔 채 아래의 빈 줄로 옮깁니다. 안전한 줄이 없으면 숨으며, 줄을 끼워 넣거나
 자식 프로세스를 스크롤하는 일은 결코 없습니다. 직접 입력과 IME 색상에는 16진수 값을 넣을 수 있고, 칸을 비우면 은은한 기본 스타일이 됩니다.
 
-[중국어 입력 소스 배지](brand/input-source-indicator.png) ·
-[긴 명령을 피하는 모습](brand/input-source-long-command.png)
+[중국어 입력 소스 배지](../../brand/input-source-indicator.png) ·
+[긴 명령을 피하는 모습](../../brand/input-source-long-command.png)
 
 <a id="optional-local-system-status"></a>
 
@@ -255,7 +255,7 @@ macOS 버전, 칩, 코어 수, 총 메모리가 보입니다. SSH 페인에서�
 닫습니다. 직접 연결한 SSH 세션은 새 연결을 시작하는 **다시 연결**을 제공합니다. Python 같은 프로그램을 끝내고 살아 있는 셸로
 돌아오는 것은 터미널 세션이 끝난 것이 아닙니다.
 
-![마지막 출력과 복구 동작을 남겨 둔 종료된 세션](brand/session-ended.png)
+![마지막 출력과 복구 동작을 남겨 둔 종료된 세션](../../brand/session-ended.png)
 
 <a id="scrollback-search-and-selection"></a>
 
@@ -296,7 +296,7 @@ macOS 버전, 칩, 코어 수, 총 메모리가 보입니다. SSH 페인에서�
 - **파일 참조.** 프로그램 출력 속 `path:line:column` — 컴파일 오류, 테스트 실패 — 은 ⌘-클릭으로 편집기에서 열립니다.
   `open-file-command`로 어떤 편집기를 쓸지 알려 주되, 편집기의 전체 경로로 시작하세요. 예:
   `open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}`
-  ([Following a file reference](CONFIGURATION.md#following-a-file-reference)).
+  ([Following a file reference](../../CONFIGURATION.md#following-a-file-reference)).
 
 어떤 파일 참조든 열려면 `open-file-command` 설정이 필요합니다. Corta는 출력에서 얻은 파일을 시스템 기본 앱으로 열지 않습니다:
 열기만 해도 코드가 실행되는 파일 형식이 있기 때문입니다.
@@ -355,7 +355,7 @@ Corta에는 디렉터리 제안이 들어 있으며, 표준 로컬 zsh 세션에
 입력 아래에 흐린 글자로 보입니다. 계속 입력하면 폴더가 걸러지고, 커서 옆에 흐린 나머지 부분이 나타납니다. 예를 들어 `cd De`는
 `Developer/`를 제안할 수 있습니다. 제안은 미리보기일 뿐이며, 받아들이기 전에는 명령의 일부가 아닙니다.
 
-![cd 아래의 디렉터리 제안과 성공, 실패, 중단된 명령 표시](brand/directory-suggestions.png)
+![cd 아래의 디렉터리 제안과 성공, 실패, 중단된 명령 표시](../../brand/directory-suggestions.png)
 
 제안이 보이는 동안:
 
@@ -408,7 +408,7 @@ Corta는 시스템의 OpenSSH를 씁니다 — `~/.ssh/config`, 키, 에이전�
   전송은 도구 막대의 화살표 버튼 아래에 있으며 속도, 남은 시간, Finder에서 보기가 있습니다.
 - **원격 파일 편집.** 브라우저의 **편집** — 또는 원격 페인에서 `path:line`을 ⌘-클릭 — 은 사본을 내려받아 편집기에서 엽니다.
   먼저 **설정 ▸ 터미널 ▸ 파일 열기 명령**을 편집기 실행 파일의 절대 경로와 `{file}`, `{line}`, `{column}` 자리 표시자로
-  설정하세요([예시](CONFIGURATION.md#following-a-file-reference)). 변경 내용 업로드는 별도의 명시적인 단계이며, Corta는 그동안
+  설정하세요([예시](../../CONFIGURATION.md#following-a-file-reference)). 변경 내용 업로드는 별도의 명시적인 단계이며, Corta는 그동안
   원격 파일이 바뀌었는지 먼저 확인합니다. 64 MiB가 넘는 파일은 이 방식으로 복사하지 않습니다. 진행 상황을 보여 주고 취소할 수 있는
   브라우저에서 내려받으세요. 30일 동안 아무도 열거나 바꾸지 않은 사본은 다음에 원격 편집을 쓸 때 지워집니다. 아직 업로드하거나
   버리지 않은 변경이 있는 사본은 남습니다.
@@ -422,7 +422,7 @@ Corta는 시스템의 OpenSSH를 씁니다 — `~/.ssh/config`, 키, 에이전�
 원격 편집 업로드는 크기와 수정 시각뿐 아니라 원격 내용도 비교하고, 승인한 비공개 스냅숏을 보냅니다. 승인 프롬프트 뒤에 로컬 편집을
 다시 저장하면 Corta가 새로 결정을 묻습니다. 업로드 중의 저장은 보류 상태로 남습니다. 연결이 실패한 뒤에는 다음 편집이나 업로드가
 다시 연결하고, 실패한 업로드는 보류 중인 결정을 유지합니다. 앱 데이터를 지우기 전에 결정하지 않은 로컬 편집을 보관해 두세요.
-[저장 데이터 정책](SECURITY.md#5-data-at-rest)(영어)을 보세요.
+[저장 데이터 정책](../../SECURITY.md#5-data-at-rest)(영어)을 보세요.
 
 <a id="images-in-the-terminal"></a>
 
@@ -501,7 +501,7 @@ Corta는 빠른 방법을 스스로 고릅니다. 여기서는 설정이 필요 
 - **숨겨진 페인은 양보합니다.** 페인이 숨겨지고 2초 뒤 — 다른 탭, 최소화된 윈도우 — 그 출력은 백그라운드 우선순위로 읽혀, 보고 있는 것과
   경쟁하지 않습니다. 잃는 것은 없으며, 그 페인에 입력하거나 붙여 넣으면 즉시 원래 우선순위로 돌아옵니다.
 
-측정값과 측정 방법은 [Performance](PERFORMANCE.md)(영어)에 있습니다.
+측정값과 측정 방법은 [Performance](../../PERFORMANCE.md)(영어)에 있습니다.
 
 <a id="settings-and-the-config-file"></a>
 
@@ -538,7 +538,7 @@ bind.equalize-panes = ctrl+cmd+e
 ```
 
 대부분의 설정은 바로 적용됩니다. 몇 가지(윈도우 크기, 스크롤백 길이)는 다음 윈도우나 세션부터 적용됩니다.
-[Configuration](CONFIGURATION.md)(영어)에 모든 키, 기본값, 적용 시점이 나와 있습니다.
+[Configuration](../../CONFIGURATION.md)(영어)에 모든 키, 기본값, 적용 시점이 나와 있습니다.
 
 <a id="keyboard-shortcuts"></a>
 
@@ -558,7 +558,7 @@ bind.close =
 **셸** 메뉴에는 분할, 다시 열기, 화면 지우기가 바로 있습니다. 나머지 도구는 **포커스 이동**, **명령 및 출력**, **작업 디렉터리**,
 **창 분할 레이아웃**, **터미널 및 연결** 아래에 묶여 있습니다.
 
-이 버전 기준의 기본값입니다 — [Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)(영어)가 공식 목록입니다:
+이 버전 기준의 기본값입니다 — [Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts)(영어)가 공식 목록입니다:
 
 | 명령 | 단축키 |
 | --- | --- |
@@ -581,15 +581,15 @@ bind.close =
 | 명령 팔레트… | ⇧⌘P |
 
 그 밖의 모든 명령 — 페인 균등 분할, 기록 지우기, 터미널 재설정, 원격 파일 찾아보기…, 명령 출력과 작업 디렉터리 명령 — 에는 기본 키가
-없으며, 명령 팔레트에서 검색 한 번이면 찾을 수 있습니다. [Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)(영어)에
+없으며, 명령 팔레트에서 검색 한 번이면 찾을 수 있습니다. [Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts)(영어)에
 각 명령의 `bind.` 이름이 포함된 전체 표가 있습니다.
 
 <a id="when-something-goes-wrong"></a>
 
 ## 문제가 생겼을 때
 
-[문제 해결](TROUBLESHOOTING.ko.md)은 무언가 실패했을 때 보이는 것과 고치는 방법을 다룹니다 — macOS가 열지 않는 다운로드, 거부되는 글꼴,
-아무 반응이 없는 단축키. [Features and limitations](FEATURES.md)(영어)에는 Corta가 아직 하지 못하는 것이 나와 있습니다.
+[문제 해결](TROUBLESHOOTING.md)은 무언가 실패했을 때 보이는 것과 고치는 방법을 다룹니다 — macOS가 열지 않는 다운로드, 거부되는 글꼴,
+아무 반응이 없는 단축키. [Features and limitations](../../FEATURES.md)(영어)에는 Corta가 아직 하지 못하는 것이 나와 있습니다.
 그 밖의 것은 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose)에 신고해 주세요. 사용법 질문은
 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a)로 가거나,
 [Discord](https://discord.gg/QNdWfdwr7j)의 `#help`에서 물어보세요.

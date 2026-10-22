@@ -1,10 +1,10 @@
 # ユーザーガイド
 
-[ドキュメント索引（英語）](README.md) · [プロジェクト概要](../README.ja.md)
+[ドキュメント索引（英語）](../../README.md) · [プロジェクト概要](README.md)
 
-🇺🇸 [English](USER-GUIDE.md) · 🇨🇳 [简体中文](USER-GUIDE.zh-CN.md) · 🇭🇰 [繁體中文](USER-GUIDE.zh-Hant.md) · 🇯🇵 [日本語](USER-GUIDE.ja.md) · 🇰🇷 [한국어](USER-GUIDE.ko.md) · 🇩🇪 [Deutsch](USER-GUIDE.de.md) · 🇫🇷 [Français](USER-GUIDE.fr.md) · 🇪🇸 [Español](USER-GUIDE.es.md) · 🇧🇷 [Português](USER-GUIDE.pt-BR.md)
+🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
-> このページは英語版 [USER-GUIDE.md](USER-GUIDE.md) のコミット
+> このページは英語版 [USER-GUIDE.md](../../USER-GUIDE.md) のコミット
 > [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/USER-GUIDE.md)
 > 時点の翻訳です。その後英語版が更新された場合や内容に食い違いがある場合は、英語版が正となります。
 > 画面上の名前は Corta の日本語 UI に合わせています。設定キー、コマンド、コードは原文のままです。
@@ -52,7 +52,7 @@ Corta を「アプリケーション」にドラッグし、イメージを取�
 1.1.8 以前は元の ZIP のままです。
 
 公式リリースは Developer ID で署名され、公証済みです。macOS がダウンロードを拒否する場合は
-[トラブルシューティング](TROUBLESHOOTING.ja.md#installing)に従ってください。ほかの場所から起動すると、
+[トラブルシューティング](TROUBLESHOOTING.md#installing)に従ってください。ほかの場所から起動すると、
 Corta は自分を `/Applications` に移動するよう提案します（`suggest-applications-folder`）。
 
 **アップデート。** **Corta ▸ アップデートを確認…** ですぐに確認します。`update-auto-check = false` にしない限り、
@@ -64,7 +64,7 @@ Corta は自分を `/Applications` に移動するよう提案します（`sugge
 
 Corta にはインポート機能はありません。読むのはテキストファイル `~/.config/corta/config` ひとつだけで、
 設定ウインドウもこのファイルを編集します。ほとんどの習慣は、いくつかのキーで引き継げます。左の列はその習慣がほかのターミナルで
-どこにあるか、右の列は対応する Corta のキーです（それぞれの値と適用タイミングは [Configuration](CONFIGURATION.md)、英語）。
+どこにあるか、右の列は対応する Corta のキーです（それぞれの値と適用タイミングは [Configuration](../../CONFIGURATION.md)、英語）。
 
 | 頼りにしていたもの | Corta では |
 | :--- | :--- |
@@ -77,7 +77,7 @@ Corta にはインポート機能はありません。読むのはテキスト�
 | 自分の配色 | ファイルで定義したテーマ（`theme.<name>.*`）、または **表示 ▸ テーマエディタ…**。[テーマの作成と編集](#creating-and-editing-themes)。 |
 | 自分のキー割り当て | `bind.<command> = <shortcut>`。コマンド名は[キーボードショートカット](#keyboard-shortcuts)にあります。 |
 | 好きなフォント | **設定 ▸ 外観 ▸ フォント**、または `font-family`。Corta がグリッド上に配置できる等幅ファミリーだけが表示されます。 |
-| リガチャ、透明化、プロファイルごとの設定 | ありません。これらは[提供していない](CONFIGURATION.md#6-what-is-deliberately-not-configurable)もので、どれもまず決定が必要です。プリセットでシェル、ディレクトリ、環境変数を指定できます（[Presets](CONFIGURATION.md#4a-presets)）。 |
+| リガチャ、透明化、プロファイルごとの設定 | ありません。これらは[提供していない](../../CONFIGURATION.md#6-what-is-deliberately-not-configurable)もので、どれもまず決定が必要です。プリセットでシェル、ディレクトリ、環境変数を指定できます（[Presets](../../CONFIGURATION.md#4a-presets)）。 |
 | `tmux -CC` コントロールモード | 非対応（D09）。通常の `tmux` は、ほかのプログラムと同じく Corta の中で動きます。 |
 
 **シェル統合。** 標準のローカル zsh セッションは、起動ファイルに手を加えずに Corta のフックを読み込みます。
@@ -89,7 +89,7 @@ Corta にはインポート機能はありません。読むのはテキスト�
 リモートホストでは何も変える必要はありません。`xterm-ghostty` や `xterm-kitty` 向けに設定されたホストでは、代わりにこの一般的な値になります。
 
 コピー、ウインドウを閉じる操作、クイックターミナルのホットキー、リモートのバッジなど、細かな違いは
-[トラブルシューティング → ほかのターミナルと異なる動作](TROUBLESHOOTING.ja.md#behaviour-that-differs-from-other-terminals)にまとめてあります。
+[トラブルシューティング → ほかのターミナルと異なる動作](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals)にまとめてあります。
 
 <a id="windows-tabs-and-panes"></a>
 
@@ -120,7 +120,7 @@ Corta にはインポート機能はありません。読むのはテキスト�
   復元されません。クイックターミナルは対象外です。
 - **プリセット。** プリセットは、設定ファイルで定義する名前付きのシェル、ディレクトリ、環境変数の組です。
   **シェル ▸ プリセットで新規ペイン** で開きます。⌥ を押しながら選ぶと、専用のウインドウで開きます
-  （[Presets](CONFIGURATION.md#4a-presets)）。
+  （[Presets](../../CONFIGURATION.md#4a-presets)）。
 - 新しいウインドウは `columns` × `rows` のセル数で開きます（デフォルトは 120 × 30）。
 
 <a id="text-fonts-and-themes"></a>
@@ -155,7 +155,7 @@ Corta にはインポート機能はありません。読むのはテキスト�
   ウインドウに合わせて調整され、セルに満たない余りは最終行の下に背景として表示されます。
 - **テーマ。** 組み込みテーマは `corta`、`solarized`、`mono` の 3 つで、それぞれにライトとダークがあります。
   `appearance = auto` にすると macOS の切り替えに追従します。**表示 ▸ テーマエディタ…** や設定ファイルで自分のテーマを
-  定義することも、既存のテーマを継承していくつかの色だけを変えることもできます（[Themes](CONFIGURATION.md#4-themes)）。
+  定義することも、既存のテーマを継承していくつかの色だけを変えることもできます（[Themes](../../CONFIGURATION.md#4-themes)）。
 - **Unicode。** 中国語、日本語、韓国語のテキストは 2 桁を使い、ほかのテキストと揃います。絵文字、結合文字、国旗、
   絵文字シーケンスはそれぞれ 1 つのクラスタです。フォントにない文字はシステムのフォールバックフォントから描かれます。
   標準化された絵文字表示シーケンス（テキスト文字の後に VS16、⚠️ や ✍️ など）は 2 桁を使い、テキスト表示は狭いままです。
@@ -205,8 +205,8 @@ Corta にはインポート機能はありません。読むのはテキスト�
 バッジは右端に寄せたまま下の空いた行へ移ります。安全な行がなければ隠れ、行を挿入したり子プロセスをスクロールさせたりは
 決してしません。直接入力と IME の色には 16 進値を指定できます。欄を空にすると控えめなデフォルトのスタイルになります。
 
-[中国語の入力ソースバッジ](brand/input-source-indicator.png) ·
-[長いコマンドを避ける様子](brand/input-source-long-command.png)
+[中国語の入力ソースバッジ](../../brand/input-source-indicator.png) ·
+[長いコマンドを避ける様子](../../brand/input-source-long-command.png)
 
 <a id="optional-local-system-status"></a>
 
@@ -267,7 +267,7 @@ Corta にはインポート機能はありません。読むのはテキスト�
 新しい接続を始める **再接続** が表示されます。Python などのプログラムを終了して生きているシェルに戻っても、
 ターミナルセッションの終了にはなりません。
 
-![最後の出力と復旧の操作を残した、終了済みのセッション](brand/session-ended.png)
+![最後の出力と復旧の操作を残した、終了済みのセッション](../../brand/session-ended.png)
 
 <a id="scrollback-search-and-selection"></a>
 
@@ -309,7 +309,7 @@ Corta にはインポート機能はありません。読むのはテキスト�
 - **ファイル参照。** プログラム出力の中の `path:line:column`——コンパイルエラー、テストの失敗——は、⌘ クリックでエディタで開きます。
   どのエディタを使うかは `open-file-command` で指定し、エディタのフルパスから書き始めます。たとえば
   `open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}`
-  （[Following a file reference](CONFIGURATION.md#following-a-file-reference)）。
+  （[Following a file reference](../../CONFIGURATION.md#following-a-file-reference)）。
 
 ファイル参照を開くには、`open-file-command` の設定が必要です。Corta は、出力から得たファイルをシステムのデフォルトアプリで
 開くことは決してしません：開いただけでコードが実行されるファイル形式があるからです。
@@ -371,7 +371,7 @@ Corta にはディレクトリ候補があり、標準のローカル zsh セッ
 カーソルの横に淡い続きが表示されます。たとえば `cd De` なら `Developer/` が候補になります。
 候補はプレビューにすぎず、確定するまではコマンドの一部ではありません。
 
-![cd の下に表示されたディレクトリ候補と、成功・失敗・中断したコマンドのマーク](brand/directory-suggestions.png)
+![cd の下に表示されたディレクトリ候補と、成功・失敗・中断したコマンドのマーク](../../brand/directory-suggestions.png)
 
 候補が表示されている間：
 
@@ -426,7 +426,7 @@ Corta はシステムの OpenSSH を使います——`~/.ssh/config`、鍵、�
   ファイルを Finder にドラッグするとダウンロードです。転送はツールバーの矢印ボタンにあり、速度、残り時間、「Finderに表示」があります。
 - **リモートファイルの編集。** ブラウザの **編集**——またはリモートのペインで `path:line` を ⌘ クリック——すると、コピーを
   ダウンロードしてエディタで開きます。先に **設定 ▸ ターミナル ▸ ファイルを開くコマンド** を、エディタの実行ファイルの絶対パスと
-  `{file}`、`{line}`、`{column}` のプレースホルダで設定してください（[例](CONFIGURATION.md#following-a-file-reference)）。
+  `{file}`、`{line}`、`{column}` のプレースホルダで設定してください（[例](../../CONFIGURATION.md#following-a-file-reference)）。
   変更のアップロードは別の明示的な手順で、Corta はその間にリモートのファイルが変わっていないかを先に確認します。
   64 MiB を超えるファイルはこの方法ではコピーされません。進捗を表示でき取り消しもできるブラウザからダウンロードしてください。
   30 日間誰も開かず変更もしなかったコピーは、次にリモート編集を使ったときに削除されます。まだアップロードも破棄もしていない
@@ -442,7 +442,7 @@ Corta はシステムの OpenSSH を使います——`~/.ssh/config`、鍵、�
 リモート編集のアップロードでは、サイズと更新日時に加えてリモートの内容も比較し、承認した非公開のスナップショットを送ります。
 承認のプロンプトの後にローカルの編集をもう一度保存すると、Corta は改めて判断を求めます。アップロード中の保存は保留のままです。
 接続に失敗した後は、次の編集またはアップロードで再接続し、失敗したアップロードは保留中の判断を保ちます。アプリのデータを削除する前に、
-判断していないローカルの編集を保存しておいてください。[保存データのポリシー](SECURITY.md#5-data-at-rest)（英語）を参照してください。
+判断していないローカルの編集を保存しておいてください。[保存データのポリシー](../../SECURITY.md#5-data-at-rest)（英語）を参照してください。
 
 <a id="images-in-the-terminal"></a>
 
@@ -524,7 +524,7 @@ Corta は速いやり方を自分で選びます。ここに設定は必要あ�
 - **隠れたペインは譲ります。** ペインが隠れて 2 秒後——別のタブ、最小化したウインドウ——その出力はバックグラウンドの優先度で読み取られ、
   見ているものと競合しません。何も失われず、そのペインに入力やペーストをするとすぐに通常の優先度に戻ります。
 
-測定値と測定方法は [Performance](PERFORMANCE.md)（英語）にあります。
+測定値と測定方法は [Performance](../../PERFORMANCE.md)（英語）にあります。
 
 <a id="settings-and-the-config-file"></a>
 
@@ -564,7 +564,7 @@ bind.equalize-panes = ctrl+cmd+e
 ```
 
 ほとんどの設定はすぐに反映されます。いくつか（ウインドウサイズ、スクロールバックの長さ）は次のウインドウやセッションから反映されます。
-[Configuration](CONFIGURATION.md)（英語）に、すべてのキー、デフォルト値、反映のタイミングが載っています。
+[Configuration](../../CONFIGURATION.md)（英語）に、すべてのキー、デフォルト値、反映のタイミングが載っています。
 
 <a id="keyboard-shortcuts"></a>
 
@@ -584,7 +584,7 @@ bind.close =
 **シェル** メニューには、分割、再度開く、画面を消去がそのまま置かれています。そのほかのツールは **フォーカスを移動**、
 **コマンドと出力**、**作業ディレクトリ**、**ペインのレイアウト**、**ターミナルと接続** にまとめられています。
 
-このバージョン時点のデフォルトです——[Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)（英語）が正式な一覧です：
+このバージョン時点のデフォルトです——[Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts)（英語）が正式な一覧です：
 
 | コマンド | ショートカット |
 | --- | --- |
@@ -608,14 +608,14 @@ bind.close =
 
 ほかのすべてのコマンド——ペインを均等にする、履歴を消去、ターミナルをリセット、リモートファイルをブラウズ…、コマンドの出力と
 作業ディレクトリのコマンド——にはデフォルトのキーがなく、コマンドパレットで検索すればすぐに見つかります。
-[Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)（英語）に、各コマンドの `bind.` 名つきの完全な表があります。
+[Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts)（英語）に、各コマンドの `bind.` 名つきの完全な表があります。
 
 <a id="when-something-goes-wrong"></a>
 
 ## うまくいかないとき
 
-[トラブルシューティング](TROUBLESHOOTING.ja.md)では、何かが失敗したときに見えるものと直し方を扱っています——macOS が開こうとしない
-ダウンロード、拒否されるフォント、何も起きないショートカット。[Features and limitations](FEATURES.md)（英語）には、
+[トラブルシューティング](TROUBLESHOOTING.md)では、何かが失敗したときに見えるものと直し方を扱っています——macOS が開こうとしない
+ダウンロード、拒否されるフォント、何も起きないショートカット。[Features and limitations](../../FEATURES.md)（英語）には、
 Corta がまだできないことが載っています。そのほかのことは [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose) に
 報告してください。使い方の質問は [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a) へ、
 または [Discord](https://discord.gg/QNdWfdwr7j) の `#help` でどうぞ。

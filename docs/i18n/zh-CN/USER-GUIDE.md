@@ -1,10 +1,10 @@
 # 用户指南
 
-[文档索引（英文）](README.md) · [项目概览](../README.zh-CN.md)
+[文档索引（英文）](../../README.md) · [项目概览](README.md)
 
-🇺🇸 [English](USER-GUIDE.md) · 🇨🇳 [简体中文](USER-GUIDE.zh-CN.md) · 🇭🇰 [繁體中文](USER-GUIDE.zh-Hant.md) · 🇯🇵 [日本語](USER-GUIDE.ja.md) · 🇰🇷 [한국어](USER-GUIDE.ko.md) · 🇩🇪 [Deutsch](USER-GUIDE.de.md) · 🇫🇷 [Français](USER-GUIDE.fr.md) · 🇪🇸 [Español](USER-GUIDE.es.md) · 🇧🇷 [Português](USER-GUIDE.pt-BR.md)
+🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
-> 本文译自英文版 [USER-GUIDE.md](USER-GUIDE.md)，对应提交
+> 本文译自英文版 [USER-GUIDE.md](../../USER-GUIDE.md)，对应提交
 > [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/USER-GUIDE.md)。
 > 此后英文版如有更新，或两者有出入，以英文版为准。界面名称按 Corta 的简体中文界面书写；
 > 配置项、命令和代码保持原文。
@@ -51,7 +51,7 @@ open Corta-x.y.z.dmg
 把 Corta 拖进“应用程序”，然后推出映像。1.1.9 起的版本都是磁盘映像；1.1.8 及更早的版本保留原来的 ZIP。
 
 正式版本都经过 Developer ID 签名和公证。如果 macOS 拒绝打开下载的文件，请按
-[故障排除](TROUBLESHOOTING.zh-CN.md#installing)操作。从其他位置启动时，Corta 会提出把自己移到
+[故障排除](TROUBLESHOOTING.md#installing)操作。从其他位置启动时，Corta 会提出把自己移到
 `/Applications`（`suggest-applications-folder`）。
 
 **更新。** **Corta ▸ 检查更新…** 会立即检查；除非设置了 `update-auto-check = false`，
@@ -63,7 +63,7 @@ open Corta-x.y.z.dmg
 
 Corta 没有导入工具：它只读一个文本文件 `~/.config/corta/config`，设置窗口编辑的也是这个文件。
 多数习惯通过几个配置项就能延续。左栏是这个习惯在别的终端里的位置，右栏是 Corta 对应的配置项
-（每一项的取值和生效时机见 [Configuration](CONFIGURATION.md)，英文）。
+（每一项的取值和生效时机见 [Configuration](../../CONFIGURATION.md)，英文）。
 
 | 如果你习惯… | 在 Corta 里 |
 | :--- | :--- |
@@ -76,7 +76,7 @@ Corta 没有导入工具：它只读一个文本文件 `~/.config/corta/config`�
 | 自己的配色方案 | 在文件里定义主题（`theme.<name>.*`），或用 **显示 ▸ 主题编辑器…**。见[创建和编辑主题](#creating-and-editing-themes)。 |
 | 自己的按键绑定 | `bind.<command> = <shortcut>`。命令名见[键盘快捷键](#keyboard-shortcuts)。 |
 | 自选字体 | **设置 ▸ 外观 ▸ 字体**，或 `font-family`。只提供 Corta 能在网格上排版的等宽字体。 |
-| 连字、透明或按配置文件区分的设置 | 不提供；它们[没有发布](CONFIGURATION.md#6-what-is-deliberately-not-configurable)，每一项都要先做决策。预设可以指定 shell、目录和环境变量（[Presets](CONFIGURATION.md#4a-presets)）。 |
+| 连字、透明或按配置文件区分的设置 | 不提供；它们[没有发布](../../CONFIGURATION.md#6-what-is-deliberately-not-configurable)，每一项都要先做决策。预设可以指定 shell、目录和环境变量（[Presets](../../CONFIGURATION.md#4a-presets)）。 |
 | `tmux -CC` 控制模式 | 不支持（D09）。普通的 `tmux` 和其他程序一样在 Corta 里运行。 |
 
 **Shell 集成。** 标准的本地 zsh 会话无需改动启动文件就会加载 Corta 的钩子。如果你的 `~/.zshrc`、
@@ -87,7 +87,7 @@ Corta 没有导入工具：它只读一个文本文件 `~/.config/corta/config`�
 工作的远程主机无需任何改动；为 `xterm-ghostty` 或 `xterm-kitty` 设置的主机则会拿到这个通用值。
 
 复制、关闭、快捷终端热键、远程标记等细节上的不同，集中在
-[故障排除 → 与其他终端不同的行为](TROUBLESHOOTING.zh-CN.md#behaviour-that-differs-from-other-terminals)。
+[故障排除 → 与其他终端不同的行为](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals)。
 
 <a id="windows-tabs-and-panes"></a>
 
@@ -116,7 +116,7 @@ Corta 没有导入工具：它只读一个文本文件 `~/.config/corta/config`�
   （`restore-windows`，默认开启）。每个窗格都会启动新的进程；终端文本和正在运行的任务不会恢复。
   快捷终端不在恢复之列。
 - **预设。** 预设是在配置文件中定义的一组命名的 shell、目录和环境变量。**Shell ▸ 使用预设新建窗格**
-  会打开一个预设；按住 ⌥ 则在单独的窗口中打开（[Presets](CONFIGURATION.md#4a-presets)）。
+  会打开一个预设；按住 ⌥ 则在单独的窗口中打开（[Presets](../../CONFIGURATION.md#4a-presets)）。
 - 新窗口按 `columns` × `rows` 个字符格打开（默认 120 × 30）。
 
 <a id="text-fonts-and-themes"></a>
@@ -148,7 +148,7 @@ Corta 没有导入工具：它只读一个文本文件 `~/.config/corta/config`�
   剩余不足一格的空间在最后一行下方显示为背景。
 - **主题。** 内置三个主题 `corta`、`solarized` 和 `mono`，各有浅色和深色变体；`appearance = auto`
   会跟随 macOS 的切换。你可以通过 **显示 ▸ 主题编辑器…** 或在配置文件中定义自己的主题，
-  也可以继承某个主题、只改几个颜色（[Themes](CONFIGURATION.md#4-themes)）。
+  也可以继承某个主题、只改几个颜色（[Themes](../../CONFIGURATION.md#4-themes)）。
 - **Unicode。** 中文、日文和韩文文字占两列，并与其他内容对齐；emoji、组合符号、旗帜和 emoji 序列
   各算一个字符簇。字体缺少的字符来自系统的回退字体。标准化的 emoji 呈现序列（文本字符后跟 VS16，
   如 ⚠️ 或 ✍️）占两列；文本呈现保持窄宽度。
@@ -193,8 +193,8 @@ Corta 没有导入工具：它只读一个文本文件 `~/.config/corta/config`�
 选择命令行位置时，长命令会把标记移到下方的空闲处，使其保持在右侧；没有安全的行时它会隐藏，
 绝不会插入新行或让子进程滚动。直接输入和输入法的颜色可以填十六进制值；清空输入框即使用默认的低调样式。
 
-[中文输入法标记](brand/input-source-indicator.png) ·
-[避开长命令](brand/input-source-long-command.png)
+[中文输入法标记](../../brand/input-source-indicator.png) ·
+[避开长命令](../../brand/input-source-long-command.png)
 
 <a id="optional-local-system-status"></a>
 
@@ -251,7 +251,7 @@ shell 退出后，窗格会保留它的输出，并显示一张 **会话已结�
 **关闭窗格** 会关闭该窗格。直接连接的 SSH 会话会提供 **重新连接**，以建立新的连接。
 从 Python 或其他程序退回到仍在运行的 shell，不算终端会话结束。
 
-![会话结束后保留最终输出和恢复操作](brand/session-ended.png)
+![会话结束后保留最终输出和恢复操作](../../brand/session-ended.png)
 
 <a id="scrollback-search-and-selection"></a>
 
@@ -291,7 +291,7 @@ shell 退出后，窗格会保留它的输出，并显示一张 **会话已结�
 - **文件引用。** 程序输出中的 `path:line:column`——编译错误、测试失败——用 ⌘ 点按即可在你的编辑器中打开。
   通过 `open-file-command` 告诉 Corta 用哪个编辑器，以编辑器的完整路径开头，例如
   `open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}`
-  （[Following a file reference](CONFIGURATION.md#following-a-file-reference)）。
+  （[Following a file reference](../../CONFIGURATION.md#following-a-file-reference)）。
 
 打开任何文件引用都需要先配置 `open-file-command`。Corta 从不用系统默认应用打开来自输出的文件：
 有些文件类型一打开就会执行代码。
@@ -348,7 +348,7 @@ Corta 自带目录补全，在标准的本地 zsh 会话中默认开启。输入
 继续输入可以筛选文件夹；光标旁会出现淡色的后缀。例如，`cd De` 可能会补全为 `Developer/`。
 补全只是预览：在被接受之前，它们不是命令的一部分。
 
-![cd 下方的目录补全，以及成功、失败和被中断的命令标记](brand/directory-suggestions.png)
+![cd 下方的目录补全，以及成功、失败和被中断的命令标记](../../brand/directory-suggestions.png)
 
 补全可见时：
 
@@ -400,7 +400,7 @@ Corta 使用系统的 OpenSSH——你的 `~/.ssh/config`、密钥、代理和 `
   传输在工具栏的箭头按钮下，显示速度、剩余时间和“在访达中显示”。
 - **编辑远程文件。** 浏览器中的 **编辑**——或在远程窗格中 ⌘ 点按 `path:line`——会下载一份副本并在你的编辑器中打开。
   请先设置 **设置 ▸ 终端 ▸ 打开文件方式**，使用编辑器可执行文件的绝对路径以及 `{file}`、`{line}`、`{column}` 占位符
-  （[示例](CONFIGURATION.md#following-a-file-reference)）。上传你的修改是一个单独的、明确的步骤，
+  （[示例](../../CONFIGURATION.md#following-a-file-reference)）。上传你的修改是一个单独的、明确的步骤，
   Corta 会先检查远程文件在此期间是否被改过。超过 64 MiB 的文件不会以这种方式复制；请从浏览器下载它们，
   浏览器会显示进度并可以取消。30 天没人打开或修改过的副本，会在下次使用远程编辑时被删除；
   带有你尚未上传或放弃的修改的副本会保留。
@@ -415,7 +415,7 @@ Corta 使用系统的 OpenSSH——你的 `~/.ssh/config`、密钥、代理和 `
 远程编辑上传时，除了大小和修改时间，还会比较远程内容，并发送你批准的那份私有快照。
 如果你在批准提示之后又保存了一次本地编辑，Corta 会请你重新决定；上传过程中的保存会保持待处理状态。
 连接失败后，下一次编辑或上传会重新连接，失败的上传会保留其待处理的决定。删除应用数据前，
-请先保存尚未决定的本地编辑。见[静态数据策略](SECURITY.md#5-data-at-rest)（英文）。
+请先保存尚未决定的本地编辑。见[静态数据策略](../../SECURITY.md#5-data-at-rest)（英文）。
 
 <a id="images-in-the-terminal"></a>
 
@@ -494,7 +494,7 @@ Corta 会自己选择更快的做法；这里的一切都不需要设置。下�
 - **隐藏的窗格会让路。** 窗格被隐藏两秒后——切到另一个标签页、窗口最小化——它的输出以后台优先级读取，
   不会和你正在看的内容争抢资源。不会丢失任何内容，向它输入或粘贴会立即恢复完整的优先级。
 
-[Performance](PERFORMANCE.md)（英文）记录了测量结果和测量方法。
+[Performance](../../PERFORMANCE.md)（英文）记录了测量结果和测量方法。
 
 <a id="settings-and-the-config-file"></a>
 
@@ -531,7 +531,7 @@ bind.equalize-panes = ctrl+cmd+e
 ```
 
 多数设置立即生效；少数几项（窗口大小、回滚长度）作用于下一个窗口或会话。
-[Configuration](CONFIGURATION.md)（英文）列出了每个配置项、默认值以及何时生效。
+[Configuration](../../CONFIGURATION.md)（英文）列出了每个配置项、默认值以及何时生效。
 
 <a id="keyboard-shortcuts"></a>
 
@@ -550,7 +550,7 @@ bind.close =
 **Shell** 菜单直接提供拆分、重新打开和清除屏幕。其他工具归在 **移动焦点**、**命令与输出**、**工作目录**、
 **窗格布局** 以及 **终端与连接** 之下。
 
-以下是本版本的默认值——[Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)（英文）是权威列表：
+以下是本版本的默认值——[Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts)（英文）是权威列表：
 
 | 命令 | 快捷键 |
 | --- | --- |
@@ -573,15 +573,15 @@ bind.close =
 | 命令面板… | ⇧⌘P |
 
 其他所有命令——均分窗格、清除历史记录、重置终端、浏览远程文件…、命令输出和工作目录相关的命令——
-都没有默认按键，在命令面板里一搜就到。[Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts)（英文）
+都没有默认按键，在命令面板里一搜就到。[Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts)（英文）
 有完整的表格，列出每个命令的 `bind.` 名称。
 
 <a id="when-something-goes-wrong"></a>
 
 ## 出问题时
 
-[故障排除](TROUBLESHOOTING.zh-CN.md)介绍出问题时你会看到什么以及如何修复——macOS 打不开的下载、被拒绝的字体、
-没有反应的快捷键。[Features and limitations](FEATURES.md)（英文）列出了 Corta 目前还做不到的事。
+[故障排除](TROUBLESHOOTING.md)介绍出问题时你会看到什么以及如何修复——macOS 打不开的下载、被拒绝的字体、
+没有反应的快捷键。[Features and limitations](../../FEATURES.md)（英文）列出了 Corta 目前还做不到的事。
 其他问题请在 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose) 报告。
 使用问题请到 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a)，
 或在 [Discord](https://discord.gg/QNdWfdwr7j) 的 `#help` 频道提问。

@@ -1,10 +1,10 @@
 # 疑難排解
 
-[文件索引（英文）](README.md) · [專案概覽](../README.zh-Hant.md)
+[文件索引（英文）](../../README.md) · [專案概覽](README.md)
 
-🇺🇸 [English](TROUBLESHOOTING.md) · 🇨🇳 [简体中文](TROUBLESHOOTING.zh-CN.md) · 🇭🇰 [繁體中文](TROUBLESHOOTING.zh-Hant.md) · 🇯🇵 [日本語](TROUBLESHOOTING.ja.md) · 🇰🇷 [한국어](TROUBLESHOOTING.ko.md) · 🇩🇪 [Deutsch](TROUBLESHOOTING.de.md) · 🇫🇷 [Français](TROUBLESHOOTING.fr.md) · 🇪🇸 [Español](TROUBLESHOOTING.es.md) · 🇧🇷 [Português](TROUBLESHOOTING.pt-BR.md)
+🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
-> 本文譯自英文版 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)，對應提交
+> 本文譯自英文版 [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md)，對應提交
 > [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md)。
 > 此後英文版如有更新，或兩者有出入，以英文版為準。macOS 的提示文字以英文原文為準，中文為對照譯文。
 
@@ -137,7 +137,7 @@ Corta 會保留已有的設定，並拒絕寫入這個檔案，因為寫入會�
 ### 透過 ssh 時顏色或 `TERM` 看起來不對
 
 Corta 刻意宣告 `TERM=xterm-256color`（`docs/DECISIONS.md` D08）。使用相同的 TERM 值並不代表完全相容 xterm。
-用 `printf '%s\n' "$TERM"` 檢查遠端環境，並對比一個最小重現；[Conformance](CONFORMANCE.md#42-external-suites)（英文）
+用 `printf '%s\n' "$TERM"` 檢查遠端環境，並對比一個最小重現；[Conformance](../../CONFORMANCE.md#42-external-suites)（英文）
 記錄了支援的序列和尚存的失敗項目。
 
 ### 某個字符比旁邊的字符小
@@ -230,7 +230,7 @@ SFTP 連線會在它的視窗上彈出對話框詢問密碼或金鑰密語；對
 超過上限的舊輸出會在新輸出到來時被捨棄；頂部的提示條會顯示畫面回捲了多遠。可以調高上限（最多 1,000,000；
 壓縮後的冷歷史佔用多少記憶體取決於文字和負載）。一個儲存的字元格在壓縮前是 16 位元組，這不是常駐記憶體的估算。
 量測 100,000 行 120 欄的負載增加了大約 11 MiB 常駐記憶體；見
-[Performance](PERFORMANCE.md#56-numbers-by-release)（英文）。需要保留超過上限的輸出，請匯出。
+[Performance](../../PERFORMANCE.md#56-numbers-by-release)（英文）。需要保留超過上限的輸出，請匯出。
 
 ### 安全鍵盤輸入已開啟，但我的巨集工具仍然有效
 

@@ -1,10 +1,10 @@
 # Dépannage
 
-[Index de la documentation (anglais)](README.md) · [Présentation du projet](../README.fr.md)
+[Index de la documentation (anglais)](../../README.md) · [Présentation du projet](README.md)
 
-🇺🇸 [English](TROUBLESHOOTING.md) · 🇨🇳 [简体中文](TROUBLESHOOTING.zh-CN.md) · 🇭🇰 [繁體中文](TROUBLESHOOTING.zh-Hant.md) · 🇯🇵 [日本語](TROUBLESHOOTING.ja.md) · 🇰🇷 [한국어](TROUBLESHOOTING.ko.md) · 🇩🇪 [Deutsch](TROUBLESHOOTING.de.md) · 🇫🇷 [Français](TROUBLESHOOTING.fr.md) · 🇪🇸 [Español](TROUBLESHOOTING.es.md) · 🇧🇷 [Português](TROUBLESHOOTING.pt-BR.md)
+🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
-> Cette page est une traduction de [TROUBLESHOOTING.md](TROUBLESHOOTING.md), dans son état au commit
+> Cette page est une traduction de [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md), dans son état au commit
 > [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md).
 > Si la version anglaise a changé depuis, ou si les deux diffèrent, la version anglaise fait foi.
 > Les messages de macOS sont accompagnés de leur texte anglais d’origine.
@@ -156,7 +156,7 @@ modificateur xterm dans tous les cas.
 
 Corta annonce volontairement `TERM=xterm-256color` (`docs/DECISIONS.md` D08). Partager cette valeur de TERM n’implique pas
 une compatibilité xterm complète. Vérifiez l’environnement distant avec `printf '%s\n' "$TERM"` et comparez un cas
-minimal de reproduction ; [Conformance](CONFORMANCE.md#42-external-suites) (en anglais) recense les séquences prises en
+minimal de reproduction ; [Conformance](../../CONFORMANCE.md#42-external-suites) (en anglais) recense les séquences prises en
 charge et les échecs restants.
 
 ### Un glyphe est dessiné plus petit que ses voisins
@@ -266,7 +266,7 @@ arrive ; la pastille en haut indique jusqu’où remonte la vue. Augmentez le pl
 occupée par l’historique ancien compressé dépend du texte et de la charge). Une cellule stockée fait 16 octets avant
 compression, ce qui n’est pas une estimation de la mémoire résidente. Une charge mesurée de 100 000 lignes de 120 colonnes
 a ajouté environ 11 Mio de mémoire résidente ; voir
-[Performance](PERFORMANCE.md#56-numbers-by-release) (en anglais). Exportez la sortie que vous devez conserver au-delà du
+[Performance](../../PERFORMANCE.md#56-numbers-by-release) (en anglais). Exportez la sortie que vous devez conserver au-delà du
 plafond configuré.
 
 ### La Saisie clavier sécurisée est activée mais mon outil de macros fonctionne encore

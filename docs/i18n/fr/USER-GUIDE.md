@@ -1,10 +1,10 @@
 # Guide d’utilisation
 
-[Index de la documentation (anglais)](README.md) · [Présentation du projet](../README.fr.md)
+[Index de la documentation (anglais)](../../README.md) · [Présentation du projet](README.md)
 
-🇺🇸 [English](USER-GUIDE.md) · 🇨🇳 [简体中文](USER-GUIDE.zh-CN.md) · 🇭🇰 [繁體中文](USER-GUIDE.zh-Hant.md) · 🇯🇵 [日本語](USER-GUIDE.ja.md) · 🇰🇷 [한국어](USER-GUIDE.ko.md) · 🇩🇪 [Deutsch](USER-GUIDE.de.md) · 🇫🇷 [Français](USER-GUIDE.fr.md) · 🇪🇸 [Español](USER-GUIDE.es.md) · 🇧🇷 [Português](USER-GUIDE.pt-BR.md)
+🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
-> Cette page est une traduction de [USER-GUIDE.md](USER-GUIDE.md), dans son état au commit
+> Cette page est une traduction de [USER-GUIDE.md](../../USER-GUIDE.md), dans son état au commit
 > [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/USER-GUIDE.md).
 > Si la version anglaise a changé depuis, ou si les deux diffèrent, la version anglaise fait foi.
 > Les noms d’interface suivent l’interface française de Corta ; clés de configuration, commandes et code restent en version originale.
@@ -52,7 +52,7 @@ Faites glisser Corta dans Applications, puis éjectez l’image. Les versions de
 la 1.1.8 et les précédentes gardent leurs ZIP d’origine.
 
 Les versions officielles sont signées avec un Developer ID et notarisées. Si macOS refuse un téléchargement, suivez le
-[Dépannage](TROUBLESHOOTING.fr.md#installing). Lancé depuis un autre endroit, Corta propose de se déplacer dans
+[Dépannage](TROUBLESHOOTING.md#installing). Lancé depuis un autre endroit, Corta propose de se déplacer dans
 `/Applications` (`suggest-applications-folder`).
 
 **Mises à jour.** **Corta ▸ Rechercher les mises à jour…** vérifie immédiatement ; une vérification en arrière-plan a lieu
@@ -64,7 +64,7 @@ une fois par jour sauf si `update-auto-check = false`. Une mise à jour n’est 
 
 Corta n’a pas d’outil d’importation : il lit un seul fichier texte, `~/.config/corta/config`, et la fenêtre Réglages
 modifie ce même fichier. La plupart des habitudes se transposent avec quelques clés. La colonne de gauche indique où
-l’habitude se trouve ailleurs ; celle de droite donne la clé Corta ([Configuration](CONFIGURATION.md), en anglais,
+l’habitude se trouve ailleurs ; celle de droite donne la clé Corta ([Configuration](../../CONFIGURATION.md), en anglais,
 donne les valeurs de chacune et quand elle s’applique).
 
 | Si vous comptiez sur… | Dans Corta |
@@ -78,7 +78,7 @@ donne les valeurs de chacune et quand elle s’applique).
 | Votre propre jeu de couleurs | Un thème défini dans le fichier (`theme.<name>.*`), ou **Présentation ▸ Éditeur de thème…**. [Créer et modifier des thèmes](#creating-and-editing-themes). |
 | Vos propres raccourcis | `bind.<command> = <shortcut>`. Les noms de commandes sont dans [Raccourcis clavier](#keyboard-shortcuts). |
 | Une police de votre choix | **Réglages ▸ Apparence ▸ Police**, ou `font-family`. Seules les familles à chasse fixe que Corta peut placer sur sa grille sont proposées. |
-| Ligatures, transparence ou réglages par profil | Non disponibles ; ils ne sont [pas proposés](CONFIGURATION.md#6-what-is-deliberately-not-configurable), et chacun exige d’abord une décision. Les préréglages couvrent un shell, un dossier et un environnement ([Presets](CONFIGURATION.md#4a-presets)). |
+| Ligatures, transparence ou réglages par profil | Non disponibles ; ils ne sont [pas proposés](../../CONFIGURATION.md#6-what-is-deliberately-not-configurable), et chacun exige d’abord une décision. Les préréglages couvrent un shell, un dossier et un environnement ([Presets](../../CONFIGURATION.md#4a-presets)). |
 | Le mode de contrôle `tmux -CC` | Non pris en charge (D09). Un `tmux` ordinaire tourne dans Corta comme n’importe quel programme. |
 
 **Intégration du shell.** Les sessions zsh locales standard chargent les hooks de Corta sans toucher à vos fichiers de
@@ -91,7 +91,7 @@ n’a besoin de rien de nouveau ; un hôte configuré pour `xterm-ghostty` ou `x
 
 Les comportements qui diffèrent plus légèrement — copie, fermeture, raccourci du Terminal rapide, badges distants — sont
 rassemblés dans
-[Dépannage → Comportements différents des autres terminaux](TROUBLESHOOTING.fr.md#behaviour-that-differs-from-other-terminals).
+[Dépannage → Comportements différents des autres terminaux](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals).
 
 <a id="windows-tabs-and-panes"></a>
 
@@ -124,7 +124,7 @@ rassemblés dans
   est exclu.
 - **Préréglages.** Un préréglage est un shell, un dossier et un environnement nommés, définis dans le fichier de
   configuration. **Shell ▸ Nouveau volet avec préréglage** en ouvre un ; maintenez ⌥ pour l’ouvrir dans une fenêtre à
-  part ([Presets](CONFIGURATION.md#4a-presets)).
+  part ([Presets](../../CONFIGURATION.md#4a-presets)).
 - Les nouvelles fenêtres s’ouvrent à `columns` × `rows` cellules (120 × 30 par défaut).
 
 <a id="text-fonts-and-themes"></a>
@@ -166,7 +166,7 @@ rassemblés dans
 - **Thème.** Trois thèmes intégrés, `corta`, `solarized` et `mono`, chacun en variante claire et sombre ;
   `appearance = auto` suit macOS quand il bascule. Vous pouvez définir votre propre thème via
   **Présentation ▸ Éditeur de thème…** ou dans le fichier de configuration, ou hériter d’un thème et changer quelques
-  couleurs ([Themes](CONFIGURATION.md#4-themes)).
+  couleurs ([Themes](../../CONFIGURATION.md#4-themes)).
 - **Unicode.** Le texte chinois, japonais et coréen occupe deux colonnes et s’aligne avec le reste ; emoji, signes
   combinants, drapeaux et séquences d’emoji forment chacun une grappe. Les caractères absents de la police viennent des
   polices de secours du système. Les séquences de présentation emoji standardisées (un caractère texte suivi de VS16,
@@ -222,8 +222,8 @@ toujours au bord droit ; il se masque quand il ne reste aucune ligne sûre, et n
 le programme enfant. Les couleurs de saisie directe et d’IME acceptent des valeurs hexadécimales ; videz un champ pour le
 style discret par défaut.
 
-[Badge de source de saisie chinoise](brand/input-source-indicator.png) ·
-[Évitement des commandes longues](brand/input-source-long-command.png)
+[Badge de source de saisie chinoise](../../brand/input-source-indicator.png) ·
+[Évitement des commandes longues](../../brand/input-source-long-command.png)
 
 <a id="optional-local-system-status"></a>
 
@@ -290,7 +290,7 @@ toujours. **Nouvelle session** demande confirmation avant de remplacer la sortie
 ce volet. Une session SSH connectée directement propose **Reconnecter** pour établir une nouvelle connexion. Quitter
 Python ou un autre programme pour revenir à un shell actif ne termine pas la session du terminal.
 
-![Session terminée conservant sa dernière sortie et les actions de reprise](brand/session-ended.png)
+![Session terminée conservant sa dernière sortie et les actions de reprise](../../brand/session-ended.png)
 
 <a id="scrollback-search-and-selection"></a>
 
@@ -336,7 +336,7 @@ Python ou un autre programme pour revenir à un shell actif ne termine pas la se
   en échec — s’ouvre dans votre éditeur d’un ⌘-clic. Indiquez à Corta quel éditeur avec `open-file-command`, en
   commençant par le chemin complet de l’éditeur, par exemple
   `open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}`
-  ([Following a file reference](CONFIGURATION.md#following-a-file-reference)).
+  ([Following a file reference](../../CONFIGURATION.md#following-a-file-reference)).
 
 Ouvrir une référence de fichier exige un `open-file-command` configuré. Corta n’ouvre jamais un fichier issu de la sortie
 dans son application par défaut du système : certains types de fichiers exécutent du code à l’ouverture.
@@ -406,7 +406,7 @@ voir les dossiers du répertoire courant en texte pâle sous votre saisie. Conti
 apparaît à côté du curseur. Par exemple, `cd De` peut suggérer `Developer/`. Les suggestions sont des aperçus : elles ne
 font pas partie de votre commande tant qu’elles ne sont pas acceptées.
 
-![Suggestions de dossiers sous cd, avec des marques de commandes réussies, échouées et interrompues](brand/directory-suggestions.png)
+![Suggestions de dossiers sous cd, avec des marques de commandes réussies, échouées et interrompues](../../brand/directory-suggestions.png)
 
 Tant qu’une suggestion est visible :
 
@@ -471,7 +471,7 @@ n’a pas sa propre implémentation de SSH.
 - **Modifier un fichier distant.** **Modifier** dans le navigateur — ou un ⌘-clic sur un `path:line` dans un volet
   distant — télécharge une copie et l’ouvre dans votre éditeur. Réglez d’abord
   **Réglages ▸ Terminal ▸ Ouvrir le fichier avec**, avec le chemin absolu d’un exécutable d’éditeur et les marqueurs
-  `{file}`, `{line}`, `{column}` ([exemples](CONFIGURATION.md#following-a-file-reference)). Envoyer vos modifications est
+  `{file}`, `{line}`, `{column}` ([exemples](../../CONFIGURATION.md#following-a-file-reference)). Envoyer vos modifications est
   une étape séparée et explicite, et Corta vérifie d’abord si le fichier distant a changé entre-temps. Les fichiers de plus
   de 64 Mio ne sont pas copiés de cette façon ; téléchargez-les depuis le navigateur, qui affiche la progression et peut
   annuler. Une copie que personne n’a ouverte ni modifiée depuis 30 jours est supprimée lors de l’utilisation suivante de
@@ -490,7 +490,7 @@ envoient l’instantané privé que vous avez approuvé. Si vous enregistrez une
 d’approbation, Corta demande une nouvelle décision ; les enregistrements pendant un envoi restent en attente. Après un
 échec de connexion, la modification ou l’envoi suivant se reconnecte, et un envoi échoué garde sa décision en attente.
 Préservez les modifications locales non décidées avant de supprimer les données de l’app. Voir la
-[politique des données au repos](SECURITY.md#5-data-at-rest) (en anglais).
+[politique des données au repos](../../SECURITY.md#5-data-at-rest) (en anglais).
 
 <a id="images-in-the-terminal"></a>
 
@@ -583,7 +583,7 @@ quoi vous attendre.
   réduite —, sa sortie est lue en priorité d’arrière-plan, pour ne pas concurrencer ce que vous regardez. Rien n’est
   perdu, et taper ou coller dedans rétablit aussitôt la pleine priorité.
 
-[Performance](PERFORMANCE.md) (en anglais) contient les mesures et la façon dont elles ont été faites.
+[Performance](../../PERFORMANCE.md) (en anglais) contient les mesures et la façon dont elles ont été faites.
 
 <a id="settings-and-the-config-file"></a>
 
@@ -627,7 +627,7 @@ bind.equalize-panes = ctrl+cmd+e
 ```
 
 La plupart des réglages s’appliquent immédiatement ; quelques-uns (taille de fenêtre, longueur de l’historique)
-s’appliquent à la fenêtre ou session suivante. [Configuration](CONFIGURATION.md) (en anglais) liste chaque clé, sa valeur
+s’appliquent à la fenêtre ou session suivante. [Configuration](../../CONFIGURATION.md) (en anglais) liste chaque clé, sa valeur
 par défaut et le moment où elle prend effet.
 
 <a id="keyboard-shortcuts"></a>
@@ -649,7 +649,7 @@ Le menu **Shell** garde la division, la réouverture et Effacer l’écran direc
 regroupés sous **Déplacer le focus**, **Commandes et sortie**, **Répertoire de travail**, **Disposition des panneaux** et
 **Terminal et connexion**.
 
-Les valeurs par défaut, à cette version — [Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts) (en anglais) est la
+Les valeurs par défaut, à cette version — [Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts) (en anglais) est la
 liste de référence :
 
 | Commande | Raccourci |
@@ -674,16 +674,16 @@ liste de référence :
 
 Toutes les autres commandes — Égaliser les volets, Effacer l’historique, Réinitialiser le terminal, Parcourir les fichiers
 distants…, les commandes de sortie et de répertoire de travail — n’ont pas de touche par défaut et sont à une recherche de
-distance dans la palette de commandes. [Keyboard shortcuts](CONFIGURATION.md#5-keyboard-shortcuts) (en anglais) donne le
+distance dans la palette de commandes. [Keyboard shortcuts](../../CONFIGURATION.md#5-keyboard-shortcuts) (en anglais) donne le
 tableau complet avec le nom `bind.` de chaque commande.
 
 <a id="when-something-goes-wrong"></a>
 
 ## Quand quelque chose ne va pas
 
-Le [Dépannage](TROUBLESHOOTING.fr.md) décrit ce que vous voyez quand quelque chose échoue et comment y remédier — un
+Le [Dépannage](TROUBLESHOOTING.md) décrit ce que vous voyez quand quelque chose échoue et comment y remédier — un
 téléchargement que macOS refuse d’ouvrir, une police refusée, un raccourci qui ne fait rien.
-[Features and limitations](FEATURES.md) (en anglais) liste ce que Corta ne fait pas encore. Signalez tout le reste sur
+[Features and limitations](../../FEATURES.md) (en anglais) liste ce que Corta ne fait pas encore. Signalez tout le reste sur
 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose). Pour les questions d’utilisation, allez dans
 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a), ou demandez dans `#help` sur le
 [Discord](https://discord.gg/QNdWfdwr7j).
