@@ -465,12 +465,25 @@ final class SettingsModel {
 
     // MARK: - Font
 
+    private var fontLoadGeneration = 0
+
     func loadFonts() async {
-        // Side by side: the CJK list needs no grid measurement, so it does
-        // not wait for the monospace scan.
-        async let monospaced = Task.detached { MonospacedFontCatalog.entries() }.value
-        async let cjk = Task.detached { MonospacedFontCatalog.cjkEntries() }.value
-        (availableFonts, availableCJKFonts) = await (monospaced, cjk)
+        await loadFonts(
+            monospaced: { await MonospacedFontCatalog.loadEntries() },
+            cjk: { await MonospacedFontCatalog.loadCJKEntries() })
+    }
+
+    func loadFonts(
+        monospaced: @Sendable () async -> [MonospacedFontCatalog.Entry],
+        cjk: @Sendable () async -> [MonospacedFontCatalog.Entry]
+    ) async {
+        fontLoadGeneration &+= 1
+        let generation = fontLoadGeneration
+        async let primary = monospaced()
+        async let fallback = cjk()
+        let result = await (primary, fallback)
+        guard !Task.isCancelled, generation == fontLoadGeneration else { return }
+        (availableFonts, availableCJKFonts) = result
     }
 
     /// Empty while fallback is off: no CJK font is used then, chosen or not.

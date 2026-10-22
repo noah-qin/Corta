@@ -76,6 +76,8 @@ public enum LicenseHeaders {
         ("Corta/Localizable.xcstrings", .reuse),
         ("TestPlans/*.xctestplan", .reuse),
         ("Sparkle-Info.plist", .reuse),
+        ("scripts/image-decoder/*.plist", .reuse),
+        ("scripts/image-decoder/*.entitlements", .reuse),
         ("Corta/PrivacyInfo.xcprivacy", .reuse),
         ("appcast.xml", .reuse),
         (".xcode-version", .reuse),

@@ -23,6 +23,16 @@ import Testing
 /// configuration, and the recently used hosts. Each test builds its own
 /// home directory and store file under the temporary directory.
 struct SSHConfigHostsTests {
+    @MainActor
+    @Test("a cancelled connect dialog does not scan SSH aliases")
+    func cancelledSuggestionsAreEmpty() async {
+        let task = Task { await SSHConfigHosts.loadSuggestions() }
+        task.cancel()
+        let result = await task.value
+        #expect(result.hosts.isEmpty)
+        #expect(result.hiddenGitHosts.isEmpty)
+    }
+
     @Test("Host names are read, patterns and negations left out, comments ignored")
     func parse() {
         let parsed = SSHConfigHosts.parse(

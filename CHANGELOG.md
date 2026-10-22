@@ -20,6 +20,9 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Run PNG decoding in an independently signed App Sandbox helper app,
+  replacing the deprecated runtime sandbox interface.
+
 - A pane whose session ended, whose connection dropped or that stopped
   working now shows one panel over its dimmed output, which stays
   readable — and, once the session has ended, selectable: what ended and
@@ -42,6 +45,7 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Discard cancelled or superseded font scans and SSH host suggestions.
 - Rebuilding Corta reuses one Metal pipeline archive path instead of adding
   a new path to Metal's bounded usage index on every build, which could
   eventually log `MDB_MAP_FULL`. Routine accessibility query logs now
@@ -52,8 +56,10 @@ Versioning for compatibility changes.
   Cleanup runs in the background with a per-run work budget.
 - Remote-edit operations time out after 120 seconds once connected, releasing
   a stuck upload and offering its approval again for retry.
-- Idle block-cursor capture waits for the GPU off the main thread without
-  holding the live renderer lock; failed captures back off before retrying.
+- Idle block-cursor capture resumes from GPU completion without blocking
+  the main thread or holding the renderer lock; failed captures back off.
+- Release SFTP stderr listeners with their channels and prevent PTY signals
+  from racing child-process reaping.
 - Cancelling an SFTP password prompt no longer opens it again. OpenSSH
   read the cancelled prompt as an empty password, tried it and asked again,
   up to three times or more; Cancel now ends that connection attempt.

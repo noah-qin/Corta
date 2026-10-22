@@ -136,6 +136,8 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     private let state = Mutex(State())
     private let exitQueue: DispatchQueue
     private let exitSource: DispatchSourceProcess
+    /// Retained until teardown so EOF cleanup does not depend on a live channel.
+    private(set) var stderrSource: DispatchSourceRead?
 
     /// A bounded tail: enough to classify, never growing with a verbose ssh.
     private static let diagnosticsLimit = 64 * 1024
@@ -305,8 +307,9 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         // Drain forever, or a chatty ssh fills the pipe and stalls the channel.
         let stderrSource = DispatchSource.makeReadSource(
             fileDescriptor: stderrRead, queue: exitQueue)
+        self.stderrSource = stderrSource
         stderrSource.setEventHandler { [weak self] in
-            guard let self else { return }
+            guard let self else { stderrSource.cancel(); return }
             var chunk = [UInt8](repeating: 0, count: 4096)
             let count = chunk.withUnsafeMutableBytes { buffer in
                 Darwin.read(stderrRead, buffer.baseAddress, buffer.count)
@@ -332,6 +335,7 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
     deinit {
         // Reached unclosed only when nothing called `close`; a closed channel
         // stays alive until its reap has run on `exitQueue`.
+        stderrSource?.cancel()
         if shutDown() { _ = reap(blocking: true) }
         exitSource.cancel()
     }

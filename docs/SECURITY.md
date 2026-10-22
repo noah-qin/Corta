@@ -242,7 +242,7 @@ allocating without bound. These caps are asserted in the fuzz harness
 | OSC / DCS string length    | Hard limit; discard the sequence on overflow and resynchronise |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
 | Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size; 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) |
-| Kitty PNG decoding         | `corta-image-decoder`, a process of its own under the `pure-computation` sandbox (no files, no network), 10 s, a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor before sandbox entry, so decoded pixels never travel over stdout |
+| Kitty PNG decoding         | `corta-image-decoder`, a process of its own under the independent App Sandbox (no access to host user files or network entitlements), 10 s, a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor inside its sandbox, so decoded pixels never travel over stdout |
 | Compressed Kitty image (`o=z`) | Inflates to exactly its declared pixels (RGB, RGBA) or at most the 64 MB image cap (PNG); the stream stops at the ceiling and the image is refused, so the expansion is never allocated. The zlib header and Adler-32 must check out; any other `o=` value is refused |
 | CSI parameter count        | 16 (xterm's limit); ignore the remainder               |
 | CSI parameter value        | Clamp to a sane maximum before use                     |
@@ -256,7 +256,11 @@ and never closes it must not accumulate gigabytes in a buffer.
 
 The decoder's sandbox is checked by the suite, not per decode:
 `ImageDecoderProcessTests` runs the helper's `--check-sandbox` mode, which
-enters the sandbox and must be refused a file read. Checking it on every
+must be refused both reads and writes of an existing private file outside
+its container; `--check-network` must be refused an outgoing connection.
+The signature applies the sandbox before main and grants no inheritance,
+network or file-access exceptions. Standard system resources and the
+helper's own container remain available under App Sandbox. Checking it on every
 image logged a sandbox violation for each picture shown.
 
 Unknown sequences must be **safely ignored**. Because `$TERM` announces

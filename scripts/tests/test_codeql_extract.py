@@ -17,6 +17,7 @@
 """Prevent extraction optimizations from omitting new production targets."""
 
 import importlib.util
+import io
 from pathlib import Path
 import tempfile
 import unittest
@@ -58,6 +59,26 @@ class SupplementalTargetsTests(unittest.TestCase):
 
 
 class CoverageTests(unittest.TestCase):
+    def test_missing_source_reports_extractor_crash_without_weakening_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "swift"
+            database.mkdir()
+            (root / "log").mkdir()
+            (root / "log/build-tracer.log").write_text(
+                "command: omitted\nWhile type-checking 'loadFonts'\n"
+                "Extractor terminated by signal 11\n")
+            with zipfile.ZipFile(database / "src.zip", "w"):
+                pass
+            diagnostic = io.StringIO()
+            with patch.object(extract, "native_sources", return_value=["Corta/New.c"]), \
+                    patch("sys.stderr", diagnostic):
+                with self.assertRaisesRegex(RuntimeError, "Corta/New.c"):
+                    extract.verify_coverage("c-cpp", database)
+            self.assertIn("While type-checking 'loadFonts'", diagnostic.getvalue())
+            self.assertIn("terminated by signal 11", diagnostic.getvalue())
+            self.assertNotIn("command: omitted", diagnostic.getvalue())
+
     def test_missing_native_file_fails_coverage(self):
         with tempfile.TemporaryDirectory() as directory:
             database = Path(directory)

@@ -36,6 +36,8 @@ path = [
   "Corta/Localizable.xcstrings",
   "TestPlans/*.xctestplan",
   "Sparkle-Info.plist",
+  "scripts/image-decoder/*.plist",
+  "scripts/image-decoder/*.entitlements",
   "Corta/PrivacyInfo.xcprivacy",
   "appcast.xml",
   ".xcode-version",

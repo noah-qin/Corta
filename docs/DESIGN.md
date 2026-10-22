@@ -217,7 +217,7 @@ four reasons and what it would have bought.
 | `Scrollback`        | `CortaTerminal`                      | nonisolated | Bounded history in 256-row arenas; cold arenas compressed in memory |
 | `TerminalSession`   | `CortaTerminal`                      | nonisolated | Owns PTY + Parser + Grid; the unit a split renders   |
 | `PTY`, `corta-exec` | `CortaTerminal`                      | nonisolated | Spawn, read/write, winsize, child lifecycle          |
-| `corta-image-decoder` | `CortaTerminal/Sources/corta-image-decoder/` | own process | Decodes a Kitty PNG under the `pure-computation` sandbox; spawned by `ImageDecoderProcess` |
+| `corta-image-decoder` | `CortaTerminal/Sources/corta-image-decoder/` | own process | Decodes a Kitty PNG under the independent App Sandbox; spawned by `ImageDecoderProcess` |
 | `CortaSFTP`         | `CortaTerminal/Sources/CortaSFTP/`   | nonisolated | The SFTP protocol over the system `ssh`, no SSH library (§7.9); a sibling library, not part of the core |
 | `CortaPOSIX`        | `CortaTerminal/Sources/CortaPOSIX/`  | nonisolated | Process plumbing both libraries and the app's image decoder share: `GuardedDescriptor`, `ProcessExit`, a spawn's signal reset |
 | Renderer            | `Corta/Renderer/`                    | nonisolated | `TerminalRenderer`, `Metal4Backend` (the only GPU backend: one render pass per frame, D21), `QuadPipelineCache`, `GlyphAtlas`, `KittyImageRenderer`; draws a session into a rect, driven from the display link |

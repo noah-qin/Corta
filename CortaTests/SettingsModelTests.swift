@@ -25,6 +25,53 @@ import Testing
 /// they change.
 @MainActor
 struct SettingsModelTests {
+    private actor FontScan {
+        private var result: CheckedContinuation<[MonospacedFontCatalog.Entry], Never>?
+        private var started: CheckedContinuation<Void, Never>?
+
+        func load() async -> [MonospacedFontCatalog.Entry] {
+            await withCheckedContinuation { continuation in
+                result = continuation
+                started?.resume()
+                started = nil
+            }
+        }
+        func waitUntilStarted() async {
+            if result != nil { return }
+            await withCheckedContinuation { started = $0 }
+        }
+        func finish(_ entries: [MonospacedFontCatalog.Entry]) {
+            result?.resume(returning: entries)
+            result = nil
+        }
+    }
+
+    @Test("an older font scan cannot replace a newer list")
+    func olderFontScanCannotOverwriteNewerResults() async {
+        let model = SettingsModel()
+        let scan = FontScan()
+        let older = Task { await model.loadFonts(monospaced: { await scan.load() }, cjk: { [] }) }
+        await scan.waitUntilStarted()
+        let newest = MonospacedFontCatalog.Entry(name: "newest", origin: .apple, hasCJK: false)
+        await model.loadFonts(monospaced: { [newest] }, cjk: { [] })
+        await scan.finish([.init(name: "old", origin: .apple, hasCJK: false)])
+        await older.value
+        #expect(model.availableFonts == [newest])
+    }
+
+    @Test("a cancelled settings task never publishes its font scan")
+    func cancelledFontScanDoesNotPublish() async {
+        let model = SettingsModel()
+        let scan = FontScan()
+        let task = Task { await model.loadFonts(monospaced: { await scan.load() }, cjk: { [] }) }
+        await scan.waitUntilStarted()
+        task.cancel()
+        await scan.finish([.init(name: "cancelled", origin: .apple, hasCJK: false)])
+        await task.value
+        #expect(model.availableFonts.isEmpty)
+        #expect(model.availableCJKFonts.isEmpty)
+    }
+
     @Test func explicitAppearanceImmediatelyUpdatesPreview() {
         let model = SettingsModel()
         let original = model.appearance

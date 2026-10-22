@@ -21,6 +21,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import time
 import zipfile
 
@@ -124,6 +125,14 @@ def verify_coverage(language, database):
     missing = [path for path in expected if not any(name.endswith("/" + path) or name == path
                                                    for name in extracted)]
     if missing:
+        # Extractor crashes do not necessarily fail the compiler invocation.
+        # Surface the frontend's context without dumping commands or env vars.
+        markers = ("While type-checking", "While evaluating request", "terminated by signal")
+        for log in (database.parent / "log").glob("build-tracer*.log"):
+            lines = [line for line in log.read_text(errors="replace").splitlines()
+                     if any(marker in line for marker in markers)]
+            for line in lines[-30:]:
+                print(line[:1000], file=sys.stderr)
         raise RuntimeError("Production files missing from CodeQL source archive: " + ", ".join(missing))
     print(f"Verified {len(expected)} production {language} source files in CodeQL's archive.", flush=True)
 

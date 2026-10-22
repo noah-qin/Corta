@@ -135,6 +135,14 @@ public enum ReleaseCheck {
         "com.apple.security.cs.debugger",
     ]
 
+    /// The decoder has its own sandbox, without inheritance or extra rights.
+    public static func hasIndependentDecoderSandbox(inPlist data: Data) -> Bool {
+        guard let value = try? PropertyListSerialization.propertyList(from: data, format: nil),
+            let entitlements = value as? [String: Any] else { return false }
+        return Set(entitlements.keys) == ["com.apple.security.app-sandbox"]
+            && entitlements["com.apple.security.app-sandbox"] as? Bool == true
+    }
+
     /// The denied entitlements a `codesign -d --entitlements - --xml`
     /// plist grants, any value but `false` counting. An empty output is no
     /// entitlements; `nil` is output that is not a dictionary plist.

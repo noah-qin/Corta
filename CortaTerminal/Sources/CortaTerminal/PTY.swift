@@ -43,6 +43,8 @@ public final class PTY: @unchecked Sendable {
         var exit: ProcessExit?
         /// Two reapers never race for one status.
         var isReaping = false
+        /// Test gate after waitpid, while the pid is owned by the reaper.
+        var beforeExitPublication: (@Sendable () -> Void)?
     }
 
     private let state = Mutex(State())
@@ -390,8 +392,12 @@ public final class PTY: @unchecked Sendable {
     /// (`SECURITY.md` §4.4). Refused once reaped: the id may be recycled.
     @discardableResult
     public func signalProcessGroup(_ signal: Int32) -> Bool {
-        guard state.withLock({ $0.exit == nil }) else { return false }
-        return kill(-processIdentifier, signal) == 0
+        state.withLock { state in
+            // A reaper owns the pid until it publishes the exit. Never signal
+            // across waitpid: the kernel may already have recycled that id.
+            guard state.exit == nil, !state.isReaping else { return false }
+            return kill(-processIdentifier, signal) == 0
+        }
     }
 
     /// What typing `^C` does when the line discipline has `ISIG`: `SIGINT`
@@ -400,16 +406,18 @@ public final class PTY: @unchecked Sendable {
     /// nothing, when `ISIG` is off (a raw-mode program reads `^C` as input)
     /// or the terminal cannot answer.
     public func interruptForegroundGroupIfSignalsEnabled() -> Bool {
-        guard state.withLock({ $0.exit == nil }) else { return false }
-        let group: pid_t? = descriptor.withNumber { fd -> pid_t? in
-            var attributes = termios()
-            guard tcgetattr(fd, &attributes) == 0, attributes.c_lflag & tcflag_t(ISIG) != 0
-            else { return nil }
-            let group = tcgetpgrp(fd)
-            return group > 0 ? group : nil
-        } ?? nil
-        guard let group else { return false }
-        return kill(-group, SIGINT) == 0
+        return state.withLock { state in
+            guard state.exit == nil, !state.isReaping else { return false }
+            let group: pid_t? = descriptor.withNumber { fd -> pid_t? in
+                var attributes = termios()
+                guard tcgetattr(fd, &attributes) == 0, attributes.c_lflag & tcflag_t(ISIG) != 0
+                else { return nil }
+                let group = tcgetpgrp(fd)
+                return group > 0 ? group : nil
+            } ?? nil
+            guard let group else { return false }
+            return kill(-group, SIGINT) == 0
+        }
     }
 
     /// The line discipline has neither `ICANON` nor `ECHO`: a program has put
@@ -440,6 +448,12 @@ public final class PTY: @unchecked Sendable {
         return reap(blocking: false)
     }
 
+    /// Tests hold the otherwise tiny waitpid-to-publication window open.
+    var beforeExitPublication: (@Sendable () -> Void)? {
+        get { state.withLock { $0.beforeExitPublication } }
+        set { state.withLock { $0.beforeExitPublication = newValue } }
+    }
+
     @discardableResult
     private func reap(blocking: Bool) -> ProcessExit? {
         let claimed = state.withLock { state -> Bool in
@@ -460,6 +474,7 @@ public final class PTY: @unchecked Sendable {
             return nil
         }
 
+        state.withLock { $0.beforeExitPublication }?()
         let exit = ProcessExit(waitpidStatus: status)
         state.withLock {
             $0.exit = exit

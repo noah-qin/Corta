@@ -63,6 +63,7 @@ stage session-ended-narrow 'appearance = light\ncolumns = 42\nrows = 24\nrestore
 stage terminal-recovery 'restore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\ncolumns = 90\nrows = 24\n'
 stage cursor-oversized 'columns = 500\nrows = 300\nrestore-windows = true\ncursor-shape = bar\ncursor-blink = true\n'
 stage cursor-blink 'appearance = light\ncolumns = 90\nrows = 24\nrestore-windows = false\ncursor-shape = bar\ncursor-blink = true\n'
+stage cursor-idle-block 'appearance = light\ncolumns = 90\nrows = 24\nrestore-windows = false\ncursor-shape = block\ncursor-blink = true\n'
 for name in system-status-bar system-theme-editor system-menu-preview; do
   stage "$name" 'appearance = light\nrestore-windows = false\ninput-source-indicator = off\n'
 done

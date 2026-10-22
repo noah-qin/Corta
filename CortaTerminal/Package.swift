@@ -79,9 +79,9 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
         // The PNG decoder the app spawns for Kitty images: ImageIO in a
-        // process of its own under the `pure-computation` sandbox, so a
-        // decoder bug cannot reach Corta's TCC grants. Embedded beside
-        // `corta-exec`; see its doc comment.
+        // process of its own under the independent App Sandbox, so a
+        // decoder bug cannot reach Corta's TCC grants. Embedded as its own
+        // helper app; see its doc comment.
         .executableTarget(
             name: "corta-image-decoder",
             swiftSettings: swiftSettings

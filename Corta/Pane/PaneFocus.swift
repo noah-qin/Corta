@@ -62,15 +62,6 @@ final class PaneFocus: NSObject {
     private var lastCursorGrid: Grid?
     private var blinkIsInvalidating = false
     private var cursorOffAt: CFTimeInterval?
-    private var cursorCaptureTask: Task<Void, Never>?
-    private var cursorCaptureGeneration = 0
-    private var cursorCaptureRetryAfter: ContinuousClock.Instant?
-
-    private func cancelCursorCapture() {
-        cursorCaptureGeneration &+= 1
-        cursorCaptureTask?.cancel()
-        cursorCaptureTask = nil
-    }
 
     /// Retire the independent CA cursor before submitting a replacement Metal
     /// frame. Its graph removal still waits for a positive presented callback.
@@ -100,9 +91,7 @@ final class PaneFocus: NSObject {
             idleCursorLayer = nil
         }
     }
-    private func makeIdleCursorLayer(
-        capture: (image: CGImage, column: Int, columns: Int)? = nil
-    ) -> CursorLayerPresentation? {
+    private func makeIdleCursorLayer(capture: TerminalRenderer.CursorImage? = nil) -> CursorLayerPresentation? {
         guard let pane = host as? ViewController, let grid = lastCursorGrid,
             let renderer = pane.terminalRenderer, let view = pane.terminalView,
             !view.hasMarkedText(), pane.selection == nil,
@@ -147,33 +136,35 @@ final class PaneFocus: NSObject {
         return CursorLayerPresentation(layer: layer)
     }
 
-    /// The timer never waits for a GPU. One capture at a time, with stale
-    /// results discarded and a cooldown after failure; Metal blinks meanwhile.
+    private var cursorCaptureTask: Task<Void, Never>?
+    private var cursorCaptureGeneration: UInt64 = 0
+    private var cursorCaptureRetryAfter: ContinuousClock.Instant?
+
+    private func cancelCursorCapture() {
+        cursorCaptureGeneration &+= 1
+        cursorCaptureTask?.cancel()
+        cursorCaptureTask = nil
+    }
+
     private func prepareIdleCursorLayer() {
-        guard handoff.snapshot.outputRevision == lastCursorOutputRevision,
-            cursorCaptureTask == nil,
-            cursorCaptureRetryAfter.map({ ContinuousClock.now >= $0 }) ?? true
-        else { return }
-        if lastBlinkStyle != .blinkingBlock {
+        guard cursorCaptureTask == nil,
+            handoff.snapshot.outputRevision == lastCursorOutputRevision,
+            cursorCaptureRetryAfter.map({ ContinuousClock.now >= $0 }) ?? true else { return }
+        guard lastBlinkStyle == .blinkingBlock else {
             if let layer = makeIdleCursorLayer() { installIdleCursorLayer(layer) }
             return
         }
         guard let pane = host as? ViewController, let renderer = pane.terminalRenderer,
-            let grid = lastCursorGrid
-        else { return }
+            let grid = lastCursorGrid else { return }
         let generation = cursorCaptureGeneration
         let revision = lastCursorOutputRevision
         cursorCaptureTask = Task { [weak self] in
-            let capture = await renderer.cursorImageInBackground(grid: grid)
-            guard let self, !Task.isCancelled, generation == self.cursorCaptureGeneration else {
-                return
-            }
+            let capture = await renderer.cursorImageAsync(grid: grid)
+            guard let self, !Task.isCancelled, generation == self.cursorCaptureGeneration else { return }
             self.cursorCaptureTask = nil
             guard self.canBlinkCursor, self.lastBlinkStyle == .blinkingBlock,
                 self.lastCursorOutputRevision == revision,
-                self.handoff.snapshot.outputRevision == revision,
-                self.handoff.phase == .metal
-            else { return }
+                self.handoff.snapshot.outputRevision == revision, self.handoff.phase == .metal else { return }
             guard let capture, let layer = self.makeIdleCursorLayer(capture: capture) else {
                 self.cursorCaptureRetryAfter = .now.advanced(by: .seconds(5))
                 return
@@ -184,9 +175,7 @@ final class PaneFocus: NSObject {
     }
 
     private func installIdleCursorLayer(_ layer: CursorLayerPresentation) {
-        guard
-            handoff.handOff(expectedOutputRevision: lastCursorOutputRevision, presentation: layer)
-                != nil
+        guard handoff.handOff(expectedOutputRevision: lastCursorOutputRevision, presentation: layer) != nil
         else { return }
         pendingCursorLayer = layer
         cursorBlinkTimer?.invalidate()
@@ -431,9 +420,7 @@ final class PaneFocus: NSObject {
                 guard self.handoff.phase == .metal else { return }
                 self.cursorBlinkVisible.toggle()
                 if !self.cursorBlinkVisible { self.cursorOffAt = CACurrentMediaTime() }
-                if !self.cursorBlinkVisible {
-                    self.prepareIdleCursorLayer()
-                }
+                if !self.cursorBlinkVisible { self.prepareIdleCursorLayer() }
                 self.blinkIsInvalidating = true
                 self.host?.invalidateDisplay()
                 self.blinkIsInvalidating = false

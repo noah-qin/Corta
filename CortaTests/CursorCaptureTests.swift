@@ -28,25 +28,28 @@ import Testing
     .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct CursorCaptureTests {
     @Test(arguments: ["X", "中", "🦔", "█", "─"], [CGFloat(1), CGFloat(2)])
-    func snapshotMatchesThePresentedCursorCell(_ text: String, _ scale: CGFloat) throws {
+    func snapshotMatchesThePresentedCursorCell(_ text: String, _ scale: CGFloat) async throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let renderer = try TerminalRenderer(
             device: device,
             font: CTFontCreateWithName("Menlo" as CFString, 14, nil), scale: scale)
+        // Settings tests may change the process palette while this test awaits.
+        renderer.themeVariant = Theme.corta.dark
         var terminal = Terminal(rows: 4, columns: 10)
         terminal.feed(Array(("\u{1b}[2;3H" + text + "\u{1b}[2;3H").utf8))
         let grid = terminal.grid
         let width = Int(renderer.metrics.cellWidth) * 10
         let height = Int(renderer.metrics.cellHeight) * 4
         let target = MetalRenderTarget.make(device: device, width: width, height: height)
-        let done = DispatchSemaphore(value: 0)
-        renderer.render(
-            grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-            drawableSize: CGSize(width: width, height: height), cursorVisible: true,
-            selection: nil, target: target, clearColor: MTLClearColorMake(0, 0, 0, 1)
-        ) { _ in done.signal() }
-        #expect(done.wait(timeout: .now() + 5) == .success)
-        let capture = try #require(renderer.cursorImage(grid: grid))
+        await withCheckedContinuation { continuation in
+            renderer.render(
+                grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                drawableSize: CGSize(width: width, height: height), cursorVisible: true,
+                selection: nil, target: target, clearColor: MTLClearColorMake(0, 0, 0, 1)
+            ) { _ in continuation.resume() }
+        }
+        let captured = await renderer.cursorImageAsync(grid: grid)
+        let capture = try #require(captured)
         let image = capture.image
         var expected = [UInt8](repeating: 0, count: image.width * image.height * 4)
         expected.withUnsafeMutableBytes {
@@ -76,11 +79,35 @@ struct CursorCaptureTests {
             thread.start()
             #expect(
                 entered.wait(timeout: .now() + 5) == .success,
-                "a GPU wait must not keep the live renderer locked")
-}
+                "a GPU completion must not keep the live renderer locked")
+        }
         let terminal = Terminal(rows: 2, columns: 4)
-        let capture = await renderer.cursorImageInBackground(grid: terminal.grid)
+        let capture = await renderer.cursorImageAsync(grid: terminal.grid)
         #expect(capture != nil)
     }
 
+}
+
+/// CPU-only continuation lifetime tests also run on the CI virtual GPU.
+struct CursorCaptureCancellationTests {
+    @Test("cancellation before capture registration resumes immediately")
+    func cancellationBeforeRegistration() async {
+        let completion = TerminalRenderer.CursorCaptureCompletion()
+        completion.finish(nil)
+        let result: TerminalRenderer.CursorImage? = await withCheckedContinuation { continuation in
+            if !completion.install(continuation) { continuation.resume(returning: nil) }
+        }
+        #expect(result == nil)
+    }
+
+    @Test("a late GPU callback cannot resume a cancelled capture twice")
+    func completionAfterCancellation() async {
+        let completion = TerminalRenderer.CursorCaptureCompletion()
+        let result: TerminalRenderer.CursorImage? = await withCheckedContinuation { continuation in
+            #expect(completion.install(continuation))
+            completion.finish(nil)
+            completion.finish(nil)
+        }
+        #expect(result == nil)
+    }
 }

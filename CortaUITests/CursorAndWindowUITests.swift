@@ -85,7 +85,7 @@ final class CursorAndWindowUITests: XCTestCase {
 
     @MainActor func testIdleCursorStopsAppFramesAfterHandoff() throws {
         continueAfterFailure = false
-        let stage = try UIFixtures.stage("cursor-blink")
+        let stage = try UIFixtures.stage("cursor-idle-block")
         let app = makeApp(stage: stage)
         let metrics = stage.appendingPathComponent("cursor-idle-\(UUID().uuidString).log")
         app.launchEnvironment["CORTA_RENDER_METRICS"] = metrics.path
