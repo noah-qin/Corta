@@ -5,7 +5,7 @@
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](USER-GUIDE.md)
 
 > Esta página é uma tradução de [USER-GUIDE.md](../../USER-GUIDE.md), no estado do commit
-> [`6d71b21`](https://github.com/noah-qin/Corta/blob/6d71b211e36e977f9250f45df1ccf10dde8fde2f/docs/USER-GUIDE.md).
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/USER-GUIDE.md).
 > Se a versão em inglês mudou desde então, ou se as duas divergirem, vale a versão em inglês.
 > Os nomes da interface seguem a interface em português do Corta; chaves de configuração, comandos e código ficam no original.
 
@@ -484,7 +484,9 @@ desconhecida ou alterada, servidor sem SFTP —, com as palavras do ssh em **Det
 Os envios da edição remota comparam o conteúdo remoto além do tamanho e da data de modificação, e enviam o snapshot
 privado que você aprovou. Se você salvar outra edição local depois do pedido de aprovação, o Corta pede uma nova decisão;
 os salvamentos durante um envio ficam pendentes. Depois de uma falha de conexão, a próxima edição ou envio reconecta, e um
-envio que falhou mantém a decisão pendente. Preserve as edições locais não decididas antes de apagar os dados do app. Veja
+envio que falhou mantém a decisão pendente. Depois de conectado,
+uma operação que não terminou em 120 segundos é interrompida e o envio é oferecido de novo: uma conexão travada não
+prende uma edição para sempre. Preserve as edições locais não decididas antes de apagar os dados do app. Veja
 a [política de dados em repouso](../../SECURITY.md#5-data-at-rest) (em inglês).
 
 <a id="images-in-the-terminal"></a>

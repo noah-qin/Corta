@@ -16,6 +16,7 @@ Renderização com Metal 4 · Entrada CJK / IME nativa · SSH, SFTP e edição r
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](../../../LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-join-5865f2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/QNdWfdwr7j)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=flat-square&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/noah-qin)
 
 **[↓ Baixar](https://github.com/noah-qin/Corta/releases/latest)** ·
 **[Guia do usuário](USER-GUIDE.md)** ·
@@ -31,7 +32,7 @@ Renderização com Metal 4 · Entrada CJK / IME nativa · SSH, SFTP e edição r
 </div>
 
 > Esta página é uma tradução do [README.md](../../../README.md) em inglês, no estado do commit
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/README.md).
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md).
 > Se a versão em inglês mudou desde então, ou se as duas divergirem, vale a versão em inglês.
 
 ## Instalação
@@ -181,7 +182,13 @@ Para conversar com outros usuários e com o mantenedor, entre no [Discord](https
 Para perguntas de uso cujas respostas outras pessoas devam poder encontrar, vá a [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a);
 para compartilhar um tema ou uma configuração, a [Show and tell](https://github.com/noah-qin/Corta/discussions/categories/show-and-tell).
 Para outros problemas, [abra uma issue](https://github.com/noah-qin/Corta/issues/new/choose).
-Se quiser apoiar a manutenção, [patrocine o projeto](https://github.com/sponsors/noah-qin).
+
+### Patrocinar
+
+O Corta é construído e mantido por uma pessoa, em público. Se ele já faz parte do seu dia, um patrocínio o mantém em
+movimento — qualquer valor ajuda.
+
+<a href="https://github.com/sponsors/noah-qin"><img src="https://img.shields.io/badge/Sponsor_noah--qin_on_GitHub-%E2%9D%A4-db61a2?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Patrocine noah-qin no GitHub"></a>
 
 ### Colaboradores
 

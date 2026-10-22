@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > Diese Seite ist eine Übersetzung von [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md) mit dem Stand von Commit
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md).
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md).
 > Wurde die englische Fassung seitdem geändert oder weichen die beiden ab, gilt die englische.
 > Meldungen von macOS stehen zusätzlich im englischen Original.
 
@@ -297,6 +297,13 @@ Die lokale Datei hat sich nach der Version geändert, die die ursprüngliche Nac
 ausdrücklich. Ein älterer verwalteter Eintrag ohne Prüfsumme des entfernten Inhalts braucht ebenfalls einmal eine
 Konfliktentscheidung. Ein Inhaltsvergleich kann entfernte Änderungen erkennen, auch wenn Dateigröße und Zeitstempel
 unverändert sind.
+
+### Ein Upload der Remote-Bearbeitung fragt nach langer Wartezeit erneut
+
+Die Verbindung ist ins Stocken geraten. Ist sie aufgebaut, hat jeder Vorgang der Remote-Bearbeitung 120 Sekunden Zeit;
+danach schließt Corta die Verbindung und bietet den Upload erneut an. Bestätige ihn, um es über eine neue Verbindung noch
+einmal zu versuchen. Auch eine sehr große Datei über eine langsame Leitung kann die Grenze erreichen: Kopiere sie dann mit
+dem SFTP-Browser.
 
 ---
 

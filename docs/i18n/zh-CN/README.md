@@ -16,6 +16,7 @@ Metal 4 渲染 · 原生中日韩输入法 · SSH、SFTP 与远程编辑
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](../../../LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-join-5865f2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/QNdWfdwr7j)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=flat-square&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/noah-qin)
 
 **[↓ 下载](https://github.com/noah-qin/Corta/releases/latest)** ·
 **[用户指南](USER-GUIDE.md)** ·
@@ -31,7 +32,7 @@ Metal 4 渲染 · 原生中日韩输入法 · SSH、SFTP 与远程编辑
 </div>
 
 > 本文译自英文版 [README.md](../../../README.md)，对应提交
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/README.md)。
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md)。
 > 此后英文版如有更新，或两者有出入，以英文版为准。
 
 ## 安装
@@ -176,7 +177,12 @@ Corta 仍在积极开发中，也有已知问题。下面的测量是快照，�
 希望答案能被别人搜到的使用问题，请发到 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a)，中文提问同样欢迎；
 想分享主题或配置，请发到 [Show and tell](https://github.com/noah-qin/Corta/discussions/categories/show-and-tell)。
 其他问题请[提交 issue](https://github.com/noah-qin/Corta/issues/new/choose)。
-如果你愿意支持项目的维护，可以[赞助本项目](https://github.com/sponsors/noah-qin)。
+
+### 赞助
+
+Corta 由一个人公开开发和维护。如果它已经成为你日常的一部分，赞助能让它继续前进——多少都有帮助。
+
+<a href="https://github.com/sponsors/noah-qin"><img src="https://img.shields.io/badge/Sponsor_noah--qin_on_GitHub-%E2%9D%A4-db61a2?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="在 GitHub 上赞助 noah-qin"></a>
 
 ### 贡献者
 

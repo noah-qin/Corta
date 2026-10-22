@@ -16,6 +16,7 @@ Metal 4 렌더링 · 네이티브 CJK / IME · SSH, SFTP, 원격 편집
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](../../../LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-join-5865f2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/QNdWfdwr7j)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=flat-square&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/noah-qin)
 
 **[↓ 다운로드](https://github.com/noah-qin/Corta/releases/latest)** ·
 **[사용자 가이드](USER-GUIDE.md)** ·
@@ -31,7 +32,7 @@ Metal 4 렌더링 · 네이티브 CJK / IME · SSH, SFTP, 원격 편집
 </div>
 
 > 이 문서는 영어판 [README.md](../../../README.md)의 커밋
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/README.md)
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md)
 > 시점을 번역한 것입니다. 이후 영어판이 바뀌었거나 내용이 다르면 영어판을 따릅니다.
 
 ## 설치
@@ -174,7 +175,12 @@ Corta를 써 보고 원래 터미널로 돌아갔나요? 그 이야기도 듣고
 다른 사람도 답을 찾을 수 있어야 하는 사용법 질문은 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a)로 (한국어 질문도 환영합니다),
 테마나 환경을 공유하려면 [Show and tell](https://github.com/noah-qin/Corta/discussions/categories/show-and-tell)로 가세요.
 그 밖의 문제는 [이슈를 열어](https://github.com/noah-qin/Corta/issues/new/choose) 주세요.
-유지 보수를 지원하고 싶다면 [프로젝트를 후원](https://github.com/sponsors/noah-qin)해 주세요.
+
+### 후원
+
+Corta는 한 사람이 공개적으로 만들고 유지합니다. 매일 쓰는 도구가 되었다면, 후원이 개발을 이어 가게 합니다 — 금액에 상관없이 도움이 됩니다.
+
+<a href="https://github.com/sponsors/noah-qin"><img src="https://img.shields.io/badge/Sponsor_noah--qin_on_GitHub-%E2%9D%A4-db61a2?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="GitHub에서 noah-qin 후원하기"></a>
 
 ### 기여자
 

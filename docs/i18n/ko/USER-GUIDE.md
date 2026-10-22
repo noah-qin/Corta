@@ -5,7 +5,7 @@
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
 > 이 문서는 영어판 [USER-GUIDE.md](../../USER-GUIDE.md)의 커밋
-> [`6d71b21`](https://github.com/noah-qin/Corta/blob/6d71b211e36e977f9250f45df1ccf10dde8fde2f/docs/USER-GUIDE.md)
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/USER-GUIDE.md)
 > 시점을 번역한 것입니다. 이후 영어판이 바뀌었거나 내용이 다르면 영어판을 따릅니다.
 > 화면에 보이는 이름은 Corta의 한국어 UI를 따랐습니다. 설정 키, 명령, 코드는 원문 그대로 둡니다.
 
@@ -437,7 +437,8 @@ Corta는 시스템의 OpenSSH를 씁니다 — `~/.ssh/config`, 키, 에이전�
 
 원격 편집 업로드는 크기와 수정 시각뿐 아니라 원격 내용도 비교하고, 승인한 비공개 스냅숏을 보냅니다. 승인 프롬프트 뒤에 로컬 편집을
 다시 저장하면 Corta가 새로 결정을 묻습니다. 업로드 중의 저장은 보류 상태로 남습니다. 연결이 실패한 뒤에는 다음 편집이나 업로드가
-다시 연결하고, 실패한 업로드는 보류 중인 결정을 유지합니다. 앱 데이터를 지우기 전에 결정하지 않은 로컬 편집을 보관해 두세요.
+다시 연결하고, 실패한 업로드는 보류 중인 결정을 유지합니다.
+연결된 뒤 120초가 지나도 끝나지 않는 작업은 중단되고 업로드를 다시 묻기 때문에, 연결이 멈춰도 편집이 끝없이 걸려 있지 않습니다. 앱 데이터를 지우기 전에 결정하지 않은 로컬 편집을 보관해 두세요.
 [저장 데이터 정책](../../SECURITY.md#5-data-at-rest)(영어)을 보세요.
 
 <a id="images-in-the-terminal"></a>

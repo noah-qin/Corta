@@ -5,7 +5,7 @@
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
 > Diese Seite ist eine Übersetzung von [USER-GUIDE.md](../../USER-GUIDE.md) mit dem Stand von Commit
-> [`6d71b21`](https://github.com/noah-qin/Corta/blob/6d71b211e36e977f9250f45df1ccf10dde8fde2f/docs/USER-GUIDE.md).
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/USER-GUIDE.md).
 > Wurde die englische Fassung seitdem geändert oder weichen die beiden ab, gilt die englische.
 > Namen in der Oberfläche folgen Cortas deutscher Oberfläche; Konfigurationsschlüssel, Befehle und Code bleiben im Original.
 
@@ -504,7 +504,8 @@ Uploads aus der Remote-Bearbeitung vergleichen neben Größe und Änderungszeit 
 privaten Schnappschuss, den du bestätigt hast. Sicherst du nach der Bestätigung eine weitere lokale Änderung, fragt Corta
 erneut nach einer Entscheidung; Sicherungen während eines Uploads bleiben ausstehend. Nach einem Verbindungsfehler
 verbindet die nächste Bearbeitung oder der nächste Upload neu, und ein fehlgeschlagener Upload behält seine ausstehende
-Entscheidung. Bewahre unentschiedene lokale Änderungen auf, bevor du App-Daten löschst. Siehe die
+Entscheidung. Ist die Verbindung aufgebaut, wird ein Vorgang, der nach 120 Sekunden nicht fertig ist,
+abgebrochen und der Upload erneut angeboten – eine hängende Verbindung hält eine Bearbeitung nicht ewig fest. Bewahre unentschiedene lokale Änderungen auf, bevor du App-Daten löschst. Siehe die
 [Richtlinie zu gespeicherten Daten](../../SECURITY.md#5-data-at-rest) (Englisch).
 
 <a id="images-in-the-terminal"></a>

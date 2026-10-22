@@ -16,6 +16,7 @@ Metal 4 レンダリング · ネイティブな CJK / IME · SSH、SFTP、リ�
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](../../../LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-join-5865f2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/QNdWfdwr7j)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=flat-square&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/noah-qin)
 
 **[↓ ダウンロード](https://github.com/noah-qin/Corta/releases/latest)** ·
 **[ユーザーガイド](USER-GUIDE.md)** ·
@@ -31,7 +32,7 @@ Metal 4 レンダリング · ネイティブな CJK / IME · SSH、SFTP、リ�
 </div>
 
 > このページは英語版 [README.md](../../../README.md) のコミット
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/README.md)
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md)
 > 時点の翻訳です。その後英語版が更新された場合や内容に食い違いがある場合は、英語版が正となります。
 
 ## インストール
@@ -181,7 +182,12 @@ Corta を試して、元のターミナルに戻りましたか？ それもぜ�
 答えをほかの人も見つけられるようにしたい使い方の質問は [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a) へ（日本語での質問も歓迎です）。
 テーマや環境を共有するなら [Show and tell](https://github.com/noah-qin/Corta/discussions/categories/show-and-tell) へ。
 そのほかの問題は [issue を作成](https://github.com/noah-qin/Corta/issues/new/choose)してください。
-メンテナンスを支援していただけるなら、[プロジェクトのスポンサー](https://github.com/sponsors/noah-qin)になってください。
+
+### スポンサー
+
+Corta は一人の手で、公開の場で作られ、保守されています。毎日の一部になっているなら、スポンサーが開発を前に進めます——金額はいくらでも助けになります。
+
+<a href="https://github.com/sponsors/noah-qin"><img src="https://img.shields.io/badge/Sponsor_noah--qin_on_GitHub-%E2%9D%A4-db61a2?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="GitHub で noah-qin のスポンサーになる"></a>
 
 ### コントリビューター
 

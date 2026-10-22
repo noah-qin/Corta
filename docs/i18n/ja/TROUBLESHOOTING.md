@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > このページは英語版 [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md) のコミット
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md)
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md)
 > 時点の翻訳です。その後英語版が更新された場合や内容に食い違いがある場合は、英語版が正となります。
 > macOS のメッセージは英語の原文を併記しています。
 
@@ -271,6 +271,12 @@ Corta は報告されたローカルのディレクトリをバックグラウ�
 元のプロンプトが示したバージョンの後に、ローカルのファイルが変更されています。新しい編集を明示的に承認してください。
 リモートの内容のダイジェストを持たない古い管理対象の項目も、一度は競合の判断が必要です。内容の比較によって、ファイルサイズと
 タイムスタンプが変わっていなくてもリモートの変更を見分けられます。
+
+### 長く待った後で、リモート編集のアップロードがまた尋ねてくる
+
+接続が止まっています。接続後、リモート編集の各操作には 120 秒の制限があり、それを過ぎると Corta は接続を閉じてアップロードを
+改めて提示します。承認すれば新しい接続で再試行します。遅い回線での非常に大きなファイルも制限に達することがあります。その場合は
+SFTP ブラウザでコピーしてください。
 
 ---
 

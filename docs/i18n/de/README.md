@@ -16,6 +16,7 @@ Metal-4-Rendering · Native CJK-Eingabe / IME · SSH, SFTP und Bearbeiten aus de
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](../../../LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-join-5865f2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/QNdWfdwr7j)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=flat-square&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/noah-qin)
 
 **[↓ Herunterladen](https://github.com/noah-qin/Corta/releases/latest)** ·
 **[Benutzerhandbuch](USER-GUIDE.md)** ·
@@ -31,7 +32,7 @@ Metal-4-Rendering · Native CJK-Eingabe / IME · SSH, SFTP und Bearbeiten aus de
 </div>
 
 > Diese Seite ist eine Übersetzung der englischen [README.md](../../../README.md) mit dem Stand von Commit
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/README.md).
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md).
 > Wurde die englische Fassung seitdem geändert oder weichen die beiden ab, gilt die englische.
 
 ## Installation
@@ -183,7 +184,13 @@ Um mit anderen Nutzern und dem Maintainer zu chatten, tritt dem [Discord](https:
 Für Fragen zur Nutzung, deren Antworten auch andere finden sollen, geh zu [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a);
 um ein Thema oder ein Setup zu teilen, zu [Show and tell](https://github.com/noah-qin/Corta/discussions/categories/show-and-tell).
 Für andere Probleme [öffne ein Issue](https://github.com/noah-qin/Corta/issues/new/choose).
-Wenn du die Pflege unterstützen möchtest, [sponsere das Projekt](https://github.com/sponsors/noah-qin).
+
+### Sponsern
+
+Corta wird von einer Person entwickelt und gepflegt, öffentlich. Wenn es Teil deines Alltags geworden ist, hält ein
+Sponsoring es in Bewegung – jeder Betrag hilft.
+
+<a href="https://github.com/sponsors/noah-qin"><img src="https://img.shields.io/badge/Sponsor_noah--qin_on_GitHub-%E2%9D%A4-db61a2?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="noah-qin auf GitHub sponsern"></a>
 
 ### Mitwirkende
 

@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > 本文譯自英文版 [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md)，對應提交
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md)。
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md)。
 > 此後英文版如有更新，或兩者有出入，以英文版為準。macOS 的提示文字以英文原文為準，中文為對照譯文。
 
 Corta 裝不起來、打不開，或者做了你以前的終端機不會做的事時，該怎麼辦。每一條都說明你會看到什麼、原因是什麼、
@@ -253,6 +253,11 @@ Corta 在背景檢查回報的本機目錄。如果裝載很慢，或已有兩�
 
 本機檔案在最初的提示所顯示的版本之後又改過了。請明確批准新的編輯。沒有遠端內容摘要的舊受管項目也需要做一次衝突決定。
 即使檔案大小和時間戳記沒變，內容比較也能識別出遠端的改動。
+
+### 遠端編輯的上傳等了很久之後再次詢問
+
+連線卡住了。連線建立後，每個遠端編輯操作有 120 秒的時間完成；逾時後 Corta 會關閉連線並再次提供上傳。批准它即可透過新連線重試。
+慢速連線上的超大檔案也可能達到這個時限：請改用 SFTP 瀏覽器複製它。
 
 ---
 

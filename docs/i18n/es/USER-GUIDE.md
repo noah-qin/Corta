@@ -5,7 +5,7 @@
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
 > Esta página es una traducción de [USER-GUIDE.md](../../USER-GUIDE.md), tal como estaba en el commit
-> [`6d71b21`](https://github.com/noah-qin/Corta/blob/6d71b211e36e977f9250f45df1ccf10dde8fde2f/docs/USER-GUIDE.md).
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/USER-GUIDE.md).
 > Si la versión en inglés ha cambiado desde entonces, o si ambas difieren, prevalece la versión en inglés.
 > Los nombres de la interfaz siguen la interfaz en español de Corta; las claves de configuración, los comandos y el código se mantienen en el original.
 
@@ -496,7 +496,9 @@ desconocida o cambiada, servidor sin SFTP —, con las palabras de ssh en **Deta
 Las subidas de la edición remota comparan el contenido remoto además del tamaño y la fecha de modificación, y envían la
 instantánea privada que aprobaste. Si guardas otra edición local después del aviso de aprobación, Corta pide una nueva
 decisión; los guardados durante una subida quedan pendientes. Tras un fallo de conexión, la siguiente edición o subida
-vuelve a conectar, y una subida fallida conserva su decisión pendiente. Conserva las ediciones locales sin decidir antes
+vuelve a conectar, y una subida fallida conserva su decisión pendiente. Una vez conectada,
+una operación que no ha terminado tras 120 segundos se detiene y la subida se ofrece de nuevo: una conexión atascada no
+retiene una edición para siempre. Conserva las ediciones locales sin decidir antes
 de eliminar los datos de la app. Consulta la [política de datos en reposo](../../SECURITY.md#5-data-at-rest) (en inglés).
 
 <a id="images-in-the-terminal"></a>

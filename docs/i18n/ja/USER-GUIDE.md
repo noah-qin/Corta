@@ -5,7 +5,7 @@
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
 > このページは英語版 [USER-GUIDE.md](../../USER-GUIDE.md) のコミット
-> [`6d71b21`](https://github.com/noah-qin/Corta/blob/6d71b211e36e977f9250f45df1ccf10dde8fde2f/docs/USER-GUIDE.md)
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/USER-GUIDE.md)
 > 時点の翻訳です。その後英語版が更新された場合や内容に食い違いがある場合は、英語版が正となります。
 > 画面上の名前は Corta の日本語 UI に合わせています。設定キー、コマンド、コードは原文のままです。
 
@@ -455,7 +455,8 @@ Corta はシステムの OpenSSH を使います——`~/.ssh/config`、鍵、�
 
 リモート編集のアップロードでは、サイズと更新日時に加えてリモートの内容も比較し、承認した非公開のスナップショットを送ります。
 承認のプロンプトの後にローカルの編集をもう一度保存すると、Corta は改めて判断を求めます。アップロード中の保存は保留のままです。
-接続に失敗した後は、次の編集またはアップロードで再接続し、失敗したアップロードは保留中の判断を保ちます。アプリのデータを削除する前に、
+接続に失敗した後は、次の編集またはアップロードで再接続し、失敗したアップロードは保留中の判断を保ちます。
+接続後、120 秒たっても終わらない操作は止められ、アップロードを改めて提示します。接続が止まっても編集がいつまでも残ることはありません。アプリのデータを削除する前に、
 判断していないローカルの編集を保存しておいてください。[保存データのポリシー](../../SECURITY.md#5-data-at-rest)（英語）を参照してください。
 
 <a id="images-in-the-terminal"></a>

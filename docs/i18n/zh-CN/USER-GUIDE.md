@@ -5,7 +5,7 @@
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
 > 本文译自英文版 [USER-GUIDE.md](../../USER-GUIDE.md)，对应提交
-> [`6d71b21`](https://github.com/noah-qin/Corta/blob/6d71b211e36e977f9250f45df1ccf10dde8fde2f/docs/USER-GUIDE.md)。
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/USER-GUIDE.md)。
 > 此后英文版如有更新，或两者有出入，以英文版为准。界面名称按 Corta 的简体中文界面书写；
 > 配置项、命令和代码保持原文。
 
@@ -426,7 +426,8 @@ ssh 的原话在 **详细信息** 里，并提供 **重试** 或 **修改连接�
 
 远程编辑上传时，除了大小和修改时间，还会比较远程内容，并发送你批准的那份私有快照。
 如果你在批准提示之后又保存了一次本地编辑，Corta 会请你重新决定；上传过程中的保存会保持待处理状态。
-连接失败后，下一次编辑或上传会重新连接，失败的上传会保留其待处理的决定。删除应用数据前，
+连接失败后，下一次编辑或上传会重新连接，失败的上传会保留其待处理的决定。
+连接建立后，任何操作超过 120 秒仍未完成就会被停止，并再次请你决定是否上传，连接卡住也不会让一次编辑永远挂起。删除应用数据前，
 请先保存尚未决定的本地编辑。见[静态数据策略](../../SECURITY.md#5-data-at-rest)（英文）。
 
 <a id="images-in-the-terminal"></a>

@@ -5,7 +5,7 @@
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
 > Cette page est une traduction de [USER-GUIDE.md](../../USER-GUIDE.md), dans son état au commit
-> [`6d71b21`](https://github.com/noah-qin/Corta/blob/6d71b211e36e977f9250f45df1ccf10dde8fde2f/docs/USER-GUIDE.md).
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/USER-GUIDE.md).
 > Si la version anglaise a changé depuis, ou si les deux diffèrent, la version anglaise fait foi.
 > Les noms d’interface suivent l’interface française de Corta ; clés de configuration, commandes et code restent en version originale.
 
@@ -506,6 +506,8 @@ Les envois d’édition à distance comparent le contenu distant en plus de la t
 envoient l’instantané privé que vous avez approuvé. Si vous enregistrez une autre modification locale après la demande
 d’approbation, Corta demande une nouvelle décision ; les enregistrements pendant un envoi restent en attente. Après un
 échec de connexion, la modification ou l’envoi suivant se reconnecte, et un envoi échoué garde sa décision en attente.
+Une fois connecté, une opération qui n’est pas terminée après 120 secondes est arrêtée et l’envoi est proposé à
+nouveau : une connexion bloquée ne retient pas une modification indéfiniment.
 Préservez les modifications locales non décidées avant de supprimer les données de l’app. Voir la
 [politique des données au repos](../../SECURITY.md#5-data-at-rest) (en anglais).
 

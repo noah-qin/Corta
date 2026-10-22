@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > Esta página es una traducción de [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md), tal como estaba en el commit
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md).
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md).
 > Si la versión en inglés ha cambiado desde entonces, o si ambas difieren, prevalece la versión en inglés.
 > Los mensajes de macOS van acompañados de su texto original en inglés.
 
@@ -289,6 +289,12 @@ inicio en lugar de congelar Corta. El mismo plazo se aplica al ⌘-clic o al pas
 El archivo local cambió después de la versión que mostró el aviso original. Aprueba explícitamente la nueva edición. Una
 entrada gestionada antigua sin resumen del contenido remoto también necesita una decisión de conflicto una vez. Una
 comparación de contenido puede detectar cambios remotos aunque el tamaño y la marca de tiempo del archivo no hayan cambiado.
+
+### Una subida de la edición remota vuelve a preguntar tras una larga espera
+
+La conexión se atascó. Una vez conectada, cada operación de la edición remota tiene 120 segundos para terminar; después,
+Corta cierra la conexión y vuelve a ofrecer la subida. Apruébala para reintentar con una conexión nueva. Un archivo muy
+grande en un enlace lento también puede alcanzar el límite: cópialo con el navegador SFTP.
 
 ---
 

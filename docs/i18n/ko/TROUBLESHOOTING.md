@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > 이 문서는 영어판 [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md)의 커밋
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/TROUBLESHOOTING.md)
+> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md)
 > 시점을 번역한 것입니다. 이후 영어판이 바뀌었거나 내용이 다르면 영어판을 따릅니다.
 > macOS 메시지는 영어 원문을 함께 적었습니다.
 
@@ -259,6 +259,11 @@ Corta는 보고된 로컬 디렉터리를 백그라운드에서 확인합니다.
 
 원래 프롬프트가 보여 준 버전 이후에 로컬 파일이 바뀌었습니다. 새 편집을 명시적으로 승인하세요. 원격 내용 다이제스트가 없는 예전 관리 항목도
 한 번은 충돌 결정을 해야 합니다. 내용 비교는 파일 크기와 타임스탬프가 그대로여도 원격 변경을 알아낼 수 있습니다.
+
+### 오래 기다린 뒤 원격 편집 업로드가 다시 물어봄
+
+연결이 멈췄습니다. 연결된 뒤 원격 편집 작업마다 120초 안에 끝나야 하며, 그 시간이 지나면 Corta가 연결을 닫고 업로드를 다시
+묻습니다. 승인하면 새 연결로 다시 시도합니다. 느린 회선의 아주 큰 파일도 이 한도에 닿을 수 있으니, 그럴 때는 SFTP 브라우저로 복사하세요.
 
 ---
 
