@@ -215,7 +215,7 @@ commandes en mode **Automatique**. **Toujours** peut le garder pendant la sortie
 masquent pendant la lecture de l’historique ou l’utilisation d’un programme en écran alternatif.
 
 Le réglage **Position** propose **Barre d’outils de la fenêtre** (par défaut) ou **Bord droit de la ligne de commande**.
-Le badge de la barre d’outils est indépendant des boutons réseau et fichiers et reste fixe quand les commandes
+Le badge de la barre d’outils est indépendant des boutons Connexion et Nouvel onglet et reste fixe quand les commandes
 s’allongent ou passent à la ligne. Le désactiver ou choisir la ligne de commande retire son emplacement et son espacement
 de la barre d’outils. Sur la ligne de commande, les commandes longues déplacent le badge vers une ligne libre plus bas,
 toujours au bord droit ; il se masque quand il ne reste aucune ligne sûre, et n’insère jamais de ligne ni ne fait défiler
@@ -284,11 +284,17 @@ Le format des nombres suit la région actuelle.
 
 ## Quand une session se termine
 
-Un volet conserve sa sortie après la fin du shell et affiche une carte **Session terminée** avec son code de sortie ou le
-signal qui l’a terminée. Le curseur disparaît, mais le défilement, la sélection, la copie et la recherche ⌘F fonctionnent
-toujours. **Nouvelle session** demande confirmation avant de remplacer la sortie conservée ; **Fermer le panneau** ferme
-ce volet. Une session SSH connectée directement propose **Reconnecter** pour établir une nouvelle connexion. Quitter
-Python ou un autre programme pour revenir à un shell actif ne termine pas la session du terminal.
+Un volet conserve sa sortie après la fin du shell : la sortie est légèrement assombrie et un panneau dit en une phrase ce
+qui s’est terminé et comment — le code de sortie, ou le signal qui l’a arrêté. Le curseur disparaît, mais le défilement,
+la sélection, la copie et la recherche ⌘F fonctionnent toujours autour du panneau. **Nouvelle session** relance le shell
+ou le préréglage dans le volet ; **Fermer le panneau** le ferme. Une session SSH connectée directement indique à quel hôte
+elle était connectée et propose **Reconnecter** pour établir une nouvelle connexion ; le code de sortie 255 de ssh est
+expliqué comme un réseau coupé ou un hôte qui ne répond plus. Les deux boutons effacent la sortie au-dessus — le panneau
+le dit — et la nouvelle session démarre à la taille et à la taille de police du volet. Quitter Python ou un autre
+programme pour revenir à un shell actif ne termine pas la session du terminal.
+
+Quand l’entrée ou la sortie d’une session échoue, ou qu’un volet ne s’affiche plus, le même panneau propose **Réessayer**
+ou, pour une connexion, **Reconnecter** ; le texte d’erreur du système est sous **Détails**.
 
 ![Session terminée conservant sa dernière sortie et les actions de reprise](../../brand/session-ended.png)
 
@@ -449,14 +455,19 @@ n’a pas sa propre implémentation de SSH.
   savoir quel hôte.
 - **Reconnexion.** Quand une session `ssh` ou `mosh` se termine, **Se reconnecter à l’hôte** relance la même commande, comme
   une nouvelle connexion.
-- **Connexion.** Les boutons globe et dossier de la barre d’outils ouvrent une feuille pour un terminal SSH ou un
-  navigateur SFTP, avec les mêmes champs pour les deux : l’hôte (un nom, une adresse ou un alias SSH), l’utilisateur, le
-  port et une clé privée. Laissez l’un des trois derniers vide et ce sont votre `~/.ssh/config` et les valeurs par défaut
-  d’OpenSSH qui décident ; une clé choisie est proposée en premier, et les autres clés de `ssh-agent` ne sont pas essayées.
-  La feuille liste les connexions récentes — avec l’utilisateur, le port et la clé utilisés — et les noms `Host` de votre
-  `~/.ssh/config` ; tapez pour filtrer la liste, cliquez sur une entrée (ou utilisez ↑ et ↓ depuis le champ hôte) pour
-  remplir les champs, double-cliquez ou appuyez sur Retour pour vous connecter. Réglages ▸ Confidentialité et sécurité ▸
-  Hôtes récents efface les connexions récentes.
+- **Connexion.** Le bouton globe de la barre d’outils ouvre **Se connecter à un hôte**, une feuille avec un sélecteur
+  **Terminal / Fichiers (SFTP)** : un terminal par SSH, ou le navigateur de fichiers. Tapez l’hôte — un nom, une adresse,
+  `user@host` ou un alias SSH. **Options avancées** contient l’utilisateur, le port et une clé privée ; laissés vides, ce
+  sont votre `~/.ssh/config` et les valeurs par défaut d’OpenSSH qui décident. Une clé choisie est proposée en premier, et
+  les autres clés de `ssh-agent` ne sont pas essayées. La feuille liste les connexions récentes — avec le port, la clé et
+  leur dernière utilisation — et les noms `Host` de votre `~/.ssh/config`. Les hôtes qui n’acceptent que git
+  (`github.com`, ou un `Host` avec `User git`) n’y figurent pas, et la liste dit lesquels. Tapez pour filtrer la liste,
+  cliquez sur une entrée (ou utilisez ↑ et ↓ depuis le champ hôte) pour remplir les champs, double-cliquez ou appuyez sur
+  Retour pour vous connecter. Une connexion de terminal rejoint la liste récente une fois établie — un hôte qui vous refuse
+  ou n’a pas de shell, non. Survolez un hôte récent et cliquez sur ✕, ou faites un clic droit dessus, pour l’oublier ;
+  Réglages ▸ Confidentialité et sécurité ▸ Hôtes récents les efface tous.
+- **Les fichiers de ce volet.** Ouverte depuis un volet connecté à une autre machine, la feuille propose d’abord les
+  fichiers de cet hôte ; appuyez sur Retour ou sur **Parcourir les fichiers** pour les ouvrir.
 - **Parcourir les fichiers distants…** ouvre un navigateur SFTP pour l’hôte du volet : lister, envoyer, télécharger,
   renommer et supprimer. La première connexion à un hôte vous demande de confirmer son nom. Les transferts reprennent
   après une interruption et n’écrasent jamais un fichier sans demander. Un téléchargement de dossier s’arrête si un nom
@@ -465,8 +476,7 @@ n’a pas sa propre implémentation de SSH.
 - **Dans le navigateur**, comme dans le Finder : ⌘[ et ⌘] reculent et avancent, ⌘↑ remonte au dossier parent, ⌘R
   actualise, ⇧⌘G (ou un clic sur le chemin) permet de taper un chemin, ⇧⌘N crée un dossier et ⇧⌘. affiche les fichiers
   masqués. Cliquez sur un titre de colonne pour trier. Faites un clic droit sur une ligne pour ses actions ;
-  double-cliquez sur un dossier pour l’ouvrir. Déposez des fichiers du Finder sur la liste — ou sur une ligne de dossier —
-  pour les envoyer, et faites glisser un fichier vers le Finder pour le télécharger. Les transferts sont sous le bouton
+  double-cliquez sur un dossier pour l’ouvrir. Déposez des fichiers du Finder sur la liste — ou sur une ligne de dossier — pour les envoyer ; pendant le glissement, la liste (ou la ligne) est encadrée et indique la destination. Faites glisser un fichier vers le Finder pour le télécharger. Les transferts sont sous le bouton
   flèches de la barre d’outils, avec la vitesse, le temps restant et Afficher dans le Finder.
 - **Modifier un fichier distant.** **Modifier** dans le navigateur — ou un ⌘-clic sur un `path:line` dans un volet
   distant — télécharge une copie et l’ouvre dans votre éditeur. Réglez d’abord
@@ -481,9 +491,16 @@ n’a pas sa propre implémentation de SSH.
 
 Quand le serveur demande un mot de passe, une phrase secrète de clé ou un code à usage unique, ou quand un hôte est nouveau
 et que sa clé requiert votre décision, le navigateur le demande dans une boîte de dialogue sur sa fenêtre et transmet
-votre réponse à OpenSSH ; rien n’est enregistré, donc une reconnexion redemande. La boîte de dialogue de clé d’hôte
-affiche l’empreinte et a Annuler pour bouton par défaut. Une clé détenue par `ssh-agent` ou le trousseau, ou une
-connexion `ControlMaster` existante depuis votre terminal, se connecte sans rien demander.
+votre réponse à OpenSSH ; rien n’est enregistré, donc une reconnexion redemande. **Annuler la connexion** dans la boîte
+du mot de passe met fin à cette tentative et revient au champ hôte — rien n’est envoyé comme mot de passe vide.
+**Annuler** sur la phrase secrète d’une clé ne fait que sauter cette clé, et ssh passe au moyen de connexion suivant.
+La boîte de dialogue de clé d’hôte affiche l’empreinte et a Annuler pour bouton par défaut. Une clé détenue par
+`ssh-agent` ou le trousseau, ou une connexion `ControlMaster` existante depuis votre terminal, se connecte sans rien
+demander.
+
+Une connexion qui échoue dit pourquoi en une phrase — mot de passe ou clé refusé, hôte qui ne répond pas, clé d’hôte
+inconnue ou modifiée, serveur sans SFTP — avec les mots de ssh sous **Détails**, et propose **Réessayer** ou
+**Modifier la connexion**.
 
 Les envois d’édition à distance comparent le contenu distant en plus de la taille et de la date de modification, et
 envoient l’instantané privé que vous avez approuvé. Si vous enregistrez une autre modification locale après la demande
@@ -605,17 +622,18 @@ Les Réglages se présentent comme une barre latérale de catégories, à la man
   de source de saisie.
 - **Raccourcis** — la touche de chaque commande ; une flèche de réinitialisation apparaît à côté de celles que vous avez modifiées.
 - **Terminal rapide** — le raccourci global, la position et l’écran.
-- **Connexions** — Connexion SSH et préréglages enregistrés.
+- **Connexions** — Se connecter à un hôte et préréglages enregistrés.
 - **Confidentialité et sécurité** — l’écriture dans le presse-papiers par les programmes (OSC 52), la Saisie clavier
   sécurisée, l’historique des dossiers et les hôtes récents.
 
 Ces commandes modifient le même fichier de configuration. Les couleurs des thèmes personnalisés peuvent être modifiées
 graphiquement ou via le fichier.
 
-La barre d’outils de la fenêtre ajoute SSH et SFTP. Les deux ouvrent une feuille sur la fenêtre avec des champs hôte,
-utilisateur, port et clé privée — l’hôte peut être un alias de configuration — et suggèrent les hôtes récents et
-configurés ; un utilisateur, un port ou une clé laissés vides respectent la configuration d’OpenSSH. SFTP ouvre le
-navigateur du volet distant, ou demande un hôte quand le volet est local ([Travail à distance](#remote-work-ssh-and-sftp)).
+Le bouton globe de la barre d’outils de la fenêtre se connecte à un hôte, pour un terminal ou pour ses fichiers : une
+feuille sur la fenêtre avec l’hôte — il peut être un alias de configuration — et l’utilisateur, le port et la clé privée
+sous **Options avancées** ; elle suggère les hôtes récents et configurés, et un utilisateur, un port ou une clé laissés
+vides respectent la configuration d’OpenSSH. Depuis un volet distant, elle propose d’abord les fichiers de cet hôte
+([Travail à distance](#remote-work-ssh-and-sftp)).
 
 ```ini
 theme = corta

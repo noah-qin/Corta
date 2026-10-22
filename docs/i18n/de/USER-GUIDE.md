@@ -217,7 +217,7 @@ es während der Befehlsausgabe behalten. Beide Prompt-Modi blenden es aus, währ
 mit alternativem Bildschirm verwendest.
 
 Die Einstellung **Position** wählt **Fenster-Symbolleiste** (Standard) oder **Rechter Rand der Befehlszeile**. Das
-Kennzeichen in der Symbolleiste steht unabhängig von den Netzwerk- und Dateitasten und bleibt an seinem Platz, wenn
+Kennzeichen in der Symbolleiste steht unabhängig von den Tasten zum Verbinden und für einen neuen Tab und bleibt an seinem Platz, wenn
 Befehle länger werden oder umbrechen. Ausschalten oder die Platzierung an der Befehlszeile entfernt seinen Platz und
 seinen Abstand in der Symbolleiste. An der Befehlszeile verschieben lange Befehle das Kennzeichen nach unten in freien
 Platz, am rechten Rand; es verschwindet, wenn keine sichere Zeile bleibt, und fügt nie eine Zeile ein oder lässt das
@@ -284,11 +284,17 @@ nachdem du seine App-Sprache in macOS geändert hast. Zahlenformate folgen der a
 
 ## Wenn eine Sitzung endet
 
-Ein Bereich behält seine Ausgabe, nachdem die Shell beendet wurde, und zeigt eine Karte **Sitzung beendet** mit ihrem
-Exit-Code oder dem beendenden Signal. Der Cursor verschwindet, aber Scrollen, Auswählen, Kopieren und die Suche mit ⌘F
-funktionieren weiter. **Neue Sitzung** fragt nach, bevor die erhaltene Ausgabe ersetzt wird; **Bereich schließen**
-schließt diesen Bereich. Eine direkt verbundene SSH-Sitzung bietet **Neu verbinden**, um eine neue Verbindung aufzubauen.
-Wer Python oder ein anderes Programm verlässt und in eine laufende Shell zurückkehrt, beendet die Terminalsitzung nicht.
+Ein Bereich behält seine Ausgabe, nachdem die Shell beendet wurde: Die Ausgabe wird leicht abgedunkelt, und ein Feld
+sagt in einem Satz, was wie geendet hat – mit dem Exit-Code oder dem Signal, das es beendet hat. Der Cursor verschwindet,
+aber Scrollen, Auswählen, Kopieren und die Suche mit ⌘F funktionieren rund um das Feld weiter. **Neue Sitzung** startet
+die Shell oder Vorgabe im Bereich neu; **Bereich schließen** schließt ihn. Eine direkt verbundene SSH-Sitzung nennt den
+Host, mit dem sie verbunden war, und bietet **Neu verbinden** für eine neue Verbindung; den Exit-Code 255 von ssh erklärt
+sie als abgerissenes Netzwerk oder einen Host, der nicht mehr antwortet. Beide Tasten löschen die Ausgabe darüber – das
+Feld sagt es –, und die neue Sitzung beginnt in der Größe und Schriftgröße des Bereichs. Wer Python oder ein anderes
+Programm verlässt und in eine laufende Shell zurückkehrt, beendet die Terminalsitzung nicht.
+
+Scheitern Ein- oder Ausgabe einer Sitzung oder zeichnet ein Bereich nicht mehr, bietet dasselbe Feld **Erneut versuchen**
+oder, bei einer Verbindung, **Neu verbinden**; der Fehlertext des Systems steht unter **Details**.
 
 ![Beendete Sitzung mit ihrer letzten Ausgabe und Aktionen zur Wiederherstellung](../../brand/session-ended.png)
 
@@ -447,14 +453,19 @@ keine eigene SSH-Implementierung.
   der Bereich entfernt ist, ohne zu wissen, welcher Host.
 - **Neu verbinden.** Endet eine `ssh`- oder `mosh`-Sitzung, führt **Erneut mit Host verbinden** denselben Befehl als neue
   Verbindung noch einmal aus.
-- **Verbinden.** Die Globus- und Ordnertasten der Symbolleiste öffnen einen Dialog für ein SSH-Terminal oder einen
-  SFTP-Browser, mit denselben Feldern für beide: der Host (ein Name, eine Adresse oder ein SSH-Alias), der Benutzer, der
-  Port und ein privater Schlüssel. Lass eines der letzten drei leer, und deine `~/.ssh/config` sowie die Standardwerte von
-  OpenSSH entscheiden; ein gewählter Schlüssel wird zuerst angeboten, und andere Schlüssel im `ssh-agent` werden nicht
-  versucht. Der Dialog listet deine jüngsten Verbindungen – mit dem Benutzer, Port und Schlüssel, den sie verwendeten – und
-  die `Host`-Namen aus deiner `~/.ssh/config`; tippe, um die Liste einzugrenzen, klicke auf einen Eintrag (oder nutze ↑
-  und ↓ im Host-Feld), um die Felder zu füllen, und doppelklicke oder drücke Return, um zu verbinden.
-  Einstellungen ▸ Datenschutz & Sicherheit ▸ Zuletzt verbundene Hosts löscht die jüngsten.
+- **Verbinden.** Die Globustaste der Symbolleiste öffnet **Mit Host verbinden**, einen Dialog mit einem Umschalter
+  **Terminal / Dateien (SFTP)**: ein Terminal über SSH oder der Datei-Browser. Tippe den Host – einen Namen, eine Adresse,
+  `user@host` oder einen SSH-Alias. **Erweitert** enthält Benutzer, Port und privaten Schlüssel; leer entscheiden deine
+  `~/.ssh/config` und die Standardwerte von OpenSSH. Ein gewählter Schlüssel wird zuerst angeboten, und andere Schlüssel
+  im `ssh-agent` werden nicht versucht. Der Dialog listet deine jüngsten Verbindungen – mit Port, Schlüssel und wann du
+  sie zuletzt genutzt hast – und die `Host`-Namen aus deiner `~/.ssh/config`. Hosts, die nur Git annehmen (`github.com`
+  oder ein `Host` mit `User git`), fehlen, und die Liste sagt, welche. Tippe, um die Liste einzugrenzen, klicke auf einen
+  Eintrag (oder nutze ↑ und ↓ im Host-Feld), um die Felder zu füllen, und doppelklicke oder drücke Return, um zu
+  verbinden. Eine Terminalverbindung kommt erst in die Liste, wenn sie steht – ein Host, der dich abweist oder keine
+  Shell hat, nicht. Fahre mit dem Zeiger über einen jüngsten Host und klicke ✕, oder rechtsklicke ihn, um ihn zu
+  vergessen; Einstellungen ▸ Datenschutz & Sicherheit ▸ Zuletzt verbundene Hosts löscht alle.
+- **Dateien dieses Bereichs.** Aus einem Bereich geöffnet, der mit einem anderen Rechner verbunden ist, bietet der Dialog
+  zuerst die Dateien dieses Hosts an; drücke Return oder **Dateien durchsuchen**, um sie zu öffnen.
 - **Entfernte Dateien durchsuchen …** öffnet einen SFTP-Browser für den Host des Bereichs: auflisten, hochladen,
   herunterladen, umbenennen und löschen. Die erste Verbindung zu einem Host bittet dich, den Hostnamen zu bestätigen.
   Übertragungen werden nach einer Unterbrechung fortgesetzt und überschreiben nie ohne Nachfrage eine Datei.
@@ -463,8 +474,7 @@ keine eigene SSH-Implementierung.
 - **Im Browser**, wie im Finder: ⌘[ und ⌘] gehen zurück und vor, ⌘↑ zum übergeordneten Ordner, ⌘R aktualisiert,
   ⇧⌘G (oder ein Klick auf den Pfad) tippt einen Pfad, ⇧⌘N legt einen Ordner an und ⇧⌘. zeigt unsichtbare Dateien.
   Klicke auf einen Spaltentitel zum Sortieren. Rechtsklicke eine Zeile für ihre Aktionen; doppelklicke einen Ordner, um
-  ihn zu öffnen. Lege Dateien aus dem Finder auf der Liste ab – oder auf einer Ordnerzeile –, um sie hochzuladen, und
-  ziehe eine Datei in den Finder, um sie herunterzuladen. Übertragungen findest du unter der Pfeiltaste der
+  ihn zu öffnen. Lege Dateien aus dem Finder auf der Liste ab – oder auf einer Ordnerzeile –, um sie hochzuladen; beim Ziehen wird die Liste (oder die Zeile) umrandet und nennt das Ziel. Ziehe eine Datei in den Finder, um sie herunterzuladen. Übertragungen findest du unter der Pfeiltaste der
   Symbolleiste, mit Geschwindigkeit, Restzeit und „Im Finder zeigen“.
 - **Eine entfernte Datei bearbeiten.** **Bearbeiten** im Browser – oder ein ⌘-Klick auf ein `path:line` in einem
   entfernten Bereich – lädt eine Kopie herunter und öffnet sie in deinem Editor. Lege zuerst
@@ -479,9 +489,16 @@ keine eigene SSH-Implementierung.
 
 Fragt der Server nach einem Passwort, einer Schlüssel-Passphrase oder einem Einmalcode, oder ist ein Host neu und sein
 Schlüssel braucht deine Entscheidung, fragt der Browser in einem Dialog auf seinem Fenster und reicht deine Antwort an
-OpenSSH weiter; nichts wird gespeichert, sodass ein erneutes Verbinden wieder fragt. Der Hostschlüssel-Dialog zeigt den
-Fingerabdruck und hat „Abbrechen“ als Standard. Ein Schlüssel im `ssh-agent` oder im Schlüsselbund, oder eine bestehende
-`ControlMaster`-Verbindung aus deinem Terminal, meldet sich ohne Nachfrage an.
+OpenSSH weiter; nichts wird gespeichert, sodass ein erneutes Verbinden wieder fragt. **Verbindung abbrechen** im
+Passwort-Dialog beendet diesen Verbindungsversuch und kehrt zum Host-Feld zurück – es wird nicht als leeres Passwort
+gesendet. **Abbrechen** bei der Passphrase eines Schlüssels überspringt nur diesen Schlüssel, und ssh versucht die
+nächste Anmeldeart. Der Hostschlüssel-Dialog zeigt den Fingerabdruck und hat „Abbrechen“ als Standard. Ein Schlüssel im
+`ssh-agent` oder im Schlüsselbund, oder eine bestehende `ControlMaster`-Verbindung aus deinem Terminal, meldet sich ohne
+Nachfrage an.
+
+Scheitert eine Verbindung, sagt sie in einem Satz, warum – Passwort oder Schlüssel nicht angenommen, Host antwortet
+nicht, Hostschlüssel unbekannt oder geändert, der Server bietet kein SFTP –, mit den Worten von ssh unter **Details**,
+und bietet **Erneut versuchen** oder **Verbindung bearbeiten**.
 
 Uploads aus der Remote-Bearbeitung vergleichen neben Größe und Änderungszeit auch den entfernten Inhalt und senden den
 privaten Schnappschuss, den du bestätigt hast. Sicherst du nach der Bestätigung eine weitere lokale Änderung, fragt Corta
@@ -600,17 +617,17 @@ Die Einstellungen sind eine Seitenleiste mit Kategorien, aufgebaut wie die Syste
   Programm die Maus belegt, Kopieren beim Auswählen sowie Modi und Farben der Eingabequellenanzeige.
 - **Tastaturkurzbefehle** – die Taste jedes Befehls; neben einer geänderten erscheint ein Pfeil zum Zurücksetzen.
 - **Schnellterminal** – der systemweite Hotkey, Position und Bildschirm.
-- **Verbindungen** – Per SSH verbinden und gespeicherte Vorgaben.
+- **Verbindungen** – Mit Host verbinden und gespeicherte Vorgaben.
 - **Datenschutz & Sicherheit** – Schreiben in die Zwischenablage durch Programme (OSC 52), Sichere Tastatureingabe, der
   Verzeichnisverlauf und zuletzt verbundene Hosts.
 
 Diese Bedienelemente bearbeiten dieselbe Konfigurationsdatei. Farben eigener Themen lassen sich grafisch oder über die
 Datei bearbeiten.
 
-Die Symbolleiste des Fensters ergänzt SSH und SFTP. Beide öffnen einen Dialog auf dem Fenster mit Feldern für Host,
-Benutzer, Port und privaten Schlüssel – der Host darf ein Alias aus der Konfiguration sein – und schlagen zuletzt
-verwendete und konfigurierte Hosts vor; ein leerer Benutzer, Port oder Schlüssel folgt der OpenSSH-Konfiguration. SFTP
-öffnet den Browser des entfernten Bereichs oder fragt nach einem Host, wenn der Bereich lokal ist
+Die Globustaste in der Symbolleiste des Fensters verbindet mit einem Host, für ein Terminal oder für seine Dateien: ein
+Dialog auf dem Fenster mit dem Host – er darf ein Alias aus der Konfiguration sein – und Benutzer, Port und privatem
+Schlüssel unter **Erweitert**; er schlägt zuletzt verwendete und konfigurierte Hosts vor, und ein leerer Benutzer, Port
+oder Schlüssel folgt der OpenSSH-Konfiguration. Aus einem entfernten Bereich bietet er zuerst die Dateien dieses Hosts an
 ([Arbeiten aus der Ferne](#remote-work-ssh-and-sftp)).
 
 ```ini

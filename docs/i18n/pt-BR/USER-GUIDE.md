@@ -206,7 +206,7 @@ de comandos no modo **Automático**. **Sempre** pode mantê-la durante a saída 
 escondem enquanto você lê o histórico ou usa um programa de tela alternativa.
 
 O ajuste **Posição** escolhe **Barra de ferramentas da janela** (padrão) ou **Borda direita da linha de comando**. A
-insígnia da barra de ferramentas fica independente dos botões de rede e de arquivos e permanece fixa quando os comandos
+insígnia da barra de ferramentas fica independente dos botões de conexão e de nova aba e permanece fixa quando os comandos
 crescem ou quebram de linha. Desativá-la ou escolher a linha de comando remove o espaço dela e o espaçamento de separação
 na barra de ferramentas. Na linha de comando, comandos longos movem a insígnia para baixo, para um espaço livre,
 mantendo-a na borda direita; ela some quando não resta nenhuma linha segura, e nunca insere uma linha nem faz o processo
@@ -271,11 +271,16 @@ formatação de números segue a região atual.
 
 ## Quando uma sessão termina
 
-Um painel mantém sua saída depois que o shell sai e mostra um cartão **Sessão encerrada** com o código de saída ou o sinal
-que a encerrou. O cursor some, mas rolagem, seleção, cópia e a busca com ⌘F continuam funcionando. **Nova sessão** pede
-confirmação antes de substituir a saída mantida; **Fechar painel** fecha aquele painel. Uma sessão SSH conectada
-diretamente oferece **Reconectar** para iniciar uma nova conexão. Sair do Python ou de outro programa de volta a um shell
-ativo não encerra a sessão do terminal.
+Um painel mantém sua saída depois que o shell sai: a saída fica um pouco escurecida e um quadro diz numa frase o que
+terminou e como — o código de saída, ou o sinal que o interrompeu. O cursor some, mas rolagem, seleção, cópia e a busca
+com ⌘F continuam funcionando ao redor do quadro. **Nova sessão** inicia de novo o shell ou a predefinição no painel;
+**Fechar painel** o fecha. Uma sessão SSH conectada diretamente diz a qual host estava conectada e oferece **Reconectar**
+para iniciar uma nova conexão; o código de saída 255 do ssh é explicado como a rede caindo ou o host deixando de
+responder. Os dois botões apagam a saída acima — o quadro avisa — e a nova sessão começa no tamanho e no tamanho de fonte
+do painel. Sair do Python ou de outro programa de volta a um shell ativo não encerra a sessão do terminal.
+
+Quando a entrada ou a saída de uma sessão falha, ou um painel para de desenhar, o mesmo quadro oferece **Tentar de novo**
+ou, para uma conexão, **Reconectar**; o texto de erro do sistema fica em **Detalhes**.
 
 ![Sessão encerrada mantendo a última saída e as ações de recuperação](../../brand/session-ended.png)
 
@@ -432,13 +437,18 @@ implementação própria de SSH.
   quando a conexão veio da folha de conexão; caso contrário, diz que o painel é remoto sem saber qual host.
 - **Reconectar.** Quando uma sessão `ssh` ou `mosh` termina, **Reconectar ao host** executa o mesmo comando de novo, como
   uma nova conexão.
-- **Conectar.** Os botões de globo e de pasta da barra de ferramentas abrem uma folha para um terminal SSH ou um navegador
-  SFTP, com os mesmos campos para os dois: o host (um nome, um endereço ou um alias de SSH), o usuário, a porta e uma chave
-  privada. Deixe qualquer um dos três últimos vazio e quem decide são o seu `~/.ssh/config` e os padrões do OpenSSH; uma
-  chave escolhida é oferecida primeiro, e outras chaves do `ssh-agent` não são tentadas. A folha lista as conexões
-  recentes — com o usuário, a porta e a chave usados — e os nomes `Host` do seu `~/.ssh/config`; digite para filtrar a
-  lista, clique em um (ou use ↑ e ↓ a partir do campo do host) para preencher os campos, e clique duas vezes ou pressione
-  Return para conectar. Ajustes ▸ Privacidade e Segurança ▸ Hosts Recentes apaga os recentes.
+- **Conectar.** O botão de globo da barra de ferramentas abre **Conectar a um host**, uma folha com um seletor
+  **Terminal / Arquivos (SFTP)**: um terminal via SSH ou o navegador de arquivos. Digite o host — um nome, um endereço,
+  `user@host` ou um alias de SSH. **Avançado** guarda o usuário, a porta e uma chave privada; vazios, quem decide são o seu
+  `~/.ssh/config` e os padrões do OpenSSH. Uma chave escolhida é oferecida primeiro, e outras chaves do `ssh-agent` não são
+  tentadas. A folha lista as conexões recentes — com a porta, a chave e quando você as usou por último — e os nomes `Host`
+  do seu `~/.ssh/config`. Hosts que só aceitam git (`github.com`, ou um `Host` com `User git`) ficam de fora, e a lista diz
+  quais. Digite para filtrar a lista, clique em um (ou use ↑ e ↓ a partir do campo do host) para preencher os campos, e
+  clique duas vezes ou pressione Return para conectar. Uma conexão de terminal entra na lista recente quando se estabelece
+  — um host que recusa você ou não tem shell, não. Passe o ponteiro sobre um host recente e clique em ✕, ou clique com o
+  botão direito nele, para esquecê-lo; Ajustes ▸ Privacidade e Segurança ▸ Hosts Recentes apaga todos.
+- **Os arquivos deste painel.** Aberta a partir de um painel conectado a outra máquina, a folha oferece primeiro os
+  arquivos desse host; pressione Return ou **Navegar nos arquivos** para abri-los.
 - **Explorar arquivos remotos…** abre um navegador SFTP para o host do painel: listar, enviar, baixar, renomear e apagar.
   A primeira conexão a um host pede que você confirme o nome dele. As transferências continuam depois de uma interrupção e
   nunca sobrescrevem um arquivo sem perguntar. O download de uma pasta para se um nome entrar em conflito com um arquivo
@@ -447,8 +457,7 @@ implementação própria de SSH.
 - **No navegador**, como no Finder: ⌘[ e ⌘] voltam e avançam, ⌘↑ vai para a pasta acima, ⌘R atualiza, ⇧⌘G (ou um clique
   no caminho) permite digitar um caminho, ⇧⌘N cria uma pasta e ⇧⌘. mostra os arquivos ocultos. Clique no título de uma
   coluna para ordenar. Clique com o botão direito numa linha para ver as ações dela; clique duas vezes numa pasta para
-  abri-la. Solte arquivos do Finder na lista — ou numa linha de pasta — para enviá-los, e arraste um arquivo para o Finder
-  para baixá-lo. As transferências ficam sob o botão de setas da barra de ferramentas, com velocidade, tempo restante e
+  abri-la. Solte arquivos do Finder na lista — ou numa linha de pasta — para enviá-los; enquanto você arrasta, a lista (ou a linha) ganha um contorno e diz para onde os arquivos vão. Arraste um arquivo para o Finder para baixá-lo. As transferências ficam sob o botão de setas da barra de ferramentas, com velocidade, tempo restante e
   Mostrar no Finder.
 - **Editar um arquivo remoto.** **Editar** no navegador — ou um ⌘-clique num `path:line` de um painel remoto — baixa uma
   cópia e a abre no seu editor. Configure antes **Ajustes ▸ Terminal ▸ Abrir arquivo com**, com o caminho absoluto de um
@@ -462,9 +471,15 @@ implementação própria de SSH.
 
 Quando o servidor pede uma senha, uma frase-senha de chave ou um código de uso único, ou quando um host é novo e a chave
 dele precisa da sua decisão, o navegador pergunta numa caixa de diálogo na janela dele e repassa sua resposta ao OpenSSH;
-nada é salvo, então uma reconexão pergunta de novo. A caixa de diálogo da chave do host mostra a impressão digital e tem
-Cancelar como padrão. Uma chave guardada pelo `ssh-agent` ou pelas Chaves, ou uma conexão `ControlMaster` existente do seu
-terminal, entra sem perguntar.
+nada é salvo, então uma reconexão pergunta de novo. **Cancelar conexão** na caixa da senha encerra essa tentativa de
+conexão e volta ao campo do host — nada é enviado como senha vazia. **Cancelar** na frase-senha de uma chave só pula essa
+chave, e o ssh segue para a próxima forma de entrar. A caixa de diálogo da chave do host mostra a impressão digital e tem
+Cancelar como padrão. Uma chave guardada pelo `ssh-agent` ou pelas Chaves, ou uma conexão `ControlMaster` existente do
+seu terminal, entra sem perguntar.
+
+Uma conexão que falha diz por que numa frase — senha ou chave não aceita, host que não responde, chave do host
+desconhecida ou alterada, servidor sem SFTP —, com as palavras do ssh em **Detalhes**, e oferece **Tentar de novo** ou
+**Editar conexão**.
 
 Os envios da edição remota comparam o conteúdo remoto além do tamanho e da data de modificação, e enviam o snapshot
 privado que você aprovou. Se você salvar outra edição local depois do pedido de aprovação, o Corta pede uma nova decisão;
@@ -579,17 +594,17 @@ Os Ajustes são uma barra lateral de categorias, no mesmo arranjo dos Ajustes do
   controla o mouse, copiar ao selecionar e os modos e cores do indicador de fonte de entrada.
 - **Atalhos** — a tecla de cada comando; uma seta de redefinição aparece ao lado dos que você mudou.
 - **Terminal rápido** — o atalho global, a posição e a tela.
-- **Conexões** — Conectar por SSH e predefinições salvas.
+- **Conexões** — Conectar a um host e predefinições salvas.
 - **Privacidade e Segurança** — gravação na área de transferência por programas (OSC 52), Entrada de teclado segura, o
   histórico de diretórios e os hosts recentes.
 
 Esses controles editam o mesmo arquivo de configuração. As cores de temas personalizados podem ser editadas graficamente
 ou pelo arquivo.
 
-A barra de ferramentas da janela acrescenta SSH e SFTP. Os dois abrem uma folha na janela com campos de host, usuário,
-porta e chave privada — o host pode ser um alias da configuração — e sugerem hosts recentes e configurados; usuário, porta
-ou chave vazios respeitam a configuração do OpenSSH. O SFTP abre o navegador do painel remoto, ou pede um host quando o
-painel é local ([Trabalho remoto](#remote-work-ssh-and-sftp)).
+O botão de globo da barra de ferramentas da janela conecta a um host, para um terminal ou para os arquivos dele: uma folha
+na janela com o host — pode ser um alias da configuração — e o usuário, a porta e a chave privada em **Avançado**; ela
+sugere hosts recentes e configurados, e usuário, porta ou chave vazios respeitam a configuração do OpenSSH. A partir de
+um painel remoto, oferece primeiro os arquivos desse host ([Trabalho remoto](#remote-work-ssh-and-sftp)).
 
 ```ini
 theme = corta
