@@ -20,8 +20,8 @@ import Darwin
 import Foundation
 import Metal
 
-/// Kitty PNG decoding out of process: `corta-image-decoder`, embedded beside
-/// `corta-exec`, decodes under the `pure-computation` sandbox (its doc
+/// Kitty PNG decoding out of process: `corta-image-decoder` decodes inside
+/// an independently sandboxed helper app under Contents/Helpers (its doc
 /// comment has why), and this side spawns it, feeds it the PNG, and holds
 /// what comes back to the same caps the stream was held to.
 ///
@@ -155,9 +155,10 @@ nonisolated enum ImageDecoderProcess {
         return size
     }
 
-    /// The helper in the running app's `Contents/MacOS`.
+    /// The executable inside the running app's independently sandboxed helper.
     static var bundledHelper: String? {
-        Bundle.main.url(forAuxiliaryExecutable: helperName)?.path
+        Bundle.main.bundleURL.appendingPathComponent(
+            "Contents/Helpers/CortaImageDecoder.app/Contents/MacOS/" + helperName).path
     }
 
     /// `nil` for anything but a decoded PNG under the caps: no helper, a

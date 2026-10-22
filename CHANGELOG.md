@@ -20,6 +20,9 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Run PNG decoding in an independently signed App Sandbox helper app,
+  replacing the deprecated runtime sandbox interface.
+
 - A pane whose session ended, whose connection dropped or that stopped
   working now shows one panel over its dimmed output, which stays
   readable — and, once the session has ended, selectable: what ended and
@@ -41,6 +44,11 @@ Versioning for compatibility changes.
   **Edit Connection**, and ssh's output under Details.
 
 ### Fixed
+
+- Keep cursor capture off synchronous GPU waits, and discard cancelled or
+  superseded font scans and SSH host suggestions.
+- Release SFTP stderr listeners with their channels and prevent PTY signals
+  from racing child-process reaping.
 
 - Cancelling an SFTP password prompt no longer opens it again. OpenSSH
   read the cancelled prompt as an empty password, tried it and asked again,

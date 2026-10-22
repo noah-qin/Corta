@@ -18,7 +18,6 @@
 		C07A001B30465E2000E8DD20 /* CortaPOSIX in Frameworks */ = {isa = PBXBuildFile; productRef = C07A001D30465E2000E8DD20 /* CortaPOSIX */; };
 		C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */ = {isa = PBXBuildFile; productRef = C07A000730465E2000E8DD20 /* corta-exec */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		C07A001130465E2000E8DD20 /* corta-image-decoder in Frameworks */ = {isa = PBXBuildFile; productRef = C07A001330465E2000E8DD20 /* corta-image-decoder */; };
-		C07A001230465E2000E8DD20 /* corta-image-decoder in Embed corta-exec */ = {isa = PBXBuildFile; productRef = C07A001330465E2000E8DD20 /* corta-image-decoder */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		5B0E0C1D30465E2000E8DD20 /* CortaTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = 5B0E0C1C30465E2000E8DD20 /* CortaTerminal */; };
 		C07A001E30465E2000E8DD20 /* CortaPOSIX in Frameworks */ = {isa = PBXBuildFile; productRef = C07A001F30465E2000E8DD20 /* CortaPOSIX */; };
 /* End PBXBuildFile section */
@@ -55,7 +54,6 @@
 			dstSubfolderSpec = 6;
 			files = (
 				C07A000830465E2000E8DD20 /* corta-exec in Embed corta-exec */,
-				C07A001230465E2000E8DD20 /* corta-image-decoder in Embed corta-exec */,
 			);
 			name = "Embed corta-exec";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -173,6 +171,7 @@
 				4F17769C30465E1F00E8DD20 /* Frameworks */,
 				4F17769D30465E1F00E8DD20 /* Resources */,
 				C07A000930465E2000E8DD20 /* Embed corta-exec */,
+				D6C0DE010000000000000001 /* Embed sandboxed image decoder */,
 			);
 			buildRules = (
 			);
@@ -360,6 +359,30 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+        D6C0DE010000000000000001 /* Embed sandboxed image decoder */ = {
+            isa = PBXShellScriptBuildPhase;
+            buildActionMask = 2147483647;
+            files = ();
+            inputPaths = (
+                "$(BUILT_PRODUCTS_DIR)/corta-image-decoder",
+                "$(SRCROOT)/scripts/embed-image-decoder.sh",
+                "$(SRCROOT)/scripts/image-decoder/Info.plist",
+                "$(SRCROOT)/scripts/image-decoder/Decoder.entitlements",
+            );
+            name = "Embed sandboxed image decoder";
+            outputPaths = (
+                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/CortaImageDecoder.app/",
+                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/CortaImageDecoder.app/Contents/MacOS/corta-image-decoder",
+                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/CortaImageDecoder.app/Contents/Info.plist",
+                "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/CortaImageDecoder.app/Contents/_CodeSignature/CodeResources",
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+            shellPath = /bin/bash;
+            shellScript = "bash \"$SRCROOT/scripts/embed-image-decoder.sh\"";
+        };
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		4F17769B30465E1F00E8DD20 /* Sources */ = {

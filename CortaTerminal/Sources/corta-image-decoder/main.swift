@@ -17,6 +17,7 @@
 import CoreGraphics
 import Darwin
 import Foundation
+import Security
 import ImageIO
 
 /// Decodes one Kitty graphics PNG (`f=100`) for the app, in a process of its
@@ -26,10 +27,10 @@ import ImageIO
 /// The PNG is terminal output — any program, or any file `cat` prints — and
 /// ImageIO's decoder is a large C parser. Decoded inside Corta, a memory
 /// corruption in it ran with Corta's TCC grants, which every child inherits
-/// (`SECURITY.md` §4.2). Here it runs under the `pure-computation` sandbox
-/// profile: no file system, no network, no IPC beyond the pipes it was
-/// handed. An XPC service would contain it the same way; a helper beside
-/// `corta-exec` needs no new target type and is spawned the same way.
+/// (`SECURITY.md` §4.2). A signed helper app runs under its own App Sandbox,
+/// with no file-access, network or inheritance entitlements. It can read
+/// system resources and use its own container, but cannot access the host's
+/// user files or network. The host passes only pipes and anonymous pixels.
 ///
 /// Protocol: three little-endian UInt32s (width, height, row stride), then
 /// the PNG on stdin. FD 3 is the anonymous shared pixel mapping. On success,
@@ -38,7 +39,7 @@ import ImageIO
 /// nonzero exit with nothing written. The app checks the sizes again; it
 /// trusts this process no more than the stream.
 ///
-/// `--check-sandbox`, for the app's tests: enter the sandbox and exit 0
+/// `--check-sandbox <path>`, for the app's tests: exit 0
 /// only if a file read is then denied. Not checked on every decode — each
 /// decode is a process of its own, and a deliberate denial a decode left a
 /// sandbox violation in the system log for every image shown.
@@ -47,15 +48,24 @@ let maximumDimension = 8192
 let maximumPixels = 16 * 1024 * 1024
 let pngSignature: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
 
-/// `sandbox_init(3)`: deprecated as a public interface since 10.8, still
-/// what the system's own command-line tools use, and not imported into
-/// Swift. The named profile needs no profile language.
-@_silgen_name("sandbox_init")
-func sandboxInit(
-    _: UnsafePointer<CChar>, _: UInt64,
-    _: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
-) -> Int32
-let sandboxNamed: UInt64 = 0x0001
+/// App Sandbox is applied by macOS before main, from the helper app's own
+/// signature. Refuse unsigned SwiftPM products and inherited/expanded rights.
+func hasRestrictedSandboxSignature() -> Bool {
+    var dynamic: SecCode?
+    var code: SecStaticCode?
+    var information: CFDictionary?
+    guard SecCodeCopySelf([], &dynamic) == errSecSuccess, let dynamic,
+        SecCodeCopyStaticCode(dynamic, [], &code) == errSecSuccess, let code,
+        SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &information) == errSecSuccess,
+        let dictionary = information as? [String: Any],
+        let entitlements = dictionary[kSecCodeInfoEntitlementsDict as String] as? [String: Any],
+        entitlements["com.apple.security.app-sandbox"] as? Bool == true
+    else { return false }
+    // No inherited host permissions, network, file exceptions or debugging.
+    return Set(entitlements.keys) == ["com.apple.security.app-sandbox"]
+}
+
+guard hasRestrictedSandboxSignature() else { exit(3) }
 
 /// The decode the app did in process (`KittyImageRenderer.decodePNG`):
 /// the signature, `public.png` and nothing ImageIO sniffs instead, and the
@@ -89,9 +99,8 @@ func decode(_ bytes: [UInt8], mapping: UnsafeMutableRawPointer? = nil,
     return (width, height)
 }
 
-/// A 1×1 PNG decoded before the sandbox closes, so ImageIO and CoreGraphics
-/// load what they load lazily (plug-ins, colour profiles) while they still
-/// can, and the real decode inside the sandbox needs nothing new.
+/// A small startup decode verifies ImageIO works inside the signed sandbox
+/// before accepting an untrusted payload or running the explicit probes.
 let warmUp: [UInt8] = [
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
@@ -102,14 +111,35 @@ let warmUp: [UInt8] = [
 guard decode(warmUp) != nil else { exit(2) }
 
 if CommandLine.arguments.dropFirst().first == "--check-sandbox" {
-    var error: UnsafeMutablePointer<CChar>?
-    guard sandboxInit("pure-computation", sandboxNamed, &error) == 0 else { exit(3) }
-    let forbidden = open("/etc/passwd", O_RDONLY)
-    guard forbidden < 0 else { exit(5) }
+    guard CommandLine.arguments.count == 3 else { exit(1) }
+    // The host supplies an existing private file outside this helper's
+    // container. System files are readable under the standard App Sandbox.
+    let forbidden = open(CommandLine.arguments[2], O_RDONLY)
+    guard forbidden < 0, errno == EPERM || errno == EACCES else { exit(5) }
+    let writable = open(CommandLine.arguments[2], O_WRONLY)
+    guard writable < 0, errno == EPERM || errno == EACCES else { exit(5) }
     exit(0)
 }
 
-// Acquire only the inherited, already unlinked object before entering the sandbox.
+if CommandLine.arguments.dropFirst().first == "--check-network" {
+    let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+    if descriptor < 0 { exit(errno == EPERM || errno == EACCES ? 0 : 6) }
+    defer { close(descriptor) }
+    var address = sockaddr_in()
+    address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+    address.sin_family = sa_family_t(AF_INET)
+    address.sin_port = UInt16(9).bigEndian
+    address.sin_addr.s_addr = inet_addr("127.0.0.1")
+    let result = withUnsafePointer(to: &address) {
+        $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+            connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+        }
+    }
+    // ECONNREFUSED is not proof of isolation: the sandbox must reject it.
+    exit(result < 0 && (errno == EPERM || errno == EACCES) ? 0 : 6)
+}
+
+// Map only the inherited, already unlinked object inside the sandbox.
 var sharedStat = stat()
 guard fstat(3, &sharedStat) == 0, sharedStat.st_size > 0,
     sharedStat.st_size <= maximumPixels * 4 + maximumDimension * 4096
@@ -119,9 +149,6 @@ guard let mapping = mmap(nil, mappedLength, PROT_READ | PROT_WRITE, MAP_SHARED, 
     mapping != MAP_FAILED
 else { exit(4) }
 close(3)
-
-var sandboxError: UnsafeMutablePointer<CChar>?
-guard sandboxInit("pure-computation", sandboxNamed, &sandboxError) == 0 else { exit(3) }
 
 /// Standard input to end of file, refused past the cap.
 func readInput() -> [UInt8]? {

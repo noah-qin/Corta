@@ -308,10 +308,12 @@ func architectures(_ path: String) -> String {
 }
 let bundleExecutable = plistValue("CFBundleExecutable")
 let appArchitectures = architectures("\(app)/Contents/MacOS/\(bundleExecutable)")
+let decoderRelativePath = "Contents/Helpers/CortaImageDecoder.app/Contents/MacOS/corta-image-decoder"
 for executable in [bundleExecutable, "corta-exec", "corta-image-decoder"] {
-    let path = "\(app)/Contents/MacOS/\(executable)"
+    let relative = executable == "corta-image-decoder" ? decoderRelativePath : "Contents/MacOS/" + executable
+    let path = "\(app)/\(relative)"
     guard !executable.isEmpty, fileManager.fileExists(atPath: path) else {
-        fail("no executable at Contents/MacOS/\(executable.isEmpty ? "<CFBundleExecutable missing>" : executable)")
+        fail("no executable at \(relative)")
         continue
     }
     let archs = architectures(path)
@@ -320,6 +322,15 @@ for executable in [bundleExecutable, "corta-exec", "corta-image-decoder"] {
     } else {
         fail("\(executable) is built for '\(archs.isEmpty ? "unreadable" : archs)', not arm64 only (D21)")
     }
+}
+
+let decoderEntitlements = run(
+    "/usr/bin/codesign", ["-d", "--entitlements", "-", "--xml", "\(app)/\(decoderRelativePath)"]
+)?.stdout ?? ""
+if ReleaseCheck.hasIndependentDecoderSandbox(inPlist: Data(decoderEntitlements.utf8)) {
+    pass("the image decoder has an independent sandbox with no extra entitlements")
+} else {
+    fail("the image decoder must have only the App Sandbox entitlement")
 }
 
 // --- Signature

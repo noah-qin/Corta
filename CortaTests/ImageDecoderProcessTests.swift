@@ -75,19 +75,35 @@ struct ImageDecoderProcessTests {
         #expect(pixels.texture(device: device, width: 4, height: 3) != nil)
     }
 
-    @Test("the decoder is embedded beside corta-exec")
+    @Test("the decoder is embedded as its own sandboxed helper app")
     func helperIsEmbedded() throws {
         let helper = try #require(ImageDecoderProcess.bundledHelper)
         #expect(FileManager.default.isExecutableFile(atPath: helper))
-        #expect((helper as NSString).deletingLastPathComponent.hasSuffix("Contents/MacOS"))
+        #expect((helper as NSString).deletingLastPathComponent.hasSuffix("CortaImageDecoder.app/Contents/MacOS"))
     }
 
-    @Test("the decoder's sandbox denies a file read")
+    @Test("the decoder's sandbox denies a private host file read")
     func helperSandboxDeniesFiles() throws {
         let helper = try #require(ImageDecoderProcess.bundledHelper)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: helper)
-        process.arguments = ["--check-sandbox"]
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let forbidden = folder.appendingPathComponent("private.txt")
+        try Data("private host data".utf8).write(to: forbidden)
+        process.arguments = ["--check-sandbox", forbidden.path]
+        process.environment = [:]
+        try process.run()
+        process.waitUntilExit()
+        #expect(process.terminationStatus == 0)
+    }
+
+    @Test("the decoder's sandbox denies outgoing network connections")
+    func helperSandboxDeniesNetwork() throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: try #require(ImageDecoderProcess.bundledHelper))
+        process.arguments = ["--check-network"]
         process.environment = [:]
         try process.run()
         process.waitUntilExit()

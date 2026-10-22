@@ -177,3 +177,21 @@ struct ReleaseCheckTests {
         ])
     }
 }
+
+@Suite("Image decoder sandbox signature")
+struct DecoderSandboxSignatureTests {
+    @Test func onlyAnIndependentSandboxIsAccepted() throws {
+        func encoded(_ value: [String: Bool]) throws -> Data {
+            try PropertyListSerialization.data(fromPropertyList: value, format: .xml, options: 0)
+        }
+        #expect(ReleaseCheck.hasIndependentDecoderSandbox(
+            inPlist: try encoded(["com.apple.security.app-sandbox": true])))
+        for invalid: [String: Bool] in [
+            [:], ["com.apple.security.app-sandbox": false],
+            ["com.apple.security.app-sandbox": true, "com.apple.security.inherit": true],
+            ["com.apple.security.app-sandbox": true, "com.apple.security.network.client": true],
+        ] {
+            #expect(!ReleaseCheck.hasIndependentDecoderSandbox(inPlist: try encoded(invalid)))
+        }
+    }
+}
