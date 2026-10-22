@@ -298,6 +298,13 @@ ausdrücklich. Ein älterer verwalteter Eintrag ohne Prüfsumme des entfernten I
 Konfliktentscheidung. Ein Inhaltsvergleich kann entfernte Änderungen erkennen, auch wenn Dateigröße und Zeitstempel
 unverändert sind.
 
+### Ein Upload der Remote-Bearbeitung fragt nach langer Wartezeit erneut
+
+Die Verbindung ist ins Stocken geraten. Ist sie aufgebaut, hat jeder Vorgang der Remote-Bearbeitung 120 Sekunden Zeit;
+danach schließt Corta die Verbindung und bietet den Upload erneut an. Bestätige ihn, um es über eine neue Verbindung noch
+einmal zu versuchen. Auch eine sehr große Datei über eine langsame Leitung kann die Grenze erreichen: Kopiere sie dann mit
+dem SFTP-Browser.
+
 ---
 
 <a id="appearance-and-the-status-bar"></a>

@@ -554,6 +554,9 @@ time and send the private snapshot you approved. If you save another local
 edit after the approval prompt, Corta asks for a new decision; saves during
 an upload remain pending. After a connection failure, the next edit or
 upload connects again, and a failed upload keeps its pending decision.
+Once connected, an operation that has not finished after 120 seconds is
+stopped and the upload offered again, so a stalled connection cannot hold
+an edit forever.
 Preserve undecided local edits before deleting application data. See
 [data-at-rest policy](SECURITY.md#5-data-at-rest).
 

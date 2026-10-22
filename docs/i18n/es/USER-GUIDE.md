@@ -496,7 +496,9 @@ desconocida o cambiada, servidor sin SFTP —, con las palabras de ssh en **Deta
 Las subidas de la edición remota comparan el contenido remoto además del tamaño y la fecha de modificación, y envían la
 instantánea privada que aprobaste. Si guardas otra edición local después del aviso de aprobación, Corta pide una nueva
 decisión; los guardados durante una subida quedan pendientes. Tras un fallo de conexión, la siguiente edición o subida
-vuelve a conectar, y una subida fallida conserva su decisión pendiente. Conserva las ediciones locales sin decidir antes
+vuelve a conectar, y una subida fallida conserva su decisión pendiente. Una vez conectada,
+una operación que no ha terminado tras 120 segundos se detiene y la subida se ofrece de nuevo: una conexión atascada no
+retiene una edición para siempre. Conserva las ediciones locales sin decidir antes
 de eliminar los datos de la app. Consulta la [política de datos en reposo](../../SECURITY.md#5-data-at-rest) (en inglés).
 
 <a id="images-in-the-terminal"></a>

@@ -506,6 +506,8 @@ Les envois d’édition à distance comparent le contenu distant en plus de la t
 envoient l’instantané privé que vous avez approuvé. Si vous enregistrez une autre modification locale après la demande
 d’approbation, Corta demande une nouvelle décision ; les enregistrements pendant un envoi restent en attente. Après un
 échec de connexion, la modification ou l’envoi suivant se reconnecte, et un envoi échoué garde sa décision en attente.
+Une fois connecté, une opération qui n’est pas terminée après 120 secondes est arrêtée et l’envoi est proposé à
+nouveau : une connexion bloquée ne retient pas une modification indéfiniment.
 Préservez les modifications locales non décidées avant de supprimer les données de l’app. Voir la
 [politique des données au repos](../../SECURITY.md#5-data-at-rest) (en anglais).
 

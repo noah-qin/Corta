@@ -295,6 +295,12 @@ Le fichier local a changé après la version montrée par la demande initiale. A
 modification. Une ancienne entrée gérée sans empreinte du contenu distant demande aussi une décision de conflit une fois.
 Une comparaison de contenu peut repérer des changements distants même quand la taille et l’horodatage sont inchangés.
 
+### Un envoi d’édition à distance redemande après une longue attente
+
+La connexion s’est bloquée. Une fois connecté, chaque opération d’édition à distance dispose de 120 secondes ; ensuite
+Corta ferme la connexion et propose à nouveau l’envoi. Approuvez-le pour réessayer sur une nouvelle connexion. Un très gros
+fichier sur un lien lent peut aussi atteindre la limite : copiez-le plutôt avec le navigateur SFTP.
+
 ---
 
 <a id="appearance-and-the-status-bar"></a>

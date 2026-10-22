@@ -286,6 +286,12 @@ O arquivo local mudou depois da versão mostrada pelo pedido original. Aprove a 
 gerenciada antiga sem resumo do conteúdo remoto também precisa de uma decisão de conflito uma vez. Uma comparação de
 conteúdo consegue identificar mudanças remotas mesmo quando o tamanho e a data do arquivo não mudaram.
 
+### Um envio da edição remota pergunta de novo depois de uma longa espera
+
+A conexão travou. Depois de conectado, cada operação da edição remota tem 120 segundos para terminar; depois disso o
+Corta fecha a conexão e oferece o envio de novo. Aprove-o para tentar outra vez por uma conexão nova. Um arquivo muito
+grande num link lento também pode atingir o limite: copie-o com o navegador SFTP.
+
 ---
 
 <a id="appearance-and-the-status-bar"></a>

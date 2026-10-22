@@ -504,7 +504,8 @@ Uploads aus der Remote-Bearbeitung vergleichen neben Größe und Änderungszeit 
 privaten Schnappschuss, den du bestätigt hast. Sicherst du nach der Bestätigung eine weitere lokale Änderung, fragt Corta
 erneut nach einer Entscheidung; Sicherungen während eines Uploads bleiben ausstehend. Nach einem Verbindungsfehler
 verbindet die nächste Bearbeitung oder der nächste Upload neu, und ein fehlgeschlagener Upload behält seine ausstehende
-Entscheidung. Bewahre unentschiedene lokale Änderungen auf, bevor du App-Daten löschst. Siehe die
+Entscheidung. Ist die Verbindung aufgebaut, wird ein Vorgang, der nach 120 Sekunden nicht fertig ist,
+abgebrochen und der Upload erneut angeboten – eine hängende Verbindung hält eine Bearbeitung nicht ewig fest. Bewahre unentschiedene lokale Änderungen auf, bevor du App-Daten löschst. Siehe die
 [Richtlinie zu gespeicherten Daten](../../SECURITY.md#5-data-at-rest) (Englisch).
 
 <a id="images-in-the-terminal"></a>

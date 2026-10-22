@@ -16,6 +16,7 @@ Metal 4 算繪 · 原生中日韓輸入法 · SSH、SFTP 與遠端編輯
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](../../../LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-join-5865f2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/QNdWfdwr7j)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=flat-square&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/noah-qin)
 
 **[↓ 下載](https://github.com/noah-qin/Corta/releases/latest)** ·
 **[使用者指南](USER-GUIDE.md)** ·
@@ -176,7 +177,12 @@ Corta 仍在積極開發中，也有已知問題。下面的量測是快照，�
 希望答案能被別人搜尋到的使用問題，請發到 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a)，中文提問同樣歡迎；
 想分享主題或設定，請發到 [Show and tell](https://github.com/noah-qin/Corta/discussions/categories/show-and-tell)。
 其他問題請[提交 issue](https://github.com/noah-qin/Corta/issues/new/choose)。
-如果你願意支持專案的維護，可以[贊助本專案](https://github.com/sponsors/noah-qin)。
+
+### 贊助
+
+Corta 由一個人公開開發和維護。如果它已經成為你日常的一部分，贊助能讓它繼續前進——多少都有幫助。
+
+<a href="https://github.com/sponsors/noah-qin"><img src="https://img.shields.io/badge/Sponsor_noah--qin_on_GitHub-%E2%9D%A4-db61a2?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="在 GitHub 上贊助 noah-qin"></a>
 
 ### 貢獻者
 

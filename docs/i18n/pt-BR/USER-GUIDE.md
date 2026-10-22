@@ -484,7 +484,9 @@ desconhecida ou alterada, servidor sem SFTP —, com as palavras do ssh em **Det
 Os envios da edição remota comparam o conteúdo remoto além do tamanho e da data de modificação, e enviam o snapshot
 privado que você aprovou. Se você salvar outra edição local depois do pedido de aprovação, o Corta pede uma nova decisão;
 os salvamentos durante um envio ficam pendentes. Depois de uma falha de conexão, a próxima edição ou envio reconecta, e um
-envio que falhou mantém a decisão pendente. Preserve as edições locais não decididas antes de apagar os dados do app. Veja
+envio que falhou mantém a decisão pendente. Depois de conectado,
+uma operação que não terminou em 120 segundos é interrompida e o envio é oferecido de novo: uma conexão travada não
+prende uma edição para sempre. Preserve as edições locais não decididas antes de apagar os dados do app. Veja
 a [política de dados em repouso](../../SECURITY.md#5-data-at-rest) (em inglês).
 
 <a id="images-in-the-terminal"></a>

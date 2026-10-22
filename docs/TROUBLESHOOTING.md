@@ -328,6 +328,14 @@ Approve the new edit explicitly. An older managed entry without a remote
 content digest also needs a conflict decision once. A content comparison
 can identify remote changes even when file size and timestamp are unchanged.
 
+### A remote-edit upload asks again after a long wait
+
+The connection stalled. Once connected, each remote-edit operation has 120
+seconds to finish; after that Corta closes the connection and offers the
+upload again. Approve it to retry over a new connection. A very large file
+on a slow link can reach the limit too: copy it with the SFTP browser
+instead.
+
 ---
 
 ## Appearance and the status bar

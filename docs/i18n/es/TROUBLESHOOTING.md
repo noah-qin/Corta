@@ -290,6 +290,12 @@ El archivo local cambió después de la versión que mostró el aviso original. 
 entrada gestionada antigua sin resumen del contenido remoto también necesita una decisión de conflicto una vez. Una
 comparación de contenido puede detectar cambios remotos aunque el tamaño y la marca de tiempo del archivo no hayan cambiado.
 
+### Una subida de la edición remota vuelve a preguntar tras una larga espera
+
+La conexión se atascó. Una vez conectada, cada operación de la edición remota tiene 120 segundos para terminar; después,
+Corta cierra la conexión y vuelve a ofrecer la subida. Apruébala para reintentar con una conexión nueva. Un archivo muy
+grande en un enlace lento también puede alcanzar el límite: cópialo con el navegador SFTP.
+
 ---
 
 <a id="appearance-and-the-status-bar"></a>
