@@ -37,6 +37,31 @@ import Testing
 /// `.serialized` note on `TerminalSessionTests`.
 @Suite("PTY lifecycle", .serialized)
 struct PTYLifecycleTests {
+    @Test("a pid claimed by the reaper cannot receive another signal")
+    func aReapedButUnpublishedChildCannotBeSignalled() throws {
+        // The background descendant keeps the process group present after
+        // its leader exits, so kill(..., 0) would succeed without admission.
+        let pty = try PTY.spawn(
+            executable: "/bin/sh", arguments: ["-c", "trap '' HUP; sleep 30 & printf ready; wait"])
+        let reaped = DispatchSemaphore(value: 0)
+        let publish = DispatchSemaphore(value: 0)
+        defer {
+            publish.signal()
+            kill(-pty.processIdentifier, SIGKILL)
+            pty.close()
+            _ = pty.waitForExit()
+        }
+        pty.beforeExitPublication = {
+            reaped.signal()
+            _ = publish.wait(timeout: .now() + 5)
+        }
+        try #require(pty.readOutput(containing: "ready").contains("ready"))
+        try #require(kill(pty.processIdentifier, SIGKILL) == 0)
+        try #require(reaped.wait(timeout: .now() + 5) == .success)
+        #expect(!pty.signalProcessGroup(0))
+        #expect(!pty.interruptForegroundGroupIfSignalsEnabled())
+    }
+
     @Test("close wakes an indefinite poll without releasing its borrowed number")
     func closeWakeupRetainsPollDescriptor() throws {
         let wakeup = try PTYCloseWakeup()
