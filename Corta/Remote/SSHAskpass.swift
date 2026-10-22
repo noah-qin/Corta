@@ -94,6 +94,13 @@ nonisolated enum SSHAskpass {
         }
     }
 
+    /// Whether refusing this question ends the connection: a password or a
+    /// server's one-time code does. A key's passphrase does not — refused, ssh
+    /// skips that key and goes on to the next, a password among them.
+    static func refusalEndsConnection(kind: Kind, prompt: String) -> Bool {
+        question(kind: kind, prompt: prompt) == .secret && !prompt.lowercased().contains("passphrase")
+    }
+
     /// A prompt as a dialog may show it. Keyboard-interactive prompts are
     /// the server's text: controls and concealing scalars become U+FFFD
     /// (as SFTP names do), and it is bounded in characters and lines.
@@ -495,7 +502,8 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
     /// `NumberOfPasswordPrompts` times, and again for keyboard-interactive.
     /// So the ssh the question came from is ended, if it is still the very
     /// process that was admitted. A refused host key or confirmation needs
-    /// nothing: ssh stops on its own.
+    /// nothing: ssh stops on its own; a refused passphrase skips its key
+    /// (`SSHAskpass.refusalEndsConnection`).
     private func serve(_ request: SSHAskpass.Request, grant: Grant, ssh: pid_t, on client: Client) {
         let question = SSHAskpass.question(kind: request.kind, prompt: request.prompt)
         let prompt = SSHAskpass.displayPrompt(request.prompt)
@@ -509,6 +517,7 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
         // dropped. Everything touching the descriptor runs on its queue.
         client.watchHangup { task.cancel() }
         let terminate = self.terminate
+        let refusalEnds = SSHAskpass.refusalEndsConnection(kind: request.kind, prompt: request.prompt)
         Task.detached {
             let answer = await task.value
             client.queue.async {
@@ -518,7 +527,7 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
                     client.write(encoded)
                 }
                 client.close()
-                if !task.isCancelled, question == .secret, answer == nil, grant.admits(ssh) {
+                if !task.isCancelled, refusalEnds, answer == nil, grant.admits(ssh) {
                     terminate(ssh)
                 }
             }

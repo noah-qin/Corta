@@ -538,7 +538,8 @@ or when a host is new and its key needs your decision, the browser asks in
 a dialog on its window and hands your answer to OpenSSH; nothing is saved,
 so a reconnect asks again. **Cancel Connection** in the password dialog
 ends that connection attempt and returns to the host field — it is not
-sent as an empty password. The host-key dialog shows the fingerprint and
+sent as an empty password. **Cancel** on a key's passphrase skips that key,
+and ssh goes on to the next way of signing in. The host-key dialog shows the fingerprint and
 defaults to Cancel.
 
 A connection that fails says why in a sentence — the password or key was

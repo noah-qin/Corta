@@ -98,7 +98,8 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   remote pane it offers that host's files first. A pane opened from it names
   that destination in its title until the remote shell reports its own.
 - A session that ends, a connection that drops and a pane that fails show
-  one panel over the dimmed, still-selectable output: what ended, how, the
+  one panel over the dimmed, still-readable output (selectable once the
+  session has ended): what ended, how, the
   raw reason under Details, and Reconnect, New Session or Try Again — which
   start at the pane's size and font size.
 - An SFTP browser for listing, transferring, renaming and deleting remote files
@@ -110,7 +111,7 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   confirmation; a remote report alone cannot open it. Passwords, key
   passphrases, one-time codes and new host keys are asked in a dialog
   through OpenSSH's `SSH_ASKPASS` and never saved; cancelling a password
-  ends the connection attempt. A failed connection says why in a sentence,
+  ends the connection attempt, cancelling a key's passphrase skips the key. A failed connection says why in a sentence,
   ssh's diagnostics under Details.
 - Optional OSC 52 clipboard writes, disabled by default. Clipboard reads from
   terminal output are not implemented.

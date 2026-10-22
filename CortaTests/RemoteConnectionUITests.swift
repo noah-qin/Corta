@@ -32,7 +32,9 @@ struct SSHDestinationTests {
         #expect(PaneRemote.sshDestination(["-p", "2222", "deploy@box"]) == "deploy@box")
         #expect(PaneRemote.sshDestination(["-p2222", "-tt", "box", "uptime"]) == "box")
         #expect(PaneRemote.sshDestination(["-o", "ServerAliveInterval=30", "-i", "/k", "box"]) == "box")
-        #expect(PaneRemote.sshDestination(["-vA", "-l", "root", "--", "box"]) == "box")
+        #expect(PaneRemote.sshDestination(["-vA", "-l", "root", "--", "box"]) == "root@box")
+        #expect(PaneRemote.sshDestination(["-ldeploy", "box"]) == "deploy@box")
+        #expect(PaneRemote.sshDestination(["-l", "root", "admin@box"]) == "admin@box")
         #expect(PaneRemote.sshDestination(["ssh://deploy@box:2222"]) == "deploy@box")
         #expect(PaneRemote.sshDestination(["-p", "22"]) == nil)
         #expect(PaneRemote.sshDestination([]) == nil)
@@ -250,5 +252,12 @@ struct AskpassWordingTests {
         #expect(!alert.informativeText.contains(L10n.text("askpass.source")))
         #expect((alert.accessoryView as? NSSecureTextField)?.placeholderString
             == L10n.text("askpass.placeholder.password"))
+        // A passphrase's Cancel skips the key; it says only Cancel.
+        let passphrase = SSHAskpassPrompter.makeAlert(
+            .secret, host: "box", prompt: "Enter passphrase for key '/k':")
+        #expect(passphrase.buttons.last?.title == L10n.text("common.cancel"))
+        #expect(!SSHAskpass.refusalEndsConnection(kind: .secret, prompt: "Enter passphrase for key '/k':"))
+        #expect(SSHAskpass.refusalEndsConnection(kind: .secret, prompt: "Verification code:"))
+        #expect(!SSHAskpass.refusalEndsConnection(kind: .confirm, prompt: "Allow use of key?"))
     }
 }

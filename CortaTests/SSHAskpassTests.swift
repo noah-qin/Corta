@@ -200,6 +200,23 @@ struct SSHAskpassBrokerTests {
         #expect(ended.withLock { $0 }.isEmpty)
     }
 
+    /// Refused, a key's passphrase makes ssh skip that key and go on — to a
+    /// password, say. Ending the connection there would take that away.
+    @Test func aRefusedPassphraseEndsNothing() async throws {
+        let recorder = Recorder(answer: nil)
+        let ended = Mutex<[pid_t]>([])
+        let broker = SSHAskpassBroker(
+            executable: Self.executable, prompter: recorder.prompter,
+            terminate: { pid in ended.withLock { $0.append(pid) } })
+        defer { broker.stop() }
+        let grant = try #require(broker.grant(host: "box"))
+        grant.admit(getpid())
+        let result = await finish(try run(grant, prompt: "Enter passphrase for key '/Users/me/.ssh/id_ed25519': "))
+        #expect(result.status == 1)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(ended.withLock { $0 }.isEmpty)
+    }
+
     /// The default never signals Corta itself, whatever pid it is handed.
     @Test func endingAConnectionNeverEndsCorta() {
         SSHAskpassBroker.terminateConnection(getpid())

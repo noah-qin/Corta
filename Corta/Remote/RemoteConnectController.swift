@@ -120,7 +120,7 @@ final class RemoteConnectController: NSWindowController {
     /// Validated here, at the boundary: a problem keeps the dialog open and
     /// is what it shows. Nil once the dialog may close.
     private func connect(mode: RemoteConnectMode, fields: SSHTargetFields) -> SSHTarget.Problem? {
-        if fields.isEmpty, let paneFiles = draft.paneFiles {
+        if fields.isEmpty, mode == .sftp, let paneFiles = draft.paneFiles {
             close()
             paneFiles.open()
             return nil
@@ -296,8 +296,8 @@ struct RemoteConnectForm: View {
                 }
                 Button(L10n.text("sftp.host.connect"), action: onConnect)
                     .keyboardShortcut(.defaultAction)
-                    // Empty, Return opens the focused pane's host's files.
-                    .disabled(fields.isEmpty && paneFiles == nil)
+                    // Empty in Files, Return opens the focused pane's host's.
+                    .disabled(fields.isEmpty && !(paneFiles != nil && mode == .sftp))
             }
             .controlSize(.large)
         }
@@ -662,12 +662,17 @@ struct RemoteConnectForm: View {
         parts.append(target.identityFile.map { ($0 as NSString).lastPathComponent }
             ?? L10n.text("ui.connect.identityDefault"))
         if let lastUsed {
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .full
-            parts.append(formatter.localizedString(for: lastUsed, relativeTo: now))
+            parts.append(relativeTime.localizedString(for: lastUsed, relativeTo: now))
         }
         return parts.joined(separator: " · ")
     }
+
+    /// One for every row: the list is rebuilt on each keystroke.
+    private static let relativeTime: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
 
     private static let rowHeight: CGFloat = 36
     private static let headerHeight: CGFloat = 20

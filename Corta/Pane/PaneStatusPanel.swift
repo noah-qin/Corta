@@ -86,9 +86,14 @@ final class PaneStatusPanel: NSView {
             views.append(Self.wrapping(note, size: 11, color: .tertiaryLabelColor))
         }
         if let details = content.details, !details.isEmpty {
+            // One arranged view: the box starts hidden, and a hidden view's
+            // custom spacing is dropped with it.
             let (toggle, box) = makeDetails(details)
-            views.append(toggle)
-            views.append(box)
+            let group = NSStackView(views: [toggle, box])
+            group.orientation = .vertical
+            group.alignment = .centerX
+            group.spacing = 6
+            views.append(group)
         }
         let row = NSStackView()
         row.orientation = .horizontal

@@ -26,6 +26,8 @@ enum SSHAskpassPrompter {
     /// Posted with the host (`SSHTarget.displayName`) when a password is
     /// refused: the broker ends that connection's ssh, and a window waiting
     /// on it goes back to its host field rather than reporting a failure.
+    /// Two windows to the same place with different keys share the name and
+    /// both go back — rare, and Connect is one click away.
     static let refusedNotification = Notification.Name("CortaSSHAskpassRefused")
 
     /// Nil is a refusal. Task cancellation — ssh no longer waiting — takes
@@ -33,9 +35,14 @@ enum SSHAskpassPrompter {
     static func ask(_ question: SSHAskpass.Question, host: String, prompt: String) async -> String? {
         // With every window closed — a remote-edit save reconnecting — the
         // question gets a window of its own rather than a silent refusal.
+        let endsConnection = question == .secret && SSHAskpass.refusalEndsConnection(kind: .secret, prompt: prompt)
         let found = window(for: host)
         let standalone = found == nil ? makeStandaloneWindow() : nil
-        guard let window = found ?? standalone else { return nil }
+        guard let window = found ?? standalone else {
+            // Refused unasked: the broker still ends the connection.
+            if endsConnection { NotificationCenter.default.post(name: refusedNotification, object: host) }
+            return nil
+        }
         defer { standalone?.close() }
         // In the background the sheet is out of sight: bounce until the
         // user comes, and stop once the question is gone.
@@ -44,7 +51,7 @@ enum SSHAskpassPrompter {
         let alert = makeAlert(question, host: host, prompt: prompt)
         let field = alert.accessoryView as? NSSecureTextField
         let answer = await answer(alert, field: field, question: question, on: window)
-        if question == .secret, answer == nil, !Task.isCancelled {
+        if endsConnection, answer == nil, !Task.isCancelled {
             NotificationCenter.default.post(name: refusedNotification, object: host)
         }
         return answer
@@ -123,8 +130,11 @@ enum SSHAskpassPrompter {
             alert.messageText = L10n.format("askpass.secret.title", host)
             alert.informativeText = "“\(prompt)” · " + L10n.text("askpass.source.short")
             alert.addButton(withTitle: L10n.text("askpass.continue"))
-            // Cancel ends the connection (the broker), so it says so.
-            alert.addButton(withTitle: L10n.text("askpass.cancelConnection"))
+            // Cancel ends the connection (the broker), so it says so; for a
+            // key's passphrase it only skips that key.
+            alert.addButton(withTitle: L10n.text(
+                SSHAskpass.refusalEndsConnection(kind: .secret, prompt: prompt)
+                    ? "askpass.cancelConnection" : "common.cancel"))
             let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
             field.placeholderString = placeholder(for: prompt)
             field.setAccessibilityIdentifier("askpass-answer")

@@ -21,6 +21,10 @@ import AppKit
 /// pane's `PaneStatusPanel`, over the window background before anything
 /// ran, or over the dimmed last output after. A sentence, not a crash, and
 /// only the actions that help: Settings… only where a setting is the cause.
+///
+/// No click reaches the pane under it — unlike the session-ended panel's
+/// dim: the terminal may still have a live child whose output is no longer
+/// read, and keys typed there would run unseen.
 @MainActor
 final class PaneFailureView: NSView {
     /// Build again (the shell reinstalled, the volume remounted).
@@ -76,9 +80,10 @@ final class PaneFailureView: NSView {
         overlay.present(in: self, placement: .center)
         // The rightmost button is the one the panel is about.
         primaryAction = panel.buttons.last
-        // Return activates it, so the panel answers the key a person presses
-        // without looking.
-        primaryAction?.keyEquivalent = "\r"
+        // Return activates Try Again or Settings, so the panel answers the
+        // key a person presses without looking. Never Reconnect: it clears
+        // the output and opens a connection, which a stray Return must not.
+        if canRetry || !canReconnect { primaryAction?.keyEquivalent = "\r" }
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         setAccessibilityLabel(panel.accessibilityLabel())
@@ -116,12 +121,5 @@ final class PaneFailureView: NSView {
                     .priority: NSAccessibilityPriorityLevel.high.rawValue,
                 ])
         }
-    }
-
-    /// Over the dimmed output, a click outside the panel goes to the
-    /// terminal, as the overlay's own rule says.
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        let hit = super.hitTest(point)
-        return hit === self ? nil : hit
     }
 }

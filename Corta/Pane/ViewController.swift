@@ -786,7 +786,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let isConnection =
             launchedCommand.map { PaneRemoteState.isRemoteLauncher(executable: $0.executable) }
             ?? false
-        let program = launchedCommand.map { ($0.executable as NSString).lastPathComponent } ?? "shell"
+        let program = launchedCommand.map { ($0.executable as NSString).lastPathComponent }
+            ?? L10n.text("session.ended.local.unnamed")
         sessionEnd.present(
             exit, isConnection: isConnection, remoteHost: isConnection ? remote.connectionHost : nil,
             program: program)

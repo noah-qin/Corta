@@ -158,10 +158,12 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
     }
 
     /// ssh's destination: the first word that is neither an option nor an
-    /// option's value (`ssh(1)`'s synopsis), `ssh://` and a port stripped.
+    /// option's value (`ssh(1)`'s synopsis), `ssh://` and a port stripped, and
+    /// `-l`'s user put in front when it names none of its own.
     nonisolated static func sshDestination(_ arguments: [String]) -> String? {
         // The options that take a value, as one letter each.
         let valued = Set("BbcDEeFIiJLlmOoPpQRSWw")
+        var user: String?
         var index = arguments.startIndex
         while index < arguments.endIndex {
             let word = arguments[index]
@@ -174,7 +176,11 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
             let letters = word.dropFirst()
             if let at = letters.firstIndex(where: { valued.contains($0) }) {
                 // `-p22`: the value is attached; `-p 22`: it is the next word.
-                if letters.index(after: at) == letters.endIndex { index += 1 }
+                let attached = String(letters[letters.index(after: at)...])
+                if attached.isEmpty { index += 1 }
+                if letters[at] == "l" {
+                    user = attached.isEmpty ? (index < arguments.endIndex ? arguments[index] : nil) : attached
+                }
             }
             index += 1
         }
@@ -187,7 +193,9 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
                 destination = String(destination[..<colon])
             }
         }
-        return destination.isEmpty ? nil : destination
+        guard !destination.isEmpty else { return nil }
+        if let user, !destination.contains("@") { destination = "\(user)@\(destination)" }
+        return destination
     }
 
     private var establishedWatch: Timer?
@@ -202,7 +210,12 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
         establishedWatch?.invalidate()
         establishedWatch = nil
         guard let target = host?.preset?.connectTarget, let session = host?.session else { return }
-        establishedWatch = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self, weak session] _ in
+        establishedWatch = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self, weak session] timer in
+            // A pane freed without a teardown leaves no one to stop it.
+            guard self != nil else {
+                timer.invalidate()
+                return
+            }
             MainActor.assumeIsolated { self?.checkEstablished(session, target: target) }
         }
     }

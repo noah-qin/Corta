@@ -22,7 +22,8 @@ Versioning for compatibility changes.
 
 - A pane whose session ended, whose connection dropped or that stopped
   working now shows one panel over its dimmed output, which stays
-  readable and selectable: what ended and how in a sentence — a dropped
+  readable — and, once the session has ended, selectable: what ended and
+  how in a sentence — a dropped
   ssh connection names its host and explains exit code 255 — with the
   raw reason under **Details**. **Reconnect** and **New Session** start at
   once; the panel says the output is cleared, instead of asking again.
@@ -44,6 +45,7 @@ Versioning for compatibility changes.
 - Cancelling an SFTP password prompt no longer opens it again. OpenSSH
   read the cancelled prompt as an empty password, tried it and asked again,
   up to three times or more; Cancel now ends that connection attempt.
+  Cancelling a key's passphrase still only skips that key.
 - Dropping files from Finder on the SFTP browser uploads them again — into
   the folder shown, or the folder row they land on. The drop never reached
   the listing.

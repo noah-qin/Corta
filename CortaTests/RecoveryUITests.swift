@@ -83,6 +83,32 @@ struct RecoveryUITests {
         #expect(runtime.primaryAction?.title == L10n.text("failure.button.reconnect"))
     }
 
+    /// Reconnect clears the output and opens a connection; a stray Return —
+    /// typed into another pane, or at the dimmed output — must not do that.
+    @Test func returnNeverReconnects() {
+        let lost = PaneFailureView(
+            title: "t", detail: "d", canRetry: false, canReconnect: true, showsSettings: false)
+        #expect(lost.primaryAction?.title == L10n.text("failure.button.reconnect"))
+        #expect(lost.primaryAction?.keyEquivalent == "")
+    }
+
+    /// Over a failed session the terminal may still have a live child whose
+    /// output nobody reads: a click must not make it the key view.
+    @Test func noClickReachesTheFailedPane() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let root = try #require(window.contentView)
+        let failure = PaneFailureView(
+            title: "t", detail: "d", canRetry: true, showsSettings: false, backdrop: .dim)
+        failure.present(in: root, takesFocus: false)
+        root.layoutSubtreeIfNeeded()
+        let corner = NSPoint(x: 4, y: 4)
+        let hit = root.hitTest(corner)
+        #expect(hit === failure)
+    }
+
     /// The raw reason is there, but behind Details, not in the sentence.
     @Test func theRawReasonIsBehindDetails() throws {
         let view = PaneFailureView(title: "t", detail: "d", canRetry: true, details: "read: Input/output error")
