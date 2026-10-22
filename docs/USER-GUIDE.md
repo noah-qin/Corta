@@ -226,8 +226,8 @@ can keep it during command output. Both prompt modes hide it while reading
 scrollback or using an alternate-screen program.
 
 The **Position** setting chooses **Window toolbar** (default) or **Right edge
-of command line**. The toolbar badge sits independently of the network and
-file buttons and stays fixed as commands grow or wrap. Turning it off or
+of command line**. The toolbar badge sits independently of the Connect and
+New Tab buttons and stays fixed as commands grow or wrap. Turning it off or
 choosing command-line placement removes its toolbar slot and separating space.
 With command-line placement, long commands move the badge down to free space,
 keeping it at the right edge;
