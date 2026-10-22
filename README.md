@@ -16,6 +16,7 @@ Metal 4 rendering · Native CJK / IME · SSH, SFTP and remote editing
 ![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f81f7?style=flat-square)](LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-join-5865f2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/QNdWfdwr7j)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=flat-square&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/noah-qin)
 
 **[↓ Download](https://github.com/noah-qin/Corta/releases/latest)** ·
 **[User guide](docs/USER-GUIDE.md)** ·
@@ -196,7 +197,13 @@ To chat with other users and the maintainer, join the [Discord](https://discord.
 For usage questions whose answers others should be able to find, go to [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a);
 to share a theme or a setup, [Show and tell](https://github.com/noah-qin/Corta/discussions/categories/show-and-tell).
 For other problems, [open an issue](https://github.com/noah-qin/Corta/issues/new/choose).
-If you would like to support maintenance, [sponsor the project](https://github.com/sponsors/noah-qin).
+
+### Sponsor
+
+Corta is built and maintained by one person, in the open. If it has become
+part of your day, a sponsorship keeps it moving — every amount helps.
+
+<a href="https://github.com/sponsors/noah-qin"><img src="https://img.shields.io/badge/Sponsor_noah--qin_on_GitHub-%E2%9D%A4-db61a2?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor noah-qin on GitHub"></a>
 
 ### Contributors
 
