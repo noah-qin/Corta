@@ -143,4 +143,25 @@ struct PTYTests {
         pty.close()
         pty.close()
     }
+
+    /// ssh enters raw mode only once the server gave it a terminal; its
+    /// password prompt turns echo off and keeps line editing. Only the first
+    /// counts as a connection (`PaneRemote`'s recent-host record).
+    @Test("raw mode is told apart from a password prompt's echo-off")
+    func rawModeIsNotAPasswordPrompt() throws {
+        let prompt = try PTYFixture.shell("stty -echo; echo ready; read -r line")
+        _ = prompt.readOutput(until: { $0.contains("ready") })
+        #expect(!prompt.isInRawMode)
+        prompt.terminate()
+        _ = prompt.waitForExit()
+        prompt.close()
+
+        let raw = try PTYFixture.shell("stty raw -echo; echo ready; read -r line")
+        _ = raw.readOutput(until: { $0.contains("ready") })
+        #expect(raw.isInRawMode)
+        raw.terminate()
+        _ = raw.waitForExit()
+        #expect(!raw.isInRawMode)
+        raw.close()
+    }
 }

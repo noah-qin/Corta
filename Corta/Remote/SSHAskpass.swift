@@ -94,6 +94,13 @@ nonisolated enum SSHAskpass {
         }
     }
 
+    /// Whether refusing this question ends the connection: a password or a
+    /// server's one-time code does. A key's passphrase does not — refused, ssh
+    /// skips that key and goes on to the next, a password among them.
+    static func refusalEndsConnection(kind: Kind, prompt: String) -> Bool {
+        question(kind: kind, prompt: prompt) == .secret && !prompt.lowercased().contains("passphrase")
+    }
+
     /// A prompt as a dialog may show it. Keyboard-interactive prompts are
     /// the server's text: controls and concealing scalars become U+FFFD
     /// (as SFTP names do), and it is bounded in characters and lines.
@@ -328,22 +335,31 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
     private let executable: String?
     private let prompter: Prompter
     private let record: @Sendable (pid_t) -> ProcessRecord?
+    private let terminate: @Sendable (pid_t) -> Void
     private let ownProcess: pid_t
     private let acceptQueue = DispatchQueue(label: "dev.noahqin.Corta.askpass")
     private let state = Mutex(State())
 
     init(
         executable: String?, prompter: @escaping Prompter,
-        record: @escaping @Sendable (pid_t) -> ProcessRecord? = SSHAskpassBroker.processRecord(of:)
+        record: @escaping @Sendable (pid_t) -> ProcessRecord? = SSHAskpassBroker.processRecord(of:),
+        terminate: @escaping @Sendable (pid_t) -> Void = SSHAskpassBroker.terminateConnection(_:)
     ) {
         self.executable = executable
         self.prompter = prompter
         self.record = record
+        self.terminate = terminate
         self.ownProcess = getpid()
     }
 
     deinit {
         stop()
+    }
+
+    /// Ends a connection's ssh. Never Corta itself.
+    static func terminateConnection(_ pid: pid_t) {
+        guard pid > 1, pid != getpid() else { return }
+        kill(pid, SIGTERM)
     }
 
     /// A grant for one connection to `host`, listening first if this is the
@@ -448,18 +464,20 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
         guard let line = SSHAskpass.readLine(from: client.descriptor, limit: SSHAskpass.requestLimit),
             let request = try? JSONDecoder().decode(SSHAskpass.Request.self, from: line),
             request.version == 1,
-            let grant = admittedGrant(for: request, from: client.descriptor)
+            let admitted = admittedGrant(for: request, from: client.descriptor)
         else {
             client.close()
             return
         }
-        serve(request, grant: grant, on: client)
+        serve(request, grant: admitted.0, ssh: admitted.ssh, on: client)
     }
 
     /// The live grant whose token the request carries, if the sender
     /// descends — within `ancestryLimit` — from an ssh that grant's
-    /// connection spawned. The walk stops at Corta itself.
-    private func admittedGrant(for request: SSHAskpass.Request, from descriptor: Int32) -> Grant? {
+    /// connection spawned — and that ssh. The walk stops at Corta itself.
+    private func admittedGrant(
+        for request: SSHAskpass.Request, from descriptor: Int32
+    ) -> (Grant, ssh: pid_t)? {
         let grant = state.withLock { state in
             state.grants.first { SSHAskpass.tokensMatch($0.key, request.token) }?.value.grant
         }
@@ -472,14 +490,21 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
         var ancestor = record(peer)?.parent
         for _ in 0..<Self.ancestryLimit {
             guard let pid = ancestor, pid > 1 else { return nil }
-            if grant.admits(pid) { return grant }
+            if grant.admits(pid) { return (grant, pid) }
             guard pid != ownProcess else { return nil }
             ancestor = record(pid)?.parent
         }
         return nil
     }
 
-    private func serve(_ request: SSHAskpass.Request, grant: Grant, on client: Client) {
+    /// A refused password is a cancelled connection: OpenSSH reads a failed
+    /// askpass as an empty answer, tries it, and asks again — up to
+    /// `NumberOfPasswordPrompts` times, and again for keyboard-interactive.
+    /// So the ssh the question came from is ended, if it is still the very
+    /// process that was admitted. A refused host key or confirmation needs
+    /// nothing: ssh stops on its own; a refused passphrase skips its key
+    /// (`SSHAskpass.refusalEndsConnection`).
+    private func serve(_ request: SSHAskpass.Request, grant: Grant, ssh: pid_t, on client: Client) {
         let question = SSHAskpass.question(kind: request.kind, prompt: request.prompt)
         let prompt = SSHAskpass.displayPrompt(request.prompt)
         let prompter = self.prompter
@@ -491,6 +516,8 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
         // takes the dialog down with it, once; anything else it sends is
         // dropped. Everything touching the descriptor runs on its queue.
         client.watchHangup { task.cancel() }
+        let terminate = self.terminate
+        let refusalEnds = SSHAskpass.refusalEndsConnection(kind: request.kind, prompt: request.prompt)
         Task.detached {
             let answer = await task.value
             client.queue.async {
@@ -500,6 +527,9 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
                     client.write(encoded)
                 }
                 client.close()
+                if !task.isCancelled, refusalEnds, answer == nil, grant.admits(ssh) {
+                    terminate(ssh)
+                }
             }
         }
     }

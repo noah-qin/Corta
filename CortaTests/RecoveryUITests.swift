@@ -44,10 +44,81 @@ struct RecoveryUITests {
         #expect(label.contains("No such file or directory"))
         #expect(view.accessibilityRole() == .group)
 
+        // The symbol is emphasis; the words carry the meaning, so the icon
+        // itself is not read out.
         let icon = view.descendants(of: NSImageView.self).first
-        // Not `.systemRed`: the shape carries the meaning, and the label
-        // colour stays legible under Increase Contrast in both appearances.
-        #expect(icon?.contentTintColor == .secondaryLabelColor)
+        #expect(icon?.isAccessibilityElement() == false)
+    }
+
+    /// The card's colours follow its own window's appearance. Read outside
+    /// it, `windowBackgroundColor.cgColor` took the process's: a dark window
+    /// got a white card under white text.
+    @Test func thePanelFollowsItsWindowsAppearance() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        window.appearance = NSAppearance(named: .darkAqua)
+        NSApp.appearance = NSAppearance(named: .aqua)
+        defer { NSApp.appearance = nil }
+        let root = try #require(window.contentView)
+        let failure = PaneFailureView(title: "t", detail: "d", canRetry: true)
+        failure.present(in: root, takesFocus: false)
+        root.layoutSubtreeIfNeeded()
+        let panel = failure.overlay.panel
+        var expected: CGColor?
+        NSAppearance(named: .darkAqua)!.performAsCurrentDrawingAppearance {
+            expected = NSColor.windowBackgroundColor.cgColor
+        }
+        #expect(panel.layer?.backgroundColor == expected)
+    }
+
+    /// Settings… only where a setting could be the cause; a dropped
+    /// connection is not one.
+    @Test func settingsAreOfferedOnlyWhereTheyCouldHelp() {
+        let runtime = PaneFailureView(
+            title: "t", detail: "d", canRetry: false, canReconnect: true, showsSettings: false)
+        let titles = runtime.descendants(of: NSButton.self).map(\.title)
+        #expect(!titles.contains(L10n.text("failure.button.settings")))
+        #expect(runtime.primaryAction?.title == L10n.text("failure.button.reconnect"))
+    }
+
+    /// Reconnect clears the output and opens a connection; a stray Return —
+    /// typed into another pane, or at the dimmed output — must not do that.
+    @Test func returnNeverReconnects() {
+        let lost = PaneFailureView(
+            title: "t", detail: "d", canRetry: false, canReconnect: true, showsSettings: false)
+        #expect(lost.primaryAction?.title == L10n.text("failure.button.reconnect"))
+        #expect(lost.primaryAction?.keyEquivalent == "")
+    }
+
+    /// Over a failed session the terminal may still have a live child whose
+    /// output nobody reads: a click must not make it the key view.
+    @Test func noClickReachesTheFailedPane() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let root = try #require(window.contentView)
+        let failure = PaneFailureView(
+            title: "t", detail: "d", canRetry: true, showsSettings: false, backdrop: .dim)
+        failure.present(in: root, takesFocus: false)
+        root.layoutSubtreeIfNeeded()
+        let corner = NSPoint(x: 4, y: 4)
+        let hit = root.hitTest(corner)
+        #expect(hit === failure)
+    }
+
+    /// The raw reason is there, but behind Details, not in the sentence.
+    @Test func theRawReasonIsBehindDetails() throws {
+        let view = PaneFailureView(title: "t", detail: "d", canRetry: true, details: "read: Input/output error")
+        let panel = view.overlay.panel
+        #expect(!panel.isShowingDetails)
+        let toggle = try #require(panel.detailsToggle)
+        toggle.performClick(nil)
+        #expect(panel.isShowingDetails)
+        let texts = view.descendants(of: NSTextField.self).map(\.stringValue)
+        #expect(texts.contains("read: Input/output error"))
     }
 
     /// Try Again appears only where retrying can help — a Mac that reports no
@@ -57,7 +128,8 @@ struct RecoveryUITests {
         let retryable = PaneFailureView(title: "t", detail: "d", canRetry: true)
         let titles = retryable.descendants(of: NSButton.self).map(\.title)
         #expect(titles.count == 2)
-        #expect(titles.first == L10n.text("failure.button.retry"))
+        // The primary action is the rightmost, as in any Mac dialog.
+        #expect(titles.last == L10n.text("failure.button.retry"))
 
         let terminal = PaneFailureView(title: "t", detail: "d", canRetry: false)
         let onlySettings = terminal.descendants(of: NSButton.self).map(\.title)

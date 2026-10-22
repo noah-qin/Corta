@@ -16,10 +16,15 @@
 
 import AppKit
 
-/// What a pane shows when it can't build: no Metal device, no atlas, or no
-/// child (a moved `$SHELL`, an unmounted directory). A sentence, not a
-/// crash. Plain by design: icon, sentence, error, and the actions that
-/// help — failure shown by symbol and words, never colour alone.
+/// What a pane shows when it can't build — no Metal device, no atlas, no
+/// child (a moved `$SHELL`, an unmounted directory) — or stops working: the
+/// pane's `PaneStatusPanel`, over the window background before anything
+/// ran, or over the dimmed last output after. A sentence, not a crash, and
+/// only the actions that help: Settings… only where a setting is the cause.
+///
+/// No click reaches the pane under it — unlike the session-ended panel's
+/// dim: the terminal may still have a live child whose output is no longer
+/// read, and keys typed there would run unseen.
 @MainActor
 final class PaneFailureView: NSView {
     /// Build again (the shell reinstalled, the volume remounted).
@@ -29,11 +34,66 @@ final class PaneFailureView: NSView {
     var onReconnect: (() -> Void)?
     var onOpenSettings: (() -> Void)?
 
-    /// Where keyboard focus lands: Try Again, else Settings. With no terminal
-    /// view, focus would otherwise fall to the window.
+    /// Where keyboard focus lands: the rightmost — primary — action. With no
+    /// terminal view, focus would otherwise fall to the window.
     private(set) var primaryAction: NSButton?
+    let overlay: PaneStatusOverlay
 
     var announcement: String { accessibilityLabel() ?? "" }
+
+    /// - Parameters:
+    ///   - detail: the plain sentence.
+    ///   - details: the raw reason, behind Details.
+    ///   - note: what the primary action does; by default, Reconnect's.
+    ///   - showsSettings: a setting could be the cause (startup failures).
+    ///   - backdrop: `.dim` when the last output is still behind it.
+    init(
+        title: String, detail: String, canRetry: Bool, canReconnect: Bool = false,
+        details: String? = nil, note: String? = nil, showsSettings: Bool = true,
+        backdrop: PaneStatusOverlay.Backdrop = .opaque,
+        symbol: String = "exclamationmark.triangle", tint: NSColor = .systemOrange
+    ) {
+        // Set once the view exists; the panel's actions reach it through this.
+        let relay = Relay()
+        var actions: [PaneStatusPanel.Action] = []
+        if showsSettings {
+            actions.append(.init(title: L10n.text("failure.button.settings")) { relay.view?.onOpenSettings?() })
+        }
+        if canReconnect {
+            actions.append(.init(title: L10n.text("failure.button.reconnect"), isPrimary: !canRetry) {
+                relay.view?.onReconnect?()
+            })
+        }
+        if canRetry {
+            actions.append(.init(title: L10n.text("failure.button.retry"), isPrimary: true) {
+                relay.view?.onRetry?()
+            })
+        }
+        // With Reconnect, say it is a new connection, never the old session.
+        let note = note ?? (canReconnect ? L10n.text("failure.reconnectHint") : nil)
+        let panel = PaneStatusPanel(
+            .init(symbol: symbol, tint: tint, title: title, body: detail, note: note, details: details),
+            actions: actions)
+        overlay = PaneStatusOverlay(panel: panel, backdrop: backdrop)
+        super.init(frame: .zero)
+        relay.view = self
+        overlay.present(in: self, placement: .center)
+        // The rightmost button is the one the panel is about.
+        primaryAction = panel.buttons.last
+        // Return activates Try Again or Settings, so the panel answers the
+        // key a person presses without looking. Never Reconnect: it clears
+        // the output and opens a connection, which a stray Return must not.
+        if canRetry || !canReconnect { primaryAction?.keyEquivalent = "\r" }
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel(panel.accessibilityLabel())
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    private final class Relay {
+        weak var view: PaneFailureView?
+    }
 
     /// Covers `view`, takes the keyboard — or nothing is focused and
     /// assistive technology hears nothing — and is announced.
@@ -62,88 +122,4 @@ final class PaneFailureView: NSView {
                 ])
         }
     }
-
-    init(title: String, detail: String, canRetry: Bool, canReconnect: Bool = false) {
-        super.init(frame: .zero)
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-
-        let icon = NSImageView()
-        icon.image = NSImage(
-            systemSymbolName: "exclamationmark.triangle", accessibilityDescription: nil)
-        icon.symbolConfiguration = .init(pointSize: 30, weight: .regular)
-        // The shape carries the meaning; label colour survives Increase
-        // Contrast.
-        icon.contentTintColor = .secondaryLabelColor
-        icon.setAccessibilityLabel(title)
-
-        let titleLabel = NSTextField(labelWithString: title)
-        titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
-        titleLabel.alignment = .center
-        titleLabel.maximumNumberOfLines = 3
-
-        // With Reconnect, say it is a new connection, never the old session.
-        let detailText =
-            canReconnect
-            ? "\(detail)\n\n\(L10n.text("failure.reconnectHint"))"
-            : detail
-        let detailLabel = NSTextField(wrappingLabelWithString: detailText)
-        detailLabel.font = .systemFont(ofSize: 12)
-        detailLabel.textColor = .secondaryLabelColor
-        detailLabel.alignment = .center
-        detailLabel.isSelectable = true
-
-        var buttons: [NSView] = []
-        if canRetry {
-            let retry = NSButton(
-                title: L10n.text("failure.button.retry"), target: self,
-                action: #selector(retryTapped))
-            retry.keyEquivalent = "\r"
-            buttons.append(retry)
-            primaryAction = retry
-        }
-        if canReconnect {
-            let reconnect = NSButton(
-                title: L10n.text("failure.button.reconnect"), target: self,
-                action: #selector(reconnectTapped))
-            buttons.append(reconnect)
-            if primaryAction == nil { primaryAction = reconnect }
-        }
-        let settings = NSButton(
-            title: L10n.text("failure.button.settings"), target: self,
-            action: #selector(settingsTapped))
-        buttons.append(settings)
-        if primaryAction == nil { primaryAction = settings }
-        let buttonRow = NSStackView(views: buttons)
-        buttonRow.orientation = .horizontal
-        buttonRow.spacing = 10
-
-        let stack = NSStackView(views: [icon, titleLabel, detailLabel, buttonRow])
-        stack.orientation = .vertical
-        stack.alignment = .centerX
-        stack.spacing = 10
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            stack.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -48),
-            detailLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 420),
-        ])
-
-        // One described group, not four elements read in layout order.
-        setAccessibilityRole(.group)
-        setAccessibilityLabel("\(title). \(detailText)")
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-    }
-
-    @objc private func retryTapped() { onRetry?() }
-    @objc private func reconnectTapped() { onReconnect?() }
-    @objc private func settingsTapped() { onOpenSettings?() }
 }

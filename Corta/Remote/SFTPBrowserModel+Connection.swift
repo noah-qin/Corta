@@ -29,6 +29,8 @@ extension SFTPBrowserModel {
     /// re-presenting an open window must not spawn a second session.
     func connect() {
         guard client == nil else { return }
+        // A problem with the fields is shown beside them, not as a failure.
+        connectFailure = nil
         // `hostField` is consent only when the user submits it — a
         // presenter must not call this on a `.needsHost` model with a
         // prefilled suggestion (`SFTPBrowserController.present`).
@@ -61,6 +63,7 @@ extension SFTPBrowserModel {
             return
         }
         guard shouldStartConnection?(name) != false else { return }
+        connectFailure = nil
         connectionState = .connecting
         listingError = nil
         updateTitle()
@@ -102,6 +105,7 @@ extension SFTPBrowserModel {
         } catch {
             guard generation == connectionGeneration else { return }
             let error = Self.sftpError(error)
+            connectFailure = Self.connectFailure(error, host: name)
             connectionState = .failed(message: Self.errorMessage(error, host: name))
             // Left in the fields, so the destination that failed can be
             // corrected.
@@ -132,6 +136,7 @@ extension SFTPBrowserModel {
             onHostAbandoned?(host)
         }
         host = nil
+        connectFailure = nil
         connectionState = .needsHost
         updateTitle()
     }
@@ -156,6 +161,15 @@ extension SFTPBrowserModel {
     func cancelConnect() {
         guard connectionState == .connecting || isFailed else { return }
         changeHost()
+    }
+
+    /// The password for this connection was refused: its ssh is being ended
+    /// (`SSHAskpassBroker`), which is the user's cancel, not a failure.
+    func passwordRefused(host refused: String) {
+        guard connectionState == .connecting, let host,
+            SSHTarget.displayName(forKey: host) == refused
+        else { return }
+        cancelConnect()
     }
 
     /// The form's fields for a connection's key, to correct and retry.

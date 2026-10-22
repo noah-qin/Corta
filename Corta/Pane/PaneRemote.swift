@@ -142,6 +142,102 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
         return false
     }
 
+    // MARK: - The connection
+
+    /// Where this pane's connection goes, as Corta names it: the target it
+    /// was opened with, or the destination in the ssh argv it spawned. The
+    /// argv is the user's own command, never child output; it still passes
+    /// the check a typed host does before it is shown.
+    var connectionHost: String? {
+        if let target = host?.preset?.connectTarget { return target.displayName }
+        guard let command = host?.launchedCommand,
+            (command.executable as NSString).lastPathComponent == "ssh",
+            let destination = Self.sshDestination(command.arguments)
+        else { return nil }
+        return SSHTarget.named(destination)?.displayName
+    }
+
+    /// ssh's destination: the first word that is neither an option nor an
+    /// option's value (`ssh(1)`'s synopsis), `ssh://` and a port stripped, and
+    /// `-l`'s user put in front when it names none of its own.
+    nonisolated static func sshDestination(_ arguments: [String]) -> String? {
+        // The options that take a value, as one letter each.
+        let valued = Set("BbcDEeFIiJLlmOoPpQRSWw")
+        var user: String?
+        var index = arguments.startIndex
+        while index < arguments.endIndex {
+            let word = arguments[index]
+            if word == "--" {
+                index += 1
+                break
+            }
+            guard word.hasPrefix("-"), word.count > 1 else { break }
+            // A cluster of flags, the last of which may take the next word.
+            let letters = word.dropFirst()
+            if let at = letters.firstIndex(where: { valued.contains($0) }) {
+                // `-p22`: the value is attached; `-p 22`: it is the next word.
+                let attached = String(letters[letters.index(after: at)...])
+                if attached.isEmpty { index += 1 }
+                if letters[at] == "l" {
+                    user = attached.isEmpty ? (index < arguments.endIndex ? arguments[index] : nil) : attached
+                }
+            }
+            index += 1
+        }
+        guard index < arguments.endIndex else { return nil }
+        var destination = arguments[index]
+        if destination.hasPrefix("ssh://") {
+            destination.removeFirst("ssh://".count)
+            if let slash = destination.firstIndex(of: "/") { destination = String(destination[..<slash]) }
+            if let colon = destination.lastIndex(of: ":"), !destination.hasSuffix("]") {
+                destination = String(destination[..<colon])
+            }
+        }
+        guard !destination.isEmpty else { return nil }
+        if let user, !destination.contains("@") { destination = "\(user)@\(destination)" }
+        return destination
+    }
+
+    private var establishedWatch: Timer?
+
+    /// A connection opened from the connect dialog is a recent host once it
+    /// is established — when ssh has a terminal on the server and has put
+    /// this one in raw mode — not when Connect was pressed: a refused host,
+    /// or one with no shell (a git host), never becomes one. Checked once a
+    /// second until then or until the child exits; nothing on the output
+    /// path.
+    func watchForEstablishedConnection() {
+        establishedWatch?.invalidate()
+        establishedWatch = nil
+        guard let target = host?.preset?.connectTarget, let session = host?.session else { return }
+        establishedWatch = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self, weak session] timer in
+            // A pane freed without a teardown leaves no one to stop it.
+            guard self != nil else {
+                timer.invalidate()
+                return
+            }
+            MainActor.assumeIsolated { self?.checkEstablished(session, target: target) }
+        }
+    }
+
+    private func checkEstablished(_ session: TerminalSession?, target: SSHTarget) {
+        guard let session, host?.session === session, session.pty.exitStatus == nil else {
+            stopWatchingConnection()
+            return
+        }
+        guard session.pty.isInRawMode else { return }
+        stopWatchingConnection()
+        recentHosts.record(target)
+    }
+
+    /// Where an established connection is recorded; a test's own file.
+    var recentHosts = RecentHostsStore.shared
+
+    func stopWatchingConnection() {
+        establishedWatch?.invalidate()
+        establishedWatch = nil
+    }
+
     @objc func reconnectRemote(_: Any?) {
         guard canReconnect else { return }
         host?.rebuildPane(strictRespawn: true)
@@ -253,6 +349,17 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
         switch state {
         case .remote, .connected, .remoteUnknown: return true
         case .local, .unknown: return false
+        }
+    }
+
+    /// The host the Connect dialog offers this pane's files for, as Corta
+    /// names it; nil for a pane that is remote by its foreground program
+    /// alone, with no honest source naming the host.
+    nonisolated static func browseHostName(state: PaneRemoteState) -> String? {
+        switch state {
+        case .remote(let reported, _, _): SSHTarget.named(reported)?.displayName
+        case .connected(let key, _): SSHTarget.displayName(forKey: key)
+        case .remoteUnknown, .local, .unknown: nil
         }
     }
 

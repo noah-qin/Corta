@@ -79,6 +79,13 @@ struct SSHAskpassRulesTests {
 
 /// The whole path with the app's real executable as the askpass program:
 /// this test process stands where ssh would, as the client's parent.
+///
+/// On the main actor: `Process` learns of an exit on the run loop of the
+/// thread that launched it — `isRunning`, `terminationStatus` and
+/// `waitUntilExit` all wait for it — and the main run loop is the one that
+/// keeps running. Launched from a cooperative thread, an exit could go
+/// unseen and `waitUntilExit` never return.
+@MainActor
 @Suite(.serialized)
 struct SSHAskpassBrokerTests {
     /// What the prompter was asked, and what it answers.
@@ -153,15 +160,68 @@ struct SSHAskpassBrokerTests {
         #expect(asked.first?.2 == "deploy@box's password:")
     }
 
-    @Test func aRefusalIsACancelledQuestion() async throws {
+    /// OpenSSH reads a failed askpass as an empty password and asks again,
+    /// so Cancel re-opened the dialog until ssh's prompts ran out. A refused
+    /// password ends the ssh it came from instead.
+    @Test func aRefusedPasswordEndsTheConnection() async throws {
         let recorder = Recorder(answer: nil)
-        let broker = SSHAskpassBroker(executable: Self.executable, prompter: recorder.prompter)
+        let ended = Mutex<[pid_t]>([])
+        let broker = SSHAskpassBroker(
+            executable: Self.executable, prompter: recorder.prompter,
+            terminate: { pid in ended.withLock { $0.append(pid) } })
         defer { broker.stop() }
         let grant = try #require(broker.grant(host: "box"))
         grant.admit(getpid())
         let result = await finish(try run(grant, prompt: "Password: "))
         #expect(result.status == 1)
         #expect(result.output.isEmpty)
+        let deadline = SuspendingClock.now + .seconds(5) * testTimeoutScale
+        while ended.withLock({ $0.isEmpty }), SuspendingClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(ended.withLock { $0 } == [getpid()])
+    }
+
+    /// A refused host key or confirmation stops ssh by itself; nothing is
+    /// ended for it.
+    @Test func aRefusedHostKeyEndsNothing() async throws {
+        let recorder = Recorder(answer: nil)
+        let ended = Mutex<[pid_t]>([])
+        let broker = SSHAskpassBroker(
+            executable: Self.executable, prompter: recorder.prompter,
+            terminate: { pid in ended.withLock { $0.append(pid) } })
+        defer { broker.stop() }
+        let grant = try #require(broker.grant(host: "box"))
+        grant.admit(getpid())
+        let prompt = "Are you sure you want to continue connecting (yes/no/[fingerprint])?"
+        let result = await finish(try run(grant, prompt: prompt))
+        #expect(result.status == 1)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(ended.withLock { $0 }.isEmpty)
+    }
+
+    /// Refused, a key's passphrase makes ssh skip that key and go on — to a
+    /// password, say. Ending the connection there would take that away.
+    @Test func aRefusedPassphraseEndsNothing() async throws {
+        let recorder = Recorder(answer: nil)
+        let ended = Mutex<[pid_t]>([])
+        let broker = SSHAskpassBroker(
+            executable: Self.executable, prompter: recorder.prompter,
+            terminate: { pid in ended.withLock { $0.append(pid) } })
+        defer { broker.stop() }
+        let grant = try #require(broker.grant(host: "box"))
+        grant.admit(getpid())
+        let result = await finish(try run(grant, prompt: "Enter passphrase for key '/Users/me/.ssh/id_ed25519': "))
+        #expect(result.status == 1)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(ended.withLock { $0 }.isEmpty)
+    }
+
+    /// The default never signals Corta itself, whatever pid it is handed.
+    @Test func endingAConnectionNeverEndsCorta() {
+        SSHAskpassBroker.terminateConnection(getpid())
+        SSHAskpassBroker.terminateConnection(1)
+        SSHAskpassBroker.terminateConnection(0)
     }
 
     @Test func aConfirmationAnswersByItsExitStatus() async throws {
@@ -229,14 +289,14 @@ struct SSHAskpassBrokerTests {
         defer { broker.stop() }
         let grant = try #require(broker.grant(host: "box"))
         grant.admit(getpid())
-        let process = try run(grant, prompt: "Confirm user presence for key ED25519-SK", promptKind: "none")
+        let process = try await run(grant, prompt: "Confirm user presence for key ED25519-SK", promptKind: "none")
         let deadline = SuspendingClock.now + .seconds(10) * testTimeoutScale
         while recorder.asked.withLock({ $0.isEmpty }), SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(recorder.asked.withLock { $0.first?.0 } == .notify)
         process.terminate()
-        process.waitUntilExit()
+        _ = await finish(process)
         while !recorder.cancelled.withLock({ $0 }), SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))
         }

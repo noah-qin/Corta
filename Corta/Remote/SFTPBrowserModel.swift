@@ -166,6 +166,10 @@ final class SFTPBrowserModel {
     var directoryGeneration = 0
 
     var connectionState: ConnectionState
+    /// What a failed connection is shown as: a sentence for the kind of
+    /// failure, ssh's own words behind Details. Nil for a failure of the
+    /// typed fields, which the form shows beside them.
+    var connectFailure: ConnectFailure?
     var currentPath = "/"
     /// The path field's text, kept in sync with `currentPath` on every
     /// successful navigation; only its commit navigates, so half-typed

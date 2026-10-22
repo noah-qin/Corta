@@ -423,7 +423,10 @@ dialog defaults to Cancel. In the background Corta bounces in the Dock
 rather than taking focus; with no window open, the question gets a window
 of its own. The answer is written to that socket and nowhere else — not
 stored, not logged — and the dialog closes, answering nothing, the moment
-the asking process goes away. Within §1's threat model a process already
+the asking process goes away. A refused password or code — not a key's
+passphrase, which only makes ssh skip that key — ends the ssh it came from — `SIGTERM` to the admitted process, checked again by
+its start time, never Corta itself — because OpenSSH reads a failed askpass
+as an empty answer and would send it and ask again. Within §1's threat model a process already
 running as the user is out of scope; the ancestry check exists so that one
 *reading* ssh's environment cannot use the token on its own.
 

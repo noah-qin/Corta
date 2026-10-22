@@ -223,6 +223,45 @@ extension SFTPBrowserModel {
     }
 
     /// The ssh stderr tail, trimmed of its trailing newlines for display.
+    /// A failed connection as the browser's failure panel says it.
+    nonisolated struct ConnectFailure: Equatable {
+        var symbol: String
+        var title: String
+        var body: String
+        /// The whole message, ssh's diagnostics included.
+        var details: String
+    }
+
+    /// The kind of failure in a sentence; what ssh said goes to Details.
+    nonisolated static func connectFailure(_ error: SFTPError, host key: String) -> ConnectFailure {
+        let host = SSHTarget.displayName(forKey: key)
+        let details = errorMessage(error, host: key)
+        let unopened = L10n.format("sftp.failure.unopened.title", host)
+        switch error {
+        case .transport(.authenticationFailed):
+            return .init(symbol: "lock.slash", title: L10n.format("sftp.failure.auth.title", host),
+                         body: L10n.text("sftp.failure.auth.body"), details: details)
+        case .transport(.hostUnreachable):
+            return .init(symbol: "wifi.exclamationmark", title: L10n.format("sftp.failure.unreachable.title", host),
+                         body: L10n.text("sftp.failure.unreachable.body"), details: details)
+        case .transport(.hostKeyUnverified):
+            return .init(symbol: "exclamationmark.shield", title: L10n.format("sftp.failure.hostKey.title", host),
+                         body: L10n.text("sftp.failure.hostKey.body"), details: details)
+        case .transport(.subprocessFailed(let code, _)):
+            return .init(symbol: "exclamationmark.triangle", title: unopened,
+                         body: L10n.format("sftp.failure.subprocess.body", Int(code)), details: details)
+        case .transport(.closed), .transport(.connectionLost):
+            return .init(symbol: "network.slash", title: L10n.format("failure.title.connectionLost.host", host),
+                         body: L10n.text("sftp.failure.lost.body"), details: details)
+        case .transport(.spawnFailed), .transport(.executablePathNotAbsolute):
+            return .init(symbol: "exclamationmark.triangle", title: L10n.text("sftp.failure.spawn.title"),
+                         body: L10n.text("sftp.failure.spawn.body"), details: details)
+        default:
+            return .init(symbol: "exclamationmark.triangle", title: unopened,
+                         body: L10n.text("sftp.failure.server.body"), details: details)
+        }
+    }
+
     nonisolated static func trimmedDiagnostics(_ diagnostics: String) -> String {
         diagnostics.trimmingCharacters(in: .whitespacesAndNewlines)
     }

@@ -18,7 +18,7 @@ import AppKit
 import XCTest
 
 final class SessionEndedUITests: XCTestCase {
-    @MainActor func testCompactExitCardFitsAndCanStartANewSession() throws {
+    @MainActor func testExitPanelFitsAndStartsANewSession() throws {
         continueAfterFailure = false
         let previous = LatinInputSource.select()
         addTeardownBlock { LatinInputSource.restore(previous) }
@@ -42,10 +42,10 @@ final class SessionEndedUITests: XCTestCase {
             shot.name = fixture
             shot.lifetime = .keepAlways
             add(shot)
+            // No second question: the panel already says the output is
+            // cleared.
             restart.click()
-            let start = app.sheets.buttons["Start"].firstMatch
-            XCTAssertTrue(start.waitForExistence(timeout: 5))
-            start.click()
+            XCTAssertFalse(app.sheets.firstMatch.exists)
             expectation(for: NSPredicate { _, _ in !card.exists }, evaluatedWith: nil)
             waitForExpectations(timeout: 10)
             UIFixtures.requireFixturePrompt(in: app)

@@ -20,7 +20,7 @@ import CortaTerminal
 
 /// What `PaneSessionEnd` needs from its pane.
 protocol PaneSessionEndHost: AnyObject {
-    /// The pane's own view; the bar is its subview.
+    /// The pane's own view; the panel is its subview.
     var view: NSView { get }
     /// The top of the grid, below any window chrome over the pane.
     var topInset: CGFloat { get }
@@ -34,54 +34,67 @@ protocol PaneSessionEndHost: AnyObject {
     func rebuildPane(strictRespawn: Bool)
 }
 
-/// The pane's session having ended: the bar that says so until something
+/// The pane's session having ended: the panel that says so until something
 /// changes it, and the new session it offers. Only the session's own child
 /// ending gets here — a program inside the shell exiting back to its prompt
 /// is not the session ending.
 final class PaneSessionEnd {
     private weak var host: PaneSessionEndHost?
-    private(set) var bar: SessionEndedBar?
+    private(set) var overlay: PaneStatusOverlay?
 
     init(host: PaneSessionEndHost) {
         self.host = host
     }
 
-    func present(_ exit: ProcessExit, isConnection: Bool) {
+    /// - Parameters:
+    ///   - remoteHost: where a connection went, for the title.
+    ///   - program: the launcher or shell's name.
+    func present(_ exit: ProcessExit, isConnection: Bool, remoteHost: String?, program: String) {
         guard let host else { return }
-        bar?.removeFromSuperview()
-        let bar = SessionEndedBar(exit: exit, isConnection: isConnection)
-        bar.onNewSession = { [weak self] in self?.confirmNewSession(isConnection: isConnection) }
-        bar.onClosePane = { [weak host] in host?.closeEndedPane() }
-        // On the edge away from the last output: the cursor's half of the
+        overlay?.removeFromSuperview()
+        let content = SessionEnded.content(
+            for: exit, isConnection: isConnection, host: remoteHost, program: program)
+        // Asked nothing more: the panel says what starting again clears. A
+        // button press is the decision, never a key — the panel takes no
+        // keyboard, so a key pressed in a dead pane starts nothing.
+        let panel = PaneStatusPanel(content, actions: [
+            .init(title: L10n.text("menu.closePane")) { [weak host] in host?.closeEndedPane() },
+            .init(
+                title: L10n.text(isConnection ? "failure.button.reconnect" : "session.ended.newSession"),
+                isPrimary: true
+            ) { [weak self] in self?.startAgain(isConnection: isConnection) },
+        ])
+        // Found by UI tests and Accessibility as before.
+        panel.identifier = NSUserInterfaceItemIdentifier("Corta.SessionEnded")
+        let overlay = PaneStatusOverlay(panel: panel, backdrop: .dim)
+        // On the side away from the last output: the cursor's half of the
         // screen is where the program left off.
         let cursorInLowerHalf = host.snapshot().map { $0.cursor.row >= $0.rows / 2 } ?? true
-        bar.present(
-            in: host.view, atTop: cursorInLowerHalf,
-            inset: cursorInLowerHalf ? host.topInset : TerminalLayout.insets.bottom)
-        self.bar = bar
+        overlay.present(
+            in: host.view,
+            placement: cursorInLowerHalf
+                ? .top(max(host.topInset + 8, 16)) : .bottom(max(TerminalLayout.insets.bottom + 8, 16)))
+        self.overlay = overlay
+        NSAccessibility.post(element: panel, notification: .layoutChanged)
+        if NSWorkspace.shared.isVoiceOverEnabled {
+            NSAccessibility.post(
+                element: NSApp as Any, notification: .announcementRequested,
+                userInfo: [
+                    .announcement: panel.accessibilityLabel() ?? content.title,
+                    .priority: NSAccessibilityPriorityLevel.medium.rawValue,
+                ])
+        }
         // No caret: nothing typed here goes anywhere.
         host.invalidateDisplay()
     }
 
     func dismiss() {
-        bar?.removeFromSuperview()
-        bar = nil
+        overlay?.removeFromSuperview()
+        overlay = nil
     }
 
-    /// A new session replaces this pane's output; asked first, because the
-    /// output above is gone afterwards and the old program does not return.
-    private func confirmNewSession(isConnection: Bool) {
-        let alert = NSAlert()
-        alert.messageText = L10n.text("session.ended.confirm.title")
-        alert.informativeText = L10n.text(
-            isConnection ? "session.ended.confirm.remoteMessage" : "session.ended.confirm.message")
-        alert.addButton(withTitle: L10n.text("session.ended.confirm.start"))
-        alert.addButton(withTitle: L10n.text("common.cancel"))
-        alert.present(for: host?.view.window) { [weak self] response in
-            guard response == .alertFirstButtonReturn, let self, let host = self.host, !host.didTeardown,
-                self.bar != nil
-            else { return }
-            host.rebuildPane(strictRespawn: isConnection)
-        }
+    private func startAgain(isConnection: Bool) {
+        guard let host, !host.didTeardown, overlay != nil else { return }
+        host.rebuildPane(strictRespawn: isConnection)
     }
 }
