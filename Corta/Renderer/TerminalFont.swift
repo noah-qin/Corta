@@ -263,7 +263,7 @@ nonisolated enum TerminalFont {
     ///
     /// A copy of the font in hand, not a font resolved again from its
     /// descriptor: that lookup goes through the font daemon, and when it
-    /// came back empty (the font database logging `MDB_MAP_FULL`) Core Text
+    /// came back empty, Core Text
     /// answered with LastResort — a face with no ASCII glyphs, for the
     /// session's whole life. The copy keeps the face and its matrix.
     static func pinningCascadeList(

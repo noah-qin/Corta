@@ -47,8 +47,7 @@ import Testing
     /// A *user-installed* family (one in `~/Library/Fonts`, as against the
     /// ones macOS ships) is served through the font daemon, and on this
     /// machine that lookup sometimes comes back empty inside the test host:
-    /// the run logs `mdb_txn_commit error: MDB_MAP_FULL` from the font
-    /// database as it does. `MonospacedFontCatalog.isUsable` then answers
+    /// `MonospacedFontCatalog.isUsable` then answers
     /// "no" correctly — it was handed nothing to measure — and a test that
     /// blamed the catalog for it would be reporting the machine's state as
     /// a defect in the code.

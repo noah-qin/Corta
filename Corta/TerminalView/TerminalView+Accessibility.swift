@@ -26,11 +26,13 @@ import OSLog
 /// view knows nothing about `Grid`. The snapshot is rebuilt at most once per
 /// burst, since AppKit asks a dozen questions per VoiceOver step.
 extension TerminalView {
-    /// What an assistive client asked and was told, at notice level so it is
-    /// there afterwards (`log show --predicate 'subsystem ==
-    /// "dev.noahqin.Corta" and category == "accessibility"'`). VoiceOver
+    /// What an assistive client asked and was told, enabled only by
+    /// `CORTA_ACCESSIBILITY_TRACE=1` for a VoiceOver investigation.
+    /// Read with `log stream --debug --predicate 'subsystem ==
+    /// "dev.noahqin.Corta" and category == "accessibility"'`. VoiceOver
     /// can't run in a test and never says which attribute it read; this does.
-    private static let trace = Logger(subsystem: "dev.noahqin.Corta", category: "accessibility")
+    private static let trace: Logger? = DiagnosticsEnvironment.accessibilityTrace()
+        ? Logger(subsystem: "dev.noahqin.Corta", category: "accessibility") : nil
 
     // MARK: - Element identity
 
@@ -51,7 +53,7 @@ extension TerminalView {
     // MARK: - Text
 
     override func accessibilityValue() -> Any? {
-        Self.trace.notice("value")
+        Self.trace?.debug("value")
         return accessibilitySnapshot()?.text
     }
 
@@ -60,7 +62,7 @@ extension TerminalView {
     }
 
     override func accessibilityString(for range: NSRange) -> String? {
-        Self.trace.notice("string(for:) \(range.location, privacy: .public)+\(range.length, privacy: .public)")
+        Self.trace?.debug("string(for:) \(range.location, privacy: .public)+\(range.length, privacy: .public)")
         guard let snapshot = accessibilitySnapshot() else { return nil }
         let full = snapshot.text as NSString
         guard let clamped = Self.clamp(range, to: full.length) else { return nil }
@@ -76,7 +78,7 @@ extension TerminalView {
     /// range; without it, it said "No selection." over a real selection.
     /// Plain text: colour and bold aren't semantics.
     override func accessibilityAttributedString(for range: NSRange) -> NSAttributedString? {
-        Self.trace.notice("attributedString(for:) \(range.location, privacy: .public)+\(range.length, privacy: .public)")
+        Self.trace?.debug("attributedString(for:) \(range.location, privacy: .public)+\(range.length, privacy: .public)")
         guard let text = accessibilityString(for: range) else { return nil }
         return NSAttributedString(string: text)
     }
@@ -101,18 +103,18 @@ extension TerminalView {
 
     override func accessibilitySelectedTextRange() -> NSRange {
         let range = accessibilitySnapshot()?.selectedRange ?? NSRange(location: 0, length: 0)
-        Self.trace.notice("selectedTextRange -> \(range.location, privacy: .public)+\(range.length, privacy: .public)")
+        Self.trace?.debug("selectedTextRange -> \(range.location, privacy: .public)+\(range.length, privacy: .public)")
         return range
     }
 
     override func accessibilitySelectedText() -> String? {
         guard let snapshot = accessibilitySnapshot(), snapshot.selectedRange.length > 0
         else {
-            Self.trace.notice("selectedText -> nil")
+            Self.trace?.debug("selectedText -> nil")
             return nil
         }
         let text = (snapshot.text as NSString).substring(with: snapshot.selectedRange)
-        Self.trace.notice("selectedText -> \(text.utf16.count, privacy: .public) units")
+        Self.trace?.debug("selectedText -> \(text.utf16.count, privacy: .public) units")
         return text
     }
 
@@ -121,10 +123,10 @@ extension TerminalView {
     override func accessibilitySelectedTextRanges() -> [NSValue]? {
         guard let snapshot = accessibilitySnapshot(), snapshot.selectedRange.length > 0
         else {
-            Self.trace.notice("selectedTextRanges -> []")
+            Self.trace?.debug("selectedTextRanges -> []")
             return []
         }
-        Self.trace.notice("selectedTextRanges -> [\(snapshot.selectedRange.location, privacy: .public)+\(snapshot.selectedRange.length, privacy: .public)]")
+        Self.trace?.debug("selectedTextRanges -> [\(snapshot.selectedRange.location, privacy: .public)+\(snapshot.selectedRange.length, privacy: .public)]")
         return [NSValue(range: snapshot.selectedRange)]
     }
 
@@ -246,7 +248,7 @@ extension TerminalView {
     func noteAccessibilitySelectionChanged() {
         guard NSWorkspace.shared.isVoiceOverEnabled else { return }
         cachedAccessibilitySnapshot = nil
-        Self.trace.notice("post selectedTextChanged")
+        Self.trace?.debug("post selectedTextChanged")
         NSAccessibility.post(element: self, notification: .selectedTextChanged)
     }
 

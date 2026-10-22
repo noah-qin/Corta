@@ -23,6 +23,35 @@ final class SearchAndTabUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// The second process must load the first process's pipeline archive
+    /// and still produce a live terminal, rather than just construct a GPU
+    /// backend in the unit-test host.
+    @MainActor
+    func testPipelineArchiveSupportsColdAndWarmLaunches() throws {
+        let stage = try UIFixtures.stage("measurement")
+        let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
+        defer { app.terminate() }
+        let archive = stage.appendingPathComponent("Caches/QuadPipelines.metallib-archive")
+        for launch in ["cold", "warm"] {
+            app.launch()
+            let window = app.windows.firstMatch
+            XCTAssertTrue(window.waitForExistence(timeout: 10))
+            let terminal = window.textViews.firstMatch
+            XCTAssertTrue(terminal.waitForExistence(timeout: 5))
+            let prompt = NSPredicate { element, _ in
+                ((element as? XCUIElement)?.value as? String)?.contains("demo ❯") == true
+            }
+            expectation(for: prompt, evaluatedWith: terminal)
+            waitForExpectations(timeout: 10)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: archive.path))
+            let shot = XCTAttachment(screenshot: window.screenshot())
+            shot.name = "pipeline-archive-\(launch)-launch"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
+    }
+
     @MainActor
     func testCommandFOpensTheSearchBarAndEscapeClosesIt() throws {
         let app = UIFixtures.app(stage: try UIFixtures.stage("measurement"), runner: Self.self, usingTestTarget: true)

@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Foundation
+import Darwin
 import Metal
 import Synchronization
 
@@ -156,45 +157,46 @@ public nonisolated enum QuadPipelineCache {
 
     /// The compiled-pipeline archive, in `AppPaths.cacheDirectory`: purgeable
     /// and per bundle id, so pruning only touches this build's archives (D22).
-    /// Named by `buildFingerprint`, so a rebuild never reads an older build's
-    /// cache. Internal for `QuadPipelineCacheTests`.
+    /// Keep the path stable: Metal records every archive URL in its own
+    /// bounded usage database, even after we delete an old archive. Naming
+    /// archives after each build eventually exhausted that database.
     static var binaryArchiveURL: URL? {
         guard let directory = AppPaths.cacheDirectory else { return nil }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         pruneStaleBinaryArchives(in: directory)
-        return directory.appendingPathComponent("\(archivePrefix)\(buildFingerprint).metallib-archive")
+        return directory.appendingPathComponent("QuadPipelines.metallib-archive")
     }
 
-    private static let archivePrefix = "QuadPipelines-"
-
-    /// The executable's modification time, which changes on every rebuild.
-    /// A stable `"unknown"` if unreadable still caches correctly.
-    private static var buildFingerprint: String {
-        guard let url = Bundle.main.executableURL,
-            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-            let modified = attributes[.modificationDate] as? Date
-        else { return "unknown" }
-        return String(Int(modified.timeIntervalSince1970))
+    /// Rebuilds start a fresh archive at the same URL. A missing timestamp
+    /// also takes the safe, uncached path; Metal still validates the shader
+    /// and device compatibility when it loads a current archive.
+    static func archiveIsCurrent(at url: URL, executableURL: URL?) -> Bool {
+        guard let executableURL,
+            let archiveAttributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+            let executableAttributes = try? FileManager.default.attributesOfItem(atPath: executableURL.path),
+            let archive = archiveAttributes[.modificationDate] as? Date,
+            let executable = executableAttributes[.modificationDate] as? Date
+        else { return false }
+        return archive >= executable
     }
 
-    /// Removes every other archive in the directory — older builds', and the
-    /// ones 1.0 wrote under another name — which would otherwise pile up.
-    /// Best-effort.
+    /// Best-effort removal of the old, per-build archive names. Leave other
+    /// users of the cache directory alone.
     private static func pruneStaleBinaryArchives(in directory: URL) {
-        let current = "\(archivePrefix)\(buildFingerprint).metallib-archive"
         guard
             let entries = try? FileManager.default.contentsOfDirectory(
                 at: directory, includingPropertiesForKeys: nil)
         else { return }
         for entry in entries
-        where entry.pathExtension == "metallib-archive" && entry.lastPathComponent != current
+        where entry.pathExtension == "metallib-archive"
+            && entry.lastPathComponent.hasPrefix("QuadPipelines-")
         {
             try? FileManager.default.removeItem(at: entry)
         }
     }
 
-    /// Writes via a temp file and an atomic `replaceItemAt`, so a reader never
-    /// sees a half-written archive.
+    /// A same-directory POSIX rename atomically installs the first archive
+    /// or replaces an existing one, so readers never see a partial file.
     static func serialize(_ archive: any MTLBinaryArchive, to url: URL) {
         let temporaryURL =
             url.deletingLastPathComponent()
@@ -203,9 +205,7 @@ public nonisolated enum QuadPipelineCache {
             try? FileManager.default.removeItem(at: temporaryURL)
             return
         }
-        do {
-            _ = try FileManager.default.replaceItemAt(url, withItemAt: temporaryURL)
-        } catch {
+        if rename(temporaryURL.path, url.path) != 0 {
             try? FileManager.default.removeItem(at: temporaryURL)
         }
     }
@@ -233,10 +233,15 @@ public nonisolated enum QuadPipelineCache {
             return !done
         }
         if isFirst, let url = binaryArchiveURL,
-            FileManager.default.fileExists(atPath: url.path)
+            archiveIsCurrent(at: url, executableURL: Bundle.main.executableURL)
         {
             descriptor.url = url
         }
+        if let archive = try? device.makeBinaryArchive(descriptor: descriptor) { return archive }
+        // A corrupt or incompatible disk cache must not disable caching for
+        // the rest of this launch. Rebuild it through an empty descriptor.
+        guard descriptor.url != nil else { return nil }
+        descriptor.url = nil
         return try? device.makeBinaryArchive(descriptor: descriptor)
     }
 }

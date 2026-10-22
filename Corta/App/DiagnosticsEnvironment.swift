@@ -40,6 +40,7 @@ nonisolated enum DiagnosticsEnvironment {
         case sftpSSH = "CORTA_SFTP_SSH"
         case stageDirectory = "CORTA_STAGE_DIR"
         case directFullScreen = "CORTA_DIRECT_FULLSCREEN"
+        case accessibilityTrace = "CORTA_ACCESSIBILITY_TRACE"
 
         /// Whether a Release build reads it. Program substitution and deliberate main-thread stalls are
         /// withheld; the remaining switches measure or stage a build.
@@ -50,6 +51,12 @@ nonisolated enum DiagnosticsEnvironment {
 
     private static func value(_ name: Switch, in environment: Environment) -> String? {
         environment[name.rawValue]
+    }
+
+    /// Routine accessibility queries are noisy even in Xcode's debugger.
+    /// Enable their trace explicitly for a VoiceOver investigation.
+    static func accessibilityTrace(in environment: Environment = ProcessInfo.processInfo.environment) -> Bool {
+        value(.accessibilityTrace, in: environment) == "1"
     }
 
     struct MainStall: Equatable, Sendable {
