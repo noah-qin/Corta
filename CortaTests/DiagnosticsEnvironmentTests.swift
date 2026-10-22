@@ -26,6 +26,13 @@ import Testing
 struct DiagnosticsEnvironmentTests {
     private typealias Switch = DiagnosticsEnvironment.Switch
 
+    @Test func accessibilityTracingRequiresExplicitOptIn() {
+        #expect(!DiagnosticsEnvironment.accessibilityTrace(in: [:]))
+        #expect(!DiagnosticsEnvironment.accessibilityTrace(in: ["CORTA_ACCESSIBILITY_TRACE": "0"]))
+        #expect(!DiagnosticsEnvironment.accessibilityTrace(in: ["CORTA_ACCESSIBILITY_TRACE": "true"]))
+        #expect(DiagnosticsEnvironment.accessibilityTrace(in: ["CORTA_ACCESSIBILITY_TRACE": "1"]))
+    }
+
     @Test func everySwitchIsStrippedFromAChild() {
         var inherited = ["PATH": "/usr/bin:/bin"]
         for name in Switch.allCases { inherited[name.rawValue] = "/tmp/x" }

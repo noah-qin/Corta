@@ -46,6 +46,10 @@ Versioning for compatibility changes.
 ### Fixed
 
 - Discard cancelled or superseded font scans and SSH host suggestions.
+- Rebuilding Corta reuses one Metal pipeline archive path instead of adding
+  a new path to Metal's bounded usage index on every build, which could
+  eventually log `MDB_MAP_FULL`. Routine accessibility query logs now
+  require an explicit diagnostic switch instead of filling Xcode's console.
 - Large SFTP listings convert and sort in the background; superseded work
   cannot replace a newer directory or sort order.
 - Opening remote editing no longer hashes the old cache on the main thread.

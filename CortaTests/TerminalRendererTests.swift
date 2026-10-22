@@ -47,14 +47,20 @@ import Testing
             frames += 1
             rebuiltRows.append(renderer.lastRebuiltRowCount)
         } while renderer.glyphAtlas.deferredShaping && frames < 2_400
-        // A follow-up frame rebuilds only the rows still missing a glyph.
+        // Only rows still missing a glyph are rebuilt. A time-limited frame
+        // may finish less than one row, so its successor can legitimately
+        // rebuild all 40 again. Require partial rebuilds as rows complete,
+        // rather than assuming every frame completes a row on this machine.
         #expect(rebuiltRows.count > 2)
-        #expect(rebuiltRows.dropFirst().allSatisfy { $0 < 40 })
+        #expect(rebuiltRows.dropFirst().contains { $0 < 40 })
+        #expect(zip(rebuiltRows, rebuiltRows.dropFirst()).allSatisfy { $0.1 <= $0.0 })
         #expect(requests > 0)
         #expect(requests == frames - 1)
         #expect(!renderer.glyphAtlas.deferredShaping)
         #expect(renderer.glyphAtlas.evictionCount == 0)
         #expect(renderer.cachedInstances[1].count == 2400)
+        _ = renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
+        #expect(renderer.lastRebuiltRowCount == 0)
     }
 
     @Test("a page that evicts a nearly full atlas once still fills in completely")

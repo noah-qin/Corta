@@ -321,6 +321,28 @@ struct Metal4BackendTests {
     .serialized, .metalSerialized,
     .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct QuadPipelineCacheTests {
+    @Test func archiveFreshnessTracksRebuildsAndMissingFiles() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("Corta")
+        let archive = directory.appendingPathComponent("QuadPipelines.metallib-archive")
+        try Data().write(to: executable)
+        let built = Date(timeIntervalSince1970: 1_700_000_000)
+        try FileManager.default.setAttributes([.modificationDate: built], ofItemAtPath: executable.path)
+        #expect(!QuadPipelineCache.archiveIsCurrent(at: archive, executableURL: executable))
+        try Data().write(to: archive)
+        try FileManager.default.setAttributes([.modificationDate: built.addingTimeInterval(-1)], ofItemAtPath: archive.path)
+        #expect(!QuadPipelineCache.archiveIsCurrent(at: archive, executableURL: executable))
+        try FileManager.default.setAttributes([.modificationDate: built], ofItemAtPath: archive.path)
+        #expect(QuadPipelineCache.archiveIsCurrent(at: archive, executableURL: executable))
+        try FileManager.default.setAttributes([.modificationDate: built.addingTimeInterval(1)], ofItemAtPath: archive.path)
+        #expect(QuadPipelineCache.archiveIsCurrent(at: archive, executableURL: executable))
+        #expect(!QuadPipelineCache.archiveIsCurrent(at: archive, executableURL: nil))
+        try FileManager.default.removeItem(at: executable)
+        #expect(!QuadPipelineCache.archiveIsCurrent(at: archive, executableURL: executable))
+    }
+
     /// A cold pipeline-set creation writes the `MTLBinaryArchive` a later
     /// launch compiles through; this checks the file lands where
     /// `binaryArchiveURL` says. Whether a pipeline was looked up or compiled
@@ -331,10 +353,12 @@ struct QuadPipelineCacheTests {
             Issue.record("No cache directory available in this environment")
             return
         }
+        #expect(url.lastPathComponent == "QuadPipelines.metallib-archive")
         try? FileManager.default.removeItem(at: url)
         QuadPipelineCache.discardPipelines()
         _ = try Metal4Backend(device: device)
         #expect(FileManager.default.fileExists(atPath: url.path))
+        #expect(!(try Data(contentsOf: url)).isEmpty)
     }
 
     /// A second backend is a cache hit and builds with an archive already on

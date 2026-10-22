@@ -658,6 +658,26 @@ log stream --info --predicate 'process == "CortaDev"'
 log stream --info --predicate 'subsystem == "dev.noahqin.Corta"'
 ```
 
+Accessibility attribute queries are opt-in debug diagnostics. Launch with
+`CORTA_ACCESSIBILITY_TRACE=1`, then use `log stream --debug --predicate 'subsystem == "dev.noahqin.Corta" and category == "accessibility"'`.
+
+If the console reports `(Metal) mdb_txn_commit error: MDB_MAP_FULL`, quit
+other development instances and run `./scripts/build-and-run.sh --repair-metal-cache`.
+This stops this checkout's app, backs up only Corta Dev's Metal archive
+usage index, then builds and launches. Metal recreates the index; the
+installed app and settings are untouched. The backup path is printed.
+The archive now keeps one path across rebuilds to avoid adding a usage
+record for every executable timestamp. Scratch stages still have distinct
+paths, so many staged launches can eventually require another repair.
+
+The system input method can also log `IMKXPCServerProxy` secure-decoding
+warnings and `TextInputUI` ViewBridge cancellation. A BaseBoard task-port
+message naming WindowServer, or SQLite's missing `/private/var/db/DetachedSignatures`,
+is not an app-owned XPC or database failure. Capture the full subsystem,
+process and symptoms when investigating them. Do not disable input methods,
+change WindowServer privileges, create the system database or globally
+suppress logging to make the console quiet.
+
 `CORTA_RESTORE_WINDOWS=0` (set by the `Corta (Dev)` scheme) skips the
 restore, and `SHELL` names the shell to spawn — pass it in the environment
 of the launch you control, never through `launchctl setenv`. Then run the
@@ -700,6 +720,7 @@ single reader to the code.
 
 | Variable | Values | Builds | Effect |
 | --- | --- | --- | --- |
+| `CORTA_ACCESSIBILITY_TRACE` | `1` | all | Enables debug logs for accessibility attribute queries; off by default, including under Xcode |
 | `CORTA_MAIN_STALL` | `<ms>/<period-ms>`, e.g. `8/33` | Debug / Benchmark only | Repeated bounded main-thread stall, to measure what a busy main thread costs a frame; ignored in Release |
 | `CORTA_DIRECT_FULLSCREEN` | unset (default), `0`; in Debug / Benchmark also `1` or a comma-separated subset of `toolbar,mask,overlays,colorspace,present` | all; experimental values Debug / Benchmark only | For a full-screen window with one pane (#285), the default drops the corner mask; on macOS 27 or later it also selects present-by-copy. `0` disables those full-screen changes. On macOS 26 every window presents by copy as a compatibility path for #380, including when this switch is `0`. Debug / Benchmark can explicitly select `present` on later OS versions for controlled re-measurement. |
 | `CORTA_FRAME_DRIVER` | `displaylink` (default), `ondemand` | all | Experimental echo presentation with separate CADisplayLink pacing; immediate acquisition only while paused; the unaccepted no-sync experiment was removed, so both retained drivers use display synchronization |
