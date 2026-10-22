@@ -480,8 +480,10 @@ from the terminal stream is ever written into it.
 approval snapshots live under Application Support/RemoteEdit. Directories
 are restricted to mode 0700 and files to 0600; reused copies are tightened
 when opened. A copy whose content still matches its approved digest and that
-nobody opened or changed for 30 days is removed when the store loads; an
-undecided edit is kept. A ⌘-click or Edit copies at most 64 MB. Downloads create partials with 0600 and refuse a partial-file
+nobody opened or changed for 30 days is eligible for background cleanup when
+the store loads; an undecided edit is kept. Each run checks at most 32 copies
+and hashes at most 256 MiB (plus an EOF probe per file); excess copies wait for
+a later run. Opening a remote copy awaits that maintenance asynchronously. A ⌘-click or Edit copies at most 64 MB. Downloads create partials with 0600 and refuse a partial-file
 symlink. Download files and managed directories/files have inherited ACLs
 cleared before use. This does not exclude administrators or backups; parent
 storage policy and intentionally shared export destinations still matter.
@@ -513,6 +515,12 @@ against a local process deliberately swapping directories during a transfer.
 HOME and SSH_AUTH_SOCK. Tests needing isolated authentication use temporary
 keys, an explicit SSH configuration, `IdentityAgent none`, no forwarding,
 and a separate known_hosts; never alter the user's SSH files.
+
+After connection establishment, each remote-edit SFTP operation has a 120-second
+deadline. Expiry closes that connection, unwinds pending requests and offers the
+upload decision again; other operations sharing that connection also fail and
+must reconnect. This is an operation deadline, including a transfer, rather
+than a throughput guarantee.
 
 Remote editing requires an explicit `open-file-command`. Managed downloads,
 including reused copies, never use LaunchServices' default file handler:

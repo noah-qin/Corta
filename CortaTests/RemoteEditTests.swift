@@ -97,7 +97,8 @@ struct RemoteEditStoreTests {
         let stale = try stage("/srv/app/.env", edited: false, modified: longAgo)
         let undecided = try stage("/srv/app/config.yml", edited: true, modified: longAgo)
         let recent = try stage("/srv/app/notes.txt", edited: false, modified: Date())
-        store.pruneStaleCopies()
+        await store.finishMaintenance()
+        await store.pruneStaleCopies()
         #expect(store.copies[stale.id] == nil)
         #expect(!FileManager.default.fileExists(atPath: store.localURL(for: stale).path))
         #expect(store.copies[undecided.id] != nil)
@@ -105,6 +106,31 @@ struct RemoteEditStoreTests {
         #expect(store.copies[recent.id] != nil)
         // The manifest on disk agrees.
         #expect(RemoteEditStore(rootURL: root).copies[stale.id] == nil)
+    }
+
+    @Test("maintenance does not hash an oversized file and a live edit is retained")
+    func maintenanceBudgetAndLiveEdit() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = RemoteEditStore(rootURL: root)
+        await store.finishMaintenance()
+        let bytes = Data("unchanged".utf8)
+        let copy = store.recordDownload(
+            host: "box", remotePath: "/old",
+            remoteSize: UInt64(bytes.count), remoteMTime: 1,
+            remoteDigest: RemoteEditStore.sha256Hex(bytes))
+        let url = store.localURL(for: copy)
+        try store.secureCopy(at: url)
+        try bytes.write(to: url)
+        #expect(RemoteEditStore.sha256Hex(ofFile: url, byteLimit: 2) == nil)
+        #expect(RemoteEditStore.sha256Hex(ofFile: url, byteLimit: bytes.count) == copy.remoteDigest)
+        let old = Date(timeIntervalSinceNow: -RemoteEditStore.retention - 86_400)
+        try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
+        // An immutable maintenance snapshot cannot delete a copy opened since.
+        store.recordOpen(copy)
+        await store.pruneStaleCopies(candidates: [copy])
+        #expect(store.copies[copy.id] != nil)
+        #expect(FileManager.default.fileExists(atPath: url.path))
     }
 
     @Test("a corrupt or future-version manifest degrades to empty, not to a guess")
@@ -233,7 +259,9 @@ struct RemoteEditCoordinatorTests {
     /// A coordinator whose fake serves `/srv/app/main.rs` (size 100,
     /// mtime 1000); downloads write the canned content to the destination,
     /// the way the engine would.
-    private func makeFixture(remoteContent: String = "remote v1") throws -> Fixture {
+    private func makeFixture(
+        remoteContent: String = "remote v1", operationTimeout: Duration = .seconds(120)
+    ) throws -> Fixture {
         let root = try makeTempDirectory()
         let store = RemoteEditStore(rootURL: root)
         let fake = FakeSFTPClient()
@@ -254,7 +282,8 @@ struct RemoteEditCoordinatorTests {
             presenter: RemoteEditCoordinator.RemoteEditPresenter(
                 promptUpload: { recorder.uploads.append($0) },
                 promptConflict: { recorder.conflicts.append($0) },
-                showError: { recorder.errors.append($0) }))
+                showError: { recorder.errors.append($0) }),
+            operationTimeout: operationTimeout)
         return Fixture(
             root: root, store: store, fake: fake, recorder: recorder, coordinator: coordinator)
     }
@@ -313,7 +342,10 @@ struct RemoteEditCoordinatorTests {
         var made = 0
         let coordinator = RemoteEditCoordinator(
             store: RemoteEditStore(rootURL: root),
-            makeClient: { _ in made += 1; return made == 1 ? first : replacement },
+            makeClient: { _ in
+                made += 1
+                return made == 1 ? first : replacement
+            },
             opener: { _, _, _ in true },
             presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
         await #expect(throws: SFTPError.transport(.connectionLost)) {
@@ -415,7 +447,10 @@ struct RemoteEditCoordinatorTests {
         var made = 0
         let coordinator = RemoteEditCoordinator(
             store: RemoteEditStore(rootURL: root),
-            makeClient: { _ in made += 1; return made == 1 ? first : replacement },
+            makeClient: { _ in
+                made += 1
+                return made == 1 ? first : replacement
+            },
             opener: { _, _, _ in true },
             presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
         do { _ = try await coordinator.materialize(host: "build-box", remotePath: "/missing") }
@@ -470,7 +505,11 @@ struct RemoteEditCoordinatorTests {
         var made = 0
         var errors: [String] = []
         let coordinator = RemoteEditCoordinator(
-            store: store, makeClient: { _ in made += 1; return made == 1 ? first : second },
+            store: store,
+            makeClient: { _ in
+                made += 1
+                return made == 1 ? first : second
+            },
             opener: { _, _, _ in true },
             presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { errors.append($0) }))
         #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
@@ -987,7 +1026,36 @@ struct RemoteEditCoordinatorTests {
             uploaded != nil && fixture.coordinator.pendingUploads.first?.contentDigest == RemoteEditStore.sha256Hex(Data("later edit".utf8))
         }
         #expect(uploaded == "approved")
-        #expect(fixture.coordinator.pendingUploads.first?.contentDigest == RemoteEditStore.sha256Hex(Data("later edit".utf8)))
+        #expect(
+            fixture.coordinator.pendingUploads.first?.contentDigest
+                == RemoteEditStore.sha256Hex(Data("later edit".utf8)))
+    }
+
+    @Test("a silent established connection releases the upload and offers a fresh retry")
+    func silentUploadTimesOut() async throws {
+        let fixture = try makeFixture(operationTimeout: .seconds(1) * testTimeoutScale)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.coordinator.open(
+            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
+        let pending = try #require(fixture.recorder.uploads.first)
+        let prompts = fixture.recorder.uploads.count
+        fixture.fake.lstatHangs = true
+        fixture.coordinator.upload(pending)
+        await waitUntil("silent upload times out and asks again") {
+            fixture.fake.closed && fixture.recorder.uploads.count > prompts
+                && !fixture.coordinator.uploadsInFlight.contains(fixture.copyID)
+        }
+        #expect(!fixture.recorder.errors.isEmpty)
+        #expect(fixture.coordinator.approvedSnapshots[fixture.copyID] == nil)
+        fixture.fake.lstatHangs = false
+        fixture.fake.closed = false
+        fixture.coordinator.upload(try #require(fixture.recorder.uploads.last))
+        await waitUntil("retry uploads the approved snapshot") {
+            fixture.fake.transferCalls.contains { $0.isUpload }
+                && !fixture.coordinator.uploadsInFlight.contains(fixture.copyID)
+        }
     }
 
     /// A failed upload left the edit pending with no prompt: later saves

@@ -33,7 +33,7 @@ final class SFTPBrowserModel {
     /// What one row of the listing is, decided from the ATTRS permission
     /// bits. `other` covers sockets, fifos and devices — displayed, but
     /// none of the operations pretend to know what to do with one.
-    nonisolated enum Kind: Equatable {
+    nonisolated enum Kind: Equatable, Sendable {
         case file, directory, symlink, other
 
         var title: String {
@@ -55,7 +55,7 @@ final class SFTPBrowserModel {
         }
     }
 
-    nonisolated struct Entry: Identifiable, Equatable {
+    nonisolated struct Entry: Identifiable, Equatable, Sendable {
         var id: String { name }
         let name: String
         let kind: Kind
@@ -179,6 +179,9 @@ final class SFTPBrowserModel {
     /// the table shows.
     var allEntries: [Entry] = []
     var entries: [Entry] = []
+    @ObservationIgnored var entryPreparation: Task<Void, Never>?
+    @ObservationIgnored var entryGeneration = 0
+    var hiddenEntries = 0
     var selection: Set<String> = []
     /// The table's sort, applied on every listing and whenever it changes.
     var sortColumn: SortColumn = .name { didSet { applyVisibleEntries() } }
@@ -188,7 +191,7 @@ final class SFTPBrowserModel {
     /// How many dot files the current directory holds while they are hidden,
     /// so the status line can say so instead of the listing looking short.
     var hiddenEntryCount: Int {
-        showsHiddenFiles ? 0 : allEntries.count(where: \.isHidden)
+        showsHiddenFiles ? 0 : hiddenEntries
     }
     /// Directories visited before and after this one, newest last; Back and
     /// Forward walk them the way a browser's do.
