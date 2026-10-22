@@ -16,6 +16,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # The terminal host has broad access; its decoder gets an independent sandbox.
+#
+# The app target runs this with ENABLE_USER_SCRIPT_SANDBOXING = NO. In an
+# archive, $BUILT_PRODUCTS_DIR/corta-image-decoder is a symlink into
+# UninstalledProducts, and Xcode 26's script sandbox refuses to read through
+# it ("Operation not permitted"); only `xcodebuild archive` takes that path.
 set -euo pipefail
 helper_app="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/CortaImageDecoder.app"
 # codesign uses unpredictable temporary sibling names. Sign in the build
