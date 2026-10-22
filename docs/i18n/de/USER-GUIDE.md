@@ -5,7 +5,7 @@
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
 > Diese Seite ist eine Übersetzung von [USER-GUIDE.md](../../USER-GUIDE.md) mit dem Stand von Commit
-> [`04ad320`](https://github.com/noah-qin/Corta/blob/04ad320438030e3ba4a7c19761b0279e39c42afc/docs/USER-GUIDE.md).
+> [`6d71b21`](https://github.com/noah-qin/Corta/blob/6d71b211e36e977f9250f45df1ccf10dde8fde2f/docs/USER-GUIDE.md).
 > Wurde die englische Fassung seitdem geändert oder weichen die beiden ab, gilt die englische.
 > Namen in der Oberfläche folgen Cortas deutscher Oberfläche; Konfigurationsschlüssel, Befehle und Code bleiben im Original.
 
