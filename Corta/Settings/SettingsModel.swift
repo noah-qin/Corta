@@ -469,8 +469,8 @@ final class SettingsModel {
 
     func loadFonts() async {
         await loadFonts(
-            monospaced: MonospacedFontCatalog.loadEntries,
-            cjk: MonospacedFontCatalog.loadCJKEntries)
+            monospaced: { await MonospacedFontCatalog.loadEntries() },
+            cjk: { await MonospacedFontCatalog.loadCJKEntries() })
     }
 
     func loadFonts(
