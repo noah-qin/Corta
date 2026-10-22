@@ -10,6 +10,14 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- The project overview, the user guide and troubleshooting are now available
+  in every language the app speaks: Simplified and Traditional Chinese,
+  Japanese, Korean, German, French, Spanish and Brazilian Portuguese. A
+  language bar with flags at the top of each switches between them, and each
+  translation says which English version it follows.
+
 ## [1.3.1] - 2026-10-21
 
 ### Fixed

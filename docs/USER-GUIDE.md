@@ -2,6 +2,8 @@
 
 [Documentation index](README.md) · [Project overview](../README.md)
 
+🇺🇸 [English](USER-GUIDE.md) · 🇨🇳 [简体中文](USER-GUIDE.zh-CN.md) · 🇭🇰 [繁體中文](USER-GUIDE.zh-Hant.md) · 🇯🇵 [日本語](USER-GUIDE.ja.md) · 🇰🇷 [한국어](USER-GUIDE.ko.md) · 🇩🇪 [Deutsch](USER-GUIDE.de.md) · 🇫🇷 [Français](USER-GUIDE.fr.md) · 🇪🇸 [Español](USER-GUIDE.es.md) · 🇧🇷 [Português](USER-GUIDE.pt-BR.md)
+
 Everything Corta does, and how to reach it. Each section says where the
 feature lives — a menu, a shortcut, a setting — and links to the reference
 that holds the details. Shortcuts are the defaults, and all but Find Next
