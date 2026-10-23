@@ -179,8 +179,31 @@ public struct Terminal: Sendable {
     /// drawn; read back to render what the child set.
     public var dynamicColors: DynamicColors {
         get { performer.state.dynamicColors }
-        set { performer.state.dynamicColors = newValue }
+        set {
+            performer.state.dynamicColors = newValue
+            performer.state.dynamicColorDefaults = newValue
+            performer.state.dynamicColorOverrides.removeAll()
+        }
     }
+
+    /// Updates theme resources atomically with respect to the parser. OSC overrides survive.
+    /// Returns a fixed report only for an actual dark/light transition with ?2031 set.
+    public mutating func updateTheme(colors: DynamicColors, isDark: Bool) -> [UInt8] {
+        let changed = performer.state.isDark != isDark
+        performer.state.isDark = isDark
+        performer.state.dynamicColorDefaults = colors
+        if !performer.state.dynamicColorOverrides.contains(10) { performer.state.dynamicColors.foreground = colors.foreground }
+        if !performer.state.dynamicColorOverrides.contains(11) { performer.state.dynamicColors.background = colors.background }
+        if !performer.state.dynamicColorOverrides.contains(12) { performer.state.dynamicColors.cursor = colors.cursor }
+        performer.state.dynamicColors.selection = colors.selection
+        if changed, performer.state.colorSchemeReportingEnabled {
+            return Array("\u{1B}[?997;\(isDark ? 1 : 2)n".utf8)
+        }
+        return []
+    }
+
+    public var selectionBackground: Color { performer.state.selectionBackground }
+    public var selectionForeground: Color { performer.state.selectionForeground }
 
     public var indexedPalette: IndexedPalette {
         get { performer.state.indexedPalette }

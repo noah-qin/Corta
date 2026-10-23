@@ -1,0 +1,11 @@
+rows: 2 columns: 6
+cursor: row 0 column 5
+   0 |ABCDE |
+   1 |      |
+styles:
+   0 |ABCD..|
+   1 |......|
+   A = fg:default bg:default attrs:underline ul:rgb(255,0,0)
+   B = fg:default bg:default attrs:underline,double-underline ul:2
+   C = fg:default bg:default attrs:underline,curly-underline ul:rgb(0,0,255)
+   D = fg:default bg:default attrs:underline,curly-underline

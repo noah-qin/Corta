@@ -48,7 +48,7 @@ stream itself supplied.
 
 ### 2.2 Never implement title reporting
 
-Setting the window title (OSC 0 / 2) is safe and expected. **Reading it
+Setting the icon name or window title (OSC 0 / 1 / 2) is safe and expected. **Reading it
 back (`ESC [ 21 t`) is not, and Corta will not implement it.**
 
 The attack is well known: hostile output sets the title to arbitrary
@@ -58,6 +58,12 @@ arbitrary command execution from merely `cat`-ing a file.
 
 The same reasoning applies to any future sequence that echoes stored
 state back to the child. This is listed as a non-goal in `DESIGN.md` §6.
+
+XTGETTCAP replies select names and values from a fixed capability table; an
+unknown or malformed name gets a constant negative reply without an echoed name.
+DECRQSS accepts only the SGR status query: the positive reply serialises numeric
+pen state, and every other query gets a constant negative reply. Colour-scheme
+reports contain only the live theme's dark/light value. None reports titles.
 
 ### 2.3 Bracketed paste is a security feature
 
@@ -239,7 +245,7 @@ allocating without bound. These caps are asserted in the fuzz harness
 
 | Input                      | Cap                                                   |
 | -------------------------- | ----------------------------------------------------- |
-| OSC / DCS string length    | Hard limit; discard the sequence on overflow and resynchronise |
+| OSC / DCS string length    | 4096 bytes; discard the sequence on overflow and resynchronise |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
 | Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size; 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) |
 | Kitty PNG decoding         | `corta-image-decoder`, a process of its own under the independent App Sandbox (no access to host user files or network entitlements), 10 s, a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor inside its sandbox, so decoded pixels never travel over stdout |
@@ -248,6 +254,8 @@ allocating without bound. These caps are asserted in the fuzz harness
 | CSI parameter value        | Clamp to a sane maximum before use                     |
 | Repeat counts (e.g. `REP`) | Clamp to the screen or scrollback dimension            |
 | Scrollback                 | Configured line cap, enforced by the ring buffer       |
+| Title stacks | Ten window titles and ten icon names per terminal, each bounded by the 4096-byte OSC cap; overflow discards the oldest entry, empty pops do nothing; RIS clears both |
+| Underline colours | 4095 interned colours per screen, at most two screens per pane; zero falls back to the cell foreground. Reclaim only entries absent from live cells, compressed history and both pens; defer low-yield sweeps for 1023 failed interns. Snapshots own their value copy; screen replacement/RIS drops the table |
 | Glyph atlas                | Bounded with eviction                                  |
 | Pattern detection over output | Linear in the text: URL and `path:line` detectors have no overlapping quantifiers, and a hover scans at most 100,000 cells — the main thread runs them |
 
@@ -558,7 +566,7 @@ state. Charge retained resources until release; return reservations on
 failure, cancellation, replacement and owner teardown. Test both rejection
 and recovery, including work finishing after cancellation.
 
-The implementation has parser, cluster, image, texture, SFTP frame,
+The implementation has parser, title-stack, underline-colour, cluster, image, texture, SFTP frame,
 request/writer, directory-list and tree limits. New paths must name their
 budget explicitly rather than assuming another layer accounts for them.
 Cancelled SFTP requests that still owe a wire reply have a separate 1,024-ID

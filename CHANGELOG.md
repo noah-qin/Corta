@@ -12,6 +12,11 @@ Versioning for compatibility changes.
 
 ### Added
 
+- Terminal compatibility: title save/restore, live dark/light reports, coloured
+  single/double/curly underlines, XTGETTCAP capability answers, and Neovim's
+  underline-style probe. Programs can set/query/reset selection colours and
+  restore default text, background and cursor colours to the live theme.
+
 - The project overview, the user guide and troubleshooting are now available
   in every language the app speaks: Simplified and Traditional Chinese,
   Japanese, Korean, German, French, Spanish and Brazilian Portuguese. A

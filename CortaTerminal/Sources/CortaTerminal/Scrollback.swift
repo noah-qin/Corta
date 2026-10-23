@@ -54,6 +54,7 @@ public struct Scrollback: Sendable {
         var attempted = false
         var rowHyperlinks: [Int: Set<HyperlinkID>] = [:]
         var rowGraphemes: [Int: Set<GraphemeID>] = [:]
+        var rowUnderlineColors: [Int: Set<UInt16>] = [:]
     }
 
     fileprivate struct ASCIIPlane: Sendable {
@@ -155,19 +156,23 @@ public struct Scrollback: Sendable {
                 }
             }
             var rowHyperlinks: [Int: Set<HyperlinkID>] = [:], rowGraphemes: [Int: Set<GraphemeID>] = [:]
+            var rowUnderlineColors: [Int: Set<UInt16>] = [:]
             if !bytes.isEmpty {
                 for (index, row) in rows.enumerated() {
                     var links: Set<HyperlinkID> = [], clusters: Set<GraphemeID> = []
+                    var underlineColors: Set<UInt16> = []
                     for cell in cells[Int(row.start)..<(Int(row.start) + Int(row.length))] {
                         if !cell.hyperlink.isNone { links.insert(cell.hyperlink) }
                         if !cell.grapheme.isNone { clusters.insert(cell.grapheme) }
+                        if cell.underlineColorID != 0 { underlineColors.insert(cell.underlineColorID) }
                     }
                     if !links.isEmpty { rowHyperlinks[index] = links }
                     if !clusters.isEmpty { rowGraphemes[index] = clusters }
+                    if !underlineColors.isEmpty { rowUnderlineColors[index] = underlineColors }
                 }
             }
             return CompressionResult(id: id, namespace: namespace, bytes: bytes, cellCount: cells.count,
-                rowHyperlinks: rowHyperlinks, rowGraphemes: rowGraphemes)
+                rowHyperlinks: rowHyperlinks, rowGraphemes: rowGraphemes, rowUnderlineColors: rowUnderlineColors)
         }
     }
     public struct CompressionResult: Sendable {
@@ -177,6 +182,7 @@ public struct Scrollback: Sendable {
         fileprivate let cellCount: Int
         fileprivate let rowHyperlinks: [Int: Set<HyperlinkID>]
         fileprivate let rowGraphemes: [Int: Set<GraphemeID>]
+        fileprivate let rowUnderlineColors: [Int: Set<UInt16>]
     }
 
     /// Four sealed batches plus the mutable tail remain hot.
@@ -207,6 +213,7 @@ public struct Scrollback: Sendable {
             batches[index].arena = []
             batches[index].rowHyperlinks = result.rowHyperlinks
             batches[index].rowGraphemes = result.rowGraphemes
+            batches[index].rowUnderlineColors = result.rowUnderlineColors
         }
         return true
     }
@@ -284,6 +291,10 @@ public struct Scrollback: Sendable {
             text.append(byte); rows.append(Int32(documentRow)); columns.append(Int32(column))
         }
         return true
+    }
+
+    func liveUnderlineColorIDs() -> Set<UInt16> {
+        liveIDs(rows: \.rowUnderlineColors) { $0.underlineColorID == 0 ? nil : $0.underlineColorID }
     }
 
     func liveHyperlinkIDs() -> Set<HyperlinkID> {

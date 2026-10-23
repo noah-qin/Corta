@@ -382,7 +382,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         windowTitle.reset(session: started.session)
         remote.reset()
         let variant = AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
-        session.dynamicColors = variant.dynamicColors
+        session.updateTheme(colors: variant.dynamicColors, isDark: AppearanceController.shared.isDark)
         session.indexedPalette = variant.indexedPaletteDefaults
         pendingSessionNotice = started.notice
         lastRequestedSize = size

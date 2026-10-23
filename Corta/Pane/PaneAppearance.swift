@@ -124,9 +124,9 @@ final class PaneAppearance: NSObject {
         guard let host else { return }
         (host.view.window?.windowController as? TerminalWindowController)?.applyCanvasAppearance()
         // OSC 10/11/12 answers follow the live variant.
-        session?.dynamicColors =
-            AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
-            .dynamicColors
+        session?.updateTheme(
+            colors: AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark).dynamicColors,
+            isDark: AppearanceController.shared.isDark)
         // Only the defaults: an OSC 4'd index is terminal state, and a
         // get-then-set would race the reader thread.
         session?.updateIndexedPaletteDefaults(

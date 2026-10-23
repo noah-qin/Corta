@@ -47,9 +47,10 @@ nonisolated extension Theme.Variant {
         func triple(_ color: SIMD4<Float>) -> (red: UInt8, green: UInt8, blue: UInt8) {
             (byte(color.x), byte(color.y), byte(color.z))
         }
-        return DynamicColors(
-            foreground: triple(foreground), background: triple(background),
-            cursor: triple(cursor))
+        var colors = DynamicColors(
+            foreground: triple(foreground), background: triple(background), cursor: triple(cursor))
+        colors.selection = triple(overlayColors.selection)
+        return colors
     }
 
     /// OSC 4 defaults: indices 0–15 from this variant, 16–255 from

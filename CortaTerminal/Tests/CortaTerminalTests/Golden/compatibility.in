@@ -1,0 +1,6 @@
+# xterm title stacks, dynamic colours, XTGETTCAP and ITU SGR underline colours.
+# Protocol-only changes must not print payloads; titles never report.
+\e]0;shell\a\e[22;0t\e]1;editor\a\e]2;editor\a\e[23;0t\e[23;0t
+\e]10;#abc\a\e]110\a\e]17;#123\a\e]117\a\e]19;#456\a\e]119\a
+\e[?2031h\e[?996n\eP+q544e\e\\
+\e[4;58;2;255;0;0mA\e[4:2;58:5:2mB\e[4:3;58:2::0:0:255mC\e[59mD\e[0mE

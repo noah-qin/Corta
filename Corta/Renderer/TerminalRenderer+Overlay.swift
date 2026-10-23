@@ -144,6 +144,24 @@ nonisolated extension TerminalRenderer {
 
     /// Shifted by scrollback growth since recording, then by the scroll
     /// offset; rows off screen produce nothing.
+    static func selectedColumns(
+        _ selection: TerminalSelection?, grid: Grid, offset: Int, into columns: inout [Range<Int>]
+    ) {
+        columns.removeAll(keepingCapacity: true)
+        guard let selection else { return }
+        columns.reserveCapacity(grid.rows)
+        let first = ScrollbackCoordinates.reanchoredRow(selection.start.row,
+            from: selection.baseScrollbackTotal, to: grid.scrollback.totalPushed) + offset
+        let last = ScrollbackCoordinates.reanchoredRow(selection.end.row,
+            from: selection.baseScrollbackTotal, to: grid.scrollback.totalPushed) + offset
+        for row in 0..<grid.rows {
+            guard row >= first, row <= last else { columns.append(0..<0); continue }
+            let start = row == first ? min(max(0, selection.start.column), grid.columns) : 0
+            let end = row == last ? min(max(0, selection.end.column + 1), grid.columns) : grid.columns
+            columns.append(start..<max(start, end))
+        }
+    }
+
     private func selectionQuads(
         _ selection: TerminalSelection, grid: Grid, offset: Int, cellWidth: Float, cellHeight: Float,
         color: SIMD4<Float>

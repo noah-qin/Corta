@@ -31,6 +31,7 @@ struct GoldenTests {
         Golden.Case("cursor-movement", rows: 4, columns: 10),
         Golden.Case("erase-line", rows: 4, columns: 10),
         Golden.Case("erase-display", rows: 4, columns: 10),
+        Golden.Case("compatibility", rows: 2, columns: 6),
         Golden.Case("sgr", rows: 4, columns: 20),
         Golden.Case("ls-color", rows: 4, columns: 24),
         Golden.Case("scrollback", rows: 3, columns: 8, scrollbackLimit: 2, showScrollback: true),

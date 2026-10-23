@@ -27,6 +27,8 @@ extension Performer {
             if let code = Self.parseOSCCode(bytes) {
                 if code == 104 {
                     resetIndexedColors(bytes[bytes.endIndex...])
+                } else if [110, 111, 112, 117, 119].contains(code) {
+                    resetDynamicColor(code)
                 } else if code == 105 {
                     resetSpecialColors(bytes[bytes.endIndex...])
                 }
@@ -38,7 +40,12 @@ extension Performer {
         let payload = bytes[bytes.index(after: separator)...]
 
         switch code {
-        case 0, 2:
+        case 0:
+            state.iconName = String(decoding: payload, as: UTF8.self)
+            state.windowTitle = String(decoding: payload, as: UTF8.self)
+        case 1:
+            state.iconName = String(decoding: payload, as: UTF8.self)
+        case 2:
             state.windowTitle = String(decoding: payload, as: UTF8.self)
         case 7:
             setWorkingDirectory(payload)
@@ -63,7 +70,11 @@ extension Performer {
             handleSpecialColor(payload)
         case 105:
             resetSpecialColors(payload)
-        case 10, 11, 12:
+        case 110, 111, 112, 117, 119:
+            resetDynamicColor(code)
+        case 13, 14, 15, 16, 18:
+            break // Pointer/Tektronix colours have no corresponding surface.
+        case 10, 11, 12, 17, 19:
             // `?` queries; numeric state, so nothing the stream supplied is echoed.
             if payload.count == 1, payload.first == 0x3F {
                 reportDynamicColor(code)

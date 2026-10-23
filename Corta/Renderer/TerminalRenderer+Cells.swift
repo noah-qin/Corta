@@ -32,12 +32,14 @@ nonisolated extension TerminalRenderer {
         // Once per row: the property retains the ANSI array on every touch.
         let palette = framePalette
         let cursor = blockCursorColumns(in: line, row: row, cell: cell, palette: palette, into: &background)
+        let selected = frameSelectedColumns.indices.contains(row) ? frameSelectedColumns[row] : 0..<0
         var colors = CellColors()
         for column in 0..<line.count {
             let current = line[column]
             let attributes = current.attributes
             let underCursor = cursor.contains(column)
-            colors.update(for: current, underCursor: underCursor, palette: palette, overrides: indexedOverrides)
+            colors.update(for: current, underCursor: underCursor, palette: palette, overrides: indexedOverrides,
+                selectionColor: selected.contains(column) ? frameSelectionForeground : .default)
             let origin = SIMD2<Float>(Float(column) * cell.x, Float(row) * cell.y)
             let reversed = attributes.contains(.reverse)
             if underCursor || !(reversed ? current.foreground : current.background).isDefault || reversed {
@@ -91,12 +93,12 @@ nonisolated extension TerminalRenderer {
 
         @inline(__always)
         mutating func update(
-            for cell: Cell, underCursor: Bool, palette: Theme.Variant, overrides: IndexedColorOverrides
+            for cell: Cell, underCursor: Bool, palette: Theme.Variant, overrides: IndexedColorOverrides, selectionColor: Color
         ) {
             let attributes = cell.attributes
             let key = SIMD2<UInt64>(
                 UInt64(cell.foreground.rawValue) << 32 | UInt64(cell.background.rawValue),
-                UInt64(attributes.rawValue & TerminalRenderer.colorAttributeMask) << 1 | (underCursor ? 1 : 0))
+                UInt64(selectionColor.rawValue) << 32 | UInt64(attributes.rawValue & TerminalRenderer.colorAttributeMask) << 1 | (underCursor ? 1 : 0))
             guard key != self.key else { return }
             self.key = key
             // Resolve roles before reversing: the two default roles differ.
@@ -106,6 +108,7 @@ nonisolated extension TerminalRenderer {
             foreground = reversed ? resolvedBg : resolvedFg
             background = reversed ? resolvedFg : resolvedBg
             if attributes.contains(.dim) { foreground.w *= TerminalRenderer.dimAlpha }
+            if !selectionColor.isDefault { foreground = palette.resolveForeground(selectionColor, indexedOverrides: overrides) }
             if underCursor {
                 foreground = palette.background
                 background = palette.cursor
@@ -157,10 +160,14 @@ nonisolated extension TerminalRenderer {
         guard !attributes.isDisjoint(with: Self.ruleAttributes) || !cell.hyperlink.isNone,
             !attributes.contains(.invisible)
         else { return }
+        let underlineColor = cell.underlineColorID == 0 ? color :
+            frameUnderlineColors.color(for: cell.underlineColorID).map {
+                framePalette.resolveForeground($0, indexedOverrides: indexedOverrides)
+            } ?? color
         let baseline = Float(metricsValue.baselineOffset)
         let thickness = max(1, Float(scaleValue).rounded(.down))
         if attributes.contains(.curlyUnderline) {
-            appendWave(at: origin, color: color, into: &background)
+            appendWave(at: origin, color: underlineColor, into: &background)
         } else if attributes.contains(.underline) || !cell.hyperlink.isNone {
             // Below the cell's bottom edge would draw on the next row, so a
             // double rule short of room moves its first rule up, not its
@@ -172,12 +179,12 @@ nonisolated extension TerminalRenderer {
                 background.append(
                     QuadInstance(
                         origin: .init(origin.x, origin.y + second),
-                        size: .init(size.x, thickness), color: color))
+                        size: .init(size.x, thickness), color: underlineColor))
             }
             background.append(
                 QuadInstance(
                     origin: .init(origin.x, origin.y + first),
-                    size: .init(size.x, thickness), color: color))
+                    size: .init(size.x, thickness), color: underlineColor))
         }
         if attributes.contains(.strikethrough) {
             background.append(

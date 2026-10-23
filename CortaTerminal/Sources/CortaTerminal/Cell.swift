@@ -42,8 +42,28 @@ public struct Cell: Equatable, Sendable {
         }
     }
 
-    public var foreground: Color
-    public var background: Color
+    // Color needs only two tag bits; the remaining six bits of each word
+    // carry an underline-colour id, with no extra cell storage (D05).
+    private var packedForeground: UInt32
+    private var packedBackground: UInt32
+
+    @inline(__always) public var foreground: Color {
+        get { Color(rawValue: packedForeground & 0x03ff_ffff) }
+        set { packedForeground = (packedForeground & 0xfc00_0000) | (newValue.rawValue & 0x03ff_ffff) }
+    }
+    @inline(__always) public var background: Color {
+        get { Color(rawValue: packedBackground & 0x03ff_ffff) }
+        set { packedBackground = (packedBackground & 0xfc00_0000) | (newValue.rawValue & 0x03ff_ffff) }
+    }
+    /// Twelve unused colour-tag bits name the grid's underline side table.
+    /// The id travels with the cell through editing, reflow and raw compression.
+    @inline(__always) public var underlineColorID: UInt16 {
+        get { UInt16(packedForeground >> 26) | UInt16(packedBackground >> 26) << 6 }
+        set {
+            packedForeground = (packedForeground & 0x03ff_ffff) | UInt32(newValue & 63) << 26
+            packedBackground = (packedBackground & 0x03ff_ffff) | UInt32((newValue >> 6) & 63) << 26
+        }
+    }
     public var attributes: CellAttributes
     public var grapheme: GraphemeID
 
@@ -54,14 +74,16 @@ public struct Cell: Equatable, Sendable {
         background: Color = .default,
         attributes: CellAttributes = [],
         grapheme: GraphemeID = .none,
-        hyperlink: HyperlinkID = .none
+        hyperlink: HyperlinkID = .none,
+        underlineColorID: UInt16 = 0
     ) {
         self.packed =
             (scalar & Self.scalarMask) | (UInt32(hyperlink.rawValue) << Self.scalarBits)
-        self.foreground = foreground
-        self.background = background
+        self.packedForeground = foreground.rawValue
+        self.packedBackground = background.rawValue
         self.attributes = attributes
         self.grapheme = grapheme
+        self.underlineColorID = underlineColorID
     }
 
     /// What "blank" means everywhere (trimming, erase truncation). A cell erased

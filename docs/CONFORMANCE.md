@@ -49,6 +49,14 @@ measured. Priorities:
 | Focus reporting (`?1004`)                               | P2   | Implemented; Neovim autoread and tmux focus events                |
 | Alternate scroll (`?1007`)                              | P1   | The wheel sends arrow keys on the alternate screen when mouse reporting is off, so `less`, `man` and `git log` scroll; on by default, as in Terminal.app and iTerm2 (xterm's is off) |
 | OSC 8 — hyperlinks                                      | P2   | Implemented; display text and target may differ — see `SECURITY.md` §2.4 |
+| OSC 1, title push/pop (`CSI 22/23 ; 0/1/2 t`) | P1 | Icon name retained separately; independent stacks keep the newest ten entries; empty pops do nothing. Title reporting remains refused |
+| OSC 10–12 / 110–112 | P1 | Set/query dynamic foreground, background and cursor; resets restore the live theme. Overrides survive theme changes until reset |
+| OSC 17/19, 117/119 | P1 | Set/query/reset selection background and real selection-text colour. Without OSC 19, selected glyphs keep their own colours; without OSC 17, the theme's translucent highlight applies. Queries return opaque RGB, with theme selection / live foreground as defaults |
+| OSC 13–16, 18 | P2 | Accepted and ignored: pointer and Tektronix colours have no corresponding surface |
+| SGR 58 / 59 | P1 | Indexed/RGB underline colour and reset, colon or semicolon forms; independent of glyph and strikeout colour. Stored in a bounded side table without enlarging Cell |
+| Colour scheme (`?2031`, `CSI ? 996 n`) | P1 | `CSI ? 997 ; 1/2 n` reports dark/light from the live theme; a subscriber receives one report per actual variant change. DECRQM reports subscription state |
+| XTGETTCAP (`DCS + q`) | P1 | Fixed table: TN/name, Co/colors, RGB, Ss/Se, Smulx, Setulc, cursor, keypad, backtab, editing, navigation and F1–F12 keys. Unsupported/malformed names get `DCS 0 + r ST`, with no echo. Each supported name gets its own fixed reply |
+| DECRQSS SGR (`DCS $ q m ST`) | P1 | Reports numeric pen rendition, including underline style/colour, so Neovim can detect curly underlines. Other status strings receive a constant negative reply |
 | DCS and rare CSI sequences                              | P2   | The long tail                                           |
 
 ### 1.2 Query / response sequences

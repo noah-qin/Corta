@@ -20,6 +20,7 @@ public struct Pen: Equatable, Sendable {
     public var background: Color
     public var attributes: CellAttributes
     /// Not reset by SGR 0: recolouring link text has not ended the link.
+    public var underlineColorID: UInt16 = 0
     public var hyperlink: HyperlinkID
 
     public init(
@@ -45,7 +46,7 @@ public struct Pen: Equatable, Sendable {
             foreground: foreground,
             background: background,
             attributes: attributes,
-            hyperlink: hyperlink
+            hyperlink: hyperlink, underlineColorID: underlineColorID
         )
     }
 

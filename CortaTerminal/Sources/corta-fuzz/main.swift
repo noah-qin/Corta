@@ -94,6 +94,7 @@ func fuzzOne(_ bytes: [UInt8]) {
     }
     precondition(grid.graphemes.count <= GraphemeTable.capacity)
     precondition(grid.hyperlinks.count <= HyperlinkTable.capacity)
+    precondition(grid.underlineColors.count <= UnderlineColorTable.capacity)
 
     // The one path back to the child; undrained here, so its size bounds
     // what one input can queue.

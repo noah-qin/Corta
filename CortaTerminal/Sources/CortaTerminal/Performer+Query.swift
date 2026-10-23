@@ -50,6 +50,7 @@ extension Performer {
         case 2004: return state.bracketedPasteEnabled ? 1 : 2
         case 1000, 1002, 1003: return state.mouseTrackingMode.rawValue == mode ? 1 : 2
         case 1006: return state.sgrMouseEncodingEnabled ? 1 : 2
+        case 2031: return state.colorSchemeReportingEnabled ? 1 : 2
         case 2026: return state.synchronizedOutputEnabled ? 1 : 2
         case 1004: return state.focusReportingEnabled ? 1 : 2
         case 1007: return state.alternateScrollEnabled ? 1 : 2
@@ -83,6 +84,8 @@ extension Performer {
         case 10: color = state.dynamicColors.foreground
         case 11: color = state.dynamicColors.background
         case 12: color = state.dynamicColors.cursor
+        case 17: color = state.selectionBackground.components ?? state.dynamicColorDefaults.selection
+        case 19: color = state.selectionForeground.components ?? state.dynamicColors.foreground
         default: return
         }
         state.outputBuffer.append(
@@ -103,10 +106,13 @@ extension Performer {
     /// OSC 10/11/12 set; a malformed spec leaves the colour alone.
     mutating func setDynamicColor(_ code: Int, specification: ArraySlice<UInt8>) {
         guard let color = Self.parseColorSpecification(specification) else { return }
+        state.dynamicColorOverrides.insert(code)
         switch code {
         case 10: state.dynamicColors.foreground = color
         case 11: state.dynamicColors.background = color
         case 12: state.dynamicColors.cursor = color
+        case 17: state.selectionBackground = .rgb(color.red, color.green, color.blue)
+        case 19: state.selectionForeground = .rgb(color.red, color.green, color.blue)
         default: break
         }
     }

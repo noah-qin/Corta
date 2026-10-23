@@ -56,7 +56,7 @@ extension Grid {
     ///        2 |..........|
     ///        A = fg:1 bg:default attrs:bold
     public func dump(options: DumpOptions = .default) -> String {
-        var styles = StyleLegend()
+        var styles = StyleLegend(underlineColors: underlineColors)
         var text = ""
 
         text += "rows: \(rows) columns: \(columns)\n"
@@ -125,6 +125,7 @@ extension Grid {
 /// Assigns a letter to each distinct rendition in a grid, in order of first
 /// appearance, so the style layer is a single character per cell.
 private struct StyleLegend {
+    var underlineColors: UnderlineColorTable
     /// Enough symbols for any dump worth reading by hand; beyond that the
     /// layer stops being useful anyway and every further style is `?`.
     private static let symbols = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
@@ -141,7 +142,8 @@ private struct StyleLegend {
         Cell(
             foreground: cell.foreground,
             background: cell.background,
-            attributes: cell.attributes.subtracting([.wide, .wideSpacer])
+            attributes: cell.attributes.subtracting([.wide, .wideSpacer]),
+            underlineColorID: cell.underlineColorID
         )
     }
 
@@ -180,7 +182,9 @@ private struct StyleLegend {
             let symbol = index < Self.symbols.count ? Self.symbols[index] : "?"
             text += "   \(symbol) = fg:\(Self.name(style.foreground))"
             text += " bg:\(Self.name(style.background))"
-            text += " attrs:\(Self.name(style.attributes))\n"
+            text += " attrs:\(Self.name(style.attributes))"
+            if let color = underlineColors.color(for: style.underlineColorID) { text += " ul:\(Self.name(color))" }
+            text += "\n"
         }
         return text
     }
