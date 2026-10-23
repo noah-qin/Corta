@@ -126,6 +126,10 @@ extension Grid {
 /// appearance, so the style layer is a single character per cell.
 private struct StyleLegend {
     var underlineColors: UnderlineColorTable
+
+    init(underlineColors: UnderlineColorTable) {
+        self.underlineColors = underlineColors
+    }
     /// Enough symbols for any dump worth reading by hand; beyond that the
     /// layer stops being useful anyway and every further style is `?`.
     private static let symbols = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
