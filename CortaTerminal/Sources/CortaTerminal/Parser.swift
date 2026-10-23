@@ -27,9 +27,8 @@
 /// accumulate gigabytes, and a sequence that overflows is discarded and the
 /// stream resynchronises rather than being half-applied.
 public struct Parser: Sendable {
-    /// The states of the diagram. DCS is consumed and ignored: device control
-    /// strings are P2 (`CONFORMANCE.md` §1.1) and consuming them correctly is
-    /// what stops their payload being printed as text.
+    /// The states of the diagram. Only XTGETTCAP and DECRQSS DCS strings
+    /// are collected; every other device control string is consumed and ignored.
     public enum State: Sendable {
         case ground
         /// Ground, part-way through a UTF-8 sequence. A state of its own so
@@ -49,6 +48,8 @@ public struct Parser: Sendable {
         case dcsEntry
         case dcsParam
         case dcsIntermediate
+        case dcsString
+        case dcsEscape
         case dcsIgnore
         /// SOS and PM strings, consumed and dropped — nothing this project
         /// implements uses either.
@@ -200,6 +201,7 @@ public struct Parser: Sendable {
             performer.execute(byte)
             return
         case 0x1B:
+            if state == .dcsString { state = .dcsEscape; return }
             if state == .groundUTF8 { endTruncatedSequence(performer: &performer) }
             if state == .oscString { dispatchString(performer: &performer) }
             if state == .apcString { dispatchAPCString(performer: &performer) }
@@ -223,6 +225,15 @@ public struct Parser: Sendable {
         case .oscIgnore: oscIgnore(byte)
         case .dcsEntry, .dcsParam, .dcsIntermediate, .dcsIgnore:
             dcs(byte)
+        case .dcsString:
+            if byte >= 0x20, byte != 0x7F {
+                if stringBuffer.count < Self.maxStringLength { stringBuffer.append(byte) }
+                else { stringBuffer.removeAll(keepingCapacity: true); state = .dcsIgnore }
+            }
+        case .dcsEscape:
+            if byte == 0x5C { performer.dcsDispatch(stringBuffer[...]); state = .ground }
+            else { state = .escape; escape(byte, performer: &performer) }
+            stringBuffer.removeAll(keepingCapacity: true)
         case .sosPmString:
             break  // Consumed until ESC, handled above.
         case .apcString: apcString(byte)
@@ -285,6 +296,7 @@ public struct Parser: Sendable {
             collectIntermediate(byte)
             if state == .escape { state = .escapeIntermediate }
         case 0x50:  // ESC P — DCS
+            stringBuffer.removeAll(keepingCapacity: true)
             state = .dcsEntry
         case 0x58, 0x5E:  // ESC X / ESC ^ — SOS, PM: consumed and dropped.
             state = .sosPmString
@@ -444,23 +456,18 @@ public struct Parser: Sendable {
         }
     }
 
-    /// DCS is recognised so that its payload is consumed rather than printed.
-    /// Nothing is dispatched; device control strings are P2.
+    /// Only the exact XTGETTCAP/DECRQSS introducers are collected. Other DCSs are dropped.
     private mutating func dcs(_ byte: UInt8) {
-        switch state {
-        case .dcsEntry, .dcsParam, .dcsIntermediate:
-            switch byte {
-            case 0x30...0x39, 0x3B:
-                state = .dcsParam
-            case 0x20...0x2F:
-                state = .dcsIntermediate
-            case 0x40...0x7E:
-                state = .dcsIgnore  // The payload runs until ST.
-            default:
-                break
-            }
-        default:
-            break  // Payload bytes; dropped. ESC returns to the escape state.
+        if byte < 0x20 || byte == 0x7F { return }
+        if state == .dcsEntry, (byte == 0x2B || byte == 0x24) {
+            stringBuffer = [byte]
+            state = .dcsIntermediate
+        } else if state == .dcsIntermediate, (stringBuffer == [0x2B] || stringBuffer == [0x24]), byte == 0x71 {
+            stringBuffer.append(byte)
+            state = .dcsString
+        } else {
+            stringBuffer.removeAll(keepingCapacity: true)
+            state = .dcsIgnore
         }
     }
 

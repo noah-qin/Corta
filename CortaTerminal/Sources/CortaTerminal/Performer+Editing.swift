@@ -101,7 +101,8 @@ extension Performer {
         // keeping those resource values truthful for later queries. The
         // palette's *overrides* are terminal state like any other mode, so
         // they reset along with everything else — only `defaults` survives.
-        let colors = state.dynamicColors
+        let colors = state.dynamicColorDefaults
+        let isDark = state.isDark
         let paletteDefaults = state.indexedPalette.defaults
         // A fact about the session's shell, not terminal state.
         let hostnames = state.hostnamesAtStart
@@ -123,6 +124,8 @@ extension Performer {
         state.hostnamesAtStart = hostnames
         state.commandRecords = CommandRecordStore(capacity: historyCapacity)
         state.dynamicColors = colors
+        state.dynamicColorDefaults = colors
+        state.isDark = isDark
         state.indexedPalette = IndexedPalette(defaults: paletteDefaults)
     }
 

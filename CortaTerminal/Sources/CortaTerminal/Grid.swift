@@ -81,6 +81,10 @@ public struct Grid: Sendable {
     /// (`DECISIONS.md` D05): combining-mark clusters and emoji ZWJ sequences.
     public var graphemes: GraphemeTable
 
+    /// Underline rendition ids travel with cells; the table follows each screen.
+    public var underlineColors = UnderlineColorTable()
+    var underlineSweepDeferral = 0
+
     /// OSC 8 targets. Never cleared while an id may be on screen or in
     /// scrollback; unreferenced entries are swept under pressure
     /// (`internHyperlink`).

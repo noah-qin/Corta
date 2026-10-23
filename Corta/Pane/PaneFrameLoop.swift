@@ -216,7 +216,8 @@ final class PaneFrameLoop {
             hoveredLink: content.hoveredLink,
             indexedOverrides: indexedPalette.overrides,
             indexedOverridesGeneration: indexedPalette.overridesGeneration,
-            cursorStyle: content.cursorStyle)
+            cursorStyle: content.cursorStyle, dynamicColors: session.dynamicColors,
+            selectionBackground: session.selectionBackground, selectionForeground: session.selectionForeground)
         return forced || damaged
     }
 
@@ -265,7 +266,7 @@ final class PaneFrameLoop {
             gridHeight: CGFloat(renderer.cachedRowCount) * renderer.metrics.cellHeight,
             topInset: topInset())
         let onCompleted = gpuCompletion(generation: generation, backendGeneration: backendGeneration)
-        let background = TerminalColorPalette.clearColor
+        let background = renderer.renderedBackground
         let commit = InputLatencySignposts.begin(.commit)
         let accepted = trackPreparedPresentation(of: drawable, generation: generation)
         let drawn = renderer.draw(

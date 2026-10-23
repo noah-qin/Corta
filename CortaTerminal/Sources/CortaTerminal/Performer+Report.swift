@@ -39,6 +39,16 @@ struct PerformerState: Sendable {
     var bellRequested = false
     /// Never reported back: the title query is a command-injection vector.
     var windowTitle: String?
+    var iconName: String?
+    var windowTitleStack: [String?] = []
+    var iconNameStack: [String?] = []
+    static let titleStackCapacity = 10
+    var colorSchemeReportingEnabled = false
+    var isDark = true
+    var dynamicColorOverrides: Set<Int> = []
+    var dynamicColorDefaults = DynamicColors()
+    var selectionBackground: Color = .default
+    var selectionForeground: Color = .default
     var directoryCompletion: DirectoryCompletion?
     /// Local only; a report naming another host goes to `remoteContext`.
     var workingDirectory: String?
@@ -119,6 +129,7 @@ public struct DynamicColors: Sendable, Equatable {
     public var foreground: (red: UInt8, green: UInt8, blue: UInt8)
     public var background: (red: UInt8, green: UInt8, blue: UInt8)
     public var cursor: (red: UInt8, green: UInt8, blue: UInt8)
+    public var selection: (red: UInt8, green: UInt8, blue: UInt8) = (142, 126, 233)
 
     public init(
         foreground: (red: UInt8, green: UInt8, blue: UInt8) = (245, 245, 245),
@@ -132,7 +143,7 @@ public struct DynamicColors: Sendable, Equatable {
 
     public static func == (lhs: DynamicColors, rhs: DynamicColors) -> Bool {
         lhs.foreground == rhs.foreground && lhs.background == rhs.background
-            && lhs.cursor == rhs.cursor
+            && lhs.cursor == rhs.cursor && lhs.selection == rhs.selection
     }
 }
 
@@ -171,6 +182,7 @@ extension Performer {
 
     /// DECXCPR (`CSI ? 6 n`); the page is always 1.
     mutating func reportExtendedCursorPosition(_ parameters: Parameters) {
+        if parameters.value(0, default: 0) == 996 { reportColorScheme(); return }
         guard parameters.value(0, default: 0) == 6 else { return }
         state.outputBuffer.append(
             contentsOf: Array(
@@ -181,7 +193,25 @@ extension Performer {
     /// `CSI 18 t` only — the text-area size esctest asks for. The title
     /// report (21) is a command-injection vector and never implemented.
     mutating func reportWindowManipulation(_ parameters: Parameters) {
-        guard parameters.value(0, default: 0) == 18 else { return }
+        let operation = parameters.value(0, default: 0)
+        if operation == 22 || operation == 23 {
+            let target = parameters.value(1, default: 0)
+            guard target <= 2 else { return }
+            if target == 0 || target == 1 {
+                if operation == 22 {
+                    if state.iconNameStack.count == PerformerState.titleStackCapacity { state.iconNameStack.removeFirst() }
+                    state.iconNameStack.append(state.iconName)
+                } else if !state.iconNameStack.isEmpty { state.iconName = state.iconNameStack.removeLast() }
+            }
+            if target == 0 || target == 2 {
+                if operation == 22 {
+                    if state.windowTitleStack.count == PerformerState.titleStackCapacity { state.windowTitleStack.removeFirst() }
+                    state.windowTitleStack.append(state.windowTitle)
+                } else if !state.windowTitleStack.isEmpty { state.windowTitle = state.windowTitleStack.removeLast() }
+            }
+            return
+        }
+        guard operation == 18 else { return }
         state.outputBuffer.append(
             contentsOf: Array("\u{1B}[8;\(grid.rows);\(grid.columns)t".utf8)
         )

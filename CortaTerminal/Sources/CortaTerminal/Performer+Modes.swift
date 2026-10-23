@@ -41,6 +41,8 @@ extension Performer {
                 }
             case 1006:  // SGR mouse reporting
                 state.sgrMouseEncodingEnabled = enabled
+            case 2031:
+                state.colorSchemeReportingEnabled = enabled
             case 2026:  // synchronized output
                 if enabled, !state.synchronizedOutputEnabled {
                     state.synchronizedOutputEpisode &+= 1

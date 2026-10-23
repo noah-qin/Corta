@@ -19,6 +19,27 @@
 extension Grid {
     // MARK: - Side-table reclamation
 
+    /// Reclaim only unreferenced ids; compressed rows keep an index, so a
+    /// capacity attack never forces history decompression under the session lock.
+    mutating func setUnderlineColor(_ color: Color) {
+        if let id = underlineColors.intern(color) {
+            pen.underlineColorID = id
+            return
+        }
+        guard Self.sideTableSweepAllowed(&underlineSweepDeferral) else {
+            pen.underlineColorID = 0
+            return
+        }
+        var live: Set<UInt16> = [pen.underlineColorID, savedPen?.underlineColorID ?? 0]
+        for row in 0..<rows {
+            for cell in lines[row].cells where cell.underlineColorID != 0 { live.insert(cell.underlineColorID) }
+        }
+        live.formUnion(scrollback.liveUnderlineColorIDs())
+        let freed = underlineColors.reclaim(keeping: live)
+        Self.deferSideTableSweep(&underlineSweepDeferral, freed: freed, capacity: UnderlineColorTable.capacity)
+        pen.underlineColorID = underlineColors.intern(color) ?? 0
+    }
+
     /// Sweeps unreferenced entries when full; without it a session that met
     /// `capacity` URLs would never link again.
     public mutating func internHyperlink(_ url: String) -> HyperlinkID? {

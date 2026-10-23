@@ -239,23 +239,19 @@ struct Performer: ParserPerformer, Sendable {
             case 90...97: grid.pen.foreground = .indexed(UInt8(code - 90 + 8))
             case 100...107: grid.pen.background = .indexed(UInt8(code - 100 + 8))
             // A `where` binds to one pattern only; each needs its own.
-            case 38 where subparameterCount > 0, 48 where subparameterCount > 0:
+            case 38 where subparameterCount > 0, 48 where subparameterCount > 0, 58 where subparameterCount > 0:
                 if let color = Self.extendedColor(subparameters: parameters, after: index, count: subparameterCount) {
-                    if code == 38 { grid.pen.foreground = color } else { grid.pen.background = color }
+                    if code == 38 { grid.pen.foreground = color } else if code == 48 { grid.pen.background = color } else { grid.setUnderlineColor(color) }
                 }
-            // The underline's colour: not drawn, but its operands must not be
-            // read as attributes — `58;2;r;g;b` would turn on dim.
-            case 58 where subparameterCount == 0:
-                guard let (_, consumed) = Self.extendedColor(parameters, at: index) else { return }
-                index += consumed - 1
-            case 38, 48:
+            case 59: grid.pen.underlineColorID = 0
+            case 38, 48, 58:
                 guard let (color, consumed) = Self.extendedColor(parameters, at: index) else {
                     // Malformed: the parameters that would say which colour
                     // are missing. Stop rather than read the rest of the
                     // sequence as attribute codes.
                     return
                 }
-                if code == 38 { grid.pen.foreground = color } else { grid.pen.background = color }
+                if code == 38 { grid.pen.foreground = color } else if code == 48 { grid.pen.background = color } else { grid.setUnderlineColor(color) }
                 index += consumed - 1
             default: break
             }

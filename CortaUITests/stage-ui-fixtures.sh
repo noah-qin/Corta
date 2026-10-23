@@ -91,4 +91,58 @@ for name in Alpha Another '空格 中文' .hidden; do
   mkdir -p "$root/directory-completion/Demo/$name"
 done
 
+
+stage compatibility 'columns = 100\nrows = 30\nfont-size = 16\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+cat > "$root/compatibility/nvim.lua" <<'LUA'
+vim.opt.termguicolors = true
+vim.opt.number = true
+vim.api.nvim_buf_set_lines(0, 0, -1, false, {
+  '-- Corta terminal compatibility', '', 'local result = missing_value', '',
+  '-- A diagnostic supplied through the LSP diagnostic API.'
+})
+vim.diagnostic.config({virtual_text = false, underline = true, signs = false})
+vim.defer_fn(function()
+  vim.api.nvim_set_hl(0, 'DiagnosticUnderlineError', {undercurl=true, sp='#ff3030'})
+  vim.diagnostic.set(vim.api.nvim_create_namespace('compatibility'), 0, {{
+    lnum=2, col=15, end_col=28, message='Undefined global missing_value', severity=vim.diagnostic.severity.ERROR
+  }})
+end, 1000)
+vim.defer_fn(function()
+  vim.cmd('checkhealth vim.health')
+  vim.cmd('normal! /Terminal' .. string.char(13))
+end, 12000)
+LUA
+cat > "$root/compatibility/nvim-shell" <<'SH'
+#!/bin/sh
+TASK_NVIM_CONFIG="${0%/*}/nvim.lua"
+export SHELL=/bin/zsh
+exec /opt/homebrew/bin/nvim --clean -u "$TASK_NVIM_CONFIG"
+SH
+chmod 700 "$root/compatibility/nvim-shell"
+
+stage compatibility-scheme 'appearance = dark\ncolumns = 100\nrows = 30\nrestore-windows = false\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+cat > "$root/compatibility-scheme/scheme-shell" <<'PYTHON'
+#!/usr/bin/python3
+import os, pathlib, select, tty
+output = pathlib.Path(__file__).with_name('reports.txt')
+output.write_text('')
+tty.setraw(0)
+os.write(1, b'\x1b[?2031hREADY')
+pending = b''
+while True:
+    if not select.select([0], [], [], 60)[0]:
+        continue
+    data = os.read(0, 1024)
+    if not data:
+        break
+    pending += data
+    while b'n' in pending:
+        report, pending = pending.split(b'n', 1)
+        report += b'n'
+        with output.open('a') as stream:
+            stream.write(report.hex() + '\n')
+        os.write(1, b'\r\nREPORT:' + report.hex().encode() + b'\r\n')
+PYTHON
+chmod 700 "$root/compatibility-scheme/scheme-shell"
+
 printf '%s\n' "$root"

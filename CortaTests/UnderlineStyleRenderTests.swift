@@ -62,6 +62,46 @@ struct UnderlineStyleRenderTests {
         #expect(risingTop != fallingTop, "a curly underline must not be flat")
     }
 
+    @Test("SGR 58 colours single, double and curly rules independently of strikeout")
+    func underlineColorsDraw() throws {
+        let fixture = try #require(try RenderFixture(columns: 6, rows: 1))
+        fixture.renderer.themeVariant = Theme.corta.dark
+        var terminal = Terminal(rows: 1, columns: 6)
+        terminal.feed(Array("\u{1B}[32;4;58;2;255;0;0m  \u{1B}[4:2m  \u{1B}[4:3m  ".utf8))
+        let texture = MetalRenderTarget.make(device: fixture.renderer.backend.device,
+            width: fixture.width, height: fixture.height)
+        fixture.renderer.renderAndWait(grid: terminal.grid,
+            rect: CGRect(x: 0, y: 0, width: fixture.width, height: fixture.height),
+            drawableSize: CGSize(width: fixture.width, height: fixture.height),
+            cursorVisible: false, selection: nil, target: texture)
+        let width = Int(fixture.renderer.metrics.cellWidth)
+        for column in [0, 2, 4] {
+            let pixels = (0..<fixture.height).map {
+                MetalRenderTarget.pixel(of: texture, x: column * width + width / 2, y: $0)
+            }
+            #expect(pixels.contains { $0.r > 200 && $0.g < 10 && $0.b < 10 })
+            #expect(!pixels.contains { $0.g > 60 })
+        }
+    }
+
+    @Test("OSC selection text colour rebuilds selected rows and resets")
+    func selectionTextColorDraws() throws {
+        let fixture = try #require(try RenderFixture(columns: 6, rows: 1))
+        let renderer = fixture.renderer
+        renderer.themeVariant = Theme.corta.dark
+        var terminal = Terminal(rows: 1, columns: 6)
+        terminal.feed(Array("abc".utf8))
+        let selection = TerminalSelection(start: GridPosition(row: 0, column: 0),
+            end: GridPosition(row: 0, column: 1), baseScrollbackTotal: 0)
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false,
+            selection: selection, selectionForeground: .rgb(255, 0, 0))
+        #expect(renderer.cachedGlyphs.prefix(2).allSatisfy { $0.rgba == QuadInstance.packColor(.init(1,0,0,1)) })
+        #expect(renderer.cachedGlyphs.last?.rgba != QuadInstance.packColor(.init(1,0,0,1)))
+        renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil,
+            selectionForeground: .rgb(255, 0, 0))
+        #expect(renderer.cachedGlyphs.allSatisfy { $0.rgba != QuadInstance.packColor(.init(1,0,0,1)) })
+    }
+
     /// The wave is built once per metrics and stays inside the cell, joining
     /// the next cell at the same height.
     @Test("the curly wave stays inside its cell")

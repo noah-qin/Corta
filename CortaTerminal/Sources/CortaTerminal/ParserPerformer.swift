@@ -37,6 +37,8 @@ public protocol ParserPerformer {
 
     /// Raw bytes, bounded by `Parser.maxStringLength`: a payload is not
     /// necessarily text.
+    mutating func dcsDispatch(_ bytes: ArraySlice<UInt8>)
+
     mutating func oscDispatch(_ bytes: ArraySlice<UInt8>)
 
     /// Raw bytes, bounded by `Parser.maxAPCStringLength`; Kitty graphics is
@@ -58,6 +60,7 @@ extension ParserPerformer {
 
     public mutating func escapeDispatch(intermediates: Intermediates, final: UInt8) {}
     public mutating func csiDispatch(_ sequence: CSISequence) {}
+    public mutating func dcsDispatch(_ bytes: ArraySlice<UInt8>) {}
     public mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) {}
     public mutating func apcDispatch(_ bytes: ArraySlice<UInt8>) {}
 }

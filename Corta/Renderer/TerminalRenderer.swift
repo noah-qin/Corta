@@ -217,6 +217,12 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     var framePalette: Theme.Variant = Theme.corta.dark
     /// `framePalette`'s derived colours, worked out once per frame.
     var frameOverlay = Theme.corta.dark.overlayColors
+    var frameUnderlineColors = UnderlineColorTable()
+    var renderedBackground: SIMD4<Float> { framePalette.background }
+    var frameDynamicColors: DynamicColors?
+    var frameSelectionBackground: Color = .default
+    var frameSelectionForeground: Color = .default
+    var frameSelectedColumns: [Range<Int>] = []
     /// The command-status rules beside prompts (`command-status-marks`).
     /// Drawn in this pass, in the left margin, so a rule shows the frame's
     /// own rows: drawn by AppKit they led the text by a frame or two and took
@@ -367,14 +373,44 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil,
         hoveredLink: TerminalSelection? = nil,
         indexedOverrides: IndexedColorOverrides = [:], indexedOverridesGeneration: UInt64 = 0,
-        cursorStyle: CursorStyle? = nil
+        cursorStyle: CursorStyle? = nil, dynamicColors: DynamicColors? = nil,
+        selectionBackground: Color = .default, selectionForeground: Color = .default
     ) -> Bool {
         access.lock()
         defer { access.unlock() }
         let effectiveCursorStyle = cursorStyle ?? grid.cursorStyle
         self.indexedOverrides = indexedOverrides
         framePalette = themeVariant ?? TerminalColorPalette.activeVariant
+        if frameDynamicColors != dynamicColors || frameSelectionBackground != selectionBackground
+            || frameSelectionForeground != selectionForeground {
+            needsFullRebuild = true
+        }
+        frameDynamicColors = dynamicColors
+        frameSelectionBackground = selectionBackground
+        frameSelectionForeground = selectionForeground
+        // Reused ids can compare equal to a retained row built before reclamation.
+        if frameUnderlineColors.reclamationGeneration != grid.underlineColors.reclamationGeneration {
+            needsFullRebuild = true
+        }
+        frameUnderlineColors = grid.underlineColors
         frameOverlay = framePalette.overlayColors
+        if let dynamicColors {
+            func rgba(_ c: (red: UInt8, green: UInt8, blue: UInt8)) -> SIMD4<Float> {
+                .init(Float(c.red) / 255, Float(c.green) / 255, Float(c.blue) / 255, 1)
+            }
+            framePalette.foreground = rgba(dynamicColors.foreground)
+            framePalette.background = rgba(dynamicColors.background)
+            framePalette.cursor = rgba(dynamicColors.cursor)
+        }
+        if !selectionBackground.isDefault { frameOverlay.selection = framePalette.resolveBackground(selectionBackground) }
+        if !selectionForeground.isDefault {
+            if needsFullRebuild || frameSelectedColumns.count != grid.rows
+                || !Self.selectionsEqual(selection, cachedSelection) || cachedScrollbackTotalPushed != grid.scrollback.totalPushed
+                || cachedOffset != scrollOffset {
+                needsFullRebuild = true
+                Self.selectedColumns(selection, grid: grid, offset: scrollOffset, into: &frameSelectedColumns)
+            }
+        } else { frameSelectedColumns.removeAll(keepingCapacity: true) }
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
         let fullRebuild = cacheIsStale(for: grid, indexedOverridesGeneration: indexedOverridesGeneration)
 

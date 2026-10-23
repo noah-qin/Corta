@@ -69,6 +69,22 @@ extension TerminalSession {
         set { registerStateWaiter { state.withLock { $0.terminal.dynamicColors = newValue } } }
     }
 
+    public var selectionBackground: Color {
+        registerStateWaiter { state.withLock { $0.terminal.selectionBackground } }
+    }
+    public var selectionForeground: Color {
+        registerStateWaiter { state.withLock { $0.terminal.selectionForeground } }
+    }
+    public func updateTheme(colors: DynamicColors, isDark: Bool) {
+        registerStateWaiter {
+            // Enqueue under the state lock: a later query cannot overtake a change report.
+            state.withLock { current in
+                let report = current.terminal.updateTheme(colors: colors, isDark: isDark)
+                if !report.isEmpty { _ = enqueueWrite([report]) }
+            }
+        }
+    }
+
     public var indexedPalette: IndexedPalette {
         get { registerStateWaiter { state.withLock { $0.terminal.indexedPalette } } }
         set { registerStateWaiter { state.withLock { $0.terminal.indexedPalette = newValue } } }
