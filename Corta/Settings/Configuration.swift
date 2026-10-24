@@ -31,6 +31,10 @@ import Foundation
 /// dotted prefixes: `theme.<name>.…`, `preset.<name>.…` and
 /// `bind.<command>`.
 nonisolated struct Configuration: Equatable, Sendable {
+    enum PasteWarning: String, CaseIterable, Sendable {
+        case dangerous, always, off
+    }
+
     /// Which of a theme's two variants is live.
     enum Appearance: String, CaseIterable, Sendable {
         /// Follow macOS, switching live when the system does.
@@ -163,6 +167,8 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// default because it is not silent: the pane shows a toast
     /// (`TerminalView.showToast`).
     var copyOnSelect: Bool = true
+    /// Content warnings also apply when the child enabled bracketed paste.
+    var pasteWarning: PasteWarning = .dangerous
     /// See `LinkActivation`.
     var linkActivation: LinkActivation = .command
     enum MouseOverrideModifier: String, CaseIterable, Sendable {

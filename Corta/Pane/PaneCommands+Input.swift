@@ -92,24 +92,65 @@ extension PaneCommands {
     }
 
     /// Drops and Services go down the ⌘V path (`SECURITY.md` §2.3): C0
-    /// stripped, bracketed paste when asked, and a newline warning without
-    /// `?2004` — service text and filenames can hold newlines.
+    /// stripped, bracketed paste when asked, and the configured risk warning
+    /// — service text and filenames can hold newlines or concealed scalars.
     func insertAsPaste(_ text: String) {
         guard let host, host.session != nil else { return }
         let sanitized = Paste.sanitized(text)
         guard !sanitized.isEmpty else { return }
-        guard Paste.needsWarning(text: sanitized, bracketedPasteEnabled: bracketedPasteEnabled()) else {
+        guard !suppressPasteWarnings else { pasteNow(sanitized); return }
+        let risks = Paste.warningRisks(
+            in: text, bracketedPasteEnabled: bracketedPasteEnabled(),
+            policy: ConfigurationStore.shared.configuration.pasteWarning)
+        guard !risks.isEmpty else {
             pasteNow(sanitized)
             return
         }
         let alert = NSAlert()
-        alert.messageText = L10n.text("paste.newlines.title")
-        alert.informativeText = L10n.text("paste.newlines.message")
+        alert.alertStyle = .warning
+        alert.messageText = L10n.text("paste.warning.title")
+        alert.informativeText = risks.map { L10n.text($0.localizationKey) }.joined(separator: "\n")
+        let preview = NSTextView(frame: NSRect(x: 0, y: 0, width: 460, height: 160))
+        preview.isEditable = false
+        preview.drawsBackground = false
+        preview.textColor = .labelColor
+        preview.textContainerInset = NSSize(width: 12, height: 10)
+        preview.isVerticallyResizable = true
+        preview.isHorizontallyResizable = false
+        preview.autoresizingMask = [.width]
+        preview.textContainer?.widthTracksTextView = true
+        preview.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        preview.string = Paste.visiblePreview(sanitized)
+        let scroll = NSScrollView(frame: preview.frame)
+        scroll.hasVerticalScroller = true
+        scroll.drawsBackground = false
+        scroll.contentView.drawsBackground = false
+        scroll.autoresizingMask = [.width, .height]
+        scroll.documentView = preview
+        // Let AppKit resolve semantic colours for the sheet's appearance.
+        // The transparent document and clip view keep the rounded surface
+        // continuous while its text scrolls.
+        let previewBox = NSBox(frame: scroll.frame)
+        previewBox.boxType = .custom
+        previewBox.titlePosition = .noTitle
+        previewBox.contentViewMargins = .zero
+        previewBox.cornerRadius = 10
+        previewBox.borderWidth = 0.5
+        previewBox.borderColor = .separatorColor
+        previewBox.fillColor = .quaternaryLabelColor.withAlphaComponent(0.06)
+        previewBox.wantsLayer = true
+        previewBox.layer?.cornerRadius = 10
+        previewBox.layer?.masksToBounds = true
+        previewBox.contentView = scroll
+        alert.accessoryView = previewBox
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = L10n.text("paste.warning.suppress")
         alert.addButton(withTitle: L10n.text("common.paste"))
         alert.addButton(withTitle: L10n.text("common.cancel"))
         alert.present(for: host.view.window) { [weak self] response in
             // The pane may have closed while the sheet was up.
             guard response == .alertFirstButtonReturn, self?.host?.session != nil else { return }
+            if alert.suppressionButton?.state == .on { self?.suppressPasteWarnings = true }
             self?.pasteNow(sanitized)
         }
     }
@@ -192,7 +233,7 @@ extension PaneCommands {
         pasteFromClipboard()
     }
 
-    /// ?2004: wrap pastes in `ESC[200~`…`ESC[201~`, skip the newline warning.
+    /// ?2004: wrap pastes in `ESC[200~`…`ESC[201~`; content risks still warn.
     func bracketedPasteEnabled() -> Bool {
         host?.session?.isBracketedPasteEnabled ?? false
     }

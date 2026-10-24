@@ -151,7 +151,7 @@ struct MenuShortcutTests {
         _ = split.view
         defer { split.teardown() }
         let pane = try #require(split.focusedPane)
-        let commands: [TerminalCommand] = [.copy, .paste, .selectAll, .newTab, .splitRight, .splitDown, .renameTab, .close]
+        let commands: [TerminalCommand] = [.copy, .paste, .selectAll, .find, .newTab, .splitRight, .splitDown, .renameTab, .close]
         let rebound = Configuration.parse("bind.split-right = cmd+e\nbind.copy =").0
         #expect(rebound.keybindings[.copy] == nil)
         #expect(rebound.keybindings[.splitRight] == Shortcut.parse("cmd+e"))
@@ -162,6 +162,7 @@ struct MenuShortcutTests {
             let menu = pane.commands.contextMenu(bindings: config.keybindings)
             for command in commands {
                 let item = try #require(menu.items.first { $0.action == command.action })
+                #expect(item.tag == (command.menuTag ?? 0))
                 #expect(item.keyEquivalent == (config.keybindings[command]?.menuKeyEquivalent ?? ""))
                 #expect(item.keyEquivalentModifierMask == (config.keybindings[command]?.menuModifierMask ?? []))
             }

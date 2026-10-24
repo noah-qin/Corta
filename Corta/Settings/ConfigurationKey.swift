@@ -213,6 +213,7 @@ nonisolated extension Configuration {
             .integer("command-history-limit", \.commandHistoryLimit, in: commandHistoryLimitRange),
             .choice("bell", \.bell),
             .flag("copy-on-select", \.copyOnSelect),
+            .choice("paste-warning", \.pasteWarning),
             .choice("link-activation", \.linkActivation),
             .choice("mouse-override-modifier", \.mouseOverrideModifier),
             .flag("option-as-meta", \.optionAsMeta),

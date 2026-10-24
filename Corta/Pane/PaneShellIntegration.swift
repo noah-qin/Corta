@@ -138,8 +138,12 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     /// Copies `effectiveCommand`'s output, bounded by its marks, instead of a
     /// drag-while-scrolling selection. A toast reports either outcome.
     @objc func copyLastCommandOutput(_: Any?) {
+        copyCommandOutput(for: effectiveCommand)
+    }
+
+    func copyCommandOutput(for record: CommandRecord?, pasteboard: NSPasteboard = .general) {
         guard isOperable else { return }
-        guard let text = commandOutputText(for: effectiveCommand), !text.isEmpty else {
+        guard let text = commandOutputText(for: record), !text.isEmpty else {
             // No marks means no integration; no completed command means a fresh
             // prompt. Say so either way.
             terminalView?.showToast(
@@ -148,7 +152,6 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
                 kind: .warning)
             return
         }
-        let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
         terminalView?.showToast(L10n.text("toast.copiedCommandOutput"))

@@ -243,7 +243,7 @@ extension PanePointer {
 
     /// Re-checks the scheme at the boundary where output launches another
     /// app (`SECURITY.md` §2.4).
-    private func open(_ link: LinkDetection.Link) -> Bool {
+    func open(_ link: LinkDetection.Link) -> Bool {
         guard let url = Self.target(of: link.url) else { return false }
         NSWorkspace.shared.open(url)
         return true
@@ -365,7 +365,7 @@ extension PanePointer {
     }
 
     /// Through the same mapping selection uses.
-    private func linkUnder(_ event: NSEvent, in terminalView: TerminalView)
+    func linkUnder(_ event: NSEvent, in terminalView: TerminalView)
         -> LinkDetection.Link?
     {
         guard session != nil, terminalRenderer != nil else { return nil }
