@@ -112,6 +112,9 @@ extension PaneCommands {
         alert.informativeText = risks.map { L10n.text($0.localizationKey) }.joined(separator: "\n")
         let preview = NSTextView(frame: NSRect(x: 0, y: 0, width: 460, height: 160))
         preview.isEditable = false
+        preview.drawsBackground = false
+        preview.textColor = .labelColor
+        preview.textContainerInset = NSSize(width: 12, height: 10)
         preview.isVerticallyResizable = true
         preview.isHorizontallyResizable = false
         preview.autoresizingMask = [.width]
@@ -120,8 +123,26 @@ extension PaneCommands {
         preview.string = Paste.visiblePreview(sanitized)
         let scroll = NSScrollView(frame: preview.frame)
         scroll.hasVerticalScroller = true
+        scroll.drawsBackground = false
+        scroll.contentView.drawsBackground = false
+        scroll.autoresizingMask = [.width, .height]
         scroll.documentView = preview
-        alert.accessoryView = scroll
+        // Let AppKit resolve semantic colours for the sheet's appearance.
+        // The transparent document and clip view keep the rounded surface
+        // continuous while its text scrolls.
+        let previewBox = NSBox(frame: scroll.frame)
+        previewBox.boxType = .custom
+        previewBox.titlePosition = .noTitle
+        previewBox.contentViewMargins = .zero
+        previewBox.cornerRadius = 10
+        previewBox.borderWidth = 0.5
+        previewBox.borderColor = .separatorColor
+        previewBox.fillColor = .quaternaryLabelColor.withAlphaComponent(0.06)
+        previewBox.wantsLayer = true
+        previewBox.layer?.cornerRadius = 10
+        previewBox.layer?.masksToBounds = true
+        previewBox.contentView = scroll
+        alert.accessoryView = previewBox
         alert.showsSuppressionButton = true
         alert.suppressionButton?.title = L10n.text("paste.warning.suppress")
         alert.addButton(withTitle: L10n.text("common.paste"))
