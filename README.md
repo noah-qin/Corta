@@ -87,6 +87,9 @@ requirements and limitations, and describes `main` — a published release
 may not have every item yet. How Corta compares with iTerm2 and Ghostty,
 and when to pick one of them instead, is in
 [Features → How Corta compares](docs/FEATURES.md#how-corta-compares).
+For coding-agent task state, the development tree currently integrates
+**Claude Code only**; other tools have generic protocol support and process
+detection, not dedicated state adapters ([scope and limits](docs/CONFORMANCE.md#cli-signal-compatibility)).
 Corta's macOS-only scope and its exclusion of tmux control mode, built-in
 AI and a scripting engine are [settled decisions](docs/DECISIONS.md);
 ordinary tmux sessions run inside Corta as terminal programs.

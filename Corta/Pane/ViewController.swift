@@ -32,6 +32,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
     var session: TerminalSession!
+    lazy var agents = PaneAgents(host: self)
     private var readerDemotion: DispatchWorkItem?
     private var readerHiddenSince: TimeInterval?
     private var readerLastInput: TimeInterval?
@@ -415,8 +416,15 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         focus.observeWindows()
         appearance.observe()
         let generation = frameLoop.attach(session: session, renderer: terminalRenderer)
-        taskNotifier.sessionGeneration = generation
+        taskNotifier.cancelProgramNotifications()
+        agents.reset()
         let wake = frameLoop.outputWake
+        frameLoop.onOutputSignal = { [weak self] in
+            guard let self else { return }
+            self.agents.readOutput()
+            if !self.agents.visible, self.session?.takeBell() == true { self.handleBell() }
+        }
+        taskNotifier.sessionGeneration = generation
         taskNotifier.lastOutputUptimeNanoseconds = { wake.lastOutputUptimeNanoseconds }
         taskNotifier.title = { [weak self] in self?.windowTitle.notificationTitle ?? "Corta" }
         session.onChildExit = { [weak self] childExit in
@@ -575,6 +583,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         windowTitle.stop()
         search.close()
         commands.stop()
+        agents.reset()
         taskNotifier.cancel()
         remote.cancelPendingOpens()
         remote.stopWatchingConnection()
@@ -762,6 +771,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     }
 
     private func handleBell() {
+        agents.bell()
         switch ConfigurationStore.shared.configuration.bell {
         case .audible:
             NSSound.beep()
@@ -778,6 +788,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     @MainActor
     private func noteChildExit(_ exit: ProcessExit, generation: Int) {
         guard !didTeardown, frameLoop.isCurrent(generation) else { return }
+        agents.readOutput()
+        agents.exited(success: exit.isCleanExit)
         // A dead child produces no output to rebuild the title; the `Remote: host`
         // badge would outlive its connection.
         windowTitle.invalidateProcessFacts()

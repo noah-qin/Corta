@@ -18,6 +18,11 @@ change: in its pull request, and in the release notes.
 | [Translations](i18n/) | The project overview, the user guide and troubleshooting in Simplified and Traditional Chinese, Japanese, Korean, German, French, Spanish and Brazilian Portuguese, one folder per language — the language bar at the top of each links them. Each names the English commit it was translated from; the English documents remain the reference. |
 | [Changelog](../CHANGELOG.md) | You want to know what changed in a release, or what has landed on `main` since the last one. |
 
+For coding-agent state, the development tree currently integrates **Claude
+Code only** (checked reference version 2.1.310). Other tools have generic
+protocol support/process detection, not dedicated task-state adapters.
+See [scope and verification limits](CONFORMANCE.md#cli-signal-compatibility).
+
 Start with the [personalization tutorial](USER-GUIDE.md#personalizing-the-terminal)
 for cursor defaults, the optional system bar, host details and graphical themes.
 

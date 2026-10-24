@@ -780,3 +780,54 @@ lists what Corta does not do yet. Report anything else on
 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose).
 For usage questions, go to [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a),
 or ask in `#help` on the [Discord](https://discord.gg/QNdWfdwr7j).
+
+## Coding-agent state and program notifications
+
+**Claude Code is currently the only CLI with a dedicated task-state
+integration.** The checked reference version is **2.1.310**; this is not a
+compatibility guarantee for all Claude versions. Codex, Gemini CLI, pi,
+Kimi, Grok Build, Qwen Code, OpenCode and Aider have no dedicated task-state
+adapter in Corta. Generic notification/progress protocols remain available
+to any program; process detection is not a full agent integration. See the
+[compatibility scope and verification limits](CONFORMANCE.md#cli-signal-compatibility).
+
+By default, agent panes distinguish Working (accent colour), Waiting for you (orange),
+Done (green), Failed (red), Idle (grey), and State unknown (a hollow grey dot)
+on their native tab. Idle means no active turn is reported, including before
+work starts or after it stops; only an explicit `done` means completion.
+A progress ring follows OSC 7501 or OSC 9;4 reports. The Dock counts waiting
+panes and shows aggregate progress. Open the command palette or Window →
+Agents to find every agent pane across windows; choosing an entry focuses it.
+Several agents in one pane are shown by their most urgent state. Status and
+application names are reported by the program, not verified identities.
+OSC 21337 can also supply a custom indicator colour; without an explicit
+task state its label remains State unknown.
+
+Claude Code's OSC 7501 status probe needs no setting. When a background pane
+asks permission, asks a question or needs sign-in, Corta posts a fixed message.
+For Claude Code's own message text, set its `preferredNotifChannel` to
+`ghostty` (OSC 777); `iterm2` and `kitty` are also accepted. Corta still
+identifies itself as Corta. These Claude-specific protocol details are
+based on the checked reference version; availability can depend on the
+installed Claude version.
+
+Programs without status support are detected by foreground process name
+(claude, claude-code, codex, gemini, aider, opencode); add names with
+`agent-processes = my-agent,another-agent`. These panes show State unknown
+while the process is active: output and prompt redraws do not prove a task
+is working. A return to the shell or a clean process exit means Idle, not
+Done; a known failed exit is Failed. Notifications and BEL request attention
+without changing the task state. Silence alone does not mean completion.
+BEL's existing audible/visual/muted setting is unchanged.
+
+`agent-status = false` hides state indicators and the list.
+`notify-from-programs = false` disables program and agent-attention notices.
+Program messages are labelled as pane messages under Corta's pane name,
+limited and cleaned, and coalesced to at most one delivery per five seconds
+per pane. While a pane remains in a reported blocked state, a delayed program
+notice does not re-alert an already announced wait. A notice arriving before
+the first delivery can supply its message instead. macOS notification permission
+is required; enable **Badge application
+icon** in the app's notification settings for the Dock count. Notification Center may
+retain message text and show it on the lock screen. Clicking focuses the pane;
+closing or restarting the pane cancels pending program notices.

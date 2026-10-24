@@ -307,6 +307,41 @@ TEST_RUNNER_CORTA_FEEDBACK_STAGE="$FEEDBACK_STAGE" xcodebuild test \
   -project Corta.xcodeproj -scheme Corta -testPlan UI
 ```
 
+Claude Code is currently the only CLI with a dedicated task-state
+integration (reference version 2.1.310). Most `AgentStatusUITests` cases use
+synthetic OSC fixtures. They do not establish real Claude lifecycle coverage
+or task-state compatibility with other CLIs.
+
+`AgentStatusUITests` uses the `agents` stage for background status, palette
+navigation, process-only unknown state and session exit. Its native notification click test is
+opt-in: add `TEST_RUNNER_CORTA_UI_NOTIFICATIONS=1` and select
+`CortaUITests/AgentStatusUITests/testProgramNotificationChannelsAndClick`.
+It uses the `agent-notifications` stage for OSC 9, OSC 777 and OSC 99.
+Enable notifications for Corta Dev before running it; Focus and system
+delivery rules still apply. The test never changes these settings. A
+missing native notification is a failed acceptance check, not a pass.
+
+`testRealClaudeBackgroundPermissionAndNotificationChannels` is a separate,
+opt-in, billable acceptance test. Set `TEST_RUNNER_CORTA_REAL_CLAUDE` to the
+installed executable, `TEST_RUNNER_CORTA_REAL_HOME` to the authenticated home
+directory and `TEST_RUNNER_CORTA_REAL_CWD` to an already trusted checkout.
+Use the fixture root above and select that one test. When overriding the
+app's product name, also set `TEST_RUNNER_CORTA_REAL_APP_NAME` to that name
+(default `CortaDev`). Use a separate bundle identity if other development
+windows are in use. The human must enable notifications for that identity;
+the test never changes system permissions or Focus.
+
+The test launches actual Claude with a per-invocation settings overlay and
+manual Bash approval. It asks only to create a disposable marker in the
+`real-claude` stage, checks a background permission notice, retains Dock
+tile screenshots, clicks back to the permission prompt, approves that
+invocation only, and waits for `done`. It repeats with `auto`, `iterm2`,
+`ghostty` and `kitty`, checking the real transcript for each explicit OSC
+channel. It reads normal Claude account configuration; transcripts can
+contain private context and must stay local. Remove them with the fixture
+root. Failure, cancellation and auth-required lifecycles need separate
+acceptance; this test does not claim them.
+
 Remove both printed directories once the development app has exited.
 Build into the default derived data, not a `-derivedDataPath` under a
 private temporary directory: the fixture launcher starts the app by URL

@@ -12,6 +12,21 @@ Versioning for compatibility changes.
 
 ### Added
 
+- Claude Code task-state integration on native tabs and the Dock, with a
+  pane-jumping Agents list in the command palette and Window menu. Claude
+  Code is currently the only CLI with a dedicated task-state integration;
+  other tools have process detection and generic protocol support only.
+  OSC 7501 status,
+  OSC 9/777/99 notifications, OSC 9;4 progress and OSC 21337 tab metadata
+  are bounded and sanitised. Background attention uses fixed Corta text;
+  program notices are labelled pane messages and coalesced per pane. Claude
+  Code’s `done` signal is distinct from idle; process-only detection shows
+  unknown state, and ordinary messages or bells do not imply permission or
+  completion. Tab indicators remain centered when the native tab strip
+  resizes their accessory. Delayed program notices do not repeat an already
+  announced wait for permission, and notification authorization includes Dock
+  badges.
+
 - Right-click a pane to find text, copy the clicked command’s output, or
   open/copy a link or file reference under the pointer.
 - Paste warnings for shell pipes, sudo, recursive forced deletion,

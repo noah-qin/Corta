@@ -204,6 +204,9 @@ extension AppDelegate {
         menu.addItem(withTitle: L10n.text("menu.minimize"), action: #selector(NSWindow.performMiniaturize(_:)), key: "m")
         menu.addItem(withTitle: L10n.text("menu.zoom"), action: #selector(NSWindow.performZoom(_:)))
         menu.addItem(.separator())
+        let agents = NSMenuItem(title: L10n.text("agent.list"), action: nil, keyEquivalent: "")
+        agents.submenu = AgentDirectory.menu()
+        menu.addItem(agents)
         menu.addItem(withTitle: L10n.text("menu.bringAllToFront"), action: #selector(NSApplication.arrangeInFront(_:)))
         return menu
     }

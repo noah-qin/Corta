@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Observation
+import Foundation
 
 /// The command palette's state and filtering, as `CommandPaletteView`
 /// binds to it.
@@ -39,15 +40,19 @@ final class CommandPaletteModel {
     /// first: the arrow keys could never get past it.
     enum Row: Identifiable, Equatable {
         case header(String)
+        case agent(AgentDirectory.Entry)
         case command(TerminalCommand, recent: Bool, shortcut: String)
 
         var id: String {
             switch self {
+            case .agent(let entry): "agent-" + entry.id.uuidString
             case .header(let title): "header-\(title)"
             case .command(let command, let recent, _):
                 (recent ? "recent-" : "command-") + command.rawValue
             }
         }
+
+        var selectable: Bool { if case .header = self { false } else { true } }
 
         var command: TerminalCommand? {
             if case .command(let command, _, _) = self { command } else { nil }
@@ -71,6 +76,7 @@ final class CommandPaletteModel {
     /// The selected row's `id`, not its command, for the reason `Row` gives.
     private(set) var selectedRowID: String?
     var onRun: ((TerminalCommand) -> Void)?
+    var onAgent: ((UUID) -> Void)?
     var onDismiss: (() -> Void)?
 
     var selectedCommand: TerminalCommand? {
@@ -87,8 +93,10 @@ final class CommandPaletteModel {
     private var recentCommands: [TerminalCommand] = []
 
     private static let recentLimit = 5
+    private let agentEntries: () -> [AgentDirectory.Entry]
 
-    init() {
+    init(agents: @escaping () -> [AgentDirectory.Entry] = { AgentDirectory.entries }) {
+        agentEntries = agents
         rebuildRows()
     }
 
@@ -105,13 +113,13 @@ final class CommandPaletteModel {
     /// selection on nothing, or on a row that no longer exists.
     func selectFirstIfNeeded() {
         if let selectedRowID, rows.contains(where: { $0.id == selectedRowID }) { return }
-        selectedRowID = rows.first { $0.command != nil }?.id
+        selectedRowID = rows.first { $0.selectable }?.id
     }
 
     /// Subsequence matching, which is what people mean by "fuzzy" here:
     /// `spr` finds "Split Pane Right". Ranked so that a match on consecutive
     /// characters, or one starting at a word boundary, beats a scattered one.
-    private func rebuildRows() {
+    func rebuildRows() {
         let shortcuts = ConfigurationStore.shared.configuration.keybindings
         func row(_ command: TerminalCommand, recent: Bool = false) -> Row {
             .command(command, recent: recent, shortcut: shortcuts[command]?.displayText ?? "")
@@ -119,6 +127,10 @@ final class CommandPaletteModel {
         rows =
             query.isEmpty
             ? browsingRows(row: row) : searchRows(matching: query.lowercased(), row: row)
+        let agents = agentEntries().filter { query.isEmpty || Self.score($0.title.lowercased(), query: query.lowercased()) != nil }
+        if !agents.isEmpty {
+            rows = [.header(L10n.text("agent.list"))] + agents.map { .agent($0) } + rows
+        }
         selectFirstIfNeeded()
     }
 
@@ -216,21 +228,25 @@ final class CommandPaletteModel {
         let step = delta > 0 ? 1 : -1
         while remaining > 0 {
             var next = index + step
-            while next >= 0, next < rows.count, rows[next].command == nil { next += step }
+            while next >= 0, next < rows.count, !rows[next].selectable { next += step }
             guard next >= 0, next < rows.count else { break }
             index = next
             remaining -= 1
         }
-        guard index >= 0, index < rows.count, rows[index].command != nil else { return }
+        guard index >= 0, index < rows.count, rows[index].selectable else { return }
         selectedRowID = rows[index].id
     }
 
     func select(_ row: Row) {
-        guard row.command != nil else { return }
+        guard row.selectable else { return }
         selectedRowID = row.id
     }
 
     func runSelected() {
+        if let row = rows.first(where: { $0.id == selectedRowID }), case .agent(let entry) = row {
+            onAgent?(entry.id)
+            return
+        }
         guard let selectedCommand else { return }
         recentCommands.removeAll { $0 == selectedCommand }
         recentCommands.insert(selectedCommand, at: 0)

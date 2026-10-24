@@ -161,6 +161,10 @@ nonisolated struct Configuration: Equatable, Sendable {
     var rows: Int = 30
     var bell: BellMode = .visual
     var notifyOnLongTask: Bool = false
+    var notifyFromPrograms = true
+    var agentStatus = true
+    /// Additional comma-separated foreground executable names.
+    var agentProcesses = ""
     /// Seconds a command must run before its finish is worth a notification.
     var notificationThreshold: Double = 30
     /// A finished selection goes straight to the pasteboard, as on X11. On by

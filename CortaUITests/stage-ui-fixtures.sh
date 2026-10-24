@@ -152,4 +152,93 @@ for policy in dangerous always off; do
   printf 'fixture\n' > "$root/context-paste-$policy/sample.swift"
 done
 
+stage agents 'columns = 100\nrows = 30\nfont-size = 14\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\nnotify-from-programs = false\nagent-processes = corta-stub\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+cat > "$root/agents/status-demo" <<'SH2'
+#!/bin/sh
+printf '\nAgent fixture started\n'
+printf '\033]7501;state=working:app=fixture:title=QnVpbGRpbmc=\007'
+sleep 4
+printf '\033]7501;state=blocked:app=fixture:kind=permission:title=UmV2aWV3IGNoYW5nZXM=\007'
+printf '\033]9;4;4;65\007'
+printf '\nBackground permission fixture\n'
+sleep 20
+printf '\033]7501;state=clear\007\033]9;4;0\007'
+SH2
+chmod 700 "$root/agents/status-demo"
+cat > "$root/agents/completion-demo" <<'SH2'
+#!/bin/sh
+printf '\033]7501;state=working:app=claude-code\007'
+printf '\nClaude completion fixture started\n'
+sleep 6
+printf '\033]7501;state=done:app=claude-code\007'
+printf '\nReady for another turn\n'
+# Keep the process alive, as a real agent does at its input prompt.
+sleep 30
+SH2
+chmod 700 "$root/agents/completion-demo"
+cat > "$root/agents/stub.swift" <<'SWIFT'
+import Foundation
+FileHandle.standardOutput.write(Data("fallback process started\n".utf8))
+Thread.sleep(forTimeInterval: 8)
+SWIFT
+swiftc -module-cache-path "$root/module-cache" "$root/agents/stub.swift" -o "$root/agents/corta-stub"
+cat > "$root/agents/auto-shell" <<'SH'
+#!/bin/sh
+export SHELL=/bin/zsh
+if mkdir "$ZDOTDIR/$TEST_AGENT_MARKER" 2>/dev/null; then
+  if [ "$TEST_AGENT_MODE" = fallback ]; then
+    exec "$ZDOTDIR/corta-stub"
+  elif [ "$TEST_AGENT_MODE" = completion ]; then
+    "$ZDOTDIR/completion-demo"
+  else
+    "$ZDOTDIR/status-demo"
+  fi
+fi
+exec /bin/zsh -l
+SH
+chmod 700 "$root/agents/auto-shell"
+
+stage agent-notifications 'columns = 100\nrows = 30\nfont-size = 14\nrestore-windows = false\nnotify-from-programs = true\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+cat > "$root/agent-notifications/notice-shell" <<'SH'
+#!/bin/sh
+export SHELL=/bin/zsh
+if mkdir "$ZDOTDIR/$TEST_AGENT_MARKER" 2>/dev/null; then
+  printf '\nNotification target %s\n' "$TEST_AGENT_CHANNEL"
+  printf '\033]7501;state=working:app=fixture\007'
+  sleep 4
+  printf '\033]7501;state=blocked:app=fixture:kind=permission\007'
+  case "$TEST_AGENT_CHANNEL" in
+    iterm2) printf '\033]9;Corta 409 iterm2: Channel ready\007' ;;
+    ghostty) printf '\033]777;notify;Corta 409 ghostty;Channel ready\007' ;;
+    kitty)
+      printf '\033]99;i=fixture:d=0:p=title;Corta 409 kitty\007'
+      printf '\033]99;i=fixture:d=0:p=body;Channel ready\007'
+      printf '\033]99;i=fixture:d=1:a=focus:o=invisible;\007'
+      ;;
+  esac
+  sleep 20
+  printf '\033]7501;state=clear\007'
+fi
+exec /bin/zsh -l
+SH
+chmod 700 "$root/agent-notifications/notice-shell"
+
+stage real-claude 'columns = 120\nrows = 40\nfont-size = 14\nrestore-windows = false\nnotify-from-programs = true\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+cat > "$root/real-claude/claude-shell" <<'SH'
+#!/bin/sh
+export SHELL=/bin/zsh
+if mkdir "$ZDOTDIR/$TEST_AGENT_MARKER" 2>/dev/null; then
+  cd "$TEST_CLAUDE_CWD" || exit 1
+  umask 077
+  sleep 10
+  settings="{\"preferredNotifChannel\":\"$TEST_AGENT_CHANNEL\",\"permissions\":{\"ask\":[\"Bash\"]}}"
+  exec /usr/bin/script -q -F "$ZDOTDIR/$TEST_AGENT_MARKER/transcript" \
+    "$TEST_CLAUDE" --no-chrome --strict-mcp-config --tools Bash --permission-mode manual \
+    --effort low --settings "$settings" \
+    "Run exactly /usr/bin/touch $ZDOTDIR/$TEST_AGENT_MARKER/approved to create a disposable acceptance marker. Do nothing else, then reply only OK."
+fi
+exec /bin/zsh -f
+SH
+chmod 700 "$root/real-claude/claude-shell"
+
 printf '%s\n' "$root"

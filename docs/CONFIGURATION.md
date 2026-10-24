@@ -233,11 +233,19 @@ of integration uses `TaskNotifier`'s typing-and-idle heuristic.
 
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
+| `notify-from-programs` | boolean | `true` | Allow bounded program notifications and agent attention notices. Notification Center may retain their message text. |
+| `agent-status` | boolean | `true` | Show state on tabs, the Dock and the Agents list. Dedicated task-state integration currently covers Claude Code only; process-only detections show State unknown. |
+| `agent-processes` | comma-separated names | *(empty)* | Additional foreground executable names, up to 32 names of 80 bytes each; built-ins: claude, claude-code, codex, gemini, aider, opencode. Names enable process detection only, not task-state integration or hook installation. No polling timer. |
 | `notify-on-long-task` | boolean | `false` | Post a notification when a long command finishes. |
 | `notification-threshold` | ≥ 1 | `30` | Seconds a command must run to be worth one. |
 
-A notification is posted only when **all** of these hold: the setting is
-on, the command ran longer than the threshold, the window is **not** the
+Program notifications use `notify-from-programs` and the visibility/occasion
+rules described in the [user guide](USER-GUIDE.md#coding-agent-state-and-program-notifications).
+They are independent of the long-task threshold below. Process-name detection
+does not provide dedicated task-state integration for another CLI.
+
+A **long-task notification** (`notify-on-long-task`) is posted only when
+**all** of these hold: the setting is on, the command ran longer than the threshold, the window is **not** the
 key window, and macOS has granted notification permission. With shell
 integration (OSC 133) the boundaries are exact; without it, Return starts
 the timer and 1.5 s of output silence ends it — which is why the feature
@@ -357,6 +365,9 @@ allow-clipboard-write = false
 secure-keyboard-entry = false
 
 # Notifications
+notify-from-programs = true
+agent-status = true
+agent-processes =
 notify-on-long-task = true         # default false
 notification-threshold = 60        # default 30
 
