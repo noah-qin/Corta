@@ -61,7 +61,7 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
                 forName: ConfigurationStore.didChange, object: nil, queue: .main
             ) { _ in
                 MainActor.assumeIsolated {
-                    for pane in panes { pane.agents.readOutput() }
+                    for pane in Self.panes { pane.agents.readOutput() }
                     refresh()
                 }
             }
