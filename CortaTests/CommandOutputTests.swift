@@ -42,6 +42,22 @@ struct CommandOutputTests {
         return terminal
     }
 
+    @Test func contextCommandUsesClickedOutputInsteadOfLastCommand() throws {
+        let terminal = Self.session(commands: [
+            ("echo one", ["one"], 0), ("echo two", ["two"], 0),
+        ])
+        let records = terminal.commandRecords.records
+        let first = try #require(records.first)
+        let second = try #require(records.dropFirst().first)
+        let clicked = try #require(PaneCommands.command(at: first.outputStartRow!, records: records))
+        #expect(clicked.id == first.id)
+        #expect(PaneShellIntegration.commandOutputText(grid: terminal.grid, record: clicked) == "one")
+        #expect(PaneCommands.command(at: second.outputStartRow!, records: records)?.id == second.id)
+        #expect(PaneCommands.command(at: first.promptRow, records: records) == nil)
+        #expect(PaneCommands.command(at: second.endRow!, records: records) == nil)
+        #expect(PaneCommands.command(at: 0, records: []) == nil)
+    }
+
     // MARK: - Marks
 
     @Test("prompt rows and failed prompt rows are both found")

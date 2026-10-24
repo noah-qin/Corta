@@ -74,7 +74,16 @@ Copying a command from a web page where a hidden element appended
 
 - Bracketed paste is enabled by default.
 - When a paste contains a newline **and** the application has not enabled
-  bracketed paste mode, warn before sending.
+  bracketed paste mode, warn before sending (unless explicitly disabled).
+- `paste-warning = dangerous` (default) also warns for pipes into shells,
+  `sudo`, recursive forced `rm`, backslash-newline continuations and
+  `ConcealingScalars`, regardless of bracketed paste. `always` additionally
+  warns on any multiline paste; `off` disables dialogs. The pane-local
+  suppression checkbox lasts only for the pane. The dialog names each risk
+  and displays concealed scalars as Unicode codes. Cancel queues no bytes;
+  cancellation of an already queued paste still uses `Paste.closing`.
+  Deterministic conservative patterns can produce false positives and do
+  not prove other text safe. There is no network or model lookup.
 - Strip `ESC` and other C0 control characters from pasted text — a paste
   is data, never a command stream — and DEL and the C1 range with them:
   DEL is a line editor's backspace, and C1 holds CSI and ST.
@@ -166,7 +175,10 @@ grid draws each as U+FFFD in a cell of its own, so a copy of what was shown
 holds what was shown; OSC 52 strips them. ZWJ, ZWNJ and LRM/RLM stay
 zero-width — emoji sequences and real bidi text need them. Before S16 they
 were folded invisibly into the previous cell, which is exactly the failure
-this section describes.
+this section describes. Incoming pasted text is checked against the same
+list before sending, and the warning preview exposes each matching scalar
+as a visible Unicode code (§2.3), including bidi overrides in otherwise
+harmless text.
 
 ### 2.6 OSC 52 clipboard
 

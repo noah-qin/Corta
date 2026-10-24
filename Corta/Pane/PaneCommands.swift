@@ -87,11 +87,13 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         largeTextTask = nil
     }
 
+    var suppressPasteWarnings = false
+
     // MARK: - Context menu
 
     /// The right-click menu: editing and split actions, with explicit targets
     /// so it also works when shown programmatically.
-    func contextMenu(bindings suppliedBindings: Keybindings? = nil) -> NSMenu {
+    func contextMenu(bindings suppliedBindings: Keybindings? = nil, event: NSEvent? = nil) -> NSMenu {
         let menu = NSMenu()
         let bindings = suppliedBindings ?? ConfigurationStore.shared.configuration.keybindings
         func item(_ command: TerminalCommand, _ target: AnyObject?, title: String? = nil, enabled: Bool = true) {
@@ -107,6 +109,47 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         item(.copy, self, enabled: host?.selection != nil)
         item(.paste, host)
         item(.selectAll, host)
+        menu.addItem(.separator())
+        item(.find, host)
+        var clickedCommand: CommandRecord?
+        if let event, let host, host.isOperable, let view = host.terminalView,
+            host.terminalRenderer != nil, let session = host.session
+        {
+            let grid = session.snapshot()
+            let point = host.pointer.documentPosition(for: event, in: view, grid: grid)
+            let row = grid.absoluteRow(ofScreenRow: point.row)
+            clickedCommand = Self.command(at: row, records: session.commandRecords.records)
+        }
+        let commandID = clickedCommand?.id
+        contextItem(in: menu, key: "context.copyCommandOutput", enabled: clickedCommand != nil) { [weak self] in
+            guard let self, let pane = self.host as? ViewController, let commandID,
+                let record = pane.session?.commandRecords.records.first(where: { $0.id == commandID })
+            else { return }
+            pane.shell.copyCommandOutput(for: record, pasteboard: self.pasteboard)
+        }
+        if let event, let host, host.isOperable, let view = host.terminalView,
+            host.terminalRenderer != nil, host.session != nil
+        {
+            if let link = host.pointer.linkUnder(event, in: view) {
+                menu.addItem(.separator())
+                contextItem(in: menu, key: "context.openLink") { [weak host] in
+                    _ = host?.pointer.open(link)
+                }
+                contextItem(in: menu, key: "context.copyLink") { [weak self] in
+                    guard let target = PanePointer.target(of: link.url) else { return }
+                    self?.copyContextText(target.absoluteString)
+                }
+            } else if let reference = host.pointer.detectedReferenceUnder(event, in: view) {
+                menu.addItem(.separator())
+                contextItem(in: menu, key: "context.openPath") { [weak host] in
+                    host?.pointer.openDetected(reference)
+                }
+                contextItem(in: menu, key: "context.copyPath") { [weak self] in
+                    self?.copyContextText(reference.path)
+                }
+            }
+        }
+        menu.addItem(.separator())
         item(.newTab, NSApp.delegate)
         if let splitController = host?.splitController {
             menu.addItem(.separator())
@@ -117,6 +160,38 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             item(.close, splitController, title: closeTitle)
         }
         return menu
+    }
+
+    /// Absolute OSC 133 output rows, excluding the prompt and next command.
+    nonisolated static func command(at row: Int, records: [CommandRecord]) -> CommandRecord? {
+        records.last { record in
+            guard let end = record.endRow else { return false }
+            let start = record.outputStartRow ?? record.promptRow + 1
+            return row >= start && row < end
+        }
+    }
+
+    private func copyContextText(_ text: String) {
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
+
+    private func contextItem(
+        in menu: NSMenu, key: String, enabled: Bool = true, perform: @escaping () -> Void
+    ) {
+        let action = ContextAction(perform)
+        let item = NSMenuItem(title: L10n.text(key), action: #selector(ContextAction.run(_:)), keyEquivalent: "")
+        item.target = action
+        item.representedObject = action // NSMenuItem's target is weak.
+        item.isEnabled = enabled
+        menu.addItem(item)
+    }
+
+    private final class ContextAction: NSObject, NSMenuItemValidation {
+        let perform: () -> Void
+        init(_ perform: @escaping () -> Void) { self.perform = perform }
+        @objc func run(_: Any?) { perform() }
+        func validateMenuItem(_ item: NSMenuItem) -> Bool { item.isEnabled }
     }
 
     // MARK: - Font size

@@ -116,6 +116,7 @@ into another application hides it without moving focus again.
 | `open-file-command` | string | *(empty)* | The command run when a `path:line` reference in program output is ⌘-clicked. `{file}`, `{line}` and `{column}` are substituted, one argument at a time. The executable must be an **absolute path** and is run directly — never through a shell — so a path containing `;` or `$(…)` stays a path. For both local and remote references, a nonempty editor command is required. Empty disables opening: system default handlers can execute some file types. The hover tooltip names the required setting. The same template is used for the managed local copy the remote-editing flow downloads — `{file}` is the copy, the line and column are the reference's own. |
 | `search-regex` | boolean | `false` | Whether the search field is read as a regular expression (ICU syntax, as `NSRegularExpression` accepts it). The **`*`** button in the search bar writes this key. Three things are reported rather than shown as "no results": a pattern that does not compile, a pattern whose shape makes a backtracking engine take exponential time (`(a+)+`, `(a*)*`, `(a\|a)+` — every one has a linear equivalent, and it is refused *before* it runs because ICU's time limit is not reachable from Swift), and a sweep that stopped on its 500 ms budget or on a line longer than 64,000 units, which the match count marks with a `+`. |
 | `search-case-sensitive` | boolean | `false` | Whether scrollback search distinguishes case. Off by default: a person searching a log for `error` wants `Error` and `ERROR` too. The **Match Case** button in the search bar writes this key, so the choice survives closing the bar and restarting. |
+| `paste-warning` | `dangerous`, `always`, `off` | `dangerous` | Warns for shell pipes, sudo, recursive forced deletion, backslash continuations, hidden Unicode characters, and line breaks without bracketed paste. `always` also warns for any multiline paste with bracketed paste enabled; `off` disables dialogs. Applies immediately. “Don’t warn again for this pane” lasts until the pane closes. |
 | `copy-on-select` | boolean | `true` | A finished selection goes straight to the clipboard, confirmed by a label in the corner of the pane. Set `false` for ⌘C only. |
 | `mouse-override-modifier` | `option`, `shift`, `control` | `option` | Hold this modifier when beginning a drag to select terminal text while a TUI owns the mouse. Applies immediately. The pane shows a hint on first use; `copy-on-select` controls automatic copying. |
 | `link-activation` | `command`, `click` | `command` | `command` opens a link on ⌘-click. `click` opens it on a plain click and underlines the link under the pointer; dragging across a URL still selects it. |
@@ -348,6 +349,7 @@ option-as-meta = false
 open-file-command =
 search-regex = false
 search-case-sensitive = false
+paste-warning = dangerous
 copy-on-select = true
 mouse-override-modifier = option
 link-activation = command
@@ -744,7 +746,7 @@ search away.
 | `theme`, `appearance`, `font-family`, `font-family-cjk`, `font-weight`, `line-spacing`, `font-fallback`, `emoji-rendering`, `cursor-shape`, `cursor-blink` | Immediately, in every open pane; a change to the cell's size refits the rows and columns to the window. |
 | `ambiguous-width` | Immediately, for output written afterwards; text already on screen keeps its width. |
 | `font-size` | Immediately in panes without temporary font zoom; zoomed windows keep their temporary size until Actual Size (⌘0). New windows use the configured size. |
-| `bell`, `option-as-meta`, `search-case-sensitive`, `search-regex`, `open-file-command`, `copy-on-select`, `mouse-override-modifier`, `link-activation`, `allow-clipboard-write`, `confirm-close`, `directory-history`, notification keys | Immediately — they are read when the behaviour happens. |
+| `bell`, `option-as-meta`, `search-case-sensitive`, `search-regex`, `open-file-command`, `paste-warning`, `copy-on-select`, `mouse-override-modifier`, `link-activation`, `allow-clipboard-write`, `confirm-close`, `directory-history`, notification keys | Immediately — they are read when the behaviour happens. |
 | `status-bar`, `status-items`, `status-network-interface`, input-source indicator keys | Immediately; polling follows visible enabled bars. |
 | `command-status-marks` | Immediately; changes the command-outcome overlay without changing terminal text. |
 | `directory-completion` | Disabling immediately hides suggestions and restores native key handling. Enabling requires a new shell to load automatic local zsh hooks; a live shell keeps hooks it already loaded. |

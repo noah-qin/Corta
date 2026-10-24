@@ -113,6 +113,12 @@ struct PaneCommandsTests {
         #expect(!copy.isEnabled, "nothing is selected")
         let paste = try #require(menu.items.first { $0.action == TerminalCommand.paste.action })
         #expect(paste.target === host)
+        let find = try #require(menu.items.first { $0.action == TerminalCommand.find.action })
+        #expect(find.target === host)
+        let output = try #require(menu.items.first { $0.title == L10n.text("context.copyCommandOutput") })
+        #expect(!output.isEnabled)
+        menu.update()
+        #expect(!output.isEnabled, "automatic menu validation keeps empty-space copy disabled")
     }
 
     @Test("a failed pane refuses an app-initiated cd and greys the directory items")

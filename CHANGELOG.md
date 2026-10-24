@@ -10,6 +10,15 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- Right-click a pane to find text, copy the clicked command’s output, or
+  open/copy a link or file reference under the pointer.
+- Paste warnings for shell pipes, sudo, recursive forced deletion,
+  backslash continuations and concealed Unicode characters, including with
+  bracketed paste enabled. Review a visible text preview, cancel, or suppress
+  warnings for that pane; `paste-warning` selects `dangerous`, `always` or `off`.
+
 ## [1.4.0] - 2026-10-22
 
 ### Added
