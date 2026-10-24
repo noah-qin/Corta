@@ -261,6 +261,14 @@ nonisolated extension Configuration {
             .choice("quick-terminal-screen", \.quickTerminalScreen),
         ]),
         ("# Notifications", [
+            .flag("notify-from-programs", \.notifyFromPrograms),
+            .flag("agent-status", \.agentStatus),
+            ConfigurationKey(name: "agent-processes", read: { configuration, value in
+                let names = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                guard names.count <= 32, names.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 80 && !$0.contains("/") && !$0.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) }) else { return false }
+                configuration.agentProcesses = names.joined(separator: ",")
+                return true
+            }, write: { $0.agentProcesses }),
             .flag("notify-on-long-task", \.notifyOnLongTask),
             .number("notification-threshold", \.notificationThreshold, in: 1...Double.greatestFiniteMagnitude),
         ]),

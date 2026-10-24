@@ -44,7 +44,12 @@ Query/response sequences are required for correctness
 (`CONFORMANCE.md` §1.2) — DA1, DA2 and DSR-CPR are P0. They are safe
 because their responses are constants or numeric cursor coordinates. The
 danger begins the moment a response carries back a string that the
-stream itself supplied.
+stream itself supplied. OSC 99 capability queries have one deliberately
+narrow exception required for multiplexer routing: the query id may be echoed
+only after checking `[A-Za-z0-9_.+-]{1,32}`. All other response bytes are fixed.
+No activation, close-event or alive reports are sent. OSC 7501 probes receive
+only the constant `OSC 7501 ; ? ST`.
+
 
 ### 2.2 Never implement title reporting
 
@@ -247,6 +252,19 @@ of 256 KiB, four levels and 200 names. Both lists pass the character check
 a typed host does (`SSHDestination`), and picking one only fills the field.
 
 ---
+
+### 2.9 Program status and notification text
+
+Claude Code is currently the only dedicated task-state integration; generic
+protocol acceptance does not imply integration with other coding agents.
+OSC 7501/21337 state and OSC 9/777/99 notices are self-reported metadata,
+including `app`; none grants trust or runs anything. ConEmu GuiMacro and
+process execution (OSC 9;6 and 9;7) are inert. Titles/messages remove all
+controls and concealing scalars. The program's title appears only inside a
+labelled pane message, beneath Corta's own `notificationTitle`; it never
+becomes the system notification title. Agent permission/question/sign-in
+notices use Corta's fixed localised text. `notify-from-programs = false`
+disables both notice paths; `agent-status = false` hides agent chrome.
 
 ## 3. Resource Exhaustion
 
@@ -489,12 +507,18 @@ This is separate from AppKit restoration. Terminal windows set
 terminal content; `applicationSupportsSecureRestorableState` is not the
 policy switch for Corta's own JSON metadata.
 
-**Notifications carry no terminal content.** The long-task notification
-(M6.3) reports a duration under the tab's own name or its directory, never
-the window title — an OSC 0/2 title is a program's text, which macOS would
-show as Corta's own words, lock screen included — nor the command or any
-output: Notification Center is a second store, outside the app, with its
-own retention — and the grid is full of things that must not go there.
+**Long-task notifications carry no terminal content.** They report only an
+outcome/duration beneath Corta's pane name, never OSC 0/2 text or commands.
+**Program notifications are an explicit exception:** when
+`notify-from-programs = true` (default), bounded OSC 9/777/99 title/body text
+can reach Notification Center, including the lock screen and its separate
+retention store. It is labelled as a pane message, stripped of controls and
+concealing scalars, capped at 2,048 UTF-8 bytes, coalesced into one mutable
+notice per pane and delivered at most once every five seconds per pane.
+This can include secrets a program deliberately puts in its notification.
+Disable the setting to keep such text out. OSC 7501 blocked notices contain
+only Corta's fixed text for the reported reason. Pane teardown removes its
+program notice and cancels pending delivery and expiry.
 
 **The config file holds settings only** (M6.1). It is a plain text file
 at `~/.config/corta/config` with no credential-shaped field, and nothing
@@ -577,6 +601,17 @@ when a limit is exhausted. A per-frame limit does not bound accumulated
 state. Charge retained resources until release; return reservations on
 failure, cancellation, replacement and owner teardown. Test both rejection
 and recovery, including work finishing after cancellation.
+
+Program metadata has a 32-entry per-session cap. Each status retains at most
+80 bytes of app name, 192 of title, 2,048 of message, 32 per colour field
+and a bounded id. Kitty
+retains at most eight incomplete messages of 4,096 encoded bytes each; an
+oversized transmission is discarded through its final chunk. One pending
+notice and one blocked edge are coalesced per terminal. Sessions own all core
+metadata; RIS and session teardown release it. The app retains one pending
+notice, one delivery callback and one expiry callback per pane, all cancelled
+on pane teardown/session replacement. Aggregate memory scales with the number
+of live panes; there is no global notification-text history or unbounded queue.
 
 The implementation has parser, title-stack, underline-colour, cluster, image, texture, SFTP frame,
 request/writer, directory-list and tree limits. New paths must name their

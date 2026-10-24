@@ -621,3 +621,96 @@ same terms; the tree carries no dated records.
 | [2026-10-07 — 1.1.5 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-07-1.1.5-checks.md) | Full core/Unit suites, fuzz, esctest re-run, core benchmark and Release frame CPU, and the user-confirmed resize check |
 | [2026-10-07 — 1.1.6 release checks](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-07-1.1.6-checks.md) | Rounded box corners: render tests failing on 1.1.5, the launched app, and a Release frame-CPU A/B |
 | [2026-10-09 — Mac audit closeout](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-mac-audit-closeout.md) | §4.4 points 1–5, native session lifecycle, Quick Terminal and paste checks; explicit UI, VoiceOver, Shortcuts and remote limits |
+
+## Program status and desktop notifications
+
+Claude Code is currently the only CLI with a dedicated task-state
+integration. General protocol parsing and process-name detection do not
+constitute task-state integration for other CLIs. No Codex, Gemini, pi,
+Kimi, Grok Build, Qwen, OpenCode or Aider state adapter is shipped.
+
+OSC 7501 replies to probes with the constant `OSC 7501 ; ? ST` and accepts
+working/blocked/done/idle/error and clear, per optional bounded id. `done`
+is a completed turn; `idle` is a separate state (including startup and stop).
+Prompt redraws and ordinary notifications do not change reported task state.
+Corta's internal `unknown` is used for process-only detection and OSC 21337
+metadata, which do not establish an agent's task state. It is not an extra
+OSC 7501 wire state. OSC 21337
+accepts escaped indicator/status/status-color metadata. OSC 9 distinguishes
+numeric ConEmu subcommands from notification text; only 9;4 progress changes
+state, and 9;6/9;7 never execute. Other ConEmu commands are inert; directory
+and prompt reports (9;9/9;12) remain unsupported. OSC 777 accepts only notify.
+
+OSC 99 supports title/body/close, bounded chunking and base64, occasion,
+urgency metadata, focus, expiry and silent/system sounds. Urgency never
+bypasses the OS's notification policy. The capability reply echoes only a
+charset-checked query id, as required by the
+[kitty specification](https://sw.kovidgoyal.net/kitty/desktop-notifications/#querying-for-support).
+The default kitty occasion is always; other protocols default to hidden panes.
+Corta coalesces all program notices to one mutable notice per pane.
+An explicit notice delayed beyond coalescing does not re-alert a pane whose
+current blocked episode was already announced; leaving blocked resets that
+suppression. This covers Claude's delayed permission notices.
+
+Unsupported: `a=report`, `c=1` event reports, `p=alive`, icons (`n`, `g`,
+`p=icon`) and buttons. These generate no stdin reports. Close requests remove
+only the pane's currently matching id. Program-chosen ids never enter click
+routing; clicks use Corta's pane id, window number and session generation.
+
+`ProgramSignalsTests` covers byte-split sequences, bad fields/base64, entry
+and chunk exhaustion/recovery, sanitisation, refused ConEmu actions, progress,
+capability reply allowlisting and tab-status escaping. Launched-app acceptance
+also needs a real Claude startup/permission/completion, notification click
+routing and each explicit channel (`iterm2`, `ghostty`, `kitty`). Process fallback
+uses process changes, prompt return and exit; an active process alone means
+Unknown, a clean session end means Idle, and a known failed exit means Failed.
+OSC notifications and BEL never imply blocked, done or working; no idle timer
+is added. Flood delivery is bounded to 0.2 notices/second/pane after coalescing.
+
+`RealClaudeStatusTests` is opt-in: set `CORTA_REAL_CLAUDE` to the installed
+executable's absolute path and run the core test of that name. It starts the
+real program under `TerminalSession` in a fresh temporary configuration and
+checks that Claude accepts the constant probe reply. It submits no model
+prompt and reads no existing account configuration. It does not replace the
+permission, completion or Notification Center checks above.
+
+### CLI signal compatibility
+
+**Current task-state integration: Claude Code only. Reference version:
+2.1.310.** The native OSC 7501 vocabulary above was checked against that
+installed version, including a captured `idle → working → done` turn.
+The opt-in core test verifies the probe; app fixtures verify state, layout
+and notification routing. The separate opt-in real-Claude UI acceptance
+checks background Bash permission, Dock tile screenshots, notification
+clicks, completion and the three explicit notification channels. See
+[running the acceptance test](TESTING.md#running-ui-suites-against-a-prepared-stage).
+Failure, cancellation and auth-required sessions are not established by
+that test; newer versions must be checked independently. The vocabulary here is based
+on the installed CLI and captured output; it is not a claim of an officially
+documented shared standard or a guarantee for all Claude versions. The following upstream-source and
+interface references describe candidate integrations, not runtime-tested
+version ranges or adapters already shipped by Corta. Record exact CLI
+versions, source revisions and acceptance results in a change's PR when an
+adapter is added; an untested update is not a verified compatible version.
+
+| Tool / reference | Signals in the checked interface | Current Corta integration scope |
+| :--- | :--- | :--- |
+| Claude Code 2.1.310 | OSC 7501 `working`, `blocked`, `done`, `idle`, `error`, `clear`; blocked kind `question`, `permission`, `auth` | Explicit task state; `clear` removes state |
+| [Codex terminal backend](https://github.com/openai/codex/blob/main/codex-rs/tui/src/notifications/mod.rs) | OSC 9 message or BEL; neither has a typed task state | Attention only; no completion/permission inference |
+| [Gemini terminal notifications](https://github.com/google-gemini/gemini-cli/blob/main/packages/cli/src/utils/terminalNotifications.ts) | OSC 9/777 text or BEL for attention/session-complete events | Attention only; the event type is not retained in the text protocol |
+| [pi extensions](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md) | `agent_start`, `agent_end`, `agent_before_settle`, `agent_settled` | Extension events need explicit bridging; `agent_end` may be followed by retries/queued work, so notification-only work belongs at `agent_settled` |
+| [Kimi hooks](https://moonshotai.github.io/kimi-cli/en/customization/hooks.html) | `UserPromptSubmit`, `Stop`, `StopFailure`, `Notification` | Hook events need explicit bridging; a stop hook can cause continuation |
+| [Grok Build hooks](https://docs.x.ai/build/features/hooks) | `UserPromptSubmit`, `Stop`, `StopFailure`, `Notification` | Hook events need explicit bridging |
+| [Qwen hooks](https://qwenlm.github.io/qwen-code-docs/en/users/features/hooks/) | `UserPromptSubmit`, `Stop`, `StopFailure`, `Notification` | Hook events need explicit bridging |
+| [OpenCode attention API](https://github.com/anomalyco/opencode/blob/dev/packages/tui/src/attention.ts) | Terminal notification title/message; semantic sounds include done/error/question/permission | Notification text is not a typed task state |
+| [Aider notifications](https://github.com/Aider-AI/aider/blob/main/aider/io.py) | OS notification command, or BEL on return to input | No typed task state in the checked notification path |
+
+A `StopFailure` or tool-failure hook must not be confused with a normal
+completion; a failed individual tool can also be recovered within a turn.
+
+Hooks, RPC events and application-internal events are not automatically
+visible in an ordinary terminal PTY. No tool configuration is installed or
+changed automatically, and Corta never classifies notification prose as
+success, failure or permission. [Gemini's `AfterAgent`](https://geminicli.com/docs/hooks/reference/)
+and Kimi/Qwen's `Stop` can request retries; observing either hook alone is not proof that automatic
+processing has stopped.

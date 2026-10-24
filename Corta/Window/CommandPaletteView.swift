@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import SwiftUI
+import Foundation
 
 /// The command palette, in SwiftUI, glass included.
 /// `CommandPaletteModel` owns the state; `CommandPaletteController` only
@@ -102,7 +103,7 @@ struct CommandPaletteView: View {
                                 )
                                 .id(row.id)
                                 .onTapGesture {
-                                    guard row.command != nil else { return }
+                                    guard row.selectable else { return }
                                     model.select(row)
                                     model.runSelected()
                                 }
@@ -123,6 +124,9 @@ struct CommandPaletteView: View {
         // included: the view fills whatever the panel is.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { searchFocused = true }
+        .onReceive(NotificationCenter.default.publisher(for: AgentDirectory.didChange)) { _ in
+            model.rebuildRows()
+        }
     }
 }
 
@@ -141,6 +145,16 @@ private struct CommandPaletteRowView: View {
                 .padding(.bottom, 2)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(title)
+        case .agent(let entry):
+            Text(entry.title).font(.system(size: 13))
+                .padding(6).frame(maxWidth: .infinity, alignment: .leading)
+                .background(isSelected ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
+                    in: RoundedRectangle(cornerRadius: 6))
+                .contentShape(Rectangle())
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(entry.title)
+                .accessibilityIdentifier("agent-row-" + entry.id.uuidString)
+                .accessibilityAddTraits(.isButton)
         case .command(let command, _, let shortcut):
             HStack {
                 Text(command.title).font(.system(size: 13))

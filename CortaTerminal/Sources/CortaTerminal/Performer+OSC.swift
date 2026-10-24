@@ -49,6 +49,24 @@ extension Performer {
             state.windowTitle = String(decoding: payload, as: UTF8.self)
         case 7:
             setWorkingDirectory(payload)
+        case 7501:
+            if payload.elementsEqual([0x3F]) {
+                state.outputBuffer += [0x1B, 0x5D, 0x37, 0x35, 0x30, 0x31, 0x3B, 0x3F, 0x1B, 0x5C]
+            } else { state.programSignals.status(String(decoding: payload, as: UTF8.self)) }
+        case 9:
+            state.programSignals.iterm(String(decoding: payload, as: UTF8.self))
+        case 777:
+            let parts = String(decoding: payload, as: UTF8.self).split(separator: ";", maxSplits: 2, omittingEmptySubsequences: false)
+            if parts.count == 3, parts[0] == "notify" {
+                var notice = DesktopNotification()
+                notice.title = ProgramText.clean(String(parts[1]), limit: 192)
+                notice.body = ProgramText.clean(String(parts[2]), limit: 2048)
+                if !notice.title.isEmpty || !notice.body.isEmpty { state.programSignals.notification = notice }
+            }
+        case 99:
+            state.outputBuffer += state.programSignals.kitty(String(decoding: payload, as: UTF8.self))
+        case 21337:
+            state.programSignals.tabStatus(String(decoding: payload, as: UTF8.self))
         case 52:
             setClipboard(payload)
         case 133:
@@ -86,14 +104,14 @@ extension Performer {
         }
     }
 
-    /// At most three digits, bounded before each multiply-add.
+    /// At most five digits, bounded before each multiply-add.
     private static func parseOSCCode(_ bytes: ArraySlice<UInt8>) -> Int? {
         guard !bytes.isEmpty else { return nil }
         var code = 0
         for byte in bytes {
             guard byte >= 0x30, byte <= 0x39 else { return nil }
             let digit = Int(byte - 0x30)
-            guard code <= (999 - digit) / 10 else { return nil }
+            guard code <= (99999 - digit) / 10 else { return nil }
             code = code * 10 + digit
         }
         return code
