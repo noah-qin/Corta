@@ -69,6 +69,22 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   root, open a pane there), shell/directory/environment presets, and local
   `path:line:column` references that can open in an editor.
 
+## Claude Code state and generic program notifications
+
+- Claude Code is currently the only CLI with a dedicated task-state
+  integration. The checked reference version is 2.1.310; other versions
+  need verification. Its OSC 7501 reports distinguish working, waiting,
+  done, idle and failure on tabs, the Dock and the Agents list.
+- Generic OSC 9/777/99 notifications and OSC 9;4 progress are available to
+  any program. They do not establish completion or permission state.
+- Other coding CLIs have no dedicated task-state adapter. A recognised
+  foreground process can be listed as State unknown; process detection
+  does not mean its turns, failures or permission requests are integrated.
+  Corta does not install hooks or tool configuration automatically.
+
+See the [user guide](USER-GUIDE.md#coding-agent-state-and-program-notifications)
+and [verification limits](CONFORMANCE.md#cli-signal-compatibility).
+
 ## Shell and remote work
 
 - OSC 133 shell integration: prompt marks (an empty Return draws none),

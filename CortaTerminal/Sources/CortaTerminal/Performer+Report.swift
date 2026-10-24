@@ -37,6 +37,7 @@ struct PerformerState: Sendable {
     /// batch with the previous episode's end — which a bool cannot show.
     var synchronizedOutputEpisode = 0
     var bellRequested = false
+    var programSignals = ProgramSignals()
     /// Never reported back: the title query is a command-injection vector.
     var windowTitle: String?
     var iconName: String?

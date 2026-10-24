@@ -73,6 +73,26 @@ struct PaneFrameLoopTests {
         }
     }
 
+    @Test("metadata in a hidden tab drains independently of frame damage")
+    func hiddenMetadataPreservesFrameDamage() async throws {
+        let rig = try Rig()
+        _ = rig.loop.prepareFrame()
+        var signals = 0
+        rig.loop.onOutputSignal = { signals += 1 }
+        rig.session.write(Array("hidden-output\n".utf8))
+        let deadline = SuspendingClock.now + .seconds(5)
+        while signals == 0 && SuspendingClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(signals > 0)
+        #expect(rig.batches == 0, "metadata must run even without any display frames")
+        #expect(rig.loop.prepareFrame())
+        #expect(rig.contentRequests.last == true, "metadata must not take the frame's output flag")
+        let settled = signals
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(signals == settled, "an idle shell schedules no periodic metadata wake")
+    }
+
     @Test("an idle loop owes one forced frame and then nothing")
     func idleLoopPauses() throws {
         let rig = try Rig()

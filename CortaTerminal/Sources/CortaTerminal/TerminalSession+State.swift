@@ -112,6 +112,19 @@ extension TerminalSession {
         registerStateWaiter { state.withLock { $0.terminal.takeBell() } }
     }
 
+    public var programStatuses: [String: ProgramStatus] {
+        registerStateWaiter { state.withLock { $0.terminal.programStatuses } }
+    }
+    public var programProgress: ProgramProgress? {
+        registerStateWaiter { state.withLock { $0.terminal.programProgress } }
+    }
+    public func takeDesktopNotification() -> DesktopNotification? {
+        registerStateWaiter { state.withLock { $0.terminal.takeDesktopNotification() } }
+    }
+    public func takeBlockedStatus() -> ProgramStatus.Kind?? {
+        registerStateWaiter { state.withLock { $0.terminal.takeBlockedStatus() } }
+    }
+
     public var windowTitle: String? {
         registerStateWaiter { state.withLock { $0.terminal.windowTitle } }
     }

@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 import UserNotifications
 
 /// A notification when a long-running command finishes.
@@ -63,6 +64,18 @@ final class TaskNotifier {
     /// restarted numbers its commands from zero again. Set by the pane.
     var sessionGeneration = 0
     private static var didRequestAuthorization = false
+    var programPending: DesktopNotification?
+    var programTimer: DispatchWorkItem?
+    var programExpiry: DispatchWorkItem?
+    var programLastPosted: TimeInterval = -Double.infinity
+    var programLastID = ""
+    var programRevision = 0
+    var programSubmission: Task<Void, Never>?
+    var programBlocked = false
+    var programBlockedNoticeDelivered = false
+    /// Testable delivery boundary; production uses Notification Center.
+    var programDelivery: ((DesktopNotification) -> Void)?
+    var programNow: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 
     /// Whether macOS will deliver anything, so the settings page can explain
     /// an "on" switch that does nothing. Read from
@@ -153,6 +166,7 @@ final class TaskNotifier {
 
     /// The pane is closing; stop the timer.
     func cancel() {
+        cancelProgramNotifications()
         idleTimer?.invalidate()
         idleTimer = nil
         startedAt = nil
@@ -253,7 +267,7 @@ final class TaskNotifier {
     private func requestAuthorizationOnce() {
         guard !Self.didRequestAuthorization else { return }
         Self.didRequestAuthorization = true
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) {
             granted, _ in
             // Keep the result, so the setting never claims "on" falsely.
             Task { @MainActor in

@@ -74,6 +74,13 @@ func fuzzOne(_ bytes: [UInt8]) {
     }
 
     let grid = terminal.grid
+    precondition(terminal.programStatuses.count <= ProgramStatus.maximumEntries)
+    for status in terminal.programStatuses.values {
+        precondition(status.title.utf8.count <= 192)
+        precondition(status.message.utf8.count <= 2048)
+        precondition(status.app.utf8.count <= 80)
+        if let progress = status.progress { precondition((0...100).contains(progress)) }
+    }
 
     // `SECURITY.md` §3 — the caps, checked on every input.
     precondition(grid.rows == rows, "the grid must not resize itself")
@@ -115,6 +122,7 @@ enum FuzzTarget: String, CaseIterable {
 /// handler rather than the default branch.
 private let oscCodes = [
     "0", "2", "4", "5", "7", "8", "10", "11", "12", "52", "104", "105", "133", "134",
+    "9", "99", "777", "7501", "21337",
 ]
 
 /// One OSC sequence: the first byte picks the code and the terminator, the

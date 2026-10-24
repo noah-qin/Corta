@@ -22,7 +22,7 @@ import UserNotifications
 /// window and `CommandRecord.id` it carries.
 extension AppDelegate: UNUserNotificationCenterDelegate {
     /// Show banners while Corta is frontmost: the build may be in another
-    /// pane. Still no sound (`TaskNotifier.post`).
+    /// pane. Long-task notices stay silent; program notices honor their sound.
     ///
     /// Both delegate methods are `nonisolated`: the SDK does not say which
     /// thread calls them, and an isolated conformance's thunk traps when the
@@ -32,7 +32,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) ->
             Void
     ) {
-        completionHandler([.banner])
+        completionHandler(notification.request.content.sound == nil ? [.banner] : [.banner, .sound])
     }
 
     /// Brings the window forward and lands on the command; either may be
@@ -65,9 +65,21 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     }
 
     private func land(on click: NotificationClick) {
-        guard let windowNumber = click.windowNumber,
-            let window = NSApp.window(withWindowNumber: windowNumber)
-        else { return }
+        // Resolve stable pane identity before a captured Window Server
+        // number, including across native tab regrouping/backing changes.
+        let window: NSWindow?
+        if let paneID = click.paneID {
+            window = AgentDirectory.panes.first {
+                $0.taskNotifier.paneID.uuidString == paneID
+            }?.view.window
+        } else {
+            window = click.windowNumber.flatMap { NSApp.window(withWindowNumber: $0) }
+        }
+        guard let window else { return }
+        // Selecting a native tab is separate from activating its app.
+        // Explicit selection also works when Notification Center was key.
+        window.tabGroup?.selectedWindow = window
+        NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         guard let split = window.contentViewController as? SplitViewController else { return }
         let panes = split.panes

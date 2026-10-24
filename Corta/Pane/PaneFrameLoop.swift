@@ -71,6 +71,8 @@ final class PaneFrameLoop {
 
     /// `BEL` arrived since the last frame.
     var onBell: (() -> Void)?
+    /// Non-render effects must also run while a native tab is hidden.
+    var onOutputSignal: (() -> Void)?
     /// Output arrived since the last frame; runs once per frame, before the
     /// diff, whatever the batch held.
     var onOutputBatch: (() -> Void)?
@@ -95,6 +97,7 @@ final class PaneFrameLoop {
         generation += 1
         let generation = generation
         let wake = OutputWakeGate()
+        let signalWake = OutputWakeGate()
         outputWake = wake
         self.session = session
         self.renderer = renderer
@@ -109,6 +112,7 @@ final class PaneFrameLoop {
         session.onOutput = { [weak self, cursorSignal] in
             cursorSignal.noteOutput(generation: generation)
             self?.noteOutput(generation: generation, wake: wake)
+            self?.noteProgramOutput(generation: generation, wake: signalWake)
         }
         return generation
     }
@@ -243,6 +247,18 @@ final class PaneFrameLoop {
             InputLatencySignposts.end(.wake, interval)
             guard let self, self.generation == generation else { return }
             if self.renderEchoOnDemand?() != true { self.onNeedsDisplay?() }
+        }
+    }
+
+    /// Independent of the rendering wake: draining metadata must never
+    /// consume damage owed by a visible frame. One event-driven callback
+    /// per 50 ms during output, including in hidden tabs; none at idle.
+    nonisolated private func noteProgramOutput(generation: Int, wake: OutputWakeGate) {
+        guard wake.noteOutput() else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            _ = wake.takePending()
+            guard let self, self.generation == generation else { return }
+            self.onOutputSignal?()
         }
     }
 

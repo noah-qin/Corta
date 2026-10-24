@@ -228,6 +228,21 @@ public struct Terminal: Sendable {
         return requested
     }
 
+    public var programStatuses: [String: ProgramStatus] { performer.state.programSignals.statuses }
+    public var programProgress: ProgramProgress? { performer.state.programSignals.progress }
+    public mutating func takeDesktopNotification() -> DesktopNotification? {
+        defer { performer.state.programSignals.notification = nil }
+        return performer.state.programSignals.notification
+    }
+    /// Outer optional: an edge occurred. Inner optional: no specific kind.
+    public mutating func takeBlockedStatus() -> ProgramStatus.Kind?? {
+        defer {
+            performer.state.programSignals.blocked = nil
+            performer.state.programSignals.blockedID = nil
+        }
+        return performer.state.programSignals.blocked
+    }
+
     public var windowTitle: String? { performer.state.windowTitle }
     public var directoryCompletion: DirectoryCompletion? { performer.state.directoryCompletion }
 

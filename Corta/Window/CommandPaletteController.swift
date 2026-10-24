@@ -58,6 +58,10 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
                 NSApp.sendAction(command.action, to: nil, from: nil)
             }
         }
+        model.onAgent = { [weak self] id in
+            self?.close()
+            AgentDirectory.focus(id)
+        }
         model.onDismiss = { [weak self] in self?.close() }
     }
 
