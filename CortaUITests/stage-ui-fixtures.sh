@@ -145,4 +145,11 @@ while True:
 PYTHON
 chmod 700 "$root/compatibility-scheme/scheme-shell"
 
+# Context menus and paste warnings: real zsh, with a separate stage per policy.
+for policy in dangerous always off; do
+  stage "context-paste-$policy" "font-family = Menlo\nfont-size = 14\ncolumns = 90\nrows = 24\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\nopen-file-command = /usr/bin/true {file}\npaste-warning = $policy\n"
+  printf 'cd "$ZDOTDIR"\nPROMPT="demo ❯ "\n' > "$root/context-paste-$policy/.zshrc"
+  printf 'fixture\n' > "$root/context-paste-$policy/sample.swift"
+done
+
 printf '%s\n' "$root"

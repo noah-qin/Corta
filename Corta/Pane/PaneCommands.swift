@@ -103,6 +103,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
                 keyEquivalent: shortcut?.menuKeyEquivalent ?? "")
             menuItem.keyEquivalentModifierMask = shortcut?.menuModifierMask ?? []
             menuItem.target = target
+            if let tag = command.menuTag { menuItem.tag = tag }
             menuItem.isEnabled = enabled
             menu.addItem(menuItem)
         }
