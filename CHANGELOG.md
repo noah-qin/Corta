@@ -10,6 +10,13 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Directory candidates now appear in a compact, bordered panel beside the
+  input, flipping above it near the bottom and staying within the pane's
+  horizontal bounds. The panel no longer paints a full-width strip over
+  previous output; inline previews and terminal row counts are unchanged.
+
 ### Added
 
 - Built-in history suggestions for standard local zsh: type a command prefix

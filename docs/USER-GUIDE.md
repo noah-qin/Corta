@@ -450,12 +450,16 @@ and clears them.
 ## Directory suggestions (zsh)
 
 Corta includes directory suggestions, enabled by default in standard local
-zsh sessions. Type `cd ` to see folders in the current directory as faint
-text below your input. Keep typing to filter the folders; a faint suffix
+zsh sessions. Type `cd ` to see folders in the current directory in a
+compact panel beside your input. It appears below the input when there is
+room, or above it near the bottom of the pane. The panel has an opaque
+background and a rounded border to distinguish it from earlier output;
+it can temporarily cover a small part of that output and reserves no
+terminal rows. Keep typing to filter the folders; a faint suffix
 appears beside the cursor. For example, `cd De` can suggest `Developer/`.
 Suggestions are previews: they are not part of your command until accepted.
 
-![Directory suggestions below cd, with success, failure and interrupted command marks](brand/directory-suggestions.png)
+![Directory candidate panel beside cd, with success, failure and interrupted command marks](brand/directory-suggestions.png)
 
 While a suggestion is visible:
 
