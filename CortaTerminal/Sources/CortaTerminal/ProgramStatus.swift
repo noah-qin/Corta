@@ -18,7 +18,8 @@ import Foundation
 
 /// Self-reported metadata, never an identity or an execution instruction.
 public struct ProgramStatus: Sendable, Equatable {
-    public static let maximumEntries = 32
+    public static let maximumSubtasks = 32
+    public static let maximumEntries = maximumSubtasks + 1
     public enum State: String, Sendable { case unknown, idle, working, blocked, done, error }
     public enum Kind: String, Sendable { case question, permission, auth }
     public var state: State

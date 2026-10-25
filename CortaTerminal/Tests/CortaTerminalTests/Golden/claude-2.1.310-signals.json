@@ -1,0 +1,73 @@
+{
+  "version": "2.1.310",
+  "binarySHA256": "ffb64331bc0ee1b69efb7c2c428bd3ab516bc31b75bf60886b356c97c1c25ffd",
+  "normalization": "Captured from actual CLI PTYs; retained OSC 7501 and fixture shell OSC 133 only. Removed title/msg fields to exclude private text. Preserved field order, ids and terminators. Crash includes the disposable integrated shell boundary. Excludes teardown global clear.",
+  "scenarios": {
+    "cancel": {
+      "expected": "idle",
+      "wire": [
+        "\u001b]7501;?\u0007",
+        "\u001b]7501;?\u0007",
+        "\u001b]7501;state=working:app=claude-code\u0007",
+        "\u001b]7501;state=blocked:app=claude-code:kind=permission\u0007",
+        "\u001b]7501;state=idle:app=claude-code\u0007"
+      ]
+    },
+    "failure": {
+      "expected": "error",
+      "wire": [
+        "\u001b]7501;?\u0007",
+        "\u001b]7501;?\u0007",
+        "\u001b]7501;state=working:app=claude-code\u0007",
+        "\u001b]7501;state=error:app=claude-code\u0007"
+      ]
+    },
+    "auth": {
+      "expected": "blocked",
+      "wire": [
+        "\u001b]7501;?\u0007",
+        "\u001b]7501;state=working:app=claude-code\u0007",
+        "\u001b]7501;state=blocked:app=claude-code:kind=auth\u0007"
+      ]
+    },
+    "subtask": {
+      "expected": "done",
+      "wire": [
+        "\u001b]7501;?\u0007",
+        "\u001b]7501;?\u0007",
+        "\u001b]7501;state=working:app=claude-code\u0007",
+        "\u001b]7501;state=working:app=claude-code\u0007",
+        "\u001b]7501;state=working:app=claude-code:id=a4f6e20cb97b4f2cc\u0007",
+        "\u001b]7501;state=clear:id=a4f6e20cb97b4f2cc\u0007",
+        "\u001b]7501;state=working:app=claude-code\u0007",
+        "\u001b]7501;state=done:app=claude-code\u0007"
+      ]
+    },
+    "crash": {
+      "expected": "error",
+      "wire": [
+        "\u001b]133;A\u0007",
+        "\u001b]133;C\u0007",
+        "\u001b]7501;?\u0007",
+        "\u001b]7501;?\u0007",
+        "\u001b]7501;state=working:app=claude-code\u0007",
+        "\u001b]7501;state=blocked:app=claude-code:kind=permission\u0007",
+        "\u001b]133;D;137\u0007",
+        "\u001b]133;A\u0007"
+      ]
+    }
+  },
+  "notifications": {
+    "ghostty": [
+      "\u001b]777;notify;Claude Code;Claude is waiting for your input\u0007"
+    ],
+    "kitty": [
+      "\u001b]99;i=364:d=0:p=title;Claude Code\u0007",
+      "\u001b]99;i=364:p=body;Claude is waiting for your input\u0007",
+      "\u001b]99;i=364:d=1:a=focus;\u0007"
+    ],
+    "iterm2": [
+      "\u001b]9;Claude is waiting for your input\u0007"
+    ]
+  }
+}

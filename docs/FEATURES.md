@@ -88,6 +88,9 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   done, idle and failure on tabs, the Dock and the Agents list.
 - Generic OSC 9/777/99 notifications and OSC 9;4 progress are available to
   any program. They do not establish completion or permission state.
+  Claude's own message channels require explicit selection in Corta; its
+  default identity does not enable Claude's OSC 9;4 progress. OSC 21337 is
+  generic metadata; Claude 2.1.310 leaves its sender disabled.
 - Other coding CLIs have no dedicated task-state adapter. A recognised
   foreground process can be listed as State unknown; process detection
   does not mean its turns, failures or permission requests are integrated.

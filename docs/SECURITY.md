@@ -629,7 +629,9 @@ state. Charge retained resources until release; return reservations on
 failure, cancellation, replacement and owner teardown. Test both rejection
 and recovery, including work finishing after cancellation.
 
-Program metadata has a 32-entry per-session cap. Each status retains at most
+Program status has a per-session cap of one main slot plus 32 subtask slots,
+matching Claude Code 2.1.310's maximum emitted set; OSC 21337 has one separate
+metadata slot and cannot evict typed state. Each status retains at most
 80 bytes of app name, 192 of title, 2,048 of message, 32 per colour field
 and a bounded id. Kitty
 retains at most eight incomplete messages of 4,096 encoded bytes each; an
@@ -637,7 +639,12 @@ oversized transmission is discarded through its final chunk. One pending
 notice and one blocked edge are coalesced per terminal. Sessions own all core
 metadata; RIS and session teardown release it. The app retains one pending
 notice, one delivery callback and one expiry callback per pane, all cancelled
-on pane teardown/session replacement. Aggregate memory scales with the number
+on pane teardown/session replacement. State-derived attention carries a
+waiting-episode identity and is invalidated when that episode ends; independent
+program messages survive. Delivery rechecks visibility after coalescing and
+authorization, and a stale submission completes/removes before a replacement
+may submit. Shell command boundaries release stale children, progress and
+metadata after a CLI crash. Aggregate memory scales with the number
 of live panes; there is no global notification-text history or unbounded queue.
 
 The implementation has parser, title-stack, underline-colour, cluster, image, texture, SFTP frame,

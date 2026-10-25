@@ -145,6 +145,271 @@ struct ProgramNotificationTests {
         #expect(zip(times, times.dropFirst()).allSatisfy { $1 - $0 >= 5 })
     }
 
+    @Test func resolvedWaitCancelsAttentionButPreservesIndependentMessage() throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.notifyFromPrograms = true }
+        defer { ConfigurationStore.shared.update { $0 = original } }
+        let window = NSWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let notifier = TaskNotifier()
+        defer { notifier.cancel(); window.close() }
+        var delivered: [DesktopNotification] = []
+        notifier.programDelivery = { delivered.append($0) }
+        notifier.setProgramBlocked(true)
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        let stale = try #require(notifier.programTimer)
+        notifier.setProgramBlocked(false)
+        #expect(notifier.programPending == nil)
+        #expect(notifier.programTimer == nil)
+        stale.perform()
+        #expect(delivered.isEmpty)
+        notifier.setProgramBlocked(true)
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        var message = DesktopNotification(); message.body = "Independent message"
+        notifier.noteProgramNotification(message, visible: false, focused: false, in: window)
+        notifier.setProgramBlocked(false)
+        let current = try #require(notifier.programTimer)
+        current.perform(); current.cancel()
+        #expect(delivered.map(\.body) == ["Independent message"])
+    }
+
+    @Test func bellAndKindUpdatesCannotReplaceTextOrRealertWaiting() throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.notifyFromPrograms = true }
+        defer { ConfigurationStore.shared.update { $0 = original } }
+        let window = NSWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let notifier = TaskNotifier()
+        defer { notifier.cancel(); window.close() }
+        var delivered: [DesktopNotification] = []
+        notifier.programDelivery = { delivered.append($0) }
+        notifier.setProgramBlocked(true)
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        var explicit = DesktopNotification(); explicit.body = "Specific permission"
+        notifier.noteProgramNotification(explicit, visible: false, focused: false, in: window)
+        notifier.noteProgramAttention(kind: nil, in: window)
+        #expect(notifier.programPending?.body == explicit.body)
+        let pending = try #require(notifier.programTimer)
+        pending.perform(); pending.cancel()
+        notifier.noteProgramAttention(kind: nil, in: window)
+        notifier.noteProgramAttention(kind: .question, in: window)
+        #expect(delivered.count == 1)
+        #expect(notifier.programTimer == nil)
+    }
+
+    @Test func deliveryRechecksVisibilityAndCanRetryAfterSuppression() throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.notifyFromPrograms = true }
+        defer { ConfigurationStore.shared.update { $0 = original } }
+        let window = NSWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let notifier = TaskNotifier()
+        defer { notifier.cancel(); window.close() }
+        var allowed = true
+        notifier.programCanDeliver = { _ in allowed }
+        var delivered = 0
+        notifier.programDelivery = { _ in delivered += 1 }
+        notifier.setProgramBlocked(true)
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        let pending = try #require(notifier.programTimer)
+        allowed = false
+        pending.perform(); pending.cancel()
+        #expect(delivered == 0)
+        #expect(!notifier.programBlockedNoticeDelivered)
+        allowed = true
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        let retry = try #require(notifier.programTimer)
+        retry.perform(); retry.cancel()
+        #expect(delivered == 1)
+    }
+
+    private func settle(_ condition: () -> Bool) async -> Bool {
+        let deadline = SuspendingClock.now + .seconds(3)
+        while !condition(), SuspendingClock.now < deadline { try? await Task.sleep(for: .milliseconds(10)) }
+        return condition()
+    }
+
+    @Test func lateSubmissionCannotEraseOrOvertakeItsReplacement() async throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.notifyFromPrograms = true }
+        defer { ConfigurationStore.shared.update { $0 = original } }
+        let window = NSWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let notifier = TaskNotifier()
+        defer { notifier.cancel(); window.close() }
+        notifier.programAuthorize = {}
+        var release: CheckedContinuation<Void, Never>?
+        defer { release?.resume() }
+        var events: [String] = []
+        notifier.programRemove = { events.append("remove") }
+        notifier.programSubmit = { request in
+            events.append("submit")
+            #expect(request.content.userInfo["paneID"] as? String == notifier.paneID.uuidString)
+            await withCheckedContinuation { release = $0 }
+            events.append("finished")
+        }
+        notifier.setProgramBlocked(true)
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        let timer = try #require(notifier.programTimer)
+        timer.perform(); timer.cancel()
+        #expect(await settle { release != nil })
+        notifier.setProgramBlocked(false)
+        var independent = DesktopNotification(); independent.body = "Replacement"
+        notifier.noteProgramNotification(independent, visible: false, focused: false, in: window)
+        #expect(notifier.programTimer == nil, "the replacement waits for the stale OS submission")
+        release?.resume(); release = nil
+        #expect(await settle { notifier.programSubmission == nil })
+        #expect(events == ["submit", "remove", "finished", "remove"])
+        #expect(!notifier.programBlockedNoticeDelivered)
+        #expect(notifier.programPending?.body == "Replacement")
+        #expect(notifier.programTimer != nil)
+    }
+
+    @Test func authorizationDelayRechecksVisibilityAndFailedSubmissionAllowsRetry() async throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.notifyFromPrograms = true }
+        defer { ConfigurationStore.shared.update { $0 = original } }
+        let window = NSWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let notifier = TaskNotifier()
+        defer { notifier.cancel(); window.close() }
+        var release: CheckedContinuation<Void, Never>?
+        defer { release?.resume() }
+        notifier.programAuthorize = { await withCheckedContinuation { release = $0 } }
+        notifier.programRemove = {}
+        var visible = false
+        notifier.programCanDeliver = { _ in !visible }
+        var attempts = 0
+        notifier.programSubmit = { _ in attempts += 1; throw NSError(domain: "test", code: 1) }
+        notifier.setProgramBlocked(true)
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        let timer = try #require(notifier.programTimer)
+        timer.perform(); timer.cancel()
+        #expect(await settle { release != nil })
+        visible = true
+        release?.resume(); release = nil
+        #expect(await settle { notifier.programSubmission == nil })
+        #expect(attempts == 0)
+        visible = false
+        notifier.programAuthorize = {}
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        let retry = try #require(notifier.programTimer)
+        retry.perform(); retry.cancel()
+        #expect(await settle { notifier.programSubmission == nil })
+        #expect(attempts == 1)
+        #expect(!notifier.programBlockedNoticeDelivered)
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        #expect(notifier.programTimer != nil)
+    }
+
+    @Test func explicitNoticeQueuedDuringSubmissionCannotRealertAfterItSucceeds() async throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.notifyFromPrograms = true }
+        defer { ConfigurationStore.shared.update { $0 = original } }
+        let window = NSWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let notifier = TaskNotifier()
+        defer { notifier.cancel(); window.close() }
+        notifier.programAuthorize = {}
+        notifier.programRemove = {}
+        var release: CheckedContinuation<Void, Never>?
+        defer { release?.resume() }
+        var attempts = 0
+        notifier.programSubmit = { _ in
+            attempts += 1
+            await withCheckedContinuation { release = $0 }
+        }
+        notifier.setProgramBlocked(true)
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        let first = try #require(notifier.programTimer)
+        first.perform(); first.cancel()
+        #expect(await settle { release != nil })
+        var explicit = DesktopNotification(); explicit.body = "Delayed permission"
+        notifier.noteProgramNotification(explicit, visible: false, focused: false, in: window)
+        release?.resume(); release = nil
+        #expect(await settle { notifier.programSubmission == nil })
+        #expect(notifier.programBlockedNoticeDelivered)
+        let coalesced = try #require(notifier.programTimer)
+        coalesced.perform(); coalesced.cancel()
+        #expect(attempts == 1)
+        #expect(notifier.programPending == nil)
+    }
+
+    @Test func newParserEpisodeCanNotifyEvenWhenIntermediateWorkingWasCoalesced() throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.notifyFromPrograms = true }
+        defer { ConfigurationStore.shared.update { $0 = original } }
+        let window = NSWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let notifier = TaskNotifier()
+        defer { notifier.cancel(); window.close() }
+        notifier.programRemove = {}
+        var delivered = 0
+        notifier.programDelivery = { _ in delivered += 1 }
+        notifier.setProgramBlocked(true, episode: 1)
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        let first = try #require(notifier.programTimer)
+        first.perform(); first.cancel()
+        notifier.setProgramBlocked(true, episode: 1)
+        notifier.noteProgramAttention(kind: .question, in: window)
+        #expect(notifier.programTimer == nil)
+        notifier.setProgramBlocked(true, episode: 2)
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        let second = try #require(notifier.programTimer)
+        second.perform(); second.cancel()
+        #expect(delivered == 2)
+    }
+
+    @Test func independentMessageCannotAnnounceALaterWaitingEpisode() throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.notifyFromPrograms = true }
+        defer { ConfigurationStore.shared.update { $0 = original } }
+        let window = NSWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let notifier = TaskNotifier()
+        defer { notifier.cancel(); window.close() }
+        notifier.programDelivery = { _ in }
+        notifier.programRemove = {}
+        var old = DesktopNotification(); old.body = "Earlier independent message"
+        notifier.noteProgramNotification(old, visible: false, focused: false, in: window)
+        notifier.setProgramBlocked(true, episode: 1)
+        let pending = try #require(notifier.programTimer)
+        pending.perform(); pending.cancel()
+        #expect(!notifier.programBlockedNoticeDelivered)
+        notifier.noteProgramAttention(kind: .permission, in: window)
+        #expect(notifier.programTimer != nil)
+    }
+
+    @Test func kittyClosePreservesOtherPendingIDAndWaitingEpisode() throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.notifyFromPrograms = true }
+        defer { ConfigurationStore.shared.update { $0 = original } }
+        let window = NSWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let notifier = TaskNotifier()
+        defer { notifier.cancel(); window.close() }
+        notifier.programRemove = {}
+        notifier.programDelivery = { _ in }
+        var first = DesktopNotification(); first.id = "A"; first.body = "first"
+        notifier.noteProgramNotification(first, visible: false, focused: false, in: window)
+        let timer = try #require(notifier.programTimer)
+        timer.perform(); timer.cancel()
+        var second = DesktopNotification(); second.id = "B"; second.body = "second"
+        notifier.noteProgramNotification(second, visible: false, focused: false, in: window)
+        notifier.setProgramBlocked(true, episode: 7)
+        var close = DesktopNotification(); close.id = "A"; close.close = true
+        notifier.noteProgramNotification(close, visible: false, focused: false, in: window)
+        #expect(notifier.programPending?.id == "B")
+        #expect(notifier.programTimer != nil)
+        #expect(notifier.programBlocked)
+        #expect(notifier.programReportedEpisode == 7)
+        close.id = "B"
+        notifier.noteProgramNotification(close, visible: false, focused: false, in: window)
+        #expect(notifier.programPending == nil)
+        #expect(notifier.programTimer == nil)
+        #expect(notifier.programBlocked)
+    }
+
     @Test func programClickRoutesWithoutCommandTextOrID() {
         let target = AppDelegate.notificationTarget(paneID: "pane", sessionGeneration: 5,
             commandID: nil, panes: [.init(paneID: "pane", sessionGeneration: 5, commandIDs: [])])

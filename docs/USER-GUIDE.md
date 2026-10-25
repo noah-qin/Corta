@@ -800,16 +800,37 @@ panes and shows aggregate progress. Open the command palette or Window →
 Agents to find every agent pane across windows; choosing an entry focuses it.
 Several agents in one pane are shown by their most urgent state. Status and
 application names are reported by the program, not verified identities.
-OSC 21337 can also supply a custom indicator colour; without an explicit
-task state its label remains State unknown.
+Generic OSC 21337 metadata can decorate the current state with an indicator
+colour and a status label when its task title is empty. Without a task state,
+its label remains State unknown. `status-color` is retained metadata; native
+tab and menu text use the system colour. Claude Code 2.1.310 does not enable
+this metadata channel.
 
-Claude Code's OSC 7501 status probe needs no setting. When a background pane
+Claude Code's OSC 7501 status probe needs no setting in an ordinary interactive
+session. It requires Claude Code 2.1.295 or later; Corta's checked reference
+is 2.1.310, not that entire version range. Status does not pass through tmux
+by enabling `allow-passthrough`: Claude probes tmux itself. Claude's background
+sessions do not report OSC 7501 even while attached; these differ from a
+hidden Corta pane running an interactive session. Unset
+`CLAUDE_CODE_DISABLE_TERMINAL_TITLE` to allow probing and reporting. See
+[Anthropic's terminal requirements](https://code.claude.com/docs/en/terminal-config#see-session-status-in-your-terminal).
+When a hidden Corta pane
 asks permission, asks a question or needs sign-in, Corta posts a fixed message.
 For Claude Code's own message text, set its `preferredNotifChannel` to
-`ghostty` (OSC 777); `iterm2` and `kitty` are also accepted. Corta still
+`ghostty` (OSC 777), `iterm2` (OSC 9), or `kitty` (OSC 99) in Claude's
+`settings.json` or `/config` → Local notifications. `auto` does not select a
+message channel for Corta. `terminal_bell` sends BEL, `iterm2_with_bell` adds
+BEL to OSC 9, and `notifications_disabled` disables Claude's own notification
+channel; it does not disable Corta's 7501 attention notices. Corta still
 identifies itself as Corta. These Claude-specific protocol details are
 based on the checked reference version; availability can depend on the
-installed Claude version.
+installed Claude version. Claude's explicit permission notices usually wait
+about six seconds without typing; completion reminders usually wait about
+60 seconds and require no running background agent. These are separate from
+the immediate state reports. See [notification timing](https://code.claude.com/docs/en/hooks#notification).
+OSC 9;4 parsing does not mean Claude emits progress in Corta: 2.1.310's
+progress channel requires `terminalProgressBarEnabled` and a terminal it
+recognises as supporting progress; Corta's normal identity is not selected.
 
 Programs without status support are detected by foreground process name
 (claude, claude-code, codex, gemini, aider, opencode); add names with
@@ -818,7 +839,13 @@ while the process is active: output and prompt redraws do not prove a task
 is working. A return to the shell or a clean process exit means Idle, not
 Done; a known failed exit is Failed. Notifications and BEL request attention
 without changing the task state. Silence alone does not mean completion.
-BEL's existing audible/visual/muted setting is unchanged.
+BEL's existing audible/visual/muted setting is unchanged. A reported shell
+command boundary also ends stale status and progress when a crashed CLI
+cannot send clear. Exit status 130 (or a directly launched session ended by SIGINT) means
+interrupted/Idle, not Done; other
+known nonzero exits mean Failed. A new reported command clears the old
+summary. Without a shell boundary or a session exit, Corta cannot detect a
+silent crash from output alone.
 
 `agent-status = false` hides state indicators and the list.
 `notify-from-programs = false` disables program and agent-attention notices.
@@ -830,7 +857,11 @@ the first delivery can supply its message instead. macOS notification permission
 is required; enable **Badge application
 icon** in the app's notification settings for the Dock count. Notification Center may
 retain message text and show it on the lock screen. Clicking focuses the pane;
-closing or restarting the pane cancels pending program notices.
+closing or restarting the pane cancels pending program notices. Leaving a
+blocked episode cancels its fixed attention notice, while independent
+program messages keep their own lifetime. BEL cannot replace pending program
+text or re-alert an announced wait. Visibility is checked again before
+submission; system delivery after submission remains under macOS control.
 
 ## Programs using OSC extensions
 

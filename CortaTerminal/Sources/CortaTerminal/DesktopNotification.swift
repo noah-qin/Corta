@@ -34,13 +34,14 @@ public struct DesktopNotification: Sendable, Equatable {
 /// One coalesced event per pane; at most eight incomplete kitty messages,
 /// each <= 4 KiB total, including chunked input. Reset with the terminal.
 struct ProgramSignals: Sendable {
-    static let entryLimit = ProgramStatus.maximumEntries
     static let chunkLimit = 4096
     var statuses: [String: ProgramStatus] = [:]
+    var tabMetadata: ProgramStatus?
     var progress: ProgramProgress?
     var notification: DesktopNotification?
     var blocked: ProgramStatus.Kind??
     var blockedID: String?
+    var blockedEpisode = 0
     var chunks: [String: DesktopNotification] = [:]
     var chunkBytes: [String: Int] = [:]
 
@@ -58,7 +59,9 @@ struct ProgramSignals: Sendable {
         guard let raw = fields["state"], let state = ProgramStatus.State(rawValue: raw),
               state != .unknown else { return }
         if let kind = fields["kind"], ProgramStatus.Kind(rawValue: kind) == nil { return }
-        guard statuses[id] != nil || statuses.count < Self.entryLimit else { return }
+        guard id.isEmpty || statuses[id] != nil
+            || statuses.keys.filter({ !$0.isEmpty }).count < ProgramStatus.maximumSubtasks else { return }
+        let wasBlocked = statuses.values.contains { $0.state == .blocked }
         let kind = state == .blocked ? fields["kind"].flatMap(ProgramStatus.Kind.init(rawValue:)) : nil
         let title = fields["title"].flatMap { ProgramText.decoded($0, limit: 192) } ?? ""
         let message = fields["msg"].flatMap { ProgramText.decoded($0, limit: 2048) } ?? ""
@@ -68,9 +71,28 @@ struct ProgramSignals: Sendable {
         } else if state != .blocked, blockedID == id {
             blocked = nil; blockedID = nil
         }
+        if state == .blocked && !wasBlocked { blockedEpisode += 1 }
         statuses[id] = ProgramStatus(state: state, kind: kind,
             app: ProgramText.clean(fields["app"] ?? "", limit: 80), title: title, message: message,
             progress: fields["progress"].flatMap(Int.init).map { min(100, max(0, $0)) })
+    }
+
+    /// A shell boundary ends the program's lifetime even when it could not
+    /// send clear (SIGKILL, crash). A clean exit alone never proves completion.
+    mutating func endCommand(exitStatus: Int?) {
+        let result = statuses.values.max { $0.urgency < $1.urgency }
+        beginCommand()
+        guard var result else { return }
+        if exitStatus == 130 { result.state = .idle }
+        else if let exitStatus, exitStatus != 0 { result.state = .error }
+        else if result.state != .done && result.state != .error { result.state = .idle }
+        result.kind = nil; result.progress = nil
+        statuses[""] = result
+    }
+
+    mutating func beginCommand() {
+        statuses.removeAll(); progress = nil; tabMetadata = nil
+        blocked = nil; blockedID = nil
     }
 
     static func fields(_ text: String) -> [String: String] {
@@ -180,12 +202,11 @@ struct ProgramSignals: Sendable {
             else { field.append(character) }
         }
         store(field)
-        let previous = statuses["tab-status"]
+        let previous = tabMetadata
         let title = ProgramText.clean(fields["status"] ?? previous?.title ?? "", limit: 192)
         let color = ProgramText.clean(fields["indicator"] ?? previous?.color ?? "", limit: 32)
-        if title.isEmpty && color.isEmpty { statuses["tab-status"] = nil; return }
-        guard statuses["tab-status"] != nil || statuses.count < Self.entryLimit else { return }
+        if title.isEmpty && color.isEmpty { tabMetadata = nil; return }
         let statusColor = ProgramText.clean(fields["status-color"] ?? previous?.statusColor ?? "", limit: 32)
-        statuses["tab-status"] = ProgramStatus(state: .unknown, title: title, color: color, statusColor: statusColor)
+        tabMetadata = ProgramStatus(state: .unknown, title: title, color: color, statusColor: statusColor)
     }
 }

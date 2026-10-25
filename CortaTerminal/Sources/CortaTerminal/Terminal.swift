@@ -236,6 +236,8 @@ public struct Terminal: Sendable {
         return performer.state.attention
     }
     public var programStatuses: [String: ProgramStatus] { performer.state.programSignals.statuses }
+    public var programBlockedEpisode: Int { performer.state.programSignals.blockedEpisode }
+    public var programTabMetadata: ProgramStatus? { performer.state.programSignals.tabMetadata }
     public var programProgress: ProgramProgress? { performer.state.programSignals.progress }
     public mutating func takeDesktopNotification() -> DesktopNotification? {
         defer { performer.state.programSignals.notification = nil }

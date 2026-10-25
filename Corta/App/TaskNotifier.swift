@@ -71,10 +71,23 @@ final class TaskNotifier {
     var programLastID = ""
     var programRevision = 0
     var programSubmission: Task<Void, Never>?
+    var programPendingEpisode: Int?
+    var programPendingWait: Int?
+    var programPendingIsAttention = false
+    var programActiveWait: Int?
+    var programWaitGeneration = 0
+    var programReportedEpisode: Int?
+    /// Re-evaluate visibility after coalescing and asynchronous OS calls.
+    var programCanDeliver: (DesktopNotification) -> Bool = { _ in true }
     var programBlocked = false
     var programBlockedNoticeDelivered = false
     /// Testable delivery boundary; production uses Notification Center.
     var programDelivery: ((DesktopNotification) -> Void)?
+    /// Tests suspend/fail the same asynchronous boundaries without posting
+    /// native notifications or requesting machine permissions.
+    var programAuthorize: (() async -> Void)?
+    var programSubmit: ((UNNotificationRequest) async throws -> Void)?
+    var programRemove: (() -> Void)?
     var programNow: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 
     /// Whether macOS will deliver anything, so the settings page can explain

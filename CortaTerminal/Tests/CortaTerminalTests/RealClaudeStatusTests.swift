@@ -19,7 +19,7 @@ import Testing
 @testable import CortaTerminal
 
 /// Opt in with CORTA_REAL_CLAUDE=/absolute/path/to/claude. Uses a fresh
-/// configuration and never submits a model prompt or reads account tokens.
+/// configuration and never submits a model prompt; it uses an isolated configuration directory.
 struct RealClaudeStatusTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["CORTA_REAL_CLAUDE"] != nil))
     func installedClaudeAcceptsConstantProbeReply() throws {
@@ -29,6 +29,12 @@ struct RealClaudeStatusTests {
         defer { try? FileManager.default.removeItem(at: stage) }
         let log = stage.appendingPathComponent("startup.log")
         var environment = ChildEnvironment.default()
+        for key in ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR",
+                    "CLAUDE_CODE_DISABLE_TERMINAL_TITLE", "CLAUDE_CODE_SESSION_KIND", "TMUX", "STY"] {
+            environment[key] = nil
+        }
+        environment["DISABLE_AUTOUPDATER"] = "1"
+        environment["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
         environment["CLAUDE_CONFIG_DIR"] = stage.path
         environment["TERM_PROGRAM"] = "Corta"
         environment["TERM"] = "xterm-256color"

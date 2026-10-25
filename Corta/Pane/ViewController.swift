@@ -424,6 +424,15 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             self.agents.readOutput()
             if !self.agents.visible, self.session?.takeBell() == true { self.handleBell() }
         }
+        taskNotifier.programCanDeliver = { [weak self] notice in
+            guard let self, !self.didTeardown, self.frameLoop.isCurrent(generation) else { return false }
+            switch notice.occasion {
+            case .always: return true
+            case .invisible: return !self.agents.visible
+            case .unfocused:
+                return !(NSApp.isActive && self.view.window?.isKeyWindow == true && self.isFocusedPane)
+            }
+        }
         taskNotifier.sessionGeneration = generation
         taskNotifier.lastOutputUptimeNanoseconds = { wake.lastOutputUptimeNanoseconds }
         taskNotifier.title = { [weak self] in self?.windowTitle.notificationTitle ?? "Corta" }
@@ -789,7 +798,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     private func noteChildExit(_ exit: ProcessExit, generation: Int) {
         guard !didTeardown, frameLoop.isCurrent(generation) else { return }
         agents.readOutput()
-        agents.exited(success: exit.isCleanExit)
+        agents.exited(exit)
         // A dead child produces no output to rebuild the title; the `Remote: host`
         // badge would outlive its connection.
         windowTitle.invalidateProcessFacts()

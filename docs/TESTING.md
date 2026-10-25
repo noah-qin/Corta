@@ -328,7 +328,13 @@ directory and `TEST_RUNNER_CORTA_REAL_CWD` to an already trusted checkout.
 Use the fixture root above and select that one test. When overriding the
 app's product name, also set `TEST_RUNNER_CORTA_REAL_APP_NAME` to that name
 (default `CortaDev`). Use a separate bundle identity if other development
-windows are in use. The human must enable notifications for that identity;
+windows are in use. Pass `CORTA_PRODUCT_NAME=CortaCompat CORTA_BUNDLE_SUFFIX=.compat.dev`
+at build and test time, plus `TEST_RUNNER_CORTA_UI_APP_NAME=CortaCompat` and
+`TEST_RUNNER_CORTA_REAL_APP_NAME=CortaCompat`. To narrow a failed channel,
+set `TEST_RUNNER_CORTA_REAL_CHANNELS=kitty` (or a comma-separated subset);
+the default remains all four channels. Keep the custom suffix ending in
+`.dev` so development-only startup/update protections still apply; headless
+hosts bypass those services independently. The human must enable notifications for that identity;
 the test never changes system permissions or Focus.
 
 The test launches actual Claude with a per-invocation settings overlay and
@@ -337,10 +343,60 @@ manual Bash approval. It asks only to create a disposable marker in the
 tile screenshots, clicks back to the permission prompt, approves that
 invocation only, and waits for `done`. It repeats with `auto`, `iterm2`,
 `ghostty` and `kitty`, checking the real transcript for each explicit OSC
-channel. It reads normal Claude account configuration; transcripts can
+channel. After completion, each explicit channel must also deliver the real
+idle-reminder text while the pane is not blocked. The fixed 7501 permission
+notice cannot satisfy that check. Dock tile screenshots require human visual
+review; capture alone does not validate their contents. It reads normal Claude account configuration; transcripts can
 contain private context and must stay local. Remove them with the fixture
 root. Failure, cancellation and auth-required lifecycles need separate
 acceptance; this test does not claim them.
+
+The background-safe checks for this integration are `ProgramSignalsTests`
+(core), `PaneAgentsTests`, `ProgramNotificationTests`, `AgentTabViewTests`
+and the notification routing tests under the headless host described below.
+Wire fixtures independently transcribe 2.1.310's emitters, including BEL/ST,
+all typed states, optional blocked kind, main plus 32 subtasks, and kitty's
+body packet without `d=0` followed by its empty final packet. These distribution-derived fixtures are distinct from the checked-in,
+text-redacted `Golden/claude-2.1.310-signals.json`, which replays actual PTY
+captures of cancellation, failure, auth waiting, a subtask and abrupt exit.
+Notification
+policy tests inject asynchronous authorization, submission failure and late
+completion; they never request permission or post a real native notice.
+
+`RealClaudeLifecycleTests` is a separate billable/background-PTY acceptance
+suite. After explicit authorization, run it with `CORTA_REAL_MODEL_ACCEPTANCE=1`,
+`CORTA_REAL_CLAUDE`, `CORTA_REAL_HOME`, `CORTA_REAL_CWD` and optionally
+`CORTA_REAL_EVIDENCE` (a private local evidence directory):
+
+```sh
+CORTA_REAL_MODEL_ACCEPTANCE=1 \
+CORTA_REAL_CLAUDE=/absolute/path/to/claude \
+CORTA_REAL_HOME=/path/to/authenticated/home \
+CORTA_REAL_CWD=/path/to/already-trusted/checkout \
+swift test --package-path CortaTerminal --filter RealClaudeLifecycleTests
+```
+
+It cancels a real Bash permission with Esc (never approves the sleep), uses
+an invalid model for an API failure, runs a single Agent worker that only
+replies OK, and kills only its own unreaped CLI child to verify an integrated shell clears stale Waiting after
+SIGKILL (including a CLI left on the alternate screen). The auth-required
+case supplies an intentionally invalid
+OAuth token in an isolated configuration directory: it cannot recover or
+rewrite the user's account. All cases disable hooks and nonessential
+traffic and retain private local transcripts under printed directories.
+They cover those specific flows, not every failure reason or auth recovery.
+Normal-account cases can produce Claude's usual account/session bookkeeping;
+the harness supplies settings only as per-invocation overlays. Remove the
+printed evidence directories after review.
+
+Coverage limits must remain explicit: auth recovery and notification clicks
+after pane regroup/restart are not exercised by these live cases (routing
+policy has separate unit tests). Dock screenshot contents require visual
+review for each acceptance run. Record version, input,
+observed bytes, UI outcome and result in the PR. A test's existence, a retained
+screenshot, or a skipped opt-in test is not a passing result. Do not run the
+billable/foreground checks without the user's authorization; background-only
+work must report them as unverified.
 
 Remove both printed directories once the development app has exited.
 Build into the default derived data, not a `-derivedDataPath` under a

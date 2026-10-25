@@ -51,7 +51,8 @@ enum UIFixtures {
         let products = Bundle(for: runner).bundleURL
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
-        let applicationURL = products.appendingPathComponent("CortaDev.app").resolvingSymlinksInPath()
+        let product = ProcessInfo.processInfo.environment["CORTA_UI_APP_NAME"] ?? "CortaDev"
+        let applicationURL = products.appendingPathComponent(product + ".app").resolvingSymlinksInPath()
         print("UI fixture application: \(applicationURL.path)")
         // XCTest owns the target path in its run configuration. The default
         // target avoids explicit-URL launch failures on measurement runners.
