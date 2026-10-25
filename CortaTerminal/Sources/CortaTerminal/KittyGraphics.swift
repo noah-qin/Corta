@@ -53,6 +53,7 @@ public enum KittyGraphics {
         case rgb
         case rgba
         case png
+        case gif // iTerm2 only; first frame through the same sandboxed helper
 
         init?(code: Int) {
             switch code {
@@ -80,15 +81,25 @@ public enum KittyGraphics {
         /// PNG is too short or not one — the app's decoder rejects it anyway.
         var pixelHeight: Int? {
             if height > 0 { return height }
-            return format == .png ? KittyGraphics.pngDimensions(bytes)?.height : nil
+            return format == .png || format == .gif ? KittyGraphics.encodedDimensions(bytes)?.height : nil
         }
 
         /// Width in pixels without decoding: `s=`, or the `IHDR` width
         /// (bytes 16–19), as for `pixelHeight`.
         var pixelWidth: Int? {
             if width > 0 { return width }
-            return format == .png ? KittyGraphics.pngDimensions(bytes)?.width : nil
+            return format == .png || format == .gif ? KittyGraphics.encodedDimensions(bytes)?.width : nil
         }
+    }
+
+    /// Only PNG and GIF signatures are accepted; no ImageIO in the core.
+    public static func encodedDimensions(_ bytes: [UInt8]) -> (width: Int, height: Int)? {
+        if let png = pngDimensions(bytes) { return png }
+        guard bytes.count >= 10,
+            bytes.starts(with: Array("GIF87a".utf8)) || bytes.starts(with: Array("GIF89a".utf8)) else { return nil }
+        let width = Int(bytes[6]) | Int(bytes[7]) << 8
+        let height = Int(bytes[8]) | Int(bytes[9]) << 8
+        return width > 0 && height > 0 ? (width, height) : nil
     }
 
     /// A PNG's size from its header, without decoding: the signature, then
@@ -124,6 +135,8 @@ public enum KittyGraphics {
         public var rows: Int?
         public var baseScrollbackTotal: Int
         public var zIndex: Int
+        public var displayPixelWidth: Int? = nil
+        public var displayPixelHeight: Int? = nil
         /// Source UV interval retained after scrolling against a page margin.
         /// Clipping is permanent: a later reverse scroll cannot restore pixels.
         public internal(set) var sourceTop: Float = 0
@@ -169,6 +182,8 @@ public enum KittyGraphics {
         /// `C=1` leaves the cursor where it is; `kitten icat --place` sends
         /// it and positions the cursor itself.
         var movesCursor = true
+        var displayPixelWidth: Int? = nil
+        var displayPixelHeight: Int? = nil
     }
 
     /// The `d=` subset implemented. Any other letter is ignored rather than

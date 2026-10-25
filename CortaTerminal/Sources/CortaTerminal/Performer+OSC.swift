@@ -20,7 +20,19 @@ import Foundation
 /// command-injection vector (`SECURITY.md` §2.2). Payloads are already
 /// capped by `Parser.maxStringLength`.
 extension Performer {
+    mutating func oscDiscarded() {
+        state.itermImage = nil
+        state.clipboardTransfer = nil
+    }
+
     public mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) {
+        if bytes.isEmpty { state.clipboardTransfer = nil }
+        // A multipart image survives only its own parts/end; unrelated OSCs
+        // cannot leave a large abandoned allocation behind.
+        if !bytes.starts(with: Array("1337;FilePart=".utf8)),
+            !bytes.elementsEqual(Array("1337;FileEnd".utf8)) {
+            state.itermImage = nil
+        }
         guard let separator = bytes.firstIndex(of: 0x3B) else {
             // A bare code: only OSC 104/105 ("reset everything") uses one — the
             // form xterm itself sends.
@@ -54,7 +66,25 @@ extension Performer {
                 state.outputBuffer += [0x1B, 0x5D, 0x37, 0x35, 0x30, 0x31, 0x3B, 0x3F, 0x1B, 0x5C]
             } else { state.programSignals.status(String(decoding: payload, as: UTF8.self)) }
         case 9:
-            state.programSignals.iterm(String(decoding: payload, as: UTF8.self))
+            if payload.elementsEqual(Array("12".utf8)) {
+                shellIntegration([0x41][...])
+            } else { state.programSignals.iterm(String(decoding: payload, as: UTF8.self)) }
+        case 633:
+            vscodeIntegration(payload)
+        case 1337:
+            itermExtension(payload)
+        case 21:
+            kittyColors(payload)
+        case 22:
+            pointerShape(payload)
+        case 5522:
+            extendedClipboard(payload)
+        case 3, 6, 51, 106, 113, 114, 115, 116, 118, 3008:
+            break // Accepted and ignored; see CONFORMANCE.md.
+        case 46, 50, 5113:
+            break // Refused: stream-selected files/fonts.
+        case 66:
+            break // Deferred until multi-cell glyph rendering is designed.
         case 777:
             let parts = String(decoding: payload, as: UTF8.self).split(separator: ";", maxSplits: 2, omittingEmptySubsequences: false)
             if parts.count == 3, parts[0] == "notify" {
@@ -148,8 +178,9 @@ extension Performer {
     /// remote pane to this Mac's pasteboard; `allow-clipboard-write = false`
     /// turns it off. Text is sanitised first — a stream chose it, sight unseen
     /// (`SECURITY.md` §2.5).
-    private mutating func setClipboard(_ payload: ArraySlice<UInt8>) {
-        guard let separator = payload.firstIndex(of: 0x3B) else { return }  // ';'
+    mutating func setClipboard(_ payload: ArraySlice<UInt8>) {
+        guard payload.count <= Parser.maxStringLength,
+            let separator = payload.firstIndex(of: 0x3B) else { return }  // ';'
         let data = payload[payload.index(after: separator)...]
         // Query and "clear" are both declined: a stream may not blank the
         // clipboard either.
@@ -158,6 +189,7 @@ extension Performer {
         let text = Self.sanitiseClipboardText(decoded)
         guard !text.isEmpty else { return }
         state.pendingClipboardCopy = text
+        state.clipboardNeedsAcknowledgement = false
     }
 
     /// Strips `ConcealingScalars` — what lets pasted text differ from how it

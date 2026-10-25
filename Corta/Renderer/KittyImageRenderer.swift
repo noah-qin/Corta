@@ -279,7 +279,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private func decodedBytes(
         of data: KittyGraphics.ImageData, id: KittyGraphics.ImageID, generation: UInt64
     ) -> Int? {
-        if data.format != .png, data.width > 0, data.height > 0 { return data.width * data.height * 4 }
+        if data.format != .png, data.format != .gif, data.width > 0, data.height > 0 { return data.width * data.height * 4 }
         guard let known = knownDecodedBytes[id], known.generation == generation else { return nil }
         return known.bytes
     }
@@ -489,7 +489,8 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
 
             let instance = QuadInstance(
                 origin: .init(Float(placement.column) * cellWidth, Float(viewportRow) * cellHeight),
-                size: .init(Float(columns) * cellWidth, Float(placementRows) * cellHeight),
+                size: .init(placement.displayPixelWidth.map(Float.init) ?? Float(columns) * cellWidth,
+                            placement.displayPixelHeight.map(Float.init) ?? Float(placementRows) * cellHeight),
                 color: .one, atlasIndex: .max)
             // The arrival time is a metric only: no image lookup per frame without it.
             let receivedAt = RenderMetrics.isEnabled ? table.image(placement.imageID)?.receivedAt : nil
@@ -594,6 +595,10 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             return decodeRaw(data, bytesPerPixel: 4, alignment: alignment)
         case .png:
             return decodePNG(data.bytes, alignment: alignment)
+        case .gif:
+            guard data.bytes.starts(with: Array("GIF87a".utf8)) || data.bytes.starts(with: Array("GIF89a".utf8)),
+                let decoded = ImageDecoderProcess.decodePNG(data.bytes, alignment: alignment, allowGIF: true) else { return nil }
+            return DecodedImage(width: decoded.width, height: decoded.height, pixels: decoded.pixels)
         }
     }
 

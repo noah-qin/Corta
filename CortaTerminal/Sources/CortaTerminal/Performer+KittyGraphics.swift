@@ -19,6 +19,7 @@ import Foundation
 /// Kitty graphics dispatch; settled state lives in `ImagePlacementTable`.
 extension Performer {
     public mutating func apcDispatch(_ bytes: ArraySlice<UInt8>) {
+        state.itermImage = nil
         guard let command = KittyGraphicsParser.parse(bytes) else { return }
         if let imageAllowanceProvider { state.imageByteAllowance = imageAllowanceProvider() }
         switch command {
@@ -38,7 +39,7 @@ extension Performer {
         let format = header.format ?? .rgba
         let ok: Bool
         switch format {
-        case .png:
+        case .png, .gif:
             ok = true
         case .rgb, .rgba:
             ok = (header.width ?? 0) > 0 && (header.height ?? 0) > 0
@@ -117,7 +118,7 @@ extension Performer {
     /// snapshot for ~100 ms at 4K. The parse stops right after this
     /// dispatch, so nothing later in the stream is applied before
     /// `completeDeferredImage` stores and places it.
-    private mutating func finishTransmission(_ pending: PendingImageTransmission) {
+    mutating func finishTransmission(_ pending: PendingImageTransmission) {
         let deferred = DeferredImageTransmission(pending: pending, resetCount: resetCount)
         if defersLargeImageDecoding, pending.base64.count >= KittyGraphics.deferredDecodeThreshold {
             state.deferredImage = deferred
@@ -147,6 +148,10 @@ extension Performer {
         _ pending: PendingImageTransmission,
         decoded: Result<KittyGraphics.ImageData, TransmissionRefusal>
     ) {
+        if let options = pending.itermOptions {
+            if case .success(let data) = decoded { placeITermImage(data, options: options) }
+            return
+        }
         let imageID = pending.header.imageID
         let quiet = pending.header.quiet
         let storedID: KittyGraphics.ImageID
@@ -182,7 +187,8 @@ extension Performer {
     static func transmittedImage(
         _ pending: PendingImageTransmission
     ) throws(TransmissionRefusal) -> KittyGraphics.ImageData {
-        guard let decoded = Data(base64Encoded: Data(padded(pending.base64))) else {
+        let base64 = pending.itermOptions == nil ? padded(pending.base64) : pending.base64
+        guard let decoded = Data(base64Encoded: Data(base64)) else {
             throw TransmissionRefusal(message: "EINVAL:bad base64")
         }
         var bytes = [UInt8](decoded)
@@ -196,7 +202,7 @@ extension Performer {
             switch format {
             case .rgb: 3
             case .rgba: 4
-            case .png: nil
+            case .png, .gif: nil
             }
         if pending.header.compressed {
             // Pixels inflate to exactly their declared size, so that is the
@@ -217,7 +223,7 @@ extension Performer {
     }
 
     /// Stores `data` under `imageID`, or under a fresh id when it is 0.
-    private mutating func store(
+    mutating func store(
         _ data: KittyGraphics.ImageData, as imageID: KittyGraphics.ImageID
     ) throws(TransmissionRefusal) -> KittyGraphics.ImageID {
         let storedID: KittyGraphics.ImageID
@@ -237,7 +243,7 @@ extension Performer {
 
     /// What the process-wide budget leaves this terminal, less what the
     /// parked screen holds, is all the live table may hold.
-    private mutating func applyImageAllowance() {
+    mutating func applyImageAllowance() {
         let allowance = state.imageByteAllowance
         guard allowance != .max else {
             grid.imagePlacements.externalLimit = .max
@@ -247,7 +253,7 @@ extension Performer {
         grid.imagePlacements.externalLimit = max(0, allowance - parked)
     }
 
-    private mutating func placeAtCursor(_ display: KittyGraphics.DisplayHeader, respond respondFlag: Bool = true) {
+    mutating func placeAtCursor(_ display: KittyGraphics.DisplayHeader, respond respondFlag: Bool = true) {
         let placed = grid.imagePlacements.place(
             display, row: grid.cursor.row, column: grid.cursor.column,
             baseScrollbackTotal: grid.scrollback.totalPushed)

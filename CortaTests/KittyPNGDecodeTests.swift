@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CoreGraphics
+import CortaTerminal
 import Foundation
 import ImageIO
 import Testing
@@ -59,4 +60,30 @@ struct KittyPNGDecodeTests {
         } != nil)
         #expect(KittyImageRenderer.decodePNG(bytes) == nil)
     }
+    @Test("iTerm2 GIF first frame uses the same sandboxed decoder, while kitty PNG remains strict")
+    func gifFirstFrame() throws {
+        let data = NSMutableData()
+        let destination = try #require(CGImageDestinationCreateWithData(
+            data as CFMutableData, "com.compuserve.gif" as CFString, 2, nil))
+        for red in [true, false] {
+            let context = try #require(CGContext(data: nil, width: 4, height: 3,
+                bitsPerComponent: 8, bytesPerRow: 16, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.setFillColor(red: red ? 1 : 0, green: red ? 0 : 1, blue: 0, alpha: 1)
+            context.fill(CGRect(x: 0, y: 0, width: 4, height: 3))
+            CGImageDestinationAddImage(destination, try #require(context.makeImage()), nil)
+        }
+        #expect(CGImageDestinationFinalize(destination))
+        let bytes = [UInt8](data as Data)
+        #expect(KittyImageRenderer.decodePNG(bytes) == nil)
+        var terminal = Terminal(rows: 8, columns: 40)
+        terminal.grid.cellPixelWidth = 10; terminal.grid.cellPixelHeight = 20
+        terminal.feed(Array(("\u{1B}]1337;File=inline=1:" + Data(bytes).base64EncodedString() + "\u{07}").utf8))
+        let placement = try #require(terminal.grid.imagePlacements.orderedPlacements().first)
+        let image = try #require(terminal.grid.imagePlacements.image(placement.imageID))
+        let decoded = try #require(KittyImageRenderer.decode(image))
+        #expect(decoded.width == 4 && decoded.height == 3)
+        #expect(decoded.bgra[2] > 240 && decoded.bgra[1] < 10)
+    }
+
 }

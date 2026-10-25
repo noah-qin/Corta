@@ -192,6 +192,7 @@ final class PaneAppearance: NSObject {
     private func applyCellMetrics(settle: Bool) {
         guard let host, let terminalRenderer else { return }
         let metrics = terminalRenderer.pointMetrics
+        session?.updateBackingScale(Double(terminalRenderer.scale))
         terminalView?.cellSize = CGSize(width: metrics.cellWidth, height: metrics.cellHeight)
         // Before the window exists, initial sizing reads the new metrics.
         guard host.didSizeWindow, let window = host.view.window else {

@@ -398,11 +398,13 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     /// output batch from the damage pass; the policy lives here because the
     /// core has no pasteboard and no user.
     func drainClipboardRequests() {
-        guard let text = session.takeClipboardCopy() else { return }
+        guard let request = session.takeClipboardCopyRequest() else { return }
         guard ConfigurationStore.shared.configuration.allowClipboardWrite else { return }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        if pasteboard.setString(request.text, forType: .string), !request.acknowledgement.isEmpty {
+            session.write(request.acknowledgement)
+        }
     }
 
     // MARK: - Status marks and directory completion

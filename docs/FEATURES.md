@@ -37,6 +37,17 @@ the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
   after two seconds; an occluded window does not draw.
 - Glyph atlases and GPU instance buffers sized to what is on screen: a
   24-byte quad, atlases that grow on demand.
+- iTerm2 `imgcat` inline PNG and animated GIF's first frame (OSC 1337),
+  including multipart transmission, cell/pixel/percent/auto sizing and aspect
+  preservation. The same sandboxed decoder, placement table, erase/scroll
+  semantics and image budgets as kitty graphics; downloads are refused.
+- iTerm2 cwd/host reports, marks, clear history, cursor shape, background Dock
+  attention, numeric cell-size reports and permission-gated clipboard copy;
+  VS Code OSC 633 command boundaries/cwd and ConEmu OSC 9;12 prompt marks.
+- Kitty OSC 21 colours, OSC 22 mouse shapes with a bounded per-screen stack,
+  and OSC 5522 text clipboard writes under the OSC 52 permission and size cap.
+  See [the OSC verdict table](CONFORMANCE.md#osc-verdict-table) for deliberate
+  limitations, accepted no-ops and refusals.
 - Kitty graphics with direct RGB, RGBA and PNG transmission and placement,
   zlib-compressed or not (`o=z`, what `kitten icat` sends for an image it
   scales to fit). Erasing

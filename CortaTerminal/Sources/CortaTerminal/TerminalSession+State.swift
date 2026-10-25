@@ -112,6 +112,16 @@ extension TerminalSession {
         registerStateWaiter { state.withLock { $0.terminal.takeBell() } }
     }
 
+    public var pointerShape: String? {
+        registerStateWaiter { state.withLock { $0.terminal.pointerShape } }
+    }
+    public func takeProgramAttention() -> ProgramAttention? {
+        registerStateWaiter { state.withLock { $0.terminal.takeProgramAttention() } }
+    }
+    public func updateBackingScale(_ scale: Double) {
+        guard scale.isFinite, scale > 0, scale <= 8 else { return }
+        registerStateWaiter { state.withLock { $0.terminal.grid.backingScale = scale } }
+    }
     public var programStatuses: [String: ProgramStatus] {
         registerStateWaiter { state.withLock { $0.terminal.programStatuses } }
     }
@@ -188,6 +198,10 @@ extension TerminalSession {
 
     public func takeFinishedCommand() -> Int? {
         registerStateWaiter { state.withLock { $0.terminal.takeFinishedCommand() } }
+    }
+
+    public func takeClipboardCopyRequest() -> ClipboardCopyRequest? {
+        registerStateWaiter { state.withLock { $0.terminal.takeClipboardCopyRequest() } }
     }
 
     /// OSC 52; the app decides whether it reaches the pasteboard.

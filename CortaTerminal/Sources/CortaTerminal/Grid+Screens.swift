@@ -145,6 +145,7 @@ extension Grid {
         main.cellPixelHeight = cellPixelHeight  // a property of the window
         main.ambiguousIsWide = ambiguousIsWide  // a setting of the window
         main.cellPixelWidth = cellPixelWidth
+        main.backingScale = backingScale
         // Terminal-wide, not per screen: `self = main` would restore the old
         // value.
         main.reverseWraparoundEnabled = reverseWraparoundEnabled

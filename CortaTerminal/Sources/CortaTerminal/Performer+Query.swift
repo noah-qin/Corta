@@ -94,7 +94,7 @@ extension Performer {
 
     /// `rgb:RRRR/GGGG/BBBB`, each 8-bit channel doubled to xterm's 16 bits —
     /// the body of every colour query's answer.
-    private static func colorReport(_ color: (red: UInt8, green: UInt8, blue: UInt8)) -> String {
+    static func colorReport(_ color: (red: UInt8, green: UInt8, blue: UInt8)) -> String {
         func channel(_ value: UInt8) -> String {
             let hex = String(value, radix: 16)
             let byte = hex.count == 1 ? "0" + hex : hex

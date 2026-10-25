@@ -18,6 +18,12 @@ Versioning for compatibility changes.
   by default, configurable with `history-suggestions` and a Terminal settings
   toggle; yields to zsh-autosuggestions and leaves startup files unchanged.
 
+- OSC ecosystem coverage (#411): iTerm2 inline PNG/GIF first-frame images,
+  multipart transfer, host/cwd, marks, clear history, cursor, attention and
+  clipboard extensions; VS Code shell-integration marks; ConEmu prompt marks;
+  kitty colour, pointer and bounded text clipboard protocols. A tested OSC
+  verdict table records implemented forms, no-ops, refusals and limits.
+
 - Claude Code task-state integration on native tabs and the Dock, with a
   pane-jumping Agents list in the command palette and Window menu. Claude
   Code is currently the only CLI with a dedicated task-state integration;

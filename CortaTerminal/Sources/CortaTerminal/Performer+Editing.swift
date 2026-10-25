@@ -60,6 +60,7 @@ extension Performer {
     /// ESC sequences. Charset selection and everything else are ignored
     /// cleanly (`SECURITY.md` §3).
     public mutating func escapeDispatch(intermediates: Intermediates, final: UInt8) {
+        if final != 0x5C { state.itermImage = nil } // ST terminates each FilePart
         // DECALN is the one intermediate form that carries meaning here:
         // `ESC # 8`. Everything else with an intermediate — the charset
         // designators — is still ignored cleanly.

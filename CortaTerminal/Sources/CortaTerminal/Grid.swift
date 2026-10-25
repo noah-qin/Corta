@@ -112,6 +112,8 @@ public struct Grid: Sendable {
     /// The pty's pixel width per column (`ws_xpixel / ws_col`); 0 until one
     /// arrives. Only placing an image with no `c=` reads it.
     public var cellPixelWidth = 0
+    /// Physical pixels per logical point, for numeric OSC 1337 reports.
+    public var backingScale: Double = 1
 
     public var scrollback: Scrollback
 

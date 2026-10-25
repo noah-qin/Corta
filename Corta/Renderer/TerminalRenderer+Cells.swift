@@ -39,7 +39,8 @@ nonisolated extension TerminalRenderer {
             let attributes = current.attributes
             let underCursor = cursor.contains(column)
             colors.update(for: current, underCursor: underCursor, palette: palette, overrides: indexedOverrides,
-                selectionColor: selected.contains(column) ? frameSelectionForeground : .default)
+                selectionColor: selected.contains(column) ? frameSelectionForeground : .default,
+                cursorText: frameDynamicColors?.cursorText ?? .default)
             let origin = SIMD2<Float>(Float(column) * cell.x, Float(row) * cell.y)
             let reversed = attributes.contains(.reverse)
             if underCursor || !(reversed ? current.foreground : current.background).isDefault || reversed {
@@ -93,7 +94,7 @@ nonisolated extension TerminalRenderer {
 
         @inline(__always)
         mutating func update(
-            for cell: Cell, underCursor: Bool, palette: Theme.Variant, overrides: IndexedColorOverrides, selectionColor: Color
+            for cell: Cell, underCursor: Bool, palette: Theme.Variant, overrides: IndexedColorOverrides, selectionColor: Color, cursorText: Color
         ) {
             let attributes = cell.attributes
             let key = SIMD2<UInt64>(
@@ -110,7 +111,9 @@ nonisolated extension TerminalRenderer {
             if attributes.contains(.dim) { foreground.w *= TerminalRenderer.dimAlpha }
             if !selectionColor.isDefault { foreground = palette.resolveForeground(selectionColor, indexedOverrides: overrides) }
             if underCursor {
-                foreground = palette.background
+                foreground = cursorText.components.map {
+                    SIMD4<Float>(Float($0.red) / 255, Float($0.green) / 255, Float($0.blue) / 255, 1)
+                } ?? palette.background
                 background = palette.cursor
             }
             packedForeground = QuadInstance.packColor(foreground)

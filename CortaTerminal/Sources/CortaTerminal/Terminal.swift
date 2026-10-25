@@ -228,6 +228,13 @@ public struct Terminal: Sendable {
         return requested
     }
 
+    public var pointerShape: String? {
+        performer.grid.isAlternateScreenActive ? performer.state.pointerAlternate.current : performer.state.pointerMain.current
+    }
+    public mutating func takeProgramAttention() -> ProgramAttention? {
+        defer { performer.state.attention = nil }
+        return performer.state.attention
+    }
     public var programStatuses: [String: ProgramStatus] { performer.state.programSignals.statuses }
     public var programProgress: ProgramProgress? { performer.state.programSignals.progress }
     public mutating func takeDesktopNotification() -> DesktopNotification? {
@@ -285,9 +292,16 @@ public struct Terminal: Sendable {
 
     /// OSC 52 writes; the app decides whether to honour them.
     public mutating func takeClipboardCopy() -> String? {
-        let text = performer.state.pendingClipboardCopy
+        takeClipboardCopyRequest()?.text
+    }
+
+    public mutating func takeClipboardCopyRequest() -> ClipboardCopyRequest? {
+        guard let text = performer.state.pendingClipboardCopy else { return nil }
+        let acknowledgement = performer.state.clipboardNeedsAcknowledgement
+            ? Array("\u{1B}]5522;type=write:status=DONE\u{1B}\\".utf8) : []
         performer.state.pendingClipboardCopy = nil
-        return text
+        performer.state.clipboardNeedsAcknowledgement = false
+        return ClipboardCopyRequest(text: text, acknowledgement: acknowledgement)
     }
 
     /// Image bytes this terminal may hold in all, set from an
@@ -302,6 +316,7 @@ public struct Terminal: Sendable {
     public var retainedImageBytes: Int {
         performer.grid.retainedImageBytes
             + (performer.state.pendingImageTransmission?.base64.count ?? 0) / 4 * 3
+            + (performer.state.itermImage?.base64.count ?? 0) / 4 * 3
             + (performer.state.deferredImage?.decodedByteEstimate ?? 0)
             + performer.state.decodingImageBytes
     }
