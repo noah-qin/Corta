@@ -24,8 +24,28 @@ import Foundation
 /// `aid=`/`cl=` are ignored — unparsed is unexploitable.
 extension Performer {
     mutating func shellIntegration(_ payload: ArraySlice<UInt8>) {
-        // Not on the alternate screen: its rows vanish when the TUI exits.
-        guard !grid.isAlternateScreenActive, let kind = payload.first else { return }
+        guard let kind = payload.first else { return }
+        if grid.isAlternateScreenActive {
+            // A crashed TUI cannot restore the main screen. An integrated
+            // shell can still end a command known to have started on main.
+            // Finish metadata against the parked main grid without marking
+            // or switching the alternate canvas. Other alt-screen marks stay inert.
+            if kind == 0x44, state.isCommandRunning, state.commandExitStatus == nil,
+               let main = grid.suspendedMain?.grid {
+                state.historySuggestion = nil
+                let status = Self.exitStatus(payload)
+                state.isCommandRunning = false
+                state.promptAwaitsRepaint = false
+                state.commandExitStatus = status
+                state.finishedCommandExitStatus = status
+                state.bracketedPasteEnabled = false
+                state.keyboardProtocol = KeyboardProtocolStack()
+                state.programSignals.endCommand(exitStatus: status)
+                state.commandRecords.finish(exitStatus: status,
+                    endRow: main.absoluteRow(ofScreenRow: main.cursor.row), at: Date())
+            }
+            return
+        }
         if (0x41...0x44).contains(kind) { state.historySuggestion = nil }
         switch kind {
         case 0x41: promptStarted()
@@ -81,6 +101,7 @@ extension Performer {
 
     /// `C` — the command is running, and its output starts here.
     private mutating func outputStarted() {
+        if !state.isCommandRunning { state.programSignals.beginCommand() }
         state.directoryCompletion = nil
         state.isCommandRunning = true
         state.shellMarksOutputStart = true
@@ -128,6 +149,7 @@ extension Performer {
         state.isCommandRunning = false
         state.promptAwaitsRepaint = false
         let status = Self.exitStatus(payload)
+        state.programSignals.endCommand(exitStatus: status)
         state.commandExitStatus = status
         state.finishedCommandExitStatus = status
         // Only a row still holding its prompt: `clear` erased the one it

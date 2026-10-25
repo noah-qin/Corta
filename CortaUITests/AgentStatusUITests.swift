@@ -29,7 +29,13 @@ final class AgentStatusUITests: XCTestCase {
             throw XCTSkip("Set TEST_RUNNER_CORTA_REAL_CLAUDE and TEST_RUNNER_CORTA_REAL_HOME for real Claude acceptance")
         }
         let stage = try UIFixtures.stage("real-claude")
-        for channel in ["auto", "iterm2", "ghostty", "kitty"] {
+        let supported = ["auto", "iterm2", "ghostty", "kitty"]
+        let channels = environment["CORTA_REAL_CHANNELS"]?.split(separator: ",").map(String.init) ?? supported
+        guard !channels.isEmpty, channels.allSatisfy({ supported.contains($0) }) else {
+            throw NSError(domain: "CortaUITests.Setup", code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "CORTA_REAL_CHANNELS must contain auto,iterm2,ghostty or kitty"])
+        }
+        for channel in channels {
             let marker = UUID().uuidString
             let transcriptURL = stage.appendingPathComponent(marker).appendingPathComponent("transcript")
             let prefix: String? = switch channel {
@@ -49,12 +55,24 @@ final class AgentStatusUITests: XCTestCase {
             app.launch()
             defer { app.terminate() }
             XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+            app.activate()
+            let initialTerminal = app.textViews.firstMatch
+            XCTAssertTrue(initialTerminal.waitForExistence(timeout: 10))
+            initialTerminal.click()
             // Digits avoid the editor's ordinary spelling substitutions.
             let targetTitle = "409" + String(Int.random(in: 100_000_000...999_999_999))
             app.menuBars.menuBarItems["File"].click()
             app.menuBars.menuItems["Rename Tab…"].click()
             let titleEditor = app.textFields["tab-title-editor"]
-            XCTAssertTrue(titleEditor.waitForExistence(timeout: 5))
+            if !titleEditor.waitForExistence(timeout: 5) {
+                // On repeated relaunch AppKit can expose the window before
+                // its native tab's selected accessibility frame is ready.
+                app.typeKey(.escape, modifierFlags: [])
+                initialTerminal.click()
+                app.menuBars.menuBarItems["File"].click()
+                app.menuBars.menuItems["Rename Tab…"].click()
+            }
+            XCTAssertTrue(titleEditor.waitForExistence(timeout: 10))
             titleEditor.typeKey("a", modifierFlags: .command)
             titleEditor.typeText(targetTitle)
             app.typeKey(.return, modifierFlags: [])
@@ -120,8 +138,56 @@ final class AgentStatusUITests: XCTestCase {
             XCTAssertTrue(transcript.contains("7501;state=blocked:app=claude-code:kind=permission"))
             XCTAssertTrue(transcript.contains("7501;state=done:app=claude-code"))
             if let prefix { XCTAssertTrue(transcript.contains(prefix), "The real CLI must emit its explicit \(channel) channel") }
+            else {
+                for code in ["9;", "777;notify;", "99;"] {
+                    XCTAssertFalse(transcript.contains("\u{1B}]" + code), "auto must not select a message channel for Corta")
+                }
+            }
+            XCTAssertFalse(transcript.contains("\u{1B}]9;4;"), "Normal Corta identity is not selected for native progress")
+            XCTAssertFalse(transcript.contains("\u{1B}]21337;"), "Reference Claude leaves tab metadata disabled")
             let doneDockShot = XCTAttachment(screenshot: icon.screenshot())
             doneDockShot.name = "real-claude-\(channel)-dock-completed"; doneDockShot.lifetime = .keepAlways; add(doneDockShot)
+            if let prefix {
+                // Fixed 7501 permission attention cannot prove that an
+                // explicit OSC channel delivers the CLI's own message text.
+                // Wait for a separate idle reminder after blocked has ended.
+                app.typeKey("t", modifierFlags: .command)
+                let idleText = "Claude is waiting for your input" // 2.1.310 sender
+                let idleMessage = center.descendants(matching: .any).matching(NSPredicate(
+                    format: "label CONTAINS %@ OR value CONTAINS %@", idleText, idleText)).firstMatch
+                if !idleMessage.waitForExistence(timeout: 70) || !idleMessage.isHittable {
+                    let menuBar = center.menuBars.firstMatch
+                    if menuBar.exists {
+                        menuBar.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).click()
+                    }
+                }
+                XCTAssertTrue(idleMessage.waitForExistence(timeout: 60),
+                    "The real \(channel) channel must deliver its own idle text, not fixed permission attention")
+                let idleTranscript = String(decoding: try Data(contentsOf: transcriptURL), as: UTF8.self)
+                let shape: String = switch channel {
+                case "iterm2": prefix + idleText
+                case "ghostty": prefix + "Claude Code;" + idleText
+                default: ";" + idleText
+                }
+                XCTAssertTrue(idleTranscript.contains(shape), "Reference sender's idle message must be present")
+                let idleShot = XCTAttachment(screenshot: center.screenshot())
+                idleShot.name = "real-claude-\(channel)-explicit-idle-text"
+                idleShot.lifetime = .keepAlways; add(idleShot)
+                idleMessage.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+                let foreground = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                    app.state == .runningForeground
+                }, object: app)
+                if XCTWaiter.wait(for: [foreground], timeout: 1) != .completed, idleMessage.exists {
+                    idleMessage.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+                }
+                let landed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                    app.state == .runningForeground
+                }, object: app)
+                XCTAssertEqual(XCTWaiter.wait(for: [landed], timeout: 10), .completed,
+                    "Click must activate Corta, not merely find background terminal text")
+                expectation(for: NSPredicate(format: "value CONTAINS %@", "OK"), evaluatedWith: app.textViews.firstMatch)
+                waitForExpectations(timeout: 10)
+            }
             app.terminate()
         }
     }

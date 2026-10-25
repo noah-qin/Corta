@@ -242,7 +242,12 @@ of integration uses `TaskNotifier`'s typing-and-idle heuristic.
 
 Program notifications use `notify-from-programs` and the visibility/occasion
 rules described in the [user guide](USER-GUIDE.md#coding-agent-state-and-program-notifications).
-They are independent of the long-task threshold below. Process-name detection
+Claude's `preferredNotifChannel` and `terminalProgressBarEnabled` are Claude
+settings, not Corta config keys. `auto` does not choose a message channel for
+Corta. Select `ghostty`, `iterm2` or `kitty` in Claude for message text;
+`notifications_disabled` there does not disable Corta's fixed 7501 attention.
+Corta keeps its own terminal identity and does not spoof another terminal to
+enable Claude's progress channel. These notices are independent of the long-task threshold below. Process-name detection
 does not provide dedicated task-state integration for another CLI.
 
 A **long-task notification** (`notify-on-long-task`) is posted only when

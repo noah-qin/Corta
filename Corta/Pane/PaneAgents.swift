@@ -16,6 +16,8 @@
 
 import AppKit
 import CortaTerminal
+import CortaPOSIX
+import Darwin
 
 /// Event-driven pane metadata. Output, prompt return, attention and exit are
 /// facts; silence is deliberately not interpreted with a polling timer.
@@ -69,13 +71,22 @@ final class PaneAgents {
             }
         }
         host.pointer.refreshProgramPointer()
-        host.taskNotifier.setProgramBlocked(reported.values.contains { $0.state == .blocked })
+        host.taskNotifier.setProgramBlocked(reported.values.contains { $0.state == .blocked },
+            episode: session.programBlockedEpisode)
         let oldStatus = status
         let oldProgress = progress
         if configuration.agentStatus {
             refreshFallback(session: session, hasReportedStatus: !reported.isEmpty)
             status = reported.values.max { $0.urgency < $1.urgency }
                 ?? (sawSignals ? nil : fallback)
+            if let metadata = session.programTabMetadata {
+                if status == nil { status = metadata }
+                else {
+                    status?.color = metadata.color
+                    status?.statusColor = metadata.statusColor
+                    if status?.title.isEmpty == true { status?.title = metadata.title }
+                }
+            }
             progress = session.programProgress
             if progress == nil, let value = status?.progress {
                 progress = ProgramProgress(state: .normal, value: value)
@@ -124,7 +135,8 @@ final class PaneAgents {
         // Output (including prompt redraws), notifications and BEL do not
         // tell us whether an interactive agent is working or has finished.
         if session.hasShellIntegration, !session.isCommandRunning, fallbackProcess == nil {
-            fallback?.state = session.commandRecords.lastCompleted?.didFail == true ? .error : .idle
+            let exit = session.commandRecords.lastCompleted?.exitStatus
+            fallback?.state = exit != nil && exit != 0 && exit != 130 ? .error : .idle
         }
     }
 
@@ -134,16 +146,19 @@ final class PaneAgents {
         host?.taskNotifier.noteProgramAttention(kind: nil, in: host?.view.window)
     }
 
-    func exited(success: Bool) {
+    func exited(_ exit: ProcessExit) {
         // The final OSC can precede EOF by less than the coalescing delay.
         // Read it before sealing the session against late UI callbacks.
         readOutput()
         sessionHasExited = true
+        host?.taskNotifier.setProgramBlocked(false)
         processRefresh?.cancel(); processRefresh = nil
-        guard status != nil else { return }
+        progress = nil
+        guard status != nil else { AgentDirectory.refresh(); return }
         // A clean process exit is a session end, not proof that its last
         // task succeeded. Preserve a reported completion or failure.
-        if !success { status?.state = .error }
+        if exit == .exited(code: 130) || exit == .signalled(signal: SIGINT) { status?.state = .idle }
+        else if !exit.isCleanExit { status?.state = .error }
         else if status?.state != .done && status?.state != .error { status?.state = .idle }
         status?.kind = nil
         status?.progress = nil; progress = nil

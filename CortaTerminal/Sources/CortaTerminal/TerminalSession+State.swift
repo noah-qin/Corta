@@ -125,6 +125,12 @@ extension TerminalSession {
     public var programStatuses: [String: ProgramStatus] {
         registerStateWaiter { state.withLock { $0.terminal.programStatuses } }
     }
+    public var programBlockedEpisode: Int {
+        registerStateWaiter { state.withLock { $0.terminal.programBlockedEpisode } }
+    }
+    public var programTabMetadata: ProgramStatus? {
+        registerStateWaiter { state.withLock { $0.terminal.programTabMetadata } }
+    }
     public var programProgress: ProgramProgress? {
         registerStateWaiter { state.withLock { $0.terminal.programProgress } }
     }

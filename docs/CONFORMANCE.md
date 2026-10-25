@@ -721,16 +721,20 @@ constitute task-state integration for other CLIs. No Codex, Gemini, pi,
 Kimi, Grok Build, Qwen, OpenCode or Aider state adapter is shipped.
 
 OSC 7501 replies to probes with the constant `OSC 7501 ; ? ST` and accepts
-working/blocked/done/idle/error and clear, per optional bounded id. `done`
+working/blocked/done/idle/error and clear, per optional bounded id (one main slot plus 32 subtask slots). `done`
 is a completed turn; `idle` is a separate state (including startup and stop).
 Prompt redraws and ordinary notifications do not change reported task state.
 Corta's internal `unknown` is used for process-only detection and OSC 21337
 metadata, which do not establish an agent's task state. It is not an extra
 OSC 7501 wire state. OSC 21337
-accepts escaped indicator/status/status-color metadata. OSC 9 distinguishes
-numeric ConEmu subcommands from notification text; only 9;4 progress changes
-state, and 9;6/9;7 never execute. Other ConEmu commands are inert; directory
-and prompt reports (9;9/9;12) remain unsupported. OSC 777 accepts only notify.
+accepts escaped indicator/status/status-color metadata in a separate bounded
+slot. It decorates explicit state instead of competing with it; status text
+fills an empty task title. Native text uses system colours; status-color is
+retained, not rendered. OSC 9 distinguishes
+numeric ConEmu subcommands from notification text. OSC 9;4 supplies progress;
+a bare OSC 9;12 supplies a shell prompt mark. Neither establishes an agent's
+typed task state. OSC 9;6/9;7 never execute; OSC 9;9 directory reports and
+other unimplemented ConEmu commands are inert. OSC 777 accepts only notify.
 
 OSC 99 supports title/body/close, bounded chunking and base64, occasion,
 urgency metadata, focus, expiry and silent/system sounds. Urgency never
@@ -741,11 +745,15 @@ The default kitty occasion is always; other protocols default to hidden panes.
 Corta coalesces all program notices to one mutable notice per pane.
 An explicit notice delayed beyond coalescing does not re-alert a pane whose
 current blocked episode was already announced; leaving blocked resets that
-suppression. This covers Claude's delayed permission notices.
+suppression. BEL and kind changes use the same episode suppression. Fixed
+attention is cancelled when its wait ends; unrelated program messages are
+preserved. Visibility/occasion is rechecked before submission, including
+after OS authorization. OS delivery can occur after that final check.
 
 Unsupported: `a=report`, `c=1` event reports, `p=alive`, icons (`n`, `g`,
 `p=icon`) and buttons. These generate no stdin reports. Close requests remove
-only the pane's currently matching id. Program-chosen ids never enter click
+only the pane's matching delivered/pending id; closing one cannot discard a
+newer pending id or reset a blocked episode. Program-chosen ids never enter click
 routing; clicks use Corta's pane id, window number and session generation.
 
 `ProgramSignalsTests` covers byte-split sequences, bad fields/base64, entry
@@ -756,33 +764,103 @@ routing and each explicit channel (`iterm2`, `ghostty`, `kitty`). Process fallba
 uses process changes, prompt return and exit; an active process alone means
 Unknown, a clean session end means Idle, and a known failed exit means Failed.
 OSC notifications and BEL never imply blocked, done or working; no idle timer
-is added. Flood delivery is bounded to 0.2 notices/second/pane after coalescing.
+is added. Accepted OSC 133 command boundaries clear stale children, waiting,
+progress and tab metadata, even if the CLI never sent clear. A command
+started on main may end while a crashed CLI leaves the alternate screen
+active: lifecycle metadata finishes against the parked main grid without
+switching or marking the alternate canvas. A clean boundary
+preserves explicit done/error; otherwise it means Idle. Status 130 or a direct session terminated by SIGINT means
+interrupted/Idle, other known nonzero statuses mean Failed. The next command
+clears this summary. No shell boundary means no inferred CLI exit. Flood delivery is bounded to 0.2 notices/second/pane after coalescing.
 
 `RealClaudeStatusTests` is opt-in: set `CORTA_REAL_CLAUDE` to the installed
 executable's absolute path and run the core test of that name. It starts the
 real program under `TerminalSession` in a fresh temporary configuration and
 checks that Claude accepts the constant probe reply. It submits no model
-prompt and reads no existing account configuration. It does not replace the
+prompt. It isolates file configuration and removes inherited API/OAuth tokens;
+it is not an assertion about the CLI's internal keychain access. It does not replace the
 permission, completion or Notification Center checks above.
 
 ### CLI signal compatibility
 
-**Current task-state integration: Claude Code only. Reference version:
-2.1.310.** The native OSC 7501 vocabulary above was checked against that
+**Development and acceptance version: Claude Code `2.1.310 (Claude Code)`,
+native macOS arm64. Dedicated task-state integration: Claude Code only.**
+The adapter was developed against this installed version and exercised with
+real interactive sessions identifying the terminal as `Corta`
+(`TERM=xterm-256color`). The checked-in capture records the executable's
+SHA-256 alongside its version. This is a verified reference version, not a
+promise of compatibility with every Claude Code release.
+
+| Support category | What Corta supports | Boundary |
+| :--- | :--- | :--- |
+| Dedicated Claude task state | OSC 7501 working, blocked, done, idle, error and clear; permission/question/auth reasons; one main slot and 32 subtask slots | Only explicitly reported state; output, silence, BEL and notification prose do not establish an outcome. |
+| Verified real 2.1.310 flows | Probe, normal completion, permission waiting/cancellation, invalid-model failure, isolated invalid-token auth waiting, Agent child id/clear and abrupt exit to an integrated shell | These concrete flows do not cover every failure cause or auth recovery. Question kind and capacity limits also have parser/policy coverage. |
+| Verified native notifications | Default auto plus fixed 7501 attention; explicit iterm2/ghostty/kitty text, notification clicks and waiting/completed Dock badge screenshots | Auto does not select a Claude text channel for Corta; OS authorization and delivery policy still apply. |
+| Generic protocols only | OSC 9/777/99 notifications, OSC 9;4 progress and OSC 21337 metadata | Claude 2.1.310 does not enable native progress for Corta's normal identity; its OSC 21337 sender is disabled. Generic support is not evidence of Claude emission. |
+| Not implemented | Other CLIs' dedicated state adapters; OSC 99 activation/close/alive reports, icons and buttons; ConEmu execution commands | Other recognised tools have process detection and generic protocols only. No hooks or tool configuration are installed. |
+| Not guaranteed | Other Claude versions; 7501 through tmux, Claude background sessions or disabled terminal-title reporting | The upstream minimum 2.1.295 is not a Corta-tested version range. Live regroup/restart click permutations and auth recovery need separate acceptance; routing policy has unit coverage. |
+
+The native OSC 7501 vocabulary above was checked against that
 installed version, including a captured `idle → working → done` turn.
 The opt-in core test verifies the probe; app fixtures verify state, layout
 and notification routing. The separate opt-in real-Claude UI acceptance
 checks background Bash permission, Dock tile screenshots, notification
 clicks, completion and the three explicit notification channels. See
 [running the acceptance test](TESTING.md#running-ui-suites-against-a-prepared-stage).
-Failure, cancellation and auth-required sessions are not established by
-that test; newer versions must be checked independently. The vocabulary here is based
+That UI test does not establish failure, cancellation or auth-required
+sessions. `RealClaudeLifecycleTests` separately exercises real permission
+cancellation, invalid-model failure, isolated invalid-token auth waiting,
+an actual Agent subtask id/clear, and abrupt exit back to an integrated shell
+with the alternate screen still active. These checks are opt-in and billable;
+their existence is not proof of a pass, and auth recovery remains separate.
+Newer versions must be checked independently. The vocabulary here is based
 on the installed CLI and captured output; it is not a claim of an officially
 documented shared standard or a guarantee for all Claude versions. The following upstream-source and
 interface references describe candidate integrations, not runtime-tested
 version ranges or adapters already shipped by Corta. Record exact CLI
 versions, source revisions and acceptance results in a change's PR when an
 adapter is added; an untested update is not a verified compatible version.
+
+The [official terminal guide](https://code.claude.com/docs/en/terminal-config#see-session-status-in-your-terminal)
+and [official changelog](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)
+explicitly describe OSC 7501 support since 2.1.295. That minimum is not a
+Corta-tested version range. Full wire details below come from the installed
+2.1.310 distribution; undocumented fields are not evidence of a defect.
+
+| Channel | Evidence and actual 2.1.310 sending conditions | Corta contract |
+| :--- | :--- | :--- |
+| OSC 7501 | Official feature; distribution probes `7501;?` and accepts same-code replies beginning with `?`. Interactive sessions only; disabled by `CLAUDE_CODE_DISABLE_TERMINAL_TITLE`, background sessions and terminals known to print unknown sequences. In tmux the probe targets tmux, not passthrough. | Constant `7501;?` ST reply; typed states, optional reason, bounded id/base64 title/message and progress. |
+| done/idle/error/blocked | Distribution maps completed to done; startup/stopped to idle; ordinary failures to error; selected unauthenticated failures to blocked/auth. A blocked dialog may omit kind. | Done means completed turn, not a claim that every tool succeeded. Clear removes one id or all 7501 entries; it is not an outcome. |
+| OSC 9 / 777 / 99 | Distribution selects explicit `iterm2` / `ghostty` / `kitty`; `auto` recognises those terminals, not Corta. No OSC 99 capability query is used to select a notification channel. | Generic bounded notification parsers; no typed task-state inference. |
+| BEL | `terminal_bell`, or added by `iterm2_with_bell`. `notifications_disabled` disables Claude's message channel only. | Existing bell policy; attention uses the same blocked-episode deduplication. |
+| OSC 9;4 | Distribution requires `terminalProgressBarEnabled` plus recognised progress support: attachment capability, ConEmu, Ghostty ≥1.2.0 or iTerm2 ≥3.6.6; excludes its Windows Terminal branch. Normal Corta identity is not selected. | Generic progress only; no claim of native Claude-to-Corta progress emission. |
+| OSC 21337 | Distribution has an encoder but its enablement function returns false. | Generic metadata only; no claim that Claude enables it. |
+
+Claude's [notification timing](https://code.claude.com/docs/en/hooks#notification)
+is independent of status: permission/elicitation usually waits about six
+seconds without typing; idle reminders usually wait about 60 seconds, with
+no running background agent. A notification is not proof of completion.
+The distribution normally emits BEL-terminated OSC; identification as kitty
+selects ST. Tests replay both. Its kitty body packet omits `d=0`, completes
+the accumulated title/body, and is followed by an empty focus packet; tests
+assert exactly one resulting notice.
+
+`ProgramSignalsTests`'s distribution-derived wire fixtures are not captured
+lifecycle sessions. The checked-in, text-redacted
+`claude-2.1.310-signals.json` replays actual PTY captures for cancellation,
+failure, auth waiting, a subtask and abrupt exit, plus actual OSC 9/777/99
+idle notices. It retains field order, ids and terminators. Mocked transitions
+also exercise stop/failure/auth parsing,
+not Claude's actual execution of those flows. The separate opt-in
+`RealClaudeLifecycleTests` runs selected real flows; it does not infer their
+results from mock transitions. `ProgramNotificationTests`
+injects authorization/submission/removal to test cancellation, visibility,
+retry and late submissions without touching system permissions. The opt-in
+UI test checks a later idle notification's real text separately from fixed
+7501 permission attention, so a fixed notice cannot stand in for a channel.
+Dock screenshots still require visual review; taking them is not an assertion
+that the badge or progress is correct. Foreground acceptance and live model
+lifecycles remain separate checks, not implied by a background unit pass.
 
 | Tool / reference | Signals in the checked interface | Current Corta integration scope |
 | :--- | :--- | :--- |

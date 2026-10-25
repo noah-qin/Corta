@@ -16,6 +16,8 @@
 
 import AppKit
 import CortaTerminal
+import CortaPOSIX
+import Darwin
 import Testing
 @testable import Corta
 
@@ -91,7 +93,7 @@ struct PaneAgentsTests {
         #expect(pane.agents.status?.state == .unknown)
         pane.agents.bell()
         #expect(pane.agents.status?.state == .unknown)
-        pane.agents.exited(success: true)
+        pane.agents.exited(.exited(code: 0))
         #expect(pane.agents.status?.state == .idle)
         pane.agents.readOutput()
         #expect(pane.agents.status?.state == .idle, "late output cannot revive a stopped session")
@@ -109,7 +111,7 @@ struct PaneAgentsTests {
         pane.session.write(Array((osc("7501;state=done") + "\n").utf8))
         #expect(await waitUntilTrue(timeout: .seconds(5)) { pane.session.programStatuses[""]?.state == .done })
         #expect(pane.agents.status?.state == .working)
-        pane.agents.exited(success: true)
+        pane.agents.exited(.exited(code: 0))
         #expect(pane.agents.status?.state == .done)
     }
 
@@ -125,9 +127,66 @@ struct PaneAgentsTests {
         #expect(pane.agents.status?.state == .working)
         try await send(osc("7501;state=clear:id=child"), to: pane)
         #expect(pane.agents.status?.state == .done)
-        pane.agents.exited(success: true)
+        pane.agents.exited(.exited(code: 0))
         #expect(pane.agents.status?.state == .done)
         pane.agents.readOutput()
         #expect(pane.agents.status?.state == .done)
     }
+    @Test func tabMetadataDecoratesExplicitStateAndShellExitEndsWaiting() async throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.agentStatus = true }
+        let pane = try pane()
+        defer {
+            pane.agents.reset(); pane.session.stop()
+            ConfigurationStore.shared.update { $0 = original }
+        }
+        try await send(osc("133;A") + osc("133;C"), to: pane)
+        try await send(osc("7501;state=done:app=claude-code")
+            + osc("21337;indicator=#00ff00;status=Decorated;status-color=#ffffff"), to: pane)
+        #expect(pane.agents.status?.state == .done)
+        #expect(pane.agents.status?.color == "#00ff00")
+        #expect(pane.agents.status?.title == "Decorated")
+        try await send(osc("7501;state=blocked:kind=permission")
+            + osc("7501;state=working:id=child"), to: pane)
+        try await send(osc("133;D;137") + osc("133;A"), to: pane)
+        #expect(pane.agents.status?.state == .error)
+        #expect(pane.agents.status?.kind == nil)
+        #expect(pane.session.programStatuses.count == 1)
+        #expect(!pane.taskNotifier.programBlocked)
+    }
+
+    @Test func progressOnlySessionExitAndLateOutputCannotRestoreProgress() async throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.agentStatus = true }
+        let pane = try pane()
+        defer {
+            pane.agents.reset(); pane.session.stop()
+            ConfigurationStore.shared.update { $0 = original }
+        }
+        try await send(osc("9;4;1;50"), to: pane)
+        #expect(pane.agents.progress?.value == 50)
+        pane.agents.exited(.exited(code: 0))
+        #expect(pane.agents.progress == nil)
+        pane.agents.readOutput()
+        #expect(pane.agents.progress == nil)
+    }
+
+    @Test func interruptedDirectSessionIsIdleAndCrashIsFailed() async throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.agentStatus = true }
+        defer { ConfigurationStore.shared.update { $0 = original } }
+        for (exit, expected) in [(ProcessExit.exited(code: 130), ProgramStatus.State.idle),
+                                 (.signalled(signal: SIGINT), .idle), (.exited(code: 137), .error)] {
+            let pane = try pane()
+            defer { pane.agents.reset(); pane.session.stop() }
+            try await send(osc("7501;state=blocked:kind=permission:progress=30"), to: pane)
+            pane.agents.exited(exit)
+            #expect(pane.agents.status?.state == expected)
+            #expect(pane.agents.status?.kind == nil)
+            #expect(pane.agents.progress == nil)
+            pane.agents.readOutput()
+            #expect(pane.agents.status?.state == expected)
+        }
+    }
+
 }

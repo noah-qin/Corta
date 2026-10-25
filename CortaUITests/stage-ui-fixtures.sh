@@ -219,8 +219,8 @@ if mkdir "$ZDOTDIR/$TEST_AGENT_MARKER" 2>/dev/null; then
     ghostty) printf '\033]777;notify;Corta 409 ghostty;Channel ready\007' ;;
     kitty)
       printf '\033]99;i=fixture:d=0:p=title;Corta 409 kitty\007'
-      printf '\033]99;i=fixture:d=0:p=body;Channel ready\007'
-      printf '\033]99;i=fixture:d=1:a=focus:o=invisible;\007'
+      printf '\033]99;i=fixture:p=body;Channel ready\007'
+      printf '\033]99;i=fixture:d=1:a=focus;\007'
       ;;
   esac
   sleep 20
@@ -238,7 +238,7 @@ if mkdir "$ZDOTDIR/$TEST_AGENT_MARKER" 2>/dev/null; then
   cd "$TEST_CLAUDE_CWD" || exit 1
   umask 077
   sleep 10
-  settings="{\"preferredNotifChannel\":\"$TEST_AGENT_CHANNEL\",\"permissions\":{\"ask\":[\"Bash\"]}}"
+  settings="{\"preferredNotifChannel\":\"$TEST_AGENT_CHANNEL\",\"disableAllHooks\":true,\"permissions\":{\"ask\":[\"Bash\"]}}"
   exec /usr/bin/script -q -F "$ZDOTDIR/$TEST_AGENT_MARKER/transcript" \
     "$TEST_CLAUDE" --no-chrome --strict-mcp-config --tools Bash --permission-mode manual \
     --effort low --settings "$settings" \

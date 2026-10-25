@@ -168,12 +168,183 @@ struct ProgramSignalsTests {
         #expect(terminal.takeDesktopNotification()?.body == "after")
     }
 
+    // Wire shapes independently transcribed from the installed 2.1.310
+    // emitters (WDr/pD), not captured model sessions. Its normal terminator
+    // is BEL; terminal identification as kitty selects ST instead.
+    @Test func claude310WireFormatsAndTerminators() {
+        for end in ["\u{7}", "\u{1B}\\"] {
+            func wire(_ payload: String) -> [UInt8] { Array(("\u{1B}]" + payload + end).utf8) }
+            var terminal = Terminal()
+            terminal.feed(wire("7501;?"))
+            #expect(terminal.takeOutput() == osc("7501;?"))
+            for state in ["idle", "working", "done", "idle", "error"] {
+                for byte in wire("7501;state=\(state):app=claude-code") { terminal.feed([byte]) }
+                #expect(terminal.programStatuses[""]?.state.rawValue == state)
+            }
+            for kind in ["permission", "question", "auth"] {
+                terminal.feed(wire("7501;state=blocked:app=claude-code:kind=\(kind):msg=TmVlZHMgaW5wdXQ="))
+                #expect(terminal.programStatuses[""]?.kind?.rawValue == kind)
+                #expect(terminal.programStatuses[""]?.message == "Needs input")
+            }
+            terminal.feed(wire("7501;state=blocked:app=claude-code"))
+            #expect(terminal.programStatuses[""]?.kind == nil)
+            terminal.feed(wire("7501;state=working:app=claude-code:id=child-1"))
+            terminal.feed(wire("7501;state=clear:id=child-1"))
+            #expect(terminal.programStatuses.count == 1)
+            terminal.feed(wire("7501;state=clear"))
+            #expect(terminal.programStatuses.isEmpty)
+            terminal.feed(wire("9;Permission needed: Claude needs your permission"))
+            #expect(terminal.takeDesktopNotification()?.body == "Permission needed: Claude needs your permission")
+            terminal.feed(wire("777;notify;Permission needed;Claude needs your permission"))
+            let ghostty = terminal.takeDesktopNotification()
+            #expect(ghostty?.title == "Permission needed")
+            #expect(ghostty?.body == "Claude needs your permission")
+            // The real body packet omits d=0. It completes the message;
+            // Claude then emits an empty final focus packet. No second notice.
+            terminal.feed(wire("99;i=409:d=0:p=title;Permission needed"))
+            #expect(terminal.takeDesktopNotification() == nil)
+            terminal.feed(wire("99;i=409:p=body;Claude needs your permission"))
+            let kitty = terminal.takeDesktopNotification()
+            #expect(kitty?.title == "Permission needed")
+            #expect(kitty?.body == "Claude needs your permission")
+            #expect(kitty?.occasion == .always)
+            terminal.feed(wire("99;i=409:d=1:a=focus;"))
+            #expect(terminal.takeDesktopNotification() == nil)
+            #expect(terminal.takeOutput().isEmpty)
+        }
+    }
+
+    @Test func mainSlotSurvivesThirtyTwoSubtasksInEitherOrder() {
+        for mainFirst in [true, false] {
+            var terminal = Terminal()
+            if mainFirst { terminal.feed(osc("7501;state=done:app=claude-code")) }
+            for id in 0..<32 { terminal.feed(osc("7501;state=working:app=claude-code:id=c\(id)")) }
+            if !mainFirst { terminal.feed(osc("7501;state=done:app=claude-code")) }
+            terminal.feed(osc("7501;state=working:id=overflow"))
+            #expect(terminal.programStatuses.count == ProgramStatus.maximumEntries)
+            #expect(terminal.programStatuses["overflow"] == nil)
+            for id in 0..<31 { terminal.feed(osc("7501;state=clear:id=c\(id)")) }
+            #expect(terminal.programStatuses["c31"]?.state == .working)
+            terminal.feed(osc("7501;state=clear:id=c31"))
+            #expect(terminal.programStatuses[""]?.state == .done)
+        }
+    }
+
+    @Test func shellBoundaryEndsCrashedProgramAndClearsChildrenAndProgress() {
+        for (exit, expected) in [(0, ProgramStatus.State.idle), (130, .idle), (137, .error)] {
+            var terminal = Terminal()
+            terminal.feed(osc("133;A") + osc("133;C"))
+            terminal.feed(osc("7501;state=blocked:kind=permission") + osc("7501;state=working:id=child"))
+            terminal.feed(osc("9;4;1;50") + osc("21337;indicator=#00ff00;status=Old"))
+            terminal.feed(osc("133;D;\(exit)") + osc("133;A"))
+            #expect(terminal.programStatuses.count == 1)
+            #expect(terminal.programStatuses[""]?.state == expected)
+            #expect(terminal.programStatuses[""]?.kind == nil)
+            #expect(terminal.programProgress == nil)
+            #expect(terminal.programTabMetadata == nil)
+            #expect(terminal.takeBlockedStatus() == nil)
+            terminal.feed(osc("133;C"))
+            #expect(terminal.programStatuses.isEmpty)
+        }
+        for state in ["done", "error"] {
+            var terminal = Terminal()
+            terminal.feed(osc("133;A") + osc("133;C") + osc("7501;state=\(state)"))
+            terminal.feed(osc("133;D;0"))
+            #expect(terminal.programStatuses[""]?.state.rawValue == state)
+        }
+    }
+
+    @Test func killedAlternateScreenProgramCannotLeaveWaitingAtShellBoundary() {
+        var terminal = Terminal()
+        terminal.feed(osc("133;A") + osc("133;C"))
+        terminal.feed(Array("\u{1B}[?1049h".utf8))
+        terminal.feed(osc("7501;state=blocked:kind=permission") + osc("7501;state=working:id=child"))
+        terminal.feed(osc("9;4;1;40") + osc("133;D;137"))
+        #expect(terminal.grid.isAlternateScreenActive)
+        #expect(terminal.grid.promptRows.isEmpty)
+        #expect(!terminal.isCommandRunning)
+        #expect(terminal.commandRecords.lastCompleted?.exitStatus == 137)
+        #expect(terminal.programStatuses.count == 1)
+        #expect(terminal.programStatuses[""]?.state == .error)
+        #expect(terminal.programStatuses[""]?.kind == nil)
+        #expect(terminal.programProgress == nil)
+        #expect(terminal.takeBlockedStatus() == nil)
+    }
+
+    @Test func coalescedWaitingEpisodesRemainDistinctButKindUpdatesDoNot() {
+        var terminal = Terminal()
+        terminal.feed(osc("7501;state=blocked:kind=permission"))
+        #expect(terminal.programBlockedEpisode == 1)
+        terminal.feed(osc("7501;state=blocked:kind=question"))
+        #expect(terminal.programBlockedEpisode == 1)
+        terminal.feed(osc("7501;state=working") + osc("7501;state=blocked:kind=permission"))
+        #expect(terminal.programBlockedEpisode == 2)
+        terminal.feed(osc("7501;state=clear") + osc("7501;state=blocked:id=child"))
+        #expect(terminal.programBlockedEpisode == 3)
+        terminal.feed(osc("133;C"))
+        terminal.feed(osc("7501;state=working"))
+        terminal.feed(osc("133;C")) // duplicate output marker, same command
+        #expect(terminal.programStatuses[""]?.state == .working)
+    }
+
+    @Test func capturedClaude310LifecycleSignals() throws {
+        struct Capture: Decodable {
+            struct Scenario: Decodable { var expected: String; var wire: [String] }
+            var version: String
+            var scenarios: [String: Scenario]
+        }
+        let path = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("Golden/claude-2.1.310-signals.json")
+        let capture = try JSONDecoder().decode(Capture.self, from: Data(contentsOf: path))
+        #expect(capture.version == "2.1.310")
+        for (name, scenario) in capture.scenarios {
+            var terminal = Terminal()
+            var children = Set<String>()
+            var states = Set<String>()
+            for sequence in scenario.wire {
+                for byte in sequence.utf8 { terminal.feed([byte]) }
+                children.formUnion(terminal.programStatuses.keys.filter { !$0.isEmpty })
+                if let state = terminal.programStatuses[""]?.state { states.insert(state.rawValue) }
+            }
+            #expect(terminal.programStatuses[""]?.state.rawValue == scenario.expected, "captured \(name)")
+            if name == "cancel" { #expect(states.contains("blocked")); #expect(!states.contains("done")) }
+            if name == "auth" { #expect(terminal.programStatuses[""]?.kind == .auth) }
+            if name == "subtask" { #expect(!children.isEmpty); #expect(terminal.programStatuses.count == 1) }
+            if name == "crash" { #expect(!terminal.isCommandRunning); #expect(terminal.programStatuses[""]?.kind == nil) }
+        }
+    }
+
+    @Test func capturedClaude310NotificationsDeliverOneMessageWithoutChangingTaskState() throws {
+        struct Capture: Decodable { var notifications: [String: [String]] }
+        let path = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("Golden/claude-2.1.310-signals.json")
+        let capture = try JSONDecoder().decode(Capture.self, from: Data(contentsOf: path))
+        #expect(Set(capture.notifications.keys) == ["iterm2", "ghostty", "kitty"])
+        for (channel, packets) in capture.notifications {
+            var terminal = Terminal()
+            terminal.feed(osc("7501;state=done:app=claude-code"))
+            var notices: [DesktopNotification] = []
+            for packet in packets {
+                for byte in packet.utf8 { terminal.feed([byte]) }
+                if let notice = terminal.takeDesktopNotification() { notices.append(notice) }
+            }
+            #expect(notices.count == 1, "captured \(channel)")
+            #expect(notices.first?.body == "Claude is waiting for your input")
+            #expect(notices.first?.title == (channel == "iterm2" ? "" : "Claude Code"))
+            #expect(notices.first?.occasion == (channel == "kitty" ? .always : .invisible))
+            #expect(terminal.programStatuses[""]?.state == .done)
+            let rang = terminal.takeBell()
+            #expect(!rang, "OSC's BEL terminator is not a bell event")
+            #expect(terminal.takeOutput().isEmpty)
+        }
+    }
+
     @Test func tabStatusEscapesAndClear() {
         var terminal = Terminal()
         terminal.feed(osc("21337;indicator=#00ff00;status=Hello\\; world\\\\!;status-color=#ffffff"))
-        #expect(terminal.programStatuses["tab-status"]?.title == "Hello; world\\!")
-        #expect(terminal.programStatuses["tab-status"]?.state == .unknown)
-        #expect(terminal.programStatuses["tab-status"]?.color == "#00ff00")
+        #expect(terminal.programTabMetadata?.title == "Hello; world\\!")
+        #expect(terminal.programTabMetadata?.state == .unknown)
+        #expect(terminal.programTabMetadata?.color == "#00ff00")
         terminal.feed(osc("21337;indicator=;status=;status-color="))
         #expect(terminal.programStatuses.isEmpty)
     }

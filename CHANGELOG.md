@@ -46,6 +46,23 @@ Versioning for compatibility changes.
   bracketed paste enabled. Review a visible text preview, cancel, or suppress
   warnings for that pane; `paste-warning` selects `dangerous`, `always` or `off`.
 
+### Fixed
+
+- Clear stale agent waiting, subtask and progress metadata at reported shell
+  command boundaries after an abrupt CLI exit, including a CLI left on the
+  alternate screen. Preserve explicit completion
+  on clean exit; interruption is Idle and a known failed exit is Failed.
+- Cancel resolved fixed attention notices, recheck visibility before delivery,
+  and deduplicate BEL and kind changes within the same waiting episode.
+  Generic bells cannot overwrite a pending program message; late cancelled
+  submissions finish before replacement delivery.
+- Reserve a main status slot alongside 32 subtasks. Keep generic OSC 21337
+  decoration separate so it cannot hide Done or compete with typed state.
+- Match development and acceptance version Claude Code 2.1.310 in captured
+  wire regressions. Document the supported task states and notification
+  channels, actual sending conditions, unsupported features and verification
+  limits; other Claude versions are not guaranteed.
+
 ## [1.4.0] - 2026-10-22
 
 ### Added
