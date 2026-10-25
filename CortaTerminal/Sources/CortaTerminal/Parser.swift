@@ -66,6 +66,9 @@ public struct Parser: Sendable {
     /// or clipboard payload; short enough that a hostile stream cannot use it
     /// as an allocator.
     public static let maxStringLength = 4096
+    /// One legacy iTerm2 image plus a bounded metadata header. Multipart
+    /// packets keep their smaller per-packet cap; both share the image cap.
+    public static let maxInlineImageStringLength = KittyGraphics.maximumImageBytes / 3 * 4 + 4100
 
     /// The hard limit on one APC chunk. The Kitty graphics protocol chunks a
     /// transmission so that no single escape sequence has to be arbitrarily
@@ -89,6 +92,7 @@ public struct Parser: Sendable {
     /// An APC string was dispatched by the byte just advanced; read and
     /// cleared only by the stopping parse.
     private var dispatchedAPC = false
+    private var oscStringLimit = Self.maxStringLength
 
     public init() {
         stringBuffer.reserveCapacity(256)
@@ -126,7 +130,7 @@ public struct Parser: Sendable {
     }
 
     /// As `parse(_:performer:)`, but with `stoppingAfterAPC` it returns
-    /// right after an APC dispatch the performer answered with
+    /// right after an APC or OSC dispatch the performer answered with
     /// `requestsStopAfterAPC`. Returns how many bytes were consumed; the
     /// rest are the caller's to feed, and the parser's state carries over
     /// exactly as at any chunk boundary.
@@ -196,6 +200,8 @@ public struct Parser: Sendable {
         // sequence into a character nobody sent.
         switch byte {
         case 0x18, 0x1A:
+            performer.oscDiscarded()
+            stringBuffer.removeAll(keepingCapacity: stringBuffer.count <= Self.maxStringLength)
             if state == .groundUTF8 { endTruncatedSequence(performer: &performer) }
             state = .ground
             performer.execute(byte)
@@ -308,6 +314,7 @@ public struct Parser: Sendable {
         case 0x5D:  // ESC ] — OSC
             stringBuffer.removeAll(keepingCapacity: true)
             state = .oscString
+            oscStringLimit = Self.maxStringLength
         case 0x7F:
             break  // DEL is ignored inside a sequence.
         default:
@@ -418,10 +425,20 @@ public struct Parser: Sendable {
         case 0x00...0x06, 0x08...0x1F:
             break  // Controls inside a string are dropped, not executed.
         default:
-            guard stringBuffer.count < Self.maxStringLength else {
+            if stringBuffer.count == 20 {
+                if stringBuffer.starts(with: Array("1337;File=".utf8)) {
+                    oscStringLimit = Self.maxInlineImageStringLength
+                } else if stringBuffer.starts(with: Array("1337;FilePart=".utf8)) {
+                    oscStringLimit = 1024 * 1024
+                } else if stringBuffer.starts(with: Array("5522;type=wdata".utf8)) {
+                    oscStringLimit = 8192
+                }
+            }
+            guard stringBuffer.count < oscStringLimit else {
+                performer.oscDiscarded()
                 // Discard the whole sequence rather than a truncated one: a
                 // half-applied title or clipboard payload is worse than none.
-                stringBuffer.removeAll(keepingCapacity: true)
+                stringBuffer.removeAll(keepingCapacity: false)
                 state = .oscIgnore
                 return
             }
@@ -506,7 +523,8 @@ public struct Parser: Sendable {
 
     private mutating func dispatchString<P: ParserPerformer>(performer: inout P) {
         performer.oscDispatch(stringBuffer[...])
-        stringBuffer.removeAll(keepingCapacity: true)
+        dispatchedAPC = true
+        stringBuffer.removeAll(keepingCapacity: stringBuffer.count <= Self.maxStringLength)
     }
 
     private mutating func dispatchAPCString<P: ParserPerformer>(performer: inout P) {

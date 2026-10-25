@@ -157,7 +157,7 @@ public struct ImagePlacementTable: Sendable {
     }
 
     private static func dimensionsFit(_ data: KittyGraphics.ImageData) -> Bool {
-        guard data.format != .png, data.width > 0, data.height > 0 else { return true }
+        guard data.format != .png, data.format != .gif, data.width > 0, data.height > 0 else { return true }
         return KittyGraphics.dimensionsFit(width: data.width, height: data.height)
     }
 
@@ -180,7 +180,7 @@ public struct ImagePlacementTable: Sendable {
         placements[key] = KittyGraphics.Placement(
             id: header.placementID, imageID: header.imageID, row: row, column: column,
             columns: header.columns, rows: header.rows, baseScrollbackTotal: baseScrollbackTotal,
-            zIndex: header.zIndex)
+            zIndex: header.zIndex, displayPixelWidth: header.displayPixelWidth, displayPixelHeight: header.displayPixelHeight)
         revision &+= 1
         return true
     }
@@ -305,7 +305,12 @@ public struct ImagePlacementTable: Sendable {
             placement.sourceBottom -= sourceHeight * Float(clippedBottom) / Float(height)
             placement.row = max(top, moved)
             placement.baseScrollbackTotal = scrollbackTotal
-            if clippedTop > 0 || clippedBottom > 0 { placement.rows = remaining }
+            if clippedTop > 0 || clippedBottom > 0 {
+                placement.rows = remaining
+                if let pixels = placement.displayPixelHeight {
+                    placement.displayPixelHeight = max(1, pixels * remaining / height)
+                }
+            }
             placements[key] = placement
         }
         if changed {

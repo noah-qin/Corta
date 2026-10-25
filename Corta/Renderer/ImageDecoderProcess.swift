@@ -20,7 +20,7 @@ import Darwin
 import Foundation
 import Metal
 
-/// Kitty PNG decoding out of process: `corta-image-decoder` decodes inside
+/// PNG / iTerm2 GIF-first-frame decoding out of process: `corta-image-decoder` decodes inside
 /// an independently sandboxed helper app under Contents/Helpers (its doc
 /// comment has why), and this side spawns it, feeds it the PNG, and holds
 /// what comes back to the same caps the stream was held to.
@@ -166,10 +166,11 @@ nonisolated enum ImageDecoderProcess {
     /// disagrees with its own header.
     static func decodePNG(
         _ bytes: [UInt8], helper: String? = ImageDecoderProcess.bundledHelper,
-        timeout: Duration = ImageDecoderProcess.timeout, alignment: Int = 256
+        timeout: Duration = ImageDecoderProcess.timeout, alignment: Int = 256, allowGIF: Bool = false
     ) -> Decoded? {
         guard let helper, bytes.count <= KittyGraphics.maximumImageBytes,
-            let dimensions = pngDimensions(bytes),
+            let dimensions = allowGIF ? KittyGraphics.encodedDimensions(bytes) : pngDimensions(bytes),
+            KittyGraphics.dimensionsFit(width: dimensions.width, height: dimensions.height),
             let pixels = SharedPixels(
                 width: dimensions.width, height: dimensions.height, alignment: alignment)
         else {

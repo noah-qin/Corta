@@ -831,3 +831,22 @@ is required; enable **Badge application
 icon** in the app's notification settings for the Dock count. Notification Center may
 retain message text and show it on the lock screen. Clicking focuses the pane;
 closing or restarting the pane cancels pending program notices.
+
+## Programs using OSC extensions
+
+Use iTerm2's `imgcat picture.png` (or an animated GIF) to display an inline
+image; GIFs show their first frame. Cell, pixel, percent and automatic sizes
+are accepted, with aspect ratio preserved by default. Images scroll with the
+text; Clear History removes those in history. File downloads are refused.
+
+VS Code's shell integration uses the same prompt and command records as
+Corta's hooks. iTerm2 host/cwd reports remain informational for remote hosts.
+Kitty programs can set colours and pointer shapes; link hover still shows a
+hand. Clipboard writes using OSC 52, iTerm2 Copy or kitty's text-only OSC 5522
+subset all require `allow-clipboard-write = true`; reads are always refused.
+
+`printf '\e]1337;RequestAttention=once\a'` requests a Dock bounce when Corta
+is inactive. `yes` keeps requesting attention until activated, `no` cancels,
+and `fireworks` behaves like `once`. Programs cannot bring the window forward.
+The [OSC verdict table](CONFORMANCE.md#osc-verdict-table) records every supported,
+ignored and refused family.

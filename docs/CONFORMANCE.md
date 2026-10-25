@@ -59,6 +59,97 @@ measured. Priorities:
 | DECRQSS SGR (`DCS $ q m ST`) | P1 | Reports numeric pen rendition, including underline style/colour, so Neovim can detect curly underlines. Other status strings receive a constant negative reply |
 | DCS and rare CSI sequences                              | P2   | The long tail                                           |
 
+### OSC verdict table
+
+This is the complete deliberate OSC dispatcher surface. `OSCCoverageTests`
+compares numeric codes in both directions and tests that removing a row is
+caught. Unknown codes and unknown sub-forms are silently dropped. “Refused”
+means no state change and no reply for that sub-form. Security section numbers
+refer to [SECURITY.md](SECURITY.md).
+
+| Code | Sub-form | Verdict | Reason | Record |
+|---|---|---|---|---|
+| `OSC 0` | title setter | implemented | Separate icon/window names; no title reporting | §2.2; #407 |
+| `OSC 1` | title setter | implemented | Separate icon/window names; no title reporting | §2.2; #407 |
+| `OSC 2` | title setter | implemented | Separate icon/window names; no title reporting | §2.2; #407 |
+| `OSC 3` | all | ignored | X properties do not exist on macOS | #411 |
+| `OSC 4` | set/query | implemented | Indexed palette / five special slots | B06 |
+| `OSC 5` | set/query | implemented | Indexed palette / five special slots | B06 |
+| `OSC 6` | all | ignored | xterm colour-mode switches have no effect | #411 |
+| `OSC 7` | file URL | implemented | Host-aware local cwd or informational remote context | §2.8 |
+| `OSC 8` | hyperlink | implemented | Interned URI; user opens it | §2.4 |
+| `OSC 9` | notification; 4 progress; 12 prompt | implemented | Bounded notice / progress; 12 aliases OSC 133 A | #409; #411 |
+| `OSC 9` | 6 macro; 7 exec | refused | No stream-selected execution | §2.9; #409 |
+| `OSC 9` | 9 cwd; other defined numeric subcommands (1–12) | ignored | No host; cannot distinguish a remote path | §2.8; #411 |
+| `OSC 10` | set/query | implemented | Foreground/background/cursor/selection state | #407 |
+| `OSC 11` | set/query | implemented | Foreground/background/cursor/selection state | #407 |
+| `OSC 12` | set/query | implemented | Foreground/background/cursor/selection state | #407 |
+| `OSC 13` | set/reset | ignored | Pointer/Tektronix colours have no surface | #407 |
+| `OSC 14` | set/reset | ignored | Pointer/Tektronix colours have no surface | #407 |
+| `OSC 15` | set/reset | ignored | Pointer/Tektronix colours have no surface | #407 |
+| `OSC 16` | set/reset | ignored | Pointer/Tektronix colours have no surface | #407 |
+| `OSC 17` | set/query | implemented | Foreground/background/cursor/selection state | #407 |
+| `OSC 18` | set/reset | ignored | Pointer/Tektronix colours have no surface | #407 |
+| `OSC 19` | set/query | implemented | Foreground/background/cursor/selection state | #407 |
+| `OSC 21` | fixed keys / palette 0–255 | implemented | Set/query/reset shared colours; unknown keys dropped; cursor_text drawn | #411 |
+| `OSC 22` | set, push, pop, query | implemented | Fixed CSS/X11 vocabulary; 16 entries per screen; closest public NSCursor | #411 |
+| `OSC 46` | all | refused | Would open a stream-named log file | §2.10; #411 |
+| `OSC 50` | all | refused | Fonts come from verified configuration (D10/D12) | §2.10; #411 |
+| `OSC 51` | all | ignored | Emacs-specific, no consumer | #411 |
+| `OSC 52` | write | implemented | Sanitised text; allow-clipboard-write gate | §2.6 |
+| `OSC 52` | read/clear | refused | No clipboard disclosure or silent clearing | §2.6 |
+| `OSC 66` | text sizing | not yet | Multi-cell glyph scaling needs a renderer decision (D05) | #411 |
+| `OSC 99` | notice / capability query | implemented | Bounded metadata and fixed capabilities | #409 |
+| `OSC 104` | all / named resets | implemented | Indexed palette / special colour resets | B06 |
+| `OSC 105` | all / named resets | implemented | Indexed palette / special colour resets | B06 |
+| `OSC 106` | all | ignored | xterm colour-mode switches have no effect | #411 |
+| `OSC 110` | reset | implemented | Restore live theme / selection defaults | #407 |
+| `OSC 111` | reset | implemented | Restore live theme / selection defaults | #407 |
+| `OSC 112` | reset | implemented | Restore live theme / selection defaults | #407 |
+| `OSC 113` | set/reset | ignored | Pointer/Tektronix colours have no surface | #407 |
+| `OSC 114` | set/reset | ignored | Pointer/Tektronix colours have no surface | #407 |
+| `OSC 115` | set/reset | ignored | Pointer/Tektronix colours have no surface | #407 |
+| `OSC 116` | set/reset | ignored | Pointer/Tektronix colours have no surface | #407 |
+| `OSC 117` | reset | implemented | Restore live theme / selection defaults | #407 |
+| `OSC 118` | set/reset | ignored | Pointer/Tektronix colours have no surface | #407 |
+| `OSC 119` | reset | implemented | Restore live theme / selection defaults | #407 |
+| `OSC 133` | A/B/C/D | implemented | Command boundaries and exit status | §2.1 |
+| `OSC 134` | tokened directory completion | implemented | Pane-owned token required | §2.7 |
+| `OSC 633` | A/B/C/D; P;Cwd | implemented | Same command records and host-aware cwd as native hooks | #411 |
+| `OSC 633` | E command/nonce; other P | ignored | Grid owns command text; no VS Code trust model | #411 |
+| `OSC 777` | notify | implemented | Sanitised desktop notification | #409 |
+| `OSC 1337` | CurrentDir; RemoteHost; SetMark; ClearScrollback | implemented | Host-aware metadata, navigable mark, ED 3 semantics | #411 |
+| `OSC 1337` | CursorShape; RequestAttention; ReportCellSize; Copy | implemented | Temporary cursor; background Dock attention; numeric metrics; gated clipboard | #411 |
+| `OSC 1337` | File; MultipartFile; FilePart; FileEnd | implemented | inline=1 only; PNG/GIF first frame in sandbox; shared placements/budgets | #411 |
+| `OSC 1337` | SetUserVar; ShellIntegrationVersion; HighlightCursorLine; UnicodeVersion; SetKeyLabel; PushKeyLabels; PopKeyLabels; ClearCapturedOutput | ignored | No consumer or Touch Bar; Unicode rules stay fixed | #411 |
+| `OSC 1337` | StealFocus; SetProfile; SetBadgeFormat; ReportVariable; Custom; inline=0 | refused | No focus theft, config mutation, persistent badges, value echo, scripts or downloads | §2.10; D09/D10 |
+| `OSC 3008` | all | ignored | systemd context hierarchy, no consumer | #411 |
+| `OSC 5113` | all | refused | File transfer writes stream-named files | §2.10; #411 |
+| `OSC 5522` | text/plain write/wdata | implemented | Bounded sanitised text transaction, gated like OSC 52; partial protocol | #411 |
+| `OSC 5522` | read, MIME aliases, non-text, primary selection | refused | No clipboard disclosure or extra clipboard surfaces | §2.6; §2.10 |
+| `OSC 7501` | status / probe | implemented | Bounded task state; constant probe reply | #409 |
+| `OSC 21337` | tab metadata | implemented | Bounded self-reported metadata | #409 |
+
+OSC 21 accepts the same RGB hex specifications as OSC 4/10–12; an empty value
+or a bare key resets. The protocol's unknown-key echo is deliberately omitted.
+OSC 22 returns boolean lists or fixed-table names for `__current__`,
+`__default__`, `__grabbed__`; unknown setters choose `default`. macOS lacks
+public wait/progress cursors, so these use the arrow fallback. Link hover takes precedence.
+
+OSC 5522 supports only text writes, under OSC 52's 3072 decoded-byte cap.
+It does not claim full kitty extended clipboard conformance (64 MiB minimum,
+MIME aliases, primary selection or paste events).
+A successful permitted system write receives only the fixed `type=write:status=DONE` acknowledgement.
+Reads and unsupported packets are silent, and a bad packet invalidates the
+whole transaction. `allow-clipboard-write` is checked by the app before any
+pending copy reaches the system pasteboard.
+
+Protocol references: [iTerm2 extensions](https://iterm2.com/documentation-escape-codes.html),
+[iTerm2 images](https://iterm2.com/documentation-images.html),
+[kitty colours](https://sw.kovidgoyal.net/kitty/color-stack/),
+[kitty pointers](https://sw.kovidgoyal.net/kitty/pointer-shapes/),
+[kitty clipboard](https://sw.kovidgoyal.net/kitty/clipboard/).
+
 ### 1.2 Query / response sequences
 
 **These are P0 and are the most commonly missed requirement.** They are

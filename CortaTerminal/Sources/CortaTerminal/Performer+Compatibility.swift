@@ -63,6 +63,7 @@ extension Performer {
                 (hex(name), Array("\u{1B}P1+r\(hex(name))=\(hex(value))\u{1B}\\".utf8))
             })
     mutating func dcsDispatch(_ bytes: ArraySlice<UInt8>) {
+        state.itermImage = nil
         if bytes.starts(with: [0x24, 0x71]) {
             if bytes.dropFirst(2).elementsEqual([0x6D]) {
                 reportRendition()

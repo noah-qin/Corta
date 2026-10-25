@@ -266,6 +266,31 @@ becomes the system notification title. Agent permission/question/sign-in
 notices use Corta's fixed localised text. `notify-from-programs = false`
 disables both notice paths; `agent-status = false` hides agent chrome.
 
+### 2.10 OSC ecosystem limits and refusals (#411)
+
+| Request | Policy and reason |
+|---|---|
+| OSC 46; OSC 5113; OSC 1337 File without inline=1 | Refused: terminal output cannot choose log/download/transfer file paths |
+| OSC 50; OSC 1337 SetProfile | Refused: verified font and settings configuration belongs to the user (D10/D12) |
+| OSC 1337 StealFocus | Refused: output never pulls a window forward |
+| OSC 1337 SetBadgeFormat | Refused: persistent program text over the canvas needs a separate decision |
+| OSC 1337 ReportVariable | Refused: no program text or variable values echoed into child input (§2.1–2.2) |
+| OSC 1337 Custom | Refused: no arbitrary script consumers (D09) |
+| OSC 5522 read; MIME aliases; non-text; primary selection | Refused: no clipboard disclosure, file data or extra clipboard surfaces; same user-controlled write gate as OSC 52 |
+| OSC 9;9 cwd | Ignored: no host, so remote paths cannot become local spawn targets (§2.8) |
+
+OSC 1337 CurrentDir and OSC 633 P;Cwd update remote metadata while a remote
+host is known. Hostless local reports still pass the PTY's kernel cwd check
+before use for spawning. RemoteHost names are bounded ASCII and informational.
+RequestAttention only bounces the Dock while the app is inactive; `no` cancels
+the pane's prior request. No text is passed to the attention API.
+
+New replies contain only fixed keys/names, parsed palette indices, RGB channels
+or numeric cell metrics. Unknown OSC 21 keys are dropped instead of echoed.
+PNG and GIF are the only encoded raster types admitted; the existing isolated
+helper pins the ImageIO type and dimensions and decodes index zero only. The
+8192-pixel side, 16-Mpixel and all shared image/texture budgets still apply.
+
 ## 3. Resource Exhaustion
 
 The parser must survive adversarial input without crashing, hanging, or
@@ -275,10 +300,12 @@ allocating without bound. These caps are asserted in the fuzz harness
 
 | Input                      | Cap                                                   |
 | -------------------------- | ----------------------------------------------------- |
-| OSC / DCS string length    | 4096 bytes; discard the sequence on overflow and resynchronise |
+| OSC / DCS string length    | 4096 bytes ordinarily; discard the sequence on overflow and resynchronise |
+| iTerm2 image OSC | File: base64 of at most 64 MiB decoded data plus 4100 header bytes; FilePart: 1 MiB per packet. Multipart total: at most 64 MiB decoded and the pane/process allowance. Unrelated OSC/CSI/APC abandons it; malformed base64, declared-size mismatch and oversized dimensions are dropped. The parser releases large string capacity after dispatch. Large base64 decoding uses the existing decode pause outside the session lock |
+| Extended clipboard / pointer stack | OSC 5522: 8192-byte packet cap, 3072 decoded bytes per text transaction, publish only at end; any invalid part discards it. OSC 22: 16 fixed names per screen; oldest evicted, RIS clears both |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
 | Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size; 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) |
-| Kitty PNG decoding         | `corta-image-decoder`, a process of its own under the independent App Sandbox (no access to host user files or network entitlements), 10 s, a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor inside its sandbox, so decoded pixels never travel over stdout |
+| Kitty PNG / iTerm2 PNG and GIF-first-frame decoding | `corta-image-decoder`, a process of its own under the independent App Sandbox (no access to host user files or network entitlements), 10 s, a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor inside its sandbox, so decoded pixels never travel over stdout |
 | Compressed Kitty image (`o=z`) | Inflates to exactly its declared pixels (RGB, RGBA) or at most the 64 MB image cap (PNG); the stream stops at the ceiling and the image is refused, so the expansion is never allocated. The zlib header and Adler-32 must check out; any other `o=` value is refused |
 | CSI parameter count        | 16 (xterm's limit); ignore the remainder               |
 | CSI parameter value        | Clamp to a sane maximum before use                     |

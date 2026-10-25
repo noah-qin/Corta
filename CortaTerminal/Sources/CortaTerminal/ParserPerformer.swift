@@ -40,12 +40,13 @@ public protocol ParserPerformer {
     mutating func dcsDispatch(_ bytes: ArraySlice<UInt8>)
 
     mutating func oscDispatch(_ bytes: ArraySlice<UInt8>)
+    mutating func oscDiscarded()
 
     /// Raw bytes, bounded by `Parser.maxAPCStringLength`; Kitty graphics is
     /// the one user.
     mutating func apcDispatch(_ bytes: ArraySlice<UInt8>)
 
-    /// Asked right after an APC dispatch by `Parser.parse(_:performer:stoppingAfterAPC:)`:
+    /// Asked right after an APC or OSC image dispatch by `Parser.parse(_:performer:stoppingAfterAPC:)`:
     /// true stops the parse there, so the caller can finish what the
     /// dispatch began before any later byte is applied.
     var requestsStopAfterAPC: Bool { get }
@@ -62,5 +63,6 @@ extension ParserPerformer {
     public mutating func csiDispatch(_ sequence: CSISequence) {}
     public mutating func dcsDispatch(_ bytes: ArraySlice<UInt8>) {}
     public mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) {}
+    public mutating func oscDiscarded() {}
     public mutating func apcDispatch(_ bytes: ArraySlice<UInt8>) {}
 }

@@ -149,10 +149,12 @@ extension Grid {
     public mutating func resetToInitialState() {
         let cellPixelHeight = cellPixelHeight
         let cellPixelWidth = cellPixelWidth
+        let backingScale = backingScale
         let ambiguousIsWide = ambiguousIsWide
         self = Grid(rows: rows, columns: columns, scrollbackLimit: scrollback.limit)
         self.cellPixelHeight = cellPixelHeight
         self.cellPixelWidth = cellPixelWidth
+        self.backingScale = backingScale
         self.ambiguousIsWide = ambiguousIsWide
     }
 

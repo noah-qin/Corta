@@ -68,15 +68,18 @@ func hasRestrictedSandboxSignature() -> Bool {
 guard hasRestrictedSandboxSignature() else { exit(3) }
 
 /// The decode the app did in process (`KittyImageRenderer.decodePNG`):
-/// the signature, `public.png` and nothing ImageIO sniffs instead, and the
-/// header's dimensions under the caps before a pixel is decoded.
+/// the PNG/GIF signature, its matching ImageIO type, and the dimensions
+/// under the caps before the first frame is decoded. No other type is admitted.
 func decode(_ bytes: [UInt8], mapping: UnsafeMutableRawPointer? = nil,
     expectedWidth: Int? = nil, expectedHeight: Int? = nil, stride: Int? = nil
 ) -> (width: Int, height: Int)? {
-    guard bytes.starts(with: pngSignature) else { return nil }
-    let options = [kCGImageSourceTypeIdentifierHint: "public.png"] as CFDictionary
+    let type: String
+    if bytes.starts(with: pngSignature) { type = "public.png" }
+    else if bytes.starts(with: Array("GIF87a".utf8)) || bytes.starts(with: Array("GIF89a".utf8)) { type = "com.compuserve.gif" }
+    else { return nil }
+    let options = [kCGImageSourceTypeIdentifierHint: type] as CFDictionary
     guard let source = CGImageSourceCreateWithData(Data(bytes) as CFData, options),
-        CGImageSourceGetType(source) as String? == "public.png",
+        CGImageSourceGetType(source) as String? == type,
         let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
         let width = properties[kCGImagePropertyPixelWidth] as? Int,
         let height = properties[kCGImagePropertyPixelHeight] as? Int,
