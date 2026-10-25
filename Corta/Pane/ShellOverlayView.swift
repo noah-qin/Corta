@@ -28,7 +28,9 @@ final class ShellOverlayView: NSView {
     }
     var statuses: [Status] = []
     var completion: DirectoryCompletion?
-    /// Preedit and directory hints share the caret. Keep shell refreshes
+    var historySuggestion: HistorySuggestion?
+    private var suppressedHistoryRevision: Int?
+    /// Preedit and shell hints share the caret. Keep shell refreshes
     /// from recreating a hint underneath the input method's native overlay.
     var isInputComposing = false {
         didSet { if isInputComposing { hideCompletion() } }
@@ -36,6 +38,8 @@ final class ShellOverlayView: NSView {
     fileprivate struct CompletionPresentation: Equatable {
         // periphery:ignore - read by the synthesised ==
         var state: DirectoryCompletion?
+        // periphery:ignore - read by the synthesised ==
+        var history: HistorySuggestion?
         // periphery:ignore - read by the synthesised ==
         var anchor: CGRect
         // periphery:ignore - read by the synthesised ==
@@ -51,7 +55,7 @@ final class ShellOverlayView: NSView {
         var colors: CanvasTextColors
     }
     private var lastCompletionPresentation: CompletionPresentation?
-    private var preview: DirectoryGhostView?
+    private var preview: ShellGhostView?
     private var candidateRow: DirectoryCandidateRowView?
     /// Native completion previews occupy space outside the terminal grid.
     var occupiedRects: [CGRect] { subviews.filter { !$0.isHidden }.map(\.frame) }
@@ -72,17 +76,24 @@ final class ShellOverlayView: NSView {
 
     /// - Parameter colors: the frame's canvas colours, read once for every
     ///   overlay that frame draws.
-    func showCompletion(_ state: DirectoryCompletion?, anchor: CGRect,
+    func showCompletion(_ state: DirectoryCompletion?, history: HistorySuggestion? = nil, anchor: CGRect,
         font: NSFont = .monospacedSystemFont(ofSize: 14, weight: .regular), baseline: CGFloat = 12,
         colors: CanvasTextColors = .current) {
         let presentation = CompletionPresentation(
-            state: state, anchor: anchor, bounds: bounds,
+            state: state, history: history, anchor: anchor, bounds: bounds,
             font: font, baseline: baseline, composing: isInputComposing,
             colors: colors)
         guard lastCompletionPresentation != presentation else { return }
+        if isInputComposing, let history { suppressedHistoryRevision = history.revision }
+        // ZLE reports before repainting BUFFER. A later echo may move the
+        // anchor for this same revision; only input or an empty shell report
+        // dismisses it, otherwise split PTY reads would lose valid hints.
         lastCompletionPresentation = presentation
-        guard !isInputComposing, let state, let suffix = state.previewSuffix, !suffix.isEmpty else {
+        guard !isInputComposing,
+            history == nil || history?.revision != suppressedHistoryRevision,
+            let suffix = history?.suffix ?? state?.previewSuffix, !suffix.isEmpty else {
             completion = nil
+            historySuggestion = nil
             preview?.removeFromSuperview()
             preview = nil
             candidateRow?.removeFromSuperview()
@@ -90,16 +101,18 @@ final class ShellOverlayView: NSView {
             return
         }
         completion = state
+        historySuggestion = history
         let colors = HintColors(presentation)
-        if !state.typedPrefix.isEmpty {
-            let ghost = preview ?? DirectoryGhostView()
+        if history != nil || state?.typedPrefix.isEmpty == false {
+            let ghost = preview ?? ShellGhostView()
             ghost.text = suffix
+            ghost.history = history != nil
             ghost.font = font
             ghost.color = colors.muted
             ghost.baseline = baseline
             ghost.frame = CGRect(x: anchor.minX, y: anchor.minY,
                 width: max(0, bounds.width - TerminalLayout.insets.right - anchor.minX), height: anchor.height)
-            ghost.toolTip = L10n.text("completion.hint")
+            ghost.toolTip = L10n.text(history != nil ? "completion.historyHint" : "completion.hint")
             if preview == nil { addSubview(ghost)
                 preview = ghost }
             ghost.needsDisplay = true
@@ -108,7 +121,7 @@ final class ShellOverlayView: NSView {
             preview = nil
         }
         // Once the prefix resolves to one folder, the inline suffix is enough.
-        guard state.typedPrefix.isEmpty || state.candidates.count > 1 else {
+        guard history == nil, let state, state.typedPrefix.isEmpty || state.candidates.count > 1 else {
             candidateRow?.removeFromSuperview()
             candidateRow = nil
             return
@@ -130,7 +143,21 @@ final class ShellOverlayView: NSView {
         row.needsDisplay = true
     }
 
-    func hideCompletion() { showCompletion(nil, anchor: .zero) }
+    func hideCompletion() {
+        if let historySuggestion { suppressedHistoryRevision = historySuggestion.revision }
+        showCompletion(nil, anchor: .zero)
+    }
+
+    /// History hints take only acceptance and dismissal, with native Tab
+    /// and all history-navigation keys left to the shell.
+    static func historyKeySequence(for event: NSEvent) -> String? {
+        guard event.modifierFlags.isDisjoint(with: [.command, .control, .option, .shift]) else { return nil }
+        switch event.keyCode {
+        case 124, 119: return "\u{1b}[95~" // Right, End
+        case 53: return "\u{1b}[94~" // Escape
+        default: return nil
+        }
+    }
 
     /// The canvas text colour, faded for the hint (`CanvasTextColors`).
     fileprivate struct HintColors {
@@ -148,8 +175,9 @@ final class ShellOverlayView: NSView {
 
 /// CoreText uses the renderer's font and baseline, so the suggestion reads as
 /// part of the command line. It remains outside the grid and copied text.
-private final class DirectoryGhostView: NSView {
+private final class ShellGhostView: NSView {
     var text = ""
+    var history = false
     var font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
     var baseline: CGFloat = 12
     var color = CGColor(gray: 0.5, alpha: 0.35)
@@ -159,7 +187,7 @@ private final class DirectoryGhostView: NSView {
     override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
     override func accessibilityLabel() -> String? { text }
     override func accessibilityValue() -> Any? { text }
-    override func accessibilityIdentifier() -> String { "directory-completion-preview" }
+    override func accessibilityIdentifier() -> String { history ? "history-suggestion-preview" : "directory-completion-preview" }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }

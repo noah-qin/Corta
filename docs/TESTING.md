@@ -291,6 +291,14 @@ tests is caught on every run — without anything being driven. Neither CI
 nor an offscreen rendering test replaces launching the app.
 `CortaPerformanceTests` is listed the same way, for the same reason.
 
+For shell-integration latency comparisons, set
+`TEST_RUNNER_CORTA_MEASUREMENT_SHELL=/bin/zsh` when running
+`MeasurementUITests/testKeypressToGlass` or its full-screen counterpart.
+Use the same isolated measurement stage and in-memory history for both runs,
+changing only the feature toggle in its config; the default baseline shell
+remains `/bin/sh`. XCTest figures exclude the keyboard HID stage and do not
+replace the manual/Typometer check in `PERFORMANCE.md` §5.17.
+
 ### Stages for the UI plan
 
 The UI runner is sandboxed: it reads anywhere but writes only its own

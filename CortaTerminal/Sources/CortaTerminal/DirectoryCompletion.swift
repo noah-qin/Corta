@@ -73,7 +73,7 @@ public struct DirectoryCompletion: Equatable, Sendable {
     /// A folder's name is its own, but drawn as the grid would draw it: a
     /// bidi override or a zero-width character shows as U+FFFD, not as
     /// nothing (`SECURITY.md` §2.5).
-    private static func revealed(_ text: String) -> String {
+    static func revealed(_ text: String) -> String {
         guard text.unicodeScalars.contains(where: { ConcealingScalars.contains($0.value) }) else { return text }
         var scalars = String.UnicodeScalarView()
         for scalar in text.unicodeScalars {

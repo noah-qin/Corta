@@ -382,11 +382,11 @@ final class MeasurementUITests: XCTestCase {
         let app = UIFixtures.app(stage: measurementStage, runner: Self.self, usingTestTarget: true)
         // Session restore would carry the previous test's windows in.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
-        // No rc files: the prompt is up at once and nothing redraws around
-        // an echo. The same shell for every run is what makes runs comparable.
-        app.launchEnvironment["SHELL"] = "/bin/sh"
-        if renderMetrics { app.launchEnvironment["CORTA_RENDER_METRICS"] = metricsFile.path }
+        // sh is the stable echo baseline; an explicit zsh override measures
+        // shell integration against the same isolated stage and history.
         let runner = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SHELL"] = runner["CORTA_MEASUREMENT_SHELL"] ?? "/bin/sh"
+        if renderMetrics { app.launchEnvironment["CORTA_RENDER_METRICS"] = metricsFile.path }
         for key in ["CORTA_MAX_DRAWABLES", "CORTA_FRAME_LATENCY", "CORTA_RENDER_METRICS_KEYSTROKES", "CORTA_FRAME_DRIVER", "CORTA_MAIN_STALL", "CORTA_DIRECT_FULLSCREEN",
         ] {
             if let value = runner[key] { app.launchEnvironment[key] = value }

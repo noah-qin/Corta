@@ -232,6 +232,7 @@ nonisolated extension Configuration {
             .flag("allow-clipboard-write", \.allowClipboardWrite),
             .flag("directory-history", \.directoryHistory),
             .flag("directory-completion", \.directoryCompletion),
+            .flag("history-suggestions", \.historySuggestions),
             .flag("command-status-marks", \.commandStatusMarks),
             .flag("restore-windows", \.restoreWindows),
             .flag("confirm-close", \.confirmClose),

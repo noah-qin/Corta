@@ -358,6 +358,8 @@ struct SettingsView: View {
                 Toggle(L10n.text("ui.search.regex"), isOn: bind(\.searchRegex))
             }
             Section(L10n.text("settings.section.shell")) {
+                Toggle(L10n.text("settings.label.historySuggestions"), isOn: bind(\.historySuggestions))
+                    .help(L10n.text("settings.help.historySuggestions"))
                 Toggle(L10n.text("settings.label.directoryCompletion"), isOn: bind(\.directoryCompletion))
                     .help(L10n.text("settings.help.directoryCompletion"))
                 Toggle(L10n.text("settings.label.commandStatusMarks"), isOn: bind(\.commandStatusMarks))

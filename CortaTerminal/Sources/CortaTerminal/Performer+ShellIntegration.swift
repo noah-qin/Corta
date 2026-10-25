@@ -32,6 +32,7 @@ extension Performer {
             // or switching the alternate canvas. Other alt-screen marks stay inert.
             if kind == 0x44, state.isCommandRunning, state.commandExitStatus == nil,
                let main = grid.suspendedMain?.grid {
+                state.historySuggestion = nil
                 let status = Self.exitStatus(payload)
                 state.isCommandRunning = false
                 state.promptAwaitsRepaint = false
@@ -45,6 +46,7 @@ extension Performer {
             }
             return
         }
+        if (0x41...0x44).contains(kind) { state.historySuggestion = nil }
         switch kind {
         case 0x41: promptStarted()
         case 0x42: commandLineStarted()
@@ -56,6 +58,7 @@ extension Performer {
 
     /// `A` — prompt start.
     private mutating func promptStarted() {
+        state.directoryCompletion = nil
         let row = grid.absoluteRow(ofScreenRow: grid.cursor.row)
         // Nothing ran at the last prompt — no `C`, no `D` — so this is that
         // prompt again: redrawn after an empty line, or fish 4's own mark

@@ -60,11 +60,12 @@ enum ZshBootstrap {
 
     /// The child's environment; the wrapper folder it points zsh at, for
     /// `remove(_:)` once the session no longer needs it; and the token the
-    /// directory-completion widget puts before its reports, for the
+    /// shell-suggestion widgets put before their reports, for the
     /// session's `Terminal`. Both nil when the shell is not a login zsh or
     /// the folder could not be written.
     static func prepare(
-        _ original: [String: String], executable: String, arguments: [String]
+        _ original: [String: String], executable: String, arguments: [String],
+        directoryCompletion: Bool = true, historySuggestions: Bool = true
     ) -> (environment: [String: String], folder: URL?, token: String?) {
         guard (executable as NSString).lastPathComponent == "zsh",
             arguments == ["-l"] || arguments.isEmpty else { return (original, nil, nil) }
@@ -91,7 +92,7 @@ enum ZshBootstrap {
             // A shell variable, never exported: no command the shell runs,
             // and nothing a remote host prints, can learn it.
             let token = UUID().uuidString
-            let secret = "typeset -g __corta_cd_token=\(token)\n"
+            let secret = "typeset -g __corta_cd_token=\(token) __corta_cd_enabled=\(directoryCompletion ? 1 : 0) __corta_history_enabled=\(historySuggestions ? 1 : 0)\n"
             let rc = restore + history + secret + "unset CORTA_USER_ZDOTDIR CORTA_USER_ZDOTDIR_SET\n[[ -r ${ZDOTDIR:-$HOME}/.zshrc ]] && source ${ZDOTDIR:-$HOME}/.zshrc\nsource \(quote(hook.path))\n"
             try rc.write(to: folder.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
             folders.append(folder)

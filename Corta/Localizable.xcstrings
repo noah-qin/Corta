@@ -29393,6 +29393,180 @@
         }
       }
     },
+    "settings.label.historySuggestions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History suggestions (zsh)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "历史命令建议（zsh）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "歷史命令建議（zsh）"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "履歴の候補（zsh）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "명령 기록 제안(zsh)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verlaufsvorschläge (zsh)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Suggestions de l’historique (zsh)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sugerencias del historial (zsh)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sugestões do histórico (zsh)"
+          }
+        }
+      }
+    },
+    "settings.help.historySuggestions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suggest commands from local zsh history. Right or End accepts; Tab keeps native completion. Reopen the shell after enabling."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "根据本地 zsh 历史建议命令。按右箭头或 End 接受；Tab 保留原生补全。启用后请重新打开 shell。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "根據本機 zsh 歷史建議命令。按向右鍵或 End 接受；Tab 保留原生補全。啟用後請重新開啟 shell。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ローカルの zsh 履歴からコマンドを提案します。右矢印または End で確定し、Tab は通常の補完を使います。有効化後はシェルを開き直してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "로컬 zsh 기록에서 명령을 제안합니다. 오른쪽 화살표나 End로 수락하며 Tab은 기본 완성을 유지합니다. 활성화 후 셸을 다시 여세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Befehle aus dem lokalen zsh-Verlauf vorschlagen. Rechts oder Ende übernimmt; Tab behält die native Vervollständigung. Nach dem Aktivieren die Shell neu öffnen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Suggérer des commandes depuis l’historique zsh local. Droite ou Fin accepte ; Tab conserve la complétion native. Rouvrez le shell après activation."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sugerir comandos del historial local de zsh. Derecha o Fin acepta; Tab conserva la compleción nativa. Vuelve a abrir el shell tras activarlo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sugerir comandos do histórico local do zsh. Direita ou End aceita; Tab mantém a conclusão nativa. Reabra o shell após ativar."
+          }
+        }
+      }
+    },
+    "completion.historyHint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right or End accepts · Esc dismisses"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "右箭头或 End 接受 · Esc 隐藏"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "向右鍵或 End 接受 · Esc 隱藏"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "右矢印または End で確定 · Esc で閉じる"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "오른쪽 화살표 또는 End로 수락 · Esc로 닫기"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Rechts oder Ende übernimmt · Esc schließt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Droite ou Fin accepte · Échap masque"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Derecha o Fin acepta · Esc descarta"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Direita ou End aceita · Esc descarta"
+          }
+        }
+      }
+    },
     "settings.label.directoryCompletion": {
       "localizations": {
         "en": {

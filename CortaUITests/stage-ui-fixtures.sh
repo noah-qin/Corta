@@ -86,6 +86,13 @@ chmod 700 "$root/input-source-dark/plain-shell"
 
 # Directory completion: the folders it offers, one of them hidden, one of
 # them a name with a space and CJK in it.
+stage history-suggestions 'restore-windows = false\nconfirm-close = false\nupdate-auto-check = false\ninput-source-indicator = off\n'
+mkdir -p "$root/history-suggestions/Alpha"
+cat >> "$root/history-suggestions/.zshrc" <<EOF
+HISTFILE=/dev/null
+print -s -- 'echo history-suggestion-proof'
+print -s -- "cat $root/history-suggestions/Alternative"
+EOF
 stage directory-completion 'restore-windows = false\n'
 for name in Alpha Another '空格 中文' .hidden; do
   mkdir -p "$root/directory-completion/Demo/$name"

@@ -99,6 +99,7 @@ extension Performer {
                         state.keyboardProtocol = KeyboardProtocolStack()
                     }
                     state.directoryCompletion = nil
+                    state.historySuggestion = nil
                     grid.enterAlternateScreen()
                 } else {
                     if let main = state.parkedMainKeyboardProtocol {
