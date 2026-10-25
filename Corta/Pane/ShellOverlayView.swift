@@ -18,7 +18,7 @@ import AppKit
 import CoreText
 import CortaTerminal
 
-/// Native overlays live in the margin and beside the caret, never in terminal cells.
+/// Native overlays are drawn separately from terminal cells, beside the caret.
 /// The command-status rules themselves are drawn by `TerminalRenderer`, with
 /// the text they belong to (#238); this view keeps only their tooltips.
 final class ShellOverlayView: NSView {
@@ -57,7 +57,7 @@ final class ShellOverlayView: NSView {
     private var lastCompletionPresentation: CompletionPresentation?
     private var preview: ShellGhostView?
     private var candidateRow: DirectoryCandidateRowView?
-    /// Native completion previews occupy space outside the terminal grid.
+    /// Native hint frames, used to keep other overlays clear.
     var occupiedRects: [CGRect] { subviews.filter { !$0.isHidden }.map(\.frame) }
     override var isFlipped: Bool { true }
 
@@ -127,16 +127,22 @@ final class ShellOverlayView: NSView {
             return
         }
         let row = candidateRow ?? DirectoryCandidateRowView()
-        let prefixWidth = (state.typedPrefix as NSString).size(withAttributes: [.font: font]).width
-        let x = max(TerminalLayout.insets.left, anchor.minX - prefixWidth)
-        let below = anchor.maxY + 3
-        let fitsBelow = below + anchor.height <= bounds.height - TerminalLayout.insets.bottom
-        // At the bottom, the temporary hint sits above the prompt instead.
-        row.frame = CGRect(x: x, y: fitsBelow ? below : max(0, anchor.minY - anchor.height - 3),
-            width: max(0, bounds.width - TerminalLayout.insets.right - x), height: anchor.height)
-        row.baseline = baseline
-        row.backdrop = fitsBelow ? nil : colors.backdrop
+        let padding: CGFloat = 8
+        let margin = TerminalLayout.insets.left
+        let availableWidth = max(0, bounds.width - margin - TerminalLayout.insets.right)
+        row.frame.size = CGSize(width: availableWidth, height: anchor.height + 10)
+        row.baseline = baseline + 5
         row.update(state: state, font: font, colors: colors)
+        let width = min(availableWidth, row.fittingWidth)
+        let prefixWidth = (state.typedPrefix as NSString).size(withAttributes: [.font: font]).width
+        let x = min(max(margin, anchor.minX - prefixWidth - padding),
+            max(margin, bounds.width - TerminalLayout.insets.right - width))
+        let below = anchor.maxY + 4
+        let height = row.frame.height
+        let fitsBelow = below + height <= bounds.height - TerminalLayout.insets.bottom
+        row.frame = CGRect(x: x,
+            y: fitsBelow ? below : max(0, anchor.minY - height - 4),
+            width: width, height: height)
         row.toolTip = L10n.text("completion.hint")
         if candidateRow == nil { addSubview(row)
             candidateRow = row }
@@ -164,11 +170,15 @@ final class ShellOverlayView: NSView {
         var muted: CGColor
         var selected: CGColor
         var backdrop: CGColor
+        var border: CGColor
+        var candidate: CGColor
 
         init(_ presentation: CompletionPresentation) {
             muted = presentation.colors.text(alpha: 0.35, contrastAlpha: 0.7)
-            selected = presentation.colors.text(alpha: 0.65, contrastAlpha: 1)
+            selected = presentation.colors.text(alpha: 0.85, contrastAlpha: 1)
             backdrop = presentation.colors.backdrop
+            border = presentation.colors.text(alpha: 0.2, contrastAlpha: 0.6)
+            candidate = presentation.colors.text(alpha: 0.65, contrastAlpha: 1)
         }
     }
 }
@@ -204,15 +214,16 @@ private final class ShellGhostView: NSView {
     }
 }
 
-/// A quiet, single-line set of alternatives. Selection is conveyed by stronger
-/// text and an underline, with no panel chrome or focusable controls.
+/// A compact panel beside the input; its border distinguishes it from history.
 private final class DirectoryCandidateRowView: NSView {
     private var content = NSAttributedString(string: "")
     private var token = NSAttributedString(string: "…")
     private var visibleText = ""
     var baseline: CGFloat = 12
-    /// The canvas colour, when the row sits over output above the prompt.
-    var backdrop: CGColor?
+    private var backdrop = CGColor(gray: 1, alpha: 1)
+    private var border = CGColor(gray: 0, alpha: 0.2)
+    var fittingWidth: CGFloat { ceil(CTLineGetTypographicBounds(
+        CTLineCreateWithAttributedString(content), nil, nil, nil)) + 16 }
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func isAccessibilityElement() -> Bool { true }
@@ -226,7 +237,9 @@ private final class DirectoryCandidateRowView: NSView {
         func width(_ text: String) -> CGFloat {
             (text as NSString).size(withAttributes: [.font: font]).width
         }
-        let available = max(0, bounds.width - width("…    …"))
+        backdrop = colors.backdrop
+        border = colors.border
+        let available = max(0, bounds.width - 16 - width("…    …"))
         var start = state.selectedIndex
         var end = start + 1
         var used = width(state.candidates[start])
@@ -243,7 +256,7 @@ private final class DirectoryCandidateRowView: NSView {
             used += extra
             end += 1
         }
-        let muted: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.muted]
+        let muted: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.candidate]
         let result = NSMutableAttributedString(string: start > 0 ? "…  " : "", attributes: muted)
         for index in start..<end {
             if index > start { result.append(NSAttributedString(string: gap, attributes: muted)) }
@@ -263,16 +276,19 @@ private final class DirectoryCandidateRowView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
-        if let backdrop {
-            context.setFillColor(backdrop)
-            context.fill(bounds)
-        }
+        let panel = CGPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
+            cornerWidth: 6, cornerHeight: 6, transform: nil)
+        context.addPath(panel)
+        context.setFillColor(backdrop)
+        context.setStrokeColor(border)
+        context.setLineWidth(1)
+        context.drawPath(using: .fillStroke)
         let full = CTLineCreateWithAttributedString(content)
         let ellipsis = CTLineCreateWithAttributedString(token)
-        let line = CTLineCreateTruncatedLine(full, Double(bounds.width), .end, ellipsis) ?? full
+        let line = CTLineCreateTruncatedLine(full, Double(max(0, bounds.width - 16)), .end, ellipsis) ?? full
         context.saveGState()
-        context.clip(to: bounds)
-        context.translateBy(x: 0, y: baseline)
+        context.clip(to: bounds.insetBy(dx: 8, dy: 0))
+        context.translateBy(x: 8, y: baseline)
         context.scaleBy(x: 1, y: -1)
         context.textMatrix = .identity
         context.textPosition = .zero

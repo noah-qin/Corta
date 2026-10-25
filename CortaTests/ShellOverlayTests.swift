@@ -79,17 +79,23 @@ import Testing
         let anchor = CGRect(x: 80, y: 40, width: 8, height: 17)
         overlay.showCompletion(completion, anchor: anchor)
 
-        /// The most opaque pixel of the row, unpremultiplied: a glyph's core.
+        /// The strongest text pixel against the panel's opaque canvas background.
         func strongestInk() throws -> NSColor {
             let row = try #require(overlay.subviews.first {
                 $0.accessibilityIdentifier() == "directory-completion-candidates" })
             let bitmap = try #require(row.bitmapImageRepForCachingDisplay(in: row.bounds))
             row.cacheDisplay(in: row.bounds, to: bitmap)
             var best: NSColor?
-            for y in 0..<bitmap.pixelsHigh {
-                for x in 0..<bitmap.pixelsWide {
-                    guard let pixel = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
-                    if pixel.alphaComponent > (best?.alphaComponent ?? 0) { best = pixel }
+            var bestContrast: CGFloat = -1
+            let background = TerminalColorPalette.activeVariant.background
+            for y in 4..<(bitmap.pixelsHigh - 4) {
+                for x in 4..<(bitmap.pixelsWide - 4) {
+                    guard let pixel = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB),
+                        pixel.alphaComponent > 0.95 else { continue }
+                    let contrast = abs(pixel.redComponent - CGFloat(background.x))
+                        + abs(pixel.greenComponent - CGFloat(background.y))
+                        + abs(pixel.blueComponent - CGFloat(background.z))
+                    if contrast > bestContrast { best = pixel; bestContrast = contrast }
                 }
             }
             return try #require(best)
@@ -98,7 +104,7 @@ import Testing
         let ink = try strongestInk()
         #expect(ink.alphaComponent > 0.4)
         // #f0e0c0, not the black the light system colour gives.
-        #expect(ink.redComponent > 0.85 && ink.greenComponent > 0.75 && ink.blueComponent > 0.6)
+        #expect(ink.redComponent > 0.7 && ink.greenComponent > 0.65 && ink.blueComponent > 0.5)
 
         // A theme switch while the row shows recolours it: the next frame's
         // refresh must mark it dirty, not leave the old colours on screen.
@@ -112,7 +118,7 @@ import Testing
         overlay.showCompletion(completion, anchor: anchor)
         #expect(row.needsDisplay)
         let recoloured = try strongestInk()
-        #expect(recoloured.redComponent > 0.85 && recoloured.greenComponent < 0.3)
+        #expect(recoloured.redComponent > 0.6 && recoloured.greenComponent < 0.3)
     }
 
     @Test func historyPreviewSurvivesSplitRedrawButStaysHiddenAfterInputAndComposition() throws {
@@ -167,6 +173,29 @@ import Testing
         let (configuration, unknown) = Configuration.parse("history-suggestions = false\ndirectory-completion = true")
         #expect(unknown.isEmpty && !configuration.historySuggestions && configuration.directoryCompletion)
         #expect(Configuration.parse(configuration.serialized()).configuration == configuration)
+    }
+
+    @Test func candidatePanelFollowsInputAndFlipsAboveAtTheBottom() throws {
+        let overlay = ShellOverlayView(frame: CGRect(x: 0, y: 0, width: 600, height: 200))
+        let completion = try #require(DirectoryCompletion(payload: "1;0;p=;Applications/;Desktop/"))
+        let anchor = CGRect(x: 200, y: 40, width: 8, height: 17)
+        overlay.showCompletion(completion, anchor: anchor)
+        let row = try #require(overlay.subviews.first {
+            $0.accessibilityIdentifier() == "directory-completion-candidates" })
+        #expect(row.frame.minY >= anchor.maxY)
+        #expect(row.frame.minX == anchor.minX - 8)
+        #expect(row.frame.width < overlay.bounds.width / 2)
+        let originalFrame = row.frame
+        overlay.showCompletion(completion, anchor: anchor.offsetBy(dx: 20, dy: 17))
+        #expect(row.frame.minX == originalFrame.minX + 20)
+        #expect(row.frame.minY == originalFrame.minY + 17)
+        let bottom = CGRect(x: 570, y: 175, width: 8, height: 17)
+        overlay.showCompletion(completion, anchor: bottom)
+        #expect(row.frame.maxY < bottom.minY)
+        #expect(row.frame.maxX <= overlay.bounds.width - TerminalLayout.insets.right)
+        #expect(row.frame.minX >= TerminalLayout.insets.left)
+        overlay.hideCompletion()
+        #expect(overlay.occupiedRects.isEmpty)
     }
 
     @Test func statusGutterHasTextOutsideTerminalCells() {

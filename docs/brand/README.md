@@ -16,7 +16,7 @@ repository root.
 | `input-source-indicator.png` | Independent Chinese input-source badge, separated from toolbar action buttons, from an isolated demo shell |
 | `input-source-long-command.png` | Right-edge badge moved below a long command, without changing the grid |
 | `history-suggestions.png` | Local zsh history suffix, from the isolated history-suggestions UI fixture |
-| `directory-suggestions.png` | Local zsh suggestions and command-status marks from an isolated UI-test demo shell |
+| `directory-suggestions.png` | Compact local zsh candidate panel and command-status marks from an isolated UI-test demo shell |
 | `about.png`                 | About with separated links (development build)                   |
 | `social-preview.png`        | GitHub social preview card, 1280 × 640                            |
 
