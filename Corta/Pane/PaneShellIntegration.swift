@@ -438,17 +438,30 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
             }
         }
         overlay.updateStatuses(rows)
-        let completion = config.directoryCompletion && isFocusedPane && scrollOffset == 0 && host?.search.bar == nil && !session.isCommandRunning && !grid.isAlternateScreenActive ? session.directoryCompletion : nil
+        let canSuggest = isFocusedPane && scrollOffset == 0 && host?.search.bar == nil && !session.isCommandRunning && !grid.isAlternateScreenActive
+        let completion = canSuggest && config.directoryCompletion ? session.directoryCompletion : nil
+        let history = canSuggest && config.historySuggestions ? session.historySuggestion : nil
         let anchor = CGRect(x: content.minX + CGFloat(grid.cursor.column) * metrics.cellWidth,
             y: content.minY + CGFloat(grid.cursor.row) * metrics.cellHeight,
             width: metrics.cellWidth, height: metrics.cellHeight)
-        overlay.showCompletion(completion, anchor: anchor,
+        overlay.showCompletion(completion, history: history, anchor: anchor,
             font: (host?.fontStyle ?? FontStyle()).font(ofSize: host?.fontSize ?? ViewController.defaultFontSize)
                 as NSFont,
             baseline: metrics.baselineOffset, colors: canvas)
     }
 
     func handleDirectoryCompletionKey(_ event: NSEvent) -> Bool {
+        if let terminalView, terminalView.shellOverlay.historySuggestion != nil {
+            let overlay = terminalView.shellOverlay
+            let eligible = ConfigurationStore.shared.configuration.historySuggestions && isFocusedPane
+                && scrollOffset == 0 && host?.search.bar == nil && !session.isCommandRunning
+                && !session.snapshot().isAlternateScreenActive && !terminalView.hasMarkedText()
+            let sequence = eligible ? ShellOverlayView.historyKeySequence(for: event) : nil
+            overlay.hideCompletion()
+            guard let sequence else { return false }
+            session.write(Array(sequence.utf8))
+            return true
+        }
         guard let terminalView, let state = terminalView.shellOverlay.completion,
             !state.candidates.isEmpty else { return false }
         guard ConfigurationStore.shared.configuration.directoryCompletion,

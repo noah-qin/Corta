@@ -12,6 +12,12 @@ Versioning for compatibility changes.
 
 ### Added
 
+- Built-in history suggestions for standard local zsh: type a command prefix
+  to see the most recent matching suffix faintly, accept with Right/End or
+  dismiss with Esc. Tab and shell history navigation stay native. Enabled
+  by default, configurable with `history-suggestions` and a Terminal settings
+  toggle; yields to zsh-autosuggestions and leaves startup files unchanged.
+
 - Claude Code task-state integration on native tabs and the Dock, with a
   pane-jumping Agents list in the command palette and Window menu. Claude
   Code is currently the only CLI with a dedicated task-state integration;

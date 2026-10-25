@@ -20,6 +20,7 @@ and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 - [Shell integration](#shell-integration)
 - [The working directory](#the-working-directory)
 - [Directory suggestions (zsh)](#directory-suggestions-zsh)
+- [History suggestions (zsh)](#history-suggestions-zsh)
 - [Remote work: SSH and SFTP](#remote-work-ssh-and-sftp)
 - [Images in the terminal](#images-in-the-terminal)
 - [The command palette](#the-command-palette)
@@ -275,7 +276,7 @@ and blink state. Terminal programs can still temporarily override cursor style.
 ### Compact Tab indentation (zsh)
 
 Standard local zsh sessions load the bundled hooks automatically when
-Directory suggestions is enabled (the default). You do not need to modify
+Directory suggestions or History suggestions is enabled (both default to on). You do not need to modify
 your startup files. If you use custom zsh arguments or have turned off that
 automatic bootstrap, install or update Shell Integration in Settings →
 Terminal, then open a new shell. With those hooks loaded, Tab on a
@@ -390,7 +391,7 @@ to your shell's startup file — `~/.zshrc`; for bash both `~/.bashrc` and
 `~/.config/fish/config.fish` — and **Remove** takes out exactly that block.
 The startup-file block is only installed when you press the button. Standard
 local zsh sessions also load Corta's bundled hooks automatically, without
-editing your startup files, when **Directory suggestions (zsh)** is enabled
+editing your startup files, when **Directory suggestions (zsh)** or **History suggestions (zsh)** is enabled
 (the default). Custom zsh arguments, bash, fish and remote shells do not
 use this automatic bootstrap. Install compatible hooks in those shells to
 enable command boundaries there.
@@ -486,6 +487,36 @@ enabling it again. There is no startup-file block to delete for the automatic
 local hooks. If you also installed shell integration manually, its **Remove**
 button removes that separate startup-file block; removal is not needed to
 turn off directory suggestions.
+
+## History suggestions (zsh)
+
+In a standard local zsh session, typing the start of a previous command
+shows its remaining text faintly after the cursor. The most recent matching
+single-line command wins. For example, after running `git status`, typing
+`git st` suggests `atus`. The hint is only a preview until you accept it.
+
+![A local zsh history suffix shown faintly after the cursor](brand/history-suggestions.png)
+
+| Key | Action while the hint is visible |
+| --- | --- |
+| Right / End | Append the suggested suffix at the end of the input, without executing. |
+| Esc | Dismiss the hint until the input changes. |
+| Tab / Shift+Tab / Up / Down | Keep the shell's normal completion and history bindings. |
+| Return | Execute only the actual input. |
+
+Empty input, a cursor in the middle of the line and multiline history entries
+show no history hint. `cd ` keeps directory suggestions. Input-method
+composition hides hints, leaving the IME's own candidates available.
+If zsh-autosuggestions is loaded, Corta leaves history suggestions to it.
+Bash, fish, remote shells and custom startup commands keep their own editing.
+
+The default is on. Disable **Settings ▸ Terminal ▸ Shell ▸ History suggestions
+(zsh)** or set `history-suggestions = false` to hide hints and restore native
+keys immediately. Reopen the shell after enabling. Directory suggestions
+have their own toggle. Both use temporary startup wrappers and leave your
+startup files unchanged. Corta uses zsh's in-memory history, never reads
+`HISTFILE`, and never logs or saves suggested text. Suffixes longer than 128
+Unicode characters are omitted.
 
 ## Remote work: SSH and SFTP
 

@@ -91,7 +91,7 @@ and [verification limits](CONFORMANCE.md#cli-signal-compatibility).
   command history, command-output
   copy/export, navigation between commands and long-task notifications.
   Standard local zsh sessions load the bundled hooks automatically with
-  `directory-completion = true`. For explicit startup-file installation in
+  `directory-completion = true` or `history-suggestions = true`. For explicit startup-file installation in
   zsh, bash or fish, use **Settings ▸ Terminal ▸ Shell Integration**.
 - Built-in directory suggestions for standard local zsh sessions, with
   faint alternatives and inline previews, Left/Right selection and Tab
@@ -99,6 +99,12 @@ and [verification limits](CONFORMANCE.md#cli-signal-compatibility).
   through. Disable the optional feature in Settings or with
   `directory-completion = false` ([usage](USER-GUIDE.md#directory-suggestions-zsh)).
   Local hooks load without changing the user's startup files.
+- Built-in local zsh history suggestions: the most recent prefix match
+  appears as a faint suffix. Right/End accepts without executing, Esc
+  dismisses, and Tab and history navigation keep native bindings. No
+  history-file reads or startup-file edits; zsh-autosuggestions takes
+  precedence. Disable with `history-suggestions = false`
+  ([usage](USER-GUIDE.md#history-suggestions-zsh)).
 - Optional command-status rules in the prompt margin, with textual tooltips
   and gray interrupted marks for exit status 130.
 - Remote context reported by shell integration, a host indicator and reconnect

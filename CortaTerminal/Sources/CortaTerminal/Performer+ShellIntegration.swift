@@ -26,6 +26,7 @@ extension Performer {
     mutating func shellIntegration(_ payload: ArraySlice<UInt8>) {
         // Not on the alternate screen: its rows vanish when the TUI exits.
         guard !grid.isAlternateScreenActive, let kind = payload.first else { return }
+        if (0x41...0x44).contains(kind) { state.historySuggestion = nil }
         switch kind {
         case 0x41: promptStarted()
         case 0x42: commandLineStarted()
@@ -37,6 +38,7 @@ extension Performer {
 
     /// `A` — prompt start.
     private mutating func promptStarted() {
+        state.directoryCompletion = nil
         let row = grid.absoluteRow(ofScreenRow: grid.cursor.row)
         // Nothing ran at the last prompt — no `C`, no `D` — so this is that
         // prompt again: redrawn after an empty line, or fish 4's own mark

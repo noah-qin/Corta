@@ -170,6 +170,10 @@ extension TerminalSession {
         registerStateWaiter { state.withLock { $0.terminal.promptEndPosition } }
     }
 
+    public var historySuggestion: HistorySuggestion? {
+        registerStateWaiter { state.withLock { $0.terminal.historySuggestion } }
+    }
+
     public var directoryCompletion: DirectoryCompletion? {
         registerStateWaiter { state.withLock { $0.terminal.directoryCompletion } }
     }

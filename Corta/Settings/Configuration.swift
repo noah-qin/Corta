@@ -242,6 +242,7 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// `DirectoryHistory`'s own file; clearing it is a Settings action.
     var directoryHistory: Bool = true
     var directoryCompletion: Bool = true
+    var historySuggestions: Bool = true
     var commandStatusMarks: Bool = true
     /// Reopen last run's windows, splits and directories.
     var restoreWindows: Bool = true

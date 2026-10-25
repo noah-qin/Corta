@@ -43,12 +43,13 @@ enum PaneSpawn {
     ///   shell without setting `$SHELL` for anything else.
     /// - Parameter directoryCompletion: whether zsh gets the bundled hint
     ///   integration.
+    /// - Parameter historySuggestions: whether zsh suggests history suffixes.
     /// - Parameter directoryCheckTimeout: how long the off-main existence
     ///   check of `directory` may take before the next rung.
     static func start(
         size: TerminalSize, directory: String?, scrollbackLimit: Int,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity, preset: Preset? = nil,
-        configuredShell: String? = nil, directoryCompletion: Bool = true,
+        configuredShell: String? = nil, directoryCompletion: Bool = true, historySuggestions: Bool = true,
         directoryCheckTimeout: DispatchTimeInterval = .milliseconds(500)
     ) throws(PTYError) -> Started {
         // An uninstalled preset shell degrades to a working terminal.
@@ -83,8 +84,9 @@ enum PaneSpawn {
             else { continue }
             // Only for the preset's own shell; a fallback may not understand them.
             let attemptArguments = attempt.shell == configured ? arguments : ["-l"]
-            let (attemptEnvironment, folder, token) = directoryCompletion
-                ? ZshBootstrap.prepare(environment, executable: attempt.shell, arguments: attemptArguments)
+            let (attemptEnvironment, folder, token) = directoryCompletion || historySuggestions
+                ? ZshBootstrap.prepare(environment, executable: attempt.shell, arguments: attemptArguments,
+                    directoryCompletion: directoryCompletion, historySuggestions: historySuggestions)
                 : (environment, nil, nil)
             do {
                 let session = try TerminalSession(
@@ -116,9 +118,10 @@ enum PaneSpawn {
         for (key, value) in preset?.environment ?? [:] { environment[key] = value }
         var folder: URL?
         var token: String?
-        if configuration.directoryCompletion {
+        if configuration.directoryCompletion || configuration.historySuggestions {
             (environment, folder, token) = ZshBootstrap.prepare(
-                environment, executable: command.executable, arguments: command.arguments)
+                environment, executable: command.executable, arguments: command.arguments,
+                directoryCompletion: configuration.directoryCompletion, historySuggestions: configuration.historySuggestions)
         }
         do {
             // A local cwd for the launcher; the remote side lands where it lands.

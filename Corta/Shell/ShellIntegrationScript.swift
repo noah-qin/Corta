@@ -226,6 +226,50 @@ enum ShellIntegrationScript {
           typeset -g __corta_cd_installed=1 __corta_cd_revision=0 __corta_cd_index=1
           typeset -g __corta_cd_buffer='' __corta_cd_dismissed=''
           typeset -ga __corta_cd_paths
+          typeset -g __corta_history_buffer='' __corta_history_suffix='' __corta_history_dismissed=''
+          typeset -g __corta_history_cached_buffer='' __corta_history_command='' __corta_history_event=-1
+          zmodload zsh/parameter
+
+          __corta_history_available() {
+            [[ ${__corta_history_enabled:-1} == 1 && -z ${widgets[(I)*autosuggest*]} && -z ${parameters[(I)ZSH_AUTOSUGGEST_*]} ]]
+          }
+          __corta_history_refresh() {
+            emulate -L zsh
+            setopt extendedglob
+            __corta_history_suffix=''
+            [[ $BUFFER != $__corta_history_dismissed ]] && __corta_history_dismissed=''
+            __corta_history_available || return 0
+            [[ -n $BUFFER && $BUFFER != 'cd '* && $BUFFER != *[[:cntrl:]]* && $CURSOR == ${#BUFFER} && $BUFFER != $__corta_history_dismissed ]] || return 0
+            # zsh/parameter searches its special history array newest first.
+            # Quote the literal prefix as a pattern; require a longer,
+            # single-line entry. No HISTFILE read, eval or subprocess.
+            if [[ $HISTCMD != $__corta_history_event || $BUFFER != $__corta_history_cached_buffer ]]; then
+              if [[ $HISTCMD != $__corta_history_event || $BUFFER != "$__corta_history_cached_buffer"* || $__corta_history_command != "$BUFFER"?* ]]; then
+                __corta_history_command=${history[(r)${(b)BUFFER}[^[:cntrl:]]##]}
+              fi
+              __corta_history_cached_buffer=$BUFFER
+              __corta_history_event=$HISTCMD
+            fi
+            [[ $__corta_history_command == "$BUFFER"?* ]] || return 0
+            local suffix=${__corta_history_command[${#BUFFER}+1,-1]}
+            # At most 512 UTF-8 bytes (128 Unicode characters), also bounded
+            # after percent encoding, well below the OSC parser's limit.
+            (( ${#suffix} <= 128 )) || return 0
+            __corta_history_buffer=$BUFFER
+            __corta_history_suffix=$suffix
+          }
+          __corta_history_accept() {
+            emulate -L zsh
+            if __corta_history_available && [[ -n $__corta_history_suffix && $BUFFER == $__corta_history_buffer && $CURSOR == ${#BUFFER} ]]; then
+              BUFFER+=$__corta_history_suffix
+              CURSOR=${#BUFFER}
+              __corta_history_suffix=''
+            fi
+          }
+          __corta_history_dismiss() {
+            __corta_history_dismissed=$BUFFER
+            __corta_history_suffix=''
+          }
 
           __corta_cd_encode() {
             emulate -L zsh
@@ -245,7 +289,7 @@ enum ShellIntegrationScript {
             [[ $BUFFER != $__corta_cd_dismissed ]] && __corta_cd_dismissed=''
             # Only a single cd argument, with the insertion point at the end.
             # Quotes are lexed by zsh; expansions other than ~/ stay with native Tab.
-            if [[ $BUFFER == 'cd '* && $CURSOR == ${#BUFFER} && $BUFFER != $__corta_cd_dismissed ]]; then
+            if [[ ${__corta_cd_enabled:-1} == 1 && $BUFFER == 'cd '* && $CURSOR == ${#BUFFER} && $BUFFER != $__corta_cd_dismissed ]]; then
               raw=${BUFFER#'cd '}
               words=( ${(z)raw} )
               if (( ${#words} <= 1 )) && [[ $raw != *[\;\|\&\<\>\`\$\(\)\{\}]* && $raw != *[[:cntrl:]]* ]]; then
@@ -283,7 +327,11 @@ enum ShellIntegrationScript {
               __corta_cd_buffer=$BUFFER
             fi
             (( __corta_cd_index > ${#__corta_cd_paths} )) && __corta_cd_index=1
-            if (( ${#__corta_cd_paths} )); then
+            __corta_history_refresh
+            if [[ -n $__corta_history_suffix ]]; then
+              __corta_cd_encode "$__corta_history_suffix"
+              print -rn -- $'\e]134;'"$__corta_cd_token;h;$__corta_cd_revision;$REPLY"$'\a'
+            elif (( ${#__corta_cd_paths} )); then
               print -rn -- $'\e]134;'"$__corta_cd_token;$__corta_cd_revision;$((__corta_cd_index-1));p=$encodedPrefix$packet"$'\a'
             else
               print -rn -- $'\e]134;'"$__corta_cd_token;$__corta_cd_revision;0"$'\a'
@@ -314,12 +362,16 @@ enum ShellIntegrationScript {
           __corta_cd_dismiss() { __corta_cd_dismissed=$BUFFER; }
           autoload -Uz add-zle-hook-widget
           add-zle-hook-widget line-pre-redraw __corta_cd_redraw
+          zle -N __corta_history_accept
+          zle -N __corta_history_dismiss
           zle -N __corta_cd_next
           zle -N __corta_cd_previous
           zle -N __corta_cd_accept
           zle -N __corta_cd_dismiss
           # Bind both emacs and vi insertion maps, without replacing native Tab.
           for __corta_cd_map in emacs viins; do
+            bindkey -M $__corta_cd_map $'\e[95~' __corta_history_accept
+            bindkey -M $__corta_cd_map $'\e[94~' __corta_history_dismiss
             bindkey -M $__corta_cd_map $'\e[97~' __corta_cd_previous
             bindkey -M $__corta_cd_map $'\e[98~' __corta_cd_next
             bindkey -M $__corta_cd_map $'\e[99~' __corta_cd_accept

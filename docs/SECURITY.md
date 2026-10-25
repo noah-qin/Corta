@@ -206,7 +206,7 @@ clipboard — and genuinely dangerous.
   and every control but tab, LF and CR. Corta's paste strips controls again,
   but the pasteboard reaches other applications.
 
-### 2.7 Directory completion reports (OSC 134)
+### 2.7 Directory and history completion reports (OSC 134)
 
 The bundled zsh line editor reports a revision, selection index, typed basename prefix, and up to
 20 percent-encoded folder labels, bounded by the parser's 4096-byte OSC limit.
@@ -227,6 +227,13 @@ token, so it can no longer take those keys or draw a fake suggestion at the
 cursor. The token survives a terminal reset; a shell started some other way
 has none and shows no suggestions. Labels show `ConcealingScalars` as U+FFFD,
 as the grid does (§2.5).
+
+The tokened `h;revision;suffix` report carries a percent-encoded history
+suffix of at most 512 UTF-8 bytes, rejects controls, and shares the same
+display-only renderer; Right/End sends only a fixed accept-widget key,
+and zsh appends its own retained suffix without evaluating or executing it.
+History can contain typed secrets: suggested text is only drawn, never
+logged, notified, persisted, or read from `HISTFILE`.
 
 ### 2.8 Working-directory reports name a host, never a spawn target
 
