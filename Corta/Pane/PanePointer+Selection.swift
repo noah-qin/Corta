@@ -277,7 +277,7 @@ extension PanePointer {
                 NSCursor.pointingHand.set()
                 hoveringLink = true
             } else if !armed, hoveringLink {
-                NSCursor.arrow.set()
+                programCursor.set()
                 hoveringLink = false
             }
             let target = Self.target(of: link.url)?.absoluteString ?? ""
@@ -340,7 +340,7 @@ extension PanePointer {
     /// Resets hover state, only if the hand is up.
     func resetLinkHover(_ terminalView: TerminalView) {
         if hoveringLink {
-            NSCursor.arrow.set()
+            programCursor.set()
             hoveringLink = false
         }
         if terminalView.toolTip != nil { terminalView.toolTip = nil }

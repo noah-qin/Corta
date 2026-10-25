@@ -102,7 +102,13 @@ struct PerformerState: Sendable {
     /// OSC 52 writes only. The read form would hand the clipboard to the
     /// child and stays unimplemented (`SECURITY.md` §6).
     var pendingClipboardCopy: String?
+    var clipboardNeedsAcknowledgement = false
     var pendingImageTransmission: PendingImageTransmission?
+    var itermImage: ITermImageTransfer?
+    var clipboardTransfer: [UInt8]?
+    var pointerMain = PointerShapeStack()
+    var pointerAlternate = PointerShapeStack()
+    var attention: ProgramAttention?
     /// A finished transmission waiting for its decode outside the parse;
     /// taken by `Terminal.takeDeferredImage()` before the lock is released.
     var deferredImage: DeferredImageTransmission?
@@ -122,6 +128,7 @@ struct PendingImageTransmission: Sendable {
     var header: KittyGraphics.TransmitHeader
     var display: KittyGraphics.DisplayHeader?
     var base64: [UInt8]
+    var itermOptions: [String: String]? = nil
 }
 
 /// OSC 10/11/12's colours, 8 bits per channel; reported by doubling each
@@ -130,6 +137,7 @@ public struct DynamicColors: Sendable, Equatable {
     public var foreground: (red: UInt8, green: UInt8, blue: UInt8)
     public var background: (red: UInt8, green: UInt8, blue: UInt8)
     public var cursor: (red: UInt8, green: UInt8, blue: UInt8)
+    public var cursorText: Color = .default
     public var selection: (red: UInt8, green: UInt8, blue: UInt8) = (142, 126, 233)
 
     public init(
@@ -144,7 +152,7 @@ public struct DynamicColors: Sendable, Equatable {
 
     public static func == (lhs: DynamicColors, rhs: DynamicColors) -> Bool {
         lhs.foreground == rhs.foreground && lhs.background == rhs.background
-            && lhs.cursor == rhs.cursor && lhs.selection == rhs.selection
+            && lhs.cursor == rhs.cursor && lhs.selection == rhs.selection && lhs.cursorText == rhs.cursorText
     }
 }
 

@@ -47,6 +47,7 @@ final class PanePointer: NSObject {
     /// Cursor changes on transitions only: resetting the arrow every move
     /// fights the divider's resize cursor.
     var hoveringLink = false
+    private var lastProgramPointer: String?
     /// The last hover, replayed when a pending file check answers.
     var lastHover: (event: NSEvent, view: TerminalView)?
     /// What the last hover showed, kept while its answer is checked again.
@@ -63,6 +64,7 @@ final class PanePointer: NSObject {
     /// The pane's view and session are being replaced: the pill and the
     /// hover belonged to the old ones.
     func reset() {
+        lastProgramPointer = nil
         selectionContent = nil
         scrollPositionIndicator?.removeFromSuperview()
         scrollPositionIndicator = nil
@@ -72,6 +74,37 @@ final class PanePointer: NSObject {
 
     init(host: PanePointerHost? = nil) {
         self.host = host
+    }
+
+    func refreshProgramPointer(force: Bool = false) {
+        let name = session?.pointerShape
+        guard force || name != lastProgramPointer else { return }
+        lastProgramPointer = name
+        guard !hoveringLink, let view = terminalView, let window = view.window else { return }
+        let point = view.convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        guard view.bounds.contains(point) else { return }
+        programCursor.set()
+    }
+
+    var programCursor: NSCursor {
+        switch session?.pointerShape {
+        case "text": return .iBeam
+        case "vertical-text": return .iBeamCursorForVerticalLayout
+        case "pointer", "help": return .pointingHand
+        case "alias": return .dragLink
+        case "zoom-in": return .zoomIn
+        case "zoom-out": return .zoomOut
+        case "crosshair", "cell": return .crosshair
+        case "grab": return .openHand
+        case "grabbing", "move": return .closedHand
+        case "copy": return .dragCopy
+        case "no-drop", "not-allowed": return .operationNotAllowed
+        case "e-resize", "w-resize", "ew-resize": return .columnResize
+        case "n-resize", "s-resize", "ns-resize": return .rowResize
+        case "ne-resize", "sw-resize", "nesw-resize": return .frameResize(position: .topRight, directions: .all)
+        case "nw-resize", "se-resize", "nwse-resize": return .frameResize(position: .topLeft, directions: .all)
+        default: return .arrow // macOS has no public wait/progress cursor
+        }
     }
 
     // The pane's state, read and written where the code that uses it reads

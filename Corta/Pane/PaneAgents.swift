@@ -29,6 +29,7 @@ final class PaneAgents {
     private var lastProcessRead: TimeInterval = 0
     private var sawSignals = false
     private var sessionHasExited = false
+    private var attentionRequest: Int?
     private var processRefresh: DispatchWorkItem?
 
     init(host: ViewController) { self.host = host }
@@ -41,6 +42,8 @@ final class PaneAgents {
     }
 
     func reset() {
+        if let attentionRequest { NSApp.cancelUserAttentionRequest(attentionRequest) }
+        attentionRequest = nil
         processRefresh?.cancel(); processRefresh = nil
         status = nil; progress = nil; fallback = nil; fallbackProcess = nil
         lastProcessRead = 0; sawSignals = false; sessionHasExited = false
@@ -54,6 +57,18 @@ final class PaneAgents {
         sawSignals = sawSignals || !reported.isEmpty
         let blocked = session.takeBlockedStatus()
         let notice = session.takeDesktopNotification()
+        if let attention = session.takeProgramAttention() {
+            if let attentionRequest { NSApp.cancelUserAttentionRequest(attentionRequest) }
+            attentionRequest = nil
+            if !NSApp.isActive {
+                switch attention {
+                case .once: attentionRequest = NSApp.requestUserAttention(.informationalRequest)
+                case .continuous: attentionRequest = NSApp.requestUserAttention(.criticalRequest)
+                case .cancel: break
+                }
+            }
+        }
+        host.pointer.refreshProgramPointer()
         host.taskNotifier.setProgramBlocked(reported.values.contains { $0.state == .blocked })
         let oldStatus = status
         let oldProgress = progress
