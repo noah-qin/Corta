@@ -90,7 +90,7 @@ and when to pick one of them instead, is in
 For coding-agent task state, the development tree currently integrates
 **Claude Code only**; other tools have generic protocol support and process
 detection, not dedicated state adapters ([scope and limits](docs/CONFORMANCE.md#cli-signal-compatibility)).
-The reference is Claude Code 2.1.310: interactive OSC 7501 state, with
+Developed and acceptance-tested with Claude Code 2.1.310: interactive OSC 7501 state, with
 explicit channel selection for Claude message text. tmux, Claude background
 sessions and disabled terminal-title reporting have separate restrictions;
 full live lifecycle acceptance is not implied by parser coverage.

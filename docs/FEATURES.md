@@ -83,8 +83,8 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 ## Claude Code state and generic program notifications
 
 - Claude Code is currently the only CLI with a dedicated task-state
-  integration. The checked reference version is 2.1.310; other versions
-  need verification. Its OSC 7501 reports distinguish working, waiting,
+  integration. Development and real acceptance used Claude Code 2.1.310;
+  other versions need independent verification. Its OSC 7501 reports distinguish working, waiting,
   done, idle and failure on tabs, the Dock and the Agents list.
 - Generic OSC 9/777/99 notifications and OSC 9;4 progress are available to
   any program. They do not establish completion or permission state.

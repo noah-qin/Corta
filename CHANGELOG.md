@@ -52,9 +52,10 @@ Versioning for compatibility changes.
   submissions finish before replacement delivery.
 - Reserve a main status slot alongside 32 subtasks. Keep generic OSC 21337
   decoration separate so it cannot hide Done or compete with typed state.
-- Match reference Claude Code 2.1.310 notification wire shapes in regression
-  tests and document actual sending conditions, disabled channels and live
-  acceptance limits.
+- Match development and acceptance version Claude Code 2.1.310 in captured
+  wire regressions. Document the supported task states and notification
+  channels, actual sending conditions, unsupported features and verification
+  limits; other Claude versions are not guaranteed.
 
 ## [1.4.0] - 2026-10-22
 

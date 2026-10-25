@@ -784,8 +784,9 @@ or ask in `#help` on the [Discord](https://discord.gg/QNdWfdwr7j).
 ## Coding-agent state and program notifications
 
 **Claude Code is currently the only CLI with a dedicated task-state
-integration.** The checked reference version is **2.1.310**; this is not a
-compatibility guarantee for all Claude versions. Codex, Gemini CLI, pi,
+integration.** It was developed and acceptance-tested with the installed
+**Claude Code 2.1.310** on macOS arm64; this is not a compatibility guarantee
+for all Claude versions. Codex, Gemini CLI, pi,
 Kimi, Grok Build, Qwen Code, OpenCode and Aider have no dedicated task-state
 adapter in Corta. Generic notification/progress protocols remain available
 to any program; process detection is not a full agent integration. See the

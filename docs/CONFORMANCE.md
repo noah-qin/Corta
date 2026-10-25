@@ -731,9 +731,10 @@ accepts escaped indicator/status/status-color metadata in a separate bounded
 slot. It decorates explicit state instead of competing with it; status text
 fills an empty task title. Native text uses system colours; status-color is
 retained, not rendered. OSC 9 distinguishes
-numeric ConEmu subcommands from notification text; only 9;4 progress changes
-state, and 9;6/9;7 never execute. Other ConEmu commands are inert; directory
-and prompt reports (9;9/9;12) remain unsupported. OSC 777 accepts only notify.
+numeric ConEmu subcommands from notification text. OSC 9;4 supplies progress;
+a bare OSC 9;12 supplies a shell prompt mark. Neither establishes an agent's
+typed task state. OSC 9;6/9;7 never execute; OSC 9;9 directory reports and
+other unimplemented ConEmu commands are inert. OSC 777 accepts only notify.
 
 OSC 99 supports title/body/close, bounded chunking and base64, occasion,
 urgency metadata, focus, expiry and silent/system sounds. Urgency never
@@ -782,8 +783,24 @@ permission, completion or Notification Center checks above.
 
 ### CLI signal compatibility
 
-**Current task-state integration: Claude Code only. Reference version:
-2.1.310.** The native OSC 7501 vocabulary above was checked against that
+**Development and acceptance version: Claude Code `2.1.310 (Claude Code)`,
+native macOS arm64. Dedicated task-state integration: Claude Code only.**
+The adapter was developed against this installed version and exercised with
+real interactive sessions identifying the terminal as `Corta`
+(`TERM=xterm-256color`). The checked-in capture records the executable's
+SHA-256 alongside its version. This is a verified reference version, not a
+promise of compatibility with every Claude Code release.
+
+| Support category | What Corta supports | Boundary |
+| :--- | :--- | :--- |
+| Dedicated Claude task state | OSC 7501 working, blocked, done, idle, error and clear; permission/question/auth reasons; one main slot and 32 subtask slots | Only explicitly reported state; output, silence, BEL and notification prose do not establish an outcome. |
+| Verified real 2.1.310 flows | Probe, normal completion, permission waiting/cancellation, invalid-model failure, isolated invalid-token auth waiting, Agent child id/clear and abrupt exit to an integrated shell | These concrete flows do not cover every failure cause or auth recovery. Question kind and capacity limits also have parser/policy coverage. |
+| Verified native notifications | Default auto plus fixed 7501 attention; explicit iterm2/ghostty/kitty text, notification clicks and waiting/completed Dock badge screenshots | Auto does not select a Claude text channel for Corta; OS authorization and delivery policy still apply. |
+| Generic protocols only | OSC 9/777/99 notifications, OSC 9;4 progress and OSC 21337 metadata | Claude 2.1.310 does not enable native progress for Corta's normal identity; its OSC 21337 sender is disabled. Generic support is not evidence of Claude emission. |
+| Not implemented | Other CLIs' dedicated state adapters; OSC 99 activation/close/alive reports, icons and buttons; ConEmu execution commands | Other recognised tools have process detection and generic protocols only. No hooks or tool configuration are installed. |
+| Not guaranteed | Other Claude versions; 7501 through tmux, Claude background sessions or disabled terminal-title reporting | The upstream minimum 2.1.295 is not a Corta-tested version range. Live regroup/restart click permutations and auth recovery need separate acceptance; routing policy has unit coverage. |
+
+The native OSC 7501 vocabulary above was checked against that
 installed version, including a captured `idle → working → done` turn.
 The opt-in core test verifies the probe; app fixtures verify state, layout
 and notification routing. The separate opt-in real-Claude UI acceptance
