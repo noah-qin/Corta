@@ -12,6 +12,12 @@ Versioning for compatibility changes.
 
 ### Added
 
+- Built-in history suggestions for standard local zsh: type a command prefix
+  to see the most recent matching suffix faintly, accept with Right/End or
+  dismiss with Esc. Tab and shell history navigation stay native. Enabled
+  by default, configurable with `history-suggestions` and a Terminal settings
+  toggle; yields to zsh-autosuggestions and leaves startup files unchanged.
+
 - OSC ecosystem coverage (#411): iTerm2 inline PNG/GIF first-frame images,
   multipart transfer, host/cwd, marks, clear history, cursor, attention and
   clipboard extensions; VS Code shell-integration marks; ConEmu prompt marks;

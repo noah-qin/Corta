@@ -105,7 +105,16 @@ extension Performer {
             guard !grid.isAlternateScreenActive, !state.isCommandRunning,
                 let token = directoryCompletionToken,
                 let report = DirectoryCompletion.untokened(payload, expected: token) else { return }
-            state.directoryCompletion = DirectoryCompletion(payload: String(decoding: report, as: UTF8.self))
+            let text = String(decoding: report, as: UTF8.self)
+            state.directoryCompletion = nil
+            state.historySuggestion = nil
+            if text.hasPrefix("h;") {
+                if let suggestion = HistorySuggestion(payload: text), !suggestion.suffix.isEmpty {
+                    state.historySuggestion = suggestion
+                }
+            } else {
+                state.directoryCompletion = DirectoryCompletion(payload: text)
+            }
         case 8:
             setHyperlink(payload)
         case 4:

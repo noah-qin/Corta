@@ -252,6 +252,7 @@ public struct Terminal: Sendable {
 
     public var windowTitle: String? { performer.state.windowTitle }
     public var directoryCompletion: DirectoryCompletion? { performer.state.directoryCompletion }
+    public var historySuggestion: HistorySuggestion? { performer.state.historySuggestion }
 
     /// Local-or-nil by construction, so always safe for a local spawn.
     public var workingDirectory: String? { performer.state.workingDirectory }

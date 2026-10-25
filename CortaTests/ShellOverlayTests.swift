@@ -115,6 +115,60 @@ import Testing
         #expect(recoloured.redComponent > 0.85 && recoloured.greenComponent < 0.3)
     }
 
+    @Test func historyPreviewSurvivesSplitRedrawButStaysHiddenAfterInputAndComposition() throws {
+        let view = TerminalView(frame: CGRect(x: 0, y: 0, width: 500, height: 200))
+        let overlay = view.shellOverlay
+        overlay.frame = view.bounds
+        let history = try #require(HistorySuggestion(payload: "h;1;%20status"))
+        let anchor = CGRect(x: 80, y: 40, width: 8, height: 17)
+        overlay.showCompletion(nil, history: history, anchor: anchor)
+        #expect(overlay.historySuggestion == history && overlay.completion == nil)
+        #expect(overlay.subviews.count == 1)
+        #expect(overlay.subviews.first?.accessibilityIdentifier() == "history-suggestion-preview")
+        #expect(overlay.subviews.first?.accessibilityValue() as? String == " status")
+        overlay.showCompletion(nil, history: history, anchor: anchor.offsetBy(dx: 24, dy: 0))
+        #expect(overlay.historySuggestion == history, "the report can precede the shell echo")
+        overlay.hideCompletion() // a cursor-movement key hides synchronously
+        overlay.showCompletion(nil, history: history, anchor: anchor.offsetBy(dx: -8, dy: 0))
+        #expect(overlay.historySuggestion == nil && overlay.occupiedRects.isEmpty)
+        let next = try #require(HistorySuggestion(payload: "h;2;%20status"))
+        overlay.showCompletion(nil, history: next, anchor: anchor)
+        view.setMarkedText("nihao", selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0))
+        let duringComposition = try #require(HistorySuggestion(payload: "h;3;%20status"))
+        overlay.showCompletion(nil, history: duringComposition, anchor: anchor)
+        #expect(overlay.historySuggestion == nil && overlay.occupiedRects.isEmpty)
+        view.unmarkText()
+        overlay.showCompletion(nil, history: duringComposition, anchor: anchor)
+        #expect(overlay.historySuggestion == nil, "a frame cannot revive a stale suggestion")
+        let refreshed = try #require(HistorySuggestion(payload: "h;4;%20status"))
+        overlay.showCompletion(nil, history: refreshed, anchor: anchor)
+        #expect(overlay.historySuggestion == refreshed)
+        overlay.hideCompletion()
+        overlay.showCompletion(nil, history: refreshed, anchor: anchor)
+        #expect(overlay.historySuggestion == nil)
+    }
+
+    @Test func historyOnlyTakesUnmodifiedAcceptanceAndDismissalKeys() throws {
+        func event(_ key: UInt16, _ modifiers: NSEvent.ModifierFlags = []) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers,
+                timestamp: 0, windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "",
+                isARepeat: false, keyCode: key))
+        }
+        #expect(ShellOverlayView.historyKeySequence(for: try event(124)) == "\u{1b}[95~")
+        #expect(ShellOverlayView.historyKeySequence(for: try event(119)) == "\u{1b}[95~")
+        #expect(ShellOverlayView.historyKeySequence(for: try event(53)) == "\u{1b}[94~")
+        for key: UInt16 in [48, 123, 125, 126, 36] {
+            #expect(ShellOverlayView.historyKeySequence(for: try event(key)) == nil)
+        }
+        for flag: NSEvent.ModifierFlags in [.shift, .command, .control, .option] {
+            #expect(ShellOverlayView.historyKeySequence(for: try event(124, flag)) == nil)
+        }
+        let (configuration, unknown) = Configuration.parse("history-suggestions = false\ndirectory-completion = true")
+        #expect(unknown.isEmpty && !configuration.historySuggestions && configuration.directoryCompletion)
+        #expect(Configuration.parse(configuration.serialized()).configuration == configuration)
+    }
+
     @Test func statusGutterHasTextOutsideTerminalCells() {
         let overlay = ShellOverlayView()
         let rect = CGRect(x: 7, y: 60, width: 2, height: 20)

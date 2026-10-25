@@ -51,6 +51,7 @@ struct PerformerState: Sendable {
     var selectionBackground: Color = .default
     var selectionForeground: Color = .default
     var directoryCompletion: DirectoryCompletion?
+    var historySuggestion: HistorySuggestion?
     /// Local only; a report naming another host goes to `remoteContext`.
     var workingDirectory: String?
     /// This machine's names when the session started (`Performer.localHostnames`).

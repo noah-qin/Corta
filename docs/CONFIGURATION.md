@@ -170,12 +170,13 @@ and the command runs directly, without a shell.
 #### Shell integration
 
 Two paths provide the same bundled hooks. Standard local zsh sessions load
-them automatically when `directory-completion = true` (the default), without
+them automatically when `directory-completion = true` or `history-suggestions = true`
+(both default to true), without
 editing startup files. Custom zsh arguments, bash, fish and remote shells
 need explicit installation or their own compatible OSC 133 hooks. Disabling
-directory suggestions in a live shell does not unload hooks already sourced;
-new sessions with the setting off do not use the automatic zsh bootstrap.
-Directory suggestions come only from that automatic bootstrap: installed
+suggestions in a live shell does not unload hooks already sourced;
+new sessions with both settings off do not use the automatic zsh bootstrap.
+Directory and history suggestions come only from that automatic bootstrap: installed
 hooks give a shell the OSC 133 marks, not suggestions.
 
 Startup-file installation is not a config-file key — it edits the login
@@ -257,6 +258,7 @@ or a title a program set (`SECURITY.md` §5).
 
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
+| `history-suggestions` | boolean | `true` | Faint suffix from the most recent matching command in local zsh’s in-memory history. Right or End accepts at the end of a nonempty, single-line input; Esc dismisses. Tab, Shift+Tab and Up/Down keep native bindings. `cd ` retains directory-suggestion precedence. Disabled automatically when zsh-autosuggestions is loaded. No startup-file edits or history-file reads. Restart the shell after enabling. See [History suggestions](USER-GUIDE.md#history-suggestions-zsh). |
 | `directory-completion` | boolean | `true` | Faint folder alternatives below `cd`, with an inline suffix as you narrow the matches in a standard local zsh session. Tab fills the selected path; Left/Right select the previous/next candidate; Esc dismisses. Up/Down retain shell history navigation and Shift+Tab goes to the shell. Set to `false` to disable suggestions and restore native key handling. New sessions load the bundled hooks without editing the user's startup files. Restart the shell after enabling. Bash and fish retain native completion. See [Directory suggestions](USER-GUIDE.md#directory-suggestions-zsh). |
 | `command-status-marks` | boolean | `true` | Show command outcomes in the left margin: green for exit 0, red for other errors, and a split gray line for interruption (exit 130). Hover for the textual outcome. |
 | `directory-history` | boolean | `true` | Whether Corta records the local directories a completed command actually ran in (`OSC 7`). Nothing in the app lists the record yet; Settings ▸ Privacy & Security ▸ History shows its size and clears it. |
@@ -374,6 +376,7 @@ notification-threshold = 60        # default 30
 # History
 directory-history = true
 directory-completion = true
+history-suggestions = true
 command-status-marks = true
 
 # Updates
@@ -760,7 +763,7 @@ search away.
 | `bell`, `option-as-meta`, `search-case-sensitive`, `search-regex`, `open-file-command`, `paste-warning`, `copy-on-select`, `mouse-override-modifier`, `link-activation`, `allow-clipboard-write`, `confirm-close`, `directory-history`, notification keys | Immediately — they are read when the behaviour happens. |
 | `status-bar`, `status-items`, `status-network-interface`, input-source indicator keys | Immediately; polling follows visible enabled bars. |
 | `command-status-marks` | Immediately; changes the command-outcome overlay without changing terminal text. |
-| `directory-completion` | Disabling immediately hides suggestions and restores native key handling. Enabling requires a new shell to load automatic local zsh hooks; a live shell keeps hooks it already loaded. |
+| `directory-completion`, `history-suggestions` | Disabling immediately hides suggestions and restores native key handling. Enabling requires a new shell to load automatic local zsh hooks; a live shell keeps hooks it already loaded. |
 | `bind.*` | Immediately: the menu key equivalents are re-applied on every file change. |
 | `theme.*` | Immediately, if the live theme is the one you edited. |
 | `columns`, `rows` | The next window opened. |

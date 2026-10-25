@@ -362,7 +362,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 size: size, directory: inheritedWorkingDirectory,
                 scrollbackLimit: configuration.scrollbackLines,
                 commandHistoryLimit: configuration.commandHistoryLimit, preset: preset,
-                directoryCompletion: configuration.directoryCompletion)
+                directoryCompletion: configuration.directoryCompletion, historySuggestions: configuration.historySuggestions)
         } catch {
             presentFailure(
                 title: L10n.text("failure.title.session"),
