@@ -283,6 +283,29 @@ struct ParserTests {
         #expect(result == [.print(0x58)])
     }
 
+    @Test("an inline image is buffered only up to the budget the performer has left")
+    func inlineImageStringFollowsTheBudget() {
+        struct Budgeted: ParserPerformer {
+            var limit: Int
+            var dispatched: [[UInt8]] = []
+            var discarded = 0
+            mutating func print(_ scalar: UInt32) {}
+            mutating func execute(_ control: UInt8) {}
+            mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) { dispatched.append(Array(bytes)) }
+            mutating func oscDiscarded() { discarded += 1 }
+            mutating func inlineImageStringLimit() -> Int { limit }
+        }
+        let image = "\u{1B}]1337;File=inline=1:" + String(repeating: "A", count: 9000) + "\u{07}"
+        var parser = Parser()
+        var refused = Budgeted(limit: 8192)
+        parser.parse(Array(image.utf8), performer: &refused)
+        #expect(refused.dispatched.isEmpty)
+        #expect(refused.discarded == 1)
+        var accepted = Budgeted(limit: 16_384)
+        parser.parse(Array(image.utf8), performer: &accepted)
+        #expect(accepted.dispatched.count == 1)
+    }
+
     @Test("an unterminated OSC never dispatches and never grows")
     func unterminatedOSCIsBounded() throws {
         var parser = Parser()

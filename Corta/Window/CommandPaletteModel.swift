@@ -113,7 +113,9 @@ final class CommandPaletteModel {
     /// selection on nothing, or on a row that no longer exists.
     func selectFirstIfNeeded() {
         if let selectedRowID, rows.contains(where: { $0.id == selectedRowID }) { return }
-        selectedRowID = rows.first { $0.selectable }?.id
+        // A command, never an agent, by default: Enter keeps meaning "run",
+        // not "jump to whichever pane happens to have an agent".
+        selectedRowID = (rows.first { $0.command != nil } ?? rows.first { $0.selectable })?.id
     }
 
     /// Subsequence matching, which is what people mean by "fuzzy" here:
@@ -129,7 +131,10 @@ final class CommandPaletteModel {
             ? browsingRows(row: row) : searchRows(matching: query.lowercased(), row: row)
         let agents = agentEntries().filter { query.isEmpty || Self.score($0.title.lowercased(), query: query.lowercased()) != nil }
         if !agents.isEmpty {
-            rows = [.header(L10n.text("agent.list"))] + agents.map { .agent($0) } + rows
+            // Listed first while browsing; under a query, below the commands it
+            // matched, since a long pane title matches most short queries.
+            let section = [Row.header(L10n.text("agent.list"))] + agents.map { .agent($0) }
+            rows = query.isEmpty ? section + rows : rows + section
         }
         selectFirstIfNeeded()
     }

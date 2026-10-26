@@ -49,6 +49,25 @@ public struct ProgramStatus: Sendable, Equatable {
     }
 }
 
+/// One drained read of a pane's program signals (`Terminal.takeProgramSignals`).
+/// The `blocked`, `notification` and `attention` edges are consumed by the read.
+public struct ProgramSignalSnapshot: Sendable {
+    public var statuses: [String: ProgramStatus]
+    public var blockedEpisode: Int
+    public var tabMetadata: ProgramStatus?
+    public var progress: ProgramProgress?
+    /// Outer optional: an edge occurred. Inner optional: no specific kind.
+    public var blocked: ProgramStatus.Kind??
+    /// Applied before `notification`, which is never one of these closes.
+    public var closedNotificationIDs: [String]
+    public var notification: DesktopNotification?
+    public var attention: ProgramAttention?
+    public var pointerShape: String?
+    public var hasShellIntegration: Bool
+    public var isCommandRunning: Bool
+    public var lastExitStatus: Int?
+}
+
 public struct ProgramProgress: Sendable, Equatable {
     public enum State: Int, Sendable { case normal = 1, error, indeterminate, paused }
     public var state: State

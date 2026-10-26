@@ -78,32 +78,39 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
         guard session != nil else { return }
         let grid = session.snapshot()
         let records = session.commandRecords.records.filter { !failedOnly || $0.didFail }
-        guard !records.isEmpty else {
+        // A mark with no command behind it — OSC 1337 SetMark — is a stop too.
+        let marks = failedOnly ? [] : grid.promptRows
+        guard !records.isEmpty || !marks.isEmpty else {
             // No marks: no shell integration, so don't jump anywhere.
             NSSound.beep()
             return
         }
         let viewportTop = ScrollbackCoordinates.viewportTopRow(
             totalPushed: grid.scrollback.totalPushed, scrollOffset: scrollOffset)
-        let target =
-            backwards
-            ? records.last { $0.promptRow < viewportTop }
-            : records.first { $0.promptRow > viewportTop }
+        let rows = Set(records.map(\.promptRow)).union(marks).sorted()
+        let target = backwards ? rows.last { $0 < viewportTop } : rows.first { $0 > viewportTop }
         guard let target else { return }
-        land(on: target, in: grid)
+        if let record = records.last(where: { $0.promptRow == target }) {
+            land(on: record, in: grid)
+        } else {
+            scroll(toRow: target, in: grid)
+            selectedCommandID = nil
+            invalidateDisplay()
+        }
     }
 
     /// Scrolls `record`'s prompt to the top and selects it; shared with
     /// `focusCommand(id:)` so the two can't disagree.
     private func land(on record: CommandRecord, in grid: Grid) {
-        scrollOffset = min(
-            max(
-                0,
-                ScrollbackCoordinates.offset(
-                    forRow: record.promptRow, totalPushed: grid.scrollback.totalPushed)),
-            grid.scrollback.count)
+        scroll(toRow: record.promptRow, in: grid)
         selectedCommandID = record.id
         invalidateDisplay()
+    }
+
+    private func scroll(toRow row: Int, in grid: Grid) {
+        scrollOffset = min(
+            max(0, ScrollbackCoordinates.offset(forRow: row, totalPushed: grid.scrollback.totalPushed)),
+            grid.scrollback.count)
     }
 
     /// Lands on a command from a notification click (`TaskNotifier` tags it
@@ -399,12 +406,14 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     /// core has no pasteboard and no user.
     func drainClipboardRequests() {
         guard let request = session.takeClipboardCopyRequest() else { return }
-        guard ConfigurationStore.shared.configuration.allowClipboardWrite else { return }
+        guard ConfigurationStore.shared.configuration.allowClipboardWrite else {
+            if !request.refusal.isEmpty { session.write(request.refusal) }
+            return
+        }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        if pasteboard.setString(request.text, forType: .string), !request.acknowledgement.isEmpty {
-            session.write(request.acknowledgement)
-        }
+        let reply = pasteboard.setString(request.text, forType: .string) ? request.acknowledgement : request.failure
+        if !reply.isEmpty { session.write(reply) }
     }
 
     // MARK: - Status marks and directory completion
@@ -457,7 +466,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
             let overlay = terminalView.shellOverlay
             let eligible = ConfigurationStore.shared.configuration.historySuggestions && isFocusedPane
                 && scrollOffset == 0 && host?.search.bar == nil && !session.isCommandRunning
-                && !session.snapshot().isAlternateScreenActive && !terminalView.hasMarkedText()
+                && !session.isAlternateScreenActive && !terminalView.hasMarkedText()
             let sequence = eligible ? ShellOverlayView.historyKeySequence(for: event) : nil
             overlay.hideCompletion()
             guard let sequence else { return false }
@@ -467,7 +476,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
         guard let terminalView, let state = terminalView.shellOverlay.completion,
             !state.candidates.isEmpty else { return false }
         guard ConfigurationStore.shared.configuration.directoryCompletion,
-            isFocusedPane, !session.isCommandRunning, !session.snapshot().isAlternateScreenActive,
+            isFocusedPane, !session.isCommandRunning, !session.isAlternateScreenActive,
             event.modifierFlags.isDisjoint(with: [.command, .control, .option]),
             !terminalView.hasMarkedText() else {
             terminalView.shellOverlay.hideCompletion()
@@ -495,7 +504,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     func acceptDirectoryCompletion(index: Int) {
         guard let terminalView, let state = terminalView.shellOverlay.completion,
             state.candidates.indices.contains(index), !session.isCommandRunning,
-            isFocusedPane, !session.snapshot().isAlternateScreenActive else { return }
+            isFocusedPane, !session.isAlternateScreenActive else { return }
         // Only fixed widget sequences, never bytes originating from PTY output.
         let delta = index - state.selectedIndex
         let movement = delta < 0 ? "\u{1b}[97~" : "\u{1b}[98~"

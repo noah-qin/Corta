@@ -135,7 +135,16 @@ struct ProgramSignalsTests {
         #expect(notice?.expiryMilliseconds == 50)
         #expect(notice?.sound == true)
         terminal.feed(osc("99;i=safe-1:p=close;"))
-        #expect(terminal.takeDesktopNotification()?.close == true)
+        #expect(terminal.takeDesktopNotification() == nil)
+        #expect(terminal.takeClosedNotificationIDs() == ["safe-1"])
+        // Closing one id between reads never swallows another id's notice;
+        // closing the pending id itself drops it.
+        terminal.feed(osc("99;i=B;new message") + osc("99;i=A:p=close;"))
+        #expect(terminal.takeDesktopNotification()?.title == "new message")
+        #expect(terminal.takeClosedNotificationIDs() == ["A"])
+        terminal.feed(osc("99;i=C;retracted") + osc("99;i=C:p=close;"))
+        #expect(terminal.takeDesktopNotification() == nil)
+        #expect(terminal.takeClosedNotificationIDs() == ["C"])
         terminal.feed(osc("99;i=query-1:p=?;"))
         #expect(terminal.takeOutput() == osc("99;i=query-1:p=?;a=focus:o=always,unfocused,invisible:p=title,body,close,?:s=system,silent:w=1"))
         // All other input, including unsupported report/close/alive modes,
@@ -155,11 +164,15 @@ struct ProgramSignalsTests {
         #expect(terminal.takeDesktopNotification()?.title == "recovered")
         terminal.feed(osc("99;i=bad:e=1;!bad"))
         #expect(terminal.takeDesktopNotification() == nil)
+        // Eight abandoned messages never shut out a ninth: the stalest goes.
         for index in 0..<8 { terminal.feed(osc("99;i=c\(index):d=0;waiting")) }
-        terminal.feed(osc("99;i=overflow;ignored"))
-        #expect(terminal.takeDesktopNotification() == nil)
-        terminal.feed(osc("99;i=c0:p=close;"))
-        _ = terminal.takeDesktopNotification()
+        terminal.feed(osc("99;i=overflow;delivered"))
+        #expect(terminal.takeDesktopNotification()?.title == "delivered")
+        terminal.feed(osc("99;i=c0;finished"))
+        #expect(terminal.takeDesktopNotification()?.title == "finished")
+        terminal.feed(osc("99;i=c7;finished"))
+        #expect(terminal.takeDesktopNotification()?.title == "waitingfinished")
+        for index in 0..<20 { terminal.feed(osc("99;i=s\(index):d=0;stale")) }
         terminal.feed(osc("99;i=recovery;okay"))
         #expect(terminal.takeDesktopNotification()?.title == "okay")
         terminal.feed(osc("9;" + String(repeating: "x", count: 5000)))
@@ -260,6 +273,9 @@ struct ProgramSignalsTests {
         terminal.feed(Array("\u{1B}[?1049h".utf8))
         terminal.feed(osc("7501;state=blocked:kind=permission") + osc("7501;state=working:id=child"))
         terminal.feed(osc("9;4;1;40") + osc("133;D;137"))
+        // Held until the shell's own prompt confirms the child is gone.
+        #expect(terminal.isCommandRunning)
+        terminal.feed(osc("7;file://host/tmp") + osc("133;A"))
         #expect(terminal.grid.isAlternateScreenActive)
         #expect(terminal.grid.promptRows.isEmpty)
         #expect(!terminal.isCommandRunning)
@@ -269,6 +285,23 @@ struct ProgramSignalsTests {
         #expect(terminal.programStatuses[""]?.kind == nil)
         #expect(terminal.programProgress == nil)
         #expect(terminal.takeBlockedStatus() == nil)
+    }
+
+    @Test func strayFinishFromALiveAlternateScreenProgramIsInert() {
+        var terminal = Terminal()
+        terminal.feed(osc("133;A") + osc("133;C"))
+        terminal.feed(Array("\u{1B}[?1049h\u{1B}[?2004h\u{1B}[>1u".utf8))
+        terminal.feed(osc("7501;state=working"))
+        // A log shown by `less -R` carrying a finished mark, not the shell's.
+        terminal.feed(osc("133;D;0"))
+        #expect(terminal.isCommandRunning)
+        #expect(terminal.isBracketedPasteEnabled)
+        #expect(terminal.keyboardEnhancements.rawValue == 1)
+        #expect(terminal.programStatuses[""]?.state == .working)
+        // The program leaves normally; the stale mark cannot finish later.
+        terminal.feed(Array("\u{1B}[<u\u{1B}[?1049l".utf8))
+        terminal.feed(Array("\u{1B}[?1049h".utf8) + osc("133;A"))
+        #expect(terminal.isCommandRunning)
     }
 
     @Test func coalescedWaitingEpisodesRemainDistinctButKindUpdatesDoNot() {
@@ -281,6 +314,9 @@ struct ProgramSignalsTests {
         #expect(terminal.programBlockedEpisode == 2)
         terminal.feed(osc("7501;state=clear") + osc("7501;state=blocked:id=child"))
         #expect(terminal.programBlockedEpisode == 3)
+        // RIS clears the state but never reuses an announced episode number.
+        terminal.feed(Array("\u{1B}c".utf8) + osc("7501;state=blocked:kind=permission"))
+        #expect(terminal.programBlockedEpisode == 4)
         terminal.feed(osc("133;C"))
         terminal.feed(osc("7501;state=working"))
         terminal.feed(osc("133;C")) // duplicate output marker, same command

@@ -10,14 +10,12 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
-### Fixed
-
-- Directory candidates now appear in a compact, bordered panel beside the
-  input, flipping above it near the bottom and staying within the pane's
-  horizontal bounds. The panel no longer paints a full-width strip over
-  previous output; inline previews and terminal row counts are unchanged.
-
 ### Added
+
+- Terminal compatibility: title save/restore, live dark/light reports, coloured
+  single/double/curly underlines, XTGETTCAP capability answers, and Neovim's
+  underline-style probe. Programs can set/query/reset selection colours and
+  restore default text, background and cursor colours to the live theme.
 
 - Built-in history suggestions for standard local zsh: type a command prefix
   to see the most recent matching suffix faintly, accept with Right/End or
@@ -55,6 +53,50 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- In zsh vi insert mode (`bindkey -v`), Esc over a history or directory
+  suggestion now dismisses it and enters command mode in one press.
+- A finished-command mark printed by a live full-screen program, such as a
+  log viewed in `less -R`, no longer turns off its bracketed paste or
+  keyboard protocol; a crashed program's shell still ends the command at
+  its next prompt.
+- Paste warnings also catch a shell fed without a pipe: `bash <(curl …)`,
+  `source <(…)` and `sh -c "$(curl …)"`. Very large warned pastes preview
+  their first 64 KiB instead of stalling before the dialog.
+- Typing past the end of zsh history no longer rescans the whole history on
+  every key while history suggestions are on.
+- Eight unfinished kitty (OSC 99) notifications no longer block every later
+  one for the rest of the session; the stalest incomplete message is dropped.
+- The command palette no longer selects an agent pane by default, so Return
+  runs a command; agent matches sort after commands while searching.
+- Moving the mouse no longer resets the cursor on every move, which fought
+  the split divider's resize cursor; a program-chosen pointer shape is kept.
+- Copy Command Output is disabled on the alternate screen, where it could
+  copy an unrelated earlier command's output.
+- Clicking a notification from a pane that has since closed brings its
+  window forward instead of doing nothing.
+- The cursor image used for the caret follows program cursor and colour
+  changes (OSC 10/11/12) like the live cursor.
+- A refused or failed kitty clipboard write (OSC 5522) now replies with a
+  fixed `EPERM` or `EIO` status, so a waiting program does not hang.
+- Marks set with iTerm2's `OSC 1337;SetMark` are now stops for Previous /
+  Next Command (⌘↑ / ⌘↓), even without shell integration.
+- Closing one kitty notification no longer discards another program notice
+  that arrived just before it.
+- A program's wait for permission after a terminal reset (RIS) is announced
+  again instead of being taken for the wait already announced.
+- A selection colour set by a program (OSC 17, kitty OSC 21) keeps the
+  theme's translucency, so box drawing and underlines inside the selection
+  stay visible.
+- With `directory-completion = false`, `cd ` input now gets history
+  suggestions instead of no hint at all.
+- An iTerm2 inline image is limited to 4096 cells across and down, as kitty
+  placements are.
+- Spaces typed after underlining ends no longer keep an invisible underline
+  colour, which kept them from being trimmed as blank.
+- Directory candidates now appear in a compact, bordered panel beside the
+  input, flipping above it near the bottom and staying within the pane's
+  horizontal bounds. The panel no longer paints a full-width strip over
+  previous output; inline previews and terminal row counts are unchanged.
 - Clear stale agent waiting, subtask and progress metadata at reported shell
   command boundaries after an abrupt CLI exit, including a CLI left on the
   alternate screen. Preserve explicit completion
@@ -73,11 +115,6 @@ Versioning for compatibility changes.
 ## [1.4.0] - 2026-10-22
 
 ### Added
-
-- Terminal compatibility: title save/restore, live dark/light reports, coloured
-  single/double/curly underlines, XTGETTCAP capability answers, and Neovim's
-  underline-style probe. Programs can set/query/reset selection colours and
-  restore default text, background and cursor colours to the live theme.
 
 - The project overview, the user guide and troubleshooting are now available
   in every language the app speaks: Simplified and Traditional Chinese,

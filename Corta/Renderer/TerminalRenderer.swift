@@ -367,6 +367,17 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
 
     /// `false`: the cache still matches and the frame can be skipped. Size
     /// changes rebuild; scrolling shifts the retained document rows.
+    /// OSC 10/11/12 over the theme, as the live frame draws them.
+    func applyDynamicColors(to palette: inout Theme.Variant) {
+        guard let dynamicColors = frameDynamicColors else { return }
+        func rgba(_ c: (red: UInt8, green: UInt8, blue: UInt8)) -> SIMD4<Float> {
+            .init(Float(c.red) / 255, Float(c.green) / 255, Float(c.blue) / 255, 1)
+        }
+        palette.foreground = rgba(dynamicColors.foreground)
+        palette.background = rgba(dynamicColors.background)
+        palette.cursor = rgba(dynamicColors.cursor)
+    }
+
     @discardableResult
     func updateInstances(
         grid: Grid, scrollOffset: Int, cursorVisible: Bool, selection: TerminalSelection?,
@@ -393,16 +404,16 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
             needsFullRebuild = true
         }
         frameUnderlineColors = grid.underlineColors
+        applyDynamicColors(to: &framePalette)
+        // After OSC 10/11: the derived selection and marks follow the canvas drawn.
         frameOverlay = framePalette.overlayColors
-        if let dynamicColors {
-            func rgba(_ c: (red: UInt8, green: UInt8, blue: UInt8)) -> SIMD4<Float> {
-                .init(Float(c.red) / 255, Float(c.green) / 255, Float(c.blue) / 255, 1)
-            }
-            framePalette.foreground = rgba(dynamicColors.foreground)
-            framePalette.background = rgba(dynamicColors.background)
-            framePalette.cursor = rgba(dynamicColors.cursor)
+        if !selectionBackground.isDefault {
+            // The program's hue at the theme's translucency: the selection is
+            // drawn over rules and box glyphs, and an opaque one hid them.
+            var selection = framePalette.resolveBackground(selectionBackground)
+            selection.w = frameOverlay.selection.w
+            frameOverlay.selection = selection
         }
-        if !selectionBackground.isDefault { frameOverlay.selection = framePalette.resolveBackground(selectionBackground) }
         if !selectionForeground.isDefault {
             if needsFullRebuild || frameSelectedColumns.count != grid.rows
                 || !Self.selectionsEqual(selection, cachedSelection) || cachedScrollbackTotalPushed != grid.scrollback.totalPushed

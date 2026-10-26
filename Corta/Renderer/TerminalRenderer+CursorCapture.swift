@@ -112,6 +112,7 @@ nonisolated extension TerminalRenderer {
             let previousPalette = framePalette
             blockCursor = BlockCursor(row: row, column: column)
             framePalette = themeVariant ?? TerminalColorPalette.activeVariant
+            applyDynamicColors(to: &framePalette)
             defer {
                 blockCursor = previousCursor
                 framePalette = previousPalette

@@ -22,12 +22,17 @@ public enum ProgramAttention: Sendable { case once, continuous, cancel }
 /// permission check and a successful pasteboard write.
 public struct ClipboardCopyRequest: Sendable {
     public let text: String
+    /// OSC 5522 only, all fixed text: written, refused by
+    /// `allow-clipboard-write`, or failed at the pasteboard. A client that
+    /// waits for a status must get one either way. Empty for OSC 52.
     public let acknowledgement: [UInt8]
+    public let refusal: [UInt8]
+    public let failure: [UInt8]
 }
 
 extension Performer {
     mutating func vscodeIntegration(_ payload: ArraySlice<UInt8>) {
-        if payload.starts(with: Array("P;Cwd=".utf8)) {
+        if payload.starts(with: Self.vscodeCwdKey) {
             if let path = Self.vscodeProperty(payload.dropFirst(6)) { reportedDirectory(path) }
         } else if let first = payload.first, [65, 66, 67, 68].contains(first),
             payload.count == 1 || payload.dropFirst().first == 59 {
@@ -60,15 +65,16 @@ extension Performer {
         } else { state.workingDirectory = path }
     }
 
+    private static let itermImageKeys = ["File", "MultipartFile", "FilePart"].map { ($0, Array(($0 + "=").utf8)) }
+    private static let itermFileEndKey = Array("FileEnd".utf8)
+    private static let vscodeCwdKey = Array("P;Cwd=".utf8)
+
     mutating func itermExtension(_ payload: ArraySlice<UInt8>) {
-        for key in ["File", "MultipartFile", "FilePart"] {
-            let prefix = Array((key + "=").utf8)
-            if payload.starts(with: prefix) {
-                receiveITermImage(key: key, value: payload.dropFirst(prefix.count))
-                return
-            }
+        for (key, prefix) in Self.itermImageKeys where payload.starts(with: prefix) {
+            receiveITermImage(key: key, value: payload.dropFirst(prefix.count))
+            return
         }
-        if payload.elementsEqual(Array("FileEnd".utf8)) {
+        if payload.elementsEqual(Self.itermFileEndKey) {
             receiveITermImage(key: "FileEnd", value: [])
             return
         }

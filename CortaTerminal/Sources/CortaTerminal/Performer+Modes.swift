@@ -106,6 +106,7 @@ extension Performer {
                         state.keyboardProtocol = main
                         state.parkedMainKeyboardProtocol = nil
                     }
+                    state.pendingAlternateScreenFinish = nil
                     grid.exitAlternateScreen()
                     applyRowRemaps()
                 }

@@ -60,7 +60,7 @@ extension Performer {
     /// ESC sequences. Charset selection and everything else are ignored
     /// cleanly (`SECURITY.md` §3).
     public mutating func escapeDispatch(intermediates: Intermediates, final: UInt8) {
-        if final != 0x5C { state.itermImage = nil } // ST terminates each FilePart
+        if final != 0x5C, state.itermImage != nil { state.itermImage = nil } // ST terminates each FilePart
         // DECALN is the one intermediate form that carries meaning here:
         // `ESC # 8`. Everything else with an intermediate — the charset
         // designators — is still ignored cleanly.
@@ -114,6 +114,9 @@ extension Performer {
         // Recovery timers identify episodes across RIS. Reusing an identity
         // can hide a new begin in the same parse slice or match a stale timer.
         let synchronizedOutputEpisode = state.synchronizedOutputEpisode
+        // Likewise waiting episodes: the app suppresses a repeat alert by
+        // number, so a wait after RIS must not reuse the last one's.
+        let blockedEpisode = state.programSignals.blockedEpisode
         // The session's share of the app's image budget, not terminal state:
         // reset to unlimited, an image later in the same slice ignored it.
         let imageByteAllowance = state.imageByteAllowance
@@ -121,6 +124,7 @@ extension Performer {
         state = PerformerState()
         resetCount &+= 1
         state.synchronizedOutputEpisode = synchronizedOutputEpisode
+        state.programSignals.blockedEpisode = blockedEpisode
         state.imageByteAllowance = imageByteAllowance
         state.hostnamesAtStart = hostnames
         state.commandRecords = CommandRecordStore(capacity: historyCapacity)

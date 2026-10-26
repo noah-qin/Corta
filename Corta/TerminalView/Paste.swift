@@ -68,7 +68,12 @@ nonisolated enum Paste {
             joined.range(of: pattern, options: .regularExpression) != nil
         }
         var result: [PasteRisk] = []
-        if matches(#"\|&?\s*(?:(?:/[^\s;|&]+/)?sudo\s+(?:-[^\s;|&]+\s+)*(?:(?:root|[0-9]+)\s+)?)?(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)(?=$|[\s;|&])"#) {
+        // The same feed without a pipe: `bash <(curl …)`, `source <(…)`, and
+        // `sh -c "$(curl …)"` / `eval "$(wget …)"`, which run a download.
+        if matches(#"\|&?\s*(?:(?:/[^\s;|&]+/)?sudo\s+(?:-[^\s;|&]+\s+)*(?:(?:root|[0-9]+)\s+)?)?(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)(?=$|[\s;|&])"#)
+            || matches(#"(?:^|[\s;|&(])(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh|source|\.)\s+<\("#)
+            || matches(#"(?:^|[\s;|&(])(?:eval|(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)\s+(?:-[^\s;|&]+\s+)*-[A-Za-z]*c[A-Za-z]*)\s+(?:\$\(|`)\s*(?:[^)`]*[\s/])?(?:curl|wget|fetch)(?=$|[\s;|&)`])"#)
+        {
             result.append(.shellPipe)
         }
         if matches(#"(?:^|[\s;|&()`'"])(?:/[^\s;|&]+/)?sudo(?=$|[\s;|&()`'"])"#) {
@@ -107,13 +112,27 @@ nonisolated enum Paste {
     }
 
     /// Never let the preview conceal the very characters it warns about.
-    static func visiblePreview(_ text: String) -> String {
-        text.unicodeScalars.map { scalar in
-            ConcealingScalars.contains(scalar.value)
-                ? "⟦U+" + String(scalar.value, radix: 16, uppercase: true) + "⟧"
-                : String(scalar)
-        }.joined()
+    /// A multi-megabyte paste previews its start: the sheet is for reading,
+    /// and the risk sentences already cover the whole text.
+    static func visiblePreview(_ text: String, limit: Int = previewLimit) -> String {
+        var preview = String.UnicodeScalarView()
+        var count = 0
+        for scalar in text.unicodeScalars {
+            guard count < limit else {
+                preview.append(contentsOf: "\n…".unicodeScalars)
+                break
+            }
+            count += 1
+            if ConcealingScalars.contains(scalar.value) {
+                preview.append(contentsOf: ("⟦U+" + String(scalar.value, radix: 16, uppercase: true) + "⟧").unicodeScalars)
+            } else {
+                preview.append(scalar)
+            }
+        }
+        return String(preview)
     }
+
+    static let previewLimit = 64 * 1024
 
     /// What ends a paste for the child: the closing marker when bracketed.
     /// A cancelled paste the child started reading is closed with it, or the

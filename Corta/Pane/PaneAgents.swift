@@ -55,11 +55,12 @@ final class PaneAgents {
     func readOutput() {
         guard !sessionHasExited, let host, let session = host.session else { return }
         let configuration = ConfigurationStore.shared.configuration
-        let reported = session.programStatuses
+        let signals = session.takeProgramSignals()
+        let reported = signals.statuses
         sawSignals = sawSignals || !reported.isEmpty
-        let blocked = session.takeBlockedStatus()
-        let notice = session.takeDesktopNotification()
-        if let attention = session.takeProgramAttention() {
+        let blocked = signals.blocked
+        let notice = signals.notification
+        if let attention = signals.attention {
             if let attentionRequest { NSApp.cancelUserAttentionRequest(attentionRequest) }
             attentionRequest = nil
             if !NSApp.isActive {
@@ -70,16 +71,16 @@ final class PaneAgents {
                 }
             }
         }
-        host.pointer.refreshProgramPointer()
+        host.pointer.refreshProgramPointer(shape: signals.pointerShape)
         host.taskNotifier.setProgramBlocked(reported.values.contains { $0.state == .blocked },
-            episode: session.programBlockedEpisode)
+            episode: signals.blockedEpisode)
         let oldStatus = status
         let oldProgress = progress
         if configuration.agentStatus {
-            refreshFallback(session: session, hasReportedStatus: !reported.isEmpty)
+            refreshFallback(session: session, signals: signals)
             status = reported.values.max { $0.urgency < $1.urgency }
                 ?? (sawSignals ? nil : fallback)
-            if let metadata = session.programTabMetadata {
+            if let metadata = signals.tabMetadata {
                 if status == nil { status = metadata }
                 else {
                     status?.color = metadata.color
@@ -87,13 +88,18 @@ final class PaneAgents {
                     if status?.title.isEmpty == true { status?.title = metadata.title }
                 }
             }
-            progress = session.programProgress
+            progress = signals.progress
             if progress == nil, let value = status?.progress {
                 progress = ProgramProgress(state: .normal, value: value)
             }
         } else { status = nil; progress = nil }
         if let blocked, !visible {
             host.taskNotifier.noteProgramAttention(kind: blocked, in: host.view.window)
+        }
+        for id in signals.closedNotificationIDs {
+            var close = DesktopNotification()
+            close.id = id; close.close = true
+            host.taskNotifier.noteProgramNotification(close, visible: visible, focused: false, in: host.view.window)
         }
         if let notice {
             host.taskNotifier.noteProgramNotification(notice, visible: visible,
@@ -103,7 +109,8 @@ final class PaneAgents {
         if oldStatus != status || oldProgress != progress { AgentDirectory.refresh() }
     }
 
-    private func refreshFallback(session: TerminalSession, hasReportedStatus: Bool) {
+    private func refreshFallback(session: TerminalSession, signals: ProgramSignalSnapshot) {
+        let hasReportedStatus = !signals.statuses.isEmpty
         let now = ProcessInfo.processInfo.systemUptime
         // Reuse the title's syscall path and cadence, including one trailing
         // read for a fast process/prompt transition. Never periodic polling.
@@ -134,8 +141,8 @@ final class PaneAgents {
         }
         // Output (including prompt redraws), notifications and BEL do not
         // tell us whether an interactive agent is working or has finished.
-        if session.hasShellIntegration, !session.isCommandRunning, fallbackProcess == nil {
-            let exit = session.commandRecords.lastCompleted?.exitStatus
+        if fallback != nil, signals.hasShellIntegration, !signals.isCommandRunning, fallbackProcess == nil {
+            let exit = signals.lastExitStatus
             fallback?.state = exit != nil && exit != 0 && exit != 130 ? .error : .idle
         }
     }

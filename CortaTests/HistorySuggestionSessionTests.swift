@@ -39,7 +39,7 @@ import CortaTerminal
         defer { ZshBootstrap.remove(folder) }
         let session = try TerminalSession(executable: "/bin/zsh", arguments: ["-l"], environment: env,
             size: TerminalSize(rows: 40, columns: 160), workingDirectory: home.path,
-            directoryCompletionToken: try #require(token))
+            directoryCompletionToken: token)
         defer { session.stop() }
         session.start()
         try wait(session) { session.promptEndPosition != nil }
@@ -87,6 +87,32 @@ import CortaTerminal
         }
     }
 
+    @Test func escapeInViInsertModeAlsoEntersCommandMode() throws {
+        try withSession(startup: "bindkey -v\nprint -s -- 'echo vi-mode'") { session in
+            write(session, "echo ")
+            try wait(session) { session.historySuggestion?.suffix == "vi-mode" }
+            write(session, "\u{1b}[94~")
+            try wait(session) { session.historySuggestion == nil }
+            // `0iX` is a motion and an insert in command mode, text in insert mode.
+            write(session, "0iX")
+            try wait(session) { session.snapshot().dump().contains("READY> Xecho") }
+        }
+    }
+
+    @Test func aMissStaysAMissAndNewHistoryIsFound() throws {
+        try withSession(startup: "print -s -- 'echo known'") { session in
+            write(session, "echo z")
+            try wait(session) { session.snapshot().dump().contains("READY> echo z") }
+            write(session, "zz")
+            try wait(session) { session.snapshot().dump().contains("READY> echo zzz") }
+            #expect(session.historySuggestion == nil)
+            write(session, "\u{15}print -s -- 'echo zzz-new'\r")
+            try wait(session) { session.commandRecords.records.contains { $0.exitStatus == 0 } }
+            write(session, "echo zzz")
+            try wait(session) { session.historySuggestion?.suffix == "-new" }
+        }
+    }
+
     @Test func emptyMidlineMultilineAndCdDoNotSuggestHistory() throws {
         try withSession(startup: "print -s -- 'echo single'\nprint -s -- $'echo multi\\nline'\nprint -s -- 'cd Alternative'") { session in
             #expect(session.historySuggestion == nil)
@@ -115,11 +141,12 @@ import CortaTerminal
     }
 
     @Test func settingsAreIndependent() throws {
-        try withSession(startup: "print -s -- 'echo enabled'", directory: false) { session in
+        try withSession(startup: "print -s -- 'cd Alpha'\nprint -s -- 'echo enabled'", directory: false) { session in
             write(session, "echo ")
             try wait(session) { session.historySuggestion?.suffix == "enabled" }
+            // With directory suggestions off, `cd ` input gets history ones.
             write(session, "\u{15}cd A")
-            try wait(session) { session.historySuggestion == nil && session.snapshot().dump().contains("READY> cd A") }
+            try wait(session) { session.historySuggestion?.suffix == "lpha" }
             #expect(session.directoryCompletion?.candidates.isEmpty != false)
         }
         try withSession(startup: "print -s -- 'echo disabled'", history: false) { session in

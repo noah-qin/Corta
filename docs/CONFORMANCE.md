@@ -51,7 +51,7 @@ measured. Priorities:
 | OSC 8 — hyperlinks                                      | P2   | Implemented; display text and target may differ — see `SECURITY.md` §2.4 |
 | OSC 1, title push/pop (`CSI 22/23 ; 0/1/2 t`) | P1 | Icon name retained separately; independent stacks keep the newest ten entries; empty pops do nothing. Title reporting remains refused |
 | OSC 10–12 / 110–112 | P1 | Set/query dynamic foreground, background and cursor; resets restore the live theme. Overrides survive theme changes until reset |
-| OSC 17/19, 117/119 | P1 | Set/query/reset selection background and real selection-text colour. Without OSC 19, selected glyphs keep their own colours; without OSC 17, the theme's translucent highlight applies. Queries return opaque RGB, with theme selection / live foreground as defaults |
+| OSC 17/19, 117/119 | P1 | Set/query/reset selection background and real selection-text colour. Without OSC 19, selected glyphs keep their own colours; without OSC 17, the theme's translucent highlight applies; with it, the program's colour is drawn at the same translucency, so box glyphs and underlines under the selection stay visible. Queries return opaque RGB, with theme selection / live foreground as defaults |
 | OSC 13–16, 18 | P2 | Accepted and ignored: pointer and Tektronix colours have no corresponding surface |
 | SGR 58 / 59 | P1 | Indexed/RGB underline colour and reset, colon or semicolon forms; independent of glyph and strikeout colour. Stored in a bounded side table without enlarging Cell |
 | Colour scheme (`?2031`, `CSI ? 996 n`) | P1 | `CSI ? 997 ; 1/2 n` reports dark/light from the live theme; a subscriber receives one report per actual variant change. DECRQM reports subscription state |
@@ -118,14 +118,14 @@ refer to [SECURITY.md](SECURITY.md).
 | `OSC 633` | A/B/C/D; P;Cwd | implemented | Same command records and host-aware cwd as native hooks | #411 |
 | `OSC 633` | E command/nonce; other P | ignored | Grid owns command text; no VS Code trust model | #411 |
 | `OSC 777` | notify | implemented | Sanitised desktop notification | #409 |
-| `OSC 1337` | CurrentDir; RemoteHost; SetMark; ClearScrollback | implemented | Host-aware metadata, navigable mark, ED 3 semantics | #411 |
+| `OSC 1337` | CurrentDir; RemoteHost; SetMark; ClearScrollback | implemented | Host-aware metadata, mark that ⌘↑/⌘↓ stop at, ED 3 semantics | #411 |
 | `OSC 1337` | CursorShape; RequestAttention; ReportCellSize; Copy | implemented | Temporary cursor; background Dock attention; numeric metrics; gated clipboard | #411 |
 | `OSC 1337` | File; MultipartFile; FilePart; FileEnd | implemented | inline=1 only; PNG/GIF first frame in sandbox; shared placements/budgets | #411 |
 | `OSC 1337` | SetUserVar; ShellIntegrationVersion; HighlightCursorLine; UnicodeVersion; SetKeyLabel; PushKeyLabels; PopKeyLabels; ClearCapturedOutput | ignored | No consumer or Touch Bar; Unicode rules stay fixed | #411 |
 | `OSC 1337` | StealFocus; SetProfile; SetBadgeFormat; ReportVariable; Custom; inline=0 | refused | No focus theft, config mutation, persistent badges, value echo, scripts or downloads | §2.10; D09/D10 |
 | `OSC 3008` | all | ignored | systemd context hierarchy, no consumer | #411 |
 | `OSC 5113` | all | refused | File transfer writes stream-named files | §2.10; #411 |
-| `OSC 5522` | text/plain write/wdata | implemented | Bounded sanitised text transaction, gated like OSC 52; partial protocol | #411 |
+| `OSC 5522` | text/plain write/wdata | implemented | Bounded sanitised text transaction, gated like OSC 52; partial protocol. Replies a fixed `status=DONE`, `EPERM` (writes not allowed) or `EIO` (pasteboard failed) | #411 |
 | `OSC 5522` | read, MIME aliases, non-text, primary selection | refused | No clipboard disclosure or extra clipboard surfaces | §2.6; §2.10 |
 | `OSC 7501` | status / probe | implemented | Bounded task state; constant probe reply | #409 |
 | `OSC 21337` | tab metadata | implemented | Bounded self-reported metadata | #409 |
@@ -742,7 +742,9 @@ bypasses the OS's notification policy. The capability reply echoes only a
 charset-checked query id, as required by the
 [kitty specification](https://sw.kovidgoyal.net/kitty/desktop-notifications/#querying-for-support).
 The default kitty occasion is always; other protocols default to hidden panes.
-Corta coalesces all program notices to one mutable notice per pane.
+Corta coalesces all program notices to one mutable notice per pane. Up to
+eight unfinished chunked messages are kept, a ninth replacing the oldest; a
+close is applied to its own id only and never drops another id's notice.
 An explicit notice delayed beyond coalescing does not re-alert a pane whose
 current blocked episode was already announced; leaving blocked resets that
 suppression. BEL and kind changes use the same episode suppression. Fixed
@@ -768,7 +770,10 @@ is added. Accepted OSC 133 command boundaries clear stale children, waiting,
 progress and tab metadata, even if the CLI never sent clear. A command
 started on main may end while a crashed CLI leaves the alternate screen
 active: lifecycle metadata finishes against the parked main grid without
-switching or marking the alternate canvas. A clean boundary
+switching or marking the alternate canvas. On the alternate screen a `D`
+takes effect only when the shell's next prompt `A` follows it, as every
+integration script sends them; a stray `D` printed by a live full-screen
+program (a log in `less -R`) leaves its paste and keyboard modes alone. A clean boundary
 preserves explicit done/error; otherwise it means Idle. Status 130 or a direct session terminated by SIGINT means
 interrupted/Idle, other known nonzero statuses mean Failed. The next command
 clears this summary. No shell boundary means no inferred CLI exit. Flood delivery is bounded to 0.2 notices/second/pane after coalescing.

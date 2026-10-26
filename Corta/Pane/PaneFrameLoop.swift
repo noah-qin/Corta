@@ -211,7 +211,8 @@ final class PaneFrameLoop {
         let cursor = cursorHandoffSignal.snapshot
         preparedPresentationToken = cursor.token
         preparedPresentationPending = cursor.awaits(cursorDrawn: content.cursorVisible)
-        let indexedPalette = session.indexedPalette
+        let colors = session.frameColors
+        let indexedPalette = colors.indexedPalette
         let damaged = renderer.updateInstances(
             grid: content.grid, scrollOffset: content.scrollOffset,
             cursorVisible: content.cursorVisible, selection: content.selection,
@@ -220,8 +221,8 @@ final class PaneFrameLoop {
             hoveredLink: content.hoveredLink,
             indexedOverrides: indexedPalette.overrides,
             indexedOverridesGeneration: indexedPalette.overridesGeneration,
-            cursorStyle: content.cursorStyle, dynamicColors: session.dynamicColors,
-            selectionBackground: session.selectionBackground, selectionForeground: session.selectionForeground)
+            cursorStyle: content.cursorStyle, dynamicColors: colors.dynamicColors,
+            selectionBackground: colors.selectionBackground, selectionForeground: colors.selectionForeground)
         return forced || damaged
     }
 

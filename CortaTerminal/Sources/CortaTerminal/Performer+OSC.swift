@@ -25,12 +25,16 @@ extension Performer {
         state.clipboardTransfer = nil
     }
 
+    // Built once: a literal's `Array(….utf8)` allocates on every OSC.
+    static let itermFilePart = Array("1337;FilePart=".utf8)
+    static let itermFileEnd = Array("1337;FileEnd".utf8)
+
     public mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) {
         if bytes.isEmpty { state.clipboardTransfer = nil }
         // A multipart image survives only its own parts/end; unrelated OSCs
         // cannot leave a large abandoned allocation behind.
-        if !bytes.starts(with: Array("1337;FilePart=".utf8)),
-            !bytes.elementsEqual(Array("1337;FileEnd".utf8)) {
+        if state.itermImage != nil, !bytes.starts(with: Self.itermFilePart),
+            !bytes.elementsEqual(Self.itermFileEnd) {
             state.itermImage = nil
         }
         guard let separator = bytes.firstIndex(of: 0x3B) else {

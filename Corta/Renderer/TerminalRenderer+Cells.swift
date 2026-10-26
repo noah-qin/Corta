@@ -31,6 +31,10 @@ nonisolated extension TerminalRenderer {
         let cell = SIMD2<Float>(Float(metricsValue.cellWidth), Float(metricsValue.cellHeight))
         // Once per row: the property retains the ANSI array on every touch.
         let palette = framePalette
+        let overrides = indexedOverrides
+        let underlineColors = frameUnderlineColors
+        let selectionForeground = frameSelectionForeground
+        let cursorText = frameDynamicColors?.cursorText ?? .default
         let cursor = blockCursorColumns(in: line, row: row, cell: cell, palette: palette, into: &background)
         let selected = frameSelectedColumns.indices.contains(row) ? frameSelectedColumns[row] : 0..<0
         var colors = CellColors()
@@ -38,15 +42,16 @@ nonisolated extension TerminalRenderer {
             let current = line[column]
             let attributes = current.attributes
             let underCursor = cursor.contains(column)
-            colors.update(for: current, underCursor: underCursor, palette: palette, overrides: indexedOverrides,
-                selectionColor: selected.contains(column) ? frameSelectionForeground : .default,
-                cursorText: frameDynamicColors?.cursorText ?? .default)
+            colors.update(for: current, underCursor: underCursor, palette: palette, overrides: overrides,
+                selectionColor: selected.contains(column) ? selectionForeground : .default,
+                cursorText: cursorText)
             let origin = SIMD2<Float>(Float(column) * cell.x, Float(row) * cell.y)
             let reversed = attributes.contains(.reverse)
             if underCursor || !(reversed ? current.foreground : current.background).isDefault || reversed {
                 background.append(QuadInstance(origin: origin, size: cell, rgba: colors.packedBackground))
             }
-            appendRules(for: current, at: origin, cell: cell, color: colors.foreground, into: &background)
+            appendRules(for: current, at: origin, cell: cell, color: colors.foreground,
+                underlineColors: underlineColors, palette: palette, overrides: overrides, into: &background)
             guard !attributes.contains(.invisible), !attributes.contains(.wideSpacer) else { continue }
             if appendGeometry(
                 for: current.scalar, wide: attributes.contains(.wide), at: origin, cell: cell, colors: colors,
@@ -156,6 +161,7 @@ nonisolated extension TerminalRenderer {
     @inline(__always)
     private func appendRules(
         for cell: Cell, at origin: SIMD2<Float>, cell size: SIMD2<Float>, color: SIMD4<Float>,
+        underlineColors: UnderlineColorTable, palette: Theme.Variant, overrides: IndexedColorOverrides,
         into background: inout ContiguousArray<QuadInstance>
     ) {
         let attributes = cell.attributes
@@ -164,8 +170,8 @@ nonisolated extension TerminalRenderer {
             !attributes.contains(.invisible)
         else { return }
         let underlineColor = cell.underlineColorID == 0 ? color :
-            frameUnderlineColors.color(for: cell.underlineColorID).map {
-                framePalette.resolveForeground($0, indexedOverrides: indexedOverrides)
+            underlineColors.color(for: cell.underlineColorID).map {
+                palette.resolveForeground($0, indexedOverrides: overrides)
             } ?? color
         let baseline = Float(metricsValue.baselineOffset)
         let thickness = max(1, Float(scaleValue).rounded(.down))

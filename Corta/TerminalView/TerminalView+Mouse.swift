@@ -165,7 +165,7 @@ extension TerminalView {
             return
         }
         controller.pointer.handleLinkHover(event, in: self)
-        controller.pointer.refreshProgramPointer(force: true)
+        controller.pointer.reassertProgramPointer()
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -180,6 +180,6 @@ extension TerminalView {
             return
         }
         controller.pointer.handleLinkHover(event, in: self)
-        controller.pointer.refreshProgramPointer(force: true)
+        controller.pointer.reassertProgramPointer()
     }
 }

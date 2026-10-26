@@ -99,6 +99,8 @@ struct PerformerState: Sendable {
     /// once per command, not once per frame.
     var finishedCommandExitStatus: Int?
     var commandExitStatus: Int?
+    /// An alternate-screen `D`'s exit status, applied only by the shell's next `A`.
+    var pendingAlternateScreenFinish: Int?
     var commandRecords = CommandRecordStore()
     /// OSC 52 writes only. The read form would hand the clipboard to the
     /// child and stays unimplemented (`SECURITY.md` §6).
@@ -134,6 +136,14 @@ struct PendingImageTransmission: Sendable {
 
 /// OSC 10/11/12's colours, 8 bits per channel; reported by doubling each
 /// byte into xterm's 16-bit form.
+/// `TerminalSession.frameColors`: what a frame reads, taken together.
+public struct FrameColors: Sendable {
+    public var indexedPalette: IndexedPalette
+    public var dynamicColors: DynamicColors
+    public var selectionBackground: Color
+    public var selectionForeground: Color
+}
+
 public struct DynamicColors: Sendable, Equatable {
     public var foreground: (red: UInt8, green: UInt8, blue: UInt8)
     public var background: (red: UInt8, green: UInt8, blue: UInt8)

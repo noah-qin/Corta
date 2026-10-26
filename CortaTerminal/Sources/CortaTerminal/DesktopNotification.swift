@@ -39,10 +39,16 @@ struct ProgramSignals: Sendable {
     var tabMetadata: ProgramStatus?
     var progress: ProgramProgress?
     var notification: DesktopNotification?
+    /// kitty `p=close` ids, apart from `notification`: closing one message
+    /// must not overwrite another id's notice still waiting to be read.
+    var closedIDs: [String] = []
     var blocked: ProgramStatus.Kind??
     var blockedID: String?
     var blockedEpisode = 0
     var chunks: [String: DesktopNotification] = [:]
+    /// Oldest first, so a ninth incomplete message replaces the stalest one
+    /// rather than shutting out every later notice.
+    var chunkOrder: [String] = []
     var chunkBytes: [String: Int] = [:]
 
     mutating func status(_ payload: String) {
@@ -137,11 +143,20 @@ struct ProgramSignals: Sendable {
         if type == "close" {
             guard !id.isEmpty else { return [] }
             chunks[id] = nil; chunkBytes[id] = nil
-            var notice = DesktopNotification(); notice.id = id; notice.close = true
-            notification = notice
+            if notification?.id == id { notification = nil }
+            if !closedIDs.contains(id) {
+                if closedIDs.count == 8 { closedIDs.removeFirst() }
+                closedIDs.append(id)
+            }
             return []
         }
-        guard chunks[id] != nil || chunks.count < 8 else { return [] }
+        if chunks[id] == nil {
+            chunkOrder.removeAll { chunks[$0] == nil }
+            if chunks.count >= 8, !chunkOrder.isEmpty {
+                let oldest = chunkOrder.removeFirst()
+                chunks[oldest] = nil; chunkBytes[oldest] = nil
+            }
+        }
         if chunkBytes[id] == -1 {
             if fields["d"] != "0" { chunks[id] = nil; chunkBytes[id] = nil }
             return []
@@ -149,6 +164,7 @@ struct ProgramSignals: Sendable {
         let raw = String(payload[payload.index(after: separator)...])
         let total = (chunkBytes[id] ?? 0) + raw.utf8.count
         guard total <= Self.chunkLimit else {
+            if fields["d"] == "0", !chunkOrder.contains(id) { chunkOrder.append(id) }
             chunks[id] = fields["d"] == "0" ? DesktopNotification() : nil
             chunkBytes[id] = fields["d"] == "0" ? -1 : nil
             return []
@@ -177,6 +193,7 @@ struct ProgramSignals: Sendable {
             notice.sound = sound == "system"
         }
         if fields["d"] == "0" {
+            if !chunkOrder.contains(id) { chunkOrder.append(id) }
             chunks[id] = notice; chunkBytes[id] = total
         } else {
             chunks[id] = nil; chunkBytes[id] = nil

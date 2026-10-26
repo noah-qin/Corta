@@ -49,12 +49,24 @@ extension Performer {
         }
     }
 
-    private mutating func appendITermPart(_ value: ArraySlice<UInt8>) {
-        guard state.itermImage != nil else { return }
+    /// The base64 an image may still take, from the per-pane and process
+    /// budgets as they stand now.
+    private mutating func inlineImageBase64Limit() -> Int {
         if let imageAllowanceProvider { state.imageByteAllowance = imageAllowanceProvider() }
         applyImageAllowance()
         let available = grid.imagePlacements.availableBytes(for: .init(rawValue: 0))
-        let limit = min(KittyGraphics.maximumImageBytes, available) / 3 * 4 + 4
+        return min(KittyGraphics.maximumImageBytes, available) / 3 * 4 + 4
+    }
+
+    /// The legacy single-sequence form carries its header and the whole
+    /// image in one OSC; cap the parser's buffer at what could be accepted.
+    mutating func inlineImageStringLimit() -> Int {
+        min(Parser.maxInlineImageStringLength, inlineImageBase64Limit() + 4096)
+    }
+
+    private mutating func appendITermPart(_ value: ArraySlice<UInt8>) {
+        guard state.itermImage != nil else { return }
+        let limit = inlineImageBase64Limit()
         guard state.itermImage!.base64.count + value.count <= limit else {
             state.itermImage = nil; return
         }
@@ -68,6 +80,8 @@ extension Performer {
         finishTransmission(PendingImageTransmission(header: header, display: nil,
             base64: transfer.base64, itermOptions: transfer.options))
     }
+
+    static let maximumImageCells = 4096
 
     mutating func placeITermImage(_ received: KittyGraphics.ImageData, options: [String: String]) {
         let bytes = received.bytes
@@ -96,6 +110,16 @@ extension Performer {
         }
         guard width.isFinite, height.isFinite, width > 0, height > 0,
             width <= 1_000_000, height <= 1_000_000 else { return }
+        // The same 4096-cell extent kitty's `c=`/`r=` are clamped to.
+        let maxWidth = Double(Self.maximumImageCells * cw), maxHeight = Double(Self.maximumImageCells * ch)
+        if width > maxWidth || height > maxHeight {
+            if options["preserveAspectRatio"] != "0" {
+                let fit = min(maxWidth / width, maxHeight / height)
+                width *= fit; height *= fit
+            } else {
+                width = min(width, maxWidth); height = min(height, maxHeight)
+            }
+        }
         let data = KittyGraphics.ImageData(format: bytes.first == 0x47 ? .gif : .png,
             width: 0, height: 0, bytes: bytes)
         guard let id = try? store(data, as: .init(rawValue: 0)) else { return }

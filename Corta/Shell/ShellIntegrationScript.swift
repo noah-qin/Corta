@@ -239,12 +239,17 @@ enum ShellIntegrationScript {
             __corta_history_suffix=''
             [[ $BUFFER != $__corta_history_dismissed ]] && __corta_history_dismissed=''
             __corta_history_available || return 0
-            [[ -n $BUFFER && $BUFFER != 'cd '* && $BUFFER != *[[:cntrl:]]* && $CURSOR == ${#BUFFER} && $BUFFER != $__corta_history_dismissed ]] || return 0
+            # `cd ` belongs to directory suggestions only while they are on.
+            [[ -n $BUFFER && ( $BUFFER != 'cd '* || ${__corta_cd_enabled:-1} != 1 ) && $BUFFER != *[[:cntrl:]]* && $CURSOR == ${#BUFFER} && $BUFFER != $__corta_history_dismissed ]] || return 0
             # zsh/parameter searches its special history array newest first.
             # Quote the literal prefix as a pattern; require a longer,
             # single-line entry. No HISTFILE read, eval or subprocess.
+            # A longer prefix of the same history can only narrow the last
+            # answer: keep a match that still fits, and keep a miss as a miss,
+            # so typing past the end of history never rescans it per key.
             if [[ $HISTCMD != $__corta_history_event || $BUFFER != $__corta_history_cached_buffer ]]; then
-              if [[ $HISTCMD != $__corta_history_event || $BUFFER != "$__corta_history_cached_buffer"* || $__corta_history_command != "$BUFFER"?* ]]; then
+              if [[ $HISTCMD != $__corta_history_event || $BUFFER != "$__corta_history_cached_buffer"* ]] ||
+                 [[ -n $__corta_history_command && $__corta_history_command != "$BUFFER"?* ]]; then
                 __corta_history_command=${history[(r)${(b)BUFFER}[^[:cntrl:]]##]}
               fi
               __corta_history_cached_buffer=$BUFFER
@@ -360,6 +365,9 @@ enum ShellIntegrationScript {
             fi
           }
           __corta_cd_dismiss() { __corta_cd_dismissed=$BUFFER; }
+          # In vi insert mode Esc also leaves insert mode, as it would unhinted.
+          __corta_history_dismiss_vi() { __corta_history_dismiss; zle vi-cmd-mode; }
+          __corta_cd_dismiss_vi() { __corta_cd_dismiss; zle vi-cmd-mode; }
           autoload -Uz add-zle-hook-widget
           add-zle-hook-widget line-pre-redraw __corta_cd_redraw
           zle -N __corta_history_accept
@@ -368,6 +376,8 @@ enum ShellIntegrationScript {
           zle -N __corta_cd_previous
           zle -N __corta_cd_accept
           zle -N __corta_cd_dismiss
+          zle -N __corta_history_dismiss_vi
+          zle -N __corta_cd_dismiss_vi
           # Bind both emacs and vi insertion maps, without replacing native Tab.
           for __corta_cd_map in emacs viins; do
             bindkey -M $__corta_cd_map $'\e[95~' __corta_history_accept
@@ -377,6 +387,8 @@ enum ShellIntegrationScript {
             bindkey -M $__corta_cd_map $'\e[99~' __corta_cd_accept
             bindkey -M $__corta_cd_map $'\e[96~' __corta_cd_dismiss
           done
+          bindkey -M viins $'\e[94~' __corta_history_dismiss_vi
+          bindkey -M viins $'\e[96~' __corta_cd_dismiss_vi
           unset __corta_cd_map
         fi
         """#

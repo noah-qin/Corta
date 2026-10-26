@@ -19,8 +19,9 @@ public struct Pen: Equatable, Sendable {
     public var foreground: Color
     public var background: Color
     public var attributes: CellAttributes
-    /// Not reset by SGR 0: recolouring link text has not ended the link.
+    /// SGR 58's colour (`UnderlineColorTable`); SGR 0 and 59 reset it.
     public var underlineColorID: UInt16 = 0
+    /// Not reset by SGR 0: recolouring link text has not ended the link.
     public var hyperlink: HyperlinkID
 
     public init(
@@ -46,7 +47,10 @@ public struct Pen: Equatable, Sendable {
             foreground: foreground,
             background: background,
             attributes: attributes,
-            hyperlink: hyperlink, underlineColorID: underlineColorID
+            hyperlink: hyperlink,
+            // SGR 58 outlives SGR 24, but a cell without an underline has
+            // nothing to colour: carrying the id made blank cells non-blank.
+            underlineColorID: attributes.contains(.underline) ? underlineColorID : 0
         )
     }
 

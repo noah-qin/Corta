@@ -36,11 +36,17 @@ public protocol ParserPerformer {
     mutating func csiDispatch(_ sequence: CSISequence)
 
     /// Raw bytes, bounded by `Parser.maxStringLength`: a payload is not
-    /// necessarily text.
+    /// necessarily text. OSC strings share that bound, except the image and
+    /// clipboard forms `Parser.oscString` names.
     mutating func dcsDispatch(_ bytes: ArraySlice<UInt8>)
 
     mutating func oscDispatch(_ bytes: ArraySlice<UInt8>)
     mutating func oscDiscarded()
+
+    /// How long an OSC 1337 `File=` string may grow, asked once as it
+    /// begins: the image budget left, so a refused image is never buffered
+    /// whole first. At most `Parser.maxInlineImageStringLength`.
+    mutating func inlineImageStringLimit() -> Int
 
     /// Raw bytes, bounded by `Parser.maxAPCStringLength`; Kitty graphics is
     /// the one user.
@@ -64,5 +70,6 @@ extension ParserPerformer {
     public mutating func dcsDispatch(_ bytes: ArraySlice<UInt8>) {}
     public mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) {}
     public mutating func oscDiscarded() {}
+    public mutating func inlineImageStringLimit() -> Int { Parser.maxInlineImageStringLength }
     public mutating func apcDispatch(_ bytes: ArraySlice<UInt8>) {}
 }

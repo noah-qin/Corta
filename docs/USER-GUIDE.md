@@ -333,7 +333,7 @@ own error text is under **Details**.
   command without running it until you press Return. When the program has
   not turned bracketed paste on (macOS's own `/bin/bash` 3.2 never does),
   Corta warns before pasting text that contains a line break. It also warns
-  for a pipe into a shell, sudo, recursive forced deletion, a backslash
+  for a pipe into a shell (or `bash <(curl …)` and its kin), sudo, recursive forced deletion, a backslash
   continuation, or invisible/bidirectional characters, even with bracketed
   paste enabled. Review the risk sentences and text preview before choosing
   **Paste** or **Cancel**; hidden characters appear as `⟦U+202E⟧` codes.
@@ -345,7 +345,8 @@ own error text is under **Details**.
   part not yet sent is dropped and the interrupt goes straight through.
 - **Right-click.** The clicked pane offers Find… and Copy Command Output
   for the completed command whose output contains the clicked row; the copy
-  item is disabled on prompts or without shell integration. On a link it
+  item is disabled on prompts, on the alternate screen (full-screen programs)
+  and without shell integration. On a link it
   offers Open Link and Copy Link; on a `path:line:column` reference it offers
   Open Path and Copy Path. Opening uses the same link checks, configured
   editor and remote confirmation as clicking. Programs with mouse reporting
@@ -405,7 +406,8 @@ With the hooks loaded, automatically or through startup-file installation:
 - **Prompt marks.** A thin rule at the left of each prompt, green when the
   command succeeded and red when it failed. An empty Return draws no rule
   and creates no completed command-history entry.
-- **Jumping.** ⌘↑ / ⌘↓ move between commands; ⇧⌘↑ / ⇧⌘↓ move between
+- **Jumping.** ⌘↑ / ⌘↓ move between commands, and also stop at marks a
+  program sets with iTerm2's `OSC 1337;SetMark`; ⇧⌘↑ / ⇧⌘↓ move between
   the ones that failed.
 - **A command's output.** From the command palette: **Copy Last Command
   Output**, **Snapshot Running Command's Output** (what a build has printed
@@ -467,7 +469,7 @@ While a suggestion is visible:
 | --- | --- |
 | Left / Right | Select the previous / next folder instead of moving the input cursor. |
 | Tab | Fill the selected directory into the input; do not execute it. This replaces native Tab completion while suggestions are visible. |
-| Esc | Dismiss suggestions for the current input. Press Esc before using Left / Right to edit the command, or again for the shell's own Esc action. |
+| Esc | Dismiss suggestions for the current input. Press Esc before using Left / Right to edit the command, or again for the shell's own Esc action. With `bindkey -v` the same press also enters command mode. |
 | Up / Down | Keep the shell's normal command-history navigation. |
 | Shift+Tab | Pass through to the shell's configured binding. |
 | Return | Execute only the actual input; never automatically accept a faint suggestion. |
@@ -504,13 +506,14 @@ single-line command wins. For example, after running `git status`, typing
 | Key | Action while the hint is visible |
 | --- | --- |
 | Right / End | Append the suggested suffix at the end of the input, without executing. |
-| Esc | Dismiss the hint until the input changes. |
+| Esc | Dismiss the hint until the input changes. With `bindkey -v` the same press also enters command mode. |
 | Tab / Shift+Tab / Up / Down | Keep the shell's normal completion and history bindings. |
 | Return | Execute only the actual input. |
 
 Empty input, a cursor in the middle of the line and multiline history entries
-show no history hint. `cd ` keeps directory suggestions. Input-method
-composition hides hints, leaving the IME's own candidates available.
+show no history hint. `cd ` keeps directory suggestions while they are on,
+and gets history hints when they are off. Input-method composition hides
+hints, leaving the IME's own candidates available.
 If zsh-autosuggestions is loaded, Corta leaves history suggestions to it.
 Bash, fish, remote shells and custom startup commands keep their own editing.
 
@@ -834,6 +837,9 @@ work starts or after it stops; only an explicit `done` means completion.
 A progress ring follows OSC 7501 or OSC 9;4 reports. The Dock counts waiting
 panes and shows aggregate progress. Open the command palette or Window →
 Agents to find every agent pane across windows; choosing an entry focuses it.
+In the palette the agents are listed first while browsing and after matching
+commands while searching, and Return still runs the highlighted command:
+move to an agent with the arrow keys to jump to it.
 Several agents in one pane are shown by their most urgent state. Status and
 application names are reported by the program, not verified identities.
 Generic OSC 21337 metadata can decorate the current state with an indicator
