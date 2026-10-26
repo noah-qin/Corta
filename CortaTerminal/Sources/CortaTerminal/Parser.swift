@@ -427,7 +427,7 @@ public struct Parser: Sendable {
         default:
             if stringBuffer.count == 20 {
                 if stringBuffer.starts(with: Array("1337;File=".utf8)) {
-                    oscStringLimit = Self.maxInlineImageStringLength
+                    oscStringLimit = min(Self.maxInlineImageStringLength, performer.inlineImageStringLimit())
                 } else if stringBuffer.starts(with: Array("1337;FilePart=".utf8)) {
                     oscStringLimit = 1024 * 1024
                 } else if stringBuffer.starts(with: Array("5522;type=wdata".utf8)) {

@@ -250,6 +250,17 @@ struct OSCExtensionTests {
         t.feed(Self.osc("1337;File=inline=1:" + Data(bytes).base64EncodedString()))
         #expect(t.grid.imagePlacements.imageCount == 0)
     }
+    @Test func imageCellExtentIsClampedLikeKitty() {
+        for preserve in ["1", "0"] {
+            var t = Terminal(rows: 4, columns: 40)
+            t.grid.cellPixelWidth = 10; t.grid.cellPixelHeight = 20
+            t.feed(Self.osc("1337;File=inline=1;width=1000000px;height=1000000px;preserveAspectRatio=\(preserve):" + Self.png))
+            let placement = t.grid.imagePlacements.orderedPlacements().first
+            #expect(placement.map { ($0.columns ?? .max) <= 4096 && ($0.rows ?? .max) <= 4096 } == true,
+                "preserve=\(preserve)")
+        }
+    }
+
     @Test func imagePixelSizingPreservesAspectAndHistoryErase() {
         var t = Terminal(rows: 4, columns: 40)
         t.grid.cellPixelWidth = 10; t.grid.cellPixelHeight = 20
@@ -272,6 +283,8 @@ struct OSCExtensionTests {
         let copy = try #require(pendingCopy)
         #expect(copy.text == "hello")
         #expect(copy.acknowledgement == Self.osc("5522;type=write:status=DONE"))
+        #expect(copy.refusal == Self.osc("5522;type=write:status=EPERM"))
+        #expect(copy.failure == Self.osc("5522;type=write:status=EIO"))
         #expect(t.takeOutput().isEmpty) // host must first check permission and write
         #expect(t.takeClipboardCopyRequest() == nil)
     }

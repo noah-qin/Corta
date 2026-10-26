@@ -64,16 +64,16 @@ extension TerminalSession {
         registerStateWaiter { state.withLock { $0.terminal.applicationKeypadEnabled } }
     }
 
-    public var dynamicColors: DynamicColors {
-        get { registerStateWaiter { state.withLock { $0.terminal.dynamicColors } } }
-        set { registerStateWaiter { state.withLock { $0.terminal.dynamicColors = newValue } } }
-    }
-
-    public var selectionBackground: Color {
-        registerStateWaiter { state.withLock { $0.terminal.selectionBackground } }
-    }
-    public var selectionForeground: Color {
-        registerStateWaiter { state.withLock { $0.terminal.selectionForeground } }
+    /// Every colour a frame resolves cells with, under one lock per frame.
+    public var frameColors: FrameColors {
+        registerStateWaiter {
+            state.withLock {
+                FrameColors(
+                    indexedPalette: $0.terminal.indexedPalette, dynamicColors: $0.terminal.dynamicColors,
+                    selectionBackground: $0.terminal.selectionBackground,
+                    selectionForeground: $0.terminal.selectionForeground)
+            }
+        }
     }
     public func updateTheme(colors: DynamicColors, isDark: Bool) {
         registerStateWaiter {
@@ -115,9 +115,6 @@ extension TerminalSession {
     public var pointerShape: String? {
         registerStateWaiter { state.withLock { $0.terminal.pointerShape } }
     }
-    public func takeProgramAttention() -> ProgramAttention? {
-        registerStateWaiter { state.withLock { $0.terminal.takeProgramAttention() } }
-    }
     public func updateBackingScale(_ scale: Double) {
         guard scale.isFinite, scale > 0, scale <= 8 else { return }
         registerStateWaiter { state.withLock { $0.terminal.grid.backingScale = scale } }
@@ -125,20 +122,12 @@ extension TerminalSession {
     public var programStatuses: [String: ProgramStatus] {
         registerStateWaiter { state.withLock { $0.terminal.programStatuses } }
     }
-    public var programBlockedEpisode: Int {
-        registerStateWaiter { state.withLock { $0.terminal.programBlockedEpisode } }
-    }
-    public var programTabMetadata: ProgramStatus? {
-        registerStateWaiter { state.withLock { $0.terminal.programTabMetadata } }
-    }
     public var programProgress: ProgramProgress? {
         registerStateWaiter { state.withLock { $0.terminal.programProgress } }
     }
-    public func takeDesktopNotification() -> DesktopNotification? {
-        registerStateWaiter { state.withLock { $0.terminal.takeDesktopNotification() } }
-    }
-    public func takeBlockedStatus() -> ProgramStatus.Kind?? {
-        registerStateWaiter { state.withLock { $0.terminal.takeBlockedStatus() } }
+    /// One lock for a pane's whole agent-state read; drains its edges.
+    public func takeProgramSignals() -> ProgramSignalSnapshot {
+        registerStateWaiter { state.withLock { $0.terminal.takeProgramSignals() } }
     }
 
     public var windowTitle: String? {
@@ -172,6 +161,11 @@ extension TerminalSession {
     /// foreground group, since stock macOS zsh sends OSC 7 only to Terminal.app.
     public var currentDirectory: String? {
         workingDirectory ?? pty.currentWorkingDirectory
+    }
+
+    /// One flag, without copying the grid the way `snapshot()` would.
+    public var isAlternateScreenActive: Bool {
+        registerStateWaiter { state.withLock { $0.terminal.grid.isAlternateScreenActive } }
     }
 
     public var isCommandRunning: Bool {

@@ -186,6 +186,7 @@ import Testing
     }
     @Test func underlineTableReclaimsOnlyUnreferencedColors() throws {
         var grid = Grid(rows: 1, columns: 2)
+        grid.pen.attributes.insert(.underline)
         grid.setUnderlineColor(.rgb(255, 255, 255))
         grid.write(65)
         let kept = grid[0, 0].underlineColorID
@@ -194,5 +195,13 @@ import Testing
         #expect(grid.underlineColors.count <= UnderlineColorTable.capacity)
         #expect(grid.underlineColors.color(for: kept) == .rgb(255, 255, 255))
         #expect(snapshot.underlineColors.color(for: kept) == .rgb(255, 255, 255))
+    }
+
+    @Test func underlineColourIsCarriedOnlyByUnderlinedCells() {
+        var t = Terminal(rows: 2, columns: 10)
+        t.feed(Array("\u{1B}[4;58:5:1mA\u{1B}[24m  ".utf8))
+        #expect(t.grid.line(0)[0].underlineColorID != 0)
+        #expect(t.grid.line(0)[1].isBlank)
+        #expect(t.grid.line(0)[2].isBlank)
     }
 }

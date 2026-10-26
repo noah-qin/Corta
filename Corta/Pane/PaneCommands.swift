@@ -117,9 +117,13 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             host.terminalRenderer != nil, let session = host.session
         {
             let grid = session.snapshot()
-            let point = host.pointer.documentPosition(for: event, in: view, grid: grid)
-            let row = grid.absoluteRow(ofScreenRow: point.row)
-            clickedCommand = Self.command(at: row, records: session.commandRecords.records)
+            // Records index the main screen; an alternate screen's rows start
+            // again from zero and would name an unrelated old command.
+            if !grid.isAlternateScreenActive {
+                let point = host.pointer.documentPosition(for: event, in: view, grid: grid)
+                let row = grid.absoluteRow(ofScreenRow: point.row)
+                clickedCommand = Self.command(at: row, records: session.commandRecords.records)
+            }
         }
         let commandID = clickedCommand?.id
         contextItem(in: menu, key: "context.copyCommandOutput", enabled: clickedCommand != nil) { [weak self] in

@@ -80,7 +80,7 @@ struct Performer: ParserPerformer, Sendable {
     // MARK: - CSI dispatch
 
     mutating func csiDispatch(_ sequence: CSISequence) {
-        state.itermImage = nil
+        if state.itermImage != nil { state.itermImage = nil }
         // A private marker or an intermediate makes it a different sequence
         // with the same final byte — `CSI ? 25 h` is not `CSI 25 h`, and
         // `CSI > c` is not `CSI c`. The ones Corta answers route here; every

@@ -243,6 +243,11 @@ public struct Terminal: Sendable {
         defer { performer.state.programSignals.notification = nil }
         return performer.state.programSignals.notification
     }
+    /// kitty close requests since the last read, oldest first.
+    public mutating func takeClosedNotificationIDs() -> [String] {
+        defer { performer.state.programSignals.closedIDs.removeAll() }
+        return performer.state.programSignals.closedIDs
+    }
     /// Outer optional: an edge occurred. Inner optional: no specific kind.
     public mutating func takeBlockedStatus() -> ProgramStatus.Kind?? {
         defer {
@@ -250,6 +255,19 @@ public struct Terminal: Sendable {
             performer.state.programSignals.blockedID = nil
         }
         return performer.state.programSignals.blocked
+    }
+
+    /// Everything a pane's agent state reads after output, drained in one
+    /// pass so the app takes the session lock once per signal, not ten times.
+    public mutating func takeProgramSignals() -> ProgramSignalSnapshot {
+        ProgramSignalSnapshot(
+            statuses: programStatuses, blockedEpisode: programBlockedEpisode,
+            tabMetadata: programTabMetadata, progress: programProgress,
+            blocked: takeBlockedStatus(), closedNotificationIDs: takeClosedNotificationIDs(),
+            notification: takeDesktopNotification(),
+            attention: takeProgramAttention(), pointerShape: pointerShape,
+            hasShellIntegration: hasShellIntegration, isCommandRunning: isCommandRunning,
+            lastExitStatus: commandRecords.lastCompleted?.exitStatus)
     }
 
     public var windowTitle: String? { performer.state.windowTitle }
@@ -299,11 +317,14 @@ public struct Terminal: Sendable {
 
     public mutating func takeClipboardCopyRequest() -> ClipboardCopyRequest? {
         guard let text = performer.state.pendingClipboardCopy else { return nil }
-        let acknowledgement = performer.state.clipboardNeedsAcknowledgement
-            ? Array("\u{1B}]5522;type=write:status=DONE\u{1B}\\".utf8) : []
+        let answers = performer.state.clipboardNeedsAcknowledgement
+        func status(_ word: String) -> [UInt8] {
+            answers ? Array("\u{1B}]5522;type=write:status=\(word)\u{1B}\\".utf8) : []
+        }
         performer.state.pendingClipboardCopy = nil
         performer.state.clipboardNeedsAcknowledgement = false
-        return ClipboardCopyRequest(text: text, acknowledgement: acknowledgement)
+        return ClipboardCopyRequest(
+            text: text, acknowledgement: status("DONE"), refusal: status("EPERM"), failure: status("EIO"))
     }
 
     /// Image bytes this terminal may hold in all, set from an

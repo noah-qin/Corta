@@ -56,7 +56,7 @@ struct DirectoryCompletionSessionTests {
         defer { ZshBootstrap.remove(folder) }
         let session = try TerminalSession(executable: "/bin/zsh", arguments: ["-l"], environment: env,
             size: TerminalSize(rows: 40, columns: 120), workingDirectory: home.path,
-            directoryCompletionToken: try #require(token))
+            directoryCompletionToken: token)
         defer { session.stop() }
         session.start()
         func wait(_ predicate: () -> Bool) throws {

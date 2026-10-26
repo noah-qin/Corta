@@ -27,16 +27,26 @@ struct AgentPaletteTests {
         var focused: UUID?
         model.onAgent = { focused = $0 }
         #expect(model.rows.first?.id == "header-" + L10n.text("agent.list"))
+        // Enter still runs a command; an agent is chosen deliberately.
+        #expect(model.selectedCommand != nil)
+        model.moveSelection(by: -1)
         #expect(model.selectedRowID == "agent-" + id.uuidString)
         model.runSelected()
         #expect(focused == id)
         model.query = "permission"
         #expect(model.rows.contains { $0.id == "agent-" + id.uuidString })
+        model.query = "new tab"
+        #expect(model.selectedCommand == .newTab)
+        if let agent = model.rows.firstIndex(where: { $0.id == "agent-" + id.uuidString }) {
+            #expect(model.rows[..<agent].contains { $0.command != nil })
+        }
         entries[0].title = "project — Done"
         model.rebuildRows()
         #expect(!model.rows.contains { $0.id == "agent-" + id.uuidString })
         model.query = ""
         #expect(model.rows.contains { $0.id == "agent-" + id.uuidString })
+        model.moveSelection(by: -1)
+        #expect(model.selectedRowID == "agent-" + id.uuidString)
         model.moveSelection(by: 1)
         #expect(model.selectedCommand != nil)
         model.moveSelection(by: -1)

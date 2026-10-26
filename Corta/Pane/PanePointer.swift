@@ -76,18 +76,28 @@ final class PanePointer: NSObject {
         self.host = host
     }
 
-    func refreshProgramPointer(force: Bool = false) {
-        let name = session?.pointerShape
-        guard force || name != lastProgramPointer else { return }
+    /// With a shape already read under the session lock (`PaneAgents`).
+    func refreshProgramPointer(shape name: String?) {
+        guard name != lastProgramPointer else { return }
         lastProgramPointer = name
         guard !hoveringLink, let view = terminalView, let window = view.window else { return }
         let point = view.convert(window.mouseLocationOutsideOfEventStream, from: nil)
         guard view.bounds.contains(point) else { return }
-        programCursor.set()
+        Self.cursor(for: name).set()
     }
 
-    var programCursor: NSCursor {
-        switch session?.pointerShape {
+    /// On pointer motion. Only a shape a program chose (OSC 22) is put back,
+    /// from the last value read with output and without the session lock;
+    /// the default arrow keeps the transitions-only rule above.
+    func reassertProgramPointer() {
+        guard let name = lastProgramPointer, !hoveringLink else { return }
+        Self.cursor(for: name).set()
+    }
+
+    var programCursor: NSCursor { Self.cursor(for: session?.pointerShape) }
+
+    static func cursor(for shape: String?) -> NSCursor {
+        switch shape {
         case "text": return .iBeam
         case "vertical-text": return .iBeamCursorForVerticalLayout
         case "pointer", "help": return .pointingHand

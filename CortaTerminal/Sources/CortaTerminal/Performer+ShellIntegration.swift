@@ -30,10 +30,17 @@ extension Performer {
             // shell can still end a command known to have started on main.
             // Finish metadata against the parked main grid without marking
             // or switching the alternate canvas. Other alt-screen marks stay inert.
-            if kind == 0x44, state.isCommandRunning, state.commandExitStatus == nil,
+            // A live TUI can print a stray `D` (a log in `less -R`), so it is
+            // only held until the shell's own next prompt `A` confirms it:
+            // every integration script sends `D` then `A` from its prompt hook.
+            if kind == 0x44, state.isCommandRunning, state.commandExitStatus == nil {
+                state.pendingAlternateScreenFinish = Self.exitStatus(payload)
+            } else if kind == 0x41, let pending = state.pendingAlternateScreenFinish,
+               state.isCommandRunning, state.commandExitStatus == nil,
                let main = grid.suspendedMain?.grid {
+                state.pendingAlternateScreenFinish = nil
                 state.historySuggestion = nil
-                let status = Self.exitStatus(payload)
+                let status = pending
                 state.isCommandRunning = false
                 state.promptAwaitsRepaint = false
                 state.commandExitStatus = status
@@ -46,6 +53,7 @@ extension Performer {
             }
             return
         }
+        state.pendingAlternateScreenFinish = nil
         if (0x41...0x44).contains(kind) { state.historySuggestion = nil }
         switch kind {
         case 0x41: promptStarted()

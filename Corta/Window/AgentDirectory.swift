@@ -23,6 +23,10 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     static let shared = AgentDirectory()
     private var configurationObserver: NSObjectProtocol?
     private var dockView: AgentDockView?
+    /// What the Dock tile last drew: a redraw is a cross-process call, and a
+    /// program streaming progress changes `status` on most output signals.
+    private var drawnBadge: String?
+    private var drawnDockPercent: Int?
     static let didChange = Notification.Name("dev.noahqin.Corta.agentsDidChange")
 
     struct Entry: Equatable {
@@ -77,6 +81,8 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
             let progress = enabled ? split.panes.compactMap { $0.agents.progress }.first : nil
             if status != nil || progress != nil {
                 let view = (window.tab.accessoryView as? AgentTabView) ?? AgentTabView(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
+                guard view.status != status || view.progress != progress || window.tab.accessoryView !== view
+                else { continue }
                 view.status = status; view.progress = progress
                 var label = status.map { L10n.text("agent.state." + $0.state.rawValue) }
                     ?? L10n.text("agent.progress")
@@ -95,17 +101,24 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
                 }
             }
         }
-        NSApp.dockTile.badgeLabel = waiting > 0 ? String(waiting) : nil
-        if !values.isEmpty {
-            let view = directory.dockView ?? AgentDockView(frame: NSRect(origin: .zero, size: NSApp.dockTile.size))
-            directory.dockView = view
-            view.progress = values.reduce(0, +) / Double(values.count)
-            NSApp.dockTile.contentView = view
-        } else {
-            NSApp.dockTile.contentView = nil
-            directory.dockView = nil
+        let badge = waiting > 0 ? String(waiting) : nil
+        let progress = values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
+        let percent = progress.map { Int(($0 * 100).rounded()) }
+        if badge != directory.drawnBadge || percent != directory.drawnDockPercent {
+            directory.drawnBadge = badge
+            directory.drawnDockPercent = percent
+            NSApp.dockTile.badgeLabel = badge
+            if let progress {
+                let view = directory.dockView ?? AgentDockView(frame: NSRect(origin: .zero, size: NSApp.dockTile.size))
+                directory.dockView = view
+                view.progress = progress
+                NSApp.dockTile.contentView = view
+            } else {
+                NSApp.dockTile.contentView = nil
+                directory.dockView = nil
+            }
+            NSApp.dockTile.display()
         }
-        NSApp.dockTile.display()
         NotificationCenter.default.post(name: didChange, object: nil)
     }
 

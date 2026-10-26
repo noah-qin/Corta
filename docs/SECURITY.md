@@ -80,7 +80,8 @@ Copying a command from a web page where a hidden element appended
 - Bracketed paste is enabled by default.
 - When a paste contains a newline **and** the application has not enabled
   bracketed paste mode, warn before sending (unless explicitly disabled).
-- `paste-warning = dangerous` (default) also warns for pipes into shells,
+- `paste-warning = dangerous` (default) also warns for pipes into shells
+  (and the same feed through `bash <(…)` or `sh -c "$(curl …)"`),
   `sudo`, recursive forced `rm`, backslash-newline continuations and
   `ConcealingScalars`, regardless of bracketed paste. `always` additionally
   warns on any multiline paste; `off` disables dialogs. The pane-local
@@ -283,7 +284,7 @@ disables both notice paths; `agent-status = false` hides agent chrome.
 | OSC 1337 SetBadgeFormat | Refused: persistent program text over the canvas needs a separate decision |
 | OSC 1337 ReportVariable | Refused: no program text or variable values echoed into child input (§2.1–2.2) |
 | OSC 1337 Custom | Refused: no arbitrary script consumers (D09) |
-| OSC 5522 read; MIME aliases; non-text; primary selection | Refused: no clipboard disclosure, file data or extra clipboard surfaces; same user-controlled write gate as OSC 52 |
+| OSC 5522 read; MIME aliases; non-text; primary selection | Refused: no clipboard disclosure, file data or extra clipboard surfaces; same user-controlled write gate as OSC 52. A completed text write is answered with a fixed `status=DONE`, `EPERM` (writes disallowed) or `EIO` (pasteboard failure) |
 | OSC 9;9 cwd | Ignored: no host, so remote paths cannot become local spawn targets (§2.8) |
 
 OSC 1337 CurrentDir and OSC 633 P;Cwd update remote metadata while a remote
@@ -308,7 +309,7 @@ allocating without bound. These caps are asserted in the fuzz harness
 | Input                      | Cap                                                   |
 | -------------------------- | ----------------------------------------------------- |
 | OSC / DCS string length    | 4096 bytes ordinarily; discard the sequence on overflow and resynchronise |
-| iTerm2 image OSC | File: base64 of at most 64 MiB decoded data plus 4100 header bytes; FilePart: 1 MiB per packet. Multipart total: at most 64 MiB decoded and the pane/process allowance. Unrelated OSC/CSI/APC abandons it; malformed base64, declared-size mismatch and oversized dimensions are dropped. The parser releases large string capacity after dispatch. Large base64 decoding uses the existing decode pause outside the session lock |
+| iTerm2 image OSC | File: base64 of at most 64 MiB decoded data plus 4100 header bytes, and never more than the pane/process image allowance left when the sequence begins (the parser asks before buffering); FilePart: 1 MiB per packet. A placement spans at most 4096 cells each way, as kitty's `c=`/`r=` do. Multipart total: at most 64 MiB decoded and the pane/process allowance. Unrelated OSC/CSI/APC abandons it; malformed base64, declared-size mismatch and oversized dimensions are dropped. The parser releases large string capacity after dispatch. Large base64 decoding uses the existing decode pause outside the session lock |
 | Extended clipboard / pointer stack | OSC 5522: 8192-byte packet cap, 3072 decoded bytes per text transaction, publish only at end; any invalid part discards it. OSC 22: 16 fixed names per screen; oldest evicted, RIS clears both |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
 | Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size; 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) |
@@ -641,10 +642,15 @@ matching Claude Code 2.1.310's maximum emitted set; OSC 21337 has one separate
 metadata slot and cannot evict typed state. Each status retains at most
 80 bytes of app name, 192 of title, 2,048 of message, 32 per colour field
 and a bounded id. Kitty
-retains at most eight incomplete messages of 4,096 encoded bytes each; an
-oversized transmission is discarded through its final chunk. One pending
-notice and one blocked edge are coalesced per terminal. Sessions own all core
-metadata; RIS and session teardown release it. The app retains one pending
+retains at most eight incomplete messages of 4,096 encoded bytes each; a
+ninth replaces the oldest, so abandoned messages cannot shut out later ones,
+and an oversized transmission is discarded through its final chunk. Close
+requests queue apart from the pending notice, at most eight ids, so closing
+one id never discards another's unread notice. One pending notice and one
+blocked edge are coalesced per terminal. Sessions own all core
+metadata; RIS and session teardown release it. Only the waiting-episode
+counter continues across RIS, so a new wait is never mistaken for one
+already announced. The app retains one pending
 notice, one delivery callback and one expiry callback per pane, all cancelled
 on pane teardown/session replacement. State-derived attention carries a
 waiting-episode identity and is invalidated when that episode ends; independent
