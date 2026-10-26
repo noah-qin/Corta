@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-26
+
 ### Added
 
 - Terminal compatibility: title save/restore, live dark/light reports, coloured
@@ -2274,7 +2276,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.4.0...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.5.0...main
+[1.5.0]: https://github.com/noah-qin/Corta/releases/tag/v1.5.0
 [1.4.0]: https://github.com/noah-qin/Corta/releases/tag/v1.4.0
 [1.3.1]: https://github.com/noah-qin/Corta/releases/tag/v1.3.1
 [1.3.0]: https://github.com/noah-qin/Corta/releases/tag/v1.3.0
