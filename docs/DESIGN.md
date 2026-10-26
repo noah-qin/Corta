@@ -272,6 +272,16 @@ by name never consults it.
 
 ---
 
+Clear Screen is a terminal-state operation under the session lock, never a
+PTY input write. For a ready OSC 133 prompt, `Terminal` retains the complete
+`Line` range from prompt start through screen bottom, moves it to row zero,
+and translates the cursor and live command record. Copying lines retains
+wrap flags, wide-cell continuations and side-table IDs; it avoids guessing
+prompt text or relying on shell keybindings. Scrollback stays untouched.
+Without a ready prompt the main screen retains erase-and-home behavior;
+alternate-screen programs and editors with a prompt already in history are
+left intact. Clear History and Reset Terminal remain independent operations.
+
 ## 5. Milestones
 
 The original M1–M10 plan and its measurements are preserved in

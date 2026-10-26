@@ -147,6 +147,35 @@ the same for an rc file it cannot read: it reports it and leaves it alone.
 
 ## Typing and rendering
 
+### Clear Screen leaves only a cursor, without a prompt
+
+Update Corta if ⌘K erases a waiting prompt. With shell integration and a
+ready prompt-end marker, Clear Screen now keeps the displayed prompt and
+unsubmitted input, including its editing cursor. It does not send Return,
+Control-L or any other input. Enable shell integration for a shell without
+prompt markers; standard local zsh sessions load it automatically with the
+bundled suggestions. The shell's own Control-L redraw remains an alternative
+when configured by that shell. An alternate-screen program or a multiline
+editor whose prompt is already in history is deliberately left intact.
+
+### Directory suggestions stop after a folder ending in `/`
+
+Only subdirectories are candidates; a directory containing only files has no
+next directory suggestion. Type part of a child folder name or press Tab
+again when candidates are visible. Tab fills the path without executing it;
+Return runs `cd`. Hidden folders need a dot prefix. If a known child folder
+is missing, check access to that directory and compare with native shell
+completion after disabling `directory-completion`. Report the exact path
+shape and shell if the difference persists.
+
+### About or Command History opens away from the terminal
+
+Close and reopen the window in the current Corta build. Both open centered
+over the window that invoked them and are constrained to its display's usable
+area; they are not positioned at the center of the whole screen. An already
+open window keeps the position you chose.
+
+
 ### Tab does nothing in Claude Code's slash-command menu
 
 Fixed in 1.0.0 (B02); v0.1.1 has the bug. If it recurs

@@ -53,6 +53,29 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Clear Screen (⌘K) immediately keeps a ready integrated shell's prompt and
+  unsubmitted input visible, with the editing cursor intact. Multiline
+  prompts, wrapped input, wide characters and deferred wrapping keep their
+  cell data. No keystrokes are sent to the child and no command is executed.
+  Scrollback is kept; Clear History and Reset Terminal keep their separate
+  roles. Alternate-screen applications and editors taller than the screen
+  are left intact.
+- About and Command History open centered over the invoking window, within
+  the current display's usable area. A window already open stays where the
+  user put it. Command History uses a fixed size to keep its filters usable,
+  and shows a localized empty state and command count.
+- Rounder Liquid Glass across Corta's floating surfaces. Connect to Host
+  (and the file browser's host step) has a glass capsule host field, a large
+  Terminal / Files switch, glass cards for Advanced and suggestions, and glass
+  Cancel / Connect buttons. The command palette is rounder with a search
+  glyph and soft row highlights; Command History has a glass search field,
+  toggles, row buttons and results card; a pane's stopped/failed card is glass
+  with glass buttons; directory candidates sit in a glass capsule. Connect to
+  Host is never taller than its window: in a small one it scrolls.
+- Stopped and failed session panels are centered in their pane, with the
+  primary recovery action still receiving keyboard focus. Connection labels
+  use Host and Open in consistently across the terminal and file browser.
+
 - In zsh vi insert mode (`bindkey -v`), Esc over a history or directory
   suggestion now dismisses it and enters command mode in one press.
 - A finished-command mark printed by a live full-screen program, such as a
@@ -111,6 +134,15 @@ Versioning for compatibility changes.
   wire regressions. Document the supported task states and notification
   channels, actual sending conditions, unsupported features and verification
   limits; other Claude versions are not guaranteed.
+
+### Tests and tooling
+
+- Regression checks now assert visible prompt/input cells and cursor state
+  after Clear Screen, plus continued editing in real shells. Local zsh
+  completion is verified through three consecutive directory levels;
+  no completion defect was reproduced and its logic is unchanged.
+- Limit the existing SwiftLint source inventory to project sources and
+  scripts, excluding generated build trees; no lint cleanup is included.
 
 ## [1.4.0] - 2026-10-22
 

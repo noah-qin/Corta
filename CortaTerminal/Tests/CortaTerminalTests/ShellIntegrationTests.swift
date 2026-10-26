@@ -124,17 +124,102 @@ import Testing
         #expect(last.promptEndColumn == 2)
     }
 
-    /// Clear Screen erases the waiting prompt and leaves the cursor at the
-    /// top, where the next command is typed and its outcome drawn.
+    /// Clear Screen keeps the waiting prompt visible at the top.
     @Test("after Clear Screen the next command is marked where it was typed")
     func clearScreenMovesTheWaitingPrompt() {
         var terminal = self.terminal(rows: 6)
         terminal.feed(Array("\u{1B}]133;A\u{7}$ true\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;0\u{7}".utf8))
         terminal.feed(Array("\u{1B}]133;A\u{7}$ \u{1B}]133;B\u{7}".utf8))
         terminal.clearScreen()
+        #expect(terminal.grid[0, 0].scalar == 0x24)
+        #expect(terminal.grid.cursor == Cursor(row: 0, column: 2))
         terminal.feed(Array("ls\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;0\u{7}".utf8))
         #expect(terminal.grid.line(0).mark == .promptSucceeded)
         #expect(terminal.grid.promptRows == [0])
+    }
+
+    @Test("Clear Screen preserves empty input, text and a cursor inside the input",
+          arguments: ["", "echo hello", "echo hello\u{1B}[5D"])
+    func clearScreenPreservesEditor(input: String) throws {
+        var terminal = self.terminal(rows: 6, columns: 30)
+        terminal.feed(Array("history\r\noutput\r\n\u{1B}]133;A\u{7}\u{1B}[32muser ❯ \u{1B}[0m\u{1B}]133;B\u{7}".utf8))
+        terminal.feed(Array(input.utf8))
+        let before = terminal.grid
+        let column = try #require(terminal.promptEndPosition).column
+        let count = terminal.commandRecords.records.count
+        terminal.clearScreen()
+        #expect(terminal.grid.line(0) == before.line(2))
+        #expect(terminal.grid.cursor == Cursor(row: 0, column: before.cursor.column))
+        #expect(terminal.promptEndPosition?.column == column)
+        #expect(terminal.commandRecords.last?.promptEndColumn == column)
+        #expect(terminal.commandRecords.records.count == count)
+        #expect(!terminal.isCommandRunning)
+        #expect(terminal.grid.line(1).isEmpty)
+        // Repeated clearing at the top must retain the editor too.
+        terminal.clearScreen()
+        #expect(terminal.grid.line(0) == before.line(2))
+        terminal.feed(Array("X".utf8))
+        #expect(terminal.grid[0, before.cursor.column].scalar == 0x58)
+    }
+
+    @Test("Clear Screen preserves multiline prompts, wrapped wide input and rows below the cursor")
+    func clearScreenPreservesMultilineEditor() {
+        var terminal = self.terminal(rows: 10, columns: 12)
+        terminal.feed(Array("old\r\nold\r\n\u{1B}]133;A\u{7}location\r\n❯ \u{1B}]133;B\u{7}你好abcdefghi\r\nsecond e\u{301}\u{1B}[1A\u{1B}[3G".utf8))
+        let before = terminal.grid
+        terminal.clearScreen()
+        for row in 0..<8 { #expect(terminal.grid.line(row) == before.line(row + 2)) }
+        #expect(terminal.grid.cursor == Cursor(row: before.cursor.row - 2, column: before.cursor.column))
+        #expect(terminal.grid.pendingWrap == before.pendingWrap)
+        #expect(terminal.inputPromptRow == terminal.grid.absoluteRow(ofScreenRow: 0))
+        #expect(terminal.promptEndPosition == nil, "multiline prompt must not acquire a single-line boundary")
+    }
+
+    @Test("Clear Screen retains deferred wrap and scrollback without appending cleared output")
+    func clearScreenPreservesWrapAndHistory() {
+        var terminal = self.terminal(rows: 4, columns: 8)
+        terminal.feed(Array("history\r\nold\r\nold\r\nold\r\n\u{1B}]133;A\u{7}$ \u{1B}]133;B\u{7}123456".utf8))
+        let before = terminal.grid
+        #expect(before.pendingWrap)
+        terminal.clearScreen()
+        #expect(terminal.grid.line(0) == before.line(3))
+        #expect(terminal.grid.pendingWrap)
+        #expect(terminal.grid.scrollback.totalPushed == before.scrollback.totalPushed)
+        #expect(terminal.grid.line(atAbsoluteRow: 0) == before.line(atAbsoluteRow: 0))
+        terminal.feed(Array("Z".utf8))
+        #expect(terminal.grid.cursor == Cursor(row: 1, column: 1))
+        #expect(terminal.grid[1, 0].scalar == 0x5A)
+    }
+
+    @Test("Clear Screen leaves alternate programs and oversized editors intact")
+    func clearScreenDoesNotEraseOwnedCanvas() {
+        var terminal = self.terminal(rows: 3)
+        terminal.feed(Array("\u{1B}]133;A\u{7}$ \u{1B}]133;B\u{7}one\r\ntwo\r\nthree\r\nfour".utf8))
+        let editor = terminal.grid
+        terminal.clearScreen()
+        for row in 0..<3 { #expect(terminal.grid.line(row) == editor.line(row)) }
+        #expect(terminal.grid.cursor == editor.cursor)
+        terminal.feed(Array("\u{1B}]133;C\u{7}\u{1B}[?1049hVIM".utf8))
+        let alternate = terminal.grid
+        let records = terminal.commandRecords
+        terminal.clearScreen()
+        for row in 0..<3 { #expect(terminal.grid.line(row) == alternate.line(row)) }
+        #expect(terminal.grid.cursor == alternate.cursor)
+        #expect(terminal.commandRecords == records)
+        #expect(terminal.isCommandRunning)
+    }
+
+    @Test("Clear Screen during output retains the running command's boundaries")
+    func clearScreenDuringCommand() {
+        var terminal = self.terminal(rows: 6)
+        terminal.feed(Array("old\r\n\u{1B}]133;A\u{7}$ run\u{1B}]133;B\u{7}\r\n\u{1B}]133;C\u{7}output".utf8))
+        let records = terminal.commandRecords
+        terminal.clearScreen()
+        #expect(terminal.isCommandRunning)
+        #expect(terminal.commandRecords == records)
+        terminal.feed(Array("more\r\n\u{1B}]133;D;0\u{7}".utf8))
+        #expect(terminal.commandRecords.lastCompleted?.promptRow == records.last?.promptRow)
+        #expect(terminal.commandRecords.lastCompleted?.exitStatus == 0)
     }
 
     /// The session's first prompt: no `C` has arrived yet, and the repaint's

@@ -1,5 +1,16 @@
 # Guía de uso
 
+> Actualización actual (prevalece sobre los apartados anteriores): ⌘K conserva el indicador integrado
+> preparado, la entrada sin ejecutar y el cursor de edición, y los mueve arriba. No envía teclas,
+> no ejecuta y mantiene el historial. La pantalla alternativa y las entradas cuyo indicador está en
+> el historial quedan intactas; sin marcador preparado se conserva el borrado habitual. Acerca de y
+> el historial se abren centrados sobre la ventana que los invoca, dentro de la pantalla; una ventana
+> ya abierta mantiene su posición. Conexión, paleta, historial, candidatos y paneles de fin/error usan
+> vidrio redondeado. El formulario pequeño permite desplazarse y el historial tiene tamaño fijo.
+> Tab solo completa la ruta, sin ejecutar; tras `/` permite seguir por subdirectorios. Las carpetas
+> con solo archivos no tienen más candidatos. Véase la [guía inglesa](../../USER-GUIDE.md);
+> los demás apartados mantienen la referencia de traducción indicada abajo.
+
 [Índice de la documentación (inglés)](../../README.md) · [Presentación del proyecto](README.md)
 
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)

@@ -42,6 +42,11 @@ final class PaneFailureView: NSView {
     var announcement: String { accessibilityLabel() ?? "" }
 
     /// - Parameters:
+    ///   - title: the short failure heading.
+    ///   - canRetry: whether the primary action can retry the failed spawn.
+    ///   - canReconnect: whether the primary action reconnects a remote host.
+    ///   - symbol: the SF Symbol used for the failure icon.
+    ///   - tint: the failure icon's accent colour.
     ///   - detail: the plain sentence.
     ///   - details: the raw reason, behind Details.
     ///   - note: what the primary action does; by default, Reconnect's.
@@ -77,7 +82,7 @@ final class PaneFailureView: NSView {
         overlay = PaneStatusOverlay(panel: panel, backdrop: backdrop)
         super.init(frame: .zero)
         relay.view = self
-        overlay.present(in: self, placement: .center)
+        overlay.present(in: self)
         // The rightmost button is the one the panel is about.
         primaryAction = panel.buttons.last
         // Return activates Try Again or Settings, so the panel answers the

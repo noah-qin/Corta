@@ -51,7 +51,7 @@ the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
 - Kitty graphics with direct RGB, RGBA and PNG transmission and placement,
   zlib-compressed or not (`o=z`, what `kitten icat` sends for an image it
   scales to fit). Erasing
-  the screen (`clear`, ⌃L, Clear Screen) removes the images on it; erasing the
+  the main screen (`clear`, ⌃L, Clear Screen) removes the images on it; erasing the
   scrollback (`clear`'s `ED 3`, Clear History) removes the ones in history — as
   kitty does. An image wholly inside a scroll region moves with it and is
   cropped at its margins; one straddling a margin stays put, as kitty's page
@@ -72,10 +72,17 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 - Scrollback search with case-sensitive and regular-expression modes, in a
   find bar that narrows with a split pane and moves to the bottom while the
   cursor or the current match is under it; text selection, copy and export. Clear Screen, Clear History and Reset Terminal
-  are separate commands with different effects.
+  are separate commands with different effects. At a ready integrated prompt,
+  Clear Screen keeps the complete editor display and input cursor at the top
+  without sending input to the shell. Alternate-screen programs and editors
+  whose prompt has scrolled into history are left intact.
 - A command palette (⇧⌘P), configurable shortcuts, themes and a native
   Settings window — a sidebar of eight categories, System Settings style —
   backed by `~/.config/corta/config`.
+- Rounded glass surfaces for the command palette, connection form, command
+  history, directory candidates and centered stopped/failed pane panels.
+  Connect to Host scrolls in small windows; About and Command History open
+  centered over the invoking window, within its display's usable bounds.
 - Working-directory commands (reveal, copy, `cd` to the parent or project
   root, open a pane there), shell/directory/environment presets, and local
   `path:line:column` references that can open in an editor.
@@ -109,7 +116,7 @@ and [verification limits](CONFORMANCE.md#cli-signal-compatibility).
   zsh, bash or fish, use **Settings ▸ Terminal ▸ Shell Integration**.
 - Built-in directory suggestions for standard local zsh sessions, with
   faint alternatives and inline previews, Left/Right selection and Tab
-  acceptance. Up/Down keep command history navigation; Shift+Tab passes
+  acceptance, including consecutive subdirectory levels. Up/Down keep command history navigation; Shift+Tab passes
   through. Disable the optional feature in Settings or with
   `directory-completion = false` ([usage](USER-GUIDE.md#directory-suggestions-zsh)).
   Local hooks load without changing the user's startup files.

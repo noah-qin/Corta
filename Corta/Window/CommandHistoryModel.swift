@@ -274,6 +274,7 @@ final class CommandHistoryModel {
         onDismiss?()
     }
 
+    /// - Parameter id: the command record selected by the user.
     /// - Parameter shown: the text the row drew. The grid is read again
     ///   here, and output can have rewritten the record's row since the
     ///   list last refreshed.

@@ -22688,6 +22688,65 @@
         }
       }
     },
+    "commandHistory.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Commands"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有命令"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "沒有命令"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "コマンドなし"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "명령 없음"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Keine Befehle"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Aucune commande"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sin comandos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nenhum comando"
+          }
+        }
+      }
+    },
     "commandHistory.textGone": {
       "extractionState": "manual",
       "localizations": {
@@ -26706,55 +26765,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Host or SSH alias"
+            "value": "Host"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "主机或 SSH 别名"
+            "value": "主机"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "主機或 SSH 別名"
+            "value": "主機"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "ホストまたはSSHエイリアス"
+            "value": "ホスト"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "호스트 또는 SSH 별칭"
+            "value": "호스트"
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Host oder SSH-Alias"
+            "value": "Host"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Hôte ou alias SSH"
+            "value": "Hôte"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Host o alias SSH"
+            "value": "Host"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Host ou alias SSH"
+            "value": "Host"
           }
         }
       }
@@ -41359,55 +41418,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connect for"
+            "value": "Open in"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "连接用途"
+            "value": "打开方式"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "連線用途"
+            "value": "開啟方式"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "接続の用途"
+            "value": "開く方法"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "연결 용도"
+            "value": "열기 방식"
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Verbinden für"
+            "value": "Öffnen in"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Se connecter pour"
+            "value": "Ouvrir dans"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Conectar para"
+            "value": "Abrir en"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Conectar para"
+            "value": "Abrir em"
           }
         }
       }

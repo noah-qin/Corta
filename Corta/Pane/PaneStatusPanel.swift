@@ -52,22 +52,38 @@ final class PaneStatusPanel: NSView {
 
     /// Widest the text runs, so a sentence stays a sentence in a wide pane.
     static let textWidth: CGFloat = 340
+    static let cornerRadius: CGFloat = 26
+    private let glass = NSGlassEffectView()
 
     init(_ content: Content, actions: [Action]) {
         self.content = content
         super.init(frame: .zero)
         wantsLayer = true
         identifier = NSUserInterfaceItemIdentifier("Corta.StatusPanel")
-        layer?.cornerRadius = 16
+        layer?.cornerRadius = Self.cornerRadius
+        layer?.cornerCurve = .continuous
         layer?.borderWidth = 1
         // Through `NSView.shadow`: AppKit owns a layer-backed view's layer
-        // shadow and dropped one set there, leaving a white card with no edge
-        // on a light terminal.
+        // shadow and dropped one set there, leaving a card with no edge on a
+        // light terminal.
         let shadow = NSShadow()
         shadow.shadowColor = NSColor.black.withAlphaComponent(0.22)
         shadow.shadowBlurRadius = 18
         shadow.shadowOffset = NSSize(width: 0, height: -6)
         self.shadow = shadow
+        // Liquid Glass, as the find bar and the palette float on; the system
+        // makes it opaque under Reduce Transparency.
+        glass.cornerRadius = Self.cornerRadius
+        glass.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(glass)
+        NSLayoutConstraint.activate([
+            glass.leadingAnchor.constraint(equalTo: leadingAnchor),
+            glass.trailingAnchor.constraint(equalTo: trailingAnchor),
+            glass.topAnchor.constraint(equalTo: topAnchor),
+            glass.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+        let surface = NSView()
+        glass.contentView = surface
 
         let icon = NSImageView()
         icon.image = NSImage(systemSymbolName: content.symbol, accessibilityDescription: nil)
@@ -101,9 +117,12 @@ final class PaneStatusPanel: NSView {
         for (index, action) in actions.enumerated() {
             let button = NSButton(title: action.title, target: self, action: #selector(runAction(_:)))
             button.tag = index
-            button.bezelStyle = .push
+            button.bezelStyle = .glass
             button.controlSize = .large
-            if action.isPrimary { button.bezelColor = .controlAccentColor }
+            if action.isPrimary {
+                button.bezelColor = .controlAccentColor
+                button.contentTintColor = .white
+            }
             row.addArrangedSubview(button)
             buttons.append(button)
             handlers.append(action.handler)
@@ -117,12 +136,12 @@ final class PaneStatusPanel: NSView {
         stack.setCustomSpacing(10, after: icon)
         stack.setCustomSpacing(14, after: views[views.count - 2])
         stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
+        surface.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -24),
-            stack.topAnchor.constraint(equalTo: topAnchor, constant: 20),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -18),
+            stack.leadingAnchor.constraint(equalTo: surface.leadingAnchor, constant: 28),
+            stack.trailingAnchor.constraint(equalTo: surface.trailingAnchor, constant: -28),
+            stack.topAnchor.constraint(equalTo: surface.topAnchor, constant: 24),
+            stack.bottomAnchor.constraint(equalTo: surface.bottomAnchor, constant: -22),
             title.widthAnchor.constraint(lessThanOrEqualToConstant: Self.textWidth),
         ])
         updateColors()
@@ -156,7 +175,8 @@ final class PaneStatusPanel: NSView {
 
         let box = NSView()
         box.wantsLayer = true
-        box.layer?.cornerRadius = 6
+        box.layer?.cornerRadius = 10
+        box.layer?.cornerCurve = .continuous
         let text = NSTextField(wrappingLabelWithString: details)
         text.font = .monospacedSystemFont(ofSize: 10.5, weight: .regular)
         text.textColor = .secondaryLabelColor
@@ -196,7 +216,6 @@ final class PaneStatusPanel: NSView {
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
             let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
             layer?.borderColor = (dark ? NSColor(white: 1, alpha: 0.14) : NSColor(white: 0, alpha: 0.14)).cgColor
             detailsBox?.layer?.backgroundColor = NSColor.quaternarySystemFill.cgColor
         }
@@ -216,12 +235,6 @@ final class PaneStatusOverlay: NSView {
         case opaque
     }
 
-    enum Placement {
-        case top(CGFloat)
-        case bottom(CGFloat)
-        case center
-    }
-
     let panel: PaneStatusPanel
     let backdrop: Backdrop
 
@@ -235,7 +248,8 @@ final class PaneStatusOverlay: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func present(in view: NSView, placement: Placement) {
+    /// Centred in `view`, clear of its edges.
+    func present(in view: NSView) {
         translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(self)
         NSLayoutConstraint.activate([
@@ -253,16 +267,10 @@ final class PaneStatusOverlay: NSView {
             panel.topAnchor.constraint(greaterThanOrEqualTo: topAnchor, constant: 8),
             panel.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -8),
         ]
-        switch placement {
-        case .top(let inset):
-            constraints.append(panel.topAnchor.constraint(equalTo: topAnchor, constant: inset))
-        case .bottom(let inset):
-            constraints.append(panel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -inset))
-        case .center:
-            constraints.append(panel.centerYAnchor.constraint(equalTo: centerYAnchor))
-        }
-        // Wanted, not required: a short pane squeezes the inset first.
-        for constraint in constraints.suffix(1) { constraint.priority = .defaultHigh }
+        // Wanted, not required: a short pane squeezes the panel to its edges.
+        let center = panel.centerYAnchor.constraint(equalTo: centerYAnchor)
+        center.priority = .defaultHigh
+        constraints.append(center)
         NSLayoutConstraint.activate(constraints)
     }
 

@@ -1,5 +1,16 @@
 # Guide d’utilisation
 
+> Complément actuel (prioritaire sur les anciens passages) : ⌘K conserve l’invite intégrée prête,
+> la saisie non exécutée et le curseur d’édition, puis les place en haut. Aucune touche n’est envoyée,
+> rien n’est exécuté et l’historique reste intact. L’écran alternatif et les saisies dont l’invite est
+> déjà dans l’historique restent inchangés ; sans marqueur prêt, l’effacement habituel s’applique.
+> À propos et l’historique s’ouvrent au centre de la fenêtre appelante, dans l’écran ; une fenêtre déjà
+> ouverte garde sa position. Connexion, palette, historique, dossiers proposés et panneaux de fin/échec
+> utilisent du verre arrondi. Le petit formulaire défile et l’historique garde une taille fixe. Tab
+> remplit seulement le chemin, sans exécuter ; après `/`, les sous-dossiers deviennent les candidats.
+> Un dossier ne contenant que des fichiers n’en propose aucun. Voir le [guide anglais](../../USER-GUIDE.md) ;
+> les autres chapitres conservent la référence de traduction indiquée ci-dessous.
+
 [Index de la documentation (anglais)](../../README.md) · [Présentation du projet](README.md)
 
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)

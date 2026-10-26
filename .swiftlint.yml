@@ -1,0 +1,16 @@
+# Copyright 2026 Noah Qin
+# SPDX-License-Identifier: Apache-2.0
+
+included:
+  - Corta
+  - CortaTerminal/Package.swift
+  - CortaTerminal/Sources
+  - CortaTerminal/Tests
+  - CortaTests
+  - CortaUITests
+  - CortaPerformanceTests
+  - scripts
+
+excluded:
+  - .build
+  - CortaTerminal/.build

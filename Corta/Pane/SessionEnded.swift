@@ -27,6 +27,7 @@ import CortaPOSIX
 enum SessionEnded {
     /// The panel's words and symbol for an exit.
     /// - Parameters:
+    ///   - exit: the session child's final status or signal.
     ///   - isConnection: the pane ran a remote launcher; Reconnect follows.
     ///   - host: where it was connected, when known.
     ///   - program: the launcher or shell, by name (`ssh`, `zsh`).

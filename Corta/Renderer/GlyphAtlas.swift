@@ -370,6 +370,7 @@ nonisolated final class GlyphAtlas {
     /// - Parameter atlasPixelSize: the square atlas edge; tests pass a small
     ///   one to exercise eviction.
     /// - Parameter storageMode: the texture's storage; tests measure each.
+    /// - Parameter options: text shaping and rasterisation preferences.
     /// - Parameter makeTexture: a test hook to fail allocations; nil uses the
     ///   device.
     init(

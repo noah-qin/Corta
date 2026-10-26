@@ -48,6 +48,7 @@ struct DirectoryCompletionSessionTests {
         for name in ["Alpha", "Another", "空格 中文", "quote'name", ".hidden", "-dash"] {
             try fm.createDirectory(at: home.appendingPathComponent(name), withIntermediateDirectories: true)
         }
+        try fm.createDirectory(at: home.appendingPathComponent("Another/Child/Grandchild"), withIntermediateDirectories: true)
         try fm.createSymbolicLink(at: home.appendingPathComponent("Linked"), withDestinationURL: home.appendingPathComponent("Alpha"))
         try "not a directory".write(to: home.appendingPathComponent("file"), atomically: true, encoding: .utf8)
         try "PS1='READY> '\n".write(to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
@@ -80,10 +81,16 @@ struct DirectoryCompletionSessionTests {
         try wait { session.directoryCompletion?.selectedIndex == 1 }
         write("\u{1b}[99~")
         try wait { session.snapshot().dump().contains("cd Another/") }
+        try wait { session.directoryCompletion?.candidates == ["Child/"] }
+        write("\u{1b}[99~")
+        try wait { session.snapshot().dump().contains("cd Another/Child/") }
+        try wait { session.directoryCompletion?.candidates == ["Grandchild/"] }
+        write("\u{1b}[99~")
+        try wait { session.snapshot().dump().contains("cd Another/Child/Grandchild/") }
         #expect(session.commandRecords.records.compactMap(\.exitStatus).isEmpty)
         write("\r")
-        try wait { session.currentDirectory?.hasSuffix("/Another") == true }
-        write("cd ..\r")
+        try wait { session.currentDirectory?.hasSuffix("/Another/Child/Grandchild") == true }
+        write("cd ../../..\r")
         try wait { session.currentDirectory?.hasSuffix(home.lastPathComponent) == true }
         write("cd 空")
         try wait { session.directoryCompletion?.candidates == ["空格 中文/"] }

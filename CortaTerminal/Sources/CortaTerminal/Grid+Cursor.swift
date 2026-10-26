@@ -167,6 +167,22 @@ extension Grid {
         pendingWrap = false
     }
 
+    /// Keep the complete editor display, including rows below an editing
+    /// cursor. Copy Lines rather than text so wraps, wide-cell continuations,
+    /// grapheme IDs, colours and links survive without reinterpreting output.
+    mutating func clearScreen(keepingRowsFrom firstRow: Int) {
+        let kept = Array(lines[firstRow..<rows])
+        let oldCursor = cursor
+        let oldPendingWrap = pendingWrap
+        clearScreen()
+        for (row, line) in kept.enumerated() { lines[row] = line }
+        cursor = Cursor(row: oldCursor.row - firstRow, column: oldCursor.column)
+        pendingWrap = oldPendingWrap
+        if let saved = savedCursor, saved.row >= firstRow {
+            savedCursor = Cursor(row: saved.row - firstRow, column: saved.column)
+        }
+    }
+
     var hasCompressionWork: Bool {
         scrollback.hasCompressionWork || suspendedMain?.grid.scrollback.hasCompressionWork == true
     }

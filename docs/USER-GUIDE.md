@@ -357,9 +357,17 @@ own error text is under **Details**.
 
   | Command | Screen | Scrollback | Modes and colours |
   | --- | --- | --- | --- |
-  | Clear Screen (⌘K) | erased | kept | kept |
+  | Clear Screen (⌘K) | erased; ready shell prompt and input kept | kept | kept |
   | Clear History | kept | discarded | kept |
   | Reset Terminal | erased | discarded | reset |
+
+  With shell integration, Clear Screen moves the ready prompt and its
+  complete input to the top, keeping the editing cursor, wraps, colours and
+  wide characters. It sends no keystrokes and never executes the input.
+  A prompt still being printed, a running command, or a shell without ready
+  prompt markers keeps the ordinary erase-and-home behavior. Alternate-screen
+  programs such as vim are left intact; an editor whose prompt has scrolled
+  into history is also left intact to avoid erasing part of its input.
 
   Clear History and Reset Terminal ask first and say how many lines they
   would discard — unless the scrollback is empty, or `confirm-close = false`
@@ -420,6 +428,11 @@ With the hooks loaded, automatically or through startup-file installation:
   holding a tab — or one whose text changed since the list showed it is
   filled rather than run, so all of it is at the prompt and runs on your
   Return.
+- **History and About windows.** Command History and **Corta ▸ About Corta**
+  open centered over the invoking window, kept within its display's usable
+  area. An already open window stays where you moved it. Command History's
+  fixed size keeps the search and directory/project/status/host filters
+  visible; an empty result shows **No Commands** and the result count.
 - **Long-task notifications.** With `notify-on-long-task = true`, a command
   that ran longer than `notification-threshold` seconds (30) posts a
   notification when it finishes **while its window is not key**, provided
@@ -454,8 +467,8 @@ and clears them.
 Corta includes directory suggestions, enabled by default in standard local
 zsh sessions. Type `cd ` to see folders in the current directory in a
 compact panel beside your input. It appears below the input when there is
-room, or above it near the bottom of the pane. The panel has an opaque
-background and a rounded border to distinguish it from earlier output;
+room, or above it near the bottom of the pane. A rounded glass capsule with
+a tinted background and border distinguishes it from earlier output;
 it can temporarily cover a small part of that output and reserves no
 terminal rows. Keep typing to filter the folders; a faint suffix
 appears beside the cursor. For example, `cd De` can suggest `Developer/`.
@@ -474,7 +487,11 @@ While a suggestion is visible:
 | Shift+Tab | Pass through to the shell's configured binding. |
 | Return | Execute only the actual input; never automatically accept a faint suggestion. |
 
-You can filter relative paths, subdirectories and `~/` paths. Hidden folders
+You can filter relative paths, subdirectories and `~/` paths. After Tab
+fills a folder ending in `/`, its subdirectories become the next candidates;
+repeat to build a deeper path, then press Return when you want to run `cd`.
+Only folders are offered, so a folder containing only files has no further
+directory candidates. Hidden folders
 appear when you type a dot prefix. Complex shell expressions keep native
 completion. Bash and fish retain their own completion; suggestions appear
 only in a shell Corta started with its automatic zsh hooks, never on remote
@@ -540,7 +557,9 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
 - **Connecting.** The toolbar's globe button opens **Connect to Host**, a
   sheet with a **Terminal / Files (SFTP)** switch: a terminal over SSH, or
   the file browser. Type the host — a name, an address, `user@host` or an
-  SSH alias. **Advanced** holds the user, the port and a private key;
+  SSH alias. The host field, mode switch, suggestions and buttons use rounded
+  glass surfaces. In a small window the sheet scrolls to keep all fields and
+  actions reachable. **Advanced** holds the user, the port and a private key;
   leave them empty and your `~/.ssh/config` and OpenSSH's defaults decide
   them. A chosen key is offered first, and other keys in `ssh-agent` are
   not tried. The sheet lists the connections you made recently — with the

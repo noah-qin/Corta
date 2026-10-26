@@ -185,14 +185,19 @@ extension Performer {
         if promptIsWaiting { state.promptAwaitsRepaint = true }
     }
 
-    /// Clear Screen at a waiting prompt: nothing is repainted, and the next
-    /// command is typed where Corta left the cursor, at the top. Moved now,
-    /// for a shell that shows the prompt is waiting — it has sent `C` before,
-    /// or this prompt's `B` — since without either a running command looks
-    /// the same.
+    /// The ready editor's rows moved to the top without a shell repaint.
+    /// Its prompt end remains valid, including when the cursor is mid-input.
     mutating func screenClearedByUser() {
-        guard promptIsWaiting, state.shellMarksOutputStart || state.sawPromptEnd else { return }
-        movePromptToCursor()
+        guard promptIsWaiting, state.sawPromptEnd else { return }
+        let column = state.promptEndColumn
+        let row = grid.absoluteRow(ofScreenRow: 0)
+        state.promptRow = row
+        state.promptAwaitsRepaint = false
+        grid.setMark(.prompt, atAbsoluteRow: row)
+        state.commandRecords.movePrompt(
+            to: row, workingDirectory: state.workingDirectory,
+            host: state.remoteContext?.host, at: Date())
+        if let column { state.commandRecords.markPromptEnd(column: column) }
     }
 
     private mutating func movePromptToCursor() {

@@ -49,9 +49,9 @@ struct CommandPaletteView: View {
     }
     private var reduceTransparency: Bool { accessibility.reduceTransparency }
 
-    /// The window-corner radius (as `TerminalView`), not a pill: a panel
+    /// Rounded as the connect sheet's glass cards are, not a pill: a panel
     /// reads as a window.
-    private static let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+    private static let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
 
     var body: some View {
         GlassEffectContainer {
@@ -68,24 +68,32 @@ struct CommandPaletteView: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField(L10n.text("commandPalette.placeholder"), text: $model.query)
-                .textFieldStyle(.plain)
-                .font(.system(size: 16))
-                .focused($searchFocused)
-                .onKeyPress(.upArrow) {
-                    model.moveSelection(by: -1)
-                    return .handled
-                }
-                .onKeyPress(.downArrow) {
-                    model.moveSelection(by: 1)
-                    return .handled
-                }
-                .onKeyPress(.return) {
-                    model.runSelected()
-                    return .handled
-                }
-                .onExitCommand { model.dismiss() }
-            Divider()
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                TextField(L10n.text("commandPalette.placeholder"), text: $model.query)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 17))
+                    .focused($searchFocused)
+                    .onKeyPress(.upArrow) {
+                        model.moveSelection(by: -1)
+                        return .handled
+                    }
+                    .onKeyPress(.downArrow) {
+                        model.moveSelection(by: 1)
+                        return .handled
+                    }
+                    .onKeyPress(.return) {
+                        model.runSelected()
+                        return .handled
+                    }
+                    .onExitCommand { model.dismiss() }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            Divider().padding(.horizontal, 4)
             if model.rows.isEmpty {
                 Text(L10n.text("commandPalette.empty"))
                     .font(.system(size: 13))
@@ -119,7 +127,7 @@ struct CommandPaletteView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(14)
         // The panel's size is `CommandPaletteView.size`, title bar strip
         // included: the view fills whatever the panel is.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -134,6 +142,13 @@ private struct CommandPaletteRowView: View {
     let row: CommandPaletteModel.Row
     let isSelected: Bool
 
+    static let rowShape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+
+    /// The accent, softly, as the connect sheet marks its picked row.
+    static func highlight(_ isSelected: Bool) -> AnyShapeStyle {
+        isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.22)) : AnyShapeStyle(.clear)
+    }
+
     var body: some View {
         switch row {
         case .header(let title):
@@ -143,13 +158,14 @@ private struct CommandPaletteRowView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
                 .padding(.bottom, 2)
+                .padding(.horizontal, 10)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(title)
         case .agent(let entry):
             Text(entry.title).font(.system(size: 13))
-                .padding(6).frame(maxWidth: .infinity, alignment: .leading)
-                .background(isSelected ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
-                    in: RoundedRectangle(cornerRadius: 6))
+                .padding(.vertical, 7).padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Self.highlight(isSelected), in: Self.rowShape)
                 .contentShape(Rectangle())
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(entry.title)
@@ -164,12 +180,9 @@ private struct CommandPaletteRowView: View {
                 // draws them in the system face.
                 Text(shortcut).font(.system(size: 12)).foregroundStyle(.secondary)
             }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 6)
-            .background(
-                isSelected ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
-                in: RoundedRectangle(cornerRadius: 6)
-            )
+            .padding(.vertical, 7)
+            .padding(.horizontal, 10)
+            .background(Self.highlight(isSelected), in: Self.rowShape)
             .contentShape(Rectangle())
             // One element with one name, so VoiceOver announces "Split Pane
             // Right, Command Shift D" instead of two adjacent labels.

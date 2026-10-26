@@ -77,11 +77,20 @@ public struct Terminal: Sendable {
         }
     }
 
-    /// Clear Screen: the grid's, and the waiting prompt follows the cursor to
-    /// the top, where the next command is typed.
+    /// Clear Screen keeps a ready shell editor visible without sending input
+    /// to the child. A full-screen program owns its canvas; leave it alone.
     public mutating func clearScreen() {
-        performer.grid.clearScreen()
-        performer.screenClearedByUser()
+        guard !performer.grid.isAlternateScreenActive else { return }
+        if let promptRow = inputPromptRow {
+            let firstRow = promptRow - performer.grid.absoluteRow(ofScreenRow: 0)
+            // An editor taller than the screen still owns rows in history.
+            // Do not erase its visible tail or invent a partial prompt.
+            guard firstRow >= 0, firstRow <= performer.grid.cursor.row else { return }
+            performer.grid.clearScreen(keepingRowsFrom: firstRow)
+            performer.screenClearedByUser()
+        } else {
+            performer.grid.clearScreen()
+        }
     }
 
     /// `RIS`, applied here rather than written to the child's input, which
