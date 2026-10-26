@@ -11,12 +11,12 @@ repository root.
 | `../../AppIcon.icon`        | Production macOS Icon Composer bundle                            |
 | `corta-pangolin-mascot.png` | Transparent mascot master, 1254 × 1254                           |
 | `corta-pangolin-loop.gif`   | Looping mascot animation, 360 × 360                              |
-| `session-ended.png` | Ended session: the status panel over the dimmed, retained public output, from an isolated `/bin/sh` fixture |
+| `session-ended.png` | Ended session: the centered glass status panel over dimmed, retained output, from an isolated local-zsh UI fixture |
 | `screenshot.png`            | The README screenshot — light theme, a clean demo shell          |
 | `input-source-indicator.png` | Independent Chinese input-source badge, separated from toolbar action buttons, from an isolated demo shell |
 | `input-source-long-command.png` | Right-edge badge moved below a long command, without changing the grid |
 | `history-suggestions.png` | Local zsh history suffix, from the isolated history-suggestions UI fixture |
-| `directory-suggestions.png` | Compact local zsh candidate panel and command-status marks from an isolated UI-test demo shell |
+| `directory-suggestions.png` | Local zsh candidate glass capsule and command-status marks from an isolated UI-test demo shell |
 | `about.png`                 | About with separated links (development build)                   |
 | `social-preview.png`        | GitHub social preview card, 1280 × 640                            |
 
