@@ -31,15 +31,18 @@ final class CommandHistoryController: NSWindowController, NSWindowDelegate {
 
     private init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 440),
-            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            contentRect: NSRect(origin: .zero, size: CommandHistoryView.size),
+            // A fixed size: narrowed, the filter row squeezed its toggles to
+            // nothing.
+            styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = L10n.text("commandHistory.title")
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 420, height: 240)
         super.init(window: window)
         window.delegate = self
-        window.contentViewController = NSHostingController(
-            rootView: CommandHistoryView(model: model))
+        let content = NSHostingController(rootView: CommandHistoryView(model: model))
+        content.sizingOptions = []
+        window.contentViewController = content
+        window.setContentSize(CommandHistoryView.size)
         model.onDismiss = { [weak self] in
             self?.refreshTask?.cancel()
             self?.window?.close()
@@ -60,7 +63,17 @@ final class CommandHistoryController: NSWindowController, NSWindowDelegate {
                 self.model.refresh()
             }
         }
+        let shouldCenter = window?.isVisible == false
+        let screen = pane.view.window?.screen ?? window?.screen ?? NSScreen.main
         showWindow(nil)
+        if shouldCenter, let window, let screen {
+            window.contentView?.layoutSubtreeIfNeeded()
+            let visible = screen.visibleFrame
+            let target = pane.view.window?.frame ?? visible
+            window.setFrameOrigin(NSPoint(
+                x: min(max(target.midX - window.frame.width / 2, visible.minX), visible.maxX - window.frame.width),
+                y: min(max(target.midY - window.frame.height / 2, visible.minY), visible.maxY - window.frame.height)))
+        }
         window?.makeKeyAndOrderFront(nil)
     }
 }

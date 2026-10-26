@@ -296,7 +296,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     ///
     /// | Command | Screen | Scrollback | Modes, colours, cursor |
     /// | --- | --- | --- | --- |
-    /// | Clear Screen | erased | kept | kept |
+    /// | Clear Screen | erased, ready shell editor kept | kept | kept |
     /// | Clear History | kept | discarded | kept |
     /// | Reset Terminal | erased | discarded | reset |
     ///

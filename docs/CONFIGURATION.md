@@ -726,9 +726,17 @@ the same thing by "clear", and each says what it discards:
 
 | Command | Screen | Scrollback | Modes, colours, cursor |
 | --- | --- | --- | --- |
-| Clear Screen | erased | kept | kept |
+| Clear Screen | erased; ready shell editor kept | kept | kept |
 | Clear History | kept | discarded | kept |
 | Reset Terminal | erased | discarded | reset |
+
+At a ready integrated prompt, `clear-screen` relocates the complete displayed
+prompt and input to the top, preserving the cursor position within that input,
+cell attributes and wrapping. It needs this prompt's end marker (`OSC 133 B`);
+there is no prompt-text guessing or synthetic Return/Control-L. Without a ready
+prompt it retains the ordinary erase-and-home behavior. On the alternate
+screen it does nothing; an editor whose prompt starts in scrollback is also
+left intact. Scrollback is never appended or discarded by this command.
 
 All three act on Corta's own grid, not on the program running in it: nothing
 is written to the child's input, so a running job is undisturbed and redraws

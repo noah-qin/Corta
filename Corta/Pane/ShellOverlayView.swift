@@ -57,8 +57,14 @@ final class ShellOverlayView: NSView {
     private var lastCompletionPresentation: CompletionPresentation?
     private var preview: ShellGhostView?
     private var candidateRow: DirectoryCandidateRowView?
-    /// Native hint frames, used to keep other overlays clear.
-    var occupiedRects: [CGRect] { subviews.filter { !$0.isHidden }.map(\.frame) }
+    /// Liquid Glass behind the candidates, a sibling below the row so the
+    /// row stays the element tests and VoiceOver find.
+    private var candidateGlass: NSGlassEffectView?
+    /// Native hint frames, used to keep other overlays clear; the glass
+    /// shares the candidates' frame.
+    var occupiedRects: [CGRect] {
+        subviews.filter { !$0.isHidden && $0 !== candidateGlass }.map(\.frame)
+    }
     override var isFlipped: Bool { true }
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -76,6 +82,11 @@ final class ShellOverlayView: NSView {
 
     /// - Parameter colors: the frame's canvas colours, read once for every
     ///   overlay that frame draws.
+    /// - Parameter state: the shell's authenticated directory candidates.
+    /// - Parameter history: the shell's authenticated history suffix, if any.
+    /// - Parameter anchor: the input caret's rectangle in this view.
+    /// - Parameter font: the terminal font used to measure and draw hints.
+    /// - Parameter baseline: the text baseline offset within the anchor row.
     func showCompletion(_ state: DirectoryCompletion?, history: HistorySuggestion? = nil, anchor: CGRect,
         font: NSFont = .monospacedSystemFont(ofSize: 14, weight: .regular), baseline: CGFloat = 12,
         colors: CanvasTextColors = .current) {
@@ -96,8 +107,7 @@ final class ShellOverlayView: NSView {
             historySuggestion = nil
             preview?.removeFromSuperview()
             preview = nil
-            candidateRow?.removeFromSuperview()
-            candidateRow = nil
+            removeCandidates()
             return
         }
         completion = state
@@ -122,12 +132,11 @@ final class ShellOverlayView: NSView {
         }
         // Once the prefix resolves to one folder, the inline suffix is enough.
         guard history == nil, let state, state.typedPrefix.isEmpty || state.candidates.count > 1 else {
-            candidateRow?.removeFromSuperview()
-            candidateRow = nil
+            removeCandidates()
             return
         }
         let row = candidateRow ?? DirectoryCandidateRowView()
-        let padding: CGFloat = 8
+        let padding = DirectoryCandidateRowView.inset
         let margin = TerminalLayout.insets.left
         let availableWidth = max(0, bounds.width - margin - TerminalLayout.insets.right)
         row.frame.size = CGSize(width: availableWidth, height: anchor.height + 10)
@@ -144,9 +153,21 @@ final class ShellOverlayView: NSView {
             y: fitsBelow ? below : max(0, anchor.minY - height - 4),
             width: width, height: height)
         row.toolTip = L10n.text("completion.hint")
-        if candidateRow == nil { addSubview(row)
+        let glass = candidateGlass ?? NSGlassEffectView()
+        glass.frame = row.frame
+        glass.cornerRadius = row.frame.height / 2
+        if candidateGlass == nil { addSubview(glass)
+            candidateGlass = glass }
+        if candidateRow == nil { addSubview(row, positioned: .above, relativeTo: glass)
             candidateRow = row }
         row.needsDisplay = true
+    }
+
+    private func removeCandidates() {
+        candidateRow?.removeFromSuperview()
+        candidateRow = nil
+        candidateGlass?.removeFromSuperview()
+        candidateGlass = nil
     }
 
     func hideCompletion() {
@@ -214,7 +235,8 @@ private final class ShellGhostView: NSView {
     }
 }
 
-/// A compact panel beside the input; its border distinguishes it from history.
+/// A compact capsule beside the input, over glass; its border distinguishes
+/// it from history.
 private final class DirectoryCandidateRowView: NSView {
     private var content = NSAttributedString(string: "")
     private var token = NSAttributedString(string: "…")
@@ -222,8 +244,10 @@ private final class DirectoryCandidateRowView: NSView {
     var baseline: CGFloat = 12
     private var backdrop = CGColor(gray: 1, alpha: 1)
     private var border = CGColor(gray: 0, alpha: 0.2)
+    /// Text inset from each end, past the capsule's curve.
+    static let inset: CGFloat = 12
     var fittingWidth: CGFloat { ceil(CTLineGetTypographicBounds(
-        CTLineCreateWithAttributedString(content), nil, nil, nil)) + 16 }
+        CTLineCreateWithAttributedString(content), nil, nil, nil)) + 2 * Self.inset }
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func isAccessibilityElement() -> Bool { true }
@@ -239,7 +263,7 @@ private final class DirectoryCandidateRowView: NSView {
         }
         backdrop = colors.backdrop
         border = colors.border
-        let available = max(0, bounds.width - 16 - width("…    …"))
+        let available = max(0, bounds.width - 2 * Self.inset - width("…    …"))
         var start = state.selectedIndex
         var end = start + 1
         var used = width(state.candidates[start])
@@ -276,19 +300,22 @@ private final class DirectoryCandidateRowView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
+        let radius = (bounds.height - 1) / 2
         let panel = CGPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
-            cornerWidth: 6, cornerHeight: 6, transform: nil)
+            cornerWidth: radius, cornerHeight: radius, transform: nil)
         context.addPath(panel)
-        context.setFillColor(backdrop)
+        // The canvas colour, thinned so the glass beneath shows through
+        // while the theme's text keeps its contrast.
+        context.setFillColor(backdrop.copy(alpha: backdrop.alpha * 0.55) ?? backdrop)
         context.setStrokeColor(border)
         context.setLineWidth(1)
         context.drawPath(using: .fillStroke)
         let full = CTLineCreateWithAttributedString(content)
         let ellipsis = CTLineCreateWithAttributedString(token)
-        let line = CTLineCreateTruncatedLine(full, Double(max(0, bounds.width - 16)), .end, ellipsis) ?? full
+        let line = CTLineCreateTruncatedLine(full, Double(max(0, bounds.width - 2 * Self.inset)), .end, ellipsis) ?? full
         context.saveGState()
-        context.clip(to: bounds.insetBy(dx: 8, dy: 0))
-        context.translateBy(x: 8, y: baseline)
+        context.clip(to: bounds.insetBy(dx: Self.inset, dy: 0))
+        context.translateBy(x: Self.inset, y: baseline)
         context.scaleBy(x: 1, y: -1)
         context.textMatrix = .identity
         context.textPosition = .zero

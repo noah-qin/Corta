@@ -43,17 +43,29 @@ final class AboutWindowController: NSWindowController {
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
-        window.center()
         super.init(window: window)
-        window.contentViewController = NSHostingController(rootView: AboutView())
-        window.center()
+        let content = NSHostingController(rootView: AboutView())
+        // Resolve the fixed content before positioning. Automatic hosting
+        // sizing briefly made the frame zero-sized when show() centered it.
+        content.sizingOptions = []
+        window.contentViewController = content
+        window.setContentSize(content.sizeThatFits(in: CGSize(width: 420, height: CGFloat.greatestFiniteMagnitude)))
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     @objc func show(_ sender: Any?) {
+        let parent = NSApp.keyWindow === window ? nil : NSApp.keyWindow
+        let shouldCenter = window?.isVisible == false
         showWindow(sender)
-        window?.center()
+        if shouldCenter, let window, let screen = parent?.screen ?? window.screen ?? NSScreen.main {
+            window.contentView?.layoutSubtreeIfNeeded()
+            let visible = screen.visibleFrame
+            let target = parent?.frame ?? visible
+            window.setFrameOrigin(NSPoint(
+                x: min(max(target.midX - window.frame.width / 2, visible.minX), visible.maxX - window.frame.width),
+                y: min(max(target.midY - window.frame.height / 2, visible.minY), visible.maxY - window.frame.height)))
+        }
         window?.makeKeyAndOrderFront(sender)
         NSApp.activate()
     }

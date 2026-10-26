@@ -112,8 +112,8 @@ struct SFTPBrowserView: View {
                 notice: model.suggestedHost.map { L10n.format("sftp.host.suggestedMessage", $0) },
                 error: error,
                 onConnect: { model.isFailed ? model.retry() : model.connect() })
-                .frame(maxWidth: 440)
-                .padding(24)
+                .frame(maxWidth: 500)
+                .padding(.vertical, 12)
                 .frame(maxWidth: .infinity)
         }
         .scrollBounceBehavior(.basedOnSize)

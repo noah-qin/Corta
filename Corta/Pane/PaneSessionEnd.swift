@@ -22,11 +22,7 @@ import CortaTerminal
 protocol PaneSessionEndHost: AnyObject {
     /// The pane's own view; the panel is its subview.
     var view: NSView { get }
-    /// The top of the grid, below any window chrome over the pane.
-    var topInset: CGFloat { get }
     var didTeardown: Bool { get }
-    /// The grid now, or nil without a session.
-    func snapshot() -> Grid?
     /// Closes this pane, or its window when it is the last pane — as ⌘W
     /// would, without the confirmation: the session is already over.
     func closeEndedPane()
@@ -47,6 +43,8 @@ final class PaneSessionEnd {
     }
 
     /// - Parameters:
+    ///   - exit: the session child's final status or signal.
+    ///   - isConnection: whether this pane ran a remote launcher.
     ///   - remoteHost: where a connection went, for the title.
     ///   - program: the launcher or shell's name.
     func present(_ exit: ProcessExit, isConnection: Bool, remoteHost: String?, program: String) {
@@ -67,13 +65,10 @@ final class PaneSessionEnd {
         // Found by UI tests and Accessibility as before.
         panel.identifier = NSUserInterfaceItemIdentifier("Corta.SessionEnded")
         let overlay = PaneStatusOverlay(panel: panel, backdrop: .dim)
-        // On the side away from the last output: the cursor's half of the
-        // screen is where the program left off.
-        let cursorInLowerHalf = host.snapshot().map { $0.cursor.row >= $0.rows / 2 } ?? true
-        overlay.present(
-            in: host.view,
-            placement: cursorInLowerHalf
-                ? .top(max(host.topInset + 8, 16)) : .bottom(max(TerminalLayout.insets.bottom + 8, 16)))
+        // Centred in the pane, as a failure's card is: pinned to the edge
+        // away from the last output, it read as misplaced. The dim behind it
+        // keeps that output readable.
+        overlay.present(in: host.view)
         self.overlay = overlay
         NSAccessibility.post(element: panel, notification: .layoutChanged)
         if NSWorkspace.shared.isVoiceOverEnabled {

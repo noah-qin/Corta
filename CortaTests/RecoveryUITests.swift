@@ -66,11 +66,8 @@ struct RecoveryUITests {
         failure.present(in: root, takesFocus: false)
         root.layoutSubtreeIfNeeded()
         let panel = failure.overlay.panel
-        var expected: CGColor?
-        NSAppearance(named: .darkAqua)!.performAsCurrentDrawingAppearance {
-            expected = NSColor.windowBackgroundColor.cgColor
-        }
-        #expect(panel.layer?.backgroundColor == expected)
+        // The glass follows on its own; the drawn edge is resolved here.
+        #expect(panel.layer?.borderColor == NSColor(white: 1, alpha: 0.14).cgColor)
     }
 
     /// Settings… only where a setting could be the cause; a dropped

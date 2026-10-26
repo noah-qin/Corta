@@ -1,5 +1,12 @@
 # 使用者指南
 
+> 目前行為補充（優先於舊版章節）：⌘K 保留已就緒且具 shell integration 的提示字元、尚未送出
+> 的輸入及編輯游標，移到頂端；不傳送按鍵、不執行指令，捲動歷史不變。備用螢幕程式及提示字元
+> 已進入歷史的超長輸入保持原樣；沒有就緒標記時仍清除畫面。About 與指令歷史相對呼叫視窗置中，
+> 限制在螢幕可用範圍內；已開啟的視窗保留位置。連線、面板、歷史、目錄候選與結束/失敗面板使用
+> 圓角玻璃外觀；小型連線表單可捲動，歷史視窗固定大小。Tab 只填入路徑，不執行 `cd`；`/` 後可
+> 繼續選取下一層，只有檔案的目錄沒有下一層候選。詳見[英文指南](../../USER-GUIDE.md)；其餘翻譯基線不變。
+
 [文件索引（英文）](../../README.md) · [專案概覽](README.md)
 
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)

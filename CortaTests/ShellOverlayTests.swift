@@ -79,7 +79,8 @@ import Testing
         let anchor = CGRect(x: 80, y: 40, width: 8, height: 17)
         overlay.showCompletion(completion, anchor: anchor)
 
-        /// The strongest text pixel against the panel's opaque canvas background.
+        /// The strongest text pixel against the panel's canvas background,
+        /// thinned over the glass, so the ink is the near-opaque pixels.
         func strongestInk() throws -> NSColor {
             let row = try #require(overlay.subviews.first {
                 $0.accessibilityIdentifier() == "directory-completion-candidates" })
@@ -91,7 +92,7 @@ import Testing
             for y in 4..<(bitmap.pixelsHigh - 4) {
                 for x in 4..<(bitmap.pixelsWide - 4) {
                     guard let pixel = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB),
-                        pixel.alphaComponent > 0.95 else { continue }
+                        pixel.alphaComponent > 0.8 else { continue }
                     let contrast = abs(pixel.redComponent - CGFloat(background.x))
                         + abs(pixel.greenComponent - CGFloat(background.y))
                         + abs(pixel.blueComponent - CGFloat(background.z))
@@ -183,7 +184,7 @@ import Testing
         let row = try #require(overlay.subviews.first {
             $0.accessibilityIdentifier() == "directory-completion-candidates" })
         #expect(row.frame.minY >= anchor.maxY)
-        #expect(row.frame.minX == anchor.minX - 8)
+        #expect(row.frame.minX == anchor.minX - 12)
         #expect(row.frame.width < overlay.bounds.width / 2)
         let originalFrame = row.frame
         overlay.showCompletion(completion, anchor: anchor.offsetBy(dx: 20, dy: 17))

@@ -138,5 +138,46 @@ struct ShellIntegrationSessionTests {
             try waitForPrompt(after: previous)
             expectResults(statuses)
         }
+
+        // Real line editors must continue editing after the app relocates
+        // their display. Return below is an explicit test keystroke, never
+        // part of Clear Screen, and only executes these fixture commands.
+        for input in ["", "printf '%s\\n' abcd"] {
+            let start = session.snapshot()
+            session.write(Array(input.utf8))
+            let end = SuspendingClock.now + .seconds(5) * testTimeoutScale
+            let expectedColumn = start.cursor.column + input.count
+            while session.snapshot().cursor.column != expectedColumn && SuspendingClock.now < end {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+            try #require(session.snapshot().cursor.column == expectedColumn)
+            if !input.isEmpty {
+                session.write(Array("\u{1B}[D\u{1B}[D".utf8))
+                while session.snapshot().cursor.column != expectedColumn - 2 && SuspendingClock.now < end {
+                    Thread.sleep(forTimeInterval: 0.01)
+                }
+                try #require(session.snapshot().cursor.column == expectedColumn - 2)
+            }
+            let before = session.snapshot()
+            let promptRow = try #require(session.commandRecords.last).promptRow
+            let screenRow = try #require(before.screenRow(ofAbsoluteRow: promptRow))
+            let records = session.commandRecords.records.count
+            session.apply(.clearScreen)
+            let cleared = session.snapshot()
+            #expect(cleared.line(0) == before.line(screenRow))
+            #expect(cleared.cursor.row == before.cursor.row - screenRow)
+            #expect(cleared.cursor.column == before.cursor.column)
+            #expect(session.commandRecords.records.count == records)
+            #expect(!session.isCommandRunning)
+            if input.isEmpty {
+                session.write(Array("printf '%s\\n' empty-clear-ok\r".utf8))
+            } else {
+                session.write(Array("X\r".utf8))
+            }
+            try waitForPrompt(after: cleared.absoluteRow(ofScreenRow: 0))
+            let output = input.isEmpty ? "empty-clear-ok" : "abXcd"
+            #expect(session.snapshot().logicalLines().contains { $0.text == output },
+                "\(shell): editor lost its buffer/cursor after Clear Screen\n\(session.snapshot().dump())")
+        }
     }
 }

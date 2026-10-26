@@ -1,5 +1,15 @@
 # Benutzerhandbuch
 
+> Aktuelle Ergänzung (ersetzt ältere Angaben): ⌘K erhält bei einem bereiten integrierten Shell-Prompt
+> Prompt, offene Eingabe und Bearbeitungscursor und verschiebt sie nach oben. Keine Taste wird gesendet,
+> nichts ausgeführt, der Verlauf bleibt erhalten. Alternativer Bildschirm und Eingaben mit Prompt im
+> Verlauf bleiben unverändert; ohne Bereitschaftsmarkierung gilt das bisherige Löschen. About und
+> Befehlsverlauf öffnen mittig über dem aufrufenden Fenster innerhalb des Bildschirms; offene Fenster
+> bleiben an ihrer Position. Verbindung, Palette, Verlauf, Ordnerauswahl und Ende-/Fehleranzeigen nutzen
+> runde Glasflächen. Kleine Verbindungsformulare scrollen, der Verlauf hat eine feste Größe. Tab ergänzt
+> nur den Pfad, führt nichts aus und bietet nach `/` die nächste Ordnerebene an. Reine Dateiordner haben
+> keine weiteren Ordnerkandidaten. Siehe [englische Referenz](../../USER-GUIDE.md); der übrige Übersetzungsstand bleibt wie unten angegeben.
+
 [Dokumentationsindex (Englisch)](../../README.md) · [Projektübersicht](README.md)
 
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)

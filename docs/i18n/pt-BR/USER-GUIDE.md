@@ -1,5 +1,16 @@
 # Guia do usuário
 
+> Atualização atual (prevalece sobre os trechos antigos): ⌘K preserva o prompt integrado pronto,
+> a entrada ainda não executada e o cursor de edição, movendo-os para o topo. Não envia teclas,
+> não executa e mantém o histórico. A tela alternativa e entradas com prompt já no histórico ficam
+> intactas; sem marcador pronto, permanece a limpeza anterior. Sobre e o histórico abrem centralizados
+> sobre a janela que os chamou, dentro da tela; janelas já abertas mantêm a posição. Conexão, paleta,
+> histórico, candidatos e painéis de encerramento/falha usam vidro arredondado. O formulário pequeno
+> permite rolagem e o histórico tem tamanho fixo. Tab apenas preenche o caminho, sem executar;
+> após `/`, é possível continuar pelos subdiretórios. Pastas só com arquivos não oferecem mais
+> candidatos. Veja o [guia em inglês](../../USER-GUIDE.md); os outros trechos mantêm a referência
+> de tradução indicada abaixo.
+
 [Índice da documentação (inglês)](../../README.md) · [Visão geral do projeto](README.md)
 
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](USER-GUIDE.md)

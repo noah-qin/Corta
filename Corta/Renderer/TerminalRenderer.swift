@@ -267,6 +267,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// - Parameter atlasPixelSize: small in tests, to exercise eviction;
     ///   `nil` is `GlyphAtlas.atlasSize`.
     /// - Parameter atlasStorageMode: the atlas texture's storage.
+    /// - Parameter options: text shaping and rasterisation preferences.
     /// - Throws: `Metal4BackendError.metal4Unsupported` on a GPU without
     ///   `MTLGPUFamily.metal4`. There is no other renderer to fall back to.
     public init(
@@ -305,6 +306,8 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
 
     /// Reuses pipelines and texture; a new renderer per keystroke stuttered
     /// under key repeat.
+    /// - Parameter font: the replacement primary font at its point size.
+    /// - Parameter newScale: the backing scale used for glyph rasterisation.
     /// - Parameter options: nil keeps the current ones — a zoom or a new
     ///   backing scale changes the font alone.
     func setFont(_ font: CTFont, scale newScale: CGFloat, options: TextOptions? = nil) {

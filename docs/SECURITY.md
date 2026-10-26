@@ -611,6 +611,16 @@ including reused copies, never use LaunchServices' default file handler:
 The configured command remains the user's trusted editor choice and receives
 separate arguments, never shell interpolation.
 
+### User-requested Clear Screen
+
+Clear Screen never requests a shell redraw through PTY input. At a ready
+integrated prompt it moves retained grid lines and editor cursor metadata;
+it does not feed prompt text back through the parser or write any control
+character to the child. Unsubmitted commands stay unexecuted. Running main-
+screen output keeps the existing erase behavior, while alternate-screen
+applications are left intact. OSC prompt markers describe display boundaries;
+they do not authorize execution.
+
 ## 6. Rules Summary
 
 For quick reference during implementation and review:

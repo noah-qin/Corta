@@ -18,6 +18,102 @@ import XCTest
 import AppKit
 
 final class TerminalRecoveryUITests: XCTestCase {
+    @MainActor func testClearScreenKeepsPromptAndEditingCursor() throws {
+        continueAfterFailure = false
+        let original = LatinInputSource.select()
+        addTeardownBlock { LatinInputSource.restore(original) }
+        let stage = try UIFixtures.stage("terminal-recovery")
+        let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
+        let terminal = app.textViews.firstMatch
+        func expectText(_ text: String) {
+            expectation(for: NSPredicate(format: "value CONTAINS %@", text), evaluatedWith: terminal)
+            waitForExpectations(timeout: 5)
+        }
+        app.typeText("printf 'old-output\\n'\n")
+        expectText("old-output\ndemo ❯")
+        app.typeKey("k", modifierFlags: .command)
+        expectText("demo ❯")
+        XCTAssertFalse((terminal.value as? String)?.contains("old-output") == true)
+        app.typeText("printf '%s\\n' abcd")
+        expectText("demo ❯ printf '%s\\n' abcd")
+        app.typeKey(.leftArrow, modifierFlags: [])
+        app.typeKey(.leftArrow, modifierFlags: [])
+        app.typeKey("k", modifierFlags: .command)
+        expectText("demo ❯ printf '%s\\n' abcd")
+        let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        shot.name = "clear-screen-unsubmitted-input"
+        shot.lifetime = .keepAlways
+        add(shot)
+        app.typeText("X")
+        expectText("demo ❯ printf '%s\\n' abXcd")
+        app.typeKey(.return, modifierFlags: [])
+        expectText("abXcd\ndemo ❯")
+    }
+
+    @MainActor func testAboutAndHistoryCenterOverInvokingWindow() throws {
+        continueAfterFailure = false
+        let stage = try UIFixtures.stage("terminal-recovery")
+        let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
+        app.launch()
+        defer { app.terminate() }
+        let parent = app.windows.firstMatch
+        XCTAssertTrue(parent.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
+        let parentFrame = parent.frame
+        func assertCentered(_ window: XCUIElement) {
+            XCTAssertTrue(window.waitForExistence(timeout: 5))
+            print("Window placement: parent=\(parentFrame), child=\(window.frame)")
+            expectation(for: NSPredicate { _, _ in
+                abs(window.frame.midX - parentFrame.midX) <= 2 &&
+                abs(window.frame.midY - parentFrame.midY) <= 2
+            }, evaluatedWith: nil)
+            waitForExpectations(timeout: 5)
+            let shot = XCTAttachment(screenshot: window.screenshot())
+            shot.name = window.title
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        let appMenu = app.menuBars.firstMatch.menuBarItems.element(boundBy: 1)
+        appMenu.click()
+        appMenu.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", "About")).firstMatch.click()
+        let about = app.windows.matching(NSPredicate(format: "title BEGINSWITH %@", "About")).firstMatch
+        assertCentered(about)
+        about.buttons[XCUIIdentifierCloseWindow].click()
+        app.menuBars.menuBarItems["Shell"].click()
+        app.menuBars.menuBarItems["Shell"].menuItems["Search Command History…"].click()
+        assertCentered(app.windows["Command History"])
+    }
+
+    @MainActor func testClearScreenLeavesVimAlternateScreenIntact() throws {
+        continueAfterFailure = false
+        let original = LatinInputSource.select()
+        addTeardownBlock { LatinInputSource.restore(original) }
+        let stage = try UIFixtures.stage("terminal-recovery")
+        let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
+        let terminal = app.textViews.firstMatch
+        app.typeText("/usr/bin/vim -Nu NONE -n -i NONE -c 'call setline(1, \"vim-clear-proof\")'\n")
+        expectation(for: NSPredicate(format: "value CONTAINS %@", "vim-clear-proof"), evaluatedWith: terminal)
+        waitForExpectations(timeout: 5)
+        let before = terminal.value as? String
+        app.typeKey("k", modifierFlags: .command)
+        XCTAssertEqual(terminal.value as? String, before)
+        let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        shot.name = "clear-screen-vim-intact"
+        shot.lifetime = .keepAlways
+        add(shot)
+        app.typeText(":q!\n")
+        expectation(for: NSPredicate(format: "value CONTAINS %@", "demo ❯"), evaluatedWith: terminal)
+        waitForExpectations(timeout: 5)
+    }
+
     @MainActor func testResetThenSynchronizedOutputRecoversItsCanvas() throws {
         continueAfterFailure = false
         let original = LatinInputSource.select()

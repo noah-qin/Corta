@@ -86,7 +86,14 @@ final class RemoteConnectController: NSWindowController {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    /// - Parameter paneFiles: the focused pane's host, when it is remote.
+    /// Below this a sheet is too short to use; it may then pass a tiny
+    /// window's edge.
+    private static let minimumHeight: CGFloat = 300
+
+    /// - Parameters:
+    ///   - mode: the initially selected connection destination.
+    ///   - sender: the control or menu item opening the dialog.
+    ///   - paneFiles: the focused pane's host, when it is remote.
     func show(_ mode: RemoteConnectMode, sender: Any?, paneFiles: RemoteConnectPaneFiles? = nil) {
         guard let window else { return }
         if window.isVisible {
@@ -100,8 +107,12 @@ final class RemoteConnectController: NSWindowController {
         if let parent = NSApp.keyWindow ?? NSApp.mainWindow, parent.isVisible,
             parent.attachedSheet == nil, !(parent is NSPanel)
         {
+            // No taller than the window it hangs from: a small window's
+            // sheet ran past its bottom edge. What does not fit scrolls.
+            draft.maxHeight = max(Self.minimumHeight, parent.contentLayoutRect.height - 8)
             parent.beginSheet(window)
         } else {
+            draft.maxHeight = nil
             window.center()
             showWindow(sender)
             window.makeKeyAndOrderFront(sender)
@@ -153,6 +164,9 @@ final class RemoteConnectDraft {
     var fields = SSHTargetFields()
     var problem: SSHTarget.Problem?
     var paneFiles: RemoteConnectPaneFiles?
+    /// The tallest the dialog may be: its parent window's content height
+    /// as a sheet, nil as a free-standing panel.
+    var maxHeight: CGFloat?
     /// Bumped on reset, so the host field takes focus again.
     var generation = 0
 
@@ -172,16 +186,21 @@ private struct RemoteConnectSheet: View {
     let connect: (RemoteConnectMode, SSHTargetFields) -> SSHTarget.Problem?
 
     var body: some View {
-        RemoteConnectForm(
-            mode: draft.mode, modeSelection: $draft.mode, fields: $draft.fields,
-            paneFiles: draft.paneFiles,
-            error: draft.problem.map(RemoteConnectForm.message),
-            focusGeneration: draft.generation,
-            onCancel: { RemoteConnectController.shared.close() },
-            onConnect: { draft.problem = connect(draft.mode, draft.fields) })
-            .onChange(of: draft.fields) { draft.problem = nil }
-            .padding(20)
-            .frame(width: 480)
+        ScrollView {
+            RemoteConnectForm(
+                mode: draft.mode, modeSelection: $draft.mode, fields: $draft.fields,
+                paneFiles: draft.paneFiles,
+                error: draft.problem.map(RemoteConnectForm.message),
+                focusGeneration: draft.generation,
+                onCancel: { RemoteConnectController.shared.close() },
+                onConnect: { draft.problem = connect(draft.mode, draft.fields) })
+                .onChange(of: draft.fields) { draft.problem = nil }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        // Its content's height, up to the cap; then it scrolls.
+        .frame(maxHeight: draft.maxHeight ?? .infinity)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 520)
     }
 }
 
@@ -248,58 +267,69 @@ struct RemoteConnectForm: View {
     var body: some View {
         // Computed once per body: each keystroke narrows the lists.
         let shown = visibleSuggestions
-        return VStack(alignment: .leading, spacing: 14) {
-            header
-            if let notice {
-                Text(notice)
-                    .font(.callout)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let paneFiles {
-                paneFilesRow(paneFiles)
-            }
-            TextField(L10n.text("ui.ssh.host"), text: $fields.host,
-                      prompt: Text(L10n.text("ui.connect.hostPrompt")))
-                .labelsHidden()
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.large)
-                .focused($hostFocused)
-                .onSubmit(onConnect)
-                // ↓ and ↑ walk the suggestions from the field, the way an
-                // address bar's do; Return then connects to the one picked.
-                .onKeyPress(.downArrow) { stepSuggestion(by: 1) }
-                .onKeyPress(.upArrow) { stepSuggestion(by: -1) }
-                .accessibilityLabel(L10n.text("ui.ssh.host"))
-                .accessibilityIdentifier("connect-host")
-            if !shown.recents.isEmpty || !shown.aliases.isEmpty {
-                suggestions(shown)
-            }
-            advanced
-            if let error {
-                // Said in words with a symbol, never by colour alone.
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Divider()
-            HStack(alignment: .center, spacing: 12) {
-                Text(help)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                if let onCancel {
-                    Button(L10n.text("common.cancel"), action: onCancel)
-                        .keyboardShortcut(.cancelAction)
+        return GlassEffectContainer(spacing: 16) {
+            VStack(alignment: .leading, spacing: 16) {
+                header
+                if let modeSelection {
+                    Picker(L10n.text("ui.connect.modeLabel"), selection: modeSelection) {
+                        Label(L10n.text("ui.connect.mode.terminal"), systemImage: "terminal")
+                            .tag(RemoteConnectMode.ssh)
+                        Label(L10n.text("ui.connect.mode.files"), systemImage: "folder")
+                            .tag(RemoteConnectMode.sftp)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("connect-mode")
                 }
-                Button(L10n.text("sftp.host.connect"), action: onConnect)
+                if let notice {
+                    Label(notice, systemImage: "info.circle")
+                        .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .glassEffect(.regular, in: .rect(cornerRadius: Self.cardRadius))
+                }
+                if let paneFiles {
+                    paneFilesRow(paneFiles)
+                }
+                hostField
+                advanced
+                if let error {
+                    // Said in words with a symbol, never by colour alone.
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 6)
+                }
+                if !shown.recents.isEmpty || !shown.aliases.isEmpty {
+                    suggestions(shown)
+                }
+                HStack(spacing: 10) {
+                    Spacer()
+                    if let onCancel {
+                        Button(action: onCancel) {
+                            Text(L10n.text("common.cancel")).frame(minWidth: 72)
+                        }
+                        .buttonStyle(.glass)
+                        .keyboardShortcut(.cancelAction)
+                    }
+                    Button(action: onConnect) {
+                        Text(L10n.text("sftp.host.connect")).frame(minWidth: 72)
+                    }
+                    .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction)
                     // Empty in Files, Return opens the focused pane's host's.
                     .disabled(fields.isEmpty && !(paneFiles != nil && mode == .sftp))
+                }
+                .controlSize(.large)
+                .padding(.top, 4)
             }
-            .controlSize(.large)
+            .padding(24)
         }
         .onAppear { hostFocused = true }
         .onChange(of: focusGeneration) {
@@ -324,25 +354,57 @@ struct RemoteConnectForm: View {
         }
     }
 
+    /// The task beside its symbol, and what the connection relies on.
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .center, spacing: 14) {
             Image(systemName: modeSelection == nil ? mode.symbol : "network")
-                .font(.system(size: 20))
-                .foregroundStyle(.tint)
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .background(Color.accentColor.gradient, in: .rect(cornerRadius: 14))
                 .accessibilityHidden(true)
-            Text(modeSelection == nil ? mode.title : L10n.text("ui.connect.title")).font(.headline)
-            Spacer()
-            if let modeSelection {
-                Picker(L10n.text("ui.connect.modeLabel"), selection: modeSelection) {
-                    Label(L10n.text("ui.connect.mode.terminal"), systemImage: "terminal").tag(RemoteConnectMode.ssh)
-                    Label(L10n.text("ui.connect.mode.files"), systemImage: "folder").tag(RemoteConnectMode.sftp)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                .accessibilityIdentifier("connect-mode")
+            VStack(alignment: .leading, spacing: 3) {
+                Text(modeSelection == nil ? mode.title : L10n.text("ui.connect.title"))
+                    .font(.title3.weight(.semibold))
+                Text(help)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// The host, in a capsule of glass that rings with the accent colour
+    /// while it has focus.
+    private var hostField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "server.rack")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            TextField(L10n.text("ui.ssh.host"), text: $fields.host,
+                      prompt: Text(L10n.text("ui.connect.hostPrompt")))
+                .textFieldStyle(.plain)
+                .labelsHidden()
+                .font(.title3)
+                .focused($hostFocused)
+                .onSubmit(onConnect)
+                // ↓ and ↑ walk the suggestions from the field, the way an
+                // address bar's do; Return then connects to the one picked.
+                .onKeyPress(.downArrow) { stepSuggestion(by: 1) }
+                .onKeyPress(.upArrow) { stepSuggestion(by: -1) }
+                .accessibilityLabel(L10n.text("ui.ssh.host"))
+                .accessibilityIdentifier("connect-host")
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 44)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .overlay {
+            Capsule()
+                .strokeBorder(Color.accentColor.opacity(hostFocused ? 0.7 : 0), lineWidth: 2)
+                .animation(.easeOut(duration: 0.15), value: hostFocused)
+        }
+        .contentShape(.capsule)
+        .onTapGesture { hostFocused = true }
     }
 
     /// The focused pane's host, one Return away when the field is empty.
@@ -350,7 +412,7 @@ struct RemoteConnectForm: View {
         HStack(spacing: 10) {
             Image(systemName: "folder.badge.gearshape")
                 .foregroundStyle(.tint)
-                .frame(width: 18)
+                .frame(width: 20)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(L10n.text("ui.connect.thisPane"))
@@ -365,55 +427,86 @@ struct RemoteConnectForm: View {
                 RemoteConnectController.shared.close()
                 paneFiles.open()
             }
+            .buttonStyle(.glass)
             .accessibilityIdentifier("connect-pane-files")
         }
-        .padding(10)
-        .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 10))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .glassEffect(.regular, in: .rect(cornerRadius: Self.cardRadius))
     }
 
-    /// User, port and key: rarely changed, so out of the way, with what
-    /// they hold said on the closed row.
+    /// User, port and key: rarely changed, so behind a row that says what
+    /// they hold, opening in the same card.
     private var advanced: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 0) {
             Button {
-                showsAdvanced.toggle()
+                withAnimation(.snappy(duration: 0.25)) { showsAdvanced.toggle() }
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: showsAdvanced ? "chevron.down" : "chevron.right")
-                        .font(.caption2.weight(.semibold))
-                        .frame(width: 10)
-                    Text(L10n.text("ui.connect.advanced")).font(.callout.weight(.medium))
+                HStack(spacing: 8) {
+                    Image(systemName: "slider.horizontal.3")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20)
+                    Text(L10n.text("ui.connect.advanced"))
+                    Spacer(minLength: 12)
                     if !showsAdvanced {
                         Text(advancedSummary)
-                            .font(.callout)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(showsAdvanced ? 90 : 0))
                 }
-                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .frame(height: 40)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            .accessibilityValue(showsAdvanced ? "" : advancedSummary)
             .accessibilityIdentifier("connect-advanced")
             if showsAdvanced {
-                Form {
-                    TextField(L10n.text("ui.connect.user"), text: $fields.user,
-                              prompt: Text(L10n.text("ui.connect.fromConfig")))
-                        .onSubmit(onConnect)
-                        .accessibilityIdentifier("connect-user")
-                    TextField(L10n.text("ui.ssh.port"), text: $fields.port, prompt: Text(verbatim: "22"))
-                        .frame(width: 90)
-                        .onSubmit(onConnect)
-                        .help(L10n.text("ui.ssh.portDefault"))
-                        .accessibilityIdentifier("connect-port")
-                    LabeledContent(L10n.text("ui.connect.identity")) { identityRow }
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                    GridRow {
+                        Text(L10n.text("ui.connect.user")).gridColumnAlignment(.trailing)
+                        advancedField(
+                            L10n.text("ui.connect.user"), text: $fields.user,
+                            prompt: L10n.text("ui.connect.fromConfig"))
+                            .accessibilityIdentifier("connect-user")
+                    }
+                    GridRow {
+                        Text(L10n.text("ui.ssh.port"))
+                        advancedField(L10n.text("ui.ssh.port"), text: $fields.port, prompt: "22")
+                            .frame(width: 100)
+                            .help(L10n.text("ui.ssh.portDefault"))
+                            .accessibilityIdentifier("connect-port")
+                    }
+                    GridRow {
+                        Text(L10n.text("ui.connect.identity"))
+                        identityRow
+                    }
                 }
-                .formStyle(.columns)
-                .textFieldStyle(.roundedBorder)
-                .padding(.leading, 16)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.top, 2)
+                .padding(.bottom, 14)
+                .transition(.opacity)
             }
         }
+        .glassEffect(.regular, in: .rect(cornerRadius: Self.cardRadius))
+    }
+
+    /// A small capsule field inside the Advanced card.
+    private func advancedField(_ label: String, text: Binding<String>, prompt: String) -> some View {
+        TextField(label, text: text, prompt: Text(verbatim: prompt))
+            .textFieldStyle(.plain)
+            .labelsHidden()
+            .foregroundStyle(.primary)
+            .onSubmit(onConnect)
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .background(.fill.tertiary, in: .capsule)
     }
 
     /// "User · Port · Private key", or what they are set to.
@@ -436,7 +529,7 @@ struct RemoteConnectForm: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .help(fields.identityFile)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: 4)
             if !fields.identityFile.isEmpty {
                 Button {
                     fields.identityFile = ""
@@ -449,6 +542,8 @@ struct RemoteConnectForm: View {
                 .accessibilityLabel(L10n.text("ui.connect.identityClear"))
             }
             Button(L10n.text("ui.connect.identityChoose"), action: chooseIdentity)
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
                 .accessibilityIdentifier("connect-identity-choose")
         }
     }
@@ -527,13 +622,13 @@ struct RemoteConnectForm: View {
         return suggestions.filter { $0.name.localizedCaseInsensitiveContains(filter) }
     }
 
-    /// The suggestions, in a rounded well: a click fills the fields, a
-    /// double-click connects; a recent host is forgotten from its ✕ or its
-    /// menu. Drawn as plain rows — a `List` brought a square frame or its
-    /// own insets, and either sat badly in a rounded sheet.
+    /// The suggestions, in a card of glass: a click fills the fields and
+    /// highlights the row, a double-click connects; a recent host is
+    /// forgotten from its ✕ or its menu. Exactly what there is, up to about
+    /// five rows; then it scrolls.
     private func suggestions(_ shown: (recents: [Suggestion], aliases: [Suggestion])) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 suggestionSection(L10n.text("ui.connect.recent"), shown.recents, symbol: "clock")
                 suggestionSection(
                     L10n.text("ui.connect.sshConfig"), shown.aliases, symbol: "doc.text",
@@ -544,8 +639,8 @@ struct RemoteConnectForm: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .frame(height: Self.suggestionHeight(shown))
-        .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator))
+        .clipShape(.rect(cornerRadius: Self.cardRadius))
+        .glassEffect(.regular, in: .rect(cornerRadius: Self.cardRadius))
     }
 
     @ViewBuilder
@@ -567,7 +662,7 @@ struct RemoteConnectForm: View {
                         .help(trailing)
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 10)
             .frame(height: Self.headerHeight, alignment: .bottom)
             ForEach(suggestions, id: \.self) { suggestion in
                 suggestionRow(suggestion, symbol: symbol)
@@ -577,54 +672,52 @@ struct RemoteConnectForm: View {
 
     private func suggestionRow(_ suggestion: Suggestion, symbol: String) -> some View {
         let isPicked = picked == suggestion && pickedIsCurrent
+        let isHovered = hovered == suggestion
         let detail = detail(for: suggestion)
         return Button {
             pick(suggestion)
         } label: {
-            HStack(spacing: 8) {
-                // White on the selection, or it vanished into the tint.
+            HStack(spacing: 10) {
                 Image(systemName: symbol)
-                    .foregroundStyle(isPicked ? AnyShapeStyle(.white) : AnyShapeStyle(.tint))
-                    .frame(width: 16)
+                    .foregroundStyle(isPicked ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    .frame(width: 20)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(suggestion.name).lineLimit(1).truncationMode(.middle)
                     if let detail {
                         Text(detail)
                             .font(.caption)
-                            .foregroundStyle(isPicked ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: 8)
+                if case .recent(let target) = suggestion, isHovered {
+                    Button {
+                        forget(target)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(L10n.text("ui.connect.removeRecent"))
+                    .accessibilityLabel(L10n.text("ui.connect.removeRecent"))
+                } else if isPicked {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.tint)
+                        .accessibilityHidden(true)
+                }
             }
-            .foregroundStyle(isPicked ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, minHeight: Self.rowHeight, alignment: .leading)
             .background(
-                isPicked ? AnyShapeStyle(.tint)
-                    : hovered == suggestion ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
-                in: .rect(cornerRadius: 6))
-            .contentShape(.rect)
+                isPicked ? AnyShapeStyle(Color.accentColor.opacity(0.16))
+                    : isHovered ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear),
+                in: .rect(cornerRadius: 12))
+            .contentShape(.rect(cornerRadius: 12))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isPicked ? .isSelected : [])
-        .overlay(alignment: .trailing) {
-            if case .recent(let target) = suggestion, hovered == suggestion {
-                Button {
-                    forget(target)
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(isPicked ? AnyShapeStyle(.white) : AnyShapeStyle(.tertiary))
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, 8)
-                .help(L10n.text("ui.connect.removeRecent"))
-                .accessibilityLabel(L10n.text("ui.connect.removeRecent"))
-            }
-        }
         .onHover { inside in
-            if inside { hovered = suggestion } else if hovered == suggestion { hovered = nil }
+            if inside { hovered = suggestion } else if isHovered { hovered = nil }
         }
         .simultaneousGesture(TapGesture(count: 2).onEnded {
             pick(suggestion)
@@ -675,14 +768,14 @@ struct RemoteConnectForm: View {
         return formatter
     }()
 
-    private static let rowHeight: CGFloat = 36
-    private static let headerHeight: CGFloat = 20
+    private static let cardRadius: CGFloat = 18
+    private static let rowHeight: CGFloat = 42
+    private static let headerHeight: CGFloat = 22
 
-    /// Exactly what there is, up to about five rows; then it scrolls.
     private static func suggestionHeight(_ shown: (recents: [Suggestion], aliases: [Suggestion])) -> CGFloat {
         let rows = shown.recents.count + shown.aliases.count
         let headers = (shown.recents.isEmpty ? 0 : 1) + (shown.aliases.isEmpty ? 0 : 1)
-        let content = CGFloat(rows) * (Self.rowHeight + 1) + CGFloat(headers) * (Self.headerHeight + 1) + 12
-        return min(220, content)
+        let content = CGFloat(rows) * (rowHeight + 2) + CGFloat(headers) * (headerHeight + 2) + 12
+        return min(240, content)
     }
 }

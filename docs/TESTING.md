@@ -122,6 +122,19 @@ observable behaviour, derive expected results from the specification or a
 reproducer, and keep inputs as small as possible. Preserve the original
 failing bytes when reducing a parser case.
 
+### Clear Screen and shell editing
+
+`ShellIntegrationTests` checks visible prompt/input cells and cursor state,
+not only command markers: empty input, typed input, a mid-input cursor,
+multiline prompts, hard and soft wraps, wide/combining characters, deferred
+wrap, scrollback, oversized editors and alternate screens.
+`ShellIntegrationSessionTests` continues editing after Clear Screen in real
+installed shells; only explicit test Return keystrokes execute fixture
+commands. `DirectoryCompletionSessionTests` accepts three nested levels
+before executing `cd`. `TerminalRecoveryUITests` verifies ⌘K through the live
+app and checks About/Command History placement relative to the invoking
+window. Prepare UI fixtures as described below before running those tests.
+
 ### Golden fixtures
 
 [`GoldenTests.swift`](../CortaTerminal/Tests/CortaTerminalTests/GoldenTests.swift)
