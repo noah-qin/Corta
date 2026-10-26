@@ -86,6 +86,8 @@ line each:
   Corta's own executable and a dialog; nothing is stored.
 - **D28** Local tools are Swift; CI-only glue may be Python (standard
   library, tested in `scripts/tests/`).
+  **D29** No Homebrew cask until `homebrew/cask` accepts one; no tap of
+  our own.
 
 ## Working Rules
 

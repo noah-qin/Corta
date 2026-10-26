@@ -44,6 +44,7 @@ Status of every entry below is **accepted** unless it says otherwise.
 | [D26](#d26--releases-ship-as-a-disk-image) | Releases ship as a signed, notarised disk image | Accepted |
 | [D27](#d27--sftp-asks-through-opensshs-own-askpass-answered-by-corta) | SFTP asks through OpenSSH's `SSH_ASKPASS`; nothing is stored | Accepted |
 | [D28](#d28--local-tools-are-swift-ci-only-glue-may-be-python) | Local tools are Swift; CI-only glue may be Python | Accepted |
+| [D29](#d29--no-homebrew-cask-until-homebrewcask-accepts-one) | No Homebrew cask until `homebrew/cask` accepts one | Accepted |
 
 ---
 
@@ -779,3 +780,31 @@ never in a script.
 
 **Consequence.** Reopen with a reason the runners' Python cannot meet, or
 when the macOS runners become the only ones the glue needs.
+
+## D29 — No Homebrew cask until `homebrew/cask` accepts one
+
+**Decision.** Corta is installed from the signed, notarised disk image on
+GitHub Releases (D26) and updated by Sparkle (D23). There is no Homebrew
+cask, and no `noah-qin/homebrew-tap`: the only cask Corta will have is one
+in the upstream `homebrew/cask`, and that waits until the project meets
+its acceptance policy. #360 asked the question.
+
+**Why.** Homebrew's
+[package acceptance policy](https://docs.brew.sh/Package-Acceptance-Policy#notability)
+wants a repository at least 30 days old with 30 forks, 30 watchers or 75
+stars, and 90 forks, 90 watchers or 225 stars when the author submits it.
+On 2026-10-26 Corta had 2 forks, 0 watchers and 19 stars. A tap of our own
+would install, but it adds a repository, a release step that pushes to it
+and a token in the `release` environment (D20), all to save a user one
+download, and the version check it needs would belong in
+`corta-release-check`. An upstream cask costs nothing to keep: Homebrew's
+own autobump follows new releases.
+
+**What it costs.** `brew install --cask corta` does not work; people who
+install terminals with Homebrew download the disk image instead.
+
+**Consequence.** Reopen when the repository passes the threshold — 75
+stars lets a user submit the cask, 225 lets the maintainer — or when
+Homebrew's maintainers accept it as a notability exception. The cask then
+sets `auto_updates true` so `brew upgrade` leaves updates to Sparkle, and
+`depends_on macos: ">= :tahoe"` with `depends_on arch: :arm64` (D21).
