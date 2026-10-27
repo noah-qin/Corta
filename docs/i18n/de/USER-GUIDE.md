@@ -397,8 +397,9 @@ Mit geladenen Hooks, ob automatisch oder über die Startdatei:
   Befehl, den die Liste nicht vollständig zeigen kann – mehrzeilig, am Zeilenrand abgeschnitten oder mit einem
   Tabulator –, oder einer, dessen Text sich geändert hat, seit die Liste ihn zeigte, wird eingefügt statt ausgeführt,
   sodass er vollständig am Prompt steht und auf dein Return hin läuft.
-- **Verlaufs- und Infofenster.** Befehlsverlauf und **Corta ▸ Über Corta** öffnen zentriert über dem aufrufenden Fenster
-  und bleiben im nutzbaren Bereich seines Bildschirms. Ein bereits offenes Fenster bleibt dort, wohin du es geschoben hast.
+- **Verlaufs- und Infofenster.** Der Befehlsverlauf öffnet zentriert über dem aufrufenden Fenster und bleibt im nutzbaren
+  Bereich seines Bildschirms; **Corta ▸ Über Corta** öffnet wie die Infofenster anderer Apps in der Mitte dieses
+  Bildschirms. Ein bereits offenes Fenster bleibt dort, wohin du es geschoben hast.
   Die feste Größe des Befehlsverlaufs hält die Suche und die Filter für Verzeichnis / Projekt / Status / Host sichtbar;
   ein leeres Ergebnis zeigt **Keine Befehle** und die Anzahl der Treffer.
 - **Benachrichtigungen bei langen Aufgaben.** Mit `notify-on-long-task = true` meldet sich ein Befehl, der länger als

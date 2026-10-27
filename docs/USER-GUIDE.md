@@ -428,9 +428,10 @@ With the hooks loaded, automatically or through startup-file installation:
   holding a tab — or one whose text changed since the list showed it is
   filled rather than run, so all of it is at the prompt and runs on your
   Return.
-- **History and About windows.** Command History and **Corta ▸ About Corta**
-  open centered over the invoking window, kept within its display's usable
-  area. An already open window stays where you moved it. Command History's
+- **History and About windows.** Command History opens centered over the
+  invoking window, kept within its display's usable area; **Corta ▸ About
+  Corta** opens in the middle of that display, as other apps' About windows
+  do. An already open window stays where you moved it. Command History's
   fixed size keeps the search and directory/project/status/host filters
   visible; an empty result shows **No Commands** and the result count.
 - **Long-task notifications.** With `notify-on-long-task = true`, a command

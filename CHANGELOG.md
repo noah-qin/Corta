@@ -10,6 +10,12 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Changed
+
+- About Corta opens in the middle of its display, as other apps' About
+  windows do, instead of over the window it was opened from. Command
+  History still opens centered over its window.
+
 ### Tests and tooling
 
 - SwiftLint now reports nothing over the project's sources, tests and

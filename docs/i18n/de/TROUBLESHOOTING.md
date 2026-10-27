@@ -158,11 +158,12 @@ ein, ohne ihn auszuführen; Return führt `cd` aus. Versteckte Ordner brauchen e
 Unterordner, prüfe den Zugriff auf dieses Verzeichnis und vergleiche mit der nativen Vervollständigung der Shell, nachdem du
 `directory-completion` ausgeschaltet hast. Bleibt der Unterschied, melde die genaue Form des Pfads und die Shell.
 
-### Über Corta oder der Befehlsverlauf öffnet sich abseits des Terminals
+### Der Befehlsverlauf öffnet sich abseits des Terminals
 
-Schließe das Fenster und öffne es im aktuellen Corta erneut. Beide öffnen zentriert über dem aufrufenden Fenster und bleiben
-im nutzbaren Bereich seines Bildschirms; sie werden nicht in der Mitte des gesamten Bildschirms platziert. Ein bereits
-offenes Fenster behält die Position, die du gewählt hast.
+Schließe ihn und öffne ihn im aktuellen Corta erneut. Er öffnet zentriert über dem aufrufenden Fenster und bleibt im
+nutzbaren Bereich dieses Bildschirms; er wird nicht in der Mitte des gesamten Bildschirms platziert. Über Corta ist
+bewusst die Ausnahme: Es öffnet wie die Infofenster anderer Apps in der Mitte des Bildschirms. Ein bereits offenes
+Fenster behält die Position, die du gewählt hast.
 
 ### Tab tut nichts im Slash-Befehlsmenü von Claude Code
 
