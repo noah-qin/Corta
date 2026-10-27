@@ -78,6 +78,14 @@ reason or invariant. Avoid narrating the code or using a milestone number as
 the only explanation. Test names should describe observable behaviour and
 fixture comments should identify the rule being checked.
 
+Before opening a pull request that touches Swift, run SwiftLint from the
+repository root; it reports nothing, and a finding is fixed rather than
+suppressed (`docs/TESTING.md`, [Lint](docs/TESTING.md#lint)):
+
+```sh
+swiftlint lint --quiet
+```
+
 Before opening any documentation pull request, run the lightweight link check:
 
 ```sh

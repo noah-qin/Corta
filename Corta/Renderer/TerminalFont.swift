@@ -141,7 +141,8 @@ nonisolated enum TerminalFont {
     /// Every lead's two lists, built once: `pinningCascadeList` runs for
     /// each style on every ⌘= / ⌘- repeat. Immutable, hence
     /// `nonisolated(unsafe)` for the non-`Sendable` descriptors.
-    private nonisolated(unsafe) static let cascades: [CJKLead: (regular: [CTFontDescriptor], bold: [CTFontDescriptor])] =
+    private nonisolated(unsafe) static let cascades:
+        [CJKLead: (regular: [CTFontDescriptor], bold: [CTFontDescriptor])] =
         Dictionary(uniqueKeysWithValues: CJKLead.allCases.map { lead in
             let order = [lead] + CJKLead.allCases.filter { $0 != lead }
             func list(bold: Bool) -> [CTFontDescriptor] {

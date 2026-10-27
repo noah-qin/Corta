@@ -88,8 +88,7 @@ struct ImageDecodePipelineTests {
         let renderer = Self.makeRenderer(device: device, decodeCount: count) { work.append($0) }
         var terminal = Terminal(rows: 10, columns: 40)
         func update() {
-            renderer.update(table: Self.table(of: terminal), rows: 10, offset: 0,
-                scrollbackTotalPushed: 0, cellHeight: 20)
+            renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         }
         for byte in UInt8(0)..<100 {
             Self.placeRGBA(&terminal, id: 1, byte: byte)
@@ -128,8 +127,7 @@ struct ImageDecodePipelineTests {
         Self.placeRGBA(&terminal, id: 1, byte: 1)
         Self.placeRGBA(&terminal, id: 2, byte: 2)
         func update() {
-            renderer.update(table: Self.table(of: terminal), rows: 10, offset: 0,
-                scrollbackTotalPushed: 0, cellHeight: 20)
+            renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         }
         for _ in 0..<10 { update() }
         // Evicting a visible image to install the other re-decoded it on the
@@ -155,16 +153,15 @@ struct ImageDecodePipelineTests {
         var terminal = Terminal(rows: 10, columns: 40)
         for id in UInt32(1)...8 { Self.placeRGBA(&terminal, id: id, byte: 255) }
         for renderer in [a, b] {
-            renderer.update(table: Self.table(of: terminal), rows: 10, offset: 0,
-                scrollbackTotalPushed: 0, cellHeight: 20)
+            renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         }
         #expect(work.count == 2)
         while !work.isEmpty { work.removeFirst()() }
-        b.update(table: Self.table(of: terminal), rows: 10, offset: 0,
-            scrollbackTotalPushed: 0, cellHeight: 20)
+        b.update(table: Self.table(of: terminal), viewport: Self.viewport())
         #expect(work.count == 2, "another pane retries after admission is released")
         while !work.isEmpty { work.removeFirst()() }
     }
+
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
     /// Escaping closures mutate counters, so they need a reference — with a
@@ -202,7 +199,10 @@ struct ImageDecodePipelineTests {
             decodeScheduler: scheduled)
     }
 
-    private let updateArgs = (rows: 10, cellHeight: Float(20))
+    /// Ten rows of 10×20-point cells.
+    private static func viewport(offset: Int = 0, scrollbackTotalPushed: Int = 0) -> KittyImageRenderer.ImageViewport {
+        .init(rows: 10, offset: offset, scrollbackTotalPushed: scrollbackTotalPushed, cellWidth: 10, cellHeight: 20)
+    }
 
     @Test("the frame path never decodes: update schedules, lookups only read")
     func framePathNeverDecodes() throws {
@@ -219,9 +219,7 @@ struct ImageDecodePipelineTests {
 
         // One update: the decode is scheduled, not performed, and a
         // frame-path lookup finds nothing yet — without decoding anything.
-        renderer.update(
-            table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackTotalPushed: 0, cellHeight: updateArgs.cellHeight)
+        renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         #expect(work.count == 1)
         #expect(decodeCount.value == 0)
         #expect(renderer.texture(for: id) == nil)
@@ -234,9 +232,7 @@ struct ImageDecodePipelineTests {
         #expect(renderer.texture(for: id) != nil)
 
         // Later frames are pure cache hits: no reschedule, no re-decode.
-        renderer.update(
-            table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackTotalPushed: 0, cellHeight: updateArgs.cellHeight)
+        renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         #expect(work.count == 1)
         #expect(renderer.texture(for: id) != nil)
         #expect(decodeCount.value == 1)
@@ -254,23 +250,21 @@ struct ImageDecodePipelineTests {
         let id = KittyGraphics.ImageID(rawValue: 1)
 
         Self.placeRGBA(&terminal, id: 1, byte: 0xFF)
-        renderer.update(
-            table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackTotalPushed: 0, cellHeight: updateArgs.cellHeight)
+        renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         let first = try #require(renderer.texture(for: id))
         #expect(decodeCount.value == 1)
 
         // Same id, new transmission: the placement table's generation moved,
         // so the cached texture is stale and the image re-decodes once.
         Self.placeRGBA(&terminal, id: 1, byte: 0x7F)
-        renderer.update(
-            table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackTotalPushed: 0, cellHeight: updateArgs.cellHeight)
+        renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         let second = try #require(renderer.texture(for: id))
         #expect(decodeCount.value == 2)
         #expect(first !== second)
     }
+}
 
+extension ImageDecodePipelineTests {
     @Test("deleting the last placement releases its texture and budget")
     func lastPlacementDisappearingReleasesTexture() throws {
         guard let device = Self.makeDevice() else {
@@ -280,9 +274,7 @@ struct ImageDecodePipelineTests {
         let renderer = Self.makeRenderer(device: device, decodeCount: Counter()) { $0() }
         var terminal = Terminal(rows: 10, columns: 40)
         Self.placeRGBA(&terminal, id: 1, byte: 0xFF)
-        renderer.update(
-            table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackTotalPushed: 0, cellHeight: updateArgs.cellHeight)
+        renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         #expect(renderer.textureCount == 1)
         #expect(renderer.cachedTextureBytes == 16)
 
@@ -290,9 +282,7 @@ struct ImageDecodePipelineTests {
         // even though the table is now empty (a prune that bails out early
         // on an empty placement list leaks the texture).
         terminal.feed(Array("\u{1B}_Ga=d,d=i,i=1\u{1B}\\".utf8))
-        renderer.update(
-            table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackTotalPushed: 0, cellHeight: updateArgs.cellHeight)
+        renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         #expect(renderer.textureCount == 0)
         #expect(renderer.cachedTextureBytes == 0)
     }
@@ -313,18 +303,17 @@ struct ImageDecodePipelineTests {
         #expect(scrollbackCount >= 20)
 
         renderer.update(
-            table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackTotalPushed: terminal.grid.scrollback.totalPushed,
-            cellHeight: updateArgs.cellHeight)
+            table: Self.table(of: terminal),
+            viewport: Self.viewport(scrollbackTotalPushed: terminal.grid.scrollback.totalPushed))
         #expect(decodeCount.value == 0, "a provably offscreen placement must not decode")
         #expect(renderer.textureCount == 0)
 
         // Scrolled all the way up, the placement is visible again and the
         // decode happens then.
         renderer.update(
-            table: Self.table(of: terminal), rows: updateArgs.rows, offset: scrollbackCount,
-            scrollbackTotalPushed: terminal.grid.scrollback.totalPushed,
-            cellHeight: updateArgs.cellHeight)
+            table: Self.table(of: terminal),
+            viewport: Self.viewport(
+                offset: scrollbackCount, scrollbackTotalPushed: terminal.grid.scrollback.totalPushed))
         #expect(decodeCount.value == 1)
         #expect(renderer.textureCount == 1)
     }
@@ -339,12 +328,11 @@ struct ImageDecodePipelineTests {
         let renderer = Self.makeRenderer(device: device, decodeCount: decodeCount) { $0() }
         var terminal = Terminal(rows: 10, columns: 40)
         // A corrupt PNG (f=100): stored by the core, fails the decode.
-        terminal.feed(Array("\u{1B}_Ga=T,i=1,f=100;\(Data([UInt8](repeating: 0, count: 32)).base64EncodedString())\u{1B}\\".utf8))
+        terminal.feed(
+            Array("\u{1B}_Ga=T,i=1,f=100;\(Data([UInt8](repeating: 0, count: 32)).base64EncodedString())\u{1B}\\".utf8))
 
         for _ in 0..<3 {
-            renderer.update(
-                table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-                scrollbackTotalPushed: 0, cellHeight: updateArgs.cellHeight)
+            renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         }
         #expect(decodeCount.value == 1, "a failed image must not retry the decode every frame")
         #expect(renderer.textureCount == 0)
@@ -352,9 +340,7 @@ struct ImageDecodePipelineTests {
         // Same id, valid bytes this time: the failure was recorded per
         // transmission, so the re-transmission gets a fresh attempt.
         Self.placeRGBA(&terminal, id: 1, byte: 0xFF)
-        renderer.update(
-            table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackTotalPushed: 0, cellHeight: updateArgs.cellHeight)
+        renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         #expect(decodeCount.value == 2)
         #expect(renderer.textureCount == 1)
     }
@@ -370,14 +356,10 @@ struct ImageDecodePipelineTests {
         renderer.onImagesReady = { notified.value += 1 }
         var terminal = Terminal(rows: 10, columns: 40)
         Self.placeRGBA(&terminal, id: 1, byte: 0xFF)
-        renderer.update(
-            table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackTotalPushed: 0, cellHeight: updateArgs.cellHeight)
+        renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         #expect(notified.value == 1)
         // A steady frame with nothing new does not notify again.
-        renderer.update(
-            table: Self.table(of: terminal), rows: updateArgs.rows, offset: 0,
-            scrollbackTotalPushed: 0, cellHeight: updateArgs.cellHeight)
+        renderer.update(table: Self.table(of: terminal), viewport: Self.viewport())
         #expect(notified.value == 1)
     }
 }

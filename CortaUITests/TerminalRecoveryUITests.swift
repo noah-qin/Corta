@@ -140,7 +140,9 @@ final class TerminalRecoveryUITests: XCTestCase {
         waitForExpectations(timeout: 5)
         Thread.sleep(forTimeInterval: 0.4)
         let stillHeld = terminal.screenshot().pngRepresentation
-        XCTAssertNotEqual(canvasPixels(held), canvasPixels(stillHeld), "timeout must release the hold so later input changes the canvas")
+        XCTAssertNotEqual(
+            canvasPixels(held), canvasPixels(stillHeld),
+            "timeout must release the hold so later input changes the canvas")
         let heldShot = XCTAttachment(data: stillHeld, uniformTypeIdentifier: "public.png")
         heldShot.name = "issue228-sync-recovered"; heldShot.lifetime = .keepAlways; add(heldShot)
         app.typeText("printf 'ISSUE228-%s\\n' 'NEXT-FRAME'\n")
@@ -148,7 +150,8 @@ final class TerminalRecoveryUITests: XCTestCase {
         waitForExpectations(timeout: 5)
         Thread.sleep(forTimeInterval: 0.5)
         let released = terminal.screenshot().pngRepresentation
-        XCTAssertNotEqual(canvasPixels(stillHeld), canvasPixels(released), "the next command must also update the recovered canvas")
+        XCTAssertNotEqual(
+            canvasPixels(stillHeld), canvasPixels(released), "the next command must also update the recovered canvas")
         let releasedShot = XCTAttachment(data: released, uniformTypeIdentifier: "public.png")
         releasedShot.name = "issue228-sync-next-frame"; releasedShot.lifetime = .keepAlways; add(releasedShot)
     }

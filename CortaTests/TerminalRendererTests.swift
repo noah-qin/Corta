@@ -24,7 +24,9 @@ import Testing
 
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct TerminalRendererTests {
+@Suite(
+    .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct TerminalRendererTests {
 
     @Test("a static Retina CJK screen fills across budgeted frames")
     func deferredCJKCompletes() throws {
@@ -147,12 +149,15 @@ import Testing
             device: device, width: width, height: height)
 
         renderer.renderAndWait(
-            grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-            drawableSize: CGSize(width: width, height: height), cursorVisible: true, selection: nil,
-            target: texture)
+            grid: grid, cursorVisible: true, selection: nil,
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                drawableSize: CGSize(width: width, height: height)))
 
-        let cursorX = Int(Float(grid.cursor.column) * Float(renderer.metrics.cellWidth) + Float(renderer.metrics.cellWidth) / 2)
-        let cursorY = Int(Float(grid.cursor.row) * Float(renderer.metrics.cellHeight) + Float(renderer.metrics.cellHeight) / 2)
+        let cursorX = Int(
+            Float(grid.cursor.column) * Float(renderer.metrics.cellWidth) + Float(renderer.metrics.cellWidth) / 2)
+        let cursorY = Int(
+            Float(grid.cursor.row) * Float(renderer.metrics.cellHeight) + Float(renderer.metrics.cellHeight) / 2)
         let atCursor = MetalRenderTarget.pixel(of: texture, x: cursorX, y: cursorY)
         let elsewhere = MetalRenderTarget.pixel(of: texture, x: width - 4, y: height - 4)
 
@@ -184,9 +189,10 @@ import Testing
             start: GridPosition(row: 1, column: 2), end: GridPosition(row: 1, column: 4))
 
         renderer.renderAndWait(
-            grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-            drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-            selection: selection, target: texture)
+            grid: grid, cursorVisible: false, selection: selection,
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                drawableSize: CGSize(width: width, height: height)))
 
         let insideX = Int(Float(3) * Float(renderer.metrics.cellWidth) + Float(renderer.metrics.cellWidth) / 2)
         let insideY = Int(Float(1) * Float(renderer.metrics.cellHeight) + Float(renderer.metrics.cellHeight) / 2)
@@ -225,10 +231,10 @@ import Testing
 
         func draw(into texture: MTLTexture, scrollOffset: Int) {
             renderer.renderAndWait(
-                grid: grid, scrollOffset: scrollOffset,
-                rect: CGRect(x: 0, y: 0, width: width, height: height),
-                drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-                selection: nil, target: texture)
+                grid: grid, scrollOffset: scrollOffset, cursorVisible: false, selection: nil,
+                into: FrameTarget(
+                    texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                    drawableSize: CGSize(width: width, height: height)))
         }
 
         draw(into: liveTexture, scrollOffset: 0)

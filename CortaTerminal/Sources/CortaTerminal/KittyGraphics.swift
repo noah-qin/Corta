@@ -74,7 +74,7 @@ public enum KittyGraphics {
         public var height: Int
         public var bytes: [UInt8]
         /// Diagnostic-only final-payload timestamp, on the drawable uptime clock.
-        public var receivedAt: TimeInterval? = nil
+        public var receivedAt: TimeInterval?
 
         /// Height in pixels without decoding: `v=`, or for a PNG the `IHDR`
         /// chunk every PNG starts with (big-endian, bytes 20–23). Nil when a
@@ -135,8 +135,8 @@ public enum KittyGraphics {
         public var rows: Int?
         public var baseScrollbackTotal: Int
         public var zIndex: Int
-        public var displayPixelWidth: Int? = nil
-        public var displayPixelHeight: Int? = nil
+        public var displayPixelWidth: Int?
+        public var displayPixelHeight: Int?
         /// Source UV interval retained after scrolling against a page margin.
         /// Clipping is permanent: a later reverse scroll cannot restore pixels.
         public internal(set) var sourceTop: Float = 0
@@ -182,8 +182,8 @@ public enum KittyGraphics {
         /// `C=1` leaves the cursor where it is; `kitten icat --place` sends
         /// it and positions the cursor itself.
         var movesCursor = true
-        var displayPixelWidth: Int? = nil
-        var displayPixelHeight: Int? = nil
+        var displayPixelWidth: Int?
+        var displayPixelHeight: Int?
     }
 
     /// The `d=` subset implemented. Any other letter is ignored rather than

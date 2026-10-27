@@ -24,23 +24,26 @@ import Darwin
 /// safe as the locks other threads hold at that instant, and it was killed
 /// ~8% of the time even fully serialized (`DESIGN.md` §7.2).
 enum Spawn {
+    /// What the child runs, and where.
+    struct Command {
+        var executable: String
+        var arguments: [String]
+        var environment: [String: String]
+        /// Absolute, or `nil` to inherit ours.
+        var workingDirectory: String?
+    }
+
     /// - Parameters:
     ///   - parentReplica: the caller's reference, used for the initial size;
     ///     closed here the instant `corta-exec` has its own.
-    ///   - workingDirectory: absolute, or `nil` to inherit ours.
     static func child(
-        executable: String,
-        arguments: [String],
-        environment: [String: String],
-        replicaPath: String,
-        parentReplica: Int32,
-        workingDirectory: String?
+        _ command: Command, replicaPath: String, parentReplica: Int32
     ) throws(PTYError) -> pid_t {
         // Early-throw paths; the real close site disarms it.
         var parentReplicaClosed = false
         defer { if !parentReplicaClosed { close(parentReplica) } }
 
-        guard executable.hasPrefix("/") else { throw .executablePathNotAbsolute }
+        guard command.executable.hasPrefix("/") else { throw .executablePathNotAbsolute }
 
         guard let helperPath = locateHelperExecutable() else {
             throw .spawnFailed(code: ENOENT)
@@ -58,9 +61,7 @@ enum Spawn {
 
         let pid: pid_t
         do throws(PTYError) {
-            pid = try launchHelper(
-                helperPath, statusPipe: writeEnd, executable: executable, arguments: arguments,
-                environment: environment, replicaPath: replicaPath, workingDirectory: workingDirectory)
+            pid = try launchHelper(helperPath, statusPipe: writeEnd, command: command, replicaPath: replicaPath)
         } catch {
             close(readEnd)
             close(writeEnd)
@@ -96,8 +97,7 @@ enum Spawn {
     /// only other descriptor it inherits, every signal at its default and a
     /// session of its own.
     private static func launchHelper(
-        _ helperPath: String, statusPipe writeEnd: Int32, executable: String, arguments: [String],
-        environment: [String: String], replicaPath: String, workingDirectory: String?
+        _ helperPath: String, statusPipe writeEnd: Int32, command: Command, replicaPath: String
     ) throws(PTYError) -> pid_t {
         var fileActions: posix_spawn_file_actions_t?
         posix_spawn_file_actions_init(&fileActions)
@@ -108,7 +108,7 @@ enum Spawn {
         posix_spawn_file_actions_addinherit_np(&fileActions, writeEnd)
         // The spawn fails with the `chdir` errno when the directory is gone,
         // as it did when `corta-exec` changed directory itself.
-        if let workingDirectory {
+        if let workingDirectory = command.workingDirectory {
             posix_spawn_file_actions_addchdir(&fileActions, workingDirectory)
         }
 
@@ -127,9 +127,9 @@ enum Spawn {
         )
         resetSignals(of: &attributes)
 
-        var childArguments = [helperPath, String(writeEnd), executable]
-        childArguments.append(contentsOf: arguments)
-        let environmentLines = environment.map { "\($0.key)=\($0.value)" }.sorted()
+        var childArguments = [helperPath, String(writeEnd), command.executable]
+        childArguments.append(contentsOf: command.arguments)
+        let environmentLines = command.environment.map { "\($0.key)=\($0.value)" }.sorted()
 
         var pid: pid_t = 0
         let spawnResult = withCStringArray(childArguments) { argv in

@@ -87,7 +87,9 @@ extension TaskNotifier {
 
     /// One mutable system notice per pane. A flood replaces one pending
     /// value and delivers at most once per five seconds, without a queue.
-    private func queueProgramNotice(_ notice: DesktopNotification, attention: Bool, wait: Int?, episode: Int?, in window: NSWindow?) {
+    private func queueProgramNotice(
+        _ notice: DesktopNotification, attention: Bool, wait: Int?, episode: Int?, in window: NSWindow?
+    ) {
         guard let window else { return }
         programPending = notice
         programPendingIsAttention = attention; programPendingWait = wait
@@ -100,93 +102,148 @@ extension TaskNotifier {
         let generation = sessionGeneration
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.sessionGeneration == generation else { return }
-            self.programTimer = nil
-            guard let notice = self.programPending else { return }
-            let wait = self.programPendingWait
-            let episode = self.programPendingEpisode
-            let waitingAtSubmission = self.programBlocked && episode == self.programWaitGeneration ? episode : nil
-            self.programPending = nil; self.programPendingWait = nil; self.programPendingEpisode = nil
-            guard ConfigurationStore.shared.configuration.notifyFromPrograms,
-                  self.programCanDeliver(notice),
-                  !(self.programBlocked && self.programBlockedNoticeDelivered && episode == self.programWaitGeneration),
-                  wait == nil || (self.programBlocked && self.programWaitGeneration == wait) else { return }
-            self.programActiveWait = wait
-            self.programLastPosted = self.programNow()
-            self.programLastID = notice.id
-            self.programRevision += 1
-            let revision = self.programRevision
-            if let deliver = self.programDelivery {
-                self.markProgramWaitDelivered(waitingAtSubmission)
-                deliver(notice); return
-            }
-            let content = UNMutableNotificationContent()
-            content.title = ProgramText.clean(self.title(), limit: 192)
-            let text = [notice.title, notice.body].filter { !$0.isEmpty }.joined(separator: ": ")
-            content.body = L10n.format("agent.notification.message", ProgramText.clean(text, limit: 2048))
-            content.sound = notice.sound ? .default : nil
-            content.interruptionLevel = notice.urgency == 0 ? .passive : .active
-            // Routing uses Corta identities exclusively. No reports to stdin.
-            if notice.focus {
-                content.userInfo = ["windowNumber": number, "paneID": self.paneID.uuidString,
-                                    "sessionGeneration": generation]
-            }
-            self.programExpiry?.cancel(); self.programExpiry = nil
-            self.programSubmission = Task { @MainActor [weak self] in
-                guard let self else { return }
-                defer {
-                    self.programSubmission = nil
-                    if let pending = self.programPending,
-                       let window = NSApp.window(withWindowNumber: number) {
-                        self.queueProgramNotice(pending, attention: self.programPendingIsAttention,
-                            wait: self.programPendingWait, episode: self.programPendingEpisode, in: window)
-                    }
-                }
-                let center = UNUserNotificationCenter.current()
-                if let authorize = self.programAuthorize { await authorize() }
-                else {
-                    let settings = await center.notificationSettings()
-                    Self.programLog.debug("Program notice authorization: \(settings.authorizationStatus.rawValue, privacy: .public)")
-                    guard !Task.isCancelled, self.programRevision == revision,
-                          ConfigurationStore.shared.configuration.notifyFromPrograms else { return }
-                    if settings.authorizationStatus == .notDetermined
-                        || (settings.authorizationStatus == .authorized && settings.badgeSetting == .notSupported) {
-                        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
-                        Self.refreshPermission()
-                    }
-                }
-                guard !Task.isCancelled, self.programRevision == revision,
-                      self.sessionGeneration == generation,
-                      ConfigurationStore.shared.configuration.notifyFromPrograms,
-                      self.programCanDeliver(notice),
-                      wait == nil || (self.programBlocked && self.programWaitGeneration == wait) else { return }
-                do {
-                    let request = UNNotificationRequest(identifier: self.programIdentifier, content: content, trigger: nil)
-                    if let submit = self.programSubmit { try await submit(request) }
-                    else { try await center.add(request) }
-                    if self.programRevision == revision { self.markProgramWaitDelivered(waitingAtSubmission) }
-                } catch {
-                    // Never log program text, titles or ids.
-                    Self.programLog.error("Program notice delivery failed: \((error as NSError).code, privacy: .public)")
-                }
-                self.programLastPosted = self.programNow()
-                // A close/restart can race the asynchronous OS submission.
-                guard self.programRevision == revision else {
-                    self.removeProgramNotice()
-                    return
-                }
-                if notice.expiryMilliseconds > 0 {
-                    let expiry = DispatchWorkItem { [weak self] in
-                        guard let self, self.programRevision == revision else { return }
-                        self.removeProgramNotice()
-                        self.programExpiry = nil
-                    }
-                    self.programExpiry = expiry
-                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(notice.expiryMilliseconds) / 1000, execute: expiry)
-                }
-            }
+            self.firePendingProgramNotice(windowNumber: number, generation: generation)
         }
         programTimer = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    /// One notice on its way to the system, with what decides whether it
+    /// is still wanted when the asynchronous submission returns.
+    private struct ProgramSubmission {
+        var notice: DesktopNotification
+        var content: UNMutableNotificationContent
+        var revision: Int
+        var generation: Int
+        var wait: Int?
+        var waitingAtSubmission: Int?
+        var windowNumber: Int
+    }
+
+    /// The coalescing window closed: posts what is pending, if it is still
+    /// wanted.
+    private func firePendingProgramNotice(windowNumber number: Int, generation: Int) {
+        programTimer = nil
+        guard let notice = programPending else { return }
+        let wait = programPendingWait
+        let episode = programPendingEpisode
+        let waitingAtSubmission = programBlocked && episode == programWaitGeneration ? episode : nil
+        programPending = nil; programPendingWait = nil; programPendingEpisode = nil
+        guard ConfigurationStore.shared.configuration.notifyFromPrograms,
+              programCanDeliver(notice),
+              !(programBlocked && programBlockedNoticeDelivered && episode == programWaitGeneration),
+              wait == nil || (programBlocked && programWaitGeneration == wait) else { return }
+        programActiveWait = wait
+        programLastPosted = programNow()
+        programLastID = notice.id
+        programRevision += 1
+        if let deliver = programDelivery {
+            markProgramWaitDelivered(waitingAtSubmission)
+            deliver(notice); return
+        }
+        let submission = ProgramSubmission(
+            notice: notice, content: programContent(for: notice, windowNumber: number, generation: generation),
+            revision: programRevision, generation: generation, wait: wait,
+            waitingAtSubmission: waitingAtSubmission, windowNumber: number)
+        programExpiry?.cancel(); programExpiry = nil
+        programSubmission = Task { @MainActor [weak self] in
+            await self?.submitProgramNotice(submission)
+        }
+    }
+
+    private func programContent(
+        for notice: DesktopNotification, windowNumber: Int, generation: Int
+    ) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = ProgramText.clean(title(), limit: 192)
+        let text = [notice.title, notice.body].filter { !$0.isEmpty }.joined(separator: ": ")
+        content.body = L10n.format("agent.notification.message", ProgramText.clean(text, limit: 2048))
+        content.sound = notice.sound ? .default : nil
+        content.interruptionLevel = notice.urgency == 0 ? .passive : .active
+        // Routing uses Corta identities exclusively. No reports to stdin.
+        if notice.focus {
+            content.userInfo = ["windowNumber": windowNumber, "paneID": paneID.uuidString,
+                                "sessionGeneration": generation]
+        }
+        return content
+    }
+
+    /// Hands the notice to the system once permission is settled, then
+    /// queues whatever arrived meanwhile.
+    private func submitProgramNotice(_ submission: ProgramSubmission) async {
+        defer {
+            programSubmission = nil
+            if let pending = programPending,
+               let window = NSApp.window(withWindowNumber: submission.windowNumber) {
+                queueProgramNotice(pending, attention: programPendingIsAttention,
+                    wait: programPendingWait, episode: programPendingEpisode, in: window)
+            }
+        }
+        let center = UNUserNotificationCenter.current()
+        guard await authorizeProgramNotices(center, revision: submission.revision) else { return }
+        let revision = submission.revision
+        let wait = submission.wait
+        guard !Task.isCancelled, programRevision == revision,
+              sessionGeneration == submission.generation,
+              ConfigurationStore.shared.configuration.notifyFromPrograms,
+              programCanDeliver(submission.notice),
+              wait == nil || (programBlocked && programWaitGeneration == wait) else { return }
+        do {
+            let request = UNNotificationRequest(
+                identifier: programIdentifier, content: submission.content, trigger: nil)
+            if let submit = programSubmit {
+                try await submit(request)
+            } else {
+                try await center.add(request)
+            }
+            if programRevision == revision { markProgramWaitDelivered(submission.waitingAtSubmission) }
+        } catch {
+            // Never log program text, titles or ids.
+            Self.programLog.error(
+                "Program notice delivery failed: \((error as NSError).code, privacy: .public)")
+        }
+        programLastPosted = programNow()
+        // A close/restart can race the asynchronous OS submission.
+        guard programRevision == revision else {
+            removeProgramNotice()
+            return
+        }
+        if submission.notice.expiryMilliseconds > 0 {
+            scheduleProgramExpiry(after: submission.notice.expiryMilliseconds, revision: revision)
+        }
+    }
+
+    /// Asks once while permission is undecided, or while badges are
+    /// unsupported under an authorisation that predates them.
+    /// - Returns: false when the notice stopped being wanted meanwhile.
+    private func authorizeProgramNotices(_ center: UNUserNotificationCenter, revision: Int) async -> Bool {
+        if let authorize = programAuthorize {
+            await authorize()
+            return true
+        }
+        let settings = await center.notificationSettings()
+        Self.programLog.debug(
+            "Program notice authorization: \(settings.authorizationStatus.rawValue, privacy: .public)")
+        guard !Task.isCancelled, programRevision == revision,
+              ConfigurationStore.shared.configuration.notifyFromPrograms else { return false }
+        if settings.authorizationStatus == .notDetermined
+            || (settings.authorizationStatus == .authorized && settings.badgeSetting == .notSupported) {
+            _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+            Self.refreshPermission()
+        }
+        return true
+    }
+
+    /// Withdraws the posted notice when the program's expiry passes, unless
+    /// a newer one replaced it.
+    private func scheduleProgramExpiry(after milliseconds: Int, revision: Int) {
+        let expiry = DispatchWorkItem { [weak self] in
+            guard let self, self.programRevision == revision else { return }
+            self.removeProgramNotice()
+            self.programExpiry = nil
+        }
+        programExpiry = expiry
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(milliseconds) / 1000, execute: expiry)
     }
 
     private func markProgramWaitDelivered(_ wait: Int?) {

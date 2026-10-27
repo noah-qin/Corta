@@ -72,7 +72,10 @@ struct SSHConnectionTests {
         }
     }
 
-    @Test(arguments: ["", "-oProxyCommand=bad", "a;touch", "a\nb", "user@", "a@b@c", "a b", "a$(echo)", "host%h", "box:22", "[2001:db8::1]:22", "[::1", "[box]", "box]"])
+    @Test(arguments: [
+        "", "-oProxyCommand=bad", "a;touch", "a\nb", "user@", "a@b@c", "a b", "a$(echo)", "host%h", "box:22",
+        "[2001:db8::1]:22", "[::1", "[box]", "box]",
+    ])
     func rejectsInvalidHosts(_ host: String) {
         #expect(target(host) == .failure(.host))
     }

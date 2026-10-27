@@ -32,7 +32,7 @@ Metal 4 算繪 · 原生中日韓輸入法 · SSH、SFTP 與遠端編輯
 </div>
 
 > 本文譯自英文版 [README.md](../../../README.md)，對應提交
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md)。
+> [`bdcf6da`](https://github.com/noah-qin/Corta/blob/bdcf6daab52425e20f6e953a1b0de152d2dfe2bf/README.md)。
 > 此後英文版如有更新，或兩者有出入，以英文版為準。
 
 ## 安裝
@@ -81,6 +81,10 @@ shasum -a 256 -c Corta-x.y.z.dmg.sha256
 [功能參考](../../FEATURES.md)（英文）列出了全部功能及其需求和限制，描述的是 `main` 分支——
 已發布的版本不一定包含其中每一項。Corta 與 iTerm2、Ghostty 的比較，以及什麼時候該選它們，見
 [Features → How Corta compares](../../FEATURES.md#how-corta-compares)（英文）。
+在程式碼代理的工作狀態方面，開發樹目前**只整合了 Claude Code**；其他工具只有通用協定支援和程序偵測，沒有專門的狀態轉接
+（[範圍與限制](../../CONFORMANCE.md#cli-signal-compatibility)，英文）。它基於 Claude Code 2.1.310 開發和驗收：互動式 OSC 7501 狀態，
+並可明確選擇通道來顯示 Claude 的訊息文字。tmux、Claude 背景工作階段和關閉終端機標題回報各有單獨的限制；剖析器涵蓋了某個協定，
+並不代表完整的即時生命週期都經過了驗收。
 Corta 只做 macOS，不支援 tmux 控制模式、內建 AI 和指令碼引擎，這些都是
 [已定的決策](../../DECISIONS.md)（英文）；一般的 tmux 工作階段作為終端機程式在 Corta 裡照常執行。
 

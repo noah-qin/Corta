@@ -166,7 +166,8 @@ struct DocumentationDriftTests {
             let cells = line.split(separator: "|", omittingEmptySubsequences: true)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
             guard cells.count == 3,
-                  let command = TerminalCommand(rawValue: cells[0].trimmingCharacters(in: CharacterSet(charactersIn: "`")))
+                let command = TerminalCommand(
+                    rawValue: cells[0].trimmingCharacters(in: CharacterSet(charactersIn: "`")))
             else { continue }
             let documented = cells[2]
             let expected = command.defaultShortcut.map { "`\($0.text)`" } ?? "*(none"
@@ -204,27 +205,38 @@ struct DocumentationDriftTests {
             .sorted { $0.path < $1.path }
     }
 
-    private static func regex(_ pattern: String) -> NSRegularExpression {
-        // The patterns are literals below; a typo is a test failure, not a crash path.
-        try! NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
+    private struct LinkPatterns {
+        let fence: NSRegularExpression
+        let inlineCode: NSRegularExpression
+        let links: [NSRegularExpression]
+
+        init() throws {
+            func regex(_ pattern: String) throws -> NSRegularExpression {
+                try NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
+            }
+            fence = try regex(#"^\s{0,3}(`{3,}|~{3,})"#)
+            inlineCode = try regex(#"(`+).*?\1"#)
+            links = [
+                try regex(#"\]\(\s*(<[^>]+>|[^\s)]+)"#),              // [text](destination)
+                try regex(#"^\s{0,3}\[[^\]]+\]:\s*(<[^>]+>|\S+)"#),  // [label]: destination
+                try regex(#"(?:src|href)\s*=\s*["']([^"']+)["']"#),    // HTML href/src
+            ]
+        }
     }
 
-    private static let fence = regex(#"^\s{0,3}(`{3,}|~{3,})"#)
-    private static let inlineCode = regex(#"(`+).*?\1"#)
-    private static let linkPatterns = [
-        regex(#"\]\(\s*(<[^>]+>|[^\s)]+)"#),              // [text](destination)
-        regex(#"^\s{0,3}\[[^\]]+\]:\s*(<[^>]+>|\S+)"#),  // [label]: destination
-        regex(#"(?:src|href)\s*=\s*["']([^"']+)["']"#),    // HTML href/src
-    ]
+    /// The patterns are literals; a typo is a failure of the test that uses
+    /// them, not a crash of the whole run.
+    private static let linkPatterns = Result { try LinkPatterns() }
 
     /// Local-link candidates with their line numbers. Fenced and inline code
     /// are skipped: a link written as an example is not a link.
-    static func linkDestinations(in text: String) -> [(line: Int, destination: String)] {
+    static func linkDestinations(in text: String) throws -> [(line: Int, destination: String)] {
+        let patterns = try linkPatterns.get()
         var found: [(Int, String)] = []
         var openFence: String?
         for (index, raw) in text.components(separatedBy: "\n").enumerated() {
             let whole = NSRange(raw.startIndex..., in: raw)
-            if let marker = fence.firstMatch(in: raw, range: whole),
+            if let marker = patterns.fence.firstMatch(in: raw, range: whole),
                let range = Range(marker.range(at: 1), in: raw) {
                 let token = String(raw[range])
                 if let open = openFence {
@@ -235,9 +247,9 @@ struct DocumentationDriftTests {
                 continue
             }
             if openFence != nil { continue }
-            let line = inlineCode.stringByReplacingMatches(in: raw, range: whole, withTemplate: "")
+            let line = patterns.inlineCode.stringByReplacingMatches(in: raw, range: whole, withTemplate: "")
             let span = NSRange(line.startIndex..., in: line)
-            for pattern in linkPatterns {
+            for pattern in patterns.links {
                 for match in pattern.matches(in: line, range: span) {
                     guard let range = Range(match.range(at: 1), in: line) else { continue }
                     let destination = line[range].trimmingCharacters(in: CharacterSet(charactersIn: "<>"))
@@ -275,7 +287,7 @@ struct DocumentationDriftTests {
         var missing: [String] = []
         for file in files {
             let text = try String(contentsOf: file, encoding: .utf8)
-            for (line, destination) in Self.linkDestinations(in: text) {
+            for (line, destination) in try Self.linkDestinations(in: text) {
                 guard let target = Self.localTarget(of: destination, from: file, root: root) else { continue }
                 if !FileManager.default.fileExists(atPath: target.path) {
                     let name = file.path.replacingOccurrences(of: root.path + "/", with: "")
@@ -287,7 +299,7 @@ struct DocumentationDriftTests {
     }
 
     @Test("links in code are not links, and only local paths are checked")
-    func theLinkScannerSkipsWhatItShould() {
+    func theLinkScannerSkipsWhatItShould() throws {
         let text = """
             [a](docs/A.md) `[b](B.md)`
             ```
@@ -296,7 +308,7 @@ struct DocumentationDriftTests {
             [ref]: <docs/D%20E.md#part>
             <img src="assets/f.png">
             """
-        #expect(Self.linkDestinations(in: text).map(\.destination)
+        #expect(try Self.linkDestinations(in: text).map(\.destination)
                 == ["docs/A.md", "docs/D%20E.md#part", "assets/f.png"])
         let root = URL(fileURLWithPath: "/repo")
         let file = root.appendingPathComponent("docs/X.md")

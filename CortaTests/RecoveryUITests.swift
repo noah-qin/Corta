@@ -35,11 +35,11 @@ struct RecoveryUITests {
     /// Failure is signalled by the symbol *and* the words. A red panel says
     /// nothing to a person who cannot separate red from grey, and this is the
     /// screen that has to stay readable when everything else is broken.
-    @Test func theFailurePanelNamesTheFailureInWordsNotColour() {
+    @Test func theFailurePanelNamesTheFailureInWordsNotColour() throws {
         let view = PaneFailureView(
             title: "Could not start a shell", detail: "No such file or directory",
             canRetry: true)
-        let label = try! #require(view.accessibilityLabel())
+        let label = try #require(view.accessibilityLabel())
         #expect(label.contains("Could not start a shell"))
         #expect(label.contains("No such file or directory"))
         #expect(view.accessibilityRole() == .group)

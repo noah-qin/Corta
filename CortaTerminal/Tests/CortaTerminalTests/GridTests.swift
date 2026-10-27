@@ -250,7 +250,9 @@ struct GridTests {
         grid.backspace()
         #expect(grid.cursor == Cursor(row: 0, column: 0))
     }
+}
 
+extension GridTests {
     // MARK: - Movement
 
     @Test("cursor movement is clamped to the screen")
@@ -452,5 +454,4 @@ struct GridTests {
         terminal.feed(Array("\u{1B}8".utf8))
         #expect(terminal.grid.cursor == Cursor())
     }
-
 }

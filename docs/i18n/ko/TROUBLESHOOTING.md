@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > 이 문서는 영어판 [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md)의 커밋
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md)
+> [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md)
 > 시점을 번역한 것입니다. 이후 영어판이 바뀌었거나 내용이 다르면 영어판을 따릅니다.
 > macOS 메시지는 영어 원문을 함께 적었습니다.
 
@@ -128,6 +128,25 @@ Corta는 가진 설정을 유지하고 파일 쓰기를 거부합니다. 쓰면 
 <a id="typing-and-rendering"></a>
 
 ## 입력과 렌더링
+
+### 화면 지우기 후 프롬프트 없이 커서만 남음
+
+⌘K가 기다리고 있는 프롬프트를 지운다면 Corta를 업데이트하세요. 셸 통합과 준비된 프롬프트 끝 표시가 있으면, 화면 지우기는 이제
+보이는 프롬프트와 실행 전 입력을 편집 커서까지 함께 유지합니다. Return, Control-L 등 어떤 입력도 보내지 않습니다. 프롬프트 표시가
+없는 셸에서는 셸 통합을 켜세요. 표준 로컬 zsh 세션은 번들된 제안 기능과 함께 자동으로 불러옵니다. 셸에서 설정했다면 셸 자체의
+Control-L 다시 그리기도 대안입니다. 대체 화면 프로그램과 프롬프트가 이미 기록에 있는 여러 줄 편집기는 일부러 그대로 둡니다.
+
+### `/`로 끝나는 폴더 다음에서 디렉터리 제안이 멈춤
+
+하위 디렉터리만 후보이므로, 파일만 있는 디렉터리에는 다음 디렉터리 제안이 없습니다. 하위 폴더 이름의 일부를 입력하거나, 후보가
+보일 때 Tab을 한 번 더 누르세요. Tab은 경로만 채우고 실행하지 않으며, `cd`를 실행하는 것은 Return입니다. 숨김 폴더는 점으로
+시작해야 합니다. 알고 있는 하위 폴더가 나오지 않으면 그 디렉터리의 접근 권한을 확인하고, `directory-completion`을 끈 뒤 셸의 기본
+완성과 비교하세요. 차이가 계속되면 정확한 경로 형태와 셸을 알려 주세요.
+
+### 정보나 명령 기록 윈도우가 터미널과 떨어진 곳에 열림
+
+현재 Corta에서 그 윈도우를 닫았다가 다시 여세요. 둘 다 호출한 윈도우 가운데에, 그 디스플레이의 사용 가능한 영역 안에서 열리며,
+화면 전체의 가운데에 놓이지 않습니다. 이미 열린 윈도우는 고른 위치를 유지합니다.
 
 ### Claude Code의 슬래시 명령 메뉴에서 Tab이 동작하지 않음
 

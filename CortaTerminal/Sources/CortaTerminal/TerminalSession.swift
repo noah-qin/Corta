@@ -252,116 +252,15 @@ public final class TerminalSession: @unchecked Sendable {
     private let compressionQueue = DispatchQueue(label: "Corta.scrollback.compression", qos: .utility)
     private let compressionScheduled = Mutex(false)
 
-    func scheduleCompression() {
-        let start = compressionScheduled.withLock { active in
-            if active { return false }
-            active = true
-            return true
-        }
-        guard start else { return }
-        compressionQueue.async { [weak self] in
-            guard let self else { return }
-            while !self.stopped.withLock({ $0 }) {
-                guard let work = self.state.withLock({ $0.terminal.nextCompressionWork() }) else { break }
-                let result = work.compress()
-                self.state.withLock { $0.terminal.installCompression(result) }
-                self.yieldToStateWaiters()
-            }
-            self.compressionScheduled.withLock { $0 = false }
-            // Close the final feed / drain race without keeping an idle timer.
-            if !self.stopped.withLock({ $0 }), self.state.withLock({ $0.terminal.hasCompressionWork }) {
-                self.scheduleCompression()
-            }
-        }
-    }
     /// The last figure reported, written under `state`'s lock.
     let reportedImageBytes = Mutex(0)
 
     /// Render-path callers waiting on `state`; bumped before blocking, so an
     /// over-count only costs the reader one gap.
     private let stateWaiters = Mutex(0)
-
-    /// Leaves the lock uncontended long enough for a waiter to land: the
-    /// reader's unlock → relock is shorter than a futex wake.
-    func yieldToStateWaiters() {
-        guard stateWaiters.withLock({ $0 }) > 0 else { return }
-        Thread.sleep(forTimeInterval: 0.0001)
-    }
-
-    /// Not a `withLock`-shaped wrapper: `Mutex.withLock`'s `sending` closure
-    /// does not forward through one.
-    func registerStateWaiter<T>(_ body: () -> T) -> T {
-        stateWaiters.withLock { $0 += 1 }
-        defer { stateWaiters.withLock { $0 -= 1 } }
-        return body()
-    }
-
-    /// On the reader thread; the caller hops if it needs to.
-    public var onOutput: (@Sendable () -> Void)? {
-        get { callbacks.withLock { $0.onOutput } }
-        set { callbacks.withLock { $0.onOutput = newValue } }
-    }
-
-    /// Delivered once, outside locks; replayed to a late subscriber. A failed
-    /// session rejects further input, but keeps its child/grid until the owner
-    /// explicitly retries or closes it.
-    public var onIOFailure: (@Sendable (IOFailure) -> Void)? {
-        get { callbacks.withLock { $0.onIOFailure } }
-        set {
-            let replay = callbacks.withLock { current in
-                current.onIOFailure = newValue
-                return newValue == nil ? nil : current.ioFailure
-            }
-            if let replay { newValue?(replay) }
-        }
-    }
-
-    public var ioFailure: IOFailure? { callbacks.withLock { $0.ioFailure } }
-
-    func reportIOFailure(_ error: any Error, operation: IOFailure.Operation) {
-        guard !stopped.withLock({ $0 }) else { return }
-        let failure = IOFailure(operation: operation, message: String(describing: error))
-        let delivery = callbacks.withLock { current -> ((@Sendable (IOFailure) -> Void)?, Bool) in
-            guard current.ioFailure == nil else { return (nil, false) }
-            current.ioFailure = failure
-            return (current.onIOFailure, true)
-        }
-        guard delivery.1 else { return }
-        pendingWrites.withLock { $0.removeAll() }
-        delivery.0?(failure)
-    }
-
-    /// On the reader thread, after the loop stops; an earlier exit is replayed
-    /// on the installing thread.
-    public var onChildExit: (@Sendable (ProcessExit) -> Void)? {
-        get { callbacks.withLock { $0.onChildExit } }
-        set {
-            let replay: ProcessExit? = callbacks.withLock { state in
-                state.onChildExit = newValue
-                return newValue == nil ? nil : state.childExit
-            }
-            // Outside the lock: caller code may touch this session.
-            if let replay { newValue?(replay) }
-        }
-    }
-
-    public convenience init(
-        executable: String,
-        arguments: [String] = [],
-        environment: [String: String] = ChildEnvironment.default(),
-        size: TerminalSize = TerminalSize(),
-        workingDirectory: String? = nil,
-        scrollbackLimit: Int = Scrollback.defaultLimit,
-        commandHistoryLimit: Int = CommandRecordStore.defaultCapacity,
-        imageBudget: ImageMemoryBudget? = nil,
-        directoryCompletionToken: String? = nil
-    ) throws(PTYError) {
-        try self.init(
-            executable: executable, arguments: arguments, environment: environment, size: size,
-            workingDirectory: workingDirectory, scrollbackLimit: scrollbackLimit,
-            commandHistoryLimit: commandHistoryLimit, imageBudget: imageBudget,
-            directoryCompletionToken: directoryCompletionToken, seams: Seams())
-    }
+    /// The reader's QoS as asked for, and as last applied on its thread.
+    private let requestedReaderPriority = Atomic<Int>(ReaderPriority.interactive.rawValue)
+    private let appliedReaderPriority = Atomic<Int>(ReaderPriority.interactive.rawValue)
 
     init(
         executable: String,
@@ -414,6 +313,124 @@ public final class TerminalSession: @unchecked Sendable {
         stop()
     }
 
+}
+
+// MARK: - Callbacks
+
+extension TerminalSession {
+    public convenience init(
+        executable: String,
+        arguments: [String] = [],
+        environment: [String: String] = ChildEnvironment.default(),
+        size: TerminalSize = TerminalSize(),
+        workingDirectory: String? = nil,
+        scrollbackLimit: Int = Scrollback.defaultLimit,
+        commandHistoryLimit: Int = CommandRecordStore.defaultCapacity,
+        imageBudget: ImageMemoryBudget? = nil,
+        directoryCompletionToken: String? = nil
+    ) throws(PTYError) {
+        try self.init(
+            executable: executable, arguments: arguments, environment: environment, size: size,
+            workingDirectory: workingDirectory, scrollbackLimit: scrollbackLimit,
+            commandHistoryLimit: commandHistoryLimit, imageBudget: imageBudget,
+            directoryCompletionToken: directoryCompletionToken, seams: Seams())
+    }
+
+    /// On the reader thread; the caller hops if it needs to.
+    public var onOutput: (@Sendable () -> Void)? {
+        get { callbacks.withLock { $0.onOutput } }
+        set { callbacks.withLock { $0.onOutput = newValue } }
+    }
+
+    /// Delivered once, outside locks; replayed to a late subscriber. A failed
+    /// session rejects further input, but keeps its child/grid until the owner
+    /// explicitly retries or closes it.
+    public var onIOFailure: (@Sendable (IOFailure) -> Void)? {
+        get { callbacks.withLock { $0.onIOFailure } }
+        set {
+            let replay = callbacks.withLock { current in
+                current.onIOFailure = newValue
+                return newValue == nil ? nil : current.ioFailure
+            }
+            if let replay { newValue?(replay) }
+        }
+    }
+
+    public var ioFailure: IOFailure? { callbacks.withLock { $0.ioFailure } }
+
+    func reportIOFailure(_ error: any Error, operation: IOFailure.Operation) {
+        guard !stopped.withLock({ $0 }) else { return }
+        let failure = IOFailure(operation: operation, message: String(describing: error))
+        let delivery = callbacks.withLock { current -> ((@Sendable (IOFailure) -> Void)?, Bool) in
+            guard current.ioFailure == nil else { return (nil, false) }
+            current.ioFailure = failure
+            return (current.onIOFailure, true)
+        }
+        guard delivery.1 else { return }
+        pendingWrites.withLock { $0.removeAll() }
+        delivery.0?(failure)
+    }
+
+    /// On the reader thread, after the loop stops; an earlier exit is replayed
+    /// on the installing thread.
+    public var onChildExit: (@Sendable (ProcessExit) -> Void)? {
+        get { callbacks.withLock { $0.onChildExit } }
+        set {
+            let replay: ProcessExit? = callbacks.withLock { state in
+                state.onChildExit = newValue
+                return newValue == nil ? nil : state.childExit
+            }
+            // Outside the lock: caller code may touch this session.
+            if let replay { newValue?(replay) }
+        }
+    }
+}
+
+// MARK: - Background work
+
+extension TerminalSession {
+    func scheduleCompression() {
+        let start = compressionScheduled.withLock { active in
+            if active { return false }
+            active = true
+            return true
+        }
+        guard start else { return }
+        compressionQueue.async { [weak self] in
+            guard let self else { return }
+            while !self.stopped.withLock({ $0 }) {
+                guard let work = self.state.withLock({ $0.terminal.nextCompressionWork() }) else { break }
+                let result = work.compress()
+                self.state.withLock { $0.terminal.installCompression(result) }
+                self.yieldToStateWaiters()
+            }
+            self.compressionScheduled.withLock { $0 = false }
+            // Close the final feed / drain race without keeping an idle timer.
+            if !self.stopped.withLock({ $0 }), self.state.withLock({ $0.terminal.hasCompressionWork }) {
+                self.scheduleCompression()
+            }
+        }
+    }
+
+    /// Leaves the lock uncontended long enough for a waiter to land: the
+    /// reader's unlock → relock is shorter than a futex wake.
+    func yieldToStateWaiters() {
+        guard stateWaiters.withLock({ $0 }) > 0 else { return }
+        Thread.sleep(forTimeInterval: 0.0001)
+    }
+
+    /// Not a `withLock`-shaped wrapper: `Mutex.withLock`'s `sending` closure
+    /// does not forward through one.
+    func registerStateWaiter<T>(_ body: () -> T) -> T {
+        stateWaiters.withLock { $0 += 1 }
+        defer { stateWaiters.withLock { $0 -= 1 } }
+        return body()
+    }
+}
+
+// MARK: - Running
+
+extension TerminalSession {
     /// Idempotent.
     public func start() {
         let shouldStart = started.withLock { already -> Bool in
@@ -429,8 +446,6 @@ public final class TerminalSession: @unchecked Sendable {
         case interactive = 0
         case background = 1
     }
-    private let requestedReaderPriority = Atomic<Int>(ReaderPriority.interactive.rawValue)
-    private let appliedReaderPriority = Atomic<Int>(ReaderPriority.interactive.rawValue)
 
     /// Only the reader changes its pthread QoS. Requests do not wake an idle PTY.
     public func setReaderPriority(_ priority: ReaderPriority) {
@@ -457,12 +472,21 @@ public final class TerminalSession: @unchecked Sendable {
         registerStateWaiter { state.withLock { $0.terminal.grid } }
     }
 
+    /// The grid and the shell phase, from one parse batch.
+    public struct InputLineSnapshot: Sendable {
+        public var grid: Grid
+        public var hasIntegration: Bool
+        public var promptRow: Int?
+    }
+
     /// One coherent read for the native input-source overlay, with the grid
     /// and shell phase from the same parse batch. No command-history copy.
-    public func inputLineSnapshot() -> (grid: Grid, hasIntegration: Bool, promptRow: Int?) {
+    public func inputLineSnapshot() -> InputLineSnapshot {
         registerStateWaiter {
             state.withLock {
-                ($0.terminal.grid, $0.terminal.hasShellIntegration, $0.terminal.inputPromptRow)
+                InputLineSnapshot(
+                    grid: $0.terminal.grid, hasIntegration: $0.terminal.hasShellIntegration,
+                    promptRow: $0.terminal.inputPromptRow)
             }
         }
     }

@@ -291,13 +291,6 @@ extension SFTPBrowserModel {
 
     /// Folders first, then the column; ties fall back to the name, so the
     /// order is total and the same listing always lands the same way.
-    nonisolated static func sorted(
-        _ entries: [Entry], by column: SortColumn, ascending: Bool
-    ) -> [Entry] {
-        // Synchronous pure API retained for callers with small, already local data.
-        (try? sorted(entries, by: column, ascending: ascending, checkCancellation: false)) ?? []
-    }
-
     nonisolated private static func sorted(
         _ entries: [Entry], by column: SortColumn, ascending: Bool, checkCancellation: Bool
     ) throws -> [Entry] {

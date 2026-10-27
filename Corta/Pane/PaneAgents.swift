@@ -60,38 +60,14 @@ final class PaneAgents {
         sawSignals = sawSignals || !reported.isEmpty
         let blocked = signals.blocked
         let notice = signals.notification
-        if let attention = signals.attention {
-            if let attentionRequest { NSApp.cancelUserAttentionRequest(attentionRequest) }
-            attentionRequest = nil
-            if !NSApp.isActive {
-                switch attention {
-                case .once: attentionRequest = NSApp.requestUserAttention(.informationalRequest)
-                case .continuous: attentionRequest = NSApp.requestUserAttention(.criticalRequest)
-                case .cancel: break
-                }
-            }
-        }
+        if let attention = signals.attention { requestAttention(attention) }
         host.pointer.refreshProgramPointer(shape: signals.pointerShape)
         host.taskNotifier.setProgramBlocked(reported.values.contains { $0.state == .blocked },
             episode: signals.blockedEpisode)
         let oldStatus = status
         let oldProgress = progress
         if configuration.agentStatus {
-            refreshFallback(session: session, signals: signals)
-            status = reported.values.max { $0.urgency < $1.urgency }
-                ?? (sawSignals ? nil : fallback)
-            if let metadata = signals.tabMetadata {
-                if status == nil { status = metadata }
-                else {
-                    status?.color = metadata.color
-                    status?.statusColor = metadata.statusColor
-                    if status?.title.isEmpty == true { status?.title = metadata.title }
-                }
-            }
-            progress = signals.progress
-            if progress == nil, let value = status?.progress {
-                progress = ProgramProgress(state: .normal, value: value)
-            }
+            updateStatus(session: session, signals: signals)
         } else { status = nil; progress = nil }
         if let blocked, !visible {
             host.taskNotifier.noteProgramAttention(kind: blocked, in: host.view.window)
@@ -109,6 +85,41 @@ final class PaneAgents {
         if oldStatus != status || oldProgress != progress { AgentDirectory.refresh() }
     }
 
+    /// Bounces the Dock icon as the program asked, replacing any earlier
+    /// request; only while Corta is in the background.
+    private func requestAttention(_ attention: ProgramAttention) {
+        if let attentionRequest { NSApp.cancelUserAttentionRequest(attentionRequest) }
+        attentionRequest = nil
+        guard !NSApp.isActive else { return }
+        switch attention {
+        case .once: attentionRequest = NSApp.requestUserAttention(.informationalRequest)
+        case .continuous: attentionRequest = NSApp.requestUserAttention(.criticalRequest)
+        case .cancel: break
+        }
+    }
+
+    /// The most urgent reported status, else the process fallback until a
+    /// program has reported once; tab metadata colours it, and its progress
+    /// stands in when the program sent none.
+    private func updateStatus(session: TerminalSession, signals: ProgramSignalSnapshot) {
+        refreshFallback(session: session, signals: signals)
+        status = signals.statuses.values.max { $0.urgency < $1.urgency }
+            ?? (sawSignals ? nil : fallback)
+        if let metadata = signals.tabMetadata {
+            if status == nil {
+                status = metadata
+            } else {
+                status?.color = metadata.color
+                status?.statusColor = metadata.statusColor
+                if status?.title.isEmpty == true { status?.title = metadata.title }
+            }
+        }
+        progress = signals.progress
+        if progress == nil, let value = status?.progress {
+            progress = ProgramProgress(state: .normal, value: value)
+        }
+    }
+
     private func refreshFallback(session: TerminalSession, signals: ProgramSignalSnapshot) {
         let hasReportedStatus = !signals.statuses.isEmpty
         let now = ProcessInfo.processInfo.systemUptime
@@ -118,7 +129,8 @@ final class PaneAgents {
             processRefresh?.cancel(); processRefresh = nil
             lastProcessRead = now
             let process = session.activeProcessName ?? ""
-            let configured = ConfigurationStore.shared.configuration.agentProcesses.split(separator: ",").map(String.init)
+            let configured = ConfigurationStore.shared.configuration.agentProcesses
+                .split(separator: ",").map(String.init)
             let names = ["claude", "claude-code", "codex", "gemini", "aider", "opencode"] + configured
             if names.contains(process) {
                 if fallbackProcess != process {
@@ -164,9 +176,13 @@ final class PaneAgents {
         guard status != nil else { AgentDirectory.refresh(); return }
         // A clean process exit is a session end, not proof that its last
         // task succeeded. Preserve a reported completion or failure.
-        if exit == .exited(code: 130) || exit == .signalled(signal: SIGINT) { status?.state = .idle }
-        else if !exit.isCleanExit { status?.state = .error }
-        else if status?.state != .done && status?.state != .error { status?.state = .idle }
+        if exit == .exited(code: 130) || exit == .signalled(signal: SIGINT) {
+            status?.state = .idle
+        } else if !exit.isCleanExit {
+            status?.state = .error
+        } else if status?.state != .done && status?.state != .error {
+            status?.state = .idle
+        }
         status?.kind = nil
         status?.progress = nil; progress = nil
         AgentDirectory.refresh()

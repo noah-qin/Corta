@@ -55,12 +55,12 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
         var disposition: SFTPTransferEngine.PartialDisposition
     }
 
-    @Guarded var connectError: SFTPError? = nil
+    @Guarded var connectError: SFTPError?
     @Guarded var realPathResult = "/home/tester"
     @Guarded var connectedHosts: [String] = []
     @Guarded var listings: [String: [SFTPEntry]] = [:]
     @Guarded var listingErrors: [String: SFTPError] = [:]
-    @Guarded var volumeInfoResult: SFTPVolumeInfo? = nil
+    @Guarded var volumeInfoResult: SFTPVolumeInfo?
     @Guarded var lstatResults: [String: SFTPAttributes] = [:]
     @Guarded var lstatErrors: [String: SFTPError] = [:]
     @Guarded var madeDirectories: [String] = []
@@ -68,11 +68,11 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
     @Guarded var removedDirectories: [String] = []
     @Guarded var renamed: [(from: String, to: String)] = []
     @Guarded var transferCalls: [TransferCall] = []
-    @Guarded var onTransfer: ((TransferCall, SFTPTransferEngine.ProgressHandler?) async throws -> Void)? = nil
+    @Guarded var onTransfer: ((TransferCall, SFTPTransferEngine.ProgressHandler?) async throws -> Void)?
     @Guarded var closed = false
     @Guarded var lstatHangs = false
 
-    @Guarded var capabilities: SFTPServerCapabilities? = nil
+    @Guarded var capabilities: SFTPServerCapabilities?
 
     /// A server that never answers INIT: `connect` waits until `close`.
     @Guarded var connectHangs = false
@@ -130,8 +130,10 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
         progress: SFTPTransferEngine.ProgressHandler?
     ) async throws(SFTPError) -> SFTPTransferEngine.SFTPTransferReceipt {
         try await transfer(
-            isUpload: false, remotePath: remotePath, localPath: localDestination.path,
-            policy: policy, disposition: partialDisposition, progress: progress)
+            TransferCall(
+                isUpload: false, remotePath: remotePath, localPath: localDestination.path,
+                policy: Self.policyName(policy), disposition: partialDisposition),
+            progress: progress)
     }
 
     func upload(
@@ -141,19 +143,15 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
         progress: SFTPTransferEngine.ProgressHandler?
     ) async throws(SFTPError) -> SFTPTransferEngine.SFTPTransferReceipt {
         try await transfer(
-            isUpload: true, remotePath: remotePath, localPath: localSource.path,
-            policy: policy, disposition: partialDisposition, progress: progress)
+            TransferCall(
+                isUpload: true, remotePath: remotePath, localPath: localSource.path,
+                policy: Self.policyName(policy), disposition: partialDisposition),
+            progress: progress)
     }
 
     private func transfer(
-        isUpload: Bool, remotePath: String, localPath: String,
-        policy: SFTPTransferEngine.ConflictPolicy,
-        disposition: SFTPTransferEngine.PartialDisposition,
-        progress: SFTPTransferEngine.ProgressHandler?
+        _ call: TransferCall, progress: SFTPTransferEngine.ProgressHandler?
     ) async throws(SFTPError) -> SFTPTransferEngine.SFTPTransferReceipt {
-        let call = TransferCall(
-            isUpload: isUpload, remotePath: remotePath, localPath: localPath,
-            policy: Self.policyName(policy), disposition: disposition)
         $transferCalls.mutate { $0.append(call) }
         if let onTransfer {
             do {
@@ -183,7 +181,7 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
     }
     @Guarded var directoryCalls: [DirectoryCall] = []
     @Guarded var onDirectoryTransfer:
-        ((DirectoryCall, SFTPTransferEngine.DirectoryProgressHandler?) async throws -> Void)? = nil
+        ((DirectoryCall, SFTPTransferEngine.DirectoryProgressHandler?) async throws -> Void)?
 
     func downloadDirectory(
         remotePath: String, to localDirectory: URL,

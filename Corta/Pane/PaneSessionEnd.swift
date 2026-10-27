@@ -16,7 +16,6 @@
 
 import AppKit
 import CortaPOSIX
-import CortaTerminal
 
 /// What `PaneSessionEnd` needs from its pane.
 protocol PaneSessionEndHost: AnyObject {

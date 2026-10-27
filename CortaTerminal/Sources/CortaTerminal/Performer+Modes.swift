@@ -36,8 +36,11 @@ extension Performer {
                 state.bracketedPasteEnabled = enabled
             case 1000, 1002, 1003:
                 if let mode = MouseTrackingMode(rawValue: Int(parameters[index])) {
-                    if enabled { state.mouseTrackingMode = mode }
-                    else if state.mouseTrackingMode == mode { state.mouseTrackingMode = .off }
+                    if enabled {
+                        state.mouseTrackingMode = mode
+                    } else if state.mouseTrackingMode == mode {
+                        state.mouseTrackingMode = .off
+                    }
                 }
             case 1006:  // SGR mouse reporting
                 state.sgrMouseEncodingEnabled = enabled
@@ -91,27 +94,25 @@ extension Performer {
         default: return false
         }
         var handled = false
-        for index in 0..<parameters.count {
-            if parameters[index] == 1049 {
-                if set {
-                    if !grid.isAlternateScreenActive {
-                        state.parkedMainKeyboardProtocol = state.keyboardProtocol
-                        state.keyboardProtocol = KeyboardProtocolStack()
-                    }
-                    state.directoryCompletion = nil
-                    state.historySuggestion = nil
-                    grid.enterAlternateScreen()
-                } else {
-                    if let main = state.parkedMainKeyboardProtocol {
-                        state.keyboardProtocol = main
-                        state.parkedMainKeyboardProtocol = nil
-                    }
-                    state.pendingAlternateScreenFinish = nil
-                    grid.exitAlternateScreen()
-                    applyRowRemaps()
+        for index in 0..<parameters.count where parameters[index] == 1049 {
+            if set {
+                if !grid.isAlternateScreenActive {
+                    state.parkedMainKeyboardProtocol = state.keyboardProtocol
+                    state.keyboardProtocol = KeyboardProtocolStack()
                 }
-                handled = true
+                state.directoryCompletion = nil
+                state.historySuggestion = nil
+                grid.enterAlternateScreen()
+            } else {
+                if let main = state.parkedMainKeyboardProtocol {
+                    state.keyboardProtocol = main
+                    state.parkedMainKeyboardProtocol = nil
+                }
+                state.pendingAlternateScreenFinish = nil
+                grid.exitAlternateScreen()
+                applyRowRemaps()
             }
+            handled = true
         }
         return handled
     }

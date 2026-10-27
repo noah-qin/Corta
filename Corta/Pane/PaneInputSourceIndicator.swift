@@ -75,14 +75,33 @@ import CortaTerminal
         placement.reset()
     }
 
-    func update(grid: Grid, hasIntegration: Bool, promptRow: Int?, focused: Bool,
-        scrollOffset: Int, configuration: Configuration, canvas: CanvasTextColors, cellSize: CGSize,
-        topInset: CGFloat, compositionRect: CGRect?, blockedRects: [CGRect] = []) {
-        guard let source, focused,
+    /// What one frame tells the badge about its pane.
+    struct FrameState {
+        var grid: Grid
+        var hasIntegration: Bool
+        var promptRow: Int?
+        var focused: Bool
+        var scrollOffset: Int
+        var cellSize: CGSize
+        var topInset: CGFloat
+        var compositionRect: CGRect?
+        /// Overlays the prompt-placed badge must not cover.
+        var blockedRects: [CGRect] = []
+    }
+
+    func update(_ frame: FrameState, configuration: Configuration, canvas: CanvasTextColors) {
+        guard let source, frame.focused,
             configuration.inputSourceIndicator != .off,
             configuration.inputSourceIndicator != .auto || automaticallyVisible
         else {
-            if !view.isHidden { view.isHidden = true }
+            hide(resettingPlacement: true)
+            return
+        }
+        guard configuration.inputSourceIndicatorPosition != .toolbar else {
+            view.update(source: source, configuration: configuration, canvas: nil)
+            let toolbarFrame = CGRect(x: 0, y: 0, width: 28, height: 24)
+            if view.frame != toolbarFrame { view.frame = toolbarFrame }
+            if view.isHidden { view.isHidden = false }
             placement.reset()
             return
         }
@@ -90,36 +109,38 @@ import CortaTerminal
         // Code, an editor on the alternate screen — keeps it: that is where
         // people type in a second language too. Only the prompt-placed badge,
         // which sits on the grid, steps aside for them.
-        let promptPlaced = configuration.inputSourceIndicatorPosition != .toolbar
-        guard !promptPlaced || (scrollOffset == 0 && !grid.isAlternateScreenActive
-            && (configuration.inputSourceIndicator == .always || !hasIntegration || promptRow != nil))
+        guard frame.scrollOffset == 0, !frame.grid.isAlternateScreenActive,
+            configuration.inputSourceIndicator == .always || !frame.hasIntegration || frame.promptRow != nil
         else {
-            if !view.isHidden { view.isHidden = true }
-            placement.reset()
+            hide(resettingPlacement: true)
             return
         }
-        if !promptPlaced {
-            view.update(source: source, configuration: configuration, canvas: nil)
-            let frame = CGRect(x: 0, y: 0, width: 28, height: 24)
-            if view.frame != frame { view.frame = frame }
-            if view.isHidden { view.isHidden = false }
-            placement.reset()
+        guard let rect = promptRect(for: frame), !frame.blockedRects.contains(where: { $0.intersects(rect) })
+        else {
+            hide(resettingPlacement: false)
             return
         }
-        let size = CGSize(width: max(24, cellSize.width * 2 + 8), height: max(12, cellSize.height - 2))
-        guard let row = placement.row(grid: grid, promptRow: promptRow,
-            badgeColumns: Int(ceil((size.width + 4) / cellSize.width)), compositionRect: compositionRect,
-            cellSize: cellSize, topInset: topInset) else {
-            if !view.isHidden { view.isHidden = true }
-            return }
-        let rect = CGRect(x: TerminalLayout.insets.left + CGFloat(grid.columns) * cellSize.width - size.width,
-            y: topInset + CGFloat(row) * cellSize.height + 1, width: size.width, height: size.height)
-        guard !blockedRects.contains(where: { $0.intersects(rect) }) else {
-            if !view.isHidden { view.isHidden = true }
-            return }
         view.update(source: source, configuration: configuration, canvas: canvas)
         if view.frame != rect { view.frame = rect }
         if view.isHidden { view.isHidden = false }
+    }
+
+    private func hide(resettingPlacement: Bool) {
+        if !view.isHidden { view.isHidden = true }
+        if resettingPlacement { placement.reset() }
+    }
+
+    /// Right-aligned on the row `placement` settles on, or nil when no row
+    /// fits.
+    private func promptRect(for frame: FrameState) -> CGRect? {
+        let cellSize = frame.cellSize
+        let size = CGSize(width: max(24, cellSize.width * 2 + 8), height: max(12, cellSize.height - 2))
+        guard let row = placement.row(grid: frame.grid, promptRow: frame.promptRow,
+            badgeColumns: Int(ceil((size.width + 4) / cellSize.width)), compositionRect: frame.compositionRect,
+            cellSize: cellSize, topInset: frame.topInset)
+        else { return nil }
+        return CGRect(x: TerminalLayout.insets.left + CGFloat(frame.grid.columns) * cellSize.width - size.width,
+            y: frame.topInset + CGFloat(row) * cellSize.height + 1, width: size.width, height: size.height)
     }
 }
 
@@ -132,9 +153,10 @@ nonisolated struct InputSourceIndicatorPlacement {
     private var rows: Int?
     mutating func reset() { prompt = nil; minimumRow = nil; columns = nil; rows = nil }
 
-    mutating func row(grid: Grid, promptRow: Int?, badgeColumns: Int,
-        compositionRect: CGRect? = nil, cellSize: CGSize = .init(width: 8, height: 16),
-        topInset: CGFloat = 0) -> Int? {
+    mutating func row(
+        grid: Grid, promptRow: Int?, badgeColumns: Int,
+        compositionRect: CGRect? = nil, cellSize: CGSize = .init(width: 8, height: 16), topInset: CGFloat = 0
+    ) -> Int? {
         let base = grid.scrollback.totalPushed
         let identity = promptRow ?? -1
         if prompt != identity || columns != grid.columns || rows != grid.rows {
@@ -251,12 +273,16 @@ nonisolated struct InputSourceIndicatorPlacement {
         }
         let system: NSColor = .controlBackgroundColor
         let background: NSColor
-        if source.kind != .unknown, let c = Theme.color(custom) {
-            background = NSColor(srgbRed: CGFloat(c.x), green: CGFloat(c.y), blue: CGFloat(c.z), alpha: 1)
+        if source.kind != .unknown, let customColor = Theme.color(custom) {
+            background = NSColor(
+                srgbRed: CGFloat(customColor.x), green: CGFloat(customColor.y), blue: CGFloat(customColor.z), alpha: 1)
         } else { background = system }
         let rgb = background.usingColorSpace(.sRGB) ?? .gray
-        func linear(_ c: CGFloat) -> CGFloat { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
-        let luminance = 0.2126 * linear(rgb.redComponent) + 0.7152 * linear(rgb.greenComponent) + 0.0722 * linear(rgb.blueComponent)
+        func linear(_ channel: CGFloat) -> CGFloat {
+            channel <= 0.04045 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
+        }
+        let luminance =
+            0.2126 * linear(rgb.redComponent) + 0.7152 * linear(rgb.greenComponent) + 0.0722 * linear(rgb.blueComponent)
         label.textColor = luminance > 0.179 ? .black : .white
         layer?.backgroundColor = background.cgColor
         layer?.borderWidth = (canvas?.increaseContrast ?? SystemAccessibility.increaseContrast) ? 1 : 0.5

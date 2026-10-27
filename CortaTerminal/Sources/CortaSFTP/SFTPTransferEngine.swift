@@ -238,6 +238,15 @@ public final class SFTPTransferEngine: @unchecked Sendable {
 
     // MARK: - Transfers
 
+    /// One file transfer: the two paths, and what to do with what stands there.
+    struct FileTransfer {
+        var localPath: String
+        var remotePath: String
+        var policy: ConflictPolicy
+        var partialDisposition: PartialDisposition
+        var progress: ProgressHandler?
+    }
+
     struct LocalPartialIdentity: Equatable, Sendable {
         // periphery:ignore - compared by ==, which is how the download's own partial is recognised
         let device: dev_t
@@ -265,9 +274,10 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         let ownedPartial = Mutex<LocalPartialIdentity?>(nil)
         return try await withAttempts { (session: SFTPSession) async throws(SFTPError) in
             try await self.downloadOnce(
-                remotePath: remotePath, destinationPath: localDestination.path,
-                policy: policy, partialDisposition: partialDisposition,
-                progress: progress, session: session, ownedPartial: ownedPartial)
+                FileTransfer(
+                    localPath: localDestination.path, remotePath: remotePath, policy: policy,
+                    partialDisposition: partialDisposition, progress: progress),
+                session: session, ownedPartial: ownedPartial)
         }
     }
 
@@ -288,9 +298,10 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         defer { releaseTransferSlot() }
         return try await withAttempts { (session: SFTPSession) async throws(SFTPError) in
             try await self.uploadOnce(
-                sourcePath: localSource.path, remotePath: remotePath,
-                policy: policy, partialDisposition: partialDisposition,
-                progress: progress, session: session)
+                FileTransfer(
+                    localPath: localSource.path, remotePath: remotePath, policy: policy,
+                    partialDisposition: partialDisposition, progress: progress),
+                session: session)
         }
     }
 

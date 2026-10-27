@@ -297,7 +297,9 @@ struct PTYLifecycleTests {
         }
         #expect(exit != nil)
     }
+}
 
+extension PTYLifecycleTests {
     @Test("a pipeline whose first process exited is named by the process still running")
     func pipelineNamedByALiveMember() throws {
         let pty = try PTY.spawn(executable: "/bin/bash", arguments: ["--norc", "-i"])

@@ -33,7 +33,8 @@ nonisolated final class SFTPPreviewClient: SFTPClient {
                     Self.entry("empty", directory: true), Self.entry("README.md", size: 2048),
                     Self.entry("archive.zip", size: 10_485_760), Self.entry("release-notes-2026.md", size: 5120),
                     Self.entry("项目说明.txt", size: 4096)]
-        case "/home/demo/src": return [Self.entry("main.swift", size: 8192), Self.entry("Configuration.swift", size: 12_288)]
+        case "/home/demo/src":
+            return [Self.entry("main.swift", size: 8192), Self.entry("Configuration.swift", size: 12_288)]
         case "/home/demo/docs": return [Self.entry("guide.md", size: 16_384)]
         case "/home/demo/empty": return []
         default: throw .server(SFTPStatus(code: .noSuchFile))
@@ -54,21 +55,31 @@ nonisolated final class SFTPPreviewClient: SFTPClient {
     func makeDirectory(path: String) async throws(SFTPError) { throw .server(SFTPStatus(code: .permissionDenied)) }
     func remove(path: String) async throws(SFTPError) { throw .server(SFTPStatus(code: .permissionDenied)) }
     func removeDirectory(path: String) async throws(SFTPError) { throw .server(SFTPStatus(code: .permissionDenied)) }
-    func rename(from oldPath: String, to newPath: String) async throws(SFTPError) { throw .server(SFTPStatus(code: .permissionDenied)) }
-    func download(remotePath: String, to localDestination: URL, policy: SFTPTransferEngine.ConflictPolicy,
-                  partialDisposition: SFTPTransferEngine.PartialDisposition, progress: SFTPTransferEngine.ProgressHandler?) async throws(SFTPError) -> SFTPTransferEngine.SFTPTransferReceipt {
+    func rename(from oldPath: String, to newPath: String) async throws(SFTPError) {
         throw .server(SFTPStatus(code: .permissionDenied))
     }
-    func upload(from localSource: URL, to remotePath: String, policy: SFTPTransferEngine.ConflictPolicy,
-                partialDisposition: SFTPTransferEngine.PartialDisposition, progress: SFTPTransferEngine.ProgressHandler?) async throws(SFTPError) -> SFTPTransferEngine.SFTPTransferReceipt {
+    func download(
+        remotePath: String, to localDestination: URL, policy: SFTPTransferEngine.ConflictPolicy,
+        partialDisposition: SFTPTransferEngine.PartialDisposition, progress: SFTPTransferEngine.ProgressHandler?
+    ) async throws(SFTPError) -> SFTPTransferEngine.SFTPTransferReceipt {
         throw .server(SFTPStatus(code: .permissionDenied))
     }
-    func downloadDirectory(remotePath: String, to localDirectory: URL, policy: SFTPTransferEngine.ConflictPolicy,
-                           progress: SFTPTransferEngine.DirectoryProgressHandler?) async throws(SFTPError) -> SFTPTransferEngine.DirectoryTransferReceipt {
+    func upload(
+        from localSource: URL, to remotePath: String, policy: SFTPTransferEngine.ConflictPolicy,
+        partialDisposition: SFTPTransferEngine.PartialDisposition, progress: SFTPTransferEngine.ProgressHandler?
+    ) async throws(SFTPError) -> SFTPTransferEngine.SFTPTransferReceipt {
         throw .server(SFTPStatus(code: .permissionDenied))
     }
-    func uploadDirectory(from localDirectory: URL, to remotePath: String, policy: SFTPTransferEngine.ConflictPolicy,
-                         progress: SFTPTransferEngine.DirectoryProgressHandler?) async throws(SFTPError) -> SFTPTransferEngine.DirectoryTransferReceipt {
+    func downloadDirectory(
+        remotePath: String, to localDirectory: URL, policy: SFTPTransferEngine.ConflictPolicy,
+        progress: SFTPTransferEngine.DirectoryProgressHandler?
+    ) async throws(SFTPError) -> SFTPTransferEngine.DirectoryTransferReceipt {
+        throw .server(SFTPStatus(code: .permissionDenied))
+    }
+    func uploadDirectory(
+        from localDirectory: URL, to remotePath: String, policy: SFTPTransferEngine.ConflictPolicy,
+        progress: SFTPTransferEngine.DirectoryProgressHandler?
+    ) async throws(SFTPError) -> SFTPTransferEngine.DirectoryTransferReceipt {
         throw .server(SFTPStatus(code: .permissionDenied))
     }
     func close() {}

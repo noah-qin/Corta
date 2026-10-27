@@ -146,7 +146,10 @@ struct PaneTeardownTests {
         let threads = Self.threadCount()
         #expect(
             recovered,
-            "teardown must return the PTY descriptor and the reader thread; baselines fds=\(baselineFDs) threads=\(baselineThreads), now fds=\(fdCount) threads=\(threads)")
+            """
+            teardown must return the PTY descriptor and the reader thread; baselines \
+            fds=\(baselineFDs) threads=\(baselineThreads), now fds=\(fdCount) threads=\(threads)
+            """)
     }
 
     /// Whether the child has exited within `timeout` — polled with a
@@ -194,4 +197,3 @@ struct PaneTeardownTests {
         return Int(count)
     }
 }
-

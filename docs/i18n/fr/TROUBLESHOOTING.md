@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > Cette page est une traduction de [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md), dans son état au commit
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md).
+> [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md).
 > Si la version anglaise a changé depuis, ou si les deux diffèrent, la version anglaise fait foi.
 > Les messages de macOS sont accompagnés de leur texte anglais d’origine.
 
@@ -139,6 +139,29 @@ le signale et n’y touche pas.
 <a id="typing-and-rendering"></a>
 
 ## Saisie et rendu
+
+### Effacer l’écran ne laisse qu’un curseur, sans invite
+
+Mettez Corta à jour si ⌘K efface une invite en attente. Avec l’intégration du shell et un marqueur de fin d’invite prête,
+Effacer l’écran conserve désormais l’invite affichée et la saisie non envoyée, y compris son curseur d’édition. Il n’envoie
+ni Retour, ni Contrôle-L, ni aucune autre saisie. Activez l’intégration du shell pour un shell sans marqueurs d’invite ; les
+sessions zsh locales standard la chargent automatiquement avec les suggestions fournies. Le réaffichage par Contrôle-L du
+shell reste une alternative quand ce shell le configure. Un programme sur l’écran alternatif, ou un éditeur multiligne
+dont l’invite est déjà dans l’historique, est volontairement laissé intact.
+
+### Les suggestions de dossiers s’arrêtent après un dossier se terminant par `/`
+
+Seuls les sous-dossiers sont des candidats ; un dossier ne contenant que des fichiers n’a pas de suggestion suivante. Tapez
+une partie du nom d’un sous-dossier ou appuyez de nouveau sur Tab quand des candidats sont visibles. Tab insère le chemin sans
+l’exécuter ; Retour lance `cd`. Les dossiers cachés demandent un point au début. S’il manque un sous-dossier connu, vérifiez
+l’accès à ce dossier et comparez avec la complétion native du shell après avoir désactivé `directory-completion`. Si la
+différence persiste, signalez la forme exacte du chemin et le shell.
+
+### À propos ou l’historique des commandes s’ouvre loin du terminal
+
+Fermez puis rouvrez la fenêtre dans la version actuelle de Corta. Les deux s’ouvrent centrées sur la fenêtre qui les appelle,
+dans la zone utilisable de son écran ; elles ne sont pas placées au centre de l’écran entier. Une fenêtre déjà ouverte garde
+la position que vous avez choisie.
 
 ### Tab ne fait rien dans le menu des commandes slash de Claude Code
 

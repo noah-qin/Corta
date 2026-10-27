@@ -113,10 +113,10 @@ import Testing
         let primary = TerminalFont.primary(ofSize: 24, family: nil)
         let ligates = Self.shapedGlyphCount("fi", in: primary) < 2
         let atlas = try GlyphAtlas(device: device, font: primary)
-        let f = try #require(atlas.glyph(forASCII: UInt32(UInt8(ascii: "f")), style: .regular))
-        let i = try #require(atlas.glyph(forASCII: UInt32(UInt8(ascii: "i")), style: .regular))
-        #expect(!f.isMissing && !i.isMissing)
-        #expect(f.uvRect != i.uvRect, "'f' and 'i' shared an atlas entry (ligated?)")
+        let fGlyph = try #require(atlas.glyph(forASCII: UInt32(UInt8(ascii: "f")), style: .regular))
+        let iGlyph = try #require(atlas.glyph(forASCII: UInt32(UInt8(ascii: "i")), style: .regular))
+        #expect(!fGlyph.isMissing && !iGlyph.isMissing)
+        #expect(fGlyph.uvRect != iGlyph.uvRect, "'f' and 'i' shared an atlas entry (ligated?)")
         #expect(atlas.shapingHits == 0, "ligation would need shaping; the ASCII path has none")
         if ligates {
             print("note: the shipped face now ligates 'fi' when shaped; the grid still does not")

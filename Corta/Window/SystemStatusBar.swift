@@ -23,6 +23,10 @@ final class SystemStatusBar: NSView {
     private let button = NSButton(title: "", target: nil, action: nil)
     private var popover: NSPopover?
     var onVisibilityChange: (() -> Void)?
+    private static let observedNotifications = [
+        ConfigurationStore.didChange, SystemMetricsStore.didChange,
+        NSWindow.didChangeOcclusionStateNotification, AppearanceController.didChange,
+    ]
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -47,7 +51,7 @@ final class SystemStatusBar: NSView {
         // Resolve the singleton before observing its first-load notification;
         // a non-default config posts during init and must not re-enter shared.
         refresh()
-        for name in [ConfigurationStore.didChange, SystemMetricsStore.didChange, NSWindow.didChangeOcclusionStateNotification, AppearanceController.didChange] {
+        for name in Self.observedNotifications {
             NotificationCenter.default.addObserver(self, selector: #selector(changed), name: name, object: nil)
         }
     }
@@ -65,7 +69,11 @@ final class SystemStatusBar: NSView {
     func stop() {
         popover?.close()
         SystemMetricsStore.shared.setActive(false, client: client)
-        NotificationCenter.default.removeObserver(self)
+        // By name: a view can carry registrations AppKit made, which a bare
+        // `removeObserver(self)` would take with it.
+        for name in Self.observedNotifications {
+            NotificationCenter.default.removeObserver(self, name: name, object: nil)
+        }
     }
 
     private func refresh() {
@@ -96,7 +104,8 @@ final class SystemStatusBar: NSView {
         if popover?.isShown == true { popover?.close(); return }
         let popover = NSPopover()
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: SystemStatusDetails(metrics: SystemMetricsStore.shared.snapshot))
+        popover.contentViewController = NSHostingController(
+            rootView: SystemStatusDetails(metrics: SystemMetricsStore.shared.snapshot))
         self.popover = popover
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
     }
@@ -133,9 +142,12 @@ enum SystemStatusFormat {
     static func compactText(_ item: SystemMetrics.Item, metrics: SystemMetrics) -> String {
         let value: String
         switch item {
-        case .cpu: value = metrics.cpuPercent.map { ($0 / 100).formatted(.percent.precision(.fractionLength(0))) } ?? "—"
-        case .load: value = metrics.load.map { $0.formatted(.number.precision(.fractionLength(2))) }.joined(separator: "/")
-        case .memory: value = compactBytes(metrics.memoryUsed.map(Int64.init)) + "/" + compactBytes(Int64(metrics.memoryTotal))
+        case .cpu:
+            value = metrics.cpuPercent.map { ($0 / 100).formatted(.percent.precision(.fractionLength(0))) } ?? "—"
+        case .load:
+            value = metrics.load.map { $0.formatted(.number.precision(.fractionLength(2))) }.joined(separator: "/")
+        case .memory:
+            value = compactBytes(metrics.memoryUsed.map(Int64.init)) + "/" + compactBytes(Int64(metrics.memoryTotal))
         case .network:
             func rate(_ value: Double?) -> String {
                 guard let value, value.isFinite else { return "—" }
@@ -151,10 +163,13 @@ enum SystemStatusFormat {
     static func text(_ item: SystemMetrics.Item, metrics: SystemMetrics) -> String {
         let value: String
         switch item {
-        case .cpu: value = metrics.cpuPercent.map { ($0 / 100).formatted(.percent.precision(.fractionLength(0))) } ?? "—"
-        case .load: value = metrics.load.map { $0.formatted(.number.precision(.fractionLength(2))) }.joined(separator: " / ")
+        case .cpu:
+            value = metrics.cpuPercent.map { ($0 / 100).formatted(.percent.precision(.fractionLength(0))) } ?? "—"
+        case .load:
+            value = metrics.load.map { $0.formatted(.number.precision(.fractionLength(2))) }.joined(separator: " / ")
         case .memory: value = bytes(metrics.memoryUsed.map(Int64.init)) + " / " + bytes(Int64(metrics.memoryTotal))
-        case .network: value = "\(metrics.networkInterface ?? "—") ↓ \(rate(metrics.downloadRate)) ↑ \(rate(metrics.uploadRate))"
+        case .network:
+            value = "\(metrics.networkInterface ?? "—") ↓ \(rate(metrics.downloadRate)) ↑ \(rate(metrics.uploadRate))"
         case .disk: value = bytes(metrics.diskAvailable)
         case .thermal: value = thermal(metrics.thermal)
         }
@@ -178,7 +193,8 @@ struct SystemStatusDetails: View {
             }
             if showMetrics {
             Divider()
-            ForEach(SystemMetrics.Item.allCases.filter { ConfigurationStore.shared.configuration.statusItems.contains($0) }, id: \.self) { item in
+            let items = ConfigurationStore.shared.configuration.statusItems
+            ForEach(SystemMetrics.Item.allCases.filter { items.contains($0) }, id: \.self) { item in
                 Text(SystemStatusFormat.text(item, metrics: metrics)).font(.system(size: 11, design: .monospaced))
             }
             Text(L10n.text("status.memory.help")).font(.caption).foregroundStyle(.secondary)
@@ -188,7 +204,10 @@ struct SystemStatusDetails: View {
         }.padding(16).frame(width: 400, alignment: .leading)
     }
     private func row(_ key: String, _ value: String) -> some View {
-        GridRow { Text(L10n.text(key)).foregroundStyle(.secondary); Text(value).textSelection(.enabled).accessibilityIdentifier(key) }
+        GridRow {
+            Text(L10n.text(key)).foregroundStyle(.secondary)
+            Text(value).textSelection(.enabled).accessibilityIdentifier(key)
+        }
     }
 }
 
@@ -208,7 +227,9 @@ nonisolated struct LocalHostInfo {
         }
         let process = ProcessInfo.processInfo
         let version = process.operatingSystemVersion
-        return Self(name: process.hostName, system: "macOS \(version.majorVersion).\(version.minorVersion).\(version.patchVersion)",
-                    chip: chip, cores: process.processorCount)
+        return Self(
+            name: process.hostName,
+            system: "macOS \(version.majorVersion).\(version.minorVersion).\(version.patchVersion)",
+            chip: chip, cores: process.processorCount)
     }
 }

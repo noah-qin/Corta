@@ -230,17 +230,22 @@ struct RemoteReferenceResolutionTests {
 @MainActor
 struct RemoteEditCoordinatorTests {
     /// A presenter that records rather than alerts.
-    private final class Recorder {
+    final class Recorder {
         var uploads: [RemoteEditCoordinator.PendingUpload] = []
         var conflicts: [RemoteEditCoordinator.UploadConflict] = []
         var errors: [String] = []
-        var opened: [(url: URL, line: Int, column: Int?)] = []
+        struct Opened {
+            var url: URL
+            var line: Int
+            var column: Int?
+        }
+        var opened: [Opened] = []
     }
 
     /// A plain struct does not inherit the suite's MainActor isolation;
     /// the store it wraps is MainActor, so it must be.
     @MainActor
-    private struct Fixture {
+    struct Fixture {
         var root: URL
         var store: RemoteEditStore
         var fake: FakeSFTPClient
@@ -259,7 +264,7 @@ struct RemoteEditCoordinatorTests {
     /// A coordinator whose fake serves `/srv/app/main.rs` (size 100,
     /// mtime 1000); downloads write the canned content to the destination,
     /// the way the engine would.
-    private func makeFixture(
+    func makeFixture(
         remoteContent: String = "remote v1", operationTimeout: Duration = .seconds(120)
     ) throws -> Fixture {
         let root = try makeTempDirectory()
@@ -276,7 +281,7 @@ struct RemoteEditCoordinatorTests {
             store: store,
             makeClient: { _ in fake },
             opener: { url, line, column in
-                recorder.opened.append((url, line, column))
+                recorder.opened.append(.init(url: url, line: line, column: column))
                 return true
             },
             presenter: RemoteEditCoordinator.RemoteEditPresenter(
@@ -356,6 +361,23 @@ struct RemoteEditCoordinatorTests {
         #expect(made == 2 && !replacement.closed)
     }
 
+    /// A client whose file at `path` is two bytes, downloaded as "ok".
+    private static func client(serving path: String) -> FakeSFTPClient {
+        let client = FakeSFTPClient()
+        client.lstatResults[path] = SFTPAttributes(size: 2)
+        client.onTransfer = { call, _ in
+            try "ok".write(toFile: call.localPath, atomically: true, encoding: .utf8)
+        }
+        return client
+    }
+
+    /// How each of the silent-connection test's three opens ended.
+    @MainActor private final class SilentConnectOutcomes {
+        var aDone = false
+        var bDone = false
+        var cError: SFTPError?
+    }
+
     /// A server whose SFTP subsystem never answered held every open of its
     /// host: cancelling one did not stop it waiting, and the next joined
     /// the same attempt. Each waiter now leaves on its own, the attempt
@@ -368,12 +390,8 @@ struct RemoteEditCoordinatorTests {
         let path = "/srv/main.rs"
         let firstSilent = FakeSFTPClient()
         let secondSilent = FakeSFTPClient()
-        let working = FakeSFTPClient()
+        let working = Self.client(serving: path)
         for client in [firstSilent, secondSilent] { client.connectHangs = true }
-        working.lstatResults[path] = SFTPAttributes(size: 2)
-        working.onTransfer = { call, _ in
-            try "ok".write(toFile: call.localPath, atomically: true, encoding: .utf8)
-        }
         var made = 0
         let coordinator = RemoteEditCoordinator(
             store: RemoteEditStore(rootURL: root),
@@ -387,43 +405,38 @@ struct RemoteEditCoordinatorTests {
             // runner; the last waiter still meets it.
             connectTimeout: .seconds(3) * testTimeoutScale)
 
-        @MainActor final class Outcomes {
-            var aDone = false
-            var bDone = false
-            var c: SFTPError?
-        }
-        let outcomes = Outcomes()
+        let outcomes = SilentConnectOutcomes()
 
         // The only waiter cancels: it returns at once, and the attempt goes.
-        let a = Task {
+        let taskA = Task {
             defer { outcomes.aDone = true }
             _ = try await coordinator.materialize(host: "build-box", remotePath: path)
         }
         await waitUntil("first attempt started") { made == 1 }
-        a.cancel()
+        taskA.cancel()
         await waitUntil("cancelled open returned") { outcomes.aDone }
         #expect(firstSilent.closed)
 
         // Two waiters share the next attempt; one cancelling leaves it to
         // the other, which the deadline then releases.
-        let b = Task {
+        let taskB = Task {
             defer { outcomes.bDone = true }
             _ = try await coordinator.materialize(host: "build-box", remotePath: path)
         }
-        let c = Task {
+        let taskC = Task {
             do {
                 _ = try await coordinator.materialize(host: "build-box", remotePath: path)
             } catch {
-                outcomes.c = error as? SFTPError
+                outcomes.cError = error as? SFTPError
             }
         }
         await waitUntil("second attempt started") { made == 2 }
-        b.cancel()
+        taskB.cancel()
         await waitUntil("cancelled waiter returned") { outcomes.bDone }
         #expect(!secondSilent.closed, "the other waiter still wants this connection")
-        await c.value
-        if case .transport(.hostUnreachable)? = outcomes.c {} else {
-            Issue.record("expected the connect deadline, got \(String(describing: outcomes.c))")
+        await taskC.value
+        if case .transport(.hostUnreachable)? = outcomes.cError {} else {
+            Issue.record("expected the connect deadline, got \(String(describing: outcomes.cError))")
         }
         #expect(secondSilent.closed)
 
@@ -431,762 +444,4 @@ struct RemoteEditCoordinatorTests {
         _ = try await coordinator.materialize(host: "build-box", remotePath: path)
         #expect(made == 3)
     }
-
-    @Test("server errors preserve a connection; failed downloads retire it")
-    func failedDownloadReconnectsButMissingFileDoesNot() async throws {
-        let root = try makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let first = FakeSFTPClient()
-        let replacement = FakeSFTPClient()
-        let path = "/srv/main.rs"
-        for client in [first, replacement] { client.lstatResults[path] = SFTPAttributes(size: 2) }
-        first.onTransfer = { _, _ in throw SFTPError.transport(.connectionLost) }
-        replacement.onTransfer = { call, _ in
-            try "ok".write(toFile: call.localPath, atomically: true, encoding: .utf8)
-        }
-        var made = 0
-        let coordinator = RemoteEditCoordinator(
-            store: RemoteEditStore(rootURL: root),
-            makeClient: { _ in
-                made += 1
-                return made == 1 ? first : replacement
-            },
-            opener: { _, _, _ in true },
-            presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
-        do { _ = try await coordinator.materialize(host: "build-box", remotePath: "/missing") }
-        catch { #expect(error == .server(SFTPStatus(code: .noSuchFile))) }
-        #expect(made == 1 && !first.closed)
-        await #expect(throws: SFTPError.transport(.connectionLost)) {
-            try await coordinator.materialize(host: "build-box", remotePath: path)
-        }
-        #expect(first.closed)
-        #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
-        #expect(made == 2)
-    }
-
-    @Test("failed upload stays pending and reconnects only when retried")
-    func failedUploadRetainsDecision() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        #expect(try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil))
-        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.coordinator.pendingUploads.first)
-        fixture.fake.onTransfer = { call, _ in
-            if call.isUpload { throw SFTPError.transport(.connectionLost) }
-            try "remote v1".write(toFile: call.localPath, atomically: true, encoding: .utf8)
-        }
-        fixture.coordinator.upload(pending)
-        await waitUntil("failed upload reported") { !fixture.recorder.errors.isEmpty }
-        #expect(fixture.fake.closed)
-        #expect(fixture.coordinator.pendingUploads.count == 1)
-        #expect(fixture.fake.transferCalls.filter(\.isUpload).count == 1)
-    }
-
-    @Test("an upload retry gets a fresh client without losing the pending edit")
-    func uploadRetryReplacesClient() async throws {
-        let root = try makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let store = RemoteEditStore(rootURL: root)
-        let first = FakeSFTPClient()
-        let second = FakeSFTPClient()
-        let path = "/srv/main.rs"
-        for client in [first, second] {
-            client.lstatResults[path] = SFTPAttributes(size: 2, modificationTime: 1000)
-        }
-        first.onTransfer = { call, _ in
-            if call.isUpload { throw SFTPError.transport(.connectionLost) }
-            try "ok".write(toFile: call.localPath, atomically: true, encoding: .utf8)
-        }
-        second.onTransfer = { call, _ in
-            if !call.isUpload { try "ok".write(toFile: call.localPath, atomically: true, encoding: .utf8) }
-        }
-        var made = 0
-        var errors: [String] = []
-        let coordinator = RemoteEditCoordinator(
-            store: store,
-            makeClient: { _ in
-                made += 1
-                return made == 1 ? first : second
-            },
-            opener: { _, _, _ in true },
-            presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { errors.append($0) }))
-        #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
-        let copy = try #require(store.copy(host: "build-box", remotePath: path))
-        try "edited".write(to: store.localURL(for: copy), atomically: true, encoding: .utf8)
-        await coordinator.noteLocalWrite(copyID: copy.id)
-        let pending = try #require(coordinator.pendingUploads.first)
-        coordinator.upload(pending)
-        await waitUntil("first upload failed") { !errors.isEmpty }
-        #expect(first.closed && made == 1)
-        #expect(coordinator.pendingUploads.count == 1)
-        coordinator.upload(pending)
-        await waitUntil("retry finished") { coordinator.pendingUploads.isEmpty }
-        #expect(made == 2)
-        #expect(second.transferCalls.filter(\.isUpload).count == 1)
-        #expect(!second.closed)
-    }
-
-    @Test("an editor that saves immediately is still watched")
-    func immediateEditorSaveIsDetected() async throws {
-        let root = try makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let fake = FakeSFTPClient()
-        let path = "/srv/main.rs"
-        fake.lstatResults[path] = SFTPAttributes(size: 2)
-        fake.onTransfer = { call, _ in
-            try "original".write(toFile: call.localPath, atomically: true, encoding: .utf8)
-        }
-        let store = RemoteEditStore(rootURL: root)
-        let coordinator = RemoteEditCoordinator(
-            store: store, makeClient: { _ in fake },
-            opener: { url, _, _ in
-                try! "editor save".write(to: url, atomically: true, encoding: .utf8)
-                return true
-            },
-            presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
-        // A reused copy after a coordinator restart has no in-memory digest.
-        let relative = RemoteEditStore.localRelativePath(host: "build-box", remotePath: path)
-        let url = root.appendingPathComponent(relative)
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try "original".write(to: url, atomically: true, encoding: .utf8)
-        _ = store.recordDownload(host: "build-box", remotePath: path, remoteSize: 2, remoteMTime: nil)
-        #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
-        #expect(coordinator.pendingUploads.count == 1)
-        #expect(fake.transferCalls.isEmpty)
-    }
-
-    @Test("open downloads once, reuses the copy, and opens it at the reference's position")
-    func openDownloadsAndReuses() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-
-        let opened = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 12, column: 3)
-        #expect(opened)
-        #expect(fixture.recorder.opened.count == 1)
-        let first = try #require(fixture.recorder.opened.first)
-        #expect(first.line == 12 && first.column == 3)
-        #expect(first.url.path.hasPrefix(fixture.root.path))
-
-        // The manifest learned the remote stamp at download.
-        let copy = try #require(fixture.store.copies[fixture.copyID])
-        #expect(copy.remoteSize == 100 && copy.remoteMTime == 1000)
-        #expect(copy.openCount == 1)
-        #expect(fixture.fake.transferCalls.count == 1)
-        let call = try #require(fixture.fake.transferCalls.first)
-        #expect(call.policy == "fail")
-        #expect(call.disposition == .remove)
-
-        // Second open: the copy is reused, not downloaded again.
-        let again = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        #expect(again)
-        #expect(fixture.fake.transferCalls.count == 1, "no second download")
-        #expect(fixture.store.copies[fixture.copyID]?.openCount == 2)
-    }
-
-    /// The first connection to a host is the user's decision, not the
-    /// far end's: the host came from the pane's OSC 7 report — child
-    /// output — so it is asked (host and path named) before any client is
-    /// made, a refusal is `.cancelled` with nothing spawned, and an
-    /// acceptance is remembered for the run (`RemoteHostConsent`).
-    @Test("a first connection to a reported host is asked, and the answer is remembered")
-    func firstConnectionIsAskedAndRemembered() async throws {
-        let root = try makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let store = RemoteEditStore(rootURL: root)
-        let fake = FakeSFTPClient()
-        let host = "consent-\(UUID().uuidString.prefix(8)).example"
-        fake.lstatResults["/srv/app/main.rs"] = SFTPAttributes(size: 100, modificationTime: 1000)
-        fake.onTransfer = { call, _ in
-            guard !call.isUpload else { return }
-            try "remote".write(toFile: call.localPath, atomically: true, encoding: .utf8)
-        }
-        final class Asked {
-            var questions: [(host: String, path: String)] = []
-            var answer = false
-        }
-        let asked = Asked()
-        var clientsMade = 0
-        let coordinator = RemoteEditCoordinator(
-            store: store,
-            makeClient: { _ in
-                clientsMade += 1
-                return fake
-            },
-            opener: { _, _, _ in true },
-            presenter: RemoteEditCoordinator.RemoteEditPresenter(
-                promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in },
-                confirmConnection: { host, path in
-                    asked.questions.append((host, path))
-                    return asked.answer
-                }))
-
-        // Declined: nothing is connected, nothing downloaded, and the
-        // caller hears "cancelled" — the user's answer, not a failure.
-        // (Spelled with a captured result rather than a typed `catch`:
-        // the CI toolchain's SIL verifier crashed on that pattern.)
-        var declined: SFTPError?
-        do {
-            _ = try await coordinator.open(
-                host: host, remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        } catch {
-            declined = error
-        }
-        #expect(declined == .cancelled, "expected .cancelled, got \(String(describing: declined))")
-        #expect(asked.questions.count == 1)
-        let question = try #require(asked.questions.first)
-        #expect(question.host == host && question.path == "/srv/app/main.rs")
-        #expect(clientsMade == 0)
-        #expect(fake.transferCalls.isEmpty)
-        #expect(!RemoteHostConsent.isConfirmed(host))
-
-        // Accepted: connects, and the next open of the same host asks
-        // nothing more.
-        asked.answer = true
-        #expect(
-            try await coordinator.open(
-                host: host, remotePath: "/srv/app/main.rs", line: 1, column: nil))
-        #expect(asked.questions.count == 2)
-        #expect(clientsMade == 1)
-        #expect(RemoteHostConsent.isConfirmed(host))
-        _ = try await coordinator.open(
-            host: host, remotePath: "/srv/app/main.rs", line: 2, column: nil)
-        #expect(asked.questions.count == 2, "a confirmed host is not asked again")
-    }
-
-    @Test("a missing remote file is the server's answer, surfaced typed")
-    func openMissingRemoteFile() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        do {
-            _ = try await fixture.coordinator.open(
-                host: "build-box", remotePath: "/no/such/file.rs", line: 1, column: nil)
-            Issue.record("expected a no-such-file failure")
-        } catch {
-            guard case .server(let status) = error, status.code == .noSuchFile else {
-                Issue.record("expected .server(noSuchFile), got \(error)")
-                return
-            }
-        }
-        #expect(fixture.recorder.opened.isEmpty)
-    }
-
-    @Test("a local edit prompts; a write with unchanged content does not")
-    func localChangeDetection() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-
-        // Same content: a touch, not an edit.
-        try "remote v1".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        #expect(fixture.coordinator.pendingUploads.isEmpty)
-        #expect(fixture.recorder.uploads.isEmpty)
-
-        // A real edit prompts, once.
-        try "remote v1, edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        #expect(fixture.coordinator.pendingUploads.count == 1)
-        #expect(fixture.recorder.uploads.count == 1)
-        #expect(fixture.recorder.uploads.first?.remoteDisplay == "build-box:/srv/app/main.rs")
-
-        // A second edit while the first awaits a decision does not stack prompts.
-        try "remote v1, edited more".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        #expect(fixture.coordinator.pendingUploads.count == 1)
-    }
-
-    @Test("the file watcher turns an editor's save into the prompt state")
-    func watchIntegration() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        // What an editor's atomic save looks like: new file, renamed over.
-        try "edited by the editor".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await waitUntil("the watch fired and coalesced") {
-            fixture.coordinator.pendingUploads.count == 1
-        }
-        #expect(fixture.recorder.uploads.count == 1)
-    }
-
-    @Test("an unchanged remote uploads; the manifest re-stamps")
-    func uploadUnchangedRemote() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.coordinator.pendingUploads.first)
-
-        // The upload succeeds; afterwards the server's stamp has moved.
-        fixture.fake.onTransfer = { call, _ in
-            if call.isUpload {
-                fixture.fake.lstatResults["/srv/app/main.rs"] =
-                    SFTPAttributes(size: 106, modificationTime: 2000)
-            } else {
-                try "remote v1".write(toFile: call.localPath, atomically: true, encoding: .utf8)
-            }
-        }
-        fixture.coordinator.upload(pending)
-        await waitUntil("uploaded") { fixture.coordinator.pendingUploads.isEmpty }
-        let upload = try #require(fixture.fake.transferCalls.first { $0.isUpload })
-        #expect(upload.remotePath == "/srv/app/main.rs")
-        #expect(upload.policy == "overwrite")
-        #expect(upload.disposition == .remove, "an interrupted upload leaves no partial")
-        let copy = try #require(fixture.store.copies[fixture.copyID])
-        #expect(copy.remoteSize == 106 && copy.remoteMTime == 2000)
-        #expect(fixture.coordinator.pendingConflicts.isEmpty)
-    }
-
-    @Test("a changed remote requires an explicit resolution")
-    func remoteChangedConflict() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.coordinator.pendingUploads.first)
-
-        // The remote moved since the download.
-        fixture.fake.lstatResults["/srv/app/main.rs"] =
-            SFTPAttributes(size: 999, modificationTime: 5000)
-        fixture.coordinator.upload(pending)
-        await waitUntil("conflict presented") { !fixture.coordinator.pendingConflicts.isEmpty }
-        #expect(fixture.recorder.conflicts.count == 1)
-        let conflict = try #require(fixture.coordinator.pendingConflicts.first)
-        #expect(!conflict.remoteDeleted)
-        #expect(!conflict.remoteDescription.isEmpty && !conflict.atDownloadDescription.isEmpty)
-        #expect(fixture.fake.transferCalls.allSatisfy { !$0.isUpload }, "nothing sent yet")
-
-        // Re-download discards the local edits and re-baselines.
-        fixture.fake.onTransfer = { call, _ in
-            if !call.isUpload {
-                try "remote v2".write(toFile: call.localPath, atomically: true, encoding: .utf8)
-            }
-        }
-        fixture.coordinator.resolveConflict(conflict.id, choice: .redownload)
-        // Wait on the coordinator's *settled* state, not on the file's
-        // content: the fake writes the destination inside the download
-        // call, and the trailing bookkeeping (re-stamp, digest, pending
-        // removal) happens after later resumptions on the same actor.
-        // Waiting on the content observed the flow mid-flight, which is
-        // exactly what full-suite load exploited.
-        await waitUntil("re-downloaded and re-baselined") {
-            fixture.store.copies[fixture.copyID]?.remoteMTime == 5000
-                && fixture.coordinator.pendingUploads.isEmpty
-        }
-        #expect(fixture.coordinator.pendingConflicts.isEmpty)
-        #expect(
-            (try? String(contentsOf: fixture.localCopyURL, encoding: .utf8)) == "remote v2")
-        // The local edits are gone, and the new content is the baseline:
-        // checking the watch path now prompts nothing.
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        #expect(fixture.coordinator.pendingUploads.isEmpty)
-    }
-
-
-    @Test("upload anyway overwrites; save-elsewhere and dismiss send nothing")
-    func conflictResolutions() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-
-        func stageConflict(_ content: String) async throws -> RemoteEditCoordinator.UploadConflict {
-            _ = try await fixture.coordinator.open(
-                host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-            // Fresh content each stage: the digest baseline moves with
-            // every resolution, and an unchanged write prompts nothing.
-            try content.write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-            await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-            let pending = try #require(fixture.coordinator.pendingUploads.first)
-            fixture.fake.lstatResults["/srv/app/main.rs"] =
-                SFTPAttributes(size: 999, modificationTime: 5000)
-            fixture.coordinator.upload(pending)
-            await waitUntil("conflict presented") {
-                !fixture.coordinator.pendingConflicts.isEmpty
-            }
-            return fixture.coordinator.pendingConflicts.first!
-        }
-
-        // Upload anyway: the upload is sent despite the drift.
-        var conflict = try await stageConflict("edit one")
-        fixture.coordinator.resolveConflict(conflict.id, choice: .uploadAnyway)
-        // The transfer call is recorded at the start of the fake's upload;
-        // the manifest re-stamp is the flow's last step. Waiting for the
-        // call alone lets the next stage's stamp reset lose the race
-        // against the trailing re-stamp (full-suite load), silently
-        // erasing the drift stage two needs to see.
-        await waitUntil("uploaded anyway and re-stamped") {
-            fixture.fake.transferCalls.contains { $0.isUpload }
-                && fixture.store.copies[fixture.copyID]?.remoteMTime == 5000
-        }
-        #expect(fixture.fake.transferCalls.last?.policy == "overwrite")
-
-        // Save elsewhere: both sides left alone, the copy written out.
-        fixture.store.updateRemoteStamp(
-            fixture.store.copies[fixture.copyID]!, size: 100, mtime: 1000)
-        conflict = try await stageConflict("edit two")
-        // A copy that cannot be written is said, and the decision asked again.
-        let prompted = fixture.recorder.conflicts.count
-        let errorsBefore = fixture.recorder.errors.count
-        let unwritable = fixture.root.appendingPathComponent("missing/dir/saved.rs")
-        fixture.coordinator.resolveConflict(conflict.id, choice: .saveCopyElsewhere(unwritable))
-        await waitUntil("save failure reported") { fixture.recorder.errors.count == errorsBefore + 1 }
-        #expect(fixture.recorder.errors.count == errorsBefore + 1)
-        #expect(fixture.recorder.conflicts.count == prompted + 1)
-        #expect(fixture.coordinator.pendingConflicts.count == 1)
-        // A file the save panel agreed to replace is replaced.
-        let elsewhere = fixture.root.appendingPathComponent("saved.rs")
-        try "old".write(to: elsewhere, atomically: true, encoding: .utf8)
-        fixture.coordinator.resolveConflict(conflict.id, choice: .saveCopyElsewhere(elsewhere))
-        await waitUntil("saved elsewhere") { fixture.coordinator.pendingConflicts.isEmpty }
-        #expect((try? String(contentsOf: elsewhere, encoding: .utf8)) == "edit two")
-        #expect(fixture.coordinator.pendingConflicts.isEmpty)
-        let uploadsBefore = fixture.fake.transferCalls.filter { $0.isUpload }.count
-
-        // Dismiss: nothing happens, and nothing is sent.
-        fixture.store.updateRemoteStamp(
-            fixture.store.copies[fixture.copyID]!, size: 100, mtime: 1000)
-        conflict = try await stageConflict("edit three")
-        fixture.coordinator.resolveConflict(conflict.id, choice: .dismiss)
-        #expect(fixture.coordinator.pendingUploads.isEmpty)
-        #expect(
-            fixture.fake.transferCalls.filter { $0.isUpload }.count == uploadsBefore,
-            "dismiss sends nothing")
-    }
-
-    @Test("a deleted remote is its own conflict wording")
-    func remoteDeletedConflict() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.coordinator.pendingUploads.first)
-
-        fixture.fake.lstatResults.removeValue(forKey: "/srv/app/main.rs")
-        fixture.coordinator.upload(pending)
-        await waitUntil("conflict presented") { !fixture.coordinator.pendingConflicts.isEmpty }
-        let conflict = try #require(fixture.coordinator.pendingConflicts.first)
-        #expect(conflict.remoteDeleted)
-        #expect(conflict.remoteDescription == L10n.text("remoteEdit.conflict.deleted"))
-    }
-
-    /// A lost connection may have cut the upload off anywhere, so the
-    /// wording says the remote's state is not known rather than untouched.
-    @Test("a failed upload keeps the decision open and says what is known of the remote")
-    func uploadFailureWording() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.coordinator.pendingUploads.first)
-
-        fixture.fake.onTransfer = { call, _ in
-            if call.isUpload { throw SFTPError.transport(.connectionLost) }
-            try "remote v1".write(toFile: call.localPath, atomically: true, encoding: .utf8)
-        }
-        fixture.coordinator.upload(pending)
-        await waitUntil("error presented") { !fixture.recorder.errors.isEmpty }
-        let message = try #require(fixture.recorder.errors.first)
-        #expect(
-            message
-                == L10n.format(
-                    "remoteEdit.uploadUncertain", "/srv/app/main.rs", "build-box",
-                    SFTPBrowserModel.errorMessage(
-                        .transport(.connectionLost), host: "build-box")))
-        #expect(
-            fixture.coordinator.pendingUploads.count == 1,
-            "the decision is still owed — the upload can be asked for again")
-    }
-    @Test("same-size same-timestamp remote replacement requires a conflict decision")
-    func remoteContentReplacementIsDetected() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.coordinator.pendingUploads.first)
-        fixture.fake.onTransfer = { call, _ in
-            if !call.isUpload { try "remote v2".write(toFile: call.localPath, atomically: true, encoding: .utf8) }
-        }
-        fixture.coordinator.upload(pending)
-        await waitUntil("content conflict") { !fixture.coordinator.pendingConflicts.isEmpty }
-        #expect(!fixture.fake.transferCalls.contains { $0.isUpload })
-    }
-
-    /// Remote editing shipped in 1.0.0, before digests were recorded: such a
-    /// copy has only size and time, which miss a same-size rewrite within
-    /// the second, so it takes the conflict decision docs/SECURITY.md
-    /// promises instead of uploading over the remote unasked.
-    @Test("a copy from before content digests asks for a conflict decision")
-    func legacyCopyWithoutDigestAsksFirst() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        let copy = try #require(fixture.store.copies[fixture.copyID])
-        fixture.store.updateRemoteStamp(copy, size: copy.remoteSize, mtime: copy.remoteMTime, digest: nil)
-        #expect(fixture.store.copies[fixture.copyID]?.remoteDigest == nil)
-        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.coordinator.pendingUploads.first)
-        fixture.coordinator.upload(pending)
-        await waitUntil("conflict") { !fixture.coordinator.pendingConflicts.isEmpty }
-        #expect(!fixture.fake.transferCalls.contains { $0.isUpload })
-        #expect(fixture.coordinator.pendingConflicts.first?.remoteDeleted == false)
-    }
-
-    /// The save panel's Replace is consent to replace the file with the
-    /// copy. Removing it first and copying second lost it whenever the copy
-    /// failed — here, a managed copy deleted while the conflict was shown.
-    @Test("saving a copy elsewhere never removes the file it fails to replace")
-    func saveElsewhereFailureKeepsExistingFile() throws {
-        let root = try makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let existing = root.appendingPathComponent("backup.rs")
-        try "USER-BACKUP".write(to: existing, atomically: true, encoding: .utf8)
-
-        #expect(throws: (any Error).self) {
-            try RemoteEditCoordinator.copyReplacing(
-                root.appendingPathComponent("deleted.rs"), at: existing)
-        }
-        #expect((try? String(contentsOf: existing, encoding: .utf8)) == "USER-BACKUP")
-        #expect((try? FileManager.default.contentsOfDirectory(atPath: root.path)) == ["backup.rs"])
-
-        let edit = root.appendingPathComponent("edit.rs")
-        try "EDIT".write(to: edit, atomically: true, encoding: .utf8)
-        try RemoteEditCoordinator.copyReplacing(edit, at: existing)
-        #expect((try? String(contentsOf: existing, encoding: .utf8)) == "EDIT")
-        // The same file as its own destination is already saved.
-        try RemoteEditCoordinator.copyReplacing(existing, at: existing)
-        #expect((try? String(contentsOf: existing, encoding: .utf8)) == "EDIT")
-        #expect(
-            (try? FileManager.default.contentsOfDirectory(atPath: root.path).sorted())
-                == ["backup.rs", "edit.rs"])
-    }
-
-    @Test("approval snapshots a quit left behind are removed when the store opens")
-    func staleApprovalSnapshotsAreRemoved() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("corta-remote-edit-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let approvals = root.appendingPathComponent("Approvals")
-        try FileManager.default.createDirectory(at: approvals, withIntermediateDirectories: true)
-        try Data("a whole copy of a remote file".utf8)
-            .write(to: approvals.appendingPathComponent(UUID().uuidString))
-        let store = RemoteEditStore(rootURL: root)
-        #expect(store.approvalsURL.standardizedFileURL.path == approvals.standardizedFileURL.path)
-        #expect(!FileManager.default.fileExists(atPath: approvals.path))
-    }
-
-    @Test("an edit after the prompt requires a fresh approval")
-    func staleApprovalIsRejected() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "first edit".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.coordinator.pendingUploads.first)
-        try "second edit".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        fixture.coordinator.upload(pending)
-        #expect(!fixture.fake.transferCalls.contains { $0.isUpload })
-        await waitUntil("fresh approval offered") {
-            fixture.coordinator.pendingUploads.first?.contentDigest == RemoteEditStore.sha256Hex(Data("second edit".utf8))
-        }
-    }
-
-    @Test("an edit during preflight cannot replace the approved upload bytes")
-    func uploadedBytesAreFrozen() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "approved".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.coordinator.pendingUploads.first)
-        var uploaded: String?
-        fixture.fake.onTransfer = { call, _ in
-            if call.isUpload {
-                uploaded = try String(contentsOfFile: call.localPath, encoding: .utf8)
-            } else {
-                try "remote v1".write(toFile: call.localPath, atomically: true, encoding: .utf8)
-                try "later edit".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-            }
-        }
-        fixture.coordinator.upload(pending)
-        await waitUntil("frozen upload and subsequent edit checked") {
-            uploaded != nil && fixture.coordinator.pendingUploads.first?.contentDigest == RemoteEditStore.sha256Hex(Data("later edit".utf8))
-        }
-        #expect(uploaded == "approved")
-        #expect(
-            fixture.coordinator.pendingUploads.first?.contentDigest
-                == RemoteEditStore.sha256Hex(Data("later edit".utf8)))
-    }
-
-    @Test("a silent established connection releases the upload and offers a fresh retry")
-    func silentUploadTimesOut() async throws {
-        let fixture = try makeFixture(operationTimeout: .seconds(1) * testTimeoutScale)
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.recorder.uploads.first)
-        let prompts = fixture.recorder.uploads.count
-        fixture.fake.lstatHangs = true
-        fixture.coordinator.upload(pending)
-        await waitUntil("silent upload times out and asks again") {
-            fixture.fake.closed && fixture.recorder.uploads.count > prompts
-                && !fixture.coordinator.uploadsInFlight.contains(fixture.copyID)
-        }
-        #expect(!fixture.recorder.errors.isEmpty)
-        #expect(fixture.coordinator.approvedSnapshots[fixture.copyID] == nil)
-        fixture.fake.lstatHangs = false
-        fixture.fake.closed = false
-        fixture.coordinator.upload(try #require(fixture.recorder.uploads.last))
-        await waitUntil("retry uploads the approved snapshot") {
-            fixture.fake.transferCalls.contains { $0.isUpload }
-                && !fixture.coordinator.uploadsInFlight.contains(fixture.copyID)
-        }
-    }
-
-    /// A failed upload left the edit pending with no prompt: later saves
-    /// were swallowed (it was already pending) and nothing offered a retry.
-    @Test("a failed upload asks again")
-    func failedUploadAsksAgain() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        let pending = try #require(fixture.recorder.uploads.first)
-        let content = "remote v1"
-        fixture.fake.onTransfer = { call, _ in
-            if call.isUpload { throw SFTPError.transport(.connectionLost) }
-            try content.write(toFile: call.localPath, atomically: true, encoding: .utf8)
-        }
-        fixture.coordinator.upload(pending)
-        await waitUntil("the upload failed and was asked again") {
-            !fixture.recorder.errors.isEmpty && fixture.recorder.uploads.count == 2
-        }
-        #expect(fixture.coordinator.pendingUploads.count == 1)
-        // Answered again, the retry goes through.
-        fixture.fake.onTransfer = { call, _ in
-            guard !call.isUpload else { return }
-            try content.write(toFile: call.localPath, atomically: true, encoding: .utf8)
-        }
-        fixture.coordinator.upload(try #require(fixture.recorder.uploads.last))
-        await waitUntil("the retry finished") { fixture.coordinator.pendingUploads.isEmpty }
-    }
-
-    /// The copy's content at a relaunch used to become the baseline, so an
-    /// edit whose upload failed before the quit was never offered again.
-    @Test("an edit never uploaded is pending when the copy is opened again")
-    func unuploadedEditIsPendingOnReopen() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "edited, never uploaded".write(
-            to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-
-        // A fresh run: a new coordinator over the same store.
-        let recorder = Recorder()
-        let coordinator = RemoteEditCoordinator(
-            store: RemoteEditStore(rootURL: fixture.root), makeClient: { _ in fixture.fake },
-            opener: { _, _, _ in true },
-            presenter: .init(
-                promptUpload: { recorder.uploads.append($0) },
-                promptConflict: { recorder.conflicts.append($0) },
-                showError: { recorder.errors.append($0) }))
-        _ = try await coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        #expect(recorder.uploads.count == 1)
-        #expect(fixture.fake.transferCalls.filter { !$0.isUpload }.count == 1, "the copy is reused")
-    }
-
-    /// Dismiss means "not this edit": it must not be offered again on every
-    /// open after a relaunch.
-    @Test("a dismissed edit is not offered again when the copy is reopened")
-    func dismissedEditStaysDismissedAcrossARelaunch() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        try "edited, then dismissed".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
-        await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
-        fixture.coordinator.dismissUpload(try #require(fixture.recorder.uploads.first))
-
-        let recorder = Recorder()
-        let coordinator = RemoteEditCoordinator(
-            store: RemoteEditStore(rootURL: fixture.root), makeClient: { _ in fixture.fake },
-            opener: { _, _, _ in true },
-            presenter: .init(
-                promptUpload: { recorder.uploads.append($0) },
-                promptConflict: { recorder.conflicts.append($0) },
-                showError: { recorder.errors.append($0) }))
-        _ = try await coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        #expect(recorder.uploads.isEmpty)
-    }
-
-    /// A copy the manifest no longer names may hold edits; the download used
-    /// to refuse its path (policy `.fail`), and the file could not be opened.
-    @Test("a copy missing from the manifest is kept aside, not overwritten")
-    func orphanedCopyIsKeptAside() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        let relative = RemoteEditStore.localRelativePath(host: "build-box", remotePath: "/srv/app/main.rs")
-        let orphan = fixture.root.appendingPathComponent(relative)
-        try FileManager.default.createDirectory(
-            at: orphan.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try "local edits".write(to: orphan, atomically: true, encoding: .utf8)
-
-        #expect(try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil))
-        #expect(try String(contentsOf: orphan, encoding: .utf8) == "remote v1")
-        let siblings = try FileManager.default.contentsOfDirectory(
-            atPath: orphan.deletingLastPathComponent().path)
-        let kept = try #require(siblings.first { $0.contains("(local copy ") })
-        #expect(try String(
-            contentsOf: orphan.deletingLastPathComponent().appendingPathComponent(kept),
-            encoding: .utf8) == "local edits")
-        #expect(fixture.recorder.errors.count == 1, "the user is told where it went")
-    }
-
-    @Test("a manifest from a newer Corta is not overwritten")
-    func newerManifestIsPreserved() throws {
-        let root = try makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let manifest = root.appendingPathComponent("manifest.json")
-        let newer = Data(#"{"version": 99, "copies": [], "future": true}"#.utf8)
-        try newer.write(to: manifest)
-        let store = RemoteEditStore(rootURL: root)
-        #expect(store.preservesNewerManifest)
-        store.recordDownload(host: "h", remotePath: "/p", remoteSize: 1, remoteMTime: 1)
-        #expect(try Data(contentsOf: manifest) == newer)
-    }
-
-    @Test("managed copies and their manifest use owner-only modes")
-    func managedCopyPermissions() async throws {
-        let fixture = try makeFixture()
-        defer { try? FileManager.default.removeItem(at: fixture.root) }
-        _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        for url in [fixture.localCopyURL, fixture.root.appendingPathComponent("manifest.json")] {
-            let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
-            #expect(mode?.intValue == 0o600)
-        }
-        let mode = try FileManager.default.attributesOfItem(atPath: fixture.root.path)[.posixPermissions] as? NSNumber
-        #expect(mode?.intValue == 0o700)
-    }
-
 }

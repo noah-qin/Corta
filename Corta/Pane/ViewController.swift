@@ -14,6 +14,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+// The pane controller is one file by design (`docs/DESIGN.md` §4.1: no
+// `ViewController+X.swift`; new behaviour goes to a collaborator), so its
+// length is judged there, not by the generic file-length limit. Its type
+// and function lengths are still checked.
+// swiftlint:disable file_length
+
 import Cocoa
 import CortaPOSIX
 import CortaTerminal
@@ -281,6 +287,154 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         setUpPane()
     }
 
+    // MARK: - Teardown
+
+    /// Two close paths can reach one pane. Also checked by copy/export
+    /// completions — the generation guard catches a newer build, not a
+    /// teardown.
+    var didTeardown = false
+
+    /// The one place every close path (pane, tab, window, quit) funnels. Not
+    /// `deinit`: the reader thread retains the session, so a closed window's
+    /// shell would run on as an orphan.
+    func teardown() {
+        guard !didTeardown else { return }
+        didTeardown = true
+        focus.stop()
+        inputSourceIndicator.stop()
+        windowTitle.stop()
+        search.close()
+        commands.stop()
+        agents.reset()
+        taskNotifier.cancel()
+        remote.cancelPendingOpens()
+        remote.stopWatchingConnection()
+        appearance.stop()
+        frameLoop.suspendRendering()
+        terminalView?.stopRendering()
+        session?.stop()
+        removeBootstrapFolder()
+    }
+
+    /// The zsh wrappers the current session started from, gone with it.
+    private func removeBootstrapFolder() {
+        if let bootstrapFolder { ZshBootstrap.remove(bootstrapFolder) }
+        bootstrapFolder = nil
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        // Size or scale can change with no grid change the diff would see.
+        invalidateDisplay()
+        resizeSessionToFitView()
+        focus.updateLayout()
+        search.placeClearOfContent()
+    }
+
+    /// ⌘A: `NSResponder` declares it, so the pane overrides rather than
+    /// forwards.
+    override func selectAll(_ sender: Any?) { pointer.selectAll(sender) }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        if let notice = pendingSessionNotice {
+            pendingSessionNotice = nil
+            terminalView?.showToast(notice, kind: .warning)
+        }
+    }
+
+    // MARK: - Forwarding
+
+    /// Menu items, the palette, key bindings and AppKit's own items send their
+    /// actions to the first responder or to the pane by name; the pane
+    /// answers for the collaborator that implements each, through the
+    /// Objective-C runtime's forwarding, and `validateMenuItem` asks it too.
+    /// A collaborator's new `@objc` action needs nothing here; a new
+    /// collaborator that owns actions joins both lists, in the same order
+    /// (`PaneCommandsTests` holds them equal). `focus` and `appearance` have
+    /// only notification selectors and stay out.
+    /// Main-actor classes, so `Sendable`: `forwardingTarget(for:)` can carry
+    /// one out of its `assumeIsolated`.
+    var actionOwners: [any NSObject & Sendable] { [search, remote, commands, pointer, shell] }
+    /// The same owners as classes, for a question that may come from any
+    /// thread and so must not touch the instances.
+    nonisolated static let actionOwnerClasses: [NSObject.Type] = [
+        PaneSearch.self, PaneRemote.self, PaneCommands.self, PanePointer.self,
+        PaneShellIntegration.self,
+    ]
+
+    nonisolated override func responds(to aSelector: Selector!) -> Bool {
+        if super.responds(to: aSelector) { return true }
+        guard let aSelector else { return false }
+        return Self.actionOwnerClasses.contains { $0.instancesRespond(to: aSelector) }
+    }
+
+    /// Every owner of an item's action gets its say; one that does not own
+    /// it answers yes.
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        actionOwners.allSatisfy {
+            ($0 as? NSMenuItemValidation)?.validateMenuItem(menuItem) ?? true
+        }
+    }
+
+    /// Only what the pane itself does not answer: `NSObject`'s and
+    /// `NSResponder`'s own selectors stay the pane's. Actions are sent on the
+    /// main thread; one sent from another would not be forwarded, and the
+    /// runtime would report the selector unrecognised.
+    nonisolated override func forwardingTarget(for aSelector: Selector!) -> Any? {
+        guard let aSelector, Thread.isMainThread else {
+            return super.forwardingTarget(for: aSelector)
+        }
+        let owner = MainActor.assumeIsolated {
+            actionOwners.first { $0.responds(to: aSelector) }
+        }
+        return owner ?? super.forwardingTarget(for: aSelector)
+    }
+
+    /// `coalesce: false` delivers the size now: a font change is one step,
+    /// and waiting out the drag debounce drew a frame of the new font over
+    /// the old grid first.
+    func resizeSessionToFitView(coalesce: Bool = true) {
+        // Nothing reaches the child before the window is sized: a layout of the
+        // view at its placeholder size would strand blank rows under the
+        // prompt. The session is born at the target size, so nothing is lost.
+        guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil
+        else { return }
+        let grid = gridSize(fitting: view.bounds.size)
+        let pixels = pixelSize(
+            columns: Int(grid.columns), rows: Int(grid.rows), metrics: terminalRenderer.metrics)
+        let size = TerminalSize(
+            rows: grid.rows, columns: grid.columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
+        guard size != lastRequestedSize else {
+            // A layout pass may have queued this size behind the debounce.
+            if !coalesce { resizeDebouncer.flush() }
+            return
+        }
+        // A column change reflows every row (DESIGN.md §3.1), so a stored
+        // selection or offset would name the wrong text. A row-only change is
+        // ordinary growth, already handled.
+        if lastRequestedSize.map({ $0.columns != size.columns }) ?? false {
+            selection = nil
+            scrollOffset = 0
+        }
+        lastRequestedSize = size
+        // Trailing edge only: drags and the zoom animation lay out per frame,
+        // and rewrapping mid-gesture is the visible "text jumps".
+        resizeDebouncer.resize(to: size, coalesce: coalesce)
+        // The title shows the live size, as Terminal.app does.
+        if isFocusedPane {
+            windowTitle.invalidateProcessFacts()
+            // Zoom changes the grid, but only a physical window drag needs
+            // a temporary size label in the title and native tab.
+            if view.inLiveResize { windowTitle.noteTransientSizeChange() } else { windowTitle.endTransientSize() }
+            windowTitle.apply()
+        }
+    }
+}
+
+// MARK: - Setting up
+
+extension ViewController {
     /// Builds a pane or retries a failed setup. Reconnect must reuse the exact
     /// recorded command; ordinary startup may fall back to a working shell.
     /// A rebuild keeps the pane's grid and font size: the new child is born
@@ -362,7 +516,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
                 size: size, directory: inheritedWorkingDirectory,
                 scrollbackLimit: configuration.scrollbackLines,
                 commandHistoryLimit: configuration.commandHistoryLimit, preset: preset,
-                directoryCompletion: configuration.directoryCompletion, historySuggestions: configuration.historySuggestions)
+                directoryCompletion: configuration.directoryCompletion,
+                historySuggestions: configuration.historySuggestions)
         } catch {
             presentFailure(
                 title: L10n.text("failure.title.session"),
@@ -443,29 +598,35 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         }
         session.onIOFailure = { [weak self] failure in
             Task(priority: .userInitiated) { @MainActor in
-                guard let self, !self.didTeardown, self.frameLoop.isCurrent(generation) else { return }
-                let reconnect = self.remote.reconnectCommand.map {
-                    PaneRemoteState.isRemoteLauncher(executable: $0.executable)
-                } ?? false
-                self.frameLoop.suspendRendering()
-                self.terminalView?.stopRendering()
-                let title = reconnect
-                    ? self.remote.connectionHost.map { L10n.format("failure.title.connectionLost.host", $0) }
-                        ?? L10n.text("failure.title.connectionLost")
-                    : L10n.text("failure.title.runtimeSession")
-                // The last output stays readable behind it; the raw
-                // reason is the detail, not the sentence.
-                self.presentFailure(title: title,
-                    detail: L10n.text("failure.runtimeSession.body"),
-                    canRetry: !reconnect, canReconnect: reconnect,
-                    details: failure.description,
-                    note: L10n.text(reconnect ? "session.ended.connection.note" : "failure.retryHint"),
-                    showsSettings: false, backdrop: .dim,
-                    symbol: reconnect ? "bolt.horizontal.circle" : "exclamationmark.triangle",
-                    tint: reconnect ? .systemRed : .systemOrange,
-                    takesFocus: self.isFocusedPane)
+                self?.noteIOFailure(failure, generation: generation)
             }
         }
+    }
+
+    /// The session's reads or writes failed: rendering stops and the
+    /// failure panel offers Retry — or Reconnect, for a remote launcher.
+    private func noteIOFailure(_ failure: TerminalSession.IOFailure, generation: Int) {
+        guard !didTeardown, frameLoop.isCurrent(generation) else { return }
+        let reconnect = remote.reconnectCommand.map {
+            PaneRemoteState.isRemoteLauncher(executable: $0.executable)
+        } ?? false
+        frameLoop.suspendRendering()
+        terminalView?.stopRendering()
+        let title = reconnect
+            ? remote.connectionHost.map { L10n.format("failure.title.connectionLost.host", $0) }
+                ?? L10n.text("failure.title.connectionLost")
+            : L10n.text("failure.title.runtimeSession")
+        // The last output stays readable behind it; the raw
+        // reason is the detail, not the sentence.
+        presentFailure(title: title,
+            detail: L10n.text("failure.runtimeSession.body"),
+            canRetry: !reconnect, canReconnect: reconnect,
+            details: failure.description,
+            note: L10n.text(reconnect ? "session.ended.connection.note" : "failure.retryHint"),
+            showsSettings: false, backdrop: .dim,
+            symbol: reconnect ? "bolt.horizontal.circle" : "exclamationmark.triangle",
+            tint: reconnect ? .systemRed : .systemOrange,
+            takesFocus: isFocusedPane)
     }
 
     private func installTerminalCallbacks(on view: TerminalView) {
@@ -559,7 +720,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         view.onSearchKey = { [weak self] (event: NSEvent) -> Bool in
             self?.search.handleKey(event) ?? false
         }
-        view.cellSize = CGSize(width: terminalRenderer.pointMetrics.cellWidth, height: terminalRenderer.pointMetrics.cellHeight)
+        view.cellSize = CGSize(
+            width: terminalRenderer.pointMetrics.cellWidth, height: terminalRenderer.pointMetrics.cellHeight)
         view.preeditFontProvider = { [weak self] in
             guard let self else {
                 return NSFont.monospacedSystemFont(
@@ -573,51 +735,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             self.splitController?.noteFocus(self)
         }
     }
+}
 
-    // MARK: - Teardown
+// MARK: - Frames and output
 
-    /// Two close paths can reach one pane. Also checked by copy/export
-    /// completions — the generation guard catches a newer build, not a
-    /// teardown.
-    var didTeardown = false
-
-    /// The one place every close path (pane, tab, window, quit) funnels. Not
-    /// `deinit`: the reader thread retains the session, so a closed window's
-    /// shell would run on as an orphan.
-    func teardown() {
-        guard !didTeardown else { return }
-        didTeardown = true
-        focus.stop()
-        inputSourceIndicator.stop()
-        windowTitle.stop()
-        search.close()
-        commands.stop()
-        agents.reset()
-        taskNotifier.cancel()
-        remote.cancelPendingOpens()
-        remote.stopWatchingConnection()
-        appearance.stop()
-        frameLoop.suspendRendering()
-        terminalView?.stopRendering()
-        session?.stop()
-        removeBootstrapFolder()
-    }
-
-    /// The zsh wrappers the current session started from, gone with it.
-    private func removeBootstrapFolder() {
-        if let bootstrapFolder { ZshBootstrap.remove(bootstrapFolder) }
-        bootstrapFolder = nil
-    }
-
-    override func viewDidLayout() {
-        super.viewDidLayout()
-        // Size or scale can change with no grid change the diff would see.
-        invalidateDisplay()
-        resizeSessionToFitView()
-        focus.updateLayout()
-        search.placeClearOfContent()
-    }
-
+extension ViewController {
     private func makeFrameLoop() -> PaneFrameLoop {
         let loop = PaneFrameLoop()
         loop.onBell = { [weak self] in self?.handleBell() }
@@ -716,14 +838,15 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         pointer.dropSelectionIfRewritten(in: grid)
         if let inputMetadata, !terminalView.directPresentation.contains(.overlays) {
             let metrics = terminalRenderer.pointMetrics
-            inputSourceIndicator.update(
+            let frame = PaneInputSourceIndicator.FrameState(
                 grid: grid, hasIntegration: inputMetadata.hasIntegration,
                 promptRow: inputMetadata.promptRow,
                 focused: focus.hasUserFocus && view.window?.firstResponder === terminalView,
-                scrollOffset: scrollOffset, configuration: configuration, canvas: canvas,
+                scrollOffset: scrollOffset,
                 cellSize: CGSize(width: metrics.cellWidth, height: metrics.cellHeight),
                 topInset: topInset, compositionRect: terminalView.inputCompositionRect,
                 blockedRects: terminalView.shellOverlay.occupiedRects + (search.bar.map { [$0.frame] } ?? []))
+            inputSourceIndicator.update(frame, configuration: configuration, canvas: canvas)
         } else if !inputSourceIndicator.view.isHidden { inputSourceIndicator.view.isHidden = true }
         if hasOutput, scrollOffset > 0, let anchor = scrollAnchorTotalPushed {
             // Keep the viewport on the same document row while scrolled away.
@@ -847,102 +970,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     /// What copy, export and open-reference act on (`PaneShellIntegration`).
     var effectiveCommand: CommandRecord? { shell.effectiveCommand }
+}
 
-    /// ⌘A: `NSResponder` declares it, so the pane overrides rather than
-    /// forwards.
-    override func selectAll(_ sender: Any?) { pointer.selectAll(sender) }
+// MARK: - Failure paths
 
-    // MARK: - Forwarding
-
-    /// Menu items, the palette, key bindings and AppKit's own items send their
-    /// actions to the first responder or to the pane by name; the pane
-    /// answers for the collaborator that implements each, through the
-    /// Objective-C runtime's forwarding, and `validateMenuItem` asks it too.
-    /// A collaborator's new `@objc` action needs nothing here; a new
-    /// collaborator that owns actions joins both lists, in the same order
-    /// (`PaneCommandsTests` holds them equal). `focus` and `appearance` have
-    /// only notification selectors and stay out.
-    /// Main-actor classes, so `Sendable`: `forwardingTarget(for:)` can carry
-    /// one out of its `assumeIsolated`.
-    var actionOwners: [any NSObject & Sendable] { [search, remote, commands, pointer, shell] }
-    /// The same owners as classes, for a question that may come from any
-    /// thread and so must not touch the instances.
-    nonisolated static let actionOwnerClasses: [NSObject.Type] = [
-        PaneSearch.self, PaneRemote.self, PaneCommands.self, PanePointer.self,
-        PaneShellIntegration.self,
-    ]
-
-    nonisolated override func responds(to aSelector: Selector!) -> Bool {
-        if super.responds(to: aSelector) { return true }
-        guard let aSelector else { return false }
-        return Self.actionOwnerClasses.contains { $0.instancesRespond(to: aSelector) }
-    }
-
-    /// Every owner of an item's action gets its say; one that does not own
-    /// it answers yes.
-    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        actionOwners.allSatisfy {
-            ($0 as? NSMenuItemValidation)?.validateMenuItem(menuItem) ?? true
-        }
-    }
-
-    /// Only what the pane itself does not answer: `NSObject`'s and
-    /// `NSResponder`'s own selectors stay the pane's. Actions are sent on the
-    /// main thread; one sent from another would not be forwarded, and the
-    /// runtime would report the selector unrecognised.
-    nonisolated override func forwardingTarget(for aSelector: Selector!) -> Any? {
-        guard let aSelector, Thread.isMainThread else {
-            return super.forwardingTarget(for: aSelector)
-        }
-        let owner = MainActor.assumeIsolated {
-            actionOwners.first { $0.responds(to: aSelector) }
-        }
-        return owner ?? super.forwardingTarget(for: aSelector)
-    }
-
-    /// `coalesce: false` delivers the size now: a font change is one step,
-    /// and waiting out the drag debounce drew a frame of the new font over
-    /// the old grid first.
-    func resizeSessionToFitView(coalesce: Bool = true) {
-        // Nothing reaches the child before the window is sized: a layout of the
-        // view at its placeholder size would strand blank rows under the
-        // prompt. The session is born at the target size, so nothing is lost.
-        guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil
-        else { return }
-        let grid = gridSize(fitting: view.bounds.size)
-        let pixels = pixelSize(
-            columns: Int(grid.columns), rows: Int(grid.rows), metrics: terminalRenderer.metrics)
-        let size = TerminalSize(
-            rows: grid.rows, columns: grid.columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
-        guard size != lastRequestedSize else {
-            // A layout pass may have queued this size behind the debounce.
-            if !coalesce { resizeDebouncer.flush() }
-            return
-        }
-        // A column change reflows every row (DESIGN.md §3.1), so a stored
-        // selection or offset would name the wrong text. A row-only change is
-        // ordinary growth, already handled.
-        if lastRequestedSize.map({ $0.columns != size.columns }) ?? false {
-            selection = nil
-            scrollOffset = 0
-        }
-        lastRequestedSize = size
-        // Trailing edge only: drags and the zoom animation lay out per frame,
-        // and rewrapping mid-gesture is the visible "text jumps".
-        resizeDebouncer.resize(to: size, coalesce: coalesce)
-        // The title shows the live size, as Terminal.app does.
-        if isFocusedPane {
-            windowTitle.invalidateProcessFacts()
-            // Zoom changes the grid, but only a physical window drag needs
-            // a temporary size label in the title and native tab.
-            if view.inLiveResize { windowTitle.noteTransientSizeChange() }
-            else { windowTitle.endTransientSize() }
-            windowTitle.apply()
-        }
-    }
-
-    // MARK: - Failure paths
-
+extension ViewController {
     /// A configured face can pass the catalog and still fail to build; the
     /// system face at the default size is the fallback Corta stands behind
     /// (D11).
@@ -1001,7 +1033,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         failureView = failure
     }
 
-
     /// Behind Try Again (the ladder) and Reconnect (the exact command).
     func rebuildPane(strictRespawn: Bool) {
         // The grid it is shown at, while a session still says so; a pane
@@ -1039,14 +1070,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         if strictRespawn {
             // Every time: a new connection; the old scrollback is gone.
             terminalView.showToast(remote.reconnectNotice)
-        }
-    }
-
-    override func viewDidAppear() {
-        super.viewDidAppear()
-        if let notice = pendingSessionNotice {
-            pendingSessionNotice = nil
-            terminalView?.showToast(notice, kind: .warning)
         }
     }
 }

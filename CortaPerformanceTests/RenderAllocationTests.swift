@@ -14,7 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-
 import CoreGraphics
 import CoreText
 import Corta
@@ -53,6 +52,16 @@ extension PerformanceSuites {
     /// a fixed count, whatever the damage. Glyphs, rules, block elements and
     /// clusters are built per cell without touching the heap.
     @Suite struct RenderAllocationTests {
+        /// `text` on every row, each row in its own SGR colour.
+        static func filled(with text: String, rows: Int, columns: Int) -> Terminal {
+            var terminal = Terminal(rows: rows, columns: columns, scrollbackLimit: 1000)
+            for row in 0..<rows {
+                terminal.feed(Array("\u{1B}[\(31 + row % 7)m\(text)\u{1B}[0m".utf8))
+                if row < rows - 1 { terminal.feed(Array("\r\n".utf8)) }
+            }
+            return terminal
+        }
+
         @Test func allocationsPerFrame() throws {
             guard let device = MTLCreateSystemDefaultDevice() else { return }
             let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
@@ -66,27 +75,19 @@ extension PerformanceSuites {
             func frame(_ terminal: Terminal) -> Int {
                 let count = allocations {
                     renderer.render(
-                        grid: terminal.grid, scrollOffset: 0, rect: rect,
-                        drawableSize: CGSize(width: width, height: height), cursorVisible: true,
-                        selection: nil, target: texture, clearColor: MTLClearColorMake(0, 0, 0, 1)
-                    ) { _ in completed.signal() }
+                        grid: terminal.grid, scrollOffset: 0, cursorVisible: true, selection: nil,
+                        into: FrameTarget(
+                            texture: texture, rect: rect, drawableSize: CGSize(width: width, height: height),
+                            clearColor: MTLClearColorMake(0, 0, 0, 1))) { _ in completed.signal() }
                 }
                 completed.wait()
                 return count
-            }
-            func fill(_ text: String) -> Terminal {
-                var terminal = Terminal(rows: rows, columns: columns, scrollbackLimit: 1000)
-                for row in 0..<rows {
-                    terminal.feed(Array("\u{1B}[\(31 + row % 7)m\(text)\u{1B}[0m".utf8))
-                    if row < rows - 1 { terminal.feed(Array("\r\n".utf8)) }
-                }
-                return terminal
             }
             let asciiLine = String(repeating: "abcdefghij", count: 11) + "klmnopqr"
             let mixedLine = "中文 日本語 e\u{301} 👍🏽 👨‍👩‍👧 🇨🇳 ─┼─ █▓▒░ ascii text " + String(repeating: "x", count: 40)
             var results: [String: [Int]] = [:]
             for (name, line) in [("ascii", asciiLine), ("mixed", mixedLine)] {
-                var terminal = fill(line)
+                var terminal = Self.filled(with: line, rows: rows, columns: columns)
                 for _ in 0..<5 { renderer.invalidate(); _ = frame(terminal) }
                 for _ in 0..<10 {
                     results["\(name) idle", default: []].append(frame(terminal))

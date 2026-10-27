@@ -125,13 +125,13 @@ struct IndexedPaletteTests {
         // A non-black value at index 1: the xterm defaults ship it black, so
         // asserting black after reset would pass even if the whole palette
         // (not just the override) were discarded and rebuilt from scratch.
-        seededDefaults[1] = (200, 100, 50)
+        seededDefaults[1] = RGB(red: 200, green: 100, blue: 50)
         var palette = IndexedPalette(defaults: seededDefaults)
-        palette.setOverride(1, to: (10, 20, 30))
+        palette.setOverride(1, to: RGB(red: 10, green: 20, blue: 30))
         terminal.indexedPalette = palette
         terminal.reset()
         #expect(terminal.indexedPalette.overrides.isEmpty)
-        #expect(terminal.indexedPalette.color(at: 1) as (UInt8, UInt8, UInt8) == (200, 100, 50))
+        #expect(terminal.indexedPalette.color(at: 1) == RGB(red: 200, green: 100, blue: 50))
     }
 
     @Test("no OSC 4 or 104 produces unsolicited output")
@@ -144,31 +144,31 @@ struct IndexedPaletteTests {
     @Test("updateDefaults reseeds untouched indices without discarding overrides")
     func updateDefaultsPreservesOverrides() {
         var palette = IndexedPalette()
-        palette.setOverride(1, to: (10, 20, 30))
+        palette.setOverride(1, to: RGB(red: 10, green: 20, blue: 30))
         var newDefaults = IndexedPalette.xtermDefaults()
         // Index 2 is left untouched by the override above, so changing its
         // default here is what actually exercises the reseed — changing
         // index 1's instead would pass even if `updateDefaults` were a
         // no-op, since the override already shadows it.
-        newDefaults[2] = (99, 98, 97)
+        newDefaults[2] = RGB(red: 99, green: 98, blue: 97)
         palette.updateDefaults(to: newDefaults)
         // The override survives the reseed...
-        #expect(palette.color(at: 1) as (UInt8, UInt8, UInt8) == (10, 20, 30))
+        #expect(palette.color(at: 1) == RGB(red: 10, green: 20, blue: 30))
         // ...but an untouched index picks up the new default.
-        #expect(palette.color(at: 2) as (UInt8, UInt8, UInt8) == (99, 98, 97))
+        #expect(palette.color(at: 2) == RGB(red: 99, green: 98, blue: 97))
     }
 
     @Test("overridesGeneration bumps on every overrides mutation, and only those")
     func overridesGenerationBumpsOnMutation() {
         var palette = IndexedPalette()
         let initial = palette.overridesGeneration
-        palette.setOverride(1, to: (10, 20, 30))
+        palette.setOverride(1, to: RGB(red: 10, green: 20, blue: 30))
         let afterSet = palette.overridesGeneration
         #expect(afterSet != initial)
         palette.resetOverride(1)
         let afterReset = palette.overridesGeneration
         #expect(afterReset != afterSet)
-        palette.setOverride(2, to: (1, 2, 3))
+        palette.setOverride(2, to: RGB(red: 1, green: 2, blue: 3))
         let afterSecondSet = palette.overridesGeneration
         palette.resetAllOverrides()
         let afterResetAll = palette.overridesGeneration
@@ -192,9 +192,9 @@ struct IndexedPaletteTests {
     func terminalIndexedPaletteProperty() {
         var terminal = Terminal()
         var palette = terminal.indexedPalette
-        #expect(palette.color(at: 9) == (0, 0, 0))
-        palette.setOverride(9, to: (10, 20, 30))
+        #expect(palette.color(at: 9) == RGB(red: 0, green: 0, blue: 0))
+        palette.setOverride(9, to: RGB(red: 10, green: 20, blue: 30))
         terminal.indexedPalette = palette
-        #expect(terminal.indexedPalette.color(at: 9) as (UInt8, UInt8, UInt8) == (10, 20, 30))
+        #expect(terminal.indexedPalette.color(at: 9) == RGB(red: 10, green: 20, blue: 30))
     }
 }

@@ -106,7 +106,6 @@ struct SessionRestoreTests {
     }
 }
 
-
 /// A restore reads a file the user can edit and a crash can truncate,
 /// so the geometry and the tree shape it names are validated rather than
 /// trusted, and a restore that dies is not tried a second time.
@@ -357,7 +356,8 @@ struct RestoreCrashRecoveryTests {
     @Test func aNewerFormatsStateIsNotOverwritten() throws {
         try withTemporaryStateDirectory { store in
             try FileManager.default.createDirectory(at: store.directory, withIntermediateDirectories: true)
-            let newer = Data(#"[{"version": 99, "frame": {"x":0,"y":0,"width":900,"height":560}, "layout": {"pane": {}}}]"#.utf8)
+            let newer = Data(
+                #"[{"version": 99, "frame": {"x":0,"y":0,"width":900,"height":560}, "layout": {"pane": {}}}]"#.utf8)
             try newer.write(to: store.fileURL)
             #expect(store.load().isEmpty)
             #expect(store.holdsNewerState())

@@ -69,24 +69,31 @@ nonisolated struct SSHTarget: Hashable, Codable, Sendable {
         }
         guard isAcceptableHost(host) else { return .failure(.host) }
         guard user.isEmpty || isAcceptableUser(user) else { return .failure(.user) }
-        let portText = rawPort.trimmingCharacters(in: .whitespaces)
-        var port: Int?
-        if !portText.isEmpty {
-            guard let value = Int(portText), (1...65535).contains(value) else {
-                return .failure(.port)
-            }
-            port = value
-        }
+        guard case .success(let port) = port(from: rawPort) else { return .failure(.port) }
         // Not trimmed: the path comes from an open panel, and a file whose
         // name ends in a space is still that file.
         let identity = rawIdentity
-        if !identity.isEmpty {
-            guard isAcceptableIdentityPath(identity) else { return .failure(.identityFile) }
-            if checkingFiles, !isReadableFile(identity) { return .failure(.identityFileMissing) }
-        }
+        if let problem = identityProblem(identity, checkingFiles: checkingFiles) { return .failure(problem) }
         return .success(SSHTarget(
             host: host, user: user.isEmpty ? nil : user, port: port,
             identityFile: identity.isEmpty ? nil : identity))
+    }
+
+    /// An empty field is ssh's default port; anything else must be 1–65535.
+    private static func port(from rawPort: String) -> Result<Int?, Problem> {
+        let text = rawPort.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return .success(nil) }
+        guard let value = Int(text), (1...65535).contains(value) else { return .failure(.port) }
+        return .success(value)
+    }
+
+    /// Why a chosen key cannot be used, or nil when it can — or when there
+    /// is none.
+    private static func identityProblem(_ identity: String, checkingFiles: Bool) -> Problem? {
+        guard !identity.isEmpty else { return nil }
+        guard isAcceptableIdentityPath(identity) else { return .identityFile }
+        if checkingFiles, !isReadableFile(identity) { return .identityFileMissing }
+        return nil
     }
 
     /// A destination with no form behind it — a pane's report, a recent

@@ -107,7 +107,11 @@ import Testing
     @Test func inputAndOutputResumeAfterRepeatedIdlePeriods() async throws {
         let session = try TerminalSession(
             executable: "/bin/sh",
-            arguments: ["-c", "stty -echo; printf 'CORTA-IDLE-READY\\n'; while IFS= read -r line; do printf 'CHILD:%s\\n' \"$line\"; done"])
+            arguments: [
+                "-c",
+                "stty -echo; printf 'CORTA-IDLE-READY\\n'; while IFS= read "
+                    + "-r line; do printf 'CHILD:%s\\n' \"$line\"; done",
+            ])
         defer { session.stop() }
         let outputs = Mutex(0)
         session.onOutput = { outputs.withLock { $0 += 1 } }

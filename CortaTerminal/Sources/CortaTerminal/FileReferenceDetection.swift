@@ -52,9 +52,16 @@ public enum FileReferenceDetection {
     /// 100,000-character token with no colon backtracked quadratically — 54 s on
     /// the main thread per ⌘ press. `:` is in neither class, so the run can only
     /// end at the colon either way and the matches are the same.
-    private static let pattern = try! NSRegularExpression(
-        pattern: #"(?<![^\s(\[<'"])([~./]?[\w.+\-/]*+(?<=[\w.+\-])):(\d{1,9})(?!\d)(?::(\d{1,9})(?!\d))?"#,
-        options: [])
+    private static let pattern: NSRegularExpression = {
+        do {
+            return try NSRegularExpression(
+                pattern: #"(?<![^\s(\[<'"])([~./]?[\w.+\-/]*+(?<=[\w.+\-])):(\d{1,9})(?!\d)(?::(\d{1,9})(?!\d))?"#,
+                options: [])
+        } catch {
+            // A literal that does not compile is a build defect, not input.
+            fatalError("FileReferenceDetection.pattern does not compile: \(error)")
+        }
+    }()
 
     /// As in `LinkDetection`: this runs on every ⌘-hover.
     public static let maxPatternScanCells = LinkDetection.maxPatternScanCells
@@ -82,15 +89,15 @@ public enum FileReferenceDetection {
 
     public static func references(in line: LogicalLine) -> [Reference] {
         let text = line.text
-        let ns = text as NSString
+        let nsText = text as NSString
         var found: [Reference] = []
         var cursor = CharacterOffsetCursor(text)
         pattern.enumerateMatches(
-            in: text, options: [], range: NSRange(location: 0, length: ns.length)
+            in: text, options: [], range: NSRange(location: 0, length: nsText.length)
         ) { match, _, _ in
             guard let match, match.numberOfRanges >= 3 else { return }
-            let path = ns.substring(with: match.range(at: 1))
-            guard !path.isEmpty, let lineNumber = Int(ns.substring(with: match.range(at: 2))),
+            let path = nsText.substring(with: match.range(at: 1))
+            guard !path.isEmpty, let lineNumber = Int(nsText.substring(with: match.range(at: 2))),
                 lineNumber > 0
             else { return }
             // Digits and dots only is a version (`1.2.3:4`), not a file.
@@ -98,11 +105,11 @@ public enum FileReferenceDetection {
             else { return }
             var column: Int?
             if match.numberOfRanges >= 4, match.range(at: 3).location != NSNotFound {
-                column = Int(ns.substring(with: match.range(at: 3)))
+                column = Int(nsText.substring(with: match.range(at: 3)))
             }
             guard let startOffset = cursor.characterOffset(atUTF16Offset: match.range.location)
             else { return }
-            let endOffset = startOffset + ns.substring(with: match.range).count - 1
+            let endOffset = startOffset + nsText.substring(with: match.range).count - 1
             guard let start = line.position(at: startOffset),
                 let end = line.position(at: endOffset)
             else { return }

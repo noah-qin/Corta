@@ -27,8 +27,9 @@ nonisolated struct InputSourceState: Equatable, Sendable {
     var badge: String
     var kind: Kind
 
-    static func classify(identifier: String, name: String, languages: [String],
-        isKeyboardLayout: Bool, mode: String?) -> Self {
+    static func classify(
+        identifier: String, name: String, languages: [String], isKeyboardLayout: Bool, mode: String?
+    ) -> Self {
         let language = languages.first ?? ""
         let token = mode?.lowercased() ?? ""
         let appleMode = identifier.hasPrefix("com.apple.inputmethod.")
@@ -36,10 +37,15 @@ nonisolated struct InputSourceState: Equatable, Sendable {
             || appleMode && (token.hasSuffix(".roman") || token.hasSuffix(".halfwidthroman"))
         if direct { return .init(identifier: identifier, name: name, badge: "A", kind: .direct) }
         let badge: String
-        if language.hasPrefix("zh") { badge = "中" }
-        else if language.hasPrefix("ja") { badge = "あ" }
-        else if language.hasPrefix("ko") { badge = "한" }
-        else { badge = String(language.split(separator: "-").first ?? "IME").uppercased() }
+        if language.hasPrefix("zh") {
+            badge = "中"
+        } else if language.hasPrefix("ja") {
+            badge = "あ"
+        } else if language.hasPrefix("ko") {
+            badge = "한"
+        } else {
+            badge = String(language.split(separator: "-").first ?? "IME").uppercased()
+        }
         // Built-in non-Roman IME modes report their selection publicly. Third
         // party methods may hide an internal ASCII toggle: show a neutral badge.
         let nonLatinLayout = isKeyboardLayout

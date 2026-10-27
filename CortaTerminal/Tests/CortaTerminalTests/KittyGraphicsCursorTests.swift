@@ -50,7 +50,9 @@ struct KittyGraphicsCursorTests {
         var bytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13]
         bytes += Array("IHDR".utf8)
         for value in [width, height] {
-            bytes += [UInt8(value >> 24 & 0xFF), UInt8(value >> 16 & 0xFF), UInt8(value >> 8 & 0xFF), UInt8(value & 0xFF)]
+            bytes += [
+                UInt8(value >> 24 & 0xFF), UInt8(value >> 16 & 0xFF), UInt8(value >> 8 & 0xFF), UInt8(value & 0xFF),
+            ]
         }
         bytes += Array(repeating: 0, count: count - bytes.count)
         return Data(bytes)

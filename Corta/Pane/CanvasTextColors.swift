@@ -49,7 +49,9 @@ nonisolated struct CanvasTextColors: Equatable {
     /// Whether the canvas is dark, by its relative luminance — not whether
     /// macOS is.
     var isDark: Bool {
-        func linear(_ c: Float) -> Float { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        func linear(_ channel: Float) -> Float {
+            channel <= 0.04045 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
+        }
         return 0.2126 * linear(background.x) + 0.7152 * linear(background.y) + 0.0722 * linear(background.z) <= 0.179
     }
 

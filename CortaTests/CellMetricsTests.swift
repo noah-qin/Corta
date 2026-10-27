@@ -107,7 +107,8 @@ struct CellMetricsLineHeightTests {
             let font = TerminalFont.primary(ofSize: size)
             for spacing in [CGFloat(1.0), 1.18, 1.4] {
                 let line = max(Self.declared(font), size * spacing)
-                #expect(CellMetrics(font: font, scale: 2, lineSpacing: spacing).cellHeight == (line * 2).rounded(.up) / 2)
+                #expect(
+                    CellMetrics(font: font, scale: 2, lineSpacing: spacing).cellHeight == (line * 2).rounded(.up) / 2)
             }
         }
     }

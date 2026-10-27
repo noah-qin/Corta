@@ -195,7 +195,8 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
                 self.commitTabRename()
             }
         }
-        tabEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
+        tabEventMonitor = NSEvent.addLocalMonitorForEvents(matching: clicks) { [weak self] event in
             guard let self, let eventWindow = event.window, eventWindow === self.window else { return event }
             // A click anywhere but the editor ends the rename, as in Finder:
             // another tab, a close button, a tab drag, the window edge.
@@ -210,7 +211,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
                 target.window?.tabGroup?.selectedWindow = target.window
                 target.window?.makeKeyAndOrderFront(nil)
                 target.refreshTabTitle()
-                if let menu = target.tabTitleField?.makeTabMenu(base: nativeMenu), let content = eventWindow.contentView {
+                if let menu = target.tabTitleField?.makeTabMenu(base: nativeMenu),
+                    let content = eventWindow.contentView
+                {
                     NSMenu.popUpContextMenu(menu, with: event, for: content)
                 }
             } else {
@@ -242,12 +245,13 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
                let parent = current.accessibilityParent() as? NSAccessibilityProtocol {
                 let tabs = (parent.accessibilityChildren() ?? []).compactMap { $0 as? NSAccessibilityProtocol }
                     .filter { $0.accessibilitySubrole()?.rawValue == "AXTabButton" }
-                guard let index = tabs.firstIndex(where: { NSPointInRect(point, $0.accessibilityFrame()) }),
+                guard let index = tabs.firstIndex(where: { $0.accessibilityFrame().contains(point) }),
                       let windows = eventWindow.tabGroup?.windows, index < windows.count else { return nil }
                 // Let native close buttons retain their own double-click behaviour.
                 if let children = current.accessibilityChildren(), children.contains(where: {
                     guard let child = $0 as? NSAccessibilityProtocol else { return false }
-                    return child.accessibilityRole()?.rawValue == "AXButton" && NSPointInRect(point, child.accessibilityFrame())
+                    return child.accessibilityRole()?.rawValue == "AXButton"
+                        && child.accessibilityFrame().contains(point)
                 }) { return nil }
                 return windows[index].windowController as? TerminalWindowController
             }
@@ -350,7 +354,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         return state
     }
 }
-
 
 /// Owns only the native tab's title. AppKit still owns the tab bar, its close
 /// buttons, drag/reorder behaviour and grouping. No private view classes.

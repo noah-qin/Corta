@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](TROUBLESHOOTING.md)
 
 > Esta página é uma tradução de [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md), no estado do commit
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md).
+> [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md).
 > Se a versão em inglês mudou desde então, ou se as duas divergirem, vale a versão em inglês.
 > As mensagens do macOS vêm acompanhadas do texto original em inglês.
 
@@ -134,6 +134,28 @@ assim que lê de novo. A integração com o shell faz o mesmo com um arquivo rc 
 <a id="typing-and-rendering"></a>
 
 ## Digitação e renderização
+
+### Limpar tela deixa só um cursor, sem prompt
+
+Atualize o Corta se o ⌘K apagar um prompt em espera. Com integração com o shell e uma marca de fim de prompt pronto, Limpar
+tela agora mantém o prompt exibido e a entrada ainda não enviada, incluindo o cursor de edição. Ele não envia Return,
+Control-L nem qualquer outra entrada. Ative a integração com o shell num shell sem marcas de prompt; sessões locais padrão do
+zsh a carregam automaticamente com as sugestões incluídas. O redesenho por Control-L do próprio shell continua sendo uma
+alternativa quando esse shell o configura. Um programa na tela alternativa, ou um editor de várias linhas cujo prompt já
+está no histórico, fica intacto de propósito.
+
+### As sugestões de pastas param depois de uma pasta terminada em `/`
+
+Só subdiretórios são candidatos; um diretório que contém apenas arquivos não tem próxima sugestão de pasta. Digite parte do
+nome de uma subpasta ou pressione Tab de novo quando houver candidatos visíveis. O Tab preenche o caminho sem executá-lo; o
+Return executa o `cd`. Pastas ocultas precisam de um ponto no início. Se uma subpasta conhecida não aparecer, verifique o
+acesso a esse diretório e compare com a completação nativa do shell depois de desativar `directory-completion`. Se a
+diferença continuar, informe o formato exato do caminho e o shell.
+
+### Sobre ou o histórico de comandos abre longe do terminal
+
+Feche e reabra a janela na versão atual do Corta. Ambas abrem centralizadas sobre a janela que as chamou, dentro da área útil
+da sua tela; não ficam no centro da tela inteira. Uma janela já aberta mantém a posição que você escolheu.
 
 ### Tab não faz nada no menu de comandos com barra do Claude Code
 

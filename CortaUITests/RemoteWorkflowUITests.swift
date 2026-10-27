@@ -73,6 +73,66 @@ final class RemoteWorkflowUITests: XCTestCase {
     @MainActor
     func testPresetBadgeBrowseEditUploadAndReconnect() throws {
         let stage = Self.stage
+        let app = try launchOnStage(stage)
+        let window = app.windows.firstMatch
+
+        // The far end reports `file://fakebox<stage>/remote/srv/app`; the
+        // badge follows within one process-facts interval.
+        XCTAssertTrue(
+            waitUntil(timeout: 10) { app.windows.firstMatch.title.contains("Remote: fakebox · app") },
+            "title was: \(app.windows.firstMatch.title)")
+
+        // Keystrokes reach the fake remote shell (a baseline for the same
+        // check after the browser window has come and gone).
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).click()
+        app.typeText("touch \(stage.path)/typed0\n")
+        XCTAssertTrue(
+            waitUntil(timeout: 10) {
+                FileManager.default.fileExists(atPath: stage.appendingPathComponent("typed0").path)
+            },
+            "keystrokes must reach the remote pane")
+
+        let shellMenu = app.menuBarItems["Shell"]
+        askHostThenConnect(app, stage: stage)
+
+        let readme = checkListing(app, stage: stage)
+
+        try editAndUpload(readme, in: app, stage: stage)
+
+        exitAndReconnect(app, stage: stage)
+
+        // The staged config was read: its preset is offered. (Asserted, not
+        // driven — XCUITest clicks on a delegate-rebuilt submenu do not
+        // reliably fire; the spawn path under test is the same one.)
+        shellMenu.click()
+        let presets = shellMenu.menuItems["New Pane with Preset"]
+        XCTAssertTrue(
+            presets.waitForExistence(timeout: 2),
+            "Shell menu items: \(shellMenu.menuItems.allElementsBoundByIndex.map(\.title))")
+        presets.click()
+        XCTAssertTrue(presets.menuItems["fakebox"].waitForExistence(timeout: 2), "the config's preset must be listed")
+        // Leave the menu through a harmless item — performing an item is
+        // the one exit that reliably ends menu tracking; Escape left it
+        // holding the next keystrokes.
+        shellMenu.menuItems["Clear Screen"].click()
+
+        // Clean up through the same terminal — the runner cannot write
+        // outside its container. Click into the content first: a menu
+        // that was just open otherwise keeps the keystrokes.
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).click()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        app.typeText("rm -rf \(stage.path)\n")
+        XCTAssertTrue(
+            waitUntil(timeout: 10) { !FileManager.default.fileExists(atPath: stage.path) },
+            "the stage must be gone")
+    }
+
+    /// Stages the fixture through a first, plain-shell launch (the runner
+    /// cannot write where the app's children read), then relaunches with
+    /// the staged `ssh` as the shell, so the first pane is a remote launcher.
+    @MainActor
+    private func launchOnStage(_ stage: URL) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         // `/bin/sh`, not the login shell: no rc files, so the prompt is up
@@ -102,23 +162,12 @@ final class RemoteWorkflowUITests: XCTestCase {
         app.launchEnvironment["CORTA_SFTP_SSH"] = stage.appendingPathComponent("bin/sftp-ssh").path
         app.launchEnvironment["SHELL"] = stage.appendingPathComponent("bin/ssh").path
         app.launch()
-        let window = app.windows.firstMatch
-        XCTAssertTrue(window.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
+        return app
+    }
 
-        // The far end reports `file://fakebox<stage>/remote/srv/app`; the
-        // badge follows within one process-facts interval.
-        XCTAssertTrue(
-            waitUntil(timeout: 10) { app.windows.firstMatch.title.contains("Remote: fakebox · app") },
-            "title was: \(app.windows.firstMatch.title)")
-
-        // Keystrokes reach the fake remote shell (a baseline for the same
-        // check after the browser window has come and gone).
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).click()
-        app.typeText("touch \(stage.path)/typed0\n")
-        XCTAssertTrue(
-            waitUntil(timeout: 10) { FileManager.default.fileExists(atPath: stage.appendingPathComponent("typed0").path) },
-            "keystrokes must reach the remote pane")
-
+    @MainActor
+    private func askHostThenConnect(_ app: XCUIApplication, stage: URL) {
         // Shell ▸ Browse Remote Files… is offered for a remote pane, and
         // the first connection to a reported host is a question: the
         // browser opens on its host-entry step with the name prefilled.
@@ -132,7 +181,9 @@ final class RemoteWorkflowUITests: XCTestCase {
         let spawnedAtOpen = FileManager.default.fileExists(atPath: stage.appendingPathComponent("sftp-ssh.log").path)
         XCTAssertTrue(
             browser.waitForExistence(timeout: 5),
-            "the browser must open on the host question; windows: \(app.windows.allElementsBoundByIndex.map(\.title)), dialogs: \(app.dialogs.allElementsBoundByIndex.map(\.title)), sheets: \(app.sheets.count)")
+            "the browser must open on the host question; windows: \(app.windows.allElementsBoundByIndex.map(\.title)), "
+                + "dialogs: \(app.dialogs.allElementsBoundByIndex.map(\.title)), sheets: \(app.sheets.count)"
+        )
         let hostField = browser.textFields.firstMatch
         XCTAssertTrue(hostField.waitForExistence(timeout: 2))
         XCTAssertEqual(hostField.value as? String, "fakebox", "the reported host is prefilled, not connected to")
@@ -141,14 +192,25 @@ final class RemoteWorkflowUITests: XCTestCase {
                 .exists, "the provenance of the name must be stated")
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: stage.appendingPathComponent("sftp-ssh.log").path),
-            "nothing may be spawned before Connect (spawned at open: \(spawnedAtOpen), state: \(browser.staticTexts.allElementsBoundByIndex.map { $0.value as? String ?? $0.label })); log: \((try? String(contentsOf: stage.appendingPathComponent("sftp-ssh.log"), encoding: .utf8)) ?? "-"); windows: \(app.windows.allElementsBoundByIndex.map(\.title))")
+            "nothing may be spawned before Connect (spawned at open: \(spawnedAtOpen), state: "
+                + "\(browser.staticTexts.allElementsBoundByIndex.map { $0.value as? String ?? $0.label })); log: "
+                + "\((try? String(contentsOf: stage.appendingPathComponent("sftp-ssh.log"), encoding: .utf8)) ?? "-"); "
+                + "windows: \(app.windows.allElementsBoundByIndex.map(\.title))"
+        )
         browser.buttons["Connect"].click()
+    }
 
+    @MainActor
+    private func checkListing(_ app: XCUIApplication, stage: URL) -> XCUIElement {
         // A real OpenSSH sftp-server answers the listing.
         let readme = app.staticTexts["README.md"]
         XCTAssertTrue(
             readme.waitForExistence(timeout: 10),
-            "listing from sftp-server; windows: \(app.windows.allElementsBoundByIndex.map(\.title)); texts: \(app.staticTexts.allElementsBoundByIndex.prefix(30).map { $0.value as? String ?? $0.label }); cells: \(app.cells.count) rows: \(app.tableRows.count) outlines: \(app.outlines.count) log: \((try? String(contentsOf: stage.appendingPathComponent("sftp-ssh.log"), encoding: .utf8)) ?? "-")")
+            "listing from sftp-server; windows: \(app.windows.allElementsBoundByIndex.map(\.title)); texts: "
+                + "\(app.staticTexts.allElementsBoundByIndex.prefix(30).map { $0.value as? String ?? $0.label }); "
+                + "cells: \(app.cells.count) rows: \(app.tableRows.count) outlines: \(app.outlines.count) log: "
+                + "\((try? String(contentsOf: stage.appendingPathComponent("sftp-ssh.log"), encoding: .utf8)) ?? "-")"
+        )
         XCTAssertTrue(app.staticTexts["big.bin"].exists)
         XCTAssertTrue(app.staticTexts["src"].exists)
         XCTAssertTrue(
@@ -158,7 +220,11 @@ final class RemoteWorkflowUITests: XCTestCase {
         XCTAssertTrue(
             (try? String(contentsOf: stage.appendingPathComponent("sftp-ssh.log"), encoding: .utf8))?
                 .contains("-s -- fakebox sftp") == true, "the channel's argv")
+        return readme
+    }
 
+    @MainActor
+    private func editAndUpload(_ readme: XCUIElement, in app: XCUIApplication, stage: URL) throws {
         // Edit: the file is downloaded to a managed copy under the *staged*
         // Application Support and the open-file-command runs on it; the
         // "editor" rewrites the copy, as a real one saving would.
@@ -177,7 +243,9 @@ final class RemoteWorkflowUITests: XCTestCase {
             let overflow = toolbar.popUpButtons["more toolbar items"]
             XCTAssertTrue(
                 overflow.waitForExistence(timeout: 2),
-                "the toolbar's overflow menu; toolbar: \(toolbar.debugDescription); windows: \(app.windows.allElementsBoundByIndex.map { $0.identifier + "|" + $0.title })")
+                "the toolbar's overflow menu; toolbar: \(toolbar.debugDescription); windows: "
+                    + "\(app.windows.allElementsBoundByIndex.map { $0.identifier + "|" + $0.title })"
+            )
             overflow.click()
             let submenu = app.menuItems["More actions"]
             XCTAssertTrue(submenu.waitForExistence(timeout: 2), "More Actions in the overflow")
@@ -215,7 +283,10 @@ final class RemoteWorkflowUITests: XCTestCase {
         let leftovers = try FileManager.default.contentsOfDirectory(
             atPath: stage.appendingPathComponent("remote/srv/app").path)
         XCTAssertFalse(leftovers.contains { $0.contains(".corta-part") }, "no partial left: \(leftovers)")
+    }
 
+    @MainActor
+    private func exitAndReconnect(_ app: XCUIApplication, stage: URL) {
         // Back to the terminal: the fake remote shell exits, the pane goes
         // local (no badge), Reconnect is offered and starts a new
         // connection whose far end reports again.
@@ -230,12 +301,15 @@ final class RemoteWorkflowUITests: XCTestCase {
         // before asking it to exit.
         app.typeText("touch \(stage.path)/typed\n")
         XCTAssertTrue(
-            waitUntil(timeout: 10) { FileManager.default.fileExists(atPath: stage.appendingPathComponent("typed").path) },
+            waitUntil(timeout: 10) {
+                FileManager.default.fileExists(atPath: stage.appendingPathComponent("typed").path)
+            },
             "keystrokes must reach the pane after the browser window closed (first responder)")
         app.typeText("exit\n")
         XCTAssertTrue(
             waitUntil(timeout: 10) { !app.windows.firstMatch.title.contains("Remote:") },
             "a dead launcher's report must not keep the badge: \(app.windows.firstMatch.title)")
+        let shellMenu = app.menuBarItems["Shell"]
         shellMenu.click()
         let reconnect = shellMenu.menuItems["Reconnect to Host"]
         XCTAssertTrue(reconnect.waitForExistence(timeout: 2))
@@ -250,34 +324,10 @@ final class RemoteWorkflowUITests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(1))
         app.typeText("touch \(stage.path)/typed2\n")
         XCTAssertTrue(
-            waitUntil(timeout: 10) { FileManager.default.fileExists(atPath: stage.appendingPathComponent("typed2").path) },
+            waitUntil(timeout: 10) {
+                FileManager.default.fileExists(atPath: stage.appendingPathComponent("typed2").path)
+            },
             "keystrokes must reach the reconnected pane")
-
-        // The staged config was read: its preset is offered. (Asserted, not
-        // driven — XCUITest clicks on a delegate-rebuilt submenu do not
-        // reliably fire; the spawn path under test is the same one.)
-        shellMenu.click()
-        let presets = shellMenu.menuItems["New Pane with Preset"]
-        XCTAssertTrue(
-            presets.waitForExistence(timeout: 2),
-            "Shell menu items: \(shellMenu.menuItems.allElementsBoundByIndex.map(\.title))")
-        presets.click()
-        XCTAssertTrue(presets.menuItems["fakebox"].waitForExistence(timeout: 2), "the config's preset must be listed")
-        // Leave the menu through a harmless item — performing an item is
-        // the one exit that reliably ends menu tracking; Escape left it
-        // holding the next keystrokes.
-        shellMenu.menuItems["Clear Screen"].click()
-
-        // Clean up through the same terminal — the runner cannot write
-        // outside its container. Click into the content first: a menu
-        // that was just open otherwise keeps the keystrokes.
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).click()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-        app.typeText("rm -rf \(stage.path)\n")
-        XCTAssertTrue(
-            waitUntil(timeout: 10) { !FileManager.default.fileExists(atPath: stage.path) },
-            "the stage must be gone")
     }
 
     private func waitUntil(timeout: TimeInterval, _ condition: () -> Bool) -> Bool {

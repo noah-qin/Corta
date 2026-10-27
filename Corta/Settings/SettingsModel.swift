@@ -18,23 +18,6 @@ import AppKit
 import CoreText
 import Observation
 
-/// A save/status report shared by every "state plus one action" row on the
-/// settings page: the overall save line, the font's resolution, shell
-/// integration, directory history, and the notification-permission notice.
-///
-/// **Why an icon and a word, never a colour alone.** A green tick and a red
-/// cross are the same shape to a person who cannot separate those hues, and
-/// this is the only report several of these rows make. `StatusRowView`
-/// carries the symbol as the primary signal, the message as the detail, and
-/// tint as the third and least load-bearing one.
-struct RowStatus: Equatable {
-    enum Kind: Equatable { case none, saved, adjusted, failed }
-    var kind: Kind = .none
-    var message: String = ""
-    var actionTitle: String?
-    var secondaryActionTitle: String?
-}
-
 /// The settings page's state, as a `SettingsView` binds to it.
 ///
 /// Every field is populated from `ConfigurationStore.shared.configuration`
@@ -51,6 +34,9 @@ struct RowStatus: Equatable {
 @dynamicMemberLookup
 final class SettingsModel {
     // MARK: - Config mirror
+
+    /// Bumped per font load, so a slower earlier load cannot land last.
+    private var fontLoadGeneration = 0
 
     /// The store's configuration as of the last `refresh()`. Controls read
     /// through it (`model.copyOnSelect` is `configuration.copyOnSelect`) and
@@ -245,8 +231,11 @@ final class SettingsModel {
             guard let normalized = value.isEmpty ? "" : Theme.color(value).map(Theme.hex) else {
                 return L10n.text("inputSource.color.invalid")
             }
-            if direct { configuration.inputSourceDirectColor = normalized }
-            else { configuration.inputSourceIMEColor = normalized }
+            if direct {
+                configuration.inputSourceDirectColor = normalized
+            } else {
+                configuration.inputSourceIMEColor = normalized
+            }
             return nil
         }
     }
@@ -283,7 +272,9 @@ final class SettingsModel {
     }
 
     func setScrollbackLines(_ value: Int) {
-        set(\.scrollbackLines, value, clampedTo: Configuration.scrollbackLinesRange, label: L10n.text("settings.label.scrollback"))
+        set(
+            \.scrollbackLines, value, clampedTo: Configuration.scrollbackLinesRange,
+            label: L10n.text("settings.label.scrollback"))
     }
 
     func setColumns(_ value: Int) {
@@ -307,8 +298,11 @@ final class SettingsModel {
             return nil
         }
     }
+}
 
-    // MARK: - System entry points
+// MARK: - System entry points
+
+extension SettingsModel {
 
     /// The hotkey line under the Quick Terminal toggle. The key itself is
     /// edited in the config file (`quick-terminal-key`), like every `bind.*`
@@ -338,7 +332,9 @@ final class SettingsModel {
     }
 
     func setNotificationThreshold(_ value: Double) {
-        set(\.notificationThreshold, value, clampedTo: Configuration.notificationThresholdRange, label: L10n.text("settings.label.longerThan"))
+        set(
+            \.notificationThreshold, value, clampedTo: Configuration.notificationThresholdRange,
+            label: L10n.text("settings.label.longerThan"))
     }
 
     /// A field written as given.
@@ -375,25 +371,6 @@ final class SettingsModel {
         } else {
             setSaveStatus(RowStatus(kind: .saved, message: L10n.text("settings.status.saved")))
         }
-    }
-
-    /// A bound as a person would write it. The fields hold whole numbers, but
-    /// the font size and the notification threshold are `Double` — so the
-    /// unformatted description said "Size must be between 8.0 and 64.0",
-    /// which reads as a precision the setting does not have.
-    private static func plain(_ value: CustomStringConvertible) -> String {
-        let text = value.description
-        return text.hasSuffix(".0") ? String(text.dropLast(2)) : text
-    }
-
-    private static func clamp<T: Comparable & CustomStringConvertible>(
-        _ value: T, _ low: T, _ high: T, label: String
-    ) -> (T, String?) {
-        let result = min(high, max(low, value))
-        guard result != value else { return (result, nil) }
-        let message = L10n.format(
-            "settings.status.clamped", label, plain(low), plain(high), plain(result))
-        return (result, message)
     }
 
     /// A success or a clamp clears itself after a few seconds — it is a
@@ -465,8 +442,6 @@ final class SettingsModel {
 
     // MARK: - Font
 
-    private var fontLoadGeneration = 0
-
     func loadFonts() async {
         await loadFonts(
             monospaced: { await MonospacedFontCatalog.loadEntries() },
@@ -530,151 +505,17 @@ final class SettingsModel {
         }
     }
 
-    private static func detail(forFamily family: String) -> String {
-        guard family != Configuration.systemFontFamily else { return L10n.text("settings.font.origin.system") }
-        guard let entry = MonospacedFontCatalog.entry(for: family) else { return "" }
-        var lines: [String] = []
-        switch entry.origin {
-        case .apple: lines.append(L10n.text("settings.font.origin.apple"))
-        case .user(let path):
-            lines.append(L10n.format("settings.font.origin.user", (path as NSString).abbreviatingWithTildeInPath))
-        }
-        if entry.hasCJK { lines.append(L10n.text("settings.font.cjk")) }
-        return lines.joined(separator: "\n")
-    }
-
     func retryFontResolution() {
         Task { await fontsDidChange() }
-    }
-
-    // MARK: - Shell integration
-
-    /// Reflects `ShellIntegration`'s states as an icon,
-    /// a sentence and the one action that changes it. Read from disk on
-    /// every refresh rather than cached: unlike every other row on this
-    /// page, the ground truth here is the shell's startup files — two for
-    /// bash — which the user can edit outside Corta at any time.
-    private func refreshShellIntegrationStatus() {
-        let integration = ShellIntegration.current
-        switch integration.status() {
-        case .notInstalled:
-            shellIntegrationStatus = RowStatus(
-                kind: .adjusted,
-                message: L10n.text("settings.status.shellIntegrationNotInstalled"),
-                actionTitle: L10n.text("settings.action.install"))
-        case .conflicting(let name):
-            shellIntegrationStatus = RowStatus(
-                kind: .failed,
-                message: L10n.format("settings.status.shellIntegrationConflict", name),
-                actionTitle: L10n.text("settings.action.installAnyway"))
-        case .installed:
-            shellIntegrationStatus = RowStatus(
-                kind: .adjusted,
-                message: L10n.format(
-                    "settings.status.shellIntegrationInstalled", integration.displayPath),
-                actionTitle: L10n.text("settings.action.remove"))
-        case .unreadable(let path):
-            shellIntegrationStatus = RowStatus(
-                kind: .failed,
-                message: L10n.format("settings.status.shellIntegrationUnreadable", path))
-        case .outdated:
-            shellIntegrationStatus = RowStatus(
-                kind: .adjusted,
-                message: L10n.format(
-                    "settings.status.shellIntegrationOutdated", integration.pathsNeedingUpdate),
-                actionTitle: L10n.text("settings.action.update"),
-                // Removing must not first require writing the new hooks in.
-                secondaryActionTitle: L10n.text("settings.action.remove"))
-        }
-    }
-
-    /// One dispatch point for the row's first button, whichever state put
-    /// it there.
-    func toggleShellIntegration() {
-        let integration = ShellIntegration.current
-        switch integration.status() {
-        case .notInstalled, .conflicting, .outdated: applyShellIntegration(integration.install())
-        case .installed: applyShellIntegration(integration.uninstall())
-        case .unreadable: refreshShellIntegrationStatus()
-        }
-    }
-
-    /// The second button, offered only beside Update.
-    func removeShellIntegration() {
-        applyShellIntegration(ShellIntegration.current.uninstall())
-    }
-
-    /// - Parameter failures: the files that could not be written.
-    private func applyShellIntegration(_ failures: [String]) {
-        guard failures.isEmpty else {
-            shellIntegrationStatus = RowStatus(
-                kind: .failed,
-                message: L10n.format(
-                    "settings.status.shellIntegrationWriteFailed", failures.joined(separator: ", ")))
-            return
-        }
-        refreshShellIntegrationStatus()
-    }
-
-    // MARK: - Directory history
-
-    /// How many directories `DirectoryHistoryStore` currently
-    /// remembers, with a Clear action. Re-read on every refresh, same reason
-    /// as `refreshShellIntegrationStatus`: this is app-managed state, not
-    /// something this window owns a copy of.
-    private func refreshDirectoryHistoryStatus() {
-        let count = DirectoryHistoryStore.shared.history.entries.count
-        directoryHistoryStatus = RowStatus(
-            kind: .adjusted, message: L10n.format("settings.status.directoryHistoryCount", count),
-            actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)
-    }
-
-    func clearDirectoryHistory() {
-        DirectoryHistoryStore.shared.clear()
-        refreshDirectoryHistoryStatus()
-    }
-
-    // MARK: - Recent hosts
-
-    /// How many hosts the connect dialogs remember, with a Clear action —
-    /// app state like the directory history, re-read on every refresh.
-    private func refreshRecentHostsStatus() {
-        let count = RecentHostsStore.shared.targets.count
-        recentHostsStatus = RowStatus(
-            kind: .adjusted, message: L10n.format("settings.recentHosts.count", count),
-            actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)
-    }
-
-    func clearRecentHosts() {
-        RecentHostsStore.shared.clear()
-        refreshRecentHostsStatus()
-    }
-
-    // MARK: - Notification permission
-
-    /// Shown only when the setting is on *and* the system has been told not
-    /// to deliver — the one combination in which the switch's position is
-    /// not the truth.
-    private func refreshNotificationPermissionNotice() {
-        let denied = TaskNotifier.permission == .denied
-        guard configuration.notifyOnLongTask && denied else {
-            notificationPermissionNotice = RowStatus()
-            return
-        }
-        notificationPermissionNotice = RowStatus(
-            kind: .failed, message: L10n.text("settings.status.notificationsDenied"),
-            actionTitle: L10n.text("settings.status.openSystemSettings"))
-    }
-
-    func openSystemNotificationSettings() {
-        TaskNotifier.openSystemNotificationSettings()
     }
 }
 
 // Editors share the existing config-file write and rollback path.
 extension SettingsModel {
     func setCommandHistoryLimit(_ value: Int) {
-        set(\.commandHistoryLimit, value, clampedTo: Configuration.commandHistoryLimitRange, label: L10n.text("ui.history.commands"))
+        set(
+            \.commandHistoryLimit, value, clampedTo: Configuration.commandHistoryLimitRange,
+            label: L10n.text("ui.history.commands"))
     }
 
     func setQuickTerminalKey(_ value: Shortcut?) {
@@ -689,7 +530,9 @@ extension SettingsModel {
     }
     func setShortcut(_ value: Shortcut?, for command: TerminalCommand) {
         commit { configuration in
-            if let value, TerminalCommand.allCases.contains(where: { $0 != command && configuration.keybindings[$0] == value }) {
+            if let value,
+                TerminalCommand.allCases.contains(where: { $0 != command && configuration.keybindings[$0] == value })
+            {
                 return L10n.text("ui.shortcut.conflict")
             }
             configuration.keybindings[command] = value
@@ -701,7 +544,8 @@ extension SettingsModel {
     }
     func savePreset(_ preset: Preset, replacing originalName: String?) -> Bool {
         guard Self.validPresetName(preset.name), preset.isUsable,
-            !configuration.presets.contains(where: { $0.name == preset.name && $0.name != originalName }) else { return false }
+            !configuration.presets.contains(where: { $0.name == preset.name && $0.name != originalName })
+        else { return false }
         commit { configuration in
             if let index = configuration.presets.firstIndex(where: { $0.name == originalName }) {
                 configuration.presets[index] = preset
@@ -711,7 +555,10 @@ extension SettingsModel {
         return configuration.presets.contains(preset)
     }
     nonisolated static func validPresetName(_ name: String) -> Bool {
-        !name.isEmpty && !name.contains(where: { $0.isWhitespace || $0 == "." || $0 == "=" || $0 == "#" || $0.isNewline || $0 == "\0" })
+        !name.isEmpty
+            && !name.contains(where: {
+                $0.isWhitespace || $0 == "." || $0 == "=" || $0 == "#" || $0.isNewline || $0 == "\0"
+            })
     }
     func removePreset(_ name: String) {
         commit { $0.presets.removeAll { $0.name == name }; return nil }

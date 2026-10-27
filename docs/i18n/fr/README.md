@@ -32,7 +32,7 @@ Rendu Metal 4 · Saisie CJK / IME native · SSH, SFTP et édition à distance
 </div>
 
 > Cette page est une traduction du [README.md](../../../README.md) anglais, dans son état au commit
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md).
+> [`bdcf6da`](https://github.com/noah-qin/Corta/blob/bdcf6daab52425e20f6e953a1b0de152d2dfe2bf/README.md).
 > Si la version anglaise a changé depuis, ou si les deux diffèrent, la version anglaise fait foi.
 
 ## Installation
@@ -85,6 +85,12 @@ intégration du shell et restauration des dispositions sont tous là ; la [réf�
 (en anglais) liste tout, avec exigences et limites, et décrit `main` — une version publiée peut ne pas encore tout
 contenir. La comparaison de Corta avec iTerm2 et Ghostty, et quand préférer l’un d’eux, se trouve dans
 [Features → How Corta compares](../../FEATURES.md#how-corta-compares) (en anglais).
+Pour l’état des tâches des agents de code, l’arbre de développement n’intègre actuellement **que Claude Code** ; les autres outils
+ont une prise en charge générique des protocoles et une détection de processus, sans adaptateur d’état dédié
+([périmètre et limites](../../CONFORMANCE.md#cli-signal-compatibility), en anglais). Développé et validé avec Claude Code 2.1.310 :
+état OSC 7501 en session interactive, avec choix explicite du canal pour le texte des messages de Claude. tmux, les sessions
+d’arrière-plan de Claude et la désactivation des rapports de titre du terminal ont leurs propres restrictions ; la couverture de
+l’analyseur n’implique pas une validation complète du cycle de vie en conditions réelles.
 Le périmètre limité à macOS et l’absence de mode de contrôle tmux, d’IA intégrée et de moteur de scripts sont des
 [décisions arrêtées](../../DECISIONS.md) (en anglais) ; les sessions tmux ordinaires tournent dans Corta comme des
 programmes de terminal.

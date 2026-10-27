@@ -76,7 +76,9 @@ import Testing
         terminal.feed(Array("\u{1B}[?1049l".utf8))
         #expect(terminal.grid.scrollback.compressedBatchCount > 0)
         #expect(snapshot.scrollback.compressedBatchCount == 0)
-        #expect(terminal.grid.dump(options: .init(includeScrollback: true)) == snapshot.dump(options: .init(includeScrollback: true)))
+        #expect(
+            terminal.grid.dump(options: .init(includeScrollback: true))
+                == snapshot.dump(options: .init(includeScrollback: true)))
     }
 
     @Test func roundTripAndSnapshot() throws {
@@ -122,7 +124,9 @@ import Testing
         var plain = terminal.grid
         compressed.resize(rows: 8, columns: 80)
         plain.resize(rows: 8, columns: 80)
-        #expect(compressed.dump(options: .init(includeScrollback: true)) == plain.dump(options: .init(includeScrollback: true)))
+        #expect(
+            compressed.dump(options: .init(includeScrollback: true))
+                == plain.dump(options: .init(includeScrollback: true)))
     }
     @Test func concurrentSnapshotsReadEvictedAndClearedCaches() async {
         var terminal = Terminal(rows: 4, columns: 80, scrollbackLimit: 2048)

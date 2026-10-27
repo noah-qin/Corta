@@ -29,9 +29,9 @@ struct ReflowMarksTests {
         var bytes: [UInt8] = []
         for index in 0..<count {
             let status = index % 3 == 2 ? 1 : 0
-            bytes += Array(
-                "\u{1B}]133;A\u{1B}\\$ cmd\(index)\r\n\u{1B}]133;C\u{1B}\\out \(index)\r\n\u{1B}]133;D;\(status)\u{1B}\\"
-                    .utf8)
+            let command = "\u{1B}]133;A\u{1B}\\$ cmd\(index)\r\n\u{1B}]133;C\u{1B}\\out "
+                + "\(index)\r\n\u{1B}]133;D;\(status)\u{1B}\\"
+            bytes += Array(command.utf8)
         }
         return bytes + Array("\u{1B}]133;A\u{1B}\\$ ".utf8)
     }

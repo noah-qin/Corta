@@ -105,7 +105,9 @@ func currentThreadCount() -> Int {
     guard task_threads(mach_task_self_, &threads, &count) == KERN_SUCCESS else { return -1 }
     let result = Int(count)
     if let threads {
-        vm_deallocate(mach_task_self_, vm_address_t(bitPattern: threads), vm_size_t(result) * vm_size_t(MemoryLayout<thread_act_t>.stride))
+        vm_deallocate(
+            mach_task_self_, vm_address_t(bitPattern: threads),
+            vm_size_t(result) * vm_size_t(MemoryLayout<thread_act_t>.stride))
     }
     return result
 }

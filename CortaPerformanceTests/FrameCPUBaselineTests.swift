@@ -49,7 +49,9 @@ extension PerformanceSuites {
             }
             let width = Int(renderers[0].metrics.cellWidth * CGFloat(columns))
             let height = Int(renderers[0].metrics.cellHeight * CGFloat(rows))
-            let targets = try renderers.map { _ in try BenchmarkBuild.renderTarget(device: device, width: width, height: height) }
+            let targets = try renderers.map { _ in
+                try BenchmarkBuild.renderTarget(device: device, width: width, height: height)
+            }
             let rect = CGRect(x: 0, y: 0, width: width, height: height)
             let completed = DispatchSemaphore(value: 0)
             var report = "four 400x120 panes, CPU-only, gate 4 ms p50, \(BenchmarkBuild.configuration)\n"
@@ -60,16 +62,20 @@ extension PerformanceSuites {
                     if full { renderers.forEach { $0.invalidate() } }
                     let start = DispatchTime.now().uptimeNanoseconds
                     for (renderer, target) in zip(renderers, targets) {
-                        renderer.render(grid: terminal.grid, rect: rect, drawableSize: rect.size,
-                            cursorVisible: true, selection: nil, target: target,
-                            clearColor: MTLClearColorMake(0, 0, 0, 1)) { _ in completed.signal() }
+                        renderer.render(
+                            grid: terminal.grid, cursorVisible: true, selection: nil,
+                            into: FrameTarget(
+                                texture: target, rect: rect, drawableSize: rect.size,
+                                clearColor: MTLClearColorMake(0, 0, 0, 1))) { _ in completed.signal() }
                     }
-                    let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
+                    let elapsedMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
                     for _ in renderers { completed.wait() }
-                    if iteration >= 5 { durations.append(ms) }
+                    if iteration >= 5 { durations.append(elapsedMilliseconds) }
                 }
                 durations.sort()
-                report += "\(full ? "full rebuild" : "one row dirty"): p50 \(durations[30]) ms, p95 \(durations[57]) ms, p99 \(durations[59]) ms, max \(durations[59]) ms\n"
+                report +=
+                    "\(full ? "full rebuild" : "one row dirty"): p50 \(durations[30]) ms, p95 "
+                        + "\(durations[57]) ms, p99 \(durations[59]) ms, max \(durations[59]) ms\n"
             }
             try report.write(toFile: "/tmp/corta-large-grid-gate.txt", atomically: true, encoding: .utf8)
         }
@@ -87,7 +93,8 @@ extension PerformanceSuites {
             let rows = Int(CGFloat(height) / renderer.metrics.cellHeight)
             var terminal = Terminal(rows: rows, columns: columns)
             for row in 0..<rows {
-                terminal.feed(Array("\u{1B}[\(31 + row % 7)m\(String(repeating: "x", count: columns - 1))\u{1B}[0m\r\n".utf8))
+                terminal.feed(
+                    Array("\u{1B}[\(31 + row % 7)m\(String(repeating: "x", count: columns - 1))\u{1B}[0m\r\n".utf8))
             }
             let texture = try BenchmarkBuild.renderTarget(device: device, width: width, height: height)
             let rect = CGRect(x: 0, y: 0, width: width, height: height)
@@ -99,15 +106,18 @@ extension PerformanceSuites {
                 renderer.invalidate()
                 let start = DispatchTime.now().uptimeNanoseconds
                 renderer.render(
-                    grid: terminal.grid, rect: rect, drawableSize: rect.size, cursorVisible: true,
-                    selection: nil, target: texture, clearColor: MTLClearColorMake(0, 0, 0, 1)
-                ) { _ in completed.signal() }
+                    grid: terminal.grid, cursorVisible: true, selection: nil,
+                    into: FrameTarget(
+                        texture: texture, rect: rect, drawableSize: rect.size,
+                        clearColor: MTLClearColorMake(0, 0, 0, 1))) { _ in completed.signal() }
                 completed.wait()
                 if iteration >= 10 {
                     durations[byCopy]!.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)
                 }
             }
-            var report = "present by copy, \(columns)x\(rows) into \(width)x\(height), full rebuild to GPU completion, \(BenchmarkBuild.configuration)\n"
+            var report =
+                "present by copy, \(columns)x\(rows) into \(width)x\(height), full "
+                    + "rebuild to GPU completion, \(BenchmarkBuild.configuration)\n"
             for byCopy in [false, true] {
                 let sorted = durations[byCopy]!.sorted()
                 let average = sorted.reduce(0, +) / Double(sorted.count)
@@ -122,6 +132,20 @@ extension PerformanceSuites {
             try report.write(toFile: outputPath, atomically: true, encoding: .utf8)
         }
 
+        /// A screen of SGR-varied text — the worst case for instance buffer
+        /// construction, not the best case of a mostly-blank screen.
+        static func colouredScreen(rows: Int, columns: Int) -> Terminal {
+            var terminal = Terminal(rows: rows, columns: columns)
+            for row in 0..<rows {
+                let colorCode = 31 + (row % 7)
+                terminal.feed(
+                    Array(
+                        "\u{1B}[\(colorCode)m\(String(repeating: "x", count: columns - 1))\u{1B}[0m\r\n"
+                            .utf8))
+            }
+            return terminal
+        }
+
         @Test func measureFrameCPUTime() throws {
             guard let device = MTLCreateSystemDefaultDevice() else {
                 Issue.record("No Metal device available in this environment")
@@ -131,17 +155,7 @@ extension PerformanceSuites {
             let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
 
             let columns = 120, rows = 40
-            var terminal = Terminal(rows: rows, columns: columns)
-            // Fill the screen with SGR-varied text — the worst case for instance
-            // buffer construction, not the best case of a mostly-blank screen.
-            for row in 0..<rows {
-                let colorCode = 31 + (row % 7)
-                terminal.feed(
-                    Array(
-                        "\u{1B}[\(colorCode)m\(String(repeating: "x", count: columns - 1))\u{1B}[0m\r\n"
-                            .utf8))
-            }
-            let grid = terminal.grid
+            let grid = Self.colouredScreen(rows: rows, columns: columns).grid
 
             let width = Int(renderer.metrics.cellWidth * CGFloat(columns))
             let height = Int(renderer.metrics.cellHeight * CGFloat(rows))
@@ -156,10 +170,11 @@ extension PerformanceSuites {
                 let start = DispatchTime.now()
                 // The window runs to the frame's GPU completion, as it always has.
                 renderer.render(
-                    grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-                    drawableSize: CGSize(width: width, height: height), cursorVisible: true,
-                    selection: nil, target: texture, clearColor: MTLClearColorMake(0, 0, 0, 1)
-                ) { _ in completed.signal() }
+                    grid: grid, cursorVisible: true, selection: nil,
+                    into: FrameTarget(
+                        texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                        drawableSize: CGSize(width: width, height: height),
+                        clearColor: MTLClearColorMake(0, 0, 0, 1))) { _ in completed.signal() }
                 completed.wait()
                 let elapsedMs =
                     Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
@@ -174,7 +189,10 @@ extension PerformanceSuites {
             let maximum = sorted.last!
 
             let report =
-                "frame CPU time (\(columns)x\(rows), full screen, \(BenchmarkBuild.configuration)): avg \(String(format: "%.3f", average)) ms, p50 \(String(format: "%.3f", p50)) ms, p95 \(String(format: "%.3f", p95)) ms, p99 \(String(format: "%.3f", p99)) ms, max \(String(format: "%.3f", maximum)) ms, over \(iterations) iterations\n"
+                "frame CPU time (\(columns)x\(rows), full screen, \(BenchmarkBuild.configuration)): "
+                    + "avg \(String(format: "%.3f", average)) ms, p50 \(String(format: "%.3f", p50)) "
+                    + "ms, p95 \(String(format: "%.3f", p95)) ms, p99 \(String(format: "%.3f", p99)) "
+                    + "ms, max \(String(format: "%.3f", maximum)) ms, over \(iterations) iterations\n"
             let outputPath =
                 ProcessInfo.processInfo.environment["CORTA_BASELINE_OUTPUT"]
                 ?? "/tmp/corta-frame-cpu-baseline.txt"

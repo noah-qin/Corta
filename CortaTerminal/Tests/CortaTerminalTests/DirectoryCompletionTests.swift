@@ -40,7 +40,8 @@ struct DirectoryCompletionTests {
     @Test func interruptionSurvivesDisabledHistoryAndScreenChanges() {
         var terminal = Terminal(rows: 5, columns: 60, commandHistoryLimit: 0)
         terminal.directoryCompletionToken = "k"
-        terminal.feed(Array("\u{1b}]133;A\u{7}$ \u{1b}]133;B\u{7}sleep 10\r\n\u{1b}]133;C\u{7}\u{1b}]133;D;130\u{7}".utf8))
+        terminal.feed(
+            Array("\u{1b}]133;A\u{7}$ \u{1b}]133;B\u{7}sleep 10\r\n\u{1b}]133;C\u{7}\u{1b}]133;D;130\u{7}".utf8))
         #expect(terminal.grid.line(0).mark == .promptInterrupted)
         terminal.feed(Array("\u{1b}]133;A\u{7}\u{1b}]133;B\u{7}\u{1b}]134;k;1;0;Alpha/\u{7}".utf8))
         #expect(terminal.directoryCompletion?.candidates == ["Alpha/"])

@@ -32,10 +32,11 @@ import Testing
         #expect(MemoryLayout<QuadInstance>.offset(of: \.size) == 8)
         #expect(MemoryLayout<QuadInstance>.offset(of: \.rgba) == 16)
         #expect(MemoryLayout<QuadInstance>.offset(of: \.atlasIndex) == 20)
-        let q = QuadInstance(origin: .init(-2.5, -1.25), size: .init(13.125, 27.75), color: .init(0.2, 0.4, 0.6, 0.5))
-        #expect(q.origin == .init(-2.5, -1.25))
-        #expect(q.size == .init(13.125, 27.75))
-        #expect(q.rgba == 0x80996633)
+        let quad = QuadInstance(
+            origin: .init(-2.5, -1.25), size: .init(13.125, 27.75), color: .init(0.2, 0.4, 0.6, 0.5))
+        #expect(quad.origin == .init(-2.5, -1.25))
+        #expect(quad.size == .init(13.125, 27.75))
+        #expect(quad.rgba == 0x80996633)
     }
     /// The rectangle table goes to the GPU when it changes, not with every
     /// draw: a frame over glyphs already in the atlas uploads none of it.
@@ -55,10 +56,10 @@ import Testing
         func frame() -> Int {
             let done = DispatchSemaphore(value: 0)
             renderer.render(
-                grid: terminal.grid, scrollOffset: 0, rect: CGRect(origin: .zero, size: size),
-                drawableSize: size, cursorVisible: false, selection: nil, target: target,
-                clearColor: MTLClearColorMake(0, 0, 0, 1)
-            ) { _ in done.signal() }
+                grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil,
+                into: FrameTarget(
+                    texture: target, rect: CGRect(origin: .zero, size: size), drawableSize: size,
+                    clearColor: MTLClearColorMake(0, 0, 0, 1))) { _ in done.signal() }
             _ = done.wait(timeout: .now() + 5)
             return renderer.uploadedRectangleBytes
         }
@@ -190,10 +191,13 @@ import Testing
             let textures = try renderers.map { renderer in
                 try #require(renderer.texture(for: KittyGraphics.ImageID(rawValue: 1), data: data))
             }
-            let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
+            let elapsedMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
             #expect(textures.allSatisfy { $0.storageMode == mode })
             withExtendedLifetime((renderers, textures)) {
-                report += "\(mode): allocated \(textures.map(\.allocatedSize)), device delta \(Int64(device.currentAllocatedSize) - Int64(before)), footprint delta \(Int64(footprint()) - Int64(beforeFootprint)), decode/upload \(ms) ms\n"
+                report +=
+                    "\(mode): allocated \(textures.map(\.allocatedSize)), device delta "
+                        + "\(Int64(device.currentAllocatedSize) - Int64(before)), footprint delta "
+                        + "\(Int64(footprint()) - Int64(beforeFootprint)), decode/upload \(elapsedMilliseconds) ms\n"
             }
         }
         try report.write(toFile: "/tmp/corta-kitty-storage.txt", atomically: true, encoding: .utf8)

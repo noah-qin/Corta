@@ -81,14 +81,20 @@ nonisolated struct WindowState: Equatable, Sendable {
         /// `visibleFrame` (clear of menu bar and Dock), and checks for
         /// zero, negative or NaN sizes first, since `min`/`max` propagate
         /// NaN.
-        func onScreen(_ screens: [NSScreen] = NSScreen.screens, preferredScreen: NSScreen? = nil, minimumSize: CGSize = WindowState.Frame.minimumSize) -> NSRect {
-            fitting(visibleFrames: screens.map(\.visibleFrame),
-                    preferredFrame: preferredScreen?.visibleFrame ?? (screens.isEmpty ? NSScreen.main?.visibleFrame : nil),
-                    minimumSize: minimumSize)
+        func onScreen(
+            _ screens: [NSScreen] = NSScreen.screens, preferredScreen: NSScreen? = nil,
+            minimumSize: CGSize = WindowState.Frame.minimumSize
+        ) -> NSRect {
+            fitting(
+                visibleFrames: screens.map(\.visibleFrame),
+                preferredFrame: preferredScreen?.visibleFrame ?? (screens.isEmpty ? NSScreen.main?.visibleFrame : nil),
+                minimumSize: minimumSize)
         }
 
         /// Geometry-only path for Dock and multi-display regression fixtures.
-        func fitting(visibleFrames: [NSRect], preferredFrame: NSRect? = nil, minimumSize: CGSize = WindowState.Frame.minimumSize) -> NSRect {
+        func fitting(
+            visibleFrames: [NSRect], preferredFrame: NSRect? = nil, minimumSize: CGSize = WindowState.Frame.minimumSize
+        ) -> NSRect {
             let valid = x.isFinite && y.isFinite && width.isFinite && height.isFinite
                 && width > 0 && height > 0 && width >= minimumSize.width && height >= minimumSize.height
             let saved = valid ? rect : NSRect(

@@ -114,7 +114,7 @@ struct SpecialColorsTests {
         var terminal = Terminal()
         var colors = terminal.specialColors
         #expect(colors.color(at: .bold) == nil)
-        colors.setOverride(.bold, to: (10, 20, 30))
+        colors.setOverride(.bold, to: RGB(red: 10, green: 20, blue: 30))
         terminal.specialColors = colors
         let stored = terminal.specialColors.color(at: .bold)
         #expect(stored?.red == 10 && stored?.green == 20 && stored?.blue == 30)

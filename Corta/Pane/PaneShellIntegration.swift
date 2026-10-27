@@ -170,8 +170,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
         guard isOperable else { return }
         guard let host else { return }
         // Local, or the remote file's managed copy at the same line.
-        host.pointer.openDetected(host.pointer.detectedReferenceInCommand(effectiveCommand)) {
-            [weak self] in
+        host.pointer.openDetected(host.pointer.detectedReferenceInCommand(effectiveCommand)) { [weak self] in
             self?.terminalView?.showToast(L10n.text("toast.noFileReferenceInCommand"), kind: .warning)
         }
     }
@@ -364,7 +363,11 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
         return formatter
     }()
 
-    // MARK: - Menu validation
+}
+
+// MARK: - Menu validation
+
+extension PaneShellIntegration {
 
     /// Greys out items that need shell integration or a terminal, and the
     /// failed-command items without a failure: a disabled item says "not
@@ -438,8 +441,14 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
             for row in 0..<grid.rows {
                 let absolute = firstAbsolute + row
                 guard let line = grid.line(atAbsoluteRow: absolute), line.mark.hasOutcome else { continue }
-                let code = byRow[absolute] ?? (line.mark == .promptSucceeded ? 0 : line.mark == .promptInterrupted ? 130 : 1)
-                let text = code == 0 ? L10n.text("commandStatus.succeeded") : code == 130 ? L10n.text("commandHistory.statusInterrupted") : L10n.format("commandHistory.statusFailed", code)
+                let code =
+                    byRow[absolute] ?? (line.mark == .promptSucceeded ? 0 : line.mark == .promptInterrupted ? 130 : 1)
+                let text =
+                    code == 0
+                    ? L10n.text("commandStatus.succeeded")
+                    : code == 130
+                        ? L10n.text("commandHistory.statusInterrupted")
+                        : L10n.format("commandHistory.statusFailed", code)
                 rows.append(.init(
                     rect: CGRect(
                         x: content.minX - TerminalLayout.statusRuleOffset,
@@ -449,7 +458,9 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
             }
         }
         overlay.updateStatuses(rows)
-        let canSuggest = isFocusedPane && scrollOffset == 0 && host?.search.bar == nil && !session.isCommandRunning && !grid.isAlternateScreenActive
+        let canSuggest =
+            isFocusedPane && scrollOffset == 0 && host?.search.bar == nil && !session.isCommandRunning
+            && !grid.isAlternateScreenActive
         let completion = canSuggest && config.directoryCompletion ? session.directoryCompletion : nil
         let history = canSuggest && config.historySuggestions ? session.historySuggestion : nil
         let anchor = CGRect(x: content.minX + CGFloat(grid.cursor.column) * metrics.cellWidth,

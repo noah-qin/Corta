@@ -172,124 +172,6 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         }
     }
 
-    /// Throws only for local failures; remote ones surface as EOF plus
-    /// `exitStatus`. `environment` is the child's whole environment, and has
-    /// no default: the app passes the core's sanitised one
-    /// (`ChildEnvironment.default()`), which this module cannot see.
-    public static func spawn(
-        host: String,
-        executable: String = SFTPSubprocessChannel.defaultSSHPath,
-        arguments: [String]? = nil,
-        environment: [String: String],
-        beforeStart: (@Sendable (pid_t) -> Void)? = nil
-    ) throws(SFTPTransportError) -> SFTPSubprocessChannel {
-        guard executable.hasPrefix("/") else { throw .executablePathNotAbsolute }
-
-        // No exec-failure pipe (unlike `Spawn.child`, whose trampoline execs a
-        // second time): `posix_spawn` reports a failed exec itself, and an
-        // inherited pipe would lose close-on-exec — ssh would hold it open and the
-        // parent's read would never return.
-        let (stdinPipe, stdoutPipe, stderrPipe) = try makeStandardPipes()
-        let childArguments = [executable] + (arguments ?? Self.arguments(host: host))
-        let spawned = launch(
-            executable, arguments: childArguments, environment: environment,
-            stdio: (stdinPipe[0], stdoutPipe[1], stderrPipe[1]), suspended: beforeStart != nil)
-        Darwin.close(stdinPipe[0])
-        Darwin.close(stdoutPipe[1])
-        Darwin.close(stderrPipe[1])
-
-        let pid: pid_t
-        switch spawned {
-        case .success(let spawnedPID):
-            pid = spawnedPID
-        case .failure(let error):
-            Darwin.close(stdinPipe[1])
-            Darwin.close(stdoutPipe[0])
-            Darwin.close(stderrPipe[0])
-            throw .spawnFailed(code: error.code)
-        }
-
-        if let beforeStart {
-            beforeStart(pid)
-            kill(pid, SIGCONT)
-        }
-        return SFTPSubprocessChannel(
-            pid: pid,
-            stdinWrite: stdinPipe[1], stdoutRead: stdoutPipe[0],
-            stderrRead: stderrPipe[0])
-    }
-
-    /// stdin, stdout and stderr pipes for the child, all or none.
-    private static func makeStandardPipes() throws(SFTPTransportError) -> ([Int32], [Int32], [Int32]) {
-        var stdinPipe: [Int32] = [0, 0]
-        var stdoutPipe: [Int32] = [0, 0]
-        var stderrPipe: [Int32] = [0, 0]
-        guard pipe(&stdinPipe) == 0, pipe(&stdoutPipe) == 0, pipe(&stderrPipe) == 0
-        else {
-            let code = errno
-            for fd in [stdinPipe[0], stdinPipe[1], stdoutPipe[0], stdoutPipe[1],
-                stderrPipe[0], stderrPipe[1]]
-            where fd > 0 {
-                Darwin.close(fd)
-            }
-            throw .spawnFailed(code: code)
-        }
-        // The parent's ends get close-on-exec as soon as they exist, not
-        // after the spawn: they stay out of every other child spawned
-        // meanwhile, which must not write frames into this stream or hold
-        // ssh's stdin open past `close()`. (A spawner without
-        // `POSIX_SPAWN_CLOEXEC_DEFAULT` in the gap between `pipe` and here
-        // still could; macOS has no `pipe2`.) Not the child's ends: one that
-        // is already 0, 1 or 2 is `dup2`ed onto itself, which keeps the flag.
-        for fd in [stdinPipe[1], stdoutPipe[0], stderrPipe[0]] {
-            _ = fcntl(fd, F_SETFD, FD_CLOEXEC)
-        }
-        return (stdinPipe, stdoutPipe, stderrPipe)
-    }
-
-    /// `posix_spawn`s the child on `stdio`; `suspended` holds it before its
-    /// first instruction. The pid, or `posix_spawn`'s error.
-    private static func launch(
-        _ executable: String, arguments childArguments: [String], environment: [String: String],
-        stdio: (input: Int32, output: Int32, error: Int32), suspended: Bool
-    ) -> Result<pid_t, SpawnErrorCode> {
-        var fileActions: posix_spawn_file_actions_t?
-        posix_spawn_file_actions_init(&fileActions)
-        defer { posix_spawn_file_actions_destroy(&fileActions) }
-        posix_spawn_file_actions_adddup2(&fileActions, stdio.input, 0)
-        posix_spawn_file_actions_adddup2(&fileActions, stdio.output, 1)
-        posix_spawn_file_actions_adddup2(&fileActions, stdio.error, 2)
-
-        var attributes: posix_spawnattr_t?
-        posix_spawnattr_init(&attributes)
-        defer { posix_spawnattr_destroy(&attributes) }
-        // `SETSID`: otherwise a Corta launched from a terminal hands ssh that tty,
-        // and a prompt hangs in a window nobody is looking at.
-        // `START_SUSPENDED` when someone must know the pid before the child
-        // runs a single instruction (`beforeStart`); resumed just below.
-        posix_spawnattr_setflags(
-            &attributes,
-            Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF
-                | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSID
-                | (suspended ? POSIX_SPAWN_START_SUSPENDED : 0)))
-        resetSignals(of: &attributes)
-
-        let environmentLines = environment.map { "\($0.key)=\($0.value)" }.sorted()
-
-        var pid: pid_t = 0
-        let spawnResult = withCStringArray(childArguments) { argv in
-            withCStringArray(environmentLines) { envp in
-                posix_spawn(&pid, executable, &fileActions, &attributes, argv, envp)
-            }
-        }
-        return spawnResult == 0 ? .success(pid) : .failure(SpawnErrorCode(code: spawnResult))
-    }
-
-    /// `posix_spawn`'s error number, as a `Result` failure.
-    private struct SpawnErrorCode: Error {
-        let code: Int32
-    }
-
     private init(pid: pid_t, stdinWrite: Int32, stdoutRead: Int32, stderrRead: Int32) {
         self.processIdentifier = pid
         self.stdinWrite = GuardedDescriptor(stdinWrite)
@@ -458,5 +340,143 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
             $0.isReaping = false
         }
         return exit
+    }
+}
+
+// MARK: - Spawning
+
+extension SFTPSubprocessChannel {
+    /// Throws only for local failures; remote ones surface as EOF plus
+    /// `exitStatus`. `environment` is the child's whole environment, and has
+    /// no default: the app passes the core's sanitised one
+    /// (`ChildEnvironment.default()`), which this module cannot see.
+    public static func spawn(
+        host: String,
+        executable: String = SFTPSubprocessChannel.defaultSSHPath,
+        arguments: [String]? = nil,
+        environment: [String: String],
+        beforeStart: (@Sendable (pid_t) -> Void)? = nil
+    ) throws(SFTPTransportError) -> SFTPSubprocessChannel {
+        guard executable.hasPrefix("/") else { throw .executablePathNotAbsolute }
+
+        // No exec-failure pipe (unlike `Spawn.child`, whose trampoline execs a
+        // second time): `posix_spawn` reports a failed exec itself, and an
+        // inherited pipe would lose close-on-exec — ssh would hold it open and the
+        // parent's read would never return.
+        let pipes = try makeStandardPipes()
+        let (stdinPipe, stdoutPipe, stderrPipe) = (pipes.input, pipes.output, pipes.error)
+        let childArguments = [executable] + (arguments ?? Self.arguments(host: host))
+        let spawned = launch(
+            executable, arguments: childArguments, environment: environment,
+            stdio: ChildStdio(input: stdinPipe[0], output: stdoutPipe[1], error: stderrPipe[1]),
+            suspended: beforeStart != nil)
+        Darwin.close(stdinPipe[0])
+        Darwin.close(stdoutPipe[1])
+        Darwin.close(stderrPipe[1])
+
+        let pid: pid_t
+        switch spawned {
+        case .success(let spawnedPID):
+            pid = spawnedPID
+        case .failure(let error):
+            Darwin.close(stdinPipe[1])
+            Darwin.close(stdoutPipe[0])
+            Darwin.close(stderrPipe[0])
+            throw .spawnFailed(code: error.code)
+        }
+
+        if let beforeStart {
+            beforeStart(pid)
+            kill(pid, SIGCONT)
+        }
+        return SFTPSubprocessChannel(
+            pid: pid,
+            stdinWrite: stdinPipe[1], stdoutRead: stdoutPipe[0],
+            stderrRead: stderrPipe[0])
+    }
+
+    /// The child's stdin, stdout and stderr pipes, each `[read, write]`.
+    private struct StandardPipes {
+        var input: [Int32]
+        var output: [Int32]
+        var error: [Int32]
+    }
+
+    /// The descriptors the child gets as 0, 1 and 2.
+    private struct ChildStdio {
+        var input: Int32
+        var output: Int32
+        var error: Int32
+    }
+
+    /// stdin, stdout and stderr pipes for the child, all or none.
+    private static func makeStandardPipes() throws(SFTPTransportError) -> StandardPipes {
+        var stdinPipe: [Int32] = [0, 0]
+        var stdoutPipe: [Int32] = [0, 0]
+        var stderrPipe: [Int32] = [0, 0]
+        guard pipe(&stdinPipe) == 0, pipe(&stdoutPipe) == 0, pipe(&stderrPipe) == 0
+        else {
+            let code = errno
+            for fd in [stdinPipe[0], stdinPipe[1], stdoutPipe[0], stdoutPipe[1],
+                stderrPipe[0], stderrPipe[1]]
+            where fd > 0 {
+                Darwin.close(fd)
+            }
+            throw .spawnFailed(code: code)
+        }
+        // The parent's ends get close-on-exec as soon as they exist, not
+        // after the spawn: they stay out of every other child spawned
+        // meanwhile, which must not write frames into this stream or hold
+        // ssh's stdin open past `close()`. (A spawner without
+        // `POSIX_SPAWN_CLOEXEC_DEFAULT` in the gap between `pipe` and here
+        // still could; macOS has no `pipe2`.) Not the child's ends: one that
+        // is already 0, 1 or 2 is `dup2`ed onto itself, which keeps the flag.
+        for fd in [stdinPipe[1], stdoutPipe[0], stderrPipe[0]] {
+            _ = fcntl(fd, F_SETFD, FD_CLOEXEC)
+        }
+        return StandardPipes(input: stdinPipe, output: stdoutPipe, error: stderrPipe)
+    }
+
+    /// `posix_spawn`s the child on `stdio`; `suspended` holds it before its
+    /// first instruction. The pid, or `posix_spawn`'s error.
+    private static func launch(
+        _ executable: String, arguments childArguments: [String], environment: [String: String],
+        stdio: ChildStdio, suspended: Bool
+    ) -> Result<pid_t, SpawnErrorCode> {
+        var fileActions: posix_spawn_file_actions_t?
+        posix_spawn_file_actions_init(&fileActions)
+        defer { posix_spawn_file_actions_destroy(&fileActions) }
+        posix_spawn_file_actions_adddup2(&fileActions, stdio.input, 0)
+        posix_spawn_file_actions_adddup2(&fileActions, stdio.output, 1)
+        posix_spawn_file_actions_adddup2(&fileActions, stdio.error, 2)
+
+        var attributes: posix_spawnattr_t?
+        posix_spawnattr_init(&attributes)
+        defer { posix_spawnattr_destroy(&attributes) }
+        // `SETSID`: otherwise a Corta launched from a terminal hands ssh that tty,
+        // and a prompt hangs in a window nobody is looking at.
+        // `START_SUSPENDED` when someone must know the pid before the child
+        // runs a single instruction (`beforeStart`); resumed just below.
+        posix_spawnattr_setflags(
+            &attributes,
+            Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF
+                | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSID
+                | (suspended ? POSIX_SPAWN_START_SUSPENDED : 0)))
+        resetSignals(of: &attributes)
+
+        let environmentLines = environment.map { "\($0.key)=\($0.value)" }.sorted()
+
+        var pid: pid_t = 0
+        let spawnResult = withCStringArray(childArguments) { argv in
+            withCStringArray(environmentLines) { envp in
+                posix_spawn(&pid, executable, &fileActions, &attributes, argv, envp)
+            }
+        }
+        return spawnResult == 0 ? .success(pid) : .failure(SpawnErrorCode(code: spawnResult))
+    }
+
+    /// `posix_spawn`'s error number, as a `Result` failure.
+    private struct SpawnErrorCode: Error {
+        let code: Int32
     }
 }

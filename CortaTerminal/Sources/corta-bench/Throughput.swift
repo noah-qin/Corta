@@ -52,7 +52,8 @@ func benchmarkParseThroughput() {
     parser.parse(corpus, performer: &counter)
     var elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
     print(
-        "parser-only throughput: \(String(format: "%.1f", throughput(corpus.count, elapsedSeconds: elapsedSeconds))) MiB/s "
+        "parser-only throughput: "
+            + "\(String(format: "%.1f", throughput(corpus.count, elapsedSeconds: elapsedSeconds))) MiB/s "
             + "(\(counter.printableBytes) printable bytes observed)"
     )
 
@@ -61,7 +62,8 @@ func benchmarkParseThroughput() {
     gridOnly.feed(corpus)
     elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
     print(
-        "parser + grid throughput: \(String(format: "%.1f", throughput(corpus.count, elapsedSeconds: elapsedSeconds))) MiB/s "
+        "parser + grid throughput: "
+            + "\(String(format: "%.1f", throughput(corpus.count, elapsedSeconds: elapsedSeconds))) MiB/s "
             + "(scrollback disabled)"
     )
 
@@ -71,7 +73,10 @@ func benchmarkParseThroughput() {
     elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9
 
     let mibps = throughput(corpus.count, elapsedSeconds: elapsedSeconds)
-    print("core feed throughput: \(String(format: "%.1f", mibps)) MiB/s (\(corpus.count) bytes in \(String(format: "%.3f", elapsedSeconds))s)")
+    print(
+        "core feed throughput: \(String(format: "%.1f", mibps)) MiB/s "
+            + "(\(corpus.count) bytes in \(String(format: "%.3f", elapsedSeconds))s)"
+    )
 }
 
 // Synthetic workloads; never captured terminal output.
@@ -86,12 +91,14 @@ func benchmarkUnicodeCorpora() {
         ("ASCII", "\u{1B}[32mdrwxr-xr-x\u{1B}[0m user file.log\r\n"),
         ("CJK", "\u{1B}[32m终端性能测试 日本語の文章 输出历史与搜索\u{1B}[0m\r\n"),
         ("emoji", "┌────┐ │ ✅ 🚀 👩🏽‍💻 🌈 │ └────┘\r\n"),
-        ("AI CLI", "\u{1B}[36m│ 分析代码 ✅\u{1B}[0m changes: +42 −12 ├── src/main.swift 🚀\r\n")
+        ("AI CLI", "\u{1B}[36m│ 分析代码 ✅\u{1B}[0m changes: +42 −12 ├── src/main.swift 🚀\r\n"),
     ] {
         let unit = Array(line.utf8)
         let corpus = Array(repeating: unit, count: max(1, 8 * 1_048_576 / unit.count)).flatMap { $0 }
         let sampleOption = CommandLine.arguments.firstIndex(of: "--unicode-samples")
-        let requested = sampleOption.flatMap { $0 + 1 < CommandLine.arguments.count ? Int(CommandLine.arguments[$0 + 1]) : nil } ?? 5
+        let requested =
+            sampleOption.flatMap { $0 + 1 < CommandLine.arguments.count ? Int(CommandLine.arguments[$0 + 1]) : nil }
+            ?? 5
         let sampleCount = min(20, max(1, requested))
         for mode in 0..<3 {
             var samples: [Double] = []
@@ -100,8 +107,7 @@ func benchmarkUnicodeCorpora() {
                 var parser = Parser(), counter = Counter()
                 var terminal = Terminal(rows: 50, columns: 200, scrollbackLimit: mode == 1 ? 0 : 10_000)
                 let start = DispatchTime.now().uptimeNanoseconds
-                if mode == 0 { parser.parse(corpus, performer: &counter) }
-                else { terminal.feed(corpus) }
+                if mode == 0 { parser.parse(corpus, performer: &counter) } else { terminal.feed(corpus) }
                 let seconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
                 if iteration > 0 { samples.append(seconds) }
                 checksum &+= counter.count + terminal.grid.scrollback.count + terminal.grid.cursor.column
@@ -111,23 +117,44 @@ func benchmarkUnicodeCorpora() {
             let rate = throughput(corpus.count, elapsedSeconds: samples[samples.count / 2])
             let low = throughput(corpus.count, elapsedSeconds: samples.last!)
             let high = throughput(corpus.count, elapsedSeconds: samples.first!)
-            print("unicode \(name) \(["parser", "grid", "feed"][mode]): \(String(format: "%.1f", rate)) MiB/s checksum \(checksum) (n=\(sampleCount), range \(String(format: "%.1f", low))–\(String(format: "%.1f", high)), one warmup)")
+            print(
+                "unicode \(name) \(["parser", "grid", "feed"][mode]): \(String(format: "%.1f", rate)) "
+                    + "MiB/s checksum \(checksum) (n=\(sampleCount), range "
+                    + "\(String(format: "%.1f", low))–\(String(format: "%.1f", high)), one warmup)"
+            )
         }
 
     }
+}
+
+/// One synthetic line of the named corpus; never captured terminal output.
+func compressionCorpusLine(_ name: String, row: Int) -> String {
+    switch name {
+    case "SGR ls":
+        "\u{1B}[\(31 + row % 7)mdrwxr-xr-x\u{1B}[0m user file-\(row).log " + String(repeating: "abc", count: 29)
+    case "log":
+        "2026-10-11 INFO request \(row) status=\(200 + row % 5) latency=\(row % 997)ms "
+            + String(repeating: "data", count: 16)
+    default:
+        "记录 \(row) 终端历史压缩测试 日本語の文章 输出历史与搜索 " + String(repeating: "中文", count: 14)
+    }
+}
+
+/// `bytes` read as a `rows`×`columns` matrix, transposed: the byte-plane
+/// shuffle that groups each cell field's bytes together, and its inverse.
+func transpose(_ bytes: [UInt8], rows: Int, columns: Int) -> [UInt8] {
+    var result = [UInt8](repeating: 0, count: bytes.count)
+    for row in 0..<rows {
+        for column in 0..<columns { result[column * rows + row] = bytes[row * columns + column] }
+    }
+    return result
 }
 
 func benchmarkCompressionCodecs() {
     for name in ["SGR ls", "log", "CJK"] {
         var terminal = Terminal(rows: 1, columns: 120, scrollbackLimit: 100_000)
         for row in 0..<100_001 {
-            let text: String
-            switch name {
-            case "SGR ls": text = "\u{1B}[\(31 + row % 7)mdrwxr-xr-x\u{1B}[0m user file-\(row).log " + String(repeating: "abc", count: 29)
-            case "log": text = "2026-10-11 INFO request \(row) status=\(200 + row % 5) latency=\(row % 997)ms " + String(repeating: "data", count: 16)
-            default: text = "记录 \(row) 终端历史压缩测试 日本語の文章 输出历史与搜索 " + String(repeating: "中文", count: 14)
-            }
-            terminal.feed(Array((text + "\r\n").utf8))
+            terminal.feed(Array((compressionCorpusLine(name, row: row) + "\r\n").utf8))
         }
         for (codecName, codec) in [("LZ4", COMPRESSION_LZ4), ("LZFSE", COMPRESSION_LZFSE)] {
             for shuffled in [false, true] {
@@ -138,11 +165,7 @@ func benchmarkCompressionCodecs() {
                     guard !raw.isEmpty else { return }
                     let count = cells.count, stride = MemoryLayout<Cell>.stride
                     let start = DispatchTime.now().uptimeNanoseconds
-                    var source = raw
-                    if shuffled {
-                        source = [UInt8](repeating: 0, count: raw.count)
-                        for byte in 0..<stride { for cell in 0..<count { source[byte * count + cell] = raw[cell * stride + byte] } }
-                    }
+                    let source = shuffled ? transpose(raw, rows: count, columns: stride) : raw
                     var output = [UInt8](repeating: 0, count: source.count + 65536)
                     let size = source.withUnsafeBufferPointer { src in output.withUnsafeMutableBufferPointer { dst in
                         compression_encode_buffer(dst.baseAddress!, dst.count, src.baseAddress!, src.count, nil, codec)
@@ -151,19 +174,23 @@ func benchmarkCompressionCodecs() {
                     precondition(size > 0)
                     let decodeStart = DispatchTime.now().uptimeNanoseconds
                     var decoded = [UInt8](repeating: 0, count: raw.count)
-                    let sizeOut = output.withUnsafeBufferPointer { src in decoded.withUnsafeMutableBufferPointer { dst in
+                    let sizeOut = output.withUnsafeBufferPointer { src in
+                        decoded.withUnsafeMutableBufferPointer { dst in
                         compression_decode_buffer(dst.baseAddress!, dst.count, src.baseAddress!, size, nil, codec)
                     } }
-                    if shuffled {
-                        var unshuffled = [UInt8](repeating: 0, count: raw.count)
-                        for byte in 0..<stride { for cell in 0..<count { unshuffled[cell * stride + byte] = decoded[byte * count + cell] } }
-                        decoded = unshuffled
-                    }
+                    if shuffled { decoded = transpose(decoded, rows: stride, columns: count) }
                     decodeNS += DispatchTime.now().uptimeNanoseconds - decodeStart
                     precondition(sizeOut == raw.count && decoded == raw)
                     rawBytes += raw.count; encodedBytes += size
                 }
-                print("compression \(name) 100k rows \(codecName) \(shuffled ? "shuffled" : "raw"): \(String(format: "%.2f", Double(rawBytes) / Double(encodedBytes)))x encode \(String(format: "%.1f", throughput(rawBytes, elapsedSeconds: Double(encodeNS) / 1e9))) decode \(String(format: "%.1f", throughput(rawBytes, elapsedSeconds: Double(decodeNS) / 1e9))) MiB/s including shuffle/scratch; raw bytes \(rawBytes)")
+                print(
+                    "compression \(name) 100k rows \(codecName) \(shuffled ? "shuffled" : "raw"): "
+                        + "\(String(format: "%.2f", Double(rawBytes) / Double(encodedBytes)))x encode "
+                        + "\(String(format: "%.1f", throughput(rawBytes, elapsedSeconds: Double(encodeNS) / 1e9))) "
+                        + "decode "
+                        + "\(String(format: "%.1f", throughput(rawBytes, elapsedSeconds: Double(decodeNS) / 1e9))) "
+                        + "MiB/s including shuffle/scratch; raw bytes \(rawBytes)"
+                )
             }
         }
     }
@@ -186,4 +213,3 @@ func profileCJKFlood() {
     for _ in 0..<2000 { terminal.feed(bytes) }
     print(terminal.grid.scrollback.totalPushed)
 }
-

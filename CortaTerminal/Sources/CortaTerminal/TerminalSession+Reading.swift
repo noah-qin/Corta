@@ -78,6 +78,15 @@ extension TerminalSession {
     /// waiting ~100 ms behind a 4K image's base64 and zlib. A clear, resize
     /// or reset the user makes in the pause applies first, as if it had come
     /// a moment before the image's last chunk.
+    /// What one parsed slice produced, read out under the state lock.
+    private struct SliceOutcome {
+        var responses: [UInt8]
+        var episode: Int?
+        var compress: Bool
+        var consumed: Int
+        var deferred: DeferredImageTransmission?
+    }
+
     private func apply(_ batch: [UInt8]) {
         var responses: [UInt8] = []
         var episode: Int?
@@ -91,11 +100,7 @@ extension TerminalSession {
             let slice = batch[offset..<end]
             let finished = decoded
             decoded = nil
-            let applied = state.withLock {
-                current -> (
-                    responses: [UInt8], episode: Int?, compress: Bool, consumed: Int,
-                    deferred: DeferredImageTransmission?
-                ) in
+            let applied = state.withLock { current -> SliceOutcome in
                 let episodeBefore = current.terminal.synchronizedOutputEpisode
                 if let finished { current.terminal.completeDeferredImage(finished) }
                 let consumed = current.terminal.feedDeferringImageDecode(slice)
@@ -109,10 +114,14 @@ extension TerminalSession {
                 // An integer compare: a pass is queued only once a batch seals.
                 let compress = current.terminal.hasCompressionWork
                 guard episodeAfter != episodeBefore else {
-                    return (sliceResponses, nil, compress, consumed, deferred)
+                    return SliceOutcome(
+                        responses: sliceResponses, episode: nil, compress: compress, consumed: consumed,
+                        deferred: deferred)
                 }
                 current.synchronizedOutputEpisode = episodeAfter
-                return (sliceResponses, episodeAfter, compress, consumed, deferred)
+                return SliceOutcome(
+                    responses: sliceResponses, episode: episodeAfter, compress: compress, consumed: consumed,
+                    deferred: deferred)
             }
             if responses.count + applied.responses.count <= Self.maxResponseBytesPerBatch {
                 responses.append(contentsOf: applied.responses)

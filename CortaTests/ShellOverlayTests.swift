@@ -51,6 +51,29 @@ import Testing
         #expect(overlay.completion != nil)
     }
 
+    /// The strongest text pixel against the panel's canvas background,
+    /// thinned over the glass, so the ink is the near-opaque pixels.
+    private static func strongestInk(in overlay: ShellOverlayView) throws -> NSColor {
+        let row = try #require(overlay.subviews.first {
+            $0.accessibilityIdentifier() == "directory-completion-candidates" })
+        let bitmap = try #require(row.bitmapImageRepForCachingDisplay(in: row.bounds))
+        row.cacheDisplay(in: row.bounds, to: bitmap)
+        var best: NSColor?
+        var bestContrast: CGFloat = -1
+        let background = TerminalColorPalette.activeVariant.background
+        for y in 4..<(bitmap.pixelsHigh - 4) {
+            for x in 4..<(bitmap.pixelsWide - 4) {
+                guard let pixel = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB),
+                    pixel.alphaComponent > 0.8 else { continue }
+                let contrast = abs(pixel.redComponent - CGFloat(background.x))
+                    + abs(pixel.greenComponent - CGFloat(background.y))
+                    + abs(pixel.blueComponent - CGFloat(background.z))
+                if contrast > bestContrast { best = pixel; bestContrast = contrast }
+            }
+        }
+        return try #require(best)
+    }
+
     /// Found under macOS Light with `appearance = dark`: the alternatives
     /// were drawn in the system label colour, resolved to its light (black)
     /// variant, and vanished on the dark canvas (#346). A theme from the
@@ -79,30 +102,7 @@ import Testing
         let anchor = CGRect(x: 80, y: 40, width: 8, height: 17)
         overlay.showCompletion(completion, anchor: anchor)
 
-        /// The strongest text pixel against the panel's canvas background,
-        /// thinned over the glass, so the ink is the near-opaque pixels.
-        func strongestInk() throws -> NSColor {
-            let row = try #require(overlay.subviews.first {
-                $0.accessibilityIdentifier() == "directory-completion-candidates" })
-            let bitmap = try #require(row.bitmapImageRepForCachingDisplay(in: row.bounds))
-            row.cacheDisplay(in: row.bounds, to: bitmap)
-            var best: NSColor?
-            var bestContrast: CGFloat = -1
-            let background = TerminalColorPalette.activeVariant.background
-            for y in 4..<(bitmap.pixelsHigh - 4) {
-                for x in 4..<(bitmap.pixelsWide - 4) {
-                    guard let pixel = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB),
-                        pixel.alphaComponent > 0.8 else { continue }
-                    let contrast = abs(pixel.redComponent - CGFloat(background.x))
-                        + abs(pixel.greenComponent - CGFloat(background.y))
-                        + abs(pixel.blueComponent - CGFloat(background.z))
-                    if contrast > bestContrast { best = pixel; bestContrast = contrast }
-                }
-            }
-            return try #require(best)
-        }
-
-        let ink = try strongestInk()
+        let ink = try Self.strongestInk(in: overlay)
         #expect(ink.alphaComponent > 0.4)
         // #f0e0c0, not the black the light system colour gives.
         #expect(ink.redComponent > 0.7 && ink.greenComponent > 0.65 && ink.blueComponent > 0.5)
@@ -118,7 +118,7 @@ import Testing
         TerminalColorPalette.apply(red)
         overlay.showCompletion(completion, anchor: anchor)
         #expect(row.needsDisplay)
-        let recoloured = try strongestInk()
+        let recoloured = try Self.strongestInk(in: overlay)
         #expect(recoloured.redComponent > 0.6 && recoloured.greenComponent < 0.3)
     }
 
@@ -215,7 +215,8 @@ import Testing
         #expect(!configuration.directoryCompletion && !configuration.commandStatusMarks)
         #expect(Configuration.parse(configuration.serialized()).configuration == configuration)
         var terminal = Terminal(rows: 10, columns: 60)
-        terminal.feed(Array("\u{1b}]133;A\u{7}$ \u{1b}]133;B\u{7}sleep 10\r\n\u{1b}]133;C\u{7}\u{1b}]133;D;130\u{7}".utf8))
+        terminal.feed(
+            Array("\u{1b}]133;A\u{7}$ \u{1b}]133;B\u{7}sleep 10\r\n\u{1b}]133;C\u{7}\u{1b}]133;D;130\u{7}".utf8))
         let model = CommandHistoryModel()
         model.refresh(records: terminal.commandRecords.records, grid: terminal.grid, directory: nil)
         #expect(model.rows.first?.statusSymbolName == "minus.circle")

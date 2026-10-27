@@ -18,96 +18,49 @@ import CryptoKit
 import Foundation
 import ReleaseCheck
 
-/// `corta-release-check` — the one packaging check (B15 / T11). The release
-/// workflow, the update-feed workflow and a maintainer's local package all
-/// run it rather than each carrying a copy of the rules, so a local package
-/// and a CI package are rejected for the same reasons, and a rule added
-/// here reaches every route at once.
-///
-///     corta-release-check check APP [--version V] [--archive DMG]
-///                                   [--appcast] [--require-notarized]
-///     corta-release-check package APP VERSION [OUTPUT_DIRECTORY]
-///                                   [--require-notarized] [--rehearsal]
-///
-/// `check`, always: the app's Info.plist agrees with project.pbxproj on the
-/// marketing version, the build number and the deployment target; the
-/// build number is an integer; every file carries its license header;
-/// CHANGELOG.md has a heading for the version; README.md documents the release
-/// download and the minimum macOS for it; the app's executable and
-/// corta-exec are arm64 only (D21); the code signature verifies.
-///
-///     --version V          V (a tag with its `v` stripped) must be the version.
-///     --archive DMG        DMG is named Corta-V.dmg, holds Corta.app, Applications
-///                          and its Finder layout, its DMG.sha256 sidecar matches
-///                          it, and the feed and V's signature verify
-///                          (scripts/verify-appcast.swift).
-///     --appcast            appcast.xml has an item for this version and build
-///                          whose enclosure length, with --archive, is the
-///                          archive's; for an arm64-only app the item
-///                          requires arm64.
-///     --require-notarized  the signature is a Developer ID one, the
-///                          notarization ticket is stapled, and Gatekeeper
-///                          accepts the app.
-///
-/// `package` checks the finished, signed and notarised Corta-VERSION.dmg in
-/// OUTPUT_DIRECTORY (default `dist`) and writes its SHA-256 sidecar. It never
-/// rebuilds the image or invalidates its signature/ticket. The mounted app
-/// passes all the same checks. The feed is checked offline, but VERSION must
-/// not already be published unless this is a rehearsal.
-///
-///     --rehearsal          skip only that last rule, for release.yml's dry
-///                          run, which rebuilds the version the project
-///                          carries — usually one already published.
-///
-/// Run from the repository (or pass `--root`). Exit status is the number
-/// of failed checks, and every failure is printed; 2 is a usage error.
-
-let usage = """
-    usage: corta-release-check check APP [--version V] [--archive DMG] [--appcast]
-                                         [--require-notarized] [--root DIR]
-           corta-release-check package APP VERSION [OUTPUT_DIRECTORY]
-                                         [--require-notarized] [--rehearsal] [--root DIR]
-    """
-
-func usageError(_ message: String? = nil) -> Never {
-    if let message { FileHandle.standardError.write(Data("corta-release-check: \(message)\n".utf8)) }
-    FileHandle.standardError.write(Data((usage + "\n").utf8))
-    exit(2)
-}
-
-// MARK: - Processes
-
-struct Output {
-    var status: Int32
-    var stdout: String
-    var stderr: String
-}
-
-/// Runs a tool and collects what it printed; nil when it could not start.
-func run(_ executable: String, _ arguments: [String], in directory: String? = nil) -> Output? {
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: executable)
-    process.arguments = arguments
-    if let directory { process.currentDirectoryURL = URL(fileURLWithPath: directory) }
-    let out = Pipe(), err = Pipe()
-    process.standardOutput = out
-    process.standardError = err
-    guard (try? process.run()) != nil else { return nil }
-    // Drain both pipes before waiting, or a tool that fills one blocks forever.
-    final class Collected: @unchecked Sendable { var data = Data() }
-    let errors = Collected()
-    let group = DispatchGroup()
-    DispatchQueue.global().async(group: group) { errors.data = err.fileHandleForReading.readDataToEndOfFile() }
-    let outData = out.fileHandleForReading.readDataToEndOfFile()
-    group.wait()
-    let errData = errors.data
-    process.waitUntilExit()
-    return Output(status: process.terminationStatus,
-                  stdout: String(decoding: outData, as: UTF8.self),
-                  stderr: String(decoding: errData, as: UTF8.self))
-}
-
-func trimmed(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+// `corta-release-check` — the one packaging check (B15 / T11). The release
+// workflow, the update-feed workflow and a maintainer's local package all
+// run it rather than each carrying a copy of the rules, so a local package
+// and a CI package are rejected for the same reasons, and a rule added
+// here reaches every route at once.
+//
+//     corta-release-check check APP [--version V] [--archive DMG]
+//                                   [--appcast] [--require-notarized]
+//     corta-release-check package APP VERSION [OUTPUT_DIRECTORY]
+//                                   [--require-notarized] [--rehearsal]
+//
+// `check`, always: the app's Info.plist agrees with project.pbxproj on the
+// marketing version, the build number and the deployment target; the
+// build number is an integer; every file carries its license header;
+// CHANGELOG.md has a heading for the version; README.md documents the release
+// download and the minimum macOS for it; the app's executable and
+// corta-exec are arm64 only (D21); the code signature verifies.
+//
+//     --version V          V (a tag with its `v` stripped) must be the version.
+//     --archive DMG        DMG is named Corta-V.dmg, holds Corta.app, Applications
+//                          and its Finder layout, its DMG.sha256 sidecar matches
+//                          it, and the feed and V's signature verify
+//                          (scripts/verify-appcast.swift).
+//     --appcast            appcast.xml has an item for this version and build
+//                          whose enclosure length, with --archive, is the
+//                          archive's; for an arm64-only app the item
+//                          requires arm64.
+//     --require-notarized  the signature is a Developer ID one, the
+//                          notarization ticket is stapled, and Gatekeeper
+//                          accepts the app.
+//
+// `package` checks the finished, signed and notarised Corta-VERSION.dmg in
+// OUTPUT_DIRECTORY (default `dist`) and writes its SHA-256 sidecar. It never
+// rebuilds the image or invalidates its signature/ticket. The mounted app
+// passes all the same checks. The feed is checked offline, but VERSION must
+// not already be published unless this is a rehearsal.
+//
+//     --rehearsal          skip only that last rule, for release.yml's dry
+//                          run, which rebuilds the version the project
+//                          carries — usually one already published.
+//
+// Run from the repository (or pass `--root`). Exit status is the number
+// of failed checks, and every failure is printed; 2 is a usage error.
 
 // MARK: - Arguments
 
@@ -200,7 +153,10 @@ if let archivePath {
         let mount = try ReleaseCheck.inspectDiskImage(URL(fileURLWithPath: absolute(archivePath)))
         diskImageMount = mount
         app = mount.root.appendingPathComponent("Corta.app").path
-        pass("Developer ID disk image is notarised, accepted, has no license agreement and contains only Corta.app, Applications and its Finder layout")
+        pass(
+            "Developer ID disk image is notarised, accepted, has no license agreement "
+                + "and contains only Corta.app, Applications and its Finder layout"
+        )
     } catch {
         fail(error.localizedDescription)
         finish()
@@ -303,9 +259,6 @@ if readme.contains("macOS \(bundleTarget)") {
 // command line ships a universal corta-exec beside an arm64 app. Sparkle's
 // own binaries are not ours to thin; the rule covers the executables
 // this project compiles (the app, corta-exec, corta-image-decoder).
-func architectures(_ path: String) -> String {
-    trimmed(run("/usr/bin/lipo", ["-archs", path])?.stdout ?? "")
-}
 let bundleExecutable = plistValue("CFBundleExecutable")
 let appArchitectures = architectures("\(app)/Contents/MacOS/\(bundleExecutable)")
 let decoderRelativePath = "Contents/Helpers/CortaImageDecoder.app/Contents/MacOS/corta-image-decoder"
@@ -363,31 +316,6 @@ if requireNotarized {
 }
 
 // --- Hardened runtime, entitlements, load paths
-
-/// Every Mach-O file in the bundle — the app, corta-exec, Sparkle and its
-/// helpers (Autoupdate, Updater.app, the XPC services) — found by magic
-/// number rather than listed, so a component a Sparkle update adds is held
-/// to the same rules. Symlinks into a framework's versions count once.
-@MainActor func machOFiles(in bundle: String) -> [String] {
-    let magics: Set<UInt32> = [0xFEED_FACF, 0xCFFA_EDFE, 0xCAFE_BABE, 0xBEBA_FECA, 0xFEED_FACE, 0xCEFA_EDFE]
-    var seen = Set<String>()
-    var found: [String] = []
-    guard let walker = fileManager.enumerator(atPath: bundle) else { return [] }
-    while let relative = walker.nextObject() as? String {
-        let path = ("\(bundle)/\(relative)" as NSString).resolvingSymlinksInPath
-        var isDirectory: ObjCBool = false
-        guard !seen.contains(path), fileManager.fileExists(atPath: path, isDirectory: &isDirectory),
-            !isDirectory.boolValue, let handle = FileHandle(forReadingAtPath: path)
-        else { continue }
-        let head = handle.readData(ofLength: 4)
-        handle.closeFile()
-        let magic = head.reduce(UInt32(0), { $0 << 8 | UInt32($1) })
-        guard head.count == 4, magics.contains(magic) else { continue }
-        seen.insert(path)
-        found.append(path)
-    }
-    return found.sorted()
-}
 
 // A component that can be debugged, load another team's libraries, honour
 // DYLD_* or map writable executable memory inherits every TCC grant the app
@@ -512,7 +440,10 @@ if let archivePath {
         // Not a verdict on the signature: sending a maintainer after the
         // signing key when `swift` simply failed to start would be worse
         // than saying the feed went unchecked.
-        fail("verify-appcast could not run (status \(verify.map { String($0.status) } ?? "none")); the feed was not checked")
+        fail(
+            "verify-appcast could not run (status "
+                + "\(verify.map { String($0.status) } ?? "none")); the feed was not checked"
+        )
     case let status?:
         fail("verify-appcast reported \(status) failed check(s) — its output is above")
     }
@@ -567,7 +498,10 @@ if checkAppcast {
             if ReleaseCheck.requiresArm64(item.hardwareRequirements) {
                 pass("appcast item requires arm64 hardware")
             } else {
-                fail("appcast item for \(bundleVersion) has no sparkle:hardwareRequirements arm64; Intel Macs would be offered an app they cannot open")
+                fail(
+                    "appcast item for \(bundleVersion) has no sparkle:hardwareRequirements "
+                        + "arm64; Intel Macs would be offered an app they cannot open"
+                )
             }
         }
     }

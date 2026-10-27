@@ -21,16 +21,8 @@ final class DirectoryCompletionUITests: XCTestCase {
         continueAfterFailure = false
         let previousInputSource = LatinInputSource.select()
         addTeardownBlock { LatinInputSource.restore(previousInputSource) }
-        // Prepared by stage-ui-fixtures.sh: the runner cannot write folders
-        // the app's shell can see.
-        let stage = try UIFixtures.stage("directory-completion")
-        let folder = stage.appendingPathComponent("Demo")
-        let app = UIFixtures.app(stage: stage, runner: Self.self)
-        app.launch()
+        let app = try launchInDemoFolder()
         defer { app.terminate() }
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
-        UIFixtures.requireFixturePrompt(in: app)
-        app.typeText("cd '\(folder.path)'\nclear\ntrue\nfalse\nsleep 10\n")
         app.typeKey("c", modifierFlags: .control)
         app.typeText("cd ")
         let preview = app.staticTexts["directory-completion-preview"]
@@ -39,19 +31,13 @@ final class DirectoryCompletionUITests: XCTestCase {
         XCTAssertTrue(alternatives.label.contains("Alpha/"))
         XCTAssertTrue(alternatives.label.contains("Another/"))
         XCTAssertFalse(preview.exists)
-        let choicesScreenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-        choicesScreenshot.lifetime = .keepAlways
-        add(choicesScreenshot)
+        keepWindowScreenshot(of: app)
         XCTAssertFalse(app.buttons["Alpha/"].exists)
         app.typeText("Al")
         XCTAssertTrue(preview.waitForExistence(timeout: 3))
         XCTAssertFalse(alternatives.exists)
-        let alphaSuffix = NSPredicate(format: "label == %@", "pha/")
-        expectation(for: alphaSuffix, evaluatedWith: preview)
-        waitForExpectations(timeout: 3)
-        let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-        screenshot.lifetime = .keepAlways
-        add(screenshot)
+        waitForLabel("pha/", on: preview)
+        keepWindowScreenshot(of: app)
         app.typeKey(.tab, modifierFlags: [])
         XCTAssertFalse(preview.waitForExistence(timeout: 1))
         // A suggestion is not executable input until accepted, and Tab does not run it.
@@ -60,19 +46,16 @@ final class DirectoryCompletionUITests: XCTestCase {
         XCTAssertTrue(preview.waitForExistence(timeout: 3))
         XCTAssertTrue(alternatives.waitForExistence(timeout: 3))
         app.typeKey(.rightArrow, modifierFlags: [])
-        expectation(for: NSPredicate(format: "label == %@", "nother/"), evaluatedWith: preview)
-        waitForExpectations(timeout: 3)
+        waitForLabel("nother/", on: preview)
         app.typeKey(.leftArrow, modifierFlags: [])
-        expectation(for: NSPredicate(format: "label == %@", "lpha/"), evaluatedWith: preview)
-        waitForExpectations(timeout: 3)
+        waitForLabel("lpha/", on: preview)
         // Up recalls the previous shell command; Down restores the unfinished cd.
         app.typeKey(.upArrow, modifierFlags: [])
         XCTAssertFalse(preview.waitForExistence(timeout: 1))
         XCTAssertFalse(alternatives.exists)
         app.typeKey(.downArrow, modifierFlags: [])
         XCTAssertTrue(preview.waitForExistence(timeout: 3))
-        expectation(for: NSPredicate(format: "label == %@", "lpha/"), evaluatedWith: preview)
-        waitForExpectations(timeout: 3)
+        waitForLabel("lpha/", on: preview)
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertFalse(preview.waitForExistence(timeout: 1))
         XCTAssertFalse(alternatives.exists)
@@ -83,12 +66,36 @@ final class DirectoryCompletionUITests: XCTestCase {
         app.typeText("l")
         // Shift+Tab must not accept Alpha/; the input can still narrow A to Al.
         XCTAssertTrue(preview.waitForExistence(timeout: 3))
-        expectation(for: alphaSuffix, evaluatedWith: preview)
-        waitForExpectations(timeout: 3)
+        waitForLabel("pha/", on: preview)
         app.typeKey("c", modifierFlags: .control)
         app.typeText("cd .")
         XCTAssertTrue(preview.waitForExistence(timeout: 3))
-        expectation(for: NSPredicate(format: "label == %@", "hidden/"), evaluatedWith: preview)
+        waitForLabel("hidden/", on: preview)
+    }
+
+    /// Corta at the fixture prompt, in the staged Demo folder, with a few
+    /// commands in its history. Prepared by stage-ui-fixtures.sh: the
+    /// runner cannot write folders the app's shell can see.
+    @MainActor private func launchInDemoFolder() throws -> XCUIApplication {
+        let stage = try UIFixtures.stage("directory-completion")
+        let folder = stage.appendingPathComponent("Demo")
+        let app = UIFixtures.app(stage: stage, runner: Self.self)
+        app.launch()
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
+        app.typeText("cd '\(folder.path)'\nclear\ntrue\nfalse\nsleep 10\n")
+        return app
+    }
+
+    /// Waits up to three seconds for `element`'s label to read `label`.
+    @MainActor private func waitForLabel(_ label: String, on element: XCUIElement) {
+        expectation(for: NSPredicate(format: "label == %@", label), evaluatedWith: element)
         waitForExpectations(timeout: 3)
+    }
+
+    @MainActor private func keepWindowScreenshot(of app: XCUIApplication) {
+        let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
     }
 }

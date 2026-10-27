@@ -27,16 +27,20 @@ import Testing
 /// offscreen-texture pattern `CursorStyleRenderTests` already uses.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded by
 /// design — see the type's comment.
-@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct IndexedPaletteRenderTests {
+@Suite(
+    .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct IndexedPaletteRenderTests {
 
     /// Renders a 4x10 grid whose whole first row carries background index
     /// 196 (xterm's cube red, `48;5;196m`), with `oscBeforeContent` fed
     /// first if given — an OSC 4 override, or nothing.
-    private static func renderWithBackgroundIndex196(
-        oscBeforeContent: String?
-    ) throws -> (
-        texture: MTLTexture, renderer: TerminalRenderer, terminal: Terminal
-    ) {
+    private struct Rendered {
+        var texture: MTLTexture
+        var renderer: TerminalRenderer
+        var terminal: Terminal
+    }
+
+    private static func renderWithBackgroundIndex196(oscBeforeContent: String?) throws -> Rendered {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
@@ -53,13 +57,12 @@ import Testing
         let texture = MetalRenderTarget.make(device: device, width: width, height: height)
 
         renderer.renderAndWait(
-            grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-            drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-            selection: nil,
-            indexedOverrides: terminal.indexedPalette.overrides,
+            grid: grid, cursorVisible: false, selection: nil, indexedOverrides: terminal.indexedPalette.overrides,
             indexedOverridesGeneration: terminal.indexedPalette.overridesGeneration,
-            target: texture)
-        return (texture, renderer, terminal)
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                drawableSize: CGSize(width: width, height: height)))
+        return Rendered(texture: texture, renderer: renderer, terminal: terminal)
     }
 
     @Test func untouchedIndexPaintsXtermsCubeColour() throws {
@@ -67,8 +70,8 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let (texture, renderer, _) = try Self.renderWithBackgroundIndex196(
-            oscBeforeContent: nil)
+        let rendered = try Self.renderWithBackgroundIndex196(oscBeforeContent: nil)
+        let (texture, renderer) = (rendered.texture, rendered.renderer)
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
         let sample = MetalRenderTarget.pixel(of: texture, x: cellW / 2, y: cellH / 2)
@@ -84,8 +87,8 @@ import Testing
             return
         }
         // Override index 196 to pure green before the cell that uses it.
-        let (texture, renderer, terminal) = try Self.renderWithBackgroundIndex196(
-            oscBeforeContent: "\u{1B}]4;196;#00ff00\u{1B}\\")
+        let rendered = try Self.renderWithBackgroundIndex196(oscBeforeContent: "\u{1B}]4;196;#00ff00\u{1B}\\")
+        let (texture, renderer, terminal) = (rendered.texture, rendered.renderer, rendered.terminal)
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
         let sample = MetalRenderTarget.pixel(of: texture, x: cellW / 2, y: cellH / 2)
@@ -93,7 +96,7 @@ import Testing
         #expect(sample.g > 200, "expected the override (green), got \(sample)")
         #expect(sample.b < 30, "expected the override (green), got \(sample)")
         // The query and the paint agree — the whole point of this pass.
-        #expect(terminal.indexedPalette.color(at: 196) as (UInt8, UInt8, UInt8) == (0, 255, 0))
+        #expect(terminal.indexedPalette.color(at: 196) == RGB(red: 0, green: 255, blue: 0))
     }
 
     @Test func resettingAnOverrideRepaintsTheDefault() throws {
@@ -101,8 +104,9 @@ import Testing
             Issue.record("No Metal device available in this environment")
             return
         }
-        let (texture, renderer, _) = try Self.renderWithBackgroundIndex196(
+        let rendered = try Self.renderWithBackgroundIndex196(
             oscBeforeContent: "\u{1B}]4;196;#00ff00\u{1B}\\\u{1B}]104;196\u{1B}\\")
+        let (texture, renderer) = (rendered.texture, rendered.renderer)
         let cellW = Int(renderer.metrics.cellWidth)
         let cellH = Int(renderer.metrics.cellHeight)
         let sample = MetalRenderTarget.pixel(of: texture, x: cellW / 2, y: cellH / 2)
@@ -131,12 +135,12 @@ import Testing
 
         func renderOnce() {
             renderer.renderAndWait(
-                grid: terminal.grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-                drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-                selection: nil,
+                grid: terminal.grid, cursorVisible: false, selection: nil,
                 indexedOverrides: terminal.indexedPalette.overrides,
                 indexedOverridesGeneration: terminal.indexedPalette.overridesGeneration,
-                target: texture)
+                into: FrameTarget(
+                    texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                    drawableSize: CGSize(width: width, height: height)))
         }
 
         renderOnce()

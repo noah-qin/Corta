@@ -28,7 +28,9 @@ enum UIFixtures {
         guard let root = ProcessInfo.processInfo.environment["CORTA_UI_FIXTURES"] else {
             throw NSError(
                 domain: "CortaUITests.Setup", code: 1, userInfo: [
-                    NSLocalizedDescriptionKey: "setup failure: set TEST_RUNNER_CORTA_UI_FIXTURES using CortaUITests/stage-ui-fixtures.sh; the runner's sandbox cannot write a stage the app can read.",
+                    NSLocalizedDescriptionKey:
+                        "setup failure: set TEST_RUNNER_CORTA_UI_FIXTURES using CortaUITests/stage-ui-fixtures.sh;"
+                        + " the runner's sandbox cannot write a stage the app can read.",
                 ])
         }
         let stage = URL(fileURLWithPath: root, isDirectory: true).appendingPathComponent(name)
@@ -79,7 +81,8 @@ enum UIFixtures {
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         }
         XCTFail(
-            "setup failure: the app did not load the fixture's zshrc (no `demo ❯` prompt) — check CORTA_UI_FIXTURES, not the feature",
+            "setup failure: the app did not load the fixture's zshrc (no `demo ❯` prompt)"
+                + " — check CORTA_UI_FIXTURES, not the feature",
             file: file, line: line)
     }
 }

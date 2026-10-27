@@ -205,81 +205,17 @@ struct LocalizationCoverageTests {
         let catalog = try #require(
             try JSONSerialization.jsonObject(with: data) as? [String: Any])
         let strings = try #require(catalog["strings"] as? [String: Any])
-        let specifier = try NSRegularExpression(
-            pattern: "%(?:\\d+\\$)?(?:@|lld|ld|d|s)")
-
-        func specifiers(in text: String) -> [String] {
-            let range = NSRange(text.startIndex..., in: text)
-            return specifier.matches(in: text, range: range)
-                .compactMap { Range($0.range, in: text).map { String(text[$0]) } }
-                .sorted()
-        }
+        let specifiers = try FormatSpecifiers()
 
         var mismatched: [String] = []
         var strayInForms: [String] = []
         for (key, value) in strings {
             let entry = value as? [String: Any] ?? [:]
             let localizations = entry["localizations"] as? [String: Any] ?? [:]
-            // The arguments a language consumes: the visible specifiers, plus
-            // each plural substitution's own (`%#@name@` names one, at the
-            // `argNum` it declares); for a whole-string plural, the "other"
-            // form's. Languages may move the plural to a different argument
-            // (French says "3 fichiers sur 5"), so these are compared as a set
-            // of positions, not as text.
-            func consumed(_ language: String) -> [String]? {
-                guard let localization = localizations[language] as? [String: Any] else { return nil }
-                if let unit = localization["stringUnit"] as? [String: Any],
-                    let value = unit["value"] as? String
-                {
-                    var found = specifiers(in: value)
-                    let substitutions = localization["substitutions"] as? [String: Any] ?? [:]
-                    for case let substitution as [String: Any] in substitutions.values {
-                        if let argument = substitution["argNum"] as? Int,
-                            let format = substitution["formatSpecifier"] as? String
-                        {
-                            found.append("%\(argument)$\(format)")
-                        }
-                    }
-                    return found.sorted()
-                }
-                let plural =
-                    ((localization["variations"] as? [String: Any])?["plural"] as? [String: Any])
-                let other =
-                    ((plural?["other"] as? [String: Any])?["stringUnit"] as? [String: Any])?["value"]
-                    as? String
-                return other.map(specifiers(in:))
-            }
-            // Every plural form's own text: a whole-string form may use only
-            // what the "other" form uses (a stray `%@` crashes for that
-            // count alone), and a substitution's forms only `%arg`.
-            for (language, value) in localizations {
-                guard let localization = value as? [String: Any] else { continue }
-                func forms(_ plural: [String: Any]?) -> [String] {
-                    (plural ?? [:]).values.compactMap {
-                        (($0 as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String
-                    }
-                }
-                let whole = (localization["variations"] as? [String: Any])?["plural"] as? [String: Any]
-                if let whole {
-                    let other =
-                        Set(specifiers(in: ((whole["other"] as? [String: Any])?["stringUnit"]
-                            as? [String: Any])?["value"] as? String ?? ""))
-                    for form in forms(whole) where !Set(specifiers(in: form)).isSubset(of: other) {
-                        strayInForms.append("\(key) [\(language)]: \(form)")
-                    }
-                }
-                let substitutions = localization["substitutions"] as? [String: Any] ?? [:]
-                for case let substitution as [String: Any] in substitutions.values {
-                    let plural =
-                        (substitution["variations"] as? [String: Any])?["plural"] as? [String: Any]
-                    for form in forms(plural) where !specifiers(in: form).isEmpty {
-                        strayInForms.append("\(key) [\(language)]: \(form)")
-                    }
-                }
-            }
-            guard let expected = consumed("en") else { continue }
+            strayInForms += specifiers.strayInForms(key: key, localizations: localizations)
+            guard let expected = specifiers.consumed(localizations["en"]) else { continue }
             for language in Self.shippedLanguages where language != "en" {
-                guard let translated = consumed(language) else { continue }
+                guard let translated = specifiers.consumed(localizations[language]) else { continue }
                 if translated != expected {
                     mismatched.append("\(key) [\(language)]")
                 }
@@ -287,6 +223,86 @@ struct LocalizationCoverageTests {
         }
         #expect(mismatched.isEmpty, "format specifiers differ: \(mismatched.sorted())")
         #expect(strayInForms.isEmpty, "plural forms with stray specifiers: \(strayInForms.sorted())")
+    }
+
+    /// The format specifiers in the string catalog's entries.
+    private struct FormatSpecifiers {
+        private let specifier: NSRegularExpression
+
+        init() throws {
+            specifier = try NSRegularExpression(pattern: "%(?:\\d+\\$)?(?:@|lld|ld|d|s)")
+        }
+
+        func callAsFunction(in text: String) -> [String] {
+            let range = NSRange(text.startIndex..., in: text)
+            return specifier.matches(in: text, range: range)
+                .compactMap { Range($0.range, in: text).map { String(text[$0]) } }
+                .sorted()
+        }
+
+        /// The arguments a language consumes: the visible specifiers, plus
+        /// each plural substitution's own (`%#@name@` names one, at the
+        /// `argNum` it declares); for a whole-string plural, the "other"
+        /// form's. Languages may move the plural to a different argument
+        /// (French says "3 fichiers sur 5"), so these are compared as a set
+        /// of positions, not as text.
+        func consumed(_ localization: Any?) -> [String]? {
+            guard let localization = localization as? [String: Any] else { return nil }
+            if let unit = localization["stringUnit"] as? [String: Any],
+                let value = unit["value"] as? String
+            {
+                var found = self(in: value)
+                let substitutions = localization["substitutions"] as? [String: Any] ?? [:]
+                for case let substitution as [String: Any] in substitutions.values {
+                    if let argument = substitution["argNum"] as? Int,
+                        let format = substitution["formatSpecifier"] as? String
+                    {
+                        found.append("%\(argument)$\(format)")
+                    }
+                }
+                return found.sorted()
+            }
+            let plural =
+                ((localization["variations"] as? [String: Any])?["plural"] as? [String: Any])
+            let other =
+                ((plural?["other"] as? [String: Any])?["stringUnit"] as? [String: Any])?["value"]
+                as? String
+            return other.map { self(in: $0) }
+        }
+
+        /// Every plural form's own text: a whole-string form may use only
+        /// what the "other" form uses (a stray `%@` crashes for that
+        /// count alone), and a substitution's forms only `%arg`.
+        func strayInForms(key: String, localizations: [String: Any]) -> [String] {
+            var stray: [String] = []
+            for (language, value) in localizations {
+                guard let localization = value as? [String: Any] else { continue }
+                let whole = (localization["variations"] as? [String: Any])?["plural"] as? [String: Any]
+                if let whole {
+                    let other =
+                        Set(self(in: ((whole["other"] as? [String: Any])?["stringUnit"]
+                            as? [String: Any])?["value"] as? String ?? ""))
+                    for form in Self.forms(whole) where !Set(self(in: form)).isSubset(of: other) {
+                        stray.append("\(key) [\(language)]: \(form)")
+                    }
+                }
+                let substitutions = localization["substitutions"] as? [String: Any] ?? [:]
+                for case let substitution as [String: Any] in substitutions.values {
+                    let plural =
+                        (substitution["variations"] as? [String: Any])?["plural"] as? [String: Any]
+                    for form in Self.forms(plural) where !self(in: form).isEmpty {
+                        stray.append("\(key) [\(language)]: \(form)")
+                    }
+                }
+            }
+            return stray
+        }
+
+        private static func forms(_ plural: [String: Any]?) -> [String] {
+            (plural ?? [:]).values.compactMap {
+                (($0 as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String
+            }
+        }
     }
 
     /// Mechanical, not linguistic: this cannot judge whether a

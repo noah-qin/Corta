@@ -142,15 +142,20 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         continueAfterFailure = false
         // Expected visible translations also catch untranslated compiled bundles.
         let translations: [(String, [String])] = [
-            ("en", ["View", "Theme editor", "Local host details", "Cancel", "Local", "Load", "Memory", "Network", "Disk free", "Thermal state"]),
+            ("en", ["View", "Theme editor", "Local host details", "Cancel", "Local", "Load", "Memory", "Network",
+                    "Disk free", "Thermal state"]),
             ("zh-Hans", ["显示", "主题编辑器", "本机详情", "取消", "本机", "负载", "内存", "网络", "磁盘可用", "热状态"]),
             ("zh-Hant", ["檢視", "主題編輯器", "本機詳情", "取消", "本機", "負載", "記憶體", "網路", "磁碟可用", "熱狀態"]),
             ("ja", ["表示", "テーマエディタ", "ローカルホストの詳細", "キャンセル", "ローカル", "負荷", "メモリ", "ネットワーク", "ディスク空き容量", "熱状態"]),
             ("ko", ["보기", "테마 편집기", "로컬 호스트 정보", "취소", "로컬", "부하", "메모리", "네트워크", "디스크 여유 공간", "열 상태"]),
-            ("de", ["Darstellung", "Themeneditor", "Lokale Hostdetails", "Abbrechen", "Lokal", "Last", "Speicher", "Netzwerk", "Freier Speicher", "Wärmezustand"]),
-            ("fr", ["Présentation", "Éditeur de thème", "Détails de l’hôte local", "Annuler", "Local", "Charge", "Mémoire", "Réseau", "Disque libre", "État thermique"]),
-            ("es", ["Visualización", "Editor de temas", "Detalles del equipo local", "Cancelar", "Local", "Carga", "Memoria", "Red", "Disco libre", "Estado térmico"]),
-            ("pt-BR", ["Visualização", "Editor de temas", "Detalhes do host local", "Cancelar", "Local", "Carga", "Memória", "Rede", "Disco livre", "Estado térmico"]),
+            ("de", ["Darstellung", "Themeneditor", "Lokale Hostdetails", "Abbrechen", "Lokal", "Last", "Speicher",
+                    "Netzwerk", "Freier Speicher", "Wärmezustand"]),
+            ("fr", ["Présentation", "Éditeur de thème", "Détails de l’hôte local", "Annuler", "Local", "Charge",
+                    "Mémoire", "Réseau", "Disque libre", "État thermique"]),
+            ("es", ["Visualización", "Editor de temas", "Detalles del equipo local", "Cancelar", "Local", "Carga",
+                    "Memoria", "Red", "Disco libre", "Estado térmico"]),
+            ("pt-BR", ["Visualização", "Editor de temas", "Detalhes do host local", "Cancelar", "Local", "Carga",
+                       "Memória", "Rede", "Disco livre", "Estado térmico"]),
         ]
         for (language, labels) in translations {
             let stage = try UIFixtures.stage("system-language-\(language)")

@@ -137,7 +137,9 @@ for path in paths.sorted() {
                 print("\(path): \(error.localizedDescription)")
                 problems += 1
             }
-        } else if case .malformed(let reason)? = LicenseHeaders.check(text, style: style, currentYear: max(year, currentYear)) {
+        } else if case .malformed(let reason)? = LicenseHeaders.check(
+            text, style: style, currentYear: max(year, currentYear))
+        {
             print("\(path): malformed header, not changed — \(reason)")
             problems += 1
         }

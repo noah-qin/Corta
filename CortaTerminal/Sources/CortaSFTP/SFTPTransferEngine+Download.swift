@@ -23,14 +23,9 @@ extension SFTPTransferEngine {
     // MARK: - Download
 
     func downloadOnce(
-        remotePath: String,
-        destinationPath: String,
-        policy: ConflictPolicy,
-        partialDisposition: PartialDisposition,
-        progress: ProgressHandler?,
-        session: SFTPSession,
-        ownedPartial: borrowing Mutex<LocalPartialIdentity?>
+        _ transfer: FileTransfer, session: SFTPSession, ownedPartial: borrowing Mutex<LocalPartialIdentity?>
     ) async throws(SFTPError) -> SFTPTransferReceipt {
+        let (remotePath, destinationPath) = (transfer.remotePath, transfer.localPath)
         let sourceAttributes = try await session.stat(path: remotePath)
         try checkDownloadLimit(sourceAttributes)
         let partialPath = Self.partialPath(for: destinationPath)
@@ -38,14 +33,15 @@ extension SFTPTransferEngine {
         let conflict = downloadConflict(
             destinationPath: destinationPath, partialPath: partialPath, partial: partialInfo,
             source: sourceAttributes, ownedPartial: ownedPartial.withLock { $0 })
-        let resolution = try resolve(policy: policy, conflict: conflict, destinationPath: destinationPath)
+        let resolution = try resolve(policy: transfer.policy, conflict: conflict, destinationPath: destinationPath)
         let offset =
             resolution == .resume
             ? Self.downloadResumeOffset(partial: partialInfo, source: sourceAttributes) : 0
 
+        let start: PartialStart = offset != 0 ? .resume : partialInfo != nil ? .replace : .fresh
         let (handle, descriptor) = try await openDownloadEnds(
-            remotePath: remotePath, partialPath: partialPath, fresh: offset == 0,
-            replacing: partialInfo != nil, session: session, ownedPartial: ownedPartial)
+            remotePath: remotePath, partialPath: partialPath, start: start, session: session,
+            ownedPartial: ownedPartial)
 
         let abort = AbortFlag()
         // Closed exactly once: a failure after the success path's close
@@ -54,10 +50,10 @@ extension SFTPTransferEngine {
         do {
             let receipt = try await withTaskCancellationHandler {
                 try await self.pipeDownload(
-                    session: session, remotePath: remotePath, handle: handle, descriptor: descriptor,
-                    offset: offset, total: sourceAttributes.size,
-                    sourceModificationSeconds: sourceAttributes.modificationTime,
-                    progress: progress, abort: abort)
+                    DownloadPipe(
+                        remotePath: remotePath, handle: handle, descriptor: descriptor, offset: offset,
+                        total: sourceAttributes.size, sourceModificationSeconds: sourceAttributes.modificationTime),
+                    session: session, progress: transfer.progress, abort: abort)
             } onCancel: {
                 abort.set()
             }
@@ -74,7 +70,7 @@ extension SFTPTransferEngine {
             // deadline so an uncooperative peer cannot retain this slot.
             await cleanUpRemote { try? await session.close(handle) }
             cleanUpPartial(
-                partialPath, disposition: partialDisposition,
+                partialPath, disposition: transfer.partialDisposition,
                 keepForResume: resolution == .resume)
             if let sftpError = error as? SFTPError, !abort.isSet { throw sftpError }
             throw .cancelled
@@ -92,12 +88,18 @@ extension SFTPTransferEngine {
     /// Opens the remote source, then the local partial. Remote first: a
     /// refused OPEN must leave no local partial behind, and nothing open to
     /// leak.
+    /// How a download's local partial starts.
+    enum PartialStart {
+        /// Appended to, from its confirmed length.
+        case resume
+        /// Created, where none stands.
+        case fresh
+        /// Created in place of one that stands.
+        case replace
+    }
+
     private func openDownloadEnds(
-        remotePath: String,
-        partialPath: String,
-        fresh: Bool,
-        replacing: Bool,
-        session: SFTPSession,
+        remotePath: String, partialPath: String, start: PartialStart, session: SFTPSession,
         ownedPartial: borrowing Mutex<LocalPartialIdentity?>
     ) async throws(SFTPError) -> (handle: SFTPHandle, descriptor: Int32) {
         let handle = try await session.open(path: remotePath, flags: .read)
@@ -105,9 +107,9 @@ extension SFTPTransferEngine {
         // name is removed and a new one created exclusively, so whoever
         // still holds the old one open writes into a file nothing commits,
         // never into this transfer's.
-        if fresh, replacing { Darwin.unlink(partialPath) }
+        if start == .replace { Darwin.unlink(partialPath) }
         do throws(SFTPError) {
-            let opened = try Self.openPrivatePartial(partialPath, fresh: fresh)
+            let opened = try Self.openPrivatePartial(partialPath, fresh: start != .resume)
             ownedPartial.withLock { $0 = opened.identity }
             return (handle, opened.descriptor)
         } catch {
@@ -208,17 +210,21 @@ extension SFTPTransferEngine {
     /// The windowed block fetch: up to `pipelineDepth` READs in flight,
     /// each completed block written at its offset with `pwrite` before the
     /// next window slot opens. Returns bytes moved in this run.
+    /// An opened download: both ends, and the range still to move.
+    struct DownloadPipe {
+        var remotePath: String
+        var handle: SFTPHandle
+        var descriptor: Int32
+        var offset: UInt64
+        var total: UInt64?
+        var sourceModificationSeconds: UInt32?
+    }
+
     private func pipeDownload(
-        session: SFTPSession,
-        remotePath: String,
-        handle: SFTPHandle,
-        descriptor: Int32,
-        offset: UInt64,
-        total: UInt64?,
-        sourceModificationSeconds: UInt32?,
-        progress: ProgressHandler?,
-        abort: AbortFlag
+        _ pipe: DownloadPipe, session: SFTPSession, progress: ProgressHandler?, abort: AbortFlag
     ) async throws(SFTPError) -> UInt64 {
+        let (remotePath, handle, descriptor) = (pipe.remotePath, pipe.handle, pipe.descriptor)
+        let (offset, total, sourceModificationSeconds) = (pipe.offset, pipe.total, pipe.sourceModificationSeconds)
         var nextOffset = offset
         var completed = offset
         var moved: UInt64 = 0
@@ -268,7 +274,14 @@ extension SFTPTransferEngine {
         return moved
     }
 
-    private typealias PendingRead = (offset: UInt64, length: Int, task: Task<[UInt8], any Error>)
+    private typealias PendingRead = PendingBlock<[UInt8]>
+
+    /// One pipelined request: the block it covers and the task awaiting it.
+    struct PendingBlock<Value: Sendable> {
+        var offset: UInt64
+        var length: Int
+        var task: Task<Value, any Error>
+    }
 
     /// Asks for blocks from `nextOffset` until `pipelineDepth` READs are in
     /// flight or the known size is reached.
@@ -285,7 +298,7 @@ extension SFTPTransferEngine {
             let task = Task<[UInt8], any Error> {
                 try await session.read(handle: handle, offset: requestOffset, length: length)
             }
-            pending.append((offset: requestOffset, length: Int(length), task: task))
+            pending.append(PendingRead(offset: requestOffset, length: Int(length), task: task))
             nextOffset += UInt64(length)
         }
     }

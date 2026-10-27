@@ -109,19 +109,8 @@ extension Grid {
             cursorColumn: cursor.column + (pendingWrap ? 1 : 0))
         let oldBase = scrollback.totalPushed - oldScrollbackCount
 
-        // Mirrors the non-reflowing row-shrink rule below: push only as
-        // many rows to scrollback as it takes to keep the cursor's row on
-        // screen, and drop any further surplus (blank rows below it, kept
-        // around only because the old row count was taller) from the
-        // bottom rather than archiving it.
         let totalRows = rewrapped.rows.count
-        let historyCount: Int
-        if totalRows <= newRows {
-            historyCount = 0
-        } else {
-            let excess = totalRows - newRows
-            historyCount = min(excess, max(0, rewrapped.cursorRow - (newRows - 1)))
-        }
+        let historyCount = Self.rowsToHistory(of: totalRows, keepingOnScreen: rewrapped.cursorRow, rows: newRows)
         // Counting on, never back: anchors (a scroll position, a search
         // match, a selection) re-anchor by how far `totalPushed` grew. A
         // narrower reflow pushes more rows than there were; a wider one
@@ -134,8 +123,8 @@ extension Grid {
         rowRemaps.append(
             RowRemap(
                 oldBase: oldBase, newBase: newBase,
-                newRowOfOldRow: rewrapped.newStartOfOldRow.map(\.row),
-                newColumnOfOldRow: rewrapped.newStartOfOldRow.map(\.column),
+                newRowOfOldRow: rewrapped.starts.map(\.row),
+                newColumnOfOldRow: rewrapped.starts.map(\.column),
                 newRowCount: totalRows, newColumns: newColumns))
         var newScreen = ContiguousArray(
             rewrapped.rows[historyCount..<min(historyCount + newRows, totalRows)])
@@ -153,6 +142,15 @@ extension Grid {
         pendingWrap = rewrapped.cursorPendingWrap && autowrapEnabled
     }
 
+    /// Mirrors the non-reflowing row-shrink rule: push only as many rows to
+    /// scrollback as it takes to keep the cursor's row on screen, and drop
+    /// any further surplus (blank rows below it, kept around only because
+    /// the old row count was taller) from the bottom rather than archiving it.
+    private static func rowsToHistory(of totalRows: Int, keepingOnScreen cursorRow: Int, rows: Int) -> Int {
+        guard totalRows > rows else { return 0 }
+        return min(totalRows - rows, max(0, cursorRow - (rows - 1)))
+    }
+
     /// Rewraps `rows` — already known to obey the `wrapped`-chain
     /// convention — into rows of `newColumns` width, preserving cell
     /// content and attributes, one logical line (one wrap chain) at a time.
@@ -166,11 +164,9 @@ extension Grid {
     /// an output-start one. `newStartOfOldRow` is where each old row's first
     /// cell went.
     private static func rewrap(
-        rowCount: Int, appendLineAt: (Int, inout [Cell]) -> (wrapped: Bool, mark: LineMark), toColumns newColumns: Int, cursorRow oldCursorRow: Int, cursorColumn oldCursorColumn: Int
-    ) -> (
-        rows: [Line], cursorRow: Int, cursorColumn: Int, cursorPendingWrap: Bool,
-        newStartOfOldRow: [(row: Int, column: Int)]
-    ) {
+        rowCount: Int, appendLineAt: (Int, inout [Cell]) -> (wrapped: Bool, mark: LineMark), toColumns newColumns: Int,
+        cursorRow oldCursorRow: Int, cursorColumn oldCursorColumn: Int
+    ) -> Wrapped {
         var result: [Line] = []
         result.reserveCapacity(rowCount)
         var newStartOfOldRow: [(row: Int, column: Int)] = []
@@ -213,7 +209,7 @@ extension Grid {
                 cursorColumn = wrapped.cursorColumn
                 cursorPendingWrap = wrapped.cursorPendingWrap
             }
-            for (offset, start) in wrapped.rowOfStart.enumerated() {
+            for (offset, start) in wrapped.starts.enumerated() {
                 let newRow = start.row
                 newStartOfOldRow.append((result.count + newRow, start.column))
                 let mark = rowMarks[offset]
@@ -225,7 +221,19 @@ extension Grid {
             }
             result.append(contentsOf: wrapped.rows)
         }
-        return (result, cursorRow, cursorColumn, cursorPendingWrap, newStartOfOldRow)
+        return Wrapped(
+            rows: result, cursorRow: cursorRow, cursorColumn: cursorColumn,
+            cursorPendingWrap: cursorPendingWrap, starts: newStartOfOldRow)
+    }
+
+    /// Rows wrapped to a width: the new rows, where the cursor lands in
+    /// them, and where each old row's first cell went.
+    private struct Wrapped {
+        var rows: [Line]
+        var cursorRow: Int
+        var cursorColumn: Int
+        var cursorPendingWrap: Bool
+        var starts: [(row: Int, column: Int)]
     }
 
     /// Packs one logical line's cells into rows of `newColumns` width,
@@ -242,17 +250,14 @@ extension Grid {
     /// character continues the line on a new row, as it would have before.
     private static func wrapCells(
         _ cells: [Cell], toColumns newColumns: Int, cursorAt targetIndex: Int?, rowStarts: [Int]
-    ) -> (
-        rows: [Line], cursorRow: Int, cursorColumn: Int, cursorPendingWrap: Bool,
-        rowOfStart: [(row: Int, column: Int)]
-    ) {
+    ) -> Wrapped {
         if cells.isEmpty {
             // Rows of blanks trimmed to nothing: every start is this one row.
             let blanks = targetIndex ?? 0
-            return (
-                [Line()], 0, min(blanks, newColumns - 1), blanks >= newColumns,
-                Array(repeating: (0, 0), count: rowStarts.count)
-            )
+            return Wrapped(
+                rows: [Line()], cursorRow: 0, cursorColumn: min(blanks, newColumns - 1),
+                cursorPendingWrap: blanks >= newColumns,
+                starts: Array(repeating: (0, 0), count: rowStarts.count))
         }
         var packer = RowPacker(
             columns: newColumns, cellCount: cells.count, targetIndex: targetIndex, rowStarts: rowStarts)
@@ -367,10 +372,7 @@ extension Grid {
         /// The last row, the starts past the last cell, and a cursor past
         /// it as that many blanks on the last row, clamped to its margin;
         /// exactly at the margin it is a pending wrap.
-        mutating func finish() -> (
-            rows: [Line], cursorRow: Int, cursorColumn: Int, cursorPendingWrap: Bool,
-            rowOfStart: [(row: Int, column: Int)]
-        ) {
+        mutating func finish() -> Wrapped {
             rows.append(current)
             while rowOfStart.count < rowStarts.count { rowOfStart.append((rows.count - 1, column)) }
             var cursorPendingWrap = false
@@ -380,7 +382,9 @@ extension Grid {
                 cursorColumn = min(target, columns - 1)
                 cursorPendingWrap = target >= columns
             }
-            return (rows, cursorRow, cursorColumn, cursorPendingWrap, rowOfStart)
+            return Wrapped(
+                rows: rows, cursorRow: cursorRow, cursorColumn: cursorColumn,
+                cursorPendingWrap: cursorPendingWrap, starts: rowOfStart)
         }
     }
 }

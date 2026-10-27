@@ -102,7 +102,8 @@ nonisolated extension TerminalRenderer {
                 if liveScreen || forced || invalidRows[row] || line != cachedLines[row] {
                     rebuildRow(
                         row, line: line, revision: revision, graphemes: grid.graphemes,
-                        cachedStarts: (backgroundStart, glyphStart, colorGlyphStart))
+                        cachedStarts: CachedStarts(
+                            background: backgroundStart, glyphs: glyphStart, colorGlyphs: colorGlyphStart))
                 }
             }
             backgroundStart += backgroundCounts[row]
@@ -128,9 +129,22 @@ nonisolated extension TerminalRenderer {
     /// shifts by how far its document top moved. Returns where the old block
     /// cursor's row went (`-1` once it scrolled out) and how many retained
     /// history rows are still on screen.
+    private struct RowShift {
+        var shifted: Bool
+        var oldCursorRow: Int
+        var retainedHistoryRows: Int
+    }
+
+    /// One region scroll: rows `top...bottom` moved up by `delta`.
+    private struct ScrollRun {
+        var top: Int
+        var bottom: Int
+        var delta: Int
+    }
+
     private func shiftRetainedRows(
         grid: Grid, offset: Int, previousBlockCursor: BlockCursor?
-    ) -> (shifted: Bool, oldCursorRow: Int, retainedHistoryRows: Int) {
+    ) -> RowShift {
         var shifted = false
         var retainedHistoryRows = min(grid.rows, max(0, cachedOffset))
         var oldCursorRow = previousBlockCursor?.row ?? -1
@@ -147,13 +161,16 @@ nonisolated extension TerminalRenderer {
             // rows have not moved, so the old cursor also remains in its old row.
             guard grid.scrollEventsTotal >= cachedScrollEventsTotal,
                 grid.scrollEventsTotal - cachedScrollEventsTotal <= UInt64(Grid.scrollEventCapacity)
-            else { return (shifted, oldCursorRow, retainedHistoryRows) }
+            else {
+                return RowShift(
+                    shifted: shifted, oldCursorRow: oldCursorRow, retainedHistoryRows: retainedHistoryRows)
+            }
             // A region flood logs a line per event: same region, same
             // direction, the shifts add up, so each run moves once.
-            var run: (top: Int, bottom: Int, delta: Int)?
+            var run: ScrollRun?
             for sequence in cachedScrollEventsTotal..<grid.scrollEventsTotal {
                 guard let event = grid.scrollEvent(at: sequence) else { continue }
-                let next = (top: Int(event.top), bottom: Int(event.bottom), delta: Int(event.delta))
+                let next = ScrollRun(top: Int(event.top), bottom: Int(event.bottom), delta: Int(event.delta))
                 if let pending = run, pending.top == next.top, pending.bottom == next.bottom,
                     (pending.delta > 0) == (next.delta > 0)
                 {
@@ -171,14 +188,21 @@ nonisolated extension TerminalRenderer {
                 retainedHistoryRows = max(0, min(grid.rows, retainedHistoryRows - delta))
             }
         }
-        return (shifted, oldCursorRow, retainedHistoryRows)
+        return RowShift(shifted: shifted, oldCursorRow: oldCursorRow, retainedHistoryRows: retainedHistoryRows)
+    }
+
+    /// Where a rebuilt row's instances start in each cached array.
+    private struct CachedStarts {
+        var background: Int
+        var glyphs: Int
+        var colorGlyphs: Int
     }
 
     /// Builds one row's instances into the scratch arrays and records where
     /// they go in the cache.
     private func rebuildRow(
         _ row: Int, line: Line, revision: UInt64, graphemes: GraphemeTable,
-        cachedStarts: (background: Int, glyphs: Int, colorGlyphs: Int)
+        cachedStarts: CachedStarts
     ) {
         let starts = (rowBackground.count, rowGlyphs.count, rowColorGlyphs.count)
         let deferrals = glyphAtlas.deferralCount
@@ -207,7 +231,8 @@ nonisolated extension TerminalRenderer {
     /// follows the rows (the background's overlay). `counts` becomes the
     /// new per-row counts either way.
     private func place(
-        into cached: inout ContiguousArray<QuadInstance>, counts: inout [Int], from scratch: ContiguousArray<QuadInstance>,
+        into cached: inout ContiguousArray<QuadInstance>, counts: inout [Int],
+        from scratch: ContiguousArray<QuadInstance>,
         ranges: KeyPath<RebuiltRow, Range<Int>>, starts: KeyPath<RebuiltRow, Int>
     ) {
         var moves = 0

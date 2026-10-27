@@ -26,7 +26,9 @@ struct ProgramSignalsTests {
         var terminal = Terminal()
         for byte in osc("7501;?") { terminal.feed([byte]) }
         #expect(terminal.takeOutput() == osc("7501;?"))
-        for byte in osc("7501;state=blocked:app=claude-code:id=task-1:kind=permission:progress=190:title=SGVsbG8=:msg=V29ybGQ=") { terminal.feed([byte]) }
+        let blocked = "7501;state=blocked:app=claude-code:id=task-1:kind=permission:progress=190"
+            + ":title=SGVsbG8=:msg=V29ybGQ="
+        for byte in osc(blocked) { terminal.feed([byte]) }
         let status = terminal.programStatuses["task-1"]
         #expect(status?.state == .blocked)
         #expect(status?.progress == 100)
@@ -74,7 +76,10 @@ struct ProgramSignalsTests {
 
     @Test func validationAndBounds() {
         var terminal = Terminal()
-        for payload in ["state=unknown", "state=working:kind=unknown", "state=working:id=bad id", "state=working:id=" + String(repeating: "a", count: 33)] {
+        for payload in [
+            "state=unknown", "state=working:kind=unknown", "state=working:id=bad id",
+            "state=working:id=" + String(repeating: "a", count: 33),
+        ] {
             terminal.feed(osc("7501;" + payload))
         }
         #expect(terminal.programStatuses.isEmpty)
@@ -146,10 +151,16 @@ struct ProgramSignalsTests {
         #expect(terminal.takeDesktopNotification() == nil)
         #expect(terminal.takeClosedNotificationIDs() == ["C"])
         terminal.feed(osc("99;i=query-1:p=?;"))
-        #expect(terminal.takeOutput() == osc("99;i=query-1:p=?;a=focus:o=always,unfocused,invisible:p=title,body,close,?:s=system,silent:w=1"))
+        #expect(
+            terminal.takeOutput()
+                == osc("99;i=query-1:p=?;a=focus:o=always,unfocused,invisible:p=title,body,close,?:s=system,silent:w=1")
+        )
         // All other input, including unsupported report/close/alive modes,
         // either produces no reply or precisely this constant + safe id.
-        for payload in ["i=bad id:p=?;", "i=ab/c:p=?;", "i=" + String(repeating: "x", count: 33) + ":p=?;", "i=okay:p=alive;", "i=okay:a=report:c=1;body"] {
+        for payload in [
+            "i=bad id:p=?;", "i=ab/c:p=?;", "i=" + String(repeating: "x", count: 33) + ":p=?;", "i=okay:p=alive;",
+            "i=okay:a=report:c=1;body",
+        ] {
             terminal.feed(osc("99;" + payload))
             #expect(terminal.takeOutput().isEmpty)
         }
@@ -226,7 +237,9 @@ struct ProgramSignalsTests {
             #expect(terminal.takeOutput().isEmpty)
         }
     }
+}
 
+extension ProgramSignalsTests {
     @Test func mainSlotSurvivesThirtyTwoSubtasksInEitherOrder() {
         for mainFirst in [true, false] {
             var terminal = Terminal()
@@ -346,7 +359,9 @@ struct ProgramSignalsTests {
             if name == "cancel" { #expect(states.contains("blocked")); #expect(!states.contains("done")) }
             if name == "auth" { #expect(terminal.programStatuses[""]?.kind == .auth) }
             if name == "subtask" { #expect(!children.isEmpty); #expect(terminal.programStatuses.count == 1) }
-            if name == "crash" { #expect(!terminal.isCommandRunning); #expect(terminal.programStatuses[""]?.kind == nil) }
+            if name == "crash" {
+                #expect(!terminal.isCommandRunning); #expect(terminal.programStatuses[""]?.kind == nil)
+            }
         }
     }
 

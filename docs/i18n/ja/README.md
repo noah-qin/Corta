@@ -32,7 +32,7 @@ Metal 4 レンダリング · ネイティブな CJK / IME · SSH、SFTP、リ�
 </div>
 
 > このページは英語版 [README.md](../../../README.md) のコミット
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md)
+> [`bdcf6da`](https://github.com/noah-qin/Corta/blob/bdcf6daab52425e20f6e953a1b0de152d2dfe2bf/README.md)
 > 時点の翻訳です。その後英語版が更新された場合や内容に食い違いがある場合は、英語版が正となります。
 
 ## インストール
@@ -84,6 +84,11 @@ zsh、bash、fish の起動ファイルにインストールするには **設�
 内容は `main` ブランチのものです。公開済みのリリースにはまだ含まれていない項目もあります。iTerm2 や Ghostty との比較、
 そしてそちらを選ぶべき場面については
 [Features → How Corta compares](../../FEATURES.md#how-corta-compares)（英語）にあります。
+コーディングエージェントのタスク状態について、開発中のツリーが連携しているのは現在 **Claude Code だけ**です。ほかのツールには
+汎用プロトコルへの対応とプロセス検出があるだけで、専用の状態アダプタはありません（[範囲と限界](../../CONFORMANCE.md#cli-signal-compatibility)、英語）。
+Claude Code 2.1.310 で開発と受け入れ確認をしています：対話セッションの OSC 7501 の状態と、Claude のメッセージ文のための
+明示的なチャネル選択です。tmux、Claude のバックグラウンドセッション、ターミナルタイトルの報告を無効にした場合には、それぞれ別の
+制限があります。パーサが対応しているからといって、実際のライフサイクル全体の受け入れ確認が済んでいるわけではありません。
 macOS 専用であること、tmux コントロールモード・内蔵 AI・スクリプトエンジンを持たないことは
 [確定した決定事項](../../DECISIONS.md)（英語）です。通常の tmux セッションはターミナルプログラムとして Corta の中で動きます。
 

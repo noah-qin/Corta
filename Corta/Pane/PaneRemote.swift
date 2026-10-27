@@ -185,16 +185,21 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
             index += 1
         }
         guard index < arguments.endIndex else { return nil }
-        var destination = arguments[index]
-        if destination.hasPrefix("ssh://") {
-            destination.removeFirst("ssh://".count)
-            if let slash = destination.firstIndex(of: "/") { destination = String(destination[..<slash]) }
-            if let colon = destination.lastIndex(of: ":"), !destination.hasSuffix("]") {
-                destination = String(destination[..<colon])
-            }
-        }
+        var destination = Self.withoutSSHURL(arguments[index])
         guard !destination.isEmpty else { return nil }
         if let user, !destination.contains("@") { destination = "\(user)@\(destination)" }
+        return destination
+    }
+
+    /// `ssh://[user@]host[:port][/…]` as `[user@]host`; any other word as
+    /// it is.
+    private nonisolated static func withoutSSHURL(_ word: String) -> String {
+        guard word.hasPrefix("ssh://") else { return word }
+        var destination = String(word.dropFirst("ssh://".count))
+        if let slash = destination.firstIndex(of: "/") { destination = String(destination[..<slash]) }
+        if let colon = destination.lastIndex(of: ":"), !destination.hasSuffix("]") {
+            destination = String(destination[..<colon])
+        }
         return destination
     }
 

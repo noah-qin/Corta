@@ -75,11 +75,11 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private let textureByteBudget: Int
     private let globalBudget: GlobalTextureBudget
     private let paneBudget: GlobalTextureBudget
-    private static let decodeBudget = GlobalTextureBudget(limit: 2)
-    private static let decodeFinished = Notification.Name("Corta.imageDecodeFinished")
+    static let decodeBudget = GlobalTextureBudget(limit: 2)
+    static let decodeFinished = Notification.Name("Corta.imageDecodeFinished")
     private var decodeObserver: NSObjectProtocol?
-    private final class TextureLeaseKey: Sendable {}
-    private static let textureLeaseKey = TextureLeaseKey()
+    final class TextureLeaseKey: Sendable {}
+    static let textureLeaseKey = TextureLeaseKey()
 
     /// A background decode installed a texture; schedule a frame. Called on
     /// the installing thread. Any pane's decode finishing calls it, from a
@@ -108,9 +108,14 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// Images skipped for a full global budget, with the budget generation
     /// seen; retried once it moves, since another pane's release is otherwise
     /// invisible here.
-    private var budgetBlocked: [KittyGraphics.ImageID: (
-        storeGeneration: UInt64, globalGeneration: Int, paneGeneration: Int, visibilityGeneration: Int
-    )] = [:]
+    private var budgetBlocked: [KittyGraphics.ImageID: BudgetBlock] = [:]
+    /// The generations a budget block waits on: any of them moving retries it.
+    private struct BudgetBlock {
+        var storeGeneration: UInt64
+        var globalGeneration: Int
+        var paneGeneration: Int
+        var visibilityGeneration: Int
+    }
     /// Images the last `update` found potentially on screen. Never evicted to
     /// make room: when visible images alone overflow the pane budget, evicting
     /// one to install another made the next frame decode it again, and the
@@ -126,6 +131,16 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// discards its result.
     private var inFlight: [KittyGraphics.ImageID: UInt64] = [:]
     private var desiredGenerations: [KittyGraphics.ImageID: UInt64] = [:]
+
+    /// The rows a frame shows, and the cell size images are placed in.
+    struct ImageViewport {
+        var rows: Int
+        /// Rows scrolled back into history.
+        var offset: Int
+        var scrollbackTotalPushed: Int
+        var cellWidth: Float
+        var cellHeight: Float
+    }
 
     var textureCount: Int { lock.withLock { textures.count } }
 
@@ -166,17 +181,12 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// The per-frame entry point (never from `draw`, and never decodes
     /// inline): prunes unreferenced textures, drops re-transmitted ones, and
     /// schedules decodes for new or newly visible placements.
-    func update(
-        table: ImagePlacementTable, rows: Int, offset: Int, scrollbackTotalPushed: Int,
-        cellHeight: Float
-    ) {
+    func update(table: ImagePlacementTable, viewport: ImageViewport) {
         let placements = table.orderedPlacements()
         let liveIDs = Set(placements.map(\.imageID))
         let toSchedule: [DecodeJob] = lock.withLock {
             pruneLocked(keeping: liveIDs, table: table)
-            let visible = visibleImagesLocked(
-                placements, table: table, rows: rows, offset: offset,
-                scrollbackTotalPushed: scrollbackTotalPushed, cellHeight: cellHeight)
+            let visible = visibleImagesLocked(placements, table: table, viewport: viewport)
             knownDecodedBytes = knownDecodedBytes.filter { liveIDs.contains($0.key) }
             if visible != visibleIDs {
                 visibleIDs = visible
@@ -195,9 +205,24 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         }
     }
 
-    private typealias DecodeJob = (
-        id: KittyGraphics.ImageID, generation: UInt64, data: KittyGraphics.ImageData, permit: DecodePermit
-    )
+}
+
+// MARK: - Scheduling, decoding and uploading
+
+nonisolated extension KittyImageRenderer {
+    private struct DecodeJob {
+        var id: KittyGraphics.ImageID
+        var generation: UInt64
+        var data: KittyGraphics.ImageData
+        var permit: DecodePermit
+    }
+
+    /// A block on the budgets as they stand; caller holds `lock`.
+    private func budgetBlockLocked(_ generation: UInt64) -> BudgetBlock {
+        BudgetBlock(
+            storeGeneration: generation, globalGeneration: globalBudget.generation,
+            paneGeneration: paneBudget.generation, visibilityGeneration: visibilityGeneration)
+    }
 
     /// Releases textures and forgets failures and budget blocks for images
     /// the table no longer holds. The table keeps the bytes, so a later
@@ -216,16 +241,14 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// The images some placement may show in the viewport. One pass, and
     /// none at all (no allocation) for a pane without images.
     private func visibleImagesLocked(
-        _ placements: [KittyGraphics.Placement], table: ImagePlacementTable, rows: Int, offset: Int,
-        scrollbackTotalPushed: Int, cellHeight: Float
+        _ placements: [KittyGraphics.Placement], table: ImagePlacementTable, viewport: ImageViewport
     ) -> Set<KittyGraphics.ImageID> {
         var visible = Set<KittyGraphics.ImageID>()
         for placement in placements where !visible.contains(placement.imageID) {
             guard let data = table.image(placement.imageID),
                 Self.isPotentiallyVisible(
                     placement, pixelHeight: data.height > 0 ? data.height : textures[placement.imageID]?.height,
-                    rows: rows, offset: offset,
-                    scrollbackTotalPushed: scrollbackTotalPushed, cellHeight: cellHeight)
+                    viewport: viewport)
             else { continue }
             visible.insert(placement.imageID)
         }
@@ -248,13 +271,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         guard failedGenerations[id] != generation else { return nil }
         // A replacement cannot orphan an actual queued/running job.
         guard inFlight[id] == nil else { return nil }
-        if let blocked = budgetBlocked[id], blocked.storeGeneration == generation {
-            guard blocked.globalGeneration != globalBudget.generation
-                || blocked.paneGeneration != paneBudget.generation
-                || blocked.visibilityGeneration != visibilityGeneration else { return nil }
-            budgetBlocked[id] = nil
-        }
-        guard visible.contains(id) else { return nil }
+        guard !isBudgetBlockedLocked(id, generation: generation), visible.contains(id) else { return nil }
         guard data.bytes.count <= 64 * 1024 * 1024 else {
             failedGenerations[id] = generation
             return nil
@@ -265,13 +282,25 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         if let needed = decodedBytes(of: data, id: id, generation: generation),
             needed > textureByteBudget - visibleTextureBytes(excluding: id)
         {
-            budgetBlocked[id] = (
-                generation, globalBudget.generation, paneBudget.generation, visibilityGeneration)
+            budgetBlocked[id] = budgetBlockLocked(generation)
             return nil
         }
         guard Self.decodeBudget.tryReserve(1) else { return nil }
         inFlight[id] = generation
-        return (id, generation, data, DecodePermit())
+        return DecodeJob(id: id, generation: generation, data: data, permit: DecodePermit())
+    }
+
+    /// Whether `id` still waits on a budget block for `generation`. A block
+    /// lifts, and is forgotten, once either budget or the visible set has
+    /// moved. Caller holds `lock`.
+    private func isBudgetBlockedLocked(_ id: KittyGraphics.ImageID, generation: UInt64) -> Bool {
+        guard let blocked = budgetBlocked[id], blocked.storeGeneration == generation else { return false }
+        guard blocked.globalGeneration != globalBudget.generation
+            || blocked.paneGeneration != paneBudget.generation
+            || blocked.visibilityGeneration != visibilityGeneration
+        else { return true }
+        budgetBlocked[id] = nil
+        return false
     }
 
     /// Texture bytes an image needs, before decoding it: from the header for
@@ -279,7 +308,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     private func decodedBytes(
         of data: KittyGraphics.ImageData, id: KittyGraphics.ImageID, generation: UInt64
     ) -> Int? {
-        if data.format != .png, data.format != .gif, data.width > 0, data.height > 0 { return data.width * data.height * 4 }
+        if data.format != .png, data.format != .gif, data.width > 0, data.height > 0 {
+            return data.width * data.height * 4
+        }
         guard let known = knownDecodedBytes[id], known.generation == generation else { return nil }
         return known.bytes
     }
@@ -295,14 +326,13 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// never decode — nor, being "visible", ever be evicted. `draw` checks
     /// exactly.
     private static func isPotentiallyVisible(
-        _ placement: KittyGraphics.Placement, pixelHeight: Int?,
-        rows: Int, offset: Int, scrollbackTotalPushed: Int, cellHeight: Float
+        _ placement: KittyGraphics.Placement, pixelHeight: Int?, viewport: ImageViewport
     ) -> Bool {
         let placementRows: Int?
         if let rows = placement.rows {
             placementRows = rows
         } else if let pixelHeight, pixelHeight > 0 {
-            placementRows = max(1, Int((Float(pixelHeight) / cellHeight).rounded(.up)))
+            placementRows = max(1, Int((Float(pixelHeight) / viewport.cellHeight).rounded(.up)))
         } else {
             placementRows = nil
         }
@@ -310,8 +340,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         // `totalPushed`, not `.count` (`TerminalRenderer.selectionQuads`).
         let viewportRow =
             ScrollbackCoordinates.reanchoredRow(
-                placement.row, from: placement.baseScrollbackTotal, to: scrollbackTotalPushed) + offset
-        return viewportRow + placementRows > 0 && viewportRow < rows
+                placement.row, from: placement.baseScrollbackTotal, to: viewport.scrollbackTotalPushed)
+            + viewport.offset
+        return viewportRow + placementRows > 0 && viewportRow < viewport.rows
     }
 
     /// The decode, allocation and upload, on `decodeScheduler` (or inline for
@@ -362,8 +393,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
                 // A GPU that did not finish the upload in time is transient,
                 // not a broken image: retry as an image that met a full
                 // budget does, once a texture is freed or visibility moves.
-                budgetBlocked[id] = (
-                    generation, globalBudget.generation, paneBudget.generation, visibilityGeneration)
+                budgetBlocked[id] = budgetBlockLocked(generation)
             default: break
             }
             return false
@@ -408,15 +438,13 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
             releaseTextureLocked(oldest)
         }
         guard paneBudget.tryReserve(bytes) else {
-            budgetBlocked[id] = (
-                generation, globalBudget.generation, paneBudget.generation, visibilityGeneration)
+            budgetBlocked[id] = budgetBlockLocked(generation)
             return nil
         }
         guard globalBudget.tryReserve(bytes) else {
             paneBudget.release(bytes)
             // The global budget is transient: retry when its generation moves.
-            budgetBlocked[id] = (
-                generation, globalBudget.generation, paneBudget.generation, visibilityGeneration)
+            budgetBlocked[id] = budgetBlockLocked(generation)
             return nil
         }
         // The shared mapping is not charged here: it is released once its
@@ -435,71 +463,10 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         textureBytesCached -= bytes
     }
 
-    private static func lease(of texture: MTLTexture) -> TextureLease? {
-        objc_getAssociatedObject(texture, Unmanaged.passUnretained(textureLeaseKey).toOpaque()) as? TextureLease
-    }
-
     /// Retry while evicted textures await retirement; cached images alone
     /// must not create a completion/redraw loop on idle panes.
     func noteGPUCompletion() {
         if paneBudget.retiredBytes > 0 { onImagesReady?() }
-    }
-
-    /// Draws visible placements in z-index then transmission order, placed
-    /// like `TerminalRenderer.selectionQuads`, into the backend's open
-    /// frame. Cache reads only: an uncached placement draws nothing this
-    /// frame.
-    func draw(
-        table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
-        offset: Int, scrollbackTotalPushed: Int, rect: CGRect, drawableSize: CGSize,
-        backend: Metal4Backend, drawable: MTLDrawable? = nil
-    ) {
-        forEachVisiblePlacement(
-            table: table, cellWidth: cellWidth, cellHeight: cellHeight, rows: rows,
-            offset: offset, scrollbackTotalPushed: scrollbackTotalPushed
-        ) { instance, texture, sourceUVRect, receivedAt in
-            backend.drawColorQuads(
-                [instance], atlas: texture, rect: rect, drawableSize: drawableSize, imageUVRect: sourceUVRect, transient: true)
-            if RenderMetrics.isEnabled, let receivedAt, let drawable {
-                RenderMetrics.noteImagePresent(of: drawable, receivedAt: receivedAt)
-            }
-        }
-    }
-
-    /// The culling and quad math.
-    private func forEachVisiblePlacement(
-        table: ImagePlacementTable, cellWidth: Float, cellHeight: Float, rows: Int,
-        offset: Int, scrollbackTotalPushed: Int,
-        body: (QuadInstance, MTLTexture, SIMD4<Float>, TimeInterval?) -> Void
-    ) {
-        let placements = table.orderedPlacements().sorted { $0.zIndex < $1.zIndex }
-        guard !placements.isEmpty else { return }
-
-        for placement in placements {
-            guard let texture = texture(for: placement.imageID) else { continue }
-
-            // `totalPushed`, not `.count` (`TerminalRenderer.selectionQuads`).
-            let viewportRow =
-                ScrollbackCoordinates.reanchoredRow(
-                    placement.row, from: placement.baseScrollbackTotal, to: scrollbackTotalPushed) + offset
-            let columns = placement.columns ?? max(1, Int((Float(texture.width) / cellWidth).rounded(.up)))
-            let placementRows =
-                placement.rows ?? max(1, Int((Float(texture.height) / cellHeight).rounded(.up)))
-            guard viewportRow + placementRows > 0, viewportRow < rows else { continue }
-
-            let instance = QuadInstance(
-                origin: .init(Float(placement.column) * cellWidth, Float(viewportRow) * cellHeight),
-                size: .init(placement.displayPixelWidth.map(Float.init) ?? Float(columns) * cellWidth,
-                            placement.displayPixelHeight.map(Float.init) ?? Float(placementRows) * cellHeight),
-                color: .one, atlasIndex: .max)
-            // The arrival time is a metric only: no image lookup per frame without it.
-            let receivedAt = RenderMetrics.isEnabled ? table.image(placement.imageID)?.receivedAt : nil
-            body(instance, texture, Self.sourceUVRect(for: placement), receivedAt)
-        }
-    }
-
-    static func sourceUVRect(for placement: KittyGraphics.Placement) -> SIMD4<Float> {
-        .init(0, placement.sourceTop, 1, placement.sourceBottom - placement.sourceTop)
     }
 
     /// The cached texture, or nil: no decode, allocation or scheduling.
@@ -537,122 +504,6 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         }
         decodeAndInstall(id: id, generation: 0, data: data)
         return texture(for: id)
-    }
-
-    /// Premultiplied bgra plus real dimensions, which for PNG may differ from
-    /// `s=`/`v=`. Internal for the `decodeImage` hook.
-    struct DecodedImage {
-        var width: Int
-        var height: Int
-        var pixels: ImageDecoderProcess.SharedPixels?
-        var bgra: [UInt8] { pixels?.packedBytes(width: width, height: height) ?? [] }
-        init(width: Int, height: Int, pixels: ImageDecoderProcess.SharedPixels) {
-            self.width = width
-            self.height = height
-            self.pixels = pixels
-        }
-    }
-
-    private final class TextureLease {
-        let bytes: Int
-        let pane: GlobalTextureBudget
-        let global: GlobalTextureBudget
-        private var retired = false
-        init(bytes: Int, pane: GlobalTextureBudget, global: GlobalTextureBudget) {
-            self.bytes = bytes
-            self.pane = pane
-            self.global = global
-        }
-        func retire() {
-            guard !retired else { return }
-            retired = true
-            pane.markRetired(bytes)
-            global.markRetired(bytes)
-        }
-        deinit {
-            pane.release(bytes, retired: retired)
-            global.release(bytes, retired: retired)
-            NotificationCenter.default.post(name: KittyImageRenderer.decodeFinished, object: nil)
-        }
-    }
-
-    /// Scheduler abandonment and renderer teardown return admission too.
-    private final class DecodePermit: Sendable {
-        private let released = Atomic<Bool>(false)
-        func release() {
-            guard !released.exchange(true, ordering: .acquiringAndReleasing) else { return }
-            KittyImageRenderer.decodeBudget.release(1)
-            NotificationCenter.default.post(name: KittyImageRenderer.decodeFinished, object: nil)
-        }
-        deinit { release() }
-    }
-
-    static func decode(_ data: KittyGraphics.ImageData, alignment: Int = 256) -> DecodedImage? {
-        switch data.format {
-        case .rgb:
-            return decodeRaw(data, bytesPerPixel: 3, alignment: alignment)
-        case .rgba:
-            return decodeRaw(data, bytesPerPixel: 4, alignment: alignment)
-        case .png:
-            return decodePNG(data.bytes, alignment: alignment)
-        case .gif:
-            guard data.bytes.starts(with: Array("GIF87a".utf8)) || data.bytes.starts(with: Array("GIF89a".utf8)),
-                let decoded = ImageDecoderProcess.decodePNG(data.bytes, alignment: alignment, allowGIF: true) else { return nil }
-            return DecodedImage(width: decoded.width, height: decoded.height, pixels: decoded.pixels)
-        }
-    }
-
-    private static func decodeRaw(
-        _ data: KittyGraphics.ImageData, bytesPerPixel: Int,
-        alignment: Int
-    ) -> DecodedImage? {
-        let width = data.width
-        let height = data.height
-        guard KittyGraphics.dimensionsFit(width: width, height: height),
-            data.bytes.count == width * height * bytesPerPixel,
-            let pixels = ImageDecoderProcess.SharedPixels(
-                width: width, height: height, alignment: alignment, shared: false)
-        else { return nil }
-        let destination = pixels.address.assumingMemoryBound(to: UInt8.self)
-        data.bytes.withUnsafeBufferPointer { source in
-            for row in 0..<height {
-                for column in 0..<width {
-                    let s = (row * width + column) * bytesPerPixel
-                    let d = row * pixels.bytesPerRow + column * 4
-                    let alpha = bytesPerPixel == 4 ? source[s + 3] : 255
-                    let factor = Float(alpha) / 255
-                    destination[d] = UInt8((Float(source[s + 2]) * factor).rounded())
-                    destination[d + 1] = UInt8((Float(source[s + 1]) * factor).rounded())
-                    destination[d + 2] = UInt8((Float(source[s]) * factor).rounded())
-                    destination[d + 3] = alpha
-                }
-            }
-        }
-        return DecodedImage(width: width, height: height, pixels: pixels)
-    }
-
-    /// The eight bytes every PNG starts with (RFC 2083 §3.1).
-    private static let pngSignature: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
-
-    /// `f=100` is PNG and nothing else. `CGImageSource` sniffs content, so
-    /// unchecked any output could reach every ImageIO parser — TIFF, PSD,
-    /// HEIC and the rest — under the name of a PNG: the signature is checked
-    /// here, and the decoder process pins the type and the header's
-    /// dimensions before it decodes. ImageIO itself runs only in that
-    /// process, sandboxed (`ImageDecoderProcess`).
-    static func decodePNG(_ bytes: [UInt8], alignment: Int = 256) -> DecodedImage? {
-        guard bytes.starts(with: pngSignature), let decoded = ImageDecoderProcess.decodePNG(bytes, alignment: alignment)
-        else { return nil }
-        return DecodedImage(width: decoded.width, height: decoded.height, pixels: decoded.pixels)
-    }
-
-    /// A texture is born carrying its lease: MTL4 retains textures past cache
-    /// eviction (and a timed-out blit past this call), so whoever holds it
-    /// last returns the quota.
-    private func attach(_ lease: TextureLease, to texture: MTLTexture) {
-        objc_setAssociatedObject(
-            texture, Unmanaged.passUnretained(Self.textureLeaseKey).toOpaque(), lease,
-            .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
 
     private func uploadCommandQueue() -> MTLCommandQueue? {
@@ -713,54 +564,5 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
                 withBytes: baseAddress, bytesPerRow: decoded.width * 4)
         }
         return .made(texture)
-    }
-}
-
-/// The app-wide image texture budget: VRAM is shared, and per-pane caps
-/// don't stop N panes exhausting it. Texture leases release reservations
-/// only when the last texture owner disappears, including GPU retention.
-nonisolated final class GlobalTextureBudget: Sendable {
-    static let shared = GlobalTextureBudget(limit: KittyGraphics.maximumGlobalTextureBytes)
-
-    let limit: Int
-
-    private struct State {
-        var reserved = 0
-        var retired = 0
-        var releaseCount = 0
-    }
-
-    private let state = Mutex(State())
-
-    /// Bumped on every release, so a renderer that skipped an image learns
-    /// cheaply that space may exist.
-    var generation: Int { state.withLock { $0.releaseCount } }
-
-    var reservedBytes: Int { state.withLock { $0.reserved } }
-
-    var retiredBytes: Int { state.withLock { $0.retired } }
-
-    func markRetired(_ bytes: Int) {
-        state.withLock { $0.retired += bytes }
-    }
-
-    init(limit: Int) {
-        self.limit = limit
-    }
-
-    func tryReserve(_ bytes: Int) -> Bool {
-        state.withLock { state in
-            guard bytes <= limit - state.reserved else { return false }
-            state.reserved += bytes
-            return true
-        }
-    }
-
-    func release(_ bytes: Int, retired wasRetired: Bool = false) {
-        state.withLock { state in
-            state.reserved -= bytes
-            if wasRetired { state.retired -= bytes }
-            state.releaseCount &+= 1
-        }
     }
 }

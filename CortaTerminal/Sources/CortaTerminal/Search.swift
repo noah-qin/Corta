@@ -190,13 +190,13 @@ public enum Search {
             let regex = compileRegex(pattern, caseSensitive: caseSensitive)
         else { return RegexResult() }
         var result = RegexResult()
-        let deadline = SuspendingClock.now + timeBudget
-        lineLoop: for logicalLine in grid.reversedLogicalLines() {
+        let sweep = RegexSweep(regex: regex, maxMatches: maxMatches, deadline: SuspendingClock.now + timeBudget)
+        for logicalLine in grid.reversedLogicalLines() {
             guard !shouldStop() else { break }
             let text = logicalLine.text
             guard !text.isEmpty else { continue }
             // Here too: a line with no match never calls the block.
-            if SuspendingClock.now >= deadline {
+            if sweep.isExpired {
                 result.timedOut = true
                 break
             }
@@ -204,10 +204,38 @@ public enum Search {
                 result.skippedLongLines += 1
                 continue
             }
-            let ns = text as NSString
+            let found = sweep.matches(in: logicalLine, result: &result, shouldStop: shouldStop)
+            result.matches.append(contentsOf: found.reversed())
+            if result.matches.count >= maxMatches || shouldStop() { break }
+            if sweep.isExpired {
+                result.timedOut = true
+                break
+            }
+        }
+        result.matches.reverse()
+        return result
+    }
+
+    /// One regex sweep's fixed inputs: the expression, the cap and the deadline.
+    private struct RegexSweep {
+        let regex: NSRegularExpression
+        let maxMatches: Int
+        let deadline: SuspendingClock.Instant
+
+        var isExpired: Bool { SuspendingClock.now >= deadline }
+
+        /// The line's matches in text order. Sets `result.timedOut` when the
+        /// budget runs out inside the line.
+        func matches(
+            in logicalLine: LogicalLine, result: inout RegexResult, shouldStop: () -> Bool
+        ) -> [SelectionRange] {
+            let text = logicalLine.text
+            let nsText = text as NSString
             var found: [SelectionRange] = []
+            let already = result.matches.count
+            var timedOut = false
             regex.enumerateMatches(
-                in: text, options: [.reportProgress], range: NSRange(location: 0, length: ns.length)
+                in: text, options: [.reportProgress], range: NSRange(location: 0, length: nsText.length)
             ) { match, _, stop in
                 // Progress callbacks have no match. Check them before the
                 // match guard so a failing backtracking attempt can stop too.
@@ -215,15 +243,15 @@ public enum Search {
                     stop.pointee = true
                     return
                 }
-                if SuspendingClock.now >= deadline {
-                    result.timedOut = true
+                if isExpired {
+                    timedOut = true
                     stop.pointee = true
                     return
                 }
                 guard let match, match.range.length > 0 else { return }
                 // NSRange is UTF-16; the position table is by character.
-                let prefix = ns.substring(to: match.range.location)
-                let body = ns.substring(with: match.range)
+                let prefix = nsText.substring(to: match.range.location)
+                let body = nsText.substring(with: match.range)
                 let startOffset = prefix.count
                 let endOffset = startOffset + body.count - 1
                 if let startPosition = logicalLine.position(at: startOffset),
@@ -231,27 +259,22 @@ public enum Search {
                 {
                     found.append(
                         SelectionRange(
-                            start: SelectionPoint(
-                                row: startPosition.row, column: startPosition.column),
+                            start: SelectionPoint(row: startPosition.row, column: startPosition.column),
                             end: SelectionPoint(row: endPosition.row, column: endPosition.column)))
                 }
-                if result.matches.count + found.count >= maxMatches || shouldStop()
-                    || SuspendingClock.now >= deadline
-                {
+                if already + found.count >= maxMatches || shouldStop() || isExpired {
                     stop.pointee = true
                 }
             }
-            result.matches.append(contentsOf: found.reversed())
-            if result.matches.count >= maxMatches || shouldStop() { break lineLoop }
-            if SuspendingClock.now >= deadline {
-                result.timedOut = true
-                break lineLoop
-            }
+            if timedOut { result.timedOut = true }
+            return found
         }
-        result.matches.reverse()
-        return result
     }
+}
 
+// MARK: - Plain text
+
+extension Search {
     /// A table, not `| 0x20` (which folds `[` into `{`). Equivalent to
     /// `.caseInsensitive` only for ASCII — the Kelvin sign and Turkish `i` are
     /// outside it, so the fast path refuses non-ASCII.
@@ -290,6 +313,13 @@ public enum Search {
     /// Bytes scanned between `shouldStop` polls inside one logical line.
     static let stopPollInterval = 64 * 1024
 
+    /// Matches collected newest first, up to a cap.
+    private struct Matches {
+        let limit: Int
+        var ranges: [SelectionRange] = []
+        var isFull: Bool { ranges.count >= limit }
+    }
+
     /// Oldest first; empty for an empty query. A capped result is the newest
     /// `maxMatches`. `shouldStop` is polled per line and per match.
     public static func find(
@@ -297,7 +327,7 @@ public enum Search {
         maxMatches: Int = .max, shouldStop: () -> Bool = { false }
     ) -> [SelectionRange] {
         guard !query.isEmpty, maxMatches > 0 else { return [] }
-        var results: [SelectionRange] = []
+        var matches = Matches(limit: maxMatches)
         let options: String.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
 
         // Collected newest first and reversed once. Right-to-left finds the same
@@ -307,18 +337,11 @@ public enum Search {
         // ASCII on both sides — the common case — matches the cells directly, no
         // `String` per line. A line only the `String` path can represent falls back
         // on its own.
-        let needle = asciiNeedle(query, caseSensitive: caseSensitive)
-        let fold = caseSensitive ? asciiIdentity : asciiFold
-        // Matched right to left as KMP over the reversed needle: each byte
-        // is read once, however much of the needle a near miss repeats.
-        // Comparing from every start position cost the line's length times
-        // the needle's — `a`×4095 then `b` against a long line of `a`.
-        let reversedNeedle = needle.map { Array($0.reversed()) } ?? []
-        let failure = needle == nil ? [] : failureTable(reversedNeedle)
+        let matcher = asciiNeedle(query, caseSensitive: caseSensitive).map {
+            ReverseMatcher(needle: $0, caseSensitive: caseSensitive)
+        }
         var historyReader = Scrollback.ASCIIReader()
-        var haystack = ContiguousArray<UInt8>()
-        var haystackRows = ContiguousArray<Int32>()
-        var haystackColumns = ContiguousArray<Int32>()
+        var haystack = Grid.ASCIILine()
 
         // Cache per scalar, rather than shaping the entire mixed-text line
         // after an ASCII walk has already visited it. Combining/format scalars
@@ -338,99 +361,135 @@ public enum Search {
             opaqueScalars[value] = opaque
             return opaque
         }
-        lineLoop: for span in grid.reversedLogicalLineSpans() {
-            if let needle,
+        for span in grid.reversedLogicalLineSpans() {
+            let stopped: Bool
+            if let matcher,
                 grid.fillWithASCIILogicalLine(
-                    firstRow: span.firstRow, lastRow: span.lastRow,
-                    text: &haystack, rows: &haystackRows, columns: &haystackColumns,
+                    firstRow: span.firstRow, lastRow: span.lastRow, into: &haystack,
                     historyReader: &historyReader, nonASCIIIsOpaque: nonASCIIIsOpaque)
             {
-                guard !haystack.isEmpty else { continue }
+                guard !haystack.text.isEmpty else { continue }
                 if shouldStop() { break }
-                // The rightmost match first, then only what lies wholly to
-                // its left: a self-overlapping query ("aa" in "aaa") reports
-                // the later occurrence, as before.
-                let count = needle.count
-                var matched = 0
-                var index = haystack.count - 1
-                var sincePoll = 0
-                while index >= 0 {
-                    if matched == 0, index >= 15 {
-                        let lanes = haystack.withUnsafeBytes {
-                            $0.loadUnaligned(fromByteOffset: index - 15, as: SIMD16<UInt8>.self)
-                        }
-                        let upper = (lanes .>= SIMD16(repeating: 0x41)) .& (lanes .<= SIMD16(repeating: 0x5A))
-                        let folded = caseSensitive ? lanes : lanes.replacing(with: lanes &+ SIMD16(repeating: 0x20), where: upper)
-                        if !any(folded .== SIMD16(repeating: reversedNeedle[0])) {
-                            index -= 16
-                            sincePoll += 16
-                            if sincePoll >= stopPollInterval { sincePoll = 0; if shouldStop() { break lineLoop } }
-                            continue
-                        }
-                    }
-                    let byte = fold[Int(haystack[index])]
-                    while matched > 0, byte != reversedNeedle[matched] {
-                        matched = failure[matched - 1]
-                    }
-                    if byte == reversedNeedle[matched] { matched += 1 }
-                    if matched == count {
-                        let last = index + count - 1
-                        results.append(
-                            SelectionRange(
-                                start: SelectionPoint(
-                                    row: Int(haystackRows[index]),
-                                    column: Int(haystackColumns[index])),
-                                end: SelectionPoint(
-                                    row: Int(haystackRows[last]),
-                                    column: Int(haystackColumns[last]))))
-                        matched = 0
-                        if results.count >= maxMatches || shouldStop() { break lineLoop }
-                    }
-                    index -= 1
-                    // A cancelled sweep stops inside a long line too, not
-                    // only between lines and at matches.
-                    sincePoll += 1
-                    if sincePoll >= stopPollInterval {
-                        sincePoll = 0
-                        if shouldStop() { break lineLoop }
-                    }
-                }
-                continue
+                stopped = matcher.scan(haystack, into: &matches, shouldStop: shouldStop)
+            } else {
+                let line = grid.logicalLine(firstRow: span.firstRow, lastRow: span.lastRow)
+                guard !line.text.isEmpty else { continue }
+                if shouldStop() { break }
+                stopped = scanText(of: line, for: query, options: options, into: &matches, shouldStop: shouldStop)
             }
-
-            let logicalLine = grid.logicalLine(
-                firstRow: span.firstRow, lastRow: span.lastRow)
-            let text = logicalLine.text
-            guard !text.isEmpty else { continue }
-            if shouldStop() { break }
-            var searchEnd = text.endIndex
-            var searchEndOffset = text.count
-            while searchEnd > text.startIndex,
-                let found = text.range(
-                    of: query, options: options.union(.backwards),
-                    range: text.startIndex..<searchEnd)
-            {
-                guard !found.isEmpty else { break }
-                // Advance offsets with the matches; measuring each from the start is
-                // quadratic on a match-dense line.
-                searchEndOffset -= text.distance(from: found.upperBound, to: searchEnd)
-                let endOffset = searchEndOffset - 1
-                let startOffset =
-                    searchEndOffset - text.distance(from: found.lowerBound, to: found.upperBound)
-                if let startPosition = logicalLine.position(at: startOffset),
-                    let endPosition = logicalLine.position(at: endOffset)
-                {
-                    results.append(
-                        SelectionRange(
-                            start: SelectionPoint(row: startPosition.row, column: startPosition.column),
-                            end: SelectionPoint(row: endPosition.row, column: endPosition.column)))
-                }
-                searchEnd = found.lowerBound
-                searchEndOffset = startOffset
-                if results.count >= maxMatches || shouldStop() { break lineLoop }
-            }
+            if stopped { break }
         }
+        var results = matches.ranges
         results.reverse()
         return results
+    }
+
+    /// An ASCII query, reversed for a right-to-left KMP scan of a line's
+    /// bytes: each byte is read once, however much of the needle a near miss
+    /// repeats. Comparing from every start position cost the line's length
+    /// times the needle's — `a`×4095 then `b` against a long line of `a`.
+    private struct ReverseMatcher {
+        let needle: [UInt8]
+        let failure: [Int]
+        let fold: [UInt8]
+        let caseSensitive: Bool
+
+        init(needle: [UInt8], caseSensitive: Bool) {
+            self.needle = needle.reversed()
+            failure = Search.failureTable(self.needle)
+            fold = caseSensitive ? Search.asciiIdentity : Search.asciiFold
+            self.caseSensitive = caseSensitive
+        }
+
+        /// Adds the line's matches, rightmost first, then only what lies
+        /// wholly to its left: a self-overlapping query ("aa" in "aaa")
+        /// reports the later occurrence. True when the sweep must stop.
+        func scan(_ line: Grid.ASCIILine, into matches: inout Matches, shouldStop: () -> Bool) -> Bool {
+            let haystack = line.text
+            let count = needle.count
+            var matched = 0
+            var index = haystack.count - 1
+            var sincePoll = 0
+            let needleTail = SIMD16(repeating: needle[0])
+            while index >= 0 {
+                if matched == 0, index >= 15, !mayEnd(in: haystack, at: index, matching: needleTail) {
+                    index -= 16
+                    sincePoll += 16
+                    if sincePoll >= Search.stopPollInterval { sincePoll = 0; if shouldStop() { return true } }
+                    continue
+                }
+                let byte = fold[Int(haystack[index])]
+                while matched > 0, byte != needle[matched] {
+                    matched = failure[matched - 1]
+                }
+                if byte == needle[matched] { matched += 1 }
+                if matched == count {
+                    let last = index + count - 1
+                    matches.ranges.append(
+                        SelectionRange(
+                            start: SelectionPoint(row: Int(line.rows[index]), column: Int(line.columns[index])),
+                            end: SelectionPoint(row: Int(line.rows[last]), column: Int(line.columns[last]))))
+                    matched = 0
+                    if matches.isFull || shouldStop() { return true }
+                }
+                index -= 1
+                // A cancelled sweep stops inside a long line too, not
+                // only between lines and at matches.
+                sincePoll += 1
+                if sincePoll >= Search.stopPollInterval {
+                    sincePoll = 0
+                    if shouldStop() { return true }
+                }
+            }
+            return false
+        }
+
+        /// Whether the 16 bytes ending at `index` hold the needle's last
+        /// byte; when they don't, no match ends among them.
+        @inline(__always)
+        private func mayEnd(in haystack: ContiguousArray<UInt8>, at index: Int, matching last: SIMD16<UInt8>) -> Bool {
+            let lanes = haystack.withUnsafeBytes {
+                $0.loadUnaligned(fromByteOffset: index - 15, as: SIMD16<UInt8>.self)
+            }
+            let upper = (lanes .>= SIMD16(repeating: 0x41)) .& (lanes .<= SIMD16(repeating: 0x5A))
+            let folded = caseSensitive ? lanes : lanes.replacing(with: lanes &+ SIMD16(repeating: 0x20), where: upper)
+            return any(folded .== last)
+        }
+    }
+
+    /// The `String` path, for a line ASCII cannot represent. True when the
+    /// sweep must stop.
+    private static func scanText(
+        of logicalLine: LogicalLine, for query: String, options: String.CompareOptions,
+        into matches: inout Matches, shouldStop: () -> Bool
+    ) -> Bool {
+        let text = logicalLine.text
+        var searchEnd = text.endIndex
+        var searchEndOffset = text.count
+        while searchEnd > text.startIndex,
+            let found = text.range(
+                of: query, options: options.union(.backwards),
+                range: text.startIndex..<searchEnd)
+        {
+            guard !found.isEmpty else { break }
+            // Advance offsets with the matches; measuring each from the start is
+            // quadratic on a match-dense line.
+            searchEndOffset -= text.distance(from: found.upperBound, to: searchEnd)
+            let endOffset = searchEndOffset - 1
+            let startOffset =
+                searchEndOffset - text.distance(from: found.lowerBound, to: found.upperBound)
+            if let startPosition = logicalLine.position(at: startOffset),
+                let endPosition = logicalLine.position(at: endOffset)
+            {
+                matches.ranges.append(
+                    SelectionRange(
+                        start: SelectionPoint(row: startPosition.row, column: startPosition.column),
+                        end: SelectionPoint(row: endPosition.row, column: endPosition.column)))
+            }
+            searchEnd = found.lowerBound
+            searchEndOffset = startOffset
+            if matches.isFull || shouldStop() { return true }
+        }
+        return false
     }
 }

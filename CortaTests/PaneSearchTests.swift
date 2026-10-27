@@ -307,7 +307,9 @@ struct PaneSearchTests {
         #expect(hostA.search.matches.count == 1)
         #expect(hostB.search.matches.count == 2)
     }
+}
 
+extension PaneSearchTests {
     /// `regex` is a separate local flag from `caseSensitive` with its own
     /// toggle and sweep branch (`PaneSearch.sweep`) — isolating one says
     /// nothing about the other, so it needs its own proof.

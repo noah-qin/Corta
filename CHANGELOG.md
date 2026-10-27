@@ -10,6 +10,22 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Tests and tooling
+
+- SwiftLint now reports nothing over the project's sources, tests and
+  scripts (1,813 findings before). Each rule kept or adjusted in
+  `.swiftlint.yml` says why; the generated `CharacterWidth.swift` is
+  excluded, and the pane controller's file length is judged by
+  `docs/DESIGN.md` §4.1 instead. Long functions and types were split into
+  named steps, extensions and `Type+Area.swift` files, tuples became named
+  types, and `try!` became thrown or reported errors. Behaviour is
+  unchanged; the frame-CPU baseline is at parity.
+- The build has no compiler warnings, and Periphery's two scans read
+  together report no dead code: unused imports, an unused sort overload,
+  the canvas `clearColor` and an unused clipboard accessor are gone.
+  `docs/TESTING.md` explains the package scan on a toolchain whose SwiftPM
+  builds with `swiftbuild`.
+
 ## [1.5.0] - 2026-10-26
 
 ### Added

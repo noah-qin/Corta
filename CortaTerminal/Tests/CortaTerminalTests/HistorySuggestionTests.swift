@@ -21,7 +21,10 @@ struct HistorySuggestionTests {
     @Test func validatesSuffixAndRevealsConcealingCharacters() {
         #expect(HistorySuggestion(payload: "h;2;%20%E4%B8%AD%E6%96%87")?.suffix == " 中文")
         #expect(HistorySuggestion(payload: "h;3;a%E2%80%AEb%E2%80%8B")?.suffix == "a\u{FFFD}b\u{FFFD}")
-        for payload in ["h;-1;text", "h;1;a;b", "h;1;%ZZ", "h;1;%0A", "h;1;%1B", "h;1;%C2%9B", "h;1;" + String(repeating: "a", count: 513)] {
+        for payload in [
+            "h;-1;text", "h;1;a;b", "h;1;%ZZ", "h;1;%0A", "h;1;%1B", "h;1;%C2%9B",
+            "h;1;" + String(repeating: "a", count: 513),
+        ] {
             #expect(HistorySuggestion(payload: payload) == nil)
         }
         #expect(HistorySuggestion(payload: "h;1;" + String(repeating: "a", count: 512)) != nil)
@@ -54,7 +57,10 @@ struct HistorySuggestionTests {
         terminal.directoryCompletionToken = "k"
         func feed(_ text: String) { terminal.feed(Array(text.utf8)) }
         let hint = "\u{1b}]134;k;h;1; status\u{7}"
-        for boundary in ["\u{1b}]133;A\u{7}", "\u{1b}]133;B\u{7}", "\u{1b}]133;D;0\u{7}", "\u{1b}]133;C\u{7}", "\u{1b}[?1049h", "\u{1b}c"] {
+        for boundary in [
+            "\u{1b}]133;A\u{7}", "\u{1b}]133;B\u{7}", "\u{1b}]133;D;0\u{7}", "\u{1b}]133;C\u{7}", "\u{1b}[?1049h",
+            "\u{1b}c",
+        ] {
             terminal.reset()
             feed(hint)
             #expect(terminal.historySuggestion != nil)

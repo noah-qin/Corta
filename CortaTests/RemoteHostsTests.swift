@@ -158,7 +158,9 @@ struct RecentHostsStoreTests {
 
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(#"{"version":1,"hosts":[],"targets":[{"host":"ok-box"},{"host":"-oEvil"},{"host":"b","port":70000}]}"#.utf8)
+        try Data(
+            #"{"version":1,"hosts":[],"targets":[{"host":"ok-box"},{"host":"-oEvil"},{"host":"b","port":70000}]}"#.utf8
+        )
             .write(to: url)
         #expect(RecentHostsStore(fileURL: url).targets.map(\.displayName) == ["ok-box"])
     }

@@ -58,32 +58,7 @@ final class PaneStatusPanel: NSView {
     init(_ content: Content, actions: [Action]) {
         self.content = content
         super.init(frame: .zero)
-        wantsLayer = true
-        identifier = NSUserInterfaceItemIdentifier("Corta.StatusPanel")
-        layer?.cornerRadius = Self.cornerRadius
-        layer?.cornerCurve = .continuous
-        layer?.borderWidth = 1
-        // Through `NSView.shadow`: AppKit owns a layer-backed view's layer
-        // shadow and dropped one set there, leaving a card with no edge on a
-        // light terminal.
-        let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.22)
-        shadow.shadowBlurRadius = 18
-        shadow.shadowOffset = NSSize(width: 0, height: -6)
-        self.shadow = shadow
-        // Liquid Glass, as the find bar and the palette float on; the system
-        // makes it opaque under Reduce Transparency.
-        glass.cornerRadius = Self.cornerRadius
-        glass.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(glass)
-        NSLayoutConstraint.activate([
-            glass.leadingAnchor.constraint(equalTo: leadingAnchor),
-            glass.trailingAnchor.constraint(equalTo: trailingAnchor),
-            glass.topAnchor.constraint(equalTo: topAnchor),
-            glass.bottomAnchor.constraint(equalTo: bottomAnchor),
-        ])
-        let surface = NSView()
-        glass.contentView = surface
+        let surface = installCard()
 
         let icon = NSImageView()
         icon.image = NSImage(systemSymbolName: content.symbol, accessibilityDescription: nil)
@@ -111,22 +86,7 @@ final class PaneStatusPanel: NSView {
             group.spacing = 6
             views.append(group)
         }
-        let row = NSStackView()
-        row.orientation = .horizontal
-        row.spacing = 10
-        for (index, action) in actions.enumerated() {
-            let button = NSButton(title: action.title, target: self, action: #selector(runAction(_:)))
-            button.tag = index
-            button.bezelStyle = .glass
-            button.controlSize = .large
-            if action.isPrimary {
-                button.bezelColor = .controlAccentColor
-                button.contentTintColor = .white
-            }
-            row.addArrangedSubview(button)
-            buttons.append(button)
-            handlers.append(action.handler)
-        }
+        let row = makeActionRow(actions)
         views.append(row)
 
         let stack = NSStackView(views: views)
@@ -149,6 +109,59 @@ final class PaneStatusPanel: NSView {
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         setAccessibilityLabel([content.title, content.body, content.note].compactMap { $0 }.joined(separator: ". "))
+    }
+
+    /// The rounded glass card, its border and shadow; returns the surface
+    /// the content goes on.
+    private func installCard() -> NSView {
+        wantsLayer = true
+        identifier = NSUserInterfaceItemIdentifier("Corta.StatusPanel")
+        layer?.cornerRadius = Self.cornerRadius
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 1
+        // Through `NSView.shadow`: AppKit owns a layer-backed view's layer
+        // shadow and dropped one set there, leaving a card with no edge on a
+        // light terminal.
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.22)
+        shadow.shadowBlurRadius = 18
+        shadow.shadowOffset = NSSize(width: 0, height: -6)
+        self.shadow = shadow
+        // Liquid Glass, as the find bar and the palette float on; the system
+        // makes it opaque under Reduce Transparency.
+        glass.cornerRadius = Self.cornerRadius
+        glass.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(glass)
+        NSLayoutConstraint.activate([
+            glass.leadingAnchor.constraint(equalTo: leadingAnchor),
+            glass.trailingAnchor.constraint(equalTo: trailingAnchor),
+            glass.topAnchor.constraint(equalTo: topAnchor),
+            glass.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+        let surface = NSView()
+        glass.contentView = surface
+        return surface
+    }
+
+    /// The actions side by side, the primary one in the accent colour.
+    private func makeActionRow(_ actions: [Action]) -> NSStackView {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.spacing = 10
+        for (index, action) in actions.enumerated() {
+            let button = NSButton(title: action.title, target: self, action: #selector(runAction(_:)))
+            button.tag = index
+            button.bezelStyle = .glass
+            button.controlSize = .large
+            if action.isPrimary {
+                button.bezelColor = .controlAccentColor
+                button.contentTintColor = .white
+            }
+            row.addArrangedSubview(button)
+            buttons.append(button)
+            handlers.append(action.handler)
+        }
+        return row
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

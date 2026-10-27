@@ -70,9 +70,13 @@ nonisolated enum Paste {
         var result: [PasteRisk] = []
         // The same feed without a pipe: `bash <(curl …)`, `source <(…)`, and
         // `sh -c "$(curl …)"` / `eval "$(wget …)"`, which run a download.
-        if matches(#"\|&?\s*(?:(?:/[^\s;|&]+/)?sudo\s+(?:-[^\s;|&]+\s+)*(?:(?:root|[0-9]+)\s+)?)?(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)(?=$|[\s;|&])"#)
+        if matches(
+            #"\|&?\s*(?:(?:/[^\s;|&]+/)?sudo\s+(?:-[^\s;|&]+\s+)*(?:(?:root|[0-9]+)\s+)?)?"#
+                + #"(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)(?=$|[\s;|&])"#)
             || matches(#"(?:^|[\s;|&(])(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh|source|\.)\s+<\("#)
-            || matches(#"(?:^|[\s;|&(])(?:eval|(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)\s+(?:-[^\s;|&]+\s+)*-[A-Za-z]*c[A-Za-z]*)\s+(?:\$\(|`)\s*(?:[^)`]*[\s/])?(?:curl|wget|fetch)(?=$|[\s;|&)`])"#)
+            || matches(
+                #"(?:^|[\s;|&(])(?:eval|(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)\s+(?:-[^\s;|&]+\s+)*"#
+                    + #"-[A-Za-z]*c[A-Za-z]*)\s+(?:\$\(|`)\s*(?:[^)`]*[\s/])?(?:curl|wget|fetch)(?=$|[\s;|&)`])"#)
         {
             result.append(.shellPipe)
         }
@@ -85,7 +89,9 @@ nonisolated enum Paste {
             let words = command.split(whereSeparator: { $0.isWhitespace }).map(String.init)
             guard let index = words.firstIndex(where: { $0 == "rm" || $0.hasSuffix("/rm") }) else { continue }
             let options = words.dropFirst(index + 1).prefix(while: { $0 != "--" }).filter { $0.hasPrefix("-") }
-            let recursive = options.contains { $0 == "--recursive" || (!$0.hasPrefix("--") && ($0.contains("r") || $0.contains("R"))) }
+            let recursive = options.contains {
+                $0 == "--recursive" || (!$0.hasPrefix("--") && ($0.contains("r") || $0.contains("R")))
+            }
             let force = options.contains { $0 == "--force" || (!$0.hasPrefix("--") && $0.contains("f")) }
             if recursive && force { result.append(.recursiveDelete); break }
         }
@@ -124,7 +130,8 @@ nonisolated enum Paste {
             }
             count += 1
             if ConcealingScalars.contains(scalar.value) {
-                preview.append(contentsOf: ("⟦U+" + String(scalar.value, radix: 16, uppercase: true) + "⟧").unicodeScalars)
+                preview.append(
+                    contentsOf: ("⟦U+" + String(scalar.value, radix: 16, uppercase: true) + "⟧").unicodeScalars)
             } else {
                 preview.append(scalar)
             }

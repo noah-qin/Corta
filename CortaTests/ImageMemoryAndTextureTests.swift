@@ -159,7 +159,8 @@ import Testing
     func retainedTextureKeepsQuota() throws {
         let device = try #require(Self.makeDevice())
         let global = GlobalTextureBudget(limit: 16)
-        var renderer: KittyImageRenderer? = KittyImageRenderer(device: device, textureByteBudget: 16, globalBudget: global)
+        var renderer: KittyImageRenderer? = KittyImageRenderer(
+            device: device, textureByteBudget: 16, globalBudget: global)
         let data = try #require(Self.rgbaImage(id: 1, width: 2, height: 2))
         var retained: MTLTexture? = renderer?.texture(for: KittyGraphics.ImageID(rawValue: 1), data: data)
         #expect(retained != nil)
@@ -178,7 +179,8 @@ import Testing
         let global = GlobalTextureBudget(limit: 16)
         let backend = try Metal4Backend(device: device)
         let target = MetalRenderTarget.make(device: device, width: 20, height: 20)
-        var renderer: KittyImageRenderer? = KittyImageRenderer(device: device, textureByteBudget: 16, globalBudget: global)
+        var renderer: KittyImageRenderer? = KittyImageRenderer(
+            device: device, textureByteBudget: 16, globalBudget: global)
         let data = try #require(Self.rgbaImage(id: 1, width: 2, height: 2))
         var image = renderer?.texture(for: KittyGraphics.ImageID(rawValue: 1), data: data)
         let rect = CGRect(x: 0, y: 0, width: 20, height: 20)
@@ -186,7 +188,8 @@ import Testing
             if let image {
                 backend.drawColorQuads(
                     [QuadInstance(origin: .zero, size: .init(20, 20), color: .one, atlasIndex: 1)],
-                    atlas: image, atlasRects: [.init(0, 0, UInt16(image.width), UInt16(image.height))], rect: rect, drawableSize: rect.size, transient: true)
+                    atlas: image, atlasRects: [.init(0, 0, UInt16(image.width), UInt16(image.height))], rect: rect,
+                    drawableSize: rect.size, transient: true)
             }
         })
         image = nil
@@ -250,7 +253,9 @@ import Testing
         budget.release(100)
         #expect(budget.tryReserve(100))
     }
+}
 
+extension ImageMemoryAndTextureTests {
     @Test("an image skipped on a full global budget retries once another pane frees space")
     func globalBudgetBlockedImageRetriesAfterExternalRelease() throws {
         guard let device = Self.makeDevice() else {

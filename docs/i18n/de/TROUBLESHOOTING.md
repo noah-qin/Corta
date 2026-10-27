@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > Diese Seite ist eine Übersetzung von [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md) mit dem Stand von Commit
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md).
+> [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md).
 > Wurde die englische Fassung seitdem geändert oder weichen die beiden ab, gilt die englische.
 > Meldungen von macOS stehen zusätzlich im englischen Original.
 
@@ -140,6 +140,29 @@ rc-Datei, die sie nicht lesen kann: Sie meldet es und lässt die Datei in Ruhe.
 <a id="typing-and-rendering"></a>
 
 ## Tippen und Darstellung
+
+### Bildschirm löschen lässt nur einen Cursor zurück, ohne Prompt
+
+Aktualisiere Corta, wenn ⌘K einen wartenden Prompt löscht. Mit Shell-Integration und einer Markierung für das Ende eines
+bereiten Prompts behält Bildschirm löschen jetzt den angezeigten Prompt und die noch nicht abgeschickte Eingabe samt
+Bearbeitungscursor. Es sendet weder Return noch Control-L noch sonst eine Eingabe. Aktiviere die Shell-Integration für eine
+Shell ohne Prompt-Markierungen; standardmäßige lokale zsh-Sitzungen laden sie mit den mitgelieferten Vorschlägen automatisch.
+Das eigene Neuzeichnen der Shell mit Control-L bleibt eine Alternative, wenn die Shell es eingerichtet hat. Ein Programm auf
+dem alternativen Bildschirm oder ein mehrzeiliger Editor, dessen Prompt schon im Verlauf liegt, bleibt bewusst unverändert.
+
+### Die Verzeichnisvorschläge enden nach einem Ordner mit `/` am Ende
+
+Kandidaten sind nur Unterverzeichnisse; ein Verzeichnis, das nur Dateien enthält, hat keinen weiteren Verzeichnisvorschlag.
+Tippe einen Teil eines Unterordnernamens oder drücke noch einmal Tab, solange Kandidaten sichtbar sind. Tab füllt den Pfad
+ein, ohne ihn auszuführen; Return führt `cd` aus. Versteckte Ordner brauchen einen Punkt am Anfang. Fehlt ein bekannter
+Unterordner, prüfe den Zugriff auf dieses Verzeichnis und vergleiche mit der nativen Vervollständigung der Shell, nachdem du
+`directory-completion` ausgeschaltet hast. Bleibt der Unterschied, melde die genaue Form des Pfads und die Shell.
+
+### Über Corta oder der Befehlsverlauf öffnet sich abseits des Terminals
+
+Schließe das Fenster und öffne es im aktuellen Corta erneut. Beide öffnen zentriert über dem aufrufenden Fenster und bleiben
+im nutzbaren Bereich seines Bildschirms; sie werden nicht in der Mitte des gesamten Bildschirms platziert. Ein bereits
+offenes Fenster behält die Position, die du gewählt hast.
 
 ### Tab tut nichts im Slash-Befehlsmenü von Claude Code
 

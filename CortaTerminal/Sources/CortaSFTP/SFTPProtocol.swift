@@ -416,10 +416,7 @@ public enum SFTPPayload: Equatable, Sendable {
             writer.writeUInt32(version)
         case .version(let version, let extensions):
             writer.writeUInt32(version)
-            for item in extensions {
-                writer.writeString(item.name)
-                writer.writeString(item.data)
-            }
+            writer.writeExtensionPairs(extensions)
         // A request or reply that is one path, handle or block.
         case .close(let string), .lstat(let string), .fstat(let string), .opendir(let string),
             .readdir(let string), .remove(let string), .rmdir(let string),
@@ -453,12 +450,7 @@ public enum SFTPPayload: Equatable, Sendable {
             writer.writeString(status.message)
             writer.writeString(status.languageTag)
         case .name(let entries):
-            writer.writeUInt32(UInt32(entries.count))
-            for entry in entries {
-                writer.writeString(entry.filename)
-                writer.writeString(entry.longname)
-                writer.writeAttributes(entry.attributes)
-            }
+            writer.writeEntries(entries)
         case .attrs(let attributes):
             writer.writeAttributes(attributes)
         case .extendedReply(let data):
@@ -469,6 +461,15 @@ public enum SFTPPayload: Equatable, Sendable {
     static func decode(
         type: UInt8, from reader: inout SFTPReader
     ) throws(SFTPCodecError) -> SFTPPayload {
+        if let request = try decodeRequest(type: type, from: &reader) { return request }
+        if let reply = try decodeReply(type: type, from: &reader) { return reply }
+        throw SFTPCodecError.unknownMessageType(type)
+    }
+
+    /// A client-to-server message, or nil when `type` is not one.
+    private static func decodeRequest(
+        type: UInt8, from reader: inout SFTPReader
+    ) throws(SFTPCodecError) -> SFTPPayload? {
         switch type {
         case SFTPCodec.MessageType.open:
             let path = try reader.readString(field: "open.path")
@@ -492,11 +493,10 @@ public enum SFTPPayload: Equatable, Sendable {
         case SFTPCodec.MessageType.fstat:
             return .fstat(handle: try reader.readString(field: "fstat.handle"))
         case SFTPCodec.MessageType.setstat:
-            let path = try reader.readString(field: "setstat.path")
-            return .setstat(path: path, attributes: try reader.readAttributes())
+            return .setstat(path: try reader.readString(field: "setstat.path"), attributes: try reader.readAttributes())
         case SFTPCodec.MessageType.fsetstat:
-            let handle = try reader.readString(field: "fsetstat.handle")
-            return .fsetstat(handle: handle, attributes: try reader.readAttributes())
+            return .fsetstat(
+                handle: try reader.readString(field: "fsetstat.handle"), attributes: try reader.readAttributes())
         case SFTPCodec.MessageType.opendir:
             return .opendir(path: try reader.readString(field: "opendir.path"))
         case SFTPCodec.MessageType.readdir:
@@ -504,8 +504,7 @@ public enum SFTPPayload: Equatable, Sendable {
         case SFTPCodec.MessageType.remove:
             return .remove(path: try reader.readString(field: "remove.path"))
         case SFTPCodec.MessageType.mkdir:
-            let path = try reader.readString(field: "mkdir.path")
-            return .mkdir(path: path, attributes: try reader.readAttributes())
+            return .mkdir(path: try reader.readString(field: "mkdir.path"), attributes: try reader.readAttributes())
         case SFTPCodec.MessageType.rmdir:
             return .rmdir(path: try reader.readString(field: "rmdir.path"))
         case SFTPCodec.MessageType.realpath:
@@ -513,12 +512,21 @@ public enum SFTPPayload: Equatable, Sendable {
         case SFTPCodec.MessageType.stat:
             return .stat(path: try reader.readString(field: "stat.path"))
         case SFTPCodec.MessageType.rename:
-            let oldPath = try reader.readString(field: "rename.oldPath")
-            let newPath = try reader.readString(field: "rename.newPath")
-            return .rename(oldPath: oldPath, newPath: newPath)
+            return .rename(
+                oldPath: try reader.readString(field: "rename.oldPath"),
+                newPath: try reader.readString(field: "rename.newPath"))
         case SFTPCodec.MessageType.extended:
-            let name = try reader.readString(field: "extended.name")
-            return .extended(name: name, data: reader.readRemaining())
+            return .extended(name: try reader.readString(field: "extended.name"), data: reader.readRemaining())
+        default:
+            return nil
+        }
+    }
+
+    /// A server-to-client reply, or nil when `type` is not one.
+    private static func decodeReply(
+        type: UInt8, from reader: inout SFTPReader
+    ) throws(SFTPCodecError) -> SFTPPayload? {
+        switch type {
         case SFTPCodec.MessageType.status:
             let code = SFTPStatus.Code(rawValue: try reader.readUInt32())
             let message = try reader.readString(field: "status.message")
@@ -535,7 +543,7 @@ public enum SFTPPayload: Equatable, Sendable {
         case SFTPCodec.MessageType.extendedReply:
             return .extendedReply(reader.readRemaining())
         default:
-            throw SFTPCodecError.unknownMessageType(type)
+            return nil
         }
     }
 
@@ -563,197 +571,5 @@ public enum SFTPPayload: Equatable, Sendable {
                 SFTPEntry(filename: filename, longname: longname, attributes: attributes))
         }
         return entries
-    }
-}
-
-// MARK: - Byte reader / writer
-
-/// A cursor over a frame's bytes. Every read is bounds-checked against the
-/// frame's actual length — never against what the peer *claims* — so a
-/// truncated or lying frame fails as `.truncated` instead of reading out
-/// of bounds.
-struct SFTPReader {
-    let bytes: [UInt8]
-    private(set) var position: Int = 0
-
-    init(bytes: [UInt8]) {
-        self.bytes = bytes
-    }
-
-    var remaining: Int { bytes.count - position }
-    var hasRemaining: Bool { remaining > 0 }
-
-    mutating func readUInt8() throws(SFTPCodecError) -> UInt8 {
-        guard remaining >= 1 else {
-            throw .truncated(field: "uint8", needed: 1, available: remaining)
-        }
-        defer { position += 1 }
-        return bytes[position]
-    }
-
-    mutating func readUInt32() throws(SFTPCodecError) -> UInt32 {
-        guard remaining >= 4 else {
-            throw .truncated(field: "uint32", needed: 4, available: remaining)
-        }
-        defer { position += 4 }
-        var value: UInt32 = 0
-        for index in position..<(position + 4) {
-            value = (value << 8) | UInt32(bytes[index])
-        }
-        return value
-    }
-
-    mutating func readUInt64() throws(SFTPCodecError) -> UInt64 {
-        guard remaining >= 8 else {
-            throw .truncated(field: "uint64", needed: 8, available: remaining)
-        }
-        defer { position += 8 }
-        var value: UInt64 = 0
-        for index in position..<(position + 8) {
-            value = (value << 8) | UInt64(bytes[index])
-        }
-        return value
-    }
-
-    /// A protocol string: `uint32 length` plus that many raw bytes. The
-    /// length prefix is checked against `maxStringLength` *and* against
-    /// the bytes actually remaining before any allocation happens.
-    mutating func readString(field: String = "string") throws(SFTPCodecError) -> [UInt8] {
-        let length = try readUInt32()
-        guard length <= UInt32(SFTPCodec.maxStringLength) else {
-            throw .stringLengthOutOfRange(
-                field: field, length: UInt64(length),
-                limit: UInt64(SFTPCodec.maxStringLength))
-        }
-        guard remaining >= Int(length) else {
-            throw .truncated(field: field, needed: Int(length), available: remaining)
-        }
-        defer { position += Int(length) }
-        return Array(bytes[position..<(position + Int(length))])
-    }
-
-    mutating func readAttributes() throws(SFTPCodecError) -> SFTPAttributes {
-        let flags = try readUInt32()
-        var attributes = SFTPAttributes()
-        if flags & SFTPAttributes.flagSize != 0 {
-            attributes.size = try readUInt64()
-        }
-        if flags & SFTPAttributes.flagIDs != 0 {
-            attributes.userID = try readUInt32()
-            attributes.groupID = try readUInt32()
-        }
-        if flags & SFTPAttributes.flagPermissions != 0 {
-            attributes.permissions = try readUInt32()
-        }
-        if flags & SFTPAttributes.flagTimes != 0 {
-            attributes.accessTime = try readUInt32()
-            attributes.modificationTime = try readUInt32()
-        }
-        if flags & SFTPAttributes.flagExtended != 0 {
-            let count = try readUInt32()
-            // One extended attribute minimally encodes as two empty
-            // strings (8 bytes); see the NAME count check.
-            if UInt64(count) > UInt64(remaining / 8) {
-                throw .extendedAttributeCountOutOfRange(
-                    count: UInt64(count), available: remaining)
-            }
-            var extended: [SFTPExtension] = []
-            extended.reserveCapacity(Int(count))
-            for _ in 0..<count {
-                let name = try readString(field: "attrs.extended.name")
-                let data = try readString(field: "attrs.extended.data")
-                extended.append(SFTPExtension(name: name, data: data))
-            }
-            attributes.extended = extended
-        }
-        return attributes
-    }
-
-    /// Everything left in the frame — for EXTENDED bodies, whose shape the
-    /// extension, not this codec, defines.
-    mutating func readRemaining() -> [UInt8] {
-        defer { position = bytes.count }
-        return Array(bytes[position...])
-    }
-
-    /// Fails unless the frame was consumed exactly — a fixed-layout message
-    /// with trailing bytes means the peer and this codec disagree about the
-    /// layout, which is a protocol violation, not data to ignore.
-    func requireFinished() throws(SFTPCodecError) {
-        guard remaining == 0 else { throw .trailingBytes(count: remaining) }
-    }
-}
-
-/// Builds a frame body, big-endian, appending into a single buffer.
-struct SFTPWriter {
-    private(set) var bytes: [UInt8] = []
-
-    mutating func writeUInt8(_ value: UInt8) {
-        bytes.append(value)
-    }
-
-    mutating func writeUInt32(_ value: UInt32) {
-        bytes.appendUInt32(value)
-    }
-
-    mutating func writeUInt64(_ value: UInt64) {
-        bytes.appendUInt64(value)
-    }
-
-    mutating func writeString(_ value: [UInt8]) {
-        bytes.appendUInt32(UInt32(value.count))
-        bytes.append(contentsOf: value)
-    }
-
-    mutating func writeRawBytes(_ value: [UInt8]) {
-        bytes.append(contentsOf: value)
-    }
-
-    mutating func writeAttributes(_ attributes: SFTPAttributes) {
-        var flags: UInt32 = 0
-        if attributes.size != nil { flags |= SFTPAttributes.flagSize }
-        if attributes.userID != nil || attributes.groupID != nil {
-            flags |= SFTPAttributes.flagIDs
-        }
-        if attributes.permissions != nil { flags |= SFTPAttributes.flagPermissions }
-        if attributes.accessTime != nil || attributes.modificationTime != nil {
-            flags |= SFTPAttributes.flagTimes
-        }
-        if !attributes.extended.isEmpty { flags |= SFTPAttributes.flagExtended }
-        writeUInt32(flags)
-        if let size = attributes.size { writeUInt64(size) }
-        if flags & SFTPAttributes.flagIDs != 0 {
-            // The wire always carries the pair; a caller setting one side
-            // gets zero for the other, which is what "unknown" means there.
-            writeUInt32(attributes.userID ?? 0)
-            writeUInt32(attributes.groupID ?? 0)
-        }
-        if let permissions = attributes.permissions { writeUInt32(permissions) }
-        if flags & SFTPAttributes.flagTimes != 0 {
-            writeUInt32(attributes.accessTime ?? 0)
-            writeUInt32(attributes.modificationTime ?? 0)
-        }
-        if !attributes.extended.isEmpty {
-            writeUInt32(UInt32(attributes.extended.count))
-            for item in attributes.extended {
-                writeString(item.name)
-                writeString(item.data)
-            }
-        }
-    }
-}
-
-extension [UInt8] {
-    mutating func appendUInt32(_ value: UInt32) {
-        append(UInt8((value >> 24) & 0xff))
-        append(UInt8((value >> 16) & 0xff))
-        append(UInt8((value >> 8) & 0xff))
-        append(UInt8(value & 0xff))
-    }
-
-    mutating func appendUInt64(_ value: UInt64) {
-        for shift in stride(from: 56, through: 0, by: -8) {
-            append(UInt8((value >> UInt64(shift)) & 0xff))
-        }
     }
 }

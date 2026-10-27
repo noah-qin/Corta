@@ -33,7 +33,8 @@ struct PointerShapeStack: Sendable {
     mutating func handle(_ text: String) -> String? {
         let operation = text.first
         let hasOperation = operation.map { "=<>?".contains($0) } ?? false
-        let names = (hasOperation ? String(text.dropFirst()) : text).split(separator: ",", omittingEmptySubsequences: false)
+        let names = (hasOperation ? String(text.dropFirst()) : text).split(
+            separator: ",", omittingEmptySubsequences: false)
         if operation == "?" {
             return names.map { name in
                 switch name {
@@ -73,33 +74,53 @@ extension Performer {
             let index = UInt8(requestedKey)
             guard code != nil || index != nil else { continue }
             // Rebuild even palette keys from numbers; never reflect the input.
-            let key = code.flatMap { c in Self.kittyColorKeys.first { $0.value == c }?.key } ?? String(index!)
+            let key = code.flatMap { number in Self.kittyColorKeys.first { $0.value == number }?.key } ?? String(index!)
             let value = parts.count == 2 ? String(parts[1]) : ""
             if value == "?" {
-                let color: (red: UInt8, green: UInt8, blue: UInt8)?
-                switch code {
-                case 10: color = state.dynamicColors.foreground
-                case 11: color = state.dynamicColors.background
-                case 12: color = state.dynamicColors.cursor
-                case 17: color = state.selectionBackground.components
-                case 19: color = state.selectionForeground.components
-                case 20: color = state.dynamicColors.cursorText.components
-                default: color = state.indexedPalette.color(at: index!)
-                }
-                replies.append(key + "=" + (color.map(Self.colorReport) ?? ""))
+                replies.append(key + "=" + (kittyColor(code: code, index: index).map(Self.colorReport) ?? ""))
             } else if value.isEmpty {
-                if let index { state.indexedPalette.resetOverride(index) }
-                else if code == 20 { state.dynamicColors.cursorText = .default }
-                else { resetDynamicColor(code! + 100) }
-            } else if code == 20 {
-                if let color = Self.parseColorSpecification(Array(value.utf8)[...]) {
-                    state.dynamicColors.cursorText = .rgb(color.red, color.green, color.blue)
-                }
-            } else if let code { setDynamicColor(code, specification: Array(value.utf8)[...]) }
-            else if let index, let color = Self.parseColorSpecification(Array(value.utf8)[...]) {
-                state.indexedPalette.setOverride(index, to: color)
+                resetKittyColor(code: code, index: index)
+            } else {
+                setKittyColor(code: code, index: index, to: Array(value.utf8)[...])
             }
         }
-        if !replies.isEmpty { state.outputBuffer += Array(("\u{1B}]21;" + replies.joined(separator: ";") + "\u{1B}\\").utf8) }
+        if !replies.isEmpty {
+            state.outputBuffer += Array(("\u{1B}]21;" + replies.joined(separator: ";") + "\u{1B}\\").utf8)
+        }
+    }
+
+    /// A named key's colour (`code`) or a palette entry's (`index`).
+    private func kittyColor(code: Int?, index: UInt8?) -> RGB? {
+        switch code {
+        case 10: state.dynamicColors.foreground
+        case 11: state.dynamicColors.background
+        case 12: state.dynamicColors.cursor
+        case 17: state.selectionBackground.components
+        case 19: state.selectionForeground.components
+        case 20: state.dynamicColors.cursorText.components
+        default: index.map { state.indexedPalette.color(at: $0) }
+        }
+    }
+
+    private mutating func resetKittyColor(code: Int?, index: UInt8?) {
+        if let index {
+            state.indexedPalette.resetOverride(index)
+        } else if code == 20 {
+            state.dynamicColors.cursorText = .default
+        } else if let code {
+            resetDynamicColor(code + 100)
+        }
+    }
+
+    private mutating func setKittyColor(code: Int?, index: UInt8?, to specification: ArraySlice<UInt8>) {
+        if code == 20 {
+            if let color = Self.parseColorSpecification(specification) {
+                state.dynamicColors.cursorText = .rgb(color.red, color.green, color.blue)
+            }
+        } else if let code {
+            setDynamicColor(code, specification: specification)
+        } else if let index, let color = Self.parseColorSpecification(specification) {
+            state.indexedPalette.setOverride(index, to: color)
+        }
     }
 }

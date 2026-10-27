@@ -78,7 +78,8 @@ extension TerminalView {
     /// range; without it, it said "No selection." over a real selection.
     /// Plain text: colour and bold aren't semantics.
     override func accessibilityAttributedString(for range: NSRange) -> NSAttributedString? {
-        Self.trace?.debug("attributedString(for:) \(range.location, privacy: .public)+\(range.length, privacy: .public)")
+        Self.trace?.debug(
+            "attributedString(for:) \(range.location, privacy: .public)+\(range.length, privacy: .public)")
         guard let text = accessibilityString(for: range) else { return nil }
         return NSAttributedString(string: text)
     }
@@ -126,7 +127,10 @@ extension TerminalView {
             Self.trace?.debug("selectedTextRanges -> []")
             return []
         }
-        Self.trace?.debug("selectedTextRanges -> [\(snapshot.selectedRange.location, privacy: .public)+\(snapshot.selectedRange.length, privacy: .public)]")
+        Self.trace?.debug("""
+            selectedTextRanges -> [\(snapshot.selectedRange.location, privacy: .public)+\
+            \(snapshot.selectedRange.length, privacy: .public)]
+            """)
         return [NSValue(range: snapshot.selectedRange)]
     }
 

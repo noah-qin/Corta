@@ -122,7 +122,7 @@ extension RemoteEditCoordinator {
     private func askAgain(_ copy: RemoteEditStore.RemoteCopy) {
         removeSnapshot(copy.id)
         // After the failing call has unwound and released its in-flight
-        // mark: the production prompt is modal, and an Upload answered inside
+        // mark. The production prompt is modal, and an Upload answered inside
         // it would start before that mark was cleared.
         Task { @MainActor [weak self] in
             guard let self,

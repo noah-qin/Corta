@@ -32,7 +32,7 @@ Metal-4-Rendering · Native CJK-Eingabe / IME · SSH, SFTP und Bearbeiten aus de
 </div>
 
 > Diese Seite ist eine Übersetzung der englischen [README.md](../../../README.md) mit dem Stand von Commit
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md).
+> [`bdcf6da`](https://github.com/noah-qin/Corta/blob/bdcf6daab52425e20f6e953a1b0de152d2dfe2bf/README.md).
 > Wurde die englische Fassung seitdem geändert oder weichen die beiden ab, gilt die englische.
 
 ## Installation
@@ -85,6 +85,12 @@ Shell-Integration und wiederhergestellte Layouts sind alle da; die [Funktionsref
 listet alles mit Voraussetzungen und Einschränkungen auf und beschreibt `main` – ein veröffentlichtes Release enthält
 womöglich noch nicht jeden Punkt. Wie sich Corta mit iTerm2 und Ghostty vergleicht und wann du besser eines von beiden
 wählst, steht unter [Features → How Corta compares](../../FEATURES.md#how-corta-compares) (Englisch).
+Beim Aufgabenstatus von Coding-Agenten integriert der Entwicklungsstand derzeit **nur Claude Code**; andere Werkzeuge haben
+allgemeine Protokollunterstützung und Prozesserkennung, aber keine eigenen Statusadapter
+([Umfang und Grenzen](../../CONFORMANCE.md#cli-signal-compatibility), Englisch). Entwickelt und abgenommen mit Claude Code 2.1.310:
+interaktiver Status über OSC 7501 und ausdrückliche Kanalwahl für Claudes Nachrichtentext. Für tmux, Claudes Hintergrundsitzungen
+und abgeschaltete Meldung des Terminaltitels gelten eigene Einschränkungen; dass der Parser ein Protokoll abdeckt, heißt nicht,
+dass der vollständige Lebenszyklus live abgenommen ist.
 Dass Corta nur macOS unterstützt und keinen tmux-Steuermodus, keine eingebaute KI und keine Skript-Engine hat, sind
 [getroffene Entscheidungen](../../DECISIONS.md) (Englisch); gewöhnliche tmux-Sitzungen laufen als Terminalprogramme in Corta.
 

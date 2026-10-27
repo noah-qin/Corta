@@ -131,7 +131,7 @@ struct PendingImageTransmission: Sendable {
     var header: KittyGraphics.TransmitHeader
     var display: KittyGraphics.DisplayHeader?
     var base64: [UInt8]
-    var itermOptions: [String: String]? = nil
+    var itermOptions: [String: String]?
 }
 
 /// OSC 10/11/12's colours, 8 bits per channel; reported by doubling each
@@ -145,16 +145,16 @@ public struct FrameColors: Sendable {
 }
 
 public struct DynamicColors: Sendable, Equatable {
-    public var foreground: (red: UInt8, green: UInt8, blue: UInt8)
-    public var background: (red: UInt8, green: UInt8, blue: UInt8)
-    public var cursor: (red: UInt8, green: UInt8, blue: UInt8)
+    public var foreground: RGB
+    public var background: RGB
+    public var cursor: RGB
     public var cursorText: Color = .default
-    public var selection: (red: UInt8, green: UInt8, blue: UInt8) = (142, 126, 233)
+    public var selection: RGB = RGB(red: 142, green: 126, blue: 233)
 
     public init(
-        foreground: (red: UInt8, green: UInt8, blue: UInt8) = (245, 245, 245),
-        background: (red: UInt8, green: UInt8, blue: UInt8) = (35, 40, 51),
-        cursor: (red: UInt8, green: UInt8, blue: UInt8) = (245, 245, 245)
+        foreground: RGB = RGB(red: 245, green: 245, blue: 245),
+        background: RGB = RGB(red: 35, green: 40, blue: 51),
+        cursor: RGB = RGB(red: 245, green: 245, blue: 245)
     ) {
         self.foreground = foreground
         self.background = background
@@ -217,17 +217,12 @@ extension Performer {
         if operation == 22 || operation == 23 {
             let target = parameters.value(1, default: 0)
             guard target <= 2 else { return }
+            let save = operation == 22
             if target == 0 || target == 1 {
-                if operation == 22 {
-                    if state.iconNameStack.count == PerformerState.titleStackCapacity { state.iconNameStack.removeFirst() }
-                    state.iconNameStack.append(state.iconName)
-                } else if !state.iconNameStack.isEmpty { state.iconName = state.iconNameStack.removeLast() }
+                Self.saveOrRestore(&state.iconName, on: &state.iconNameStack, save: save)
             }
             if target == 0 || target == 2 {
-                if operation == 22 {
-                    if state.windowTitleStack.count == PerformerState.titleStackCapacity { state.windowTitleStack.removeFirst() }
-                    state.windowTitleStack.append(state.windowTitle)
-                } else if !state.windowTitleStack.isEmpty { state.windowTitle = state.windowTitleStack.removeLast() }
+                Self.saveOrRestore(&state.windowTitle, on: &state.windowTitleStack, save: save)
             }
             return
         }
@@ -235,5 +230,16 @@ extension Performer {
         state.outputBuffer.append(
             contentsOf: Array("\u{1B}[8;\(grid.rows);\(grid.columns)t".utf8)
         )
+    }
+
+    /// XTWINOPS 22 saves a title, 23 restores it; the stack is bounded and
+    /// drops its oldest entry when full.
+    private static func saveOrRestore<Title>(_ title: inout Title, on stack: inout [Title], save: Bool) {
+        if save {
+            if stack.count == PerformerState.titleStackCapacity { stack.removeFirst() }
+            stack.append(title)
+        } else if !stack.isEmpty {
+            title = stack.removeLast()
+        }
     }
 }

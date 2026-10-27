@@ -90,9 +90,13 @@ struct ReleaseCheckTests {
             </rss>
             """.utf8)
         #expect(try ReleaseCheck.appcastItem(version: "1.1.0", in: feed)
-                == .init(build: "12", length: "4096", hardwareRequirements: "arm64", url: "https://example.invalid/Corta-1.1.0.zip"))
+                == .init(
+                    build: "12", length: "4096", hardwareRequirements: "arm64",
+                    url: "https://example.invalid/Corta-1.1.0.zip"))
         #expect(try ReleaseCheck.appcastItem(version: "1.0.1", in: feed)
-                == .init(build: "11", length: "2048", hardwareRequirements: "", url: "https://example.invalid/Corta-1.0.1.zip"))
+                == .init(
+                    build: "11", length: "2048", hardwareRequirements: "",
+                    url: "https://example.invalid/Corta-1.0.1.zip"))
         #expect(try ReleaseCheck.appcastItem(version: "2.0.0", in: feed) == nil)
         #expect(throws: (any Error).self) { try ReleaseCheck.appcastItem(version: "1.1.0", in: Data("<rss".utf8)) }
     }

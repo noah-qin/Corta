@@ -36,8 +36,16 @@ nonisolated struct SystemMetrics: Equatable, Sendable {
 
 /// State belongs to an actor, so sampling never blocks the UI or overlaps.
 actor SystemMetricsSampler {
+    /// One up, non-loopback link-layer interface's byte counters.
+    private struct NetworkCounter: Sendable {
+        var name: String
+        var index: UInt32
+        var input: UInt32
+        var output: UInt32
+    }
+
     private var previousCPU: [UInt32]?
-    private var previousNetwork: (name: String, index: UInt32, input: UInt32, output: UInt32, time: TimeInterval)?
+    private var previousNetwork: (counter: NetworkCounter, time: TimeInterval)?
     private var diskSample: (available: Int64?, time: TimeInterval)?
 
     func reset() {
@@ -48,12 +56,7 @@ actor SystemMetricsSampler {
     func sample(items: Set<SystemMetrics.Item>, interface: String) -> SystemMetrics {
         var result = SystemMetrics()
         let now = ProcessInfo.processInfo.systemUptime
-        if items.contains(.cpu) {
-            if let ticks = Self.cpuTicks() {
-                if let previousCPU { result.cpuPercent = Self.cpuUsage(previous: previousCPU, current: ticks) }
-                previousCPU = ticks
-            } else { previousCPU = nil }
-        } else { previousCPU = nil }
+        if items.contains(.cpu) { sampleCPU(into: &result) } else { previousCPU = nil }
         if items.contains(.load) {
             var values = [Double](repeating: 0, count: 3)
             if getloadavg(&values, 3) == 3 { result.load = values }
@@ -63,20 +66,7 @@ actor SystemMetricsSampler {
             result.memoryCompressed = memory.compressed
         }
         if items.contains(.network) {
-            let candidates = Self.networkCounters()
-            let primary = Self.primaryInterface()
-            if let selected = Self.selectInterface(candidates.map(\.name), requested: interface, primary: primary),
-                let counter = candidates.first(where: { $0.name == selected }) {
-                result.networkInterface = counter.name
-                if let previousNetwork, previousNetwork.name == counter.name, previousNetwork.index == counter.index {
-                    let elapsed = now - previousNetwork.time
-                    if elapsed > 0 && elapsed <= 5 {
-                        result.downloadRate = Double(Self.counterDelta(previousNetwork.input, counter.input)) / elapsed
-                        result.uploadRate = Double(Self.counterDelta(previousNetwork.output, counter.output)) / elapsed
-                    }
-                }
-                previousNetwork = (counter.name, counter.index, counter.input, counter.output, now)
-            } else { previousNetwork = nil }
+            sampleNetwork(into: &result, interface: interface, now: now)
         } else { previousNetwork = nil }
         if items.contains(.disk) {
             if diskSample == nil || now - diskSample!.time >= 30 {
@@ -88,6 +78,39 @@ actor SystemMetricsSampler {
         }
         if items.contains(.thermal) { result.thermal = ProcessInfo.processInfo.thermalState }
         return result
+    }
+
+    /// Usage since the previous sample; the first sample only primes it.
+    private func sampleCPU(into result: inout SystemMetrics) {
+        guard let ticks = Self.cpuTicks() else {
+            previousCPU = nil
+            return
+        }
+        if let previousCPU { result.cpuPercent = Self.cpuUsage(previous: previousCPU, current: ticks) }
+        previousCPU = ticks
+    }
+
+    /// Rates on the chosen interface since the previous sample of the same
+    /// interface, if that was at most five seconds ago.
+    private func sampleNetwork(into result: inout SystemMetrics, interface: String, now: TimeInterval) {
+        let candidates = Self.networkCounters()
+        let primary = Self.primaryInterface()
+        guard let selected = Self.selectInterface(candidates.map(\.name), requested: interface, primary: primary),
+            let counter = candidates.first(where: { $0.name == selected })
+        else {
+            previousNetwork = nil
+            return
+        }
+        result.networkInterface = counter.name
+        if let (previous, time) = previousNetwork,
+            previous.name == counter.name, previous.index == counter.index {
+            let elapsed = now - time
+            if elapsed > 0 && elapsed <= 5 {
+                result.downloadRate = Double(Self.counterDelta(previous.input, counter.input)) / elapsed
+                result.uploadRate = Double(Self.counterDelta(previous.output, counter.output)) / elapsed
+            }
+        }
+        previousNetwork = (counter, now)
     }
 
     nonisolated static func cpuUsage(previous: [UInt32], current: [UInt32]) -> Double? {
@@ -133,12 +156,16 @@ actor SystemMetricsSampler {
         var info = vm_statistics64_data_t()
         // REV1 includes wired, anonymous and compressed pages, and remains
         // compatible with the minimum macOS 26 target and newer revisions.
-        let revisionBytes = MemoryLayout<vm_statistics64_data_t>.offset(of: \.swapped_count) ?? MemoryLayout<vm_statistics64_data_t>.size
+        let revisionBytes =
+            MemoryLayout<vm_statistics64_data_t>.offset(of: \.swapped_count)
+            ?? MemoryLayout<vm_statistics64_data_t>.size
         var count = mach_msg_type_number_t(revisionBytes / MemoryLayout<integer_t>.size)
         let host = mach_host_self()
         defer { mach_port_deallocate(mach_task_self_, host) }
         let status = withUnsafeMutablePointer(to: &info) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size) {
+            $0.withMemoryRebound(
+                to: integer_t.self, capacity: MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size
+            ) {
                 host_statistics64(host, HOST_VM_INFO64, $0, &count)
             }
         }
@@ -146,24 +173,27 @@ actor SystemMetricsSampler {
         var pageSize: vm_size_t = 0
         guard host_page_size(host, &pageSize) == KERN_SUCCESS else { return nil }
         let compressed = UInt64(info.compressor_page_count) * UInt64(pageSize)
-        let used = (UInt64(info.wire_count) + UInt64(info.internal_page_count) - min(UInt64(info.internal_page_count), UInt64(info.purgeable_count))) * UInt64(pageSize) + compressed
+        let used =
+            (UInt64(info.wire_count) + UInt64(info.internal_page_count)
+                - min(UInt64(info.internal_page_count), UInt64(info.purgeable_count))) * UInt64(pageSize) + compressed
         return (min(used, ProcessInfo.processInfo.physicalMemory), compressed)
     }
 
     nonisolated private static func primaryInterface() -> String? {
         guard let store = SCDynamicStoreCreate(nil, "Corta status" as CFString, nil, nil) else { return nil }
         for family in ["IPv4", "IPv6"] {
-            if let value = SCDynamicStoreCopyValue(store, "State:/Network/Global/\(family)" as CFString) as? [String: Any],
+            if let value = SCDynamicStoreCopyValue(store, "State:/Network/Global/\(family)" as CFString)
+                as? [String: Any],
                 let name = value["PrimaryInterface"] as? String { return name }
         }
         return nil
     }
 
-    nonisolated private static func networkCounters() -> [(name: String, index: UInt32, input: UInt32, output: UInt32)] {
+    nonisolated private static func networkCounters() -> [NetworkCounter] {
         var addresses: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&addresses) == 0, let first = addresses else { return [] }
         defer { freeifaddrs(first) }
-        var result: [(String, UInt32, UInt32, UInt32)] = []
+        var result: [NetworkCounter] = []
         var pointer: UnsafeMutablePointer<ifaddrs>? = first
         while let current = pointer {
             let entry = current.pointee
@@ -172,7 +202,9 @@ actor SystemMetricsSampler {
                 entry.ifa_flags & UInt32(IFF_UP) != 0, entry.ifa_flags & UInt32(IFF_LOOPBACK) == 0,
                 let data = entry.ifa_data, let name = entry.ifa_name else { continue }
             let stats = data.assumingMemoryBound(to: if_data.self).pointee
-            result.append((String(cString: name), if_nametoindex(name), stats.ifi_ibytes, stats.ifi_obytes))
+            result.append(NetworkCounter(
+                name: String(cString: name), index: if_nametoindex(name),
+                input: stats.ifi_ibytes, output: stats.ifi_obytes))
         }
         return result
     }

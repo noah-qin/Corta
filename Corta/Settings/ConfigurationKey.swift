@@ -266,7 +266,10 @@ nonisolated extension Configuration {
             .flag("agent-status", \.agentStatus),
             ConfigurationKey(name: "agent-processes", read: { configuration, value in
                 let names = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                guard names.count <= 32, names.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 80 && !$0.contains("/") && !$0.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) }) else { return false }
+                guard names.count <= 32, names.allSatisfy({ name in
+                    !name.isEmpty && name.utf8.count <= 80 && !name.contains("/")
+                        && !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+                }) else { return false }
                 configuration.agentProcesses = names.joined(separator: ",")
                 return true
             }, write: { $0.agentProcesses }),

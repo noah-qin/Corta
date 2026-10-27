@@ -137,7 +137,8 @@ struct SelectionLiveOutputTests {
         let redrawn = await waitUntilTrue(timeout: .seconds(5)) {
             _ = pane.frameLoop.prepareFrame()
             let received = session.snapshot().logicalLines().contains { $0.text.contains("DONE") }
-            return received && (reader != "frame" || (batches > before && (text == "selected" || pane.selection == nil)))
+            return received
+                && (reader != "frame" || (batches > before && (text == "selected" || pane.selection == nil)))
         }
         try #require(redrawn)
         #expect(Selection.text(of: range, in: session.snapshot()) == String(text.prefix(8)))

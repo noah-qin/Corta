@@ -58,7 +58,9 @@ private let isOptimized = true
 /// suite runs only in an optimised build: `ci.yml` runs it under `-c release`.
 @Suite(.serialized, .enabled(if: isOptimized, "allocation counts are only meaningful optimised"))
 struct HotPathAllocationTests {
-    static let ascii: [UInt8] = Array(repeating: Array("The quick brown fox jumps over the lazy dog 0123456789 ".utf8), count: 2).flatMap { $0 }
+    static let ascii: [UInt8] = Array(
+        repeating: Array("The quick brown fox jumps over the lazy dog 0123456789 ".utf8), count: 2
+    ).flatMap { $0 }
     static func lines(_ count: Int, _ line: [UInt8]) -> [UInt8] {
         Array((0..<count).map { _ in line + [0x0D, 0x0A] }.joined())
     }
@@ -88,13 +90,16 @@ struct HotPathAllocationTests {
     }
 
     @Test func colouredText() {
-        let line = Array("\u{1B}[1;31mred\u{1B}[0m \u{1B}[38;5;208morange\u{1B}[0m \u{1B}[38;2;10;200;30mtrue\u{1B}[0m plain text here".utf8)
+        let coloured = "\u{1B}[1;31mred\u{1B}[0m \u{1B}[38;5;208morange\u{1B}[0m "
+            + "\u{1B}[38;2;10;200;30mtrue\u{1B}[0m plain text here"
+        let line = Array(coloured.utf8)
         let text = Self.lines(400, line)
         #expect(measure(scrollback: 0, warm: text, stream: text) == 0)
     }
 
     @Test func cursorAndErase() {
-        let ops = Array("\u{1B}[10;10H\u{1B}[2Kabc\u{1B}[5A\u{1B}[3Cxyz\u{1B}[J\u{1B}[1;1H\u{1B}[K\u{1B}[?25l\u{1B}[?25h".utf8)
+        let ops = Array(
+            "\u{1B}[10;10H\u{1B}[2Kabc\u{1B}[5A\u{1B}[3Cxyz\u{1B}[J\u{1B}[1;1H\u{1B}[K\u{1B}[?25l\u{1B}[?25h".utf8)
         let stream = Array(repeating: ops, count: 200).flatMap { $0 }
         #expect(measure(scrollback: 0, warm: stream, stream: stream) == 0)
     }

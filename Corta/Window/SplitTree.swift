@@ -196,9 +196,9 @@ final class SplitTree {
 /// background, painted opaque, with a barely-there light lift on top.
 final class PaneSplitView: NSSplitView {
     override func drawDivider(in rect: NSRect) {
-        let bg = TerminalColorPalette.defaultBackground
+        let canvasColor = TerminalColorPalette.defaultBackground
         NSColor(
-            srgbRed: CGFloat(bg.x), green: CGFloat(bg.y), blue: CGFloat(bg.z), alpha: 1
+            srgbRed: CGFloat(canvasColor.x), green: CGFloat(canvasColor.y), blue: CGFloat(canvasColor.z), alpha: 1
         ).setFill()
         rect.fill()
         NSColor.white.withAlphaComponent(0.12).setFill()

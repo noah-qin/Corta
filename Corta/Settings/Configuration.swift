@@ -283,8 +283,6 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// The default hotkey: ⌥Space, the Mac's usual launcher key.
     static let defaultQuickTerminalKey = "alt+space"
 
-    init() {}
-
     // MARK: - Parsing
 
     /// Parses a config file. Bad lines are skipped, never fatal. Returns the
@@ -301,18 +299,9 @@ nonisolated struct Configuration: Equatable, Sendable {
         var presetDrafts: [String: Preset] = [:]
         var presetOrder: [String] = []
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let line = rawLine.trimmingCharacters(in: .whitespaces)
-            // Split key from value before stripping comments, so a value's leading
-            // `#` stays a colour (`background = #101018`).
-            guard !line.isEmpty, !line.hasPrefix("#"), let separator = line.firstIndex(of: "=")
-            else { continue }
-            let key = line[..<separator].trimmingCharacters(in: .whitespaces)
-            var value = line[line.index(after: separator)...]
-                .trimmingCharacters(in: .whitespaces)
-            if let comment = commentStart(in: value) {
-                value = String(value[..<comment]).trimmingCharacters(in: .whitespaces)
-            }
-            guard !key.isEmpty else { continue }
+            guard let line = keyAndValue(of: rawLine) else { continue }
+            let key = line.key
+            let value = line.value
             if key.hasPrefix("theme.") {
                 if applyThemeKey(key, value: value, drafts: &themeDrafts, order: &themeOrder) {
                     continue
@@ -345,7 +334,29 @@ nonisolated struct Configuration: Equatable, Sendable {
         return (configuration, unknown)
     }
 
-    // MARK: - Custom themes
+    /// A `key = value` line's two sides, its trailing comment dropped; nil
+    /// for a blank line, a comment line, or a line with no key.
+    private static func keyAndValue(of rawLine: Substring) -> (key: String, value: String)? {
+        let line = rawLine.trimmingCharacters(in: .whitespaces)
+        // Split key from value before stripping comments, so a value's leading
+        // `#` stays a colour (`background = #101018`).
+        guard !line.isEmpty, !line.hasPrefix("#"), let separator = line.firstIndex(of: "=")
+        else { return nil }
+        let key = line[..<separator].trimmingCharacters(in: .whitespaces)
+        var value = line[line.index(after: separator)...]
+            .trimmingCharacters(in: .whitespaces)
+        if let comment = commentStart(in: value) {
+            value = String(value[..<comment]).trimmingCharacters(in: .whitespaces)
+        }
+        guard !key.isEmpty else { return nil }
+        return (key, value)
+    }
+
+}
+
+// MARK: - Custom themes
+
+nonisolated extension Configuration {
 
     /// A theme under construction; unset fields inherit.
     private struct ThemeDraft {

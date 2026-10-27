@@ -110,7 +110,6 @@ final class CursorAndWindowUITests: XCTestCase {
         add(attachment)
     }
 
-
     @MainActor private func makeApp(stage: URL) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)"]
@@ -120,7 +119,9 @@ final class CursorAndWindowUITests: XCTestCase {
         return app
     }
 
-    @MainActor private func assertFitsVisibleScreen(_ frame: CGRect, file: StaticString = #filePath, line: UInt = #line) {
+    @MainActor private func assertFitsVisibleScreen(
+        _ frame: CGRect, file: StaticString = #filePath, line: UInt = #line
+    ) {
         let top = NSScreen.screens.first?.frame.maxY ?? 0
         let fits = NSScreen.screens.contains { screen in
             let visible = screen.visibleFrame

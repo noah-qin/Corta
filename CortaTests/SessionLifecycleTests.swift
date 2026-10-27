@@ -41,7 +41,9 @@ struct SessionLifecycleTests {
     }
 
     @Test(arguments: [TerminalSession.IOFailure.Operation.read, .write])
-    func anIOFailureOffersExplicitRetryAndIgnoresOldCallbacks(operation: TerminalSession.IOFailure.Operation) async throws {
+    func anIOFailureOffersExplicitRetryAndIgnoresOldCallbacks(
+        operation: TerminalSession.IOFailure.Operation
+    ) async throws {
         var preset = Preset(name: "runtime-failure")
         preset.shell = "/bin/sh"
         preset.arguments = ["-c", "exec /bin/cat"]

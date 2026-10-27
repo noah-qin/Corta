@@ -72,18 +72,13 @@ extension SFTPTransferEngine {
 
     private static let uploadResumeRecords = Mutex<[String: UploadResumeRecord]>([:])
 
-    func uploadOnce(
-        sourcePath: String,
-        remotePath: String,
-        policy: ConflictPolicy,
-        partialDisposition: PartialDisposition,
-        progress: ProgressHandler?,
-        session: SFTPSession
-    ) async throws(SFTPError) -> SFTPTransferReceipt {
-        let (descriptor, source, stamp) = try Self.openUploadSource(sourcePath)
+    func uploadOnce(_ transfer: FileTransfer, session: SFTPSession) async throws(SFTPError) -> SFTPTransferReceipt {
+        let (sourcePath, remotePath, progress) = (transfer.localPath, transfer.remotePath, transfer.progress)
+        let opened = try Self.openUploadSource(sourcePath)
+        let (descriptor, source, stamp) = (opened.descriptor, opened.identity, opened.stamp)
         defer { Darwin.close(descriptor) }
         let target = try await prepareUploadTarget(
-            remotePath: remotePath, source: source, stamp: stamp, policy: policy, session: session)
+            remotePath: remotePath, source: source, stamp: stamp, policy: transfer.policy, session: session)
 
         let abort = AbortFlag()
         let confirmedOffset = Mutex(target.offset)
@@ -91,8 +86,10 @@ extension SFTPTransferEngine {
         do {
             let moved = try await withTaskCancellationHandler {
                 try await self.pipeUpload(
-                    session: session, handle: target.handle, descriptor: descriptor,
-                    sourcePath: sourcePath, offset: target.offset, total: source.size,
+                    UploadPipe(
+                        handle: target.handle, descriptor: descriptor, sourcePath: sourcePath,
+                        offset: target.offset, total: source.size),
+                    session: session,
                     progress: { update in
                         confirmedOffset.withLock { $0 = update.completedBytes }
                         Self.uploadResumeRecords.withLock {
@@ -105,19 +102,8 @@ extension SFTPTransferEngine {
                 abort.set()
             }
             try Self.verifySourceUnchanged(descriptor: descriptor, path: sourcePath, opened: source)
-            // By handle, after the last acknowledged write (which clears a
-            // set-id bit) and before CLOSE: a path could be swapped for a
-            // link meanwhile. Failing leaves the filling mode, which grants
-            // group and others no more than this one.
-            if let final = target.finalPermissions {
-                try? await session.fsetStat(handle: target.handle, attributes: SFTPAttributes(permissions: final))
-            }
             handleOpen = false
-            try await session.close(target.handle)
-            try await commitUpload(
-                session: session, partialPath: target.partialPath, destinationPath: remotePath,
-                mayReplace: target.resolution != .fail)
-            Self.uploadResumeRecords.withLock { $0[target.recordKey] = nil }
+            try await finishUpload(target, at: remotePath, session: session)
             return SFTPTransferReceipt(
                 bytesTransferred: moved, resumedFromOffset: target.offset, attempts: 0)
         } catch {
@@ -129,10 +115,11 @@ extension SFTPTransferEngine {
                 throw failure
             }
             await cleanUpFailedUpload(
-                handle: handleOpen ? target.handle : nil, partialPath: target.partialPath,
-                keep: Self.keepsPartial(partialDisposition, keepForResume: target.resolution == .resume),
-                confirmedOffset: { confirmedOffset.withLock { $0 } }, source: source,
-                accessTime: stamp.accessTime, recordKey: target.recordKey, session: session)
+                FailedUpload(
+                    handle: handleOpen ? target.handle : nil, partialPath: target.partialPath,
+                    keep: Self.keepsPartial(transfer.partialDisposition, keepForResume: target.resolution == .resume),
+                    source: source, accessTime: stamp.accessTime, recordKey: target.recordKey),
+                confirmedOffset: { confirmedOffset.withLock { $0 } }, session: session)
             if let failure, !abort.isSet { throw failure }
             throw .cancelled
         }
@@ -244,9 +231,13 @@ extension SFTPTransferEngine {
     /// The upload's source, opened. The descriptor, not the name, is what is
     /// uploaded: its size and mtime at open are the ones the transfer is
     /// checked against.
-    private static func openUploadSource(
-        _ path: String
-    ) throws(SFTPError) -> (descriptor: Int32, identity: LocalSourceIdentity, stamp: LocalSourceStamp) {
+    private struct UploadSource {
+        var descriptor: Int32
+        var identity: LocalSourceIdentity
+        var stamp: LocalSourceStamp
+    }
+
+    private static func openUploadSource(_ path: String) throws(SFTPError) -> UploadSource {
         let descriptor = Darwin.open(path, O_RDONLY | O_CLOEXEC)
         guard descriptor >= 0 else {
             let code = errno
@@ -258,7 +249,8 @@ extension SFTPTransferEngine {
             Darwin.close(descriptor)
             throw .localIOFailed(operation: "fstat", code: code)
         }
-        return (descriptor, LocalSourceIdentity(openedStat), LocalSourceStamp(openedStat))
+        return UploadSource(
+            descriptor: descriptor, identity: LocalSourceIdentity(openedStat), stamp: LocalSourceStamp(openedStat))
     }
 
     /// Where an upload the user chose to resume picks up: the remote partial
@@ -321,12 +313,43 @@ extension SFTPTransferEngine {
         }
     }
 
+    /// What a failed upload left: the remote handle if still open, the
+    /// partial, whether to keep it, and what a resume would be checked against.
+    struct FailedUpload {
+        var handle: SFTPHandle?
+        var partialPath: String
+        var keep: Bool
+        var source: LocalSourceIdentity
+        var accessTime: UInt32
+        var recordKey: String
+    }
+
+    /// A fully written partial: its final mode, CLOSE, the rename over the
+    /// destination, and its resume record forgotten.
+    private func finishUpload(
+        _ target: UploadTarget, at remotePath: String, session: SFTPSession
+    ) async throws(SFTPError) {
+        // By handle, after the last acknowledged write (which clears a
+        // set-id bit) and before CLOSE: a path could be swapped for a
+        // link meanwhile. Failing leaves the filling mode, which grants
+        // group and others no more than this one.
+        if let final = target.finalPermissions {
+            try? await session.fsetStat(handle: target.handle, attributes: SFTPAttributes(permissions: final))
+        }
+        try await session.close(target.handle)
+        try await commitUpload(
+            session: session, partialPath: target.partialPath, destinationPath: remotePath,
+            mayReplace: target.resolution != .fail)
+        Self.uploadResumeRecords.withLock { $0[target.recordKey] = nil }
+    }
+
     /// After a failed upload: close `handle` if still open, then either keep
     /// the partial at a safe resume point or remove it.
     private func cleanUpFailedUpload(
-        handle: SFTPHandle?, partialPath: String, keep: Bool, confirmedOffset: () -> UInt64,
-        source: LocalSourceIdentity, accessTime: UInt32, recordKey: String, session: SFTPSession
+        _ failed: FailedUpload, confirmedOffset: () -> UInt64, session: SFTPSession
     ) async {
+        let (handle, partialPath, recordKey) = (failed.handle, failed.partialPath, failed.recordKey)
+        let (source, accessTime) = (failed.source, failed.accessTime)
         let handleClosed = Mutex(handle == nil)
         if let handle {
             await cleanUpRemote {
@@ -336,7 +359,7 @@ extension SFTPTransferEngine {
                 } catch {}
             }
         }
-        guard keep else {
+        guard failed.keep else {
             Self.uploadResumeRecords.withLock { $0[recordKey] = nil }
             await cleanUpRemote { try? await session.remove(path: partialPath) }
             return
@@ -380,20 +403,24 @@ extension SFTPTransferEngine {
 
     /// The write side of the window: `pread` a block locally, send WRITE,
     /// keep up to `pipelineDepth` unanswered.
+    /// An opened upload: both ends, and the range still to move.
+    struct UploadPipe {
+        var handle: SFTPHandle
+        var descriptor: Int32
+        var sourcePath: String
+        var offset: UInt64
+        var total: UInt64
+    }
+
     private func pipeUpload(
-        session: SFTPSession,
-        handle: SFTPHandle,
-        descriptor: Int32,
-        sourcePath: String,
-        offset: UInt64,
-        total: UInt64,
-        progress: ProgressHandler?,
-        abort: AbortFlag
+        _ pipe: UploadPipe, session: SFTPSession, progress: ProgressHandler?, abort: AbortFlag
     ) async throws(SFTPError) -> UInt64 {
+        let (handle, descriptor, sourcePath) = (pipe.handle, pipe.descriptor, pipe.sourcePath)
+        let (offset, total) = (pipe.offset, pipe.total)
         var nextOffset = offset
         var moved: UInt64 = 0
         var sourceDrained = offset >= total
-        var pending: [(offset: UInt64, length: Int, task: Task<Void, any Error>)] = []
+        var pending: [PendingBlock<Void>] = []
         pending.reserveCapacity(configuration.pipelineDepth)
         defer { for item in pending { item.task.cancel() } }
 
@@ -416,7 +443,7 @@ extension SFTPTransferEngine {
                 let task = Task<Void, any Error> {
                     try await session.write(handle: handle, offset: requestOffset, data: block)
                 }
-                pending.append((offset: requestOffset, length: block.count, task: task))
+                pending.append(PendingBlock(offset: requestOffset, length: block.count, task: task))
                 nextOffset += UInt64(block.count)
                 if nextOffset >= total { sourceDrained = true }
             }

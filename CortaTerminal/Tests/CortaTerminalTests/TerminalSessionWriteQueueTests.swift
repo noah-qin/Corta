@@ -302,7 +302,9 @@ import Testing
         session.stop()
         #expect(session.write([1]) == .stopped)
     }
+}
 
+extension TerminalSessionWriteQueueTests {
     /// A paste is queued whole or not at all: cut short after `ESC[200~`, the
     /// shell would wait in paste mode for an `ESC[201~` that never comes.
     @Test func aChunkedPasteIsQueuedWholeOrNotAtAll() throws {

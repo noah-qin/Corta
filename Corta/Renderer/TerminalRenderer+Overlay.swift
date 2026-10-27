@@ -21,35 +21,40 @@ import simd
 
 /// What draws over the cells: cursor, selection, search matches, the hovered link and command marks.
 nonisolated extension TerminalRenderer {
-    func rebuildOverlay(
-        grid: Grid, cursorStyle: CursorStyle, cursorVisible: Bool, selection: TerminalSelection?, offset: Int,
-        searchMatches: [TerminalSelection] = [], currentSearchMatchIndex: Int? = nil,
-        hoveredLink: TerminalSelection? = nil
-    ) {
+    /// What the cursor, selection, search and link overlay is built from.
+    struct OverlayInputs {
+        var cursorStyle: CursorStyle
+        var cursorVisible: Bool
+        var selection: TerminalSelection?
+        var searchMatches: [TerminalSelection]
+        var currentSearchMatchIndex: Int?
+        var hoveredLink: TerminalSelection?
+    }
+
+    func rebuildOverlay(grid: Grid, offset: Int, overlay: OverlayInputs) {
         let cellWidth = Float(metricsValue.cellWidth)
         let cellHeight = Float(metricsValue.cellHeight)
+        let cell = SIMD2(cellWidth, cellHeight)
         overlayScratch.removeAll(keepingCapacity: true)
-        if let selection {
+        if let selection = overlay.selection {
             overlayScratch.append(
                 contentsOf: selectionQuads(
-                    selection, grid: grid, offset: offset, cellWidth: cellWidth, cellHeight: cellHeight,
-                    color: frameOverlay.selection))
+                    selection, grid: grid, offset: offset, cell: cell, color: frameOverlay.selection))
         }
         // After the selection, before the cursor, which stays on top.
-        for (index, match) in searchMatches.enumerated() {
+        for (index, match) in overlay.searchMatches.enumerated() {
             overlayScratch.append(
                 contentsOf: selectionQuads(
-                    match, grid: grid, offset: offset, cellWidth: cellWidth, cellHeight: cellHeight,
-                    color: index == currentSearchMatchIndex
+                    match, grid: grid, offset: offset, cell: cell,
+                    color: index == overlay.currentSearchMatchIndex
                         ? frameOverlay.currentSearchMatch : frameOverlay.searchMatch))
         }
         // A rule, not a fill: it must read as a link and not fight the
         // selection.
-        if let hoveredLink {
-            for quad in selectionQuads(
-                hoveredLink, grid: grid, offset: offset, cellWidth: cellWidth,
-                cellHeight: cellHeight, color: frameOverlay.linkUnderline)
-            {
+        if let hoveredLink = overlay.hoveredLink {
+            let quads = selectionQuads(
+                hoveredLink, grid: grid, offset: offset, cell: cell, color: frameOverlay.linkUnderline)
+            for quad in quads {
                 let thickness = max(1, Float(scaleValue).rounded(.down))
                 overlayScratch.append(
                     QuadInstance(
@@ -58,13 +63,13 @@ nonisolated extension TerminalRenderer {
             }
         }
         // A block cursor is drawn by its row (`appendRowInstances`).
-        if cursorVisible, blockCursor == nil {
+        if overlay.cursorVisible, blockCursor == nil {
             let cellOrigin = SIMD2<Float>(
                 Float(grid.cursor.column) * cellWidth, Float(grid.cursor.row) * cellHeight)
             // An eighth of a cell, at least 2 device pixels.
             let stroke = max(2, (cellHeight / 8).rounded(.down))
             let cursorColor = framePalette.cursor
-            switch cursorStyle {
+            switch overlay.cursorStyle {
             case .block, .blinkingBlock:
                 break  // Only off the live screen, where no cursor is drawn.
             case .underline, .blinkingUnderline:
@@ -163,9 +168,9 @@ nonisolated extension TerminalRenderer {
     }
 
     private func selectionQuads(
-        _ selection: TerminalSelection, grid: Grid, offset: Int, cellWidth: Float, cellHeight: Float,
-        color: SIMD4<Float>
+        _ selection: TerminalSelection, grid: Grid, offset: Int, cell: SIMD2<Float>, color: SIMD4<Float>
     ) -> ContiguousArray<QuadInstance> {
+        let (cellWidth, cellHeight) = (cell.x, cell.y)
         guard selection.start.row <= selection.end.row else { return [] }
         // `totalPushed`, as the copy path uses — `.count` let the highlight and
         // the copied text disagree once the ring filled.

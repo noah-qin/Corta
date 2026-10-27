@@ -27,7 +27,9 @@ import Testing
 /// shaped as one run, and no glyph ever inks a cell that is not its own.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct WideGlyphRenderTests {
+@Suite(
+    .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct WideGlyphRenderTests {
 
     /// Renders `grid` onto a fresh black texture sized exactly to the grid.
     private static func render(
@@ -39,9 +41,10 @@ import Testing
             device: device, width: width, height: height)
 
         renderer.renderAndWait(
-            grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-            drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-            selection: nil, target: texture)
+            grid: grid, cursorVisible: false, selection: nil,
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                drawableSize: CGSize(width: width, height: height)))
         return texture
     }
 
@@ -251,12 +254,8 @@ import Testing
         let texture = Self.render(terminal.grid, renderer: renderer, device: device)
 
         #expect(renderer.glyphAtlas.evictionCount > 0, "fifteen CJK glyphs must overflow a 48x48 page")
-        var anyInk = false
-        for column in 0..<10 {
-            if !Self.cellIsBlank(texture, row: 0, column: column, metrics: renderer.metrics) {
-                anyInk = true
-                break
-            }
+        let anyInk = (0..<10).contains { column in
+            !Self.cellIsBlank(texture, row: 0, column: column, metrics: renderer.metrics)
         }
         #expect(anyInk, "expected at least one glyph to survive the eviction retry")
     }

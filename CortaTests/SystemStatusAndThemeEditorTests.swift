@@ -21,7 +21,8 @@ import Testing
 
 @MainActor struct SystemStatusAndThemeEditorTests {
     @Test func statusConfigurationRoundTripsAndUnknownItemsArePreserved() {
-        let (config, unknown) = Configuration.parse("status-bar = true\nstatus-items = cpu,thermal\nstatus-network-interface = en0")
+        let (config, unknown) = Configuration.parse(
+            "status-bar = true\nstatus-items = cpu,thermal\nstatus-network-interface = en0")
         #expect(config.statusBar)
         #expect(config.statusItems == [.cpu, .thermal])
         #expect(config.statusNetworkInterface == "en0")
@@ -70,7 +71,8 @@ import Testing
     }
 
     private func makeStore() throws -> (ConfigurationStore, URL) {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("corta-features-\(UUID().uuidString)")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "corta-features-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return (ConfigurationStore(fileURL: directory.appendingPathComponent("config")), directory)
     }

@@ -53,8 +53,8 @@ extension TerminalView: NSTextInputClient {
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         let attributed: NSAttributedString =
             switch string {
-            case let a as NSAttributedString: a
-            case let s as String: NSAttributedString(string: s)
+            case let attributed as NSAttributedString: attributed
+            case let plain as String: NSAttributedString(string: plain)
             default: NSAttributedString()
             }
         guard attributed.length > 0 else {
@@ -320,8 +320,8 @@ final class MarkedTextOverlayView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let markedText else { return }
-        func color(_ c: SIMD4<Float>) -> NSColor {
-            NSColor(srgbRed: CGFloat(c.x), green: CGFloat(c.y), blue: CGFloat(c.z), alpha: 1)
+        func color(_ components: SIMD4<Float>) -> NSColor {
+            NSColor(srgbRed: CGFloat(components.x), green: CGFloat(components.y), blue: CGFloat(components.z), alpha: 1)
         }
         color(TerminalColorPalette.defaultBackground).setFill()
         bounds.fill()

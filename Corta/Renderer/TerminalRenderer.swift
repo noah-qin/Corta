@@ -127,13 +127,13 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     /// Newly exposed history rows must rebuild even when their value is blank.
     var invalidRows: [Bool] = []
     private var cachedCursor: Cursor?
-    private var cachedCursorStyle: CursorStyle?
-    private var cachedCursorVisible = false
-    private var cachedSelection: TerminalSelection?
-    private var cachedSearchMatches: [TerminalSelection] = []
-    private var cachedCurrentSearchMatchIndex: Int?
-    private var cachedHoveredLink: TerminalSelection?
+    /// The overlay the last frame built; nil until the first.
+    private var cachedOverlay: OverlayInputs?
     private var needsFullRebuild = true
+    /// The atlas generation the frame's last row build began with.
+    private var lastBuildAtlasGeneration = 0
+    /// Evictions since a frame last deferred nothing: the current fill-in's.
+    private var fillEvictions = 0
 
     /// Non-ASCII shapes one frame may run (`GlyphAtlas.beginFrame`), so a
     /// hostile screen of distinct clusters cannot hold the main thread for
@@ -333,7 +333,6 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         needsFullRebuild = true
     }
 
-    /// Reconstructs a faulted/stalled queue, preserving the session and caches.
     /// Present each frame by copy through a classic queue. This lets a
     /// full-screen pane reach the display directly on macOS 27 and keeps
     /// Metal 4-written drawables out of the macOS 26 compositor (#380).
@@ -342,6 +341,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         set { access.withLock { backend.presentsByCopy = newValue } }
     }
 
+    /// Reconstructs a faulted/stalled queue, preserving the session and caches.
     /// An unusable device cannot cause an unlimited reconstruction loop:
     /// three rebuilds in a row, each failing within ten seconds or before
     /// completing a frame, give up. Rebuilds a long-lived pane needed days apart do not add up.
@@ -368,19 +368,13 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         return true
     }
 
+}
+
+// MARK: - Building and drawing a frame
+
+nonisolated extension TerminalRenderer {
     /// `false`: the cache still matches and the frame can be skipped. Size
     /// changes rebuild; scrolling shifts the retained document rows.
-    /// OSC 10/11/12 over the theme, as the live frame draws them.
-    func applyDynamicColors(to palette: inout Theme.Variant) {
-        guard let dynamicColors = frameDynamicColors else { return }
-        func rgba(_ c: (red: UInt8, green: UInt8, blue: UInt8)) -> SIMD4<Float> {
-            .init(Float(c.red) / 255, Float(c.green) / 255, Float(c.blue) / 255, 1)
-        }
-        palette.foreground = rgba(dynamicColors.foreground)
-        palette.background = rgba(dynamicColors.background)
-        palette.cursor = rgba(dynamicColors.cursor)
-    }
-
     @discardableResult
     func updateInstances(
         grid: Grid, scrollOffset: Int, cursorVisible: Bool, selection: TerminalSelection?,
@@ -394,37 +388,12 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         defer { access.unlock() }
         let effectiveCursorStyle = cursorStyle ?? grid.cursorStyle
         self.indexedOverrides = indexedOverrides
-        framePalette = themeVariant ?? TerminalColorPalette.activeVariant
-        if frameDynamicColors != dynamicColors || frameSelectionBackground != selectionBackground
-            || frameSelectionForeground != selectionForeground {
+        if prepareFramePalette(
+            grid: grid, dynamicColors: dynamicColors, selectionBackground: selectionBackground,
+            selectionForeground: selectionForeground) {
             needsFullRebuild = true
         }
-        frameDynamicColors = dynamicColors
-        frameSelectionBackground = selectionBackground
-        frameSelectionForeground = selectionForeground
-        // Reused ids can compare equal to a retained row built before reclamation.
-        if frameUnderlineColors.reclamationGeneration != grid.underlineColors.reclamationGeneration {
-            needsFullRebuild = true
-        }
-        frameUnderlineColors = grid.underlineColors
-        applyDynamicColors(to: &framePalette)
-        // After OSC 10/11: the derived selection and marks follow the canvas drawn.
-        frameOverlay = framePalette.overlayColors
-        if !selectionBackground.isDefault {
-            // The program's hue at the theme's translucency: the selection is
-            // drawn over rules and box glyphs, and an opaque one hid them.
-            var selection = framePalette.resolveBackground(selectionBackground)
-            selection.w = frameOverlay.selection.w
-            frameOverlay.selection = selection
-        }
-        if !selectionForeground.isDefault {
-            if needsFullRebuild || frameSelectedColumns.count != grid.rows
-                || !Self.selectionsEqual(selection, cachedSelection) || cachedScrollbackTotalPushed != grid.scrollback.totalPushed
-                || cachedOffset != scrollOffset {
-                needsFullRebuild = true
-                Self.selectedColumns(selection, grid: grid, offset: scrollOffset, into: &frameSelectedColumns)
-            }
-        } else { frameSelectedColumns.removeAll(keepingCapacity: true) }
+        updateSelectedColumns(selection, grid: grid, scrollOffset: scrollOffset)
         let offset = min(max(0, scrollOffset), grid.scrollback.count)
         let fullRebuild = cacheIsStale(for: grid, indexedOverridesGeneration: indexedOverridesGeneration)
 
@@ -439,27 +408,18 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
             previousBlockCursor: previousBlockCursor, atlasGeneration: atlasGeneration)
         var changed = rowsChanged
 
-        if fullRebuild
-            || overlayIsStale(
-                grid: grid, offset: offset, cursorStyle: effectiveCursorStyle, cursorVisible: cursorVisible,
-                selection: selection, searchMatches: searchMatches,
-                currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
-        {
-            rebuildOverlay(
-                grid: grid, cursorStyle: effectiveCursorStyle, cursorVisible: cursorVisible, selection: selection, offset: offset,
-                searchMatches: searchMatches, currentSearchMatchIndex: currentSearchMatchIndex,
-                hoveredLink: hoveredLink)
+        let overlay = OverlayInputs(
+            cursorStyle: effectiveCursorStyle, cursorVisible: cursorVisible, selection: selection,
+            searchMatches: searchMatches, currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink)
+        if fullRebuild || overlayIsStale(grid: grid, offset: offset, overlay: overlay) {
+            rebuildOverlay(grid: grid, offset: offset, overlay: overlay)
             changed = true
         }
 
         if updateImages(grid: grid, offset: offset) {
             changed = true
         }
-        remember(
-            grid: grid, offset: offset, indexedOverridesGeneration: indexedOverridesGeneration,
-            cursorStyle: effectiveCursorStyle, cursorVisible: cursorVisible, selection: selection,
-            searchMatches: searchMatches, currentSearchMatchIndex: currentSearchMatchIndex,
-            hoveredLink: hoveredLink)
+        remember(grid: grid, offset: offset, indexedOverridesGeneration: indexedOverridesGeneration, overlay: overlay)
         requestRebuildForDeferredGlyphs(frameGeneration: atlasGeneration)
         // Not on a cursor blink or a selection drag: only the rows carry marks.
         if rowsChanged || marksAreStale {
@@ -497,20 +457,16 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         return changed
     }
 
-    /// The atlas generation the frame's last row build began with.
-    private var lastBuildAtlasGeneration = 0
-    /// Evictions since a frame last deferred nothing: the current fill-in's.
-    private var fillEvictions = 0
-
     /// Hands the placements to the image renderer and reports whether they
     /// changed. Decodes are scheduled here, never in `draw`; an image delete
     /// changes no cell, so it registers as damage here or not at all.
     private func updateImages(grid: Grid, offset: Int) -> Bool {
         let changed = cachedImagePlacements.revision != grid.imagePlacements.revision
         kittyImageRenderer.update(
-            table: grid.imagePlacements, rows: grid.rows, offset: offset,
-            scrollbackTotalPushed: grid.scrollback.totalPushed,
-            cellHeight: Float(metricsValue.cellHeight))
+            table: grid.imagePlacements,
+            viewport: .init(
+                rows: grid.rows, offset: offset, scrollbackTotalPushed: grid.scrollback.totalPushed,
+                cellWidth: Float(metricsValue.cellWidth), cellHeight: Float(metricsValue.cellHeight)))
         return changed
     }
 
@@ -548,30 +504,39 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
             || cachedIndexedOverridesGeneration != indexedOverridesGeneration
     }
 
+    /// The columns a selection covers per row, when the program colours
+    /// selected text and so the cells themselves change.
+    private func updateSelectedColumns(_ selection: TerminalSelection?, grid: Grid, scrollOffset: Int) {
+        guard !frameSelectionForeground.isDefault else {
+            frameSelectedColumns.removeAll(keepingCapacity: true)
+            return
+        }
+        if needsFullRebuild || frameSelectedColumns.count != grid.rows
+            || !Self.selectionsEqual(selection, cachedOverlay?.selection)
+            || cachedScrollbackTotalPushed != grid.scrollback.totalPushed
+            || cachedOffset != scrollOffset {
+            needsFullRebuild = true
+            Self.selectedColumns(selection, grid: grid, offset: scrollOffset, into: &frameSelectedColumns)
+        }
+    }
+
     /// Whether the cursor, selection, search or link overlay differs from
     /// the one last built.
-    private func overlayIsStale(
-        grid: Grid, offset: Int, cursorStyle: CursorStyle, cursorVisible: Bool,
-        selection: TerminalSelection?, searchMatches: [TerminalSelection],
-        currentSearchMatchIndex: Int?, hoveredLink: TerminalSelection?
-    ) -> Bool {
-        cachedOffset != offset || !Self.selectionsEqual(cachedSelection, selection)
-            || grid.cursor != cachedCursor || cursorStyle != cachedCursorStyle
-            || cursorVisible != cachedCursorVisible
+    private func overlayIsStale(grid: Grid, offset: Int, overlay: OverlayInputs) -> Bool {
+        guard let cached = cachedOverlay else { return true }
+        return cachedOffset != offset || !Self.selectionsEqual(cached.selection, overlay.selection)
+            || grid.cursor != cachedCursor || overlay.cursorStyle != cached.cursorStyle
+            || overlay.cursorVisible != cached.cursorVisible
             // Both are anchored to the scrollback, so output moves them.
-            || ((selection != nil || !searchMatches.isEmpty)
+            || ((overlay.selection != nil || !overlay.searchMatches.isEmpty)
                 && cachedScrollbackTotalPushed != grid.scrollback.totalPushed)
-            || cachedSearchMatches != searchMatches
-            || cachedCurrentSearchMatchIndex != currentSearchMatchIndex
-            || !Self.selectionsEqual(cachedHoveredLink, hoveredLink)
+            || cached.searchMatches != overlay.searchMatches
+            || cached.currentSearchMatchIndex != overlay.currentSearchMatchIndex
+            || !Self.selectionsEqual(cached.hoveredLink, overlay.hoveredLink)
     }
 
     /// What the next frame's diff compares against.
-    private func remember(
-        grid: Grid, offset: Int, indexedOverridesGeneration: UInt64, cursorStyle: CursorStyle,
-        cursorVisible: Bool, selection: TerminalSelection?, searchMatches: [TerminalSelection],
-        currentSearchMatchIndex: Int?, hoveredLink: TerminalSelection?
-    ) {
+    private func remember(grid: Grid, offset: Int, indexedOverridesGeneration: UInt64, overlay: OverlayInputs) {
         cachedColumns = grid.columns
         cachedOffset = offset
         cachedScrollbackTotalPushed = grid.scrollback.totalPushed
@@ -581,12 +546,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         cachedDocumentTop = grid.scrollback.totalPushed - offset
         cachedImagePlacements = grid.imagePlacements
         cachedCursor = grid.cursor
-        cachedCursorStyle = cursorStyle
-        cachedCursorVisible = cursorVisible
-        cachedSelection = selection
-        cachedSearchMatches = searchMatches
-        cachedCurrentSearchMatchIndex = currentSearchMatchIndex
-        cachedHoveredLink = hoveredLink
+        cachedOverlay = overlay
     }
 
     /// Diff and draw in one call, for tests and benchmarks; the app's loop
@@ -595,8 +555,6 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     public func render(
         grid: Grid,
         scrollOffset: Int = 0,
-        rect: CGRect,
-        drawableSize: CGSize,
         cursorVisible: Bool,
         selection: TerminalSelection?,
         searchMatches: [TerminalSelection] = [],
@@ -604,8 +562,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         hoveredLink: TerminalSelection? = nil,
         indexedOverrides: IndexedColorOverrides = [:],
         indexedOverridesGeneration: UInt64 = 0,
-        target: MTLTexture,
-        clearColor: MTLClearColor,
+        into frame: FrameTarget,
         onCompleted: (@Sendable ((any Error)?) -> Void)? = nil
     ) {
         updateInstances(
@@ -613,9 +570,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
             selection: selection, searchMatches: searchMatches,
             currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
             indexedOverrides: indexedOverrides, indexedOverridesGeneration: indexedOverridesGeneration)
-        draw(
-            rect: rect, drawableSize: drawableSize, target: target, clearColor: clearColor,
-            drawable: nil, label: "Corta.render", onCompleted: onCompleted)
+        draw(frame, drawable: nil, label: "Corta.render", onCompleted: onCompleted)
     }
 
     /// Draws the last cached instances, without diffing again, as one render
@@ -625,13 +580,14 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     ///   it, and the drawable was presented with stale contents.
     @discardableResult
     func draw(
-        rect: CGRect, drawableSize: CGSize, target: MTLTexture, clearColor: MTLClearColor,
-        drawable: (any MTLDrawable)?, label: String,
+        _ frame: FrameTarget, drawable: (any MTLDrawable)?, label: String,
         onCompleted: (@Sendable ((any Error)?) -> Void)?
     ) -> Bool {
         access.lock()
         defer { access.unlock() }
-        let drawing = backend.beginFrame(target: target, clearColor: clearColor, label: label)
+        let rect = frame.rect
+        let drawableSize = frame.drawableSize
+        let drawing = backend.beginFrame(target: frame.texture, clearColor: frame.clearColor, label: label)
         backend.drawSolidQuads(cachedBackground, rect: rect, drawableSize: drawableSize)
         if !cachedMarks.isEmpty {
             backend.drawSolidQuads(cachedMarks, rect: markRect(beside: rect), drawableSize: drawableSize)
@@ -646,11 +602,12 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
                 drawableSize: drawableSize)
         }
         if cachedImagePlacements.placementCount > 0 {
+            let viewport = KittyImageRenderer.ImageViewport(
+                rows: cachedLines.count, offset: cachedOffset, scrollbackTotalPushed: cachedScrollbackTotalPushed,
+                cellWidth: Float(metricsValue.cellWidth), cellHeight: Float(metricsValue.cellHeight))
             kittyImageRenderer.draw(
-                table: cachedImagePlacements, cellWidth: Float(metricsValue.cellWidth),
-                cellHeight: Float(metricsValue.cellHeight), rows: cachedLines.count, offset: cachedOffset,
-                scrollbackTotalPushed: cachedScrollbackTotalPushed, rect: rect,
-                drawableSize: drawableSize, backend: backend, drawable: drawable)
+                table: cachedImagePlacements, viewport: viewport, rect: rect, drawableSize: drawableSize,
+                backend: backend, drawable: drawable)
         }
         let images = kittyImageRenderer
         backend.endFrame(presenting: drawable, echoSnapshotAt: echoSnapshotAt) { error in

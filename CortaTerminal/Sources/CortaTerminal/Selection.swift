@@ -77,8 +77,11 @@ public struct SelectionRange: Equatable, Sendable {
     /// Applies the shared row mapping to both ends, preserving columns.
     public func reanchored(from oldTotal: Int, to newTotal: Int) -> SelectionRange {
         SelectionRange(
-            start: SelectionPoint(row: ScrollbackCoordinates.reanchoredRow(start.row, from: oldTotal, to: newTotal), column: start.column),
-            end: SelectionPoint(row: ScrollbackCoordinates.reanchoredRow(end.row, from: oldTotal, to: newTotal), column: end.column))
+            start: SelectionPoint(
+                row: ScrollbackCoordinates.reanchoredRow(start.row, from: oldTotal, to: newTotal),
+                column: start.column),
+            end: SelectionPoint(
+                row: ScrollbackCoordinates.reanchoredRow(end.row, from: oldTotal, to: newTotal), column: end.column))
     }
 
     /// Re-anchors after output pushed `growth` lines from the screen into
@@ -182,23 +185,8 @@ public enum Selection {
             let line = line(at: row, in: grid)
             let firstColumn = row == range.start.row ? range.start.column : 0
             let lastColumn = row == range.end.row ? range.end.column : grid.columns - 1
-            var rowText = ""
-            var column = max(0, firstColumn)
-            let upper = min(lastColumn, grid.columns - 1)
-            while column <= upper {
-                let cell = line[column]
-                column += 1
-                if cell.attributes.contains(.wideSpacer) { continue }
-                if let cluster = grid.graphemes.scalars(for: cell.grapheme) {
-                    for scalar in cluster {
-                        if let scalar = Unicode.Scalar(scalar) {
-                            rowText.unicodeScalars.append(scalar)
-                        }
-                    }
-                } else if let scalar = Unicode.Scalar(cell.scalar) {
-                    rowText.unicodeScalars.append(scalar)
-                }
-            }
+            var rowText = characters(
+                of: line, from: max(0, firstColumn), through: min(lastColumn, grid.columns - 1), in: grid)
             let continues = row != range.end.row && line.wrapped
             if !continues {
                 while rowText.last == " " { rowText.removeLast() }
@@ -211,6 +199,25 @@ public enum Selection {
     }
 
     // MARK: - Internals
+
+    /// The characters of one row's columns `first...last` (none when
+    /// `first` is past `last`): a wide pair's spacer adds nothing, and an
+    /// interned cluster adds all its scalars.
+    private static func characters(of line: Line, from first: Int, through last: Int, in grid: Grid) -> String {
+        var text = ""
+        for column in stride(from: first, through: last, by: 1) {
+            let cell = line[column]
+            if cell.attributes.contains(.wideSpacer) { continue }
+            if let cluster = grid.graphemes.scalars(for: cell.grapheme) {
+                for scalar in cluster {
+                    if let scalar = Unicode.Scalar(scalar) { text.unicodeScalars.append(scalar) }
+                }
+            } else if let scalar = Unicode.Scalar(cell.scalar) {
+                text.unicodeScalars.append(scalar)
+            }
+        }
+        return text
+    }
 
     /// The document row's line: negative rows count backwards from the
     /// screen boundary into the scrollback, oldest-last. Out-of-range rows

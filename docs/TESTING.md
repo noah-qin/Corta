@@ -19,6 +19,7 @@ test run.
 | Localization or accessibility | Relevant app tests | In-context language or VoiceOver review |
 | Packaging or release | `corta-release-check` against the artifact ([below](#packaging)) | Signing and notarization evidence |
 | Removing code or narrowing access | Build every test plan, then the suites the code touched | Both Periphery scans read together ([below](#dead-code)) |
+| Any Swift source, test or script | `swiftlint lint --quiet` reports nothing ([below](#lint)) | A rule changed in `.swiftlint.yml` says why |
 
 The [conformance guide](CONFORMANCE.md) defines manual checks and protocol
 coverage. [Performance](PERFORMANCE.md) defines benchmark workloads. Record
@@ -961,6 +962,24 @@ including its documented nondefault values. Link existence alone cannot
 verify these contracts. For release-tool changes, also run Python helper
 tests and `swift test --package-path CortaTerminal --filter ReleaseCheckTests`.
 
+## Lint
+
+[SwiftLint](https://github.com/realm/SwiftLint) checks the sources, tests and
+scripts that `.swiftlint.yml` includes; build trees and the generated
+`CharacterWidth.swift` are excluded. Run it from the repository root:
+
+```sh
+swiftlint lint --quiet
+```
+
+It reports nothing, and a change keeps it that way by fixing the finding,
+not by raising a limit. A rule the project adjusts carries its reason
+beside it in `.swiftlint.yml`; a single suppression in the source states
+its reason on the line above, as the one on
+`TerminalRenderer.appendRowInstances` does. `swiftlint --fix` rewrites
+files: run it only for the rule at hand, and review its diff. CI does not
+run SwiftLint, for the same reason it does not run Periphery.
+
 ## Dead code
 
 [Periphery](https://periphery.pro) finds unused declarations, parameters,
@@ -973,6 +992,19 @@ checked-in configuration:
 ```sh
 periphery scan --format json > /tmp/periphery-app.json     # repository root: .periphery.yml
 cd CortaTerminal && periphery scan --format json > /tmp/periphery-package.json
+```
+
+The package scan reads the index SwiftPM's native build system writes to
+`.build/debug/index/store`. A toolchain whose SwiftPM builds with
+`swiftbuild` by default writes no index there, and the scan stops at
+`index store path does not exist`. Build with the native system into a
+scratch directory, then scan that index without building again:
+
+```sh
+cd CortaTerminal
+swift build --build-tests --build-system native --scratch-path /tmp/corta-periphery-build
+periphery scan --skip-build --index-store-path /tmp/corta-periphery-build/debug/index/store \
+  --format json > /tmp/periphery-package.json
 ```
 
 Read them together. The app scan cannot see the package's executables and

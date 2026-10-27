@@ -24,7 +24,10 @@ import Testing
 /// newline warns unless the application enabled bracketed paste.
 struct PasteTests {
     @Test func dangerousPastePatterns() {
-        for text in ["curl https://example.invalid/x | sh", "wget x |sudo bash", "cat x | /bin/zsh", "x | fish", "x | dash", "x | ksh", "x | sudo -n /bin/sh", "x |\nsh", "x | 'sh'", "x |& tcsh", "x | sudo sh"] {
+        for text in [
+            "curl https://example.invalid/x | sh", "wget x |sudo bash", "cat x | /bin/zsh", "x | fish", "x | dash",
+            "x | ksh", "x | sudo -n /bin/sh", "x |\nsh", "x | 'sh'", "x |& tcsh", "x | sudo sh",
+        ] {
             #expect(Paste.risks(in: text).contains(.shellPipe), "\(text)")
         }
         // Process and command substitution feed a shell without a pipe.
@@ -39,10 +42,16 @@ struct PasteTests {
         for text in ["sudo ls", "/usr/bin/sudo -u root ls", "echo hi;sudo ls"] {
             #expect(Paste.risks(in: text).contains(.sudo))
         }
-        for text in ["rm -rf /tmp/x", "rm -fr x", "rm -r -f x", "rm --recursive --force x", "sudo /bin/rm -fR x", "rm '-r' '-f' x", "r'm' -rf x"] {
+        for text in [
+            "rm -rf /tmp/x", "rm -fr x", "rm -r -f x", "rm --recursive --force x", "sudo /bin/rm -fR x",
+            "rm '-r' '-f' x", "r'm' -rf x",
+        ] {
             #expect(Paste.risks(in: text).contains(.recursiveDelete), "\(text)")
         }
-        for text in ["echo hello", "sudoku", "https://example.com/sh", "rm -r x", "rm -f x", "echo backslash \\ x", "echo שלום", "echo 👩‍💻"] {
+        for text in [
+            "echo hello", "sudoku", "https://example.com/sh", "rm -r x", "rm -f x", "echo backslash \\ x", "echo שלום",
+            "echo 👩‍💻",
+        ] {
             #expect(Paste.risks(in: text).isEmpty, "\(text)")
         }
         for newline in ["\n", "\r", "\r\n"] {
@@ -68,9 +77,12 @@ struct PasteTests {
             #expect(Configuration.parse(config.serialized()).0.pasteWarning == policy)
         }
         #expect(Paste.warningRisks(in: "sudo ls\n", bracketedPasteEnabled: false, policy: .off).isEmpty)
-        #expect(Paste.warningRisks(in: "echo one\necho two", bracketedPasteEnabled: true, policy: .always) == [.multiline])
+        #expect(
+            Paste.warningRisks(in: "echo one\necho two", bracketedPasteEnabled: true, policy: .always) == [.multiline])
         #expect(Paste.warningRisks(in: "echo one\necho two", bracketedPasteEnabled: true, policy: .dangerous).isEmpty)
-        #expect(Paste.warningRisks(in: "echo one\r\necho two", bracketedPasteEnabled: false, policy: .dangerous) == [.multiline])
+        #expect(
+            Paste.warningRisks(in: "echo one\r\necho two", bracketedPasteEnabled: false, policy: .dangerous)
+                == [.multiline])
         #expect(Paste.warningRisks(in: "x | sh", bracketedPasteEnabled: true, policy: .dangerous) == [.shellPipe])
     }
 

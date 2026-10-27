@@ -119,22 +119,28 @@ nonisolated extension TerminalRenderer {
             }
             let quads = cursorCellInstances(line: line, row: row, column: column, graphemes: grid.graphemes)
             let completionGate = cursorCaptureWaitGate
+            let capturedColumn = column
             return drawCapture(
                 quads, into: target, with: capture, clearColor: framePalette.cursor,
-                column: column, columns: columns, completed: { image in
+                completed: { image in
                     completionGate?()
-                    completed(image)
+                    completed(image.map { CursorImage(image: $0, column: capturedColumn, columns: columns) })
                 })
         }
+    }
+
+    /// One row's instances, by pipeline.
+    private struct CellQuads {
+        var backgrounds: ContiguousArray<QuadInstance>
+        var glyphs: ContiguousArray<QuadInstance>
+        var colors: ContiguousArray<QuadInstance>
     }
 
     /// The cursor's row built as the live block cursor draws it, moved so
     /// the cursor's cell is at the origin.
     private func cursorCellInstances(
         line: Line, row: Int, column: Int, graphemes: GraphemeTable
-    ) -> (backgrounds: ContiguousArray<QuadInstance>, glyphs: ContiguousArray<QuadInstance>,
-        colors: ContiguousArray<QuadInstance>)
-    {
+    ) -> CellQuads {
         var backgrounds: ContiguousArray<QuadInstance> = []
         var glyphs: ContiguousArray<QuadInstance> = []
         var colors: ContiguousArray<QuadInstance> = []
@@ -146,15 +152,14 @@ nonisolated extension TerminalRenderer {
         for index in backgrounds.indices { backgrounds[index].origin -= origin }
         for index in glyphs.indices { glyphs[index].origin -= origin }
         for index in colors.indices { colors[index].origin -= origin }
-        return (backgrounds, glyphs, colors)
+        return CellQuads(backgrounds: backgrounds, glyphs: glyphs, colors: colors)
     }
 
     /// Submits one frame; the callback runs after the GPU releases its writes.
     private func drawCapture(
-        _ quads: (backgrounds: ContiguousArray<QuadInstance>, glyphs: ContiguousArray<QuadInstance>,
-            colors: ContiguousArray<QuadInstance>),
+        _ quads: CellQuads,
         into target: MTLTexture, with capture: Metal4Backend, clearColor color: SIMD4<Float>,
-        column: Int, columns: Int, completed: @escaping @Sendable (CursorImage?) -> Void
+        completed: @escaping @Sendable (CGImage?) -> Void
     ) -> Bool {
         let size = CGSize(width: target.width, height: target.height)
         let rect = CGRect(origin: .zero, size: size)
@@ -177,8 +182,7 @@ nonisolated extension TerminalRenderer {
         // immutable. Retain it across GPU completion even if the pane closes.
         nonisolated(unsafe) let retained = target
         capture.endFrame(presenting: nil) { error in
-            let image = error == nil ? Self.image(of: retained) : nil
-            completed(image.map { CursorImage(image: $0, column: column, columns: columns) })
+            completed(error == nil ? Self.image(of: retained) : nil)
         }
         return true
     }

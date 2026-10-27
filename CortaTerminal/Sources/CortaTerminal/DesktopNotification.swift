@@ -89,9 +89,13 @@ struct ProgramSignals: Sendable {
         let result = statuses.values.max { $0.urgency < $1.urgency }
         beginCommand()
         guard var result else { return }
-        if exitStatus == 130 { result.state = .idle }
-        else if let exitStatus, exitStatus != 0 { result.state = .error }
-        else if result.state != .done && result.state != .error { result.state = .idle }
+        if exitStatus == 130 {
+            result.state = .idle
+        } else if let exitStatus, exitStatus != 0 {
+            result.state = .error
+        } else if result.state != .done && result.state != .error {
+            result.state = .idle
+        }
         result.kind = nil; result.progress = nil
         statuses[""] = result
     }
@@ -132,57 +136,93 @@ struct ProgramSignals: Sendable {
         let fields = Self.fields(String(payload[..<separator]))
         let id = fields["i"] ?? ""
         guard fields["i"] == nil || ProgramText.validID(id) else { return [] }
-        let type = fields["p"] ?? "title"
-        if type == "?" {
-            // The spec requires the query id for multiplexer routing. This
-            // is the sole echoed field and has passed the ASCII allowlist.
-            let identity = id.isEmpty ? "" : "i=\(id):"
-            return Array("\u{1B}]99;\(identity)p=?;a=focus:o=always,unfocused,invisible:p=title,body,close,?:s=system,silent:w=1\u{1B}\\".utf8)
+        switch fields["p"] ?? "title" {
+        case "?":
+            return Self.kittyCapabilities(id: id)
+        case "close":
+            closeKittyNotification(id)
+        case let type where type == "title" || type == "body":
+            appendKittyChunk(
+                String(payload[payload.index(after: separator)...]), id: id, isTitle: type == "title",
+                fields: fields)
+        default:
+            break
         }
-        guard ["title", "body", "close"].contains(type) else { return [] }
-        if type == "close" {
-            guard !id.isEmpty else { return [] }
-            chunks[id] = nil; chunkBytes[id] = nil
-            if notification?.id == id { notification = nil }
-            if !closedIDs.contains(id) {
-                if closedIDs.count == 8 { closedIDs.removeFirst() }
-                closedIDs.append(id)
-            }
-            return []
+        return []
+    }
+
+    /// The reply to `p=?`. The spec requires the query id for multiplexer
+    /// routing; it is the sole echoed field and has passed the ASCII allowlist.
+    private static func kittyCapabilities(id: String) -> [UInt8] {
+        let identity = id.isEmpty ? "" : "i=\(id):"
+        let capabilities = "a=focus:o=always,unfocused,invisible:p=title,body,close,?:s=system,silent:w=1"
+        return Array("\u{1B}]99;\(identity)p=?;\(capabilities)\u{1B}\\".utf8)
+    }
+
+    private mutating func closeKittyNotification(_ id: String) {
+        guard !id.isEmpty else { return }
+        chunks[id] = nil; chunkBytes[id] = nil
+        if notification?.id == id { notification = nil }
+        if !closedIDs.contains(id) {
+            if closedIDs.count == 8 { closedIDs.removeFirst() }
+            closedIDs.append(id)
         }
-        if chunks[id] == nil {
-            chunkOrder.removeAll { chunks[$0] == nil }
-            if chunks.count >= 8, !chunkOrder.isEmpty {
-                let oldest = chunkOrder.removeFirst()
-                chunks[oldest] = nil; chunkBytes[oldest] = nil
-            }
+    }
+
+    /// At most eight notifications assemble at once; a new one drops the oldest.
+    private mutating func evictOldestChunkIfFull() {
+        chunkOrder.removeAll { chunks[$0] == nil }
+        if chunks.count >= 8, !chunkOrder.isEmpty {
+            let oldest = chunkOrder.removeFirst()
+            chunks[oldest] = nil; chunkBytes[oldest] = nil
         }
+    }
+
+    /// One title or body chunk; `d=0` says more follow. An oversized
+    /// notification is dropped whole, and its later chunks with it.
+    private mutating func appendKittyChunk(_ raw: String, id: String, isTitle: Bool, fields: [String: String]) {
+        if chunks[id] == nil { evictOldestChunkIfFull() }
+        let continues = fields["d"] == "0"
         if chunkBytes[id] == -1 {
-            if fields["d"] != "0" { chunks[id] = nil; chunkBytes[id] = nil }
-            return []
+            if !continues { chunks[id] = nil; chunkBytes[id] = nil }
+            return
         }
-        let raw = String(payload[payload.index(after: separator)...])
         let total = (chunkBytes[id] ?? 0) + raw.utf8.count
         guard total <= Self.chunkLimit else {
-            if fields["d"] == "0", !chunkOrder.contains(id) { chunkOrder.append(id) }
-            chunks[id] = fields["d"] == "0" ? DesktopNotification() : nil
-            chunkBytes[id] = fields["d"] == "0" ? -1 : nil
-            return []
+            if continues, !chunkOrder.contains(id) { chunkOrder.append(id) }
+            chunks[id] = continues ? DesktopNotification() : nil
+            chunkBytes[id] = continues ? -1 : nil
+            return
         }
-        let text: String
-        if fields["e"] == "1" {
-            guard let decoded = ProgramText.decoded(raw, limit: 3072) else {
-                chunks[id] = nil; chunkBytes[id] = nil; return []
-            }
-            text = decoded
-        } else { text = ProgramText.clean(raw, limit: 3072) }
+        // `e=1` is base64; one that does not decode drops the notification.
+        let text = fields["e"] == "1" ? ProgramText.decoded(raw, limit: 3072) : ProgramText.clean(raw, limit: 3072)
+        guard let text else {
+            chunks[id] = nil; chunkBytes[id] = nil; return
+        }
         var notice = chunks[id] ?? DesktopNotification()
         notice.id = id
-        if type == "title" { notice.title += text } else { notice.body += text }
+        if isTitle { notice.title += text } else { notice.body += text }
         notice.title = ProgramText.clean(notice.title, limit: 192)
         notice.body = ProgramText.clean(notice.body, limit: 2048)
-        if let occasion = fields["o"].flatMap(DesktopNotification.Occasion.init(rawValue:)) { notice.occasion = occasion }
-        else if chunks[id] == nil { notice.occasion = .always }
+        Self.applyKittyOptions(fields, to: &notice, isFirstChunk: chunks[id] == nil)
+        if continues {
+            if !chunkOrder.contains(id) { chunkOrder.append(id) }
+            chunks[id] = notice; chunkBytes[id] = total
+        } else {
+            chunks[id] = nil; chunkBytes[id] = nil
+            if !notice.title.isEmpty || !notice.body.isEmpty { notification = notice }
+        }
+    }
+
+    /// The options any chunk may carry; the first defaults `o` to always.
+    private static func applyKittyOptions(
+        _ fields: [String: String], to notice: inout DesktopNotification, isFirstChunk: Bool
+    ) {
+        if let occasion = fields["o"].flatMap(DesktopNotification.Occasion.init(rawValue:)) {
+            notice.occasion = occasion
+        } else if isFirstChunk {
+            notice.occasion = .always
+        }
         if let urgency = fields["u"].flatMap(Int.init) { notice.urgency = min(2, max(0, urgency)) }
         if let actions = fields["a"] { notice.focus = actions.split(separator: ",").contains("focus") }
         if let expiry = fields["w"].flatMap(Int.init) { notice.expiryMilliseconds = min(86_400_000, max(-1, expiry)) }
@@ -192,14 +232,6 @@ struct ProgramSignals: Sendable {
                 ? rawSound : ProgramText.decoded(rawSound, limit: 32)
             notice.sound = sound == "system"
         }
-        if fields["d"] == "0" {
-            if !chunkOrder.contains(id) { chunkOrder.append(id) }
-            chunks[id] = notice; chunkBytes[id] = total
-        } else {
-            chunks[id] = nil; chunkBytes[id] = nil
-            if !notice.title.isEmpty || !notice.body.isEmpty { notification = notice }
-        }
-        return []
     }
 
     mutating func tabStatus(_ payload: String) {
@@ -213,10 +245,15 @@ struct ProgramSignals: Sendable {
             if parts.count == 2 { fields[String(parts[0])] = String(parts[1]) }
         }
         for character in payload {
-            if escaped { field.append(character); escaped = false }
-            else if character == "\\" { escaped = true }
-            else if character == ";" { store(field); field = "" }
-            else { field.append(character) }
+            if escaped {
+                field.append(character); escaped = false
+            } else if character == "\\" {
+                escaped = true
+            } else if character == ";" {
+                store(field); field = ""
+            } else {
+                field.append(character)
+            }
         }
         store(field)
         let previous = tabMetadata

@@ -69,12 +69,18 @@ enum PaneSpawn {
         let preferredUsable =
             preferred == home
             || !PathProbe.directories(among: [preferred], timeout: directoryCheckTimeout).isEmpty
-        let attempts: [(shell: String, directory: String, notice: String?)] = [
-            (configured, preferred, nil),
-            (configured, home, L10n.text("failure.notice.fallbackDirectory")),
-            ("/bin/zsh", preferred, L10n.format("failure.notice.fallbackShell", "/bin/zsh")),
-            ("/bin/zsh", home, L10n.format("failure.notice.fallbackShell", "/bin/zsh")),
-            ("/bin/sh", "/", L10n.format("failure.notice.fallbackShell", "/bin/sh")),
+        struct Attempt {
+            var shell: String
+            var directory: String
+            var notice: String?
+        }
+        let zshNotice = L10n.format("failure.notice.fallbackShell", "/bin/zsh")
+        let attempts = [
+            Attempt(shell: configured, directory: preferred),
+            Attempt(shell: configured, directory: home, notice: L10n.text("failure.notice.fallbackDirectory")),
+            Attempt(shell: "/bin/zsh", directory: preferred, notice: zshNotice),
+            Attempt(shell: "/bin/zsh", directory: home, notice: zshNotice),
+            Attempt(shell: "/bin/sh", directory: "/", notice: L10n.format("failure.notice.fallbackShell", "/bin/sh")),
         ].filter { preferredUsable || $0.directory != preferred }
         var attempted = Set<String>()
         var lastError = PTYError.spawnFailed(code: ENOENT)
@@ -84,23 +90,23 @@ enum PaneSpawn {
             else { continue }
             // Only for the preset's own shell; a fallback may not understand them.
             let attemptArguments = attempt.shell == configured ? arguments : ["-l"]
-            let (attemptEnvironment, folder, token) = directoryCompletion || historySuggestions
+            let prepared = directoryCompletion || historySuggestions
                 ? ZshBootstrap.prepare(environment, executable: attempt.shell, arguments: attemptArguments,
                     directoryCompletion: directoryCompletion, historySuggestions: historySuggestions)
-                : (environment, nil, nil)
+                : ZshBootstrap.Prepared(environment: environment)
             do {
                 let session = try TerminalSession(
                     executable: attempt.shell, arguments: attemptArguments,
-                    environment: attemptEnvironment, size: size,
+                    environment: prepared.environment, size: size,
                     workingDirectory: attempt.directory,
                     // Applies to new sessions: shrinking a live one would drop lines.
                     scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit,
-                    imageBudget: .app, directoryCompletionToken: token)
+                    imageBudget: .app, directoryCompletionToken: prepared.token)
                 return Started(
                     session: session, notice: attempt.notice,
-                    executable: attempt.shell, arguments: attemptArguments, bootstrapFolder: folder)
+                    executable: attempt.shell, arguments: attemptArguments, bootstrapFolder: prepared.folder)
             } catch {
-                if let folder { ZshBootstrap.remove(folder) }
+                if let folder = prepared.folder { ZshBootstrap.remove(folder) }
                 lastError = error
             }
         }
@@ -119,9 +125,13 @@ enum PaneSpawn {
         var folder: URL?
         var token: String?
         if configuration.directoryCompletion || configuration.historySuggestions {
-            (environment, folder, token) = ZshBootstrap.prepare(
+            let prepared = ZshBootstrap.prepare(
                 environment, executable: command.executable, arguments: command.arguments,
-                directoryCompletion: configuration.directoryCompletion, historySuggestions: configuration.historySuggestions)
+                directoryCompletion: configuration.directoryCompletion,
+                historySuggestions: configuration.historySuggestions)
+            environment = prepared.environment
+            folder = prepared.folder
+            token = prepared.token
         }
         do {
             // A local cwd for the launcher; the remote side lands where it lands.

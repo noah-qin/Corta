@@ -53,9 +53,8 @@ struct SelectionAutoScrollTests {
         at point: CGPoint, rows: Int = 30, scrollOffset: Int, historyDepth: Int = 100
     ) -> (scrollOffset: Int, head: SelectionPoint)? {
         PanePointer.autoScrollTick(
-            at: point, viewHeight: viewHeight(rows: rows), metrics: metrics,
-            grid: Grid(rows: rows, columns: 120), scrollOffset: scrollOffset,
-            historyDepth: historyDepth, topInset: topInset)
+            at: point, grid: Grid(rows: rows, columns: 120), scrollOffset: scrollOffset, historyDepth: historyDepth,
+            in: GridGeometry(viewHeight: viewHeight(rows: rows), metrics: metrics, topInset: topInset))
     }
 
     @Test func aPointerInsideTheGridDoesNotScroll() {

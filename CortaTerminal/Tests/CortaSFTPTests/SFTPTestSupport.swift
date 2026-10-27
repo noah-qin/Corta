@@ -47,180 +47,6 @@ func testTimeoutInterval(_ seconds: TimeInterval) -> TimeInterval {
     return seconds * TimeInterval(max(1, scale))
 }
 
-/// One bidirectional in-memory channel.
-final class SFTPLoopbackConnection: @unchecked Sendable {
-    /// Reads block up to this long before failing, so a broken test fails
-    /// instead of hanging the suite.
-    ///
-    /// The pipe is idle whenever the peer is simply busy — a test awaiting
-    /// something else, the engine backing off before a reconnect — so this
-    /// has to be generous, and it scales with `CORTA_TEST_TIMEOUT_SCALE`
-    /// like every other ceiling (`testTimeout`): under a sanitizer the
-    /// suite is an order of magnitude slower and shares a few cores, and
-    /// at a fixed 10 seconds the nightly sanitizer job failed every run
-    /// from 2026-09-15 on — an idle server read timed out, the fake server
-    /// closed the connection, and the client saw `connectionLost` in the
-    /// middle of a transfer that was fine. Only a genuinely stuck test
-    /// ever waits this out.
-    static var readDeadline: TimeInterval { testTimeoutInterval(30) }
-
-    private struct Side {
-        var buffer: [UInt8] = []
-    }
-
-    private struct State {
-        var clientToServer = Side()
-        var serverToClient = Side()
-        var isClosed = false
-    }
-
-    private let condition = NSCondition()
-    private var state = State()
-
-    /// The client's end of the channel, for `SFTPSession`.
-    func clientTransport() -> Transport { Transport(connection: self, isClientSide: true) }
-    /// The server's end, for `FakeSFTPServer`.
-    func serverTransport() -> Transport { Transport(connection: self, isClientSide: false) }
-
-    fileprivate func write(_ bytes: [UInt8], fromClient: Bool) throws(SFTPTransportError) {
-        condition.lock()
-        defer { condition.unlock() }
-        guard !state.isClosed else { throw .closed }
-        if fromClient {
-            state.clientToServer.buffer.append(contentsOf: bytes)
-        } else {
-            state.serverToClient.buffer.append(contentsOf: bytes)
-        }
-        condition.broadcast()
-    }
-
-    fileprivate func read(into out: UnsafeMutableRawBufferPointer, fromClient: Bool) throws(SFTPTransportError) -> Int {
-        condition.lock()
-        defer { condition.unlock() }
-        let deadline = Date().addingTimeInterval(Self.readDeadline)
-        while true {
-            let side = fromClient ? state.serverToClient : state.clientToServer
-            // Buffered bytes are delivered even after close: a peer that
-            // wrote a reply and then died still said it. EOF is closed
-            // *and* drained.
-            if !side.buffer.isEmpty {
-                let count = min(out.count, side.buffer.count)
-                side.buffer.withUnsafeBufferPointer { buffer in
-                    out.copyMemory(
-                        from: UnsafeRawBufferPointer(start: buffer.baseAddress!, count: count))
-                }
-                if fromClient {
-                    state.serverToClient.buffer.removeFirst(count)
-                } else {
-                    state.clientToServer.buffer.removeFirst(count)
-                }
-                return count
-            }
-            if state.isClosed { return 0 }
-            if !condition.wait(until: deadline) {
-                throw .ioFailed(code: ETIMEDOUT)
-            }
-        }
-    }
-
-    func close() {
-        condition.lock()
-        state.isClosed = true
-        condition.broadcast()
-        condition.unlock()
-    }
-
-    final class Transport: SFTPChannelTransport, @unchecked Sendable {
-        let connection: SFTPLoopbackConnection
-        let isClientSide: Bool
-
-        init(connection: SFTPLoopbackConnection, isClientSide: Bool) {
-            self.connection = connection
-            self.isClientSide = isClientSide
-        }
-
-        func read(into buffer: UnsafeMutableRawBufferPointer) throws(SFTPTransportError) -> Int {
-            try connection.read(into: buffer, fromClient: isClientSide)
-        }
-
-        func write(_ bytes: UnsafeRawBufferPointer) throws(SFTPTransportError) {
-            try connection.write(Array(bytes), fromClient: isClientSide)
-        }
-
-        func close() {
-            connection.close()
-        }
-    }
-}
-
-/// A tiny remote filesystem: flat maps of paths, POSIX-enough for the
-/// transfer engine's needs (sizes, mtimes, directories, existence).
-final class FakeRemoteFileSystem: @unchecked Sendable {
-    struct File: Equatable {
-        var data: [UInt8]
-        var modificationTime: UInt32 = 1_000
-        var permissions: UInt32 = 0o100_644
-    }
-
-    private struct State {
-        var files: [String: File] = [:]
-        var directories: Set<String> = ["/"]
-    }
-
-    private let state = Mutex(State())
-
-    func createFile(_ path: String, data: [UInt8], modificationTime: UInt32 = 1_000) {
-        state.withLock { state in
-            state.files[path] = File(data: data, modificationTime: modificationTime)
-            // Ancestor directories exist implicitly, the way a real
-            // filesystem's would.
-            var ancestor = path
-            while let slash = ancestor.lastIndex(of: "/"), slash != ancestor.startIndex {
-                ancestor = String(ancestor[ancestor.startIndex..<slash])
-                state.directories.insert(ancestor)
-            }
-        }
-    }
-
-    func createDirectory(_ path: String) {
-        _ = state.withLock { $0.directories.insert(path) }
-    }
-
-    func file(_ path: String) -> File? { state.withLock { $0.files[path] } }
-    func isDirectory(_ path: String) -> Bool { state.withLock { $0.directories.contains(path) } }
-    func exists(_ path: String) -> Bool {
-        state.withLock { $0.files.keys.contains(path) || $0.directories.contains(path) }
-    }
-
-    func removeFile(_ path: String) {
-        _ = state.withLock { $0.files.removeValue(forKey: path) }
-    }
-
-    func rename(from oldName: String, to newName: String) {
-        state.withLock { state in
-            if let file = state.files.removeValue(forKey: oldName) {
-                state.files[newName] = file
-            }
-        }
-    }
-
-    /// The names directly under a directory, or nil if it is not one.
-    func children(of path: String) -> [String]? {
-        state.withLock { state -> [String]? in
-            guard state.directories.contains(path) else { return nil }
-            let prefix = path == "/" ? "/" : path + "/"
-            var names: Set<String> = []
-            for candidate in Set(state.files.keys).union(state.directories) {
-                guard candidate != path, candidate.hasPrefix(prefix) else { continue }
-                let rest = String(candidate.dropFirst(prefix.count))
-                guard !rest.isEmpty, !rest.contains("/") else { continue }
-                names.insert(rest)
-            }
-            return names.sorted()
-        }
-    }
-}
-
 /// How the fake server answers one request when its interceptor speaks.
 enum FakeServerAction {
     /// Keep the channel open without answering, for cancellation tests.
@@ -251,10 +77,6 @@ final class FakeSFTPServer: @unchecked Sendable {
 
     /// Consulted before default handling for every request after INIT.
     private let interceptorStorage = Mutex<(@Sendable (SFTPMessage) -> FakeServerAction)?>(nil)
-    var interceptor: (@Sendable (SFTPMessage) -> FakeServerAction)? {
-        get { interceptorStorage.withLock { $0 } }
-        set { interceptorStorage.withLock { $0 = newValue } }
-    }
 
     /// Extensions advertised in VERSION, e.g. "statvfs@openssh.com".
     var advertisedExtensions: [String] = []
@@ -281,7 +103,23 @@ final class FakeSFTPServer: @unchecked Sendable {
     /// OPENs of these paths are refused with PERMISSION_DENIED.
     var refusedPaths: Set<String> = []
 
-    private struct HandleState {
+    let state = Mutex(State())
+
+    private let writeLock = NSLock()
+
+    private let transport: SFTPLoopbackConnection.Transport
+
+    init(connection: SFTPLoopbackConnection, fileSystem: FakeRemoteFileSystem) {
+        self.fileSystem = fileSystem
+        self.transport = connection.serverTransport()
+    }
+
+    var interceptor: (@Sendable (SFTPMessage) -> FakeServerAction)? {
+        get { interceptorStorage.withLock { $0 } }
+        set { interceptorStorage.withLock { $0 = newValue } }
+    }
+
+    struct HandleState {
         enum Kind {
             case file(path: String)
             case directory(path: String, entries: [SFTPEntry], position: Int)
@@ -290,24 +128,15 @@ final class FakeSFTPServer: @unchecked Sendable {
         var kind: Kind
     }
 
-    private struct State {
+    struct State {
         var log = FakeServerLog()
         var nextHandle: UInt64 = 0
         var handles: [String: HandleState] = [:]
         var outstandingReads = 0
     }
 
-    private let state = Mutex(State())
-    private let writeLock = NSLock()
-    private let transport: SFTPLoopbackConnection.Transport
-
     /// Snapshot of what the server has seen so far.
     var log: FakeServerLog { state.withLock { $0.log } }
-
-    init(connection: SFTPLoopbackConnection, fileSystem: FakeRemoteFileSystem) {
-        self.fileSystem = fileSystem
-        self.transport = connection.serverTransport()
-    }
 
     /// Runs the request loop on its own thread until the connection drops.
     func start() {
@@ -372,7 +201,7 @@ final class FakeSFTPServer: @unchecked Sendable {
         return true
     }
 
-    private func send(_ payload: SFTPPayload, requestID: UInt32) {
+    func send(_ payload: SFTPPayload, requestID: UInt32) {
         let frame = SFTPCodec.encodeFrame(SFTPMessage(requestID: requestID, request: payload))
         writeLock.lock()
         defer { writeLock.unlock() }
@@ -478,178 +307,37 @@ final class FakeSFTPServer: @unchecked Sendable {
             }
         }
     }
+}
 
+extension FakeSFTPServer {
     // MARK: - Default filesystem behaviour
 
     private func respondDefault(to message: SFTPMessage) {
         let requestID = message.requestID
-        let fail: (SFTPStatus.Code, String) -> Void = { code, text in
-            self.send(
-                .status(SFTPStatus(code: code, message: Array(text.utf8), languageTag: Array("en".utf8))),
-                requestID: requestID)
-        }
+        let fail = failure(requestID: requestID)
 
         switch message.payload {
-        case .open(let path, let flags, _):
-            let name = String(decoding: path, as: UTF8.self)
-            if refusedPaths.contains(name) {
-                fail(.permissionDenied, "refused by the test")
-                return
-            }
-            if flags.contains(.read), !fileSystem.exists(name) {
-                fail(.noSuchFile, "no such file")
-                return
-            }
-            if flags.contains(.write), flags.contains(.exclude), fileSystem.exists(name) {
-                fail(.failure, "exists")
-                return
-            }
-            if flags.contains(.create), !fileSystem.exists(name) {
-                fileSystem.createFile(name, data: [])
-            } else if flags.contains(.truncate), flags.contains(.write) {
-                if var file = fileSystem.file(name) {
-                    file.data = []
-                    fileSystem.createFile(name, data: [], modificationTime: file.modificationTime)
-                }
-            }
-            let handle = newHandle(.file(path: name))
-            send(.handle(Array(handle.utf8)), requestID: requestID)
+        case .open: respondOpen(message)
 
-        case .close(let handle):
-            let name = String(decoding: handle, as: UTF8.self)
-            let existed = state.withLock { $0.handles.removeValue(forKey: name) != nil }
-            if existed {
-                fail(.ok, "")
-            } else {
-                fail(.failure, "no such handle")
-            }
+        case .close: respondClose(message)
 
-        case .read(let handle, let offset, let length):
-            let name = String(decoding: handle, as: UTF8.self)
-            guard let info = state.withLock({ $0.handles[name] }),
-                case .file(let path) = info.kind,
-                let file = fileSystem.file(path)
-            else {
-                fail(.failure, "no such handle")
-                return
-            }
-            if offset >= UInt64(file.data.count) {
-                fail(.endOfFile, "eof")
-                return
-            }
-            let end = min(Int(offset) + min(Int(length), maximumReadReply), file.data.count)
-            send(.data(Array(file.data[Int(offset)..<end])), requestID: requestID)
+        case .read: respondRead(message)
 
-        case .write(let handle, let offset, let data):
-            let name = String(decoding: handle, as: UTF8.self)
-            state.withLock { state in
-                if let info = state.handles[name], case .file(let path) = info.kind {
-                    state.log.writePaths.append(path)
-                }
-            }
-            guard let info = state.withLock({ $0.handles[name] }),
-                case .file(let path) = info.kind,
-                var file = fileSystem.file(path)
-            else {
-                fail(.failure, "no such handle")
-                return
-            }
-            let needed = Int(offset) + data.count
-            if file.data.count < needed {
-                file.data.append(contentsOf: [UInt8](repeating: 0, count: needed - file.data.count))
-            }
-            file.data.replaceSubrange(Int(offset)..<needed, with: data)
-            fileSystem.createFile(path, data: file.data, modificationTime: file.modificationTime)
-            fail(.ok, "")
+        case .write: respondWrite(message)
 
-        case .stat(let path), .lstat(let path):
-            let name = String(decoding: path, as: UTF8.self)
-            if let file = fileSystem.file(name) {
-                send(
-                    .attrs(
-                        SFTPAttributes(
-                            size: UInt64(file.data.count),
-                            permissions: file.permissions,
-                            modificationTime: file.modificationTime)),
-                    requestID: requestID)
-            } else if fileSystem.isDirectory(name) {
-                send(
-                    .attrs(SFTPAttributes(permissions: 0o040_755, modificationTime: 1_000)),
-                    requestID: requestID)
-            } else {
-                fail(.noSuchFile, "no such file")
-            }
+        case .stat, .lstat: respondStat(message)
 
-        case .setstat(let path, let attributes):
-            let name = String(decoding: path, as: UTF8.self)
-            if var file = fileSystem.file(name) {
-                if let size = attributes.size {
-                    let count = Int(size)
-                    if count < file.data.count { file.data.removeLast(file.data.count - count) }
-                    else { file.data.append(contentsOf: repeatElement(0, count: count - file.data.count)) }
-                }
-                if let mtime = attributes.modificationTime { file.modificationTime = mtime }
-                fileSystem.createFile(name, data: file.data, modificationTime: file.modificationTime)
-                fail(.ok, "")
-            } else {
-                fail(.noSuchFile, "no such file")
-            }
+        case .setstat: respondSetstat(message)
 
         case .mkdir(let path, _):
             fileSystem.createDirectory(String(decoding: path, as: UTF8.self))
             fail(.ok, "")
 
-        case .fsetstat(let handle, let attributes):
-            let name = String(decoding: handle, as: UTF8.self)
-            guard let info = state.withLock({ $0.handles[name] }),
-                case .file(let path) = info.kind,
-                var file = fileSystem.file(path)
-            else {
-                fail(.failure, "no such handle")
-                return
-            }
-            if let mtime = attributes.modificationTime { file.modificationTime = mtime }
-            fileSystem.createFile(path, data: file.data, modificationTime: file.modificationTime)
-            fail(.ok, "")
+        case .fsetstat: respondFsetstat(message)
 
-        case .opendir(let path):
-            let name = String(decoding: path, as: UTF8.self)
-            guard let children = fileSystem.children(of: name) else {
-                fail(.noSuchFile, "no such directory")
-                return
-            }
-            let entries = children.map { child -> SFTPEntry in
-                let full = name == "/" ? "/\(child)" : "\(name)/\(child)"
-                let attributes: SFTPAttributes
-                if let file = fileSystem.file(full) {
-                    attributes = SFTPAttributes(
-                        size: UInt64(file.data.count), permissions: file.permissions,
-                        modificationTime: file.modificationTime)
-                } else {
-                    attributes = SFTPAttributes(permissions: 0o040_755)
-                }
-                return SFTPEntry(filename: Array(child.utf8), attributes: attributes)
-            }
-            let handle = newHandle(.directory(path: name, entries: entries, position: 0))
-            send(.handle(Array(handle.utf8)), requestID: requestID)
+        case .opendir: respondOpendir(message)
 
-        case .readdir(let handle):
-            let name = String(decoding: handle, as: UTF8.self)
-            guard var info = state.withLock({ $0.handles[name] }),
-                case .directory(_, let entries, let position) = info.kind
-            else {
-                fail(.failure, "no such handle")
-                return
-            }
-            if position >= entries.count {
-                fail(.endOfFile, "eof")
-                return
-            }
-            let end = min(position + readDirBatchSize, entries.count)
-            let batch = Array(entries[position..<end])
-            info.kind = .directory(path: name, entries: entries, position: end)
-            state.withLock { $0.handles[name] = info }
-            send(.name(batch), requestID: requestID)
+        case .readdir: respondReaddir(message)
 
         case .remove(let path):
             fileSystem.removeFile(String(decoding: path, as: UTF8.self))
@@ -658,74 +346,179 @@ final class FakeSFTPServer: @unchecked Sendable {
         case .rmdir:
             fail(.ok, "")
 
-        case .rename(let oldPath, let newPath):
-            let oldName = String(decoding: oldPath, as: UTF8.self)
-            let newName = String(decoding: newPath, as: UTF8.self)
-            // Version 3 semantics: fail when the destination exists.
-            if fileSystem.exists(newName) {
-                fail(.failure, "destination exists")
-                return
-            }
-            renameOnFileSystem(from: oldName, to: newName)
-            fail(.ok, "")
+        case .rename: respondRename(message)
 
         case .realpath(let path):
             send(
                 .name([SFTPEntry(filename: path)]),
                 requestID: requestID)
 
-        case .extended(let name, let data):
-            let extensionName = String(decoding: name, as: UTF8.self)
-            if extensionName == SFTPCodec.statVFSExtensionName {
-                guard advertisedExtensions.contains(extensionName), let info = statVFSReply else {
-                    fail(.operationUnsupported, "unsupported")
-                    return
-                }
-                var writer = SFTPWriter()
-                for value in [
-                    info.blockSize, info.fragmentSize, info.blocks, info.blocksFree,
-                    info.blocksAvailable, info.files, info.filesFree, info.filesAvailable,
-                    info.filesystemID, info.flags, info.nameMaximum,
-                ] {
-                    writer.writeUInt64(value)
-                }
-                _ = data
-                send(.extendedReply(writer.bytes), requestID: requestID)
-            } else if extensionName == SFTPCodec.posixRenameExtensionName {
-                guard advertisedExtensions.contains(extensionName) else {
-                    fail(.operationUnsupported, "unsupported")
-                    return
-                }
-                var reader = SFTPReader(bytes: data)
-                guard let oldPath = try? reader.readString(),
-                    let newPath = try? reader.readString()
-                else {
-                    fail(.badMessage, "bad posix-rename body")
-                    return
-                }
-                renameOnFileSystem(
-                    from: String(decoding: oldPath, as: UTF8.self),
-                    to: String(decoding: newPath, as: UTF8.self))
-                fail(.ok, "")
-            } else {
-                fail(.operationUnsupported, "unsupported")
-            }
+        case .extended: respondExtended(message)
 
         default:
             fail(.operationUnsupported, "unsupported by the fake")
         }
     }
 
-    private func newHandle(_ kind: HandleState.Kind) -> String {
-        state.withLock { state in
-            state.nextHandle += 1
-            let name = "handle-\(state.nextHandle)"
-            state.handles[name] = HandleState(kind: kind)
-            return name
+    /// Replies to `requestID` with a status and its message.
+    func failure(requestID: UInt32) -> (SFTPStatus.Code, String) -> Void {
+        { code, text in
+            self.send(
+                .status(SFTPStatus(code: code, message: Array(text.utf8), languageTag: Array("en".utf8))),
+                requestID: requestID)
         }
     }
 
-    private func renameOnFileSystem(from oldName: String, to newName: String) {
-        fileSystem.rename(from: oldName, to: newName)
+    private func respondOpen(_ message: SFTPMessage) {
+        guard case .open(let path, let flags, _) = message.payload else { return }
+        let requestID = message.requestID
+        let fail = failure(requestID: requestID)
+        let name = String(decoding: path, as: UTF8.self)
+        if refusedPaths.contains(name) {
+            fail(.permissionDenied, "refused by the test")
+            return
+        }
+        if flags.contains(.read), !fileSystem.exists(name) {
+            fail(.noSuchFile, "no such file")
+            return
+        }
+        if flags.contains(.write), flags.contains(.exclude), fileSystem.exists(name) {
+            fail(.failure, "exists")
+            return
+        }
+        if flags.contains(.create), !fileSystem.exists(name) {
+            fileSystem.createFile(name, data: [])
+        } else if flags.contains(.truncate), flags.contains(.write) {
+            if var file = fileSystem.file(name) {
+                file.data = []
+                fileSystem.createFile(name, data: [], modificationTime: file.modificationTime)
+            }
+        }
+        let handle = newHandle(.file(path: name))
+        send(.handle(Array(handle.utf8)), requestID: requestID)
+    }
+
+    private func respondClose(_ message: SFTPMessage) {
+        guard case .close(let handle) = message.payload else { return }
+        let requestID = message.requestID
+        let fail = failure(requestID: requestID)
+        let name = String(decoding: handle, as: UTF8.self)
+        let existed = state.withLock { $0.handles.removeValue(forKey: name) != nil }
+        if existed {
+            fail(.ok, "")
+        } else {
+            fail(.failure, "no such handle")
+        }
+    }
+
+    private func respondRead(_ message: SFTPMessage) {
+        guard case .read(let handle, let offset, let length) = message.payload else { return }
+        let requestID = message.requestID
+        let fail = failure(requestID: requestID)
+        let name = String(decoding: handle, as: UTF8.self)
+        guard let info = state.withLock({ $0.handles[name] }),
+            case .file(let path) = info.kind,
+            let file = fileSystem.file(path)
+        else {
+            fail(.failure, "no such handle")
+            return
+        }
+        if offset >= UInt64(file.data.count) {
+            fail(.endOfFile, "eof")
+            return
+        }
+        let end = min(Int(offset) + min(Int(length), maximumReadReply), file.data.count)
+        send(.data(Array(file.data[Int(offset)..<end])), requestID: requestID)
+    }
+
+    private func respondWrite(_ message: SFTPMessage) {
+        guard case .write(let handle, let offset, let data) = message.payload else { return }
+        let requestID = message.requestID
+        let fail = failure(requestID: requestID)
+        let name = String(decoding: handle, as: UTF8.self)
+        state.withLock { state in
+            if let info = state.handles[name], case .file(let path) = info.kind {
+                state.log.writePaths.append(path)
+            }
+        }
+        guard let info = state.withLock({ $0.handles[name] }),
+            case .file(let path) = info.kind,
+            var file = fileSystem.file(path)
+        else {
+            fail(.failure, "no such handle")
+            return
+        }
+        let needed = Int(offset) + data.count
+        if file.data.count < needed {
+            file.data.append(contentsOf: [UInt8](repeating: 0, count: needed - file.data.count))
+        }
+        file.data.replaceSubrange(Int(offset)..<needed, with: data)
+        fileSystem.createFile(path, data: file.data, modificationTime: file.modificationTime)
+        fail(.ok, "")
+    }
+
+    private func respondStat(_ message: SFTPMessage) {
+        let path: [UInt8]
+        switch message.payload {
+        case .stat(let statPath), .lstat(let statPath): path = statPath
+        default: return
+        }
+        let requestID = message.requestID
+        let fail = failure(requestID: requestID)
+        let name = String(decoding: path, as: UTF8.self)
+        if let file = fileSystem.file(name) {
+            send(
+                .attrs(
+                    SFTPAttributes(
+                        size: UInt64(file.data.count),
+                        permissions: file.permissions,
+                        modificationTime: file.modificationTime)),
+                requestID: requestID)
+        } else if fileSystem.isDirectory(name) {
+            send(
+                .attrs(SFTPAttributes(permissions: 0o040_755, modificationTime: 1_000)),
+                requestID: requestID)
+        } else {
+            fail(.noSuchFile, "no such file")
+        }
+    }
+
+    private func respondSetstat(_ message: SFTPMessage) {
+        guard case .setstat(let path, let attributes) = message.payload else { return }
+        let requestID = message.requestID
+        let fail = failure(requestID: requestID)
+        let name = String(decoding: path, as: UTF8.self)
+        if var file = fileSystem.file(name) {
+            if let size = attributes.size {
+                let count = Int(size)
+                if count < file.data.count {
+                    file.data.removeLast(file.data.count - count)
+                } else {
+                    file.data.append(contentsOf: repeatElement(0, count: count - file.data.count))
+                }
+            }
+            if let mtime = attributes.modificationTime { file.modificationTime = mtime }
+            fileSystem.createFile(name, data: file.data, modificationTime: file.modificationTime)
+            fail(.ok, "")
+        } else {
+            fail(.noSuchFile, "no such file")
+        }
+    }
+
+    private func respondFsetstat(_ message: SFTPMessage) {
+        guard case .fsetstat(let handle, let attributes) = message.payload else { return }
+        let requestID = message.requestID
+        let fail = failure(requestID: requestID)
+        let name = String(decoding: handle, as: UTF8.self)
+        guard let info = state.withLock({ $0.handles[name] }),
+            case .file(let path) = info.kind,
+            var file = fileSystem.file(path)
+        else {
+            fail(.failure, "no such handle")
+            return
+        }
+        if let mtime = attributes.modificationTime { file.modificationTime = mtime }
+        fileSystem.createFile(path, data: file.data, modificationTime: file.modificationTime)
+        fail(.ok, "")
     }
 }

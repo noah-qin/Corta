@@ -26,7 +26,9 @@ import Testing
 ///
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded by
 /// design — see that type's comment.
-@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct ShellIntegrationRenderTests {
+@Suite(
+    .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct ShellIntegrationRenderTests {
     /// `margin`: the left inset the grid sits in, where the status rules draw.
     private static func draw(
         _ fixture: RenderFixture, grid: Grid, hoveredLink: TerminalSelection? = nil, margin: Int = 0
@@ -35,11 +37,10 @@ import Testing
             device: fixture.renderer.backend.device, width: margin + fixture.width,
             height: fixture.height)
         fixture.renderer.renderAndWait(
-            grid: grid, scrollOffset: 0,
-            rect: CGRect(x: margin, y: 0, width: fixture.width, height: fixture.height),
-            drawableSize: CGSize(width: margin + fixture.width, height: fixture.height),
-            cursorVisible: false, selection: nil, hoveredLink: hoveredLink,
-            target: texture)
+            grid: grid, scrollOffset: 0, cursorVisible: false, selection: nil, hoveredLink: hoveredLink,
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: margin, y: 0, width: fixture.width, height: fixture.height),
+                drawableSize: CGSize(width: margin + fixture.width, height: fixture.height)))
         return texture
     }
 
@@ -164,7 +165,7 @@ import Testing
         // of the backing scale.
         let x = 4 * cellWidth
         let rows = ((2 * rowHeight - 4)..<(2 * rowHeight))
-        func bluest(_ texture: MTLTexture, x: Int) -> (r: UInt8, g: UInt8, b: UInt8, a: UInt8) {
+        func bluest(_ texture: MTLTexture, x: Int) -> MetalRenderTarget.Pixel {
             rows.map { MetalRenderTarget.pixel(of: texture, x: x, y: $0) }.max { $0.b < $1.b }!
         }
         #expect(bluest(plain, x: x).b == 0)

@@ -137,7 +137,7 @@ struct ParserTests {
                 == [
                     .csi(
                         CSISequence(
-                            parameters: Parameters([1049]), privateMarker: 0x3F, final: 0x68))
+                            parameters: Parameters([1049]), privateMarker: 0x3F, final: 0x68)),
                 ])
         #expect(try actions("\\e[>c") == [.csi(CSISequence(privateMarker: 0x3E, final: 0x63))])
     }
@@ -151,7 +151,7 @@ struct ParserTests {
                         CSISequence(
                             parameters: Parameters([2]),
                             intermediates: Intermediates([0x24]),
-                            final: 0x70))
+                            final: 0x70)),
                 ])
     }
 

@@ -140,7 +140,7 @@ struct CharacterWidthTests {
     /// the generated data, so they are checked here rather than by eye.
     @Test("the range table is sorted, non-overlapping, and only 0 or 2")
     func rangeTableIsWellFormed() {
-        var previousUpper: UInt32? = nil
+        var previousUpper: UInt32?
         for range in characterWidthRanges {
             #expect(range.lower <= range.upper)
             #expect(range.width == 0 || range.width == 2)

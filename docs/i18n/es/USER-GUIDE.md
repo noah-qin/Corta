@@ -1,22 +1,11 @@
 # Guía de uso
 
-> Actualización actual (prevalece sobre los apartados anteriores): ⌘K conserva el indicador integrado
-> preparado, la entrada sin ejecutar y el cursor de edición, y los mueve arriba. No envía teclas,
-> no ejecuta y mantiene el historial. La pantalla alternativa y las entradas cuyo indicador está en
-> el historial quedan intactas; sin marcador preparado se conserva el borrado habitual. Acerca de y
-> el historial se abren centrados sobre la ventana que los invoca, dentro de la pantalla; una ventana
-> ya abierta mantiene su posición. Conexión, paleta, historial, candidatos y paneles de fin/error usan
-> vidrio redondeado. El formulario pequeño permite desplazarse y el historial tiene tamaño fijo.
-> Tab solo completa la ruta, sin ejecutar; tras `/` permite seguir por subdirectorios. Las carpetas
-> con solo archivos no tienen más candidatos. Véase la [guía inglesa](../../USER-GUIDE.md);
-> los demás apartados mantienen la referencia de traducción indicada abajo.
-
 [Índice de la documentación (inglés)](../../README.md) · [Presentación del proyecto](README.md)
 
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](../de/USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
 > Esta página es una traducción de [USER-GUIDE.md](../../USER-GUIDE.md), tal como estaba en el commit
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/USER-GUIDE.md).
+> [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/USER-GUIDE.md).
 > Si la versión en inglés ha cambiado desde entonces, o si ambas difieren, prevalece la versión en inglés.
 > Los nombres de la interfaz siguen la interfaz en español de Corta; las claves de configuración, los comandos y el código se mantienen en el original.
 
@@ -35,6 +24,7 @@ Buscar anterior se pueden cambiar ([Atajos de teclado](#keyboard-shortcuts)).
 - [Integración del shell](#shell-integration)
 - [El directorio de trabajo](#the-working-directory)
 - [Sugerencias de carpetas (zsh)](#directory-suggestions-zsh)
+- [Sugerencias del historial (zsh)](#history-suggestions-zsh)
 - [Trabajo remoto: SSH y SFTP](#remote-work-ssh-and-sftp)
 - [Imágenes en el terminal](#images-in-the-terminal)
 - [La paleta de comandos](#the-command-palette)
@@ -44,6 +34,8 @@ Buscar anterior se pueden cambiar ([Atajos de teclado](#keyboard-shortcuts)).
 - [Ajustes y archivo de configuración](#settings-and-the-config-file)
 - [Atajos de teclado](#keyboard-shortcuts)
 - [Cuando algo va mal](#when-something-goes-wrong)
+- [Estado de los agentes de código y notificaciones de programas](#coding-agent-state-and-program-notifications)
+- [Programas que usan extensiones OSC](#programs-using-osc-extensions)
 
 <a id="install-and-update"></a>
 
@@ -269,8 +261,8 @@ estilo del cursor.
 
 ### Sangría compacta con Tab (zsh)
 
-Las sesiones locales estándar de zsh cargan automáticamente los hooks incluidos cuando las sugerencias de carpetas están
-activadas (la opción predeterminada). No necesitas modificar tus archivos de inicio. Si usas argumentos de zsh
+Las sesiones locales estándar de zsh cargan automáticamente los hooks incluidos cuando las sugerencias de carpetas o las
+sugerencias del historial están activadas (ambas lo están por defecto). No necesitas modificar tus archivos de inicio. Si usas argumentos de zsh
 personalizados o has desactivado ese arranque automático, instala o actualiza la integración del shell en
 Ajustes → Terminal y abre un shell nuevo. Con esos hooks cargados, Tab en una línea de comandos que solo contiene espacios
 inserta cuatro espacios. Tab después de texto de comando mantiene la asignación de autocompletado existente. Es un widget
@@ -320,16 +312,33 @@ o, para una conexión, **Reconectar**; el texto de error del sistema está en **
 - **Pegar.** ⌘V. El texto pegado se marca como pegado (bracketed paste), así que un shell que lo admite — zsh, fish,
   bash 5.1 o posterior — inserta un comando pegado sin ejecutarlo hasta que pulses Retorno. Cuando el programa no ha
   activado el bracketed paste (el `/bin/bash` 3.2 de macOS nunca lo hace), Corta avisa antes de pegar un texto que
-  contiene un salto de línea. Un pegado grande que el shell todavía está procesando se puede cancelar con ⌃C: la parte
-  aún no enviada se descarta y la interrupción pasa directamente.
+  contiene un salto de línea. Incluso con el bracketed paste activado, también avisa ante una tubería hacia un shell (o
+  `bash <(curl …)` y similares), sudo, un borrado recursivo forzado, una continuación con barra invertida o caracteres
+  invisibles / bidireccionales. Revisa las frases de riesgo y la vista previa del texto antes de elegir **Pegar** o
+  **Cancelar**; los caracteres ocultos aparecen como códigos del tipo `⟦U+202E⟧`. **No volver a advertir en este panel** dura
+  hasta que se cierra ese panel. Pon `paste-warning = always` para avisar en cada pegado de varias líneas, u `off` para
+  desactivar estos diálogos. Son patrones prudentes, no un analizador de shell ni una garantía de que el resto del texto sea
+  seguro. Un pegado grande que el shell todavía está procesando se puede cancelar con ⌃C: la parte aún no enviada se
+  descarta y la interrupción pasa directamente.
+- **Clic derecho.** El panel en el que haces clic ofrece Buscar… y Copiar salida del comando para el comando terminado cuya
+  salida contiene la fila pulsada; la copia está desactivada sobre los indicadores, en la pantalla alternativa (programas a
+  pantalla completa) y sin integración del shell. Sobre un enlace ofrece Abrir enlace y Copiar enlace; sobre una referencia
+  `path:line:column`, Abrir ruta y Copiar ruta. Abrir usa las mismas comprobaciones de enlaces, el editor configurado y la
+  confirmación remota que un clic. Los programas con informes de ratón siguen recibiendo los clics derechos.
 - **Exportar texto…** (⇧⌘S) guarda la selección — o, sin selección, todo el historial y la pantalla — en un archivo.
 - **Borrar.** Tres comandos, porque descartan cosas distintas:
 
   | Comando | Pantalla | Historial | Modos y colores |
   | --- | --- | --- | --- |
-  | Borrar pantalla (⌘K) | borrada | conservado | conservados |
+  | Borrar pantalla (⌘K) | borrada; se conservan el indicador listo del shell y la entrada | conservado | conservados |
   | Borrar historial | conservada | descartado | conservados |
   | Restablecer terminal | borrada | descartado | restablecidos |
+
+  Con la integración del shell, Borrar pantalla lleva arriba el indicador listo y toda su entrada, y conserva el cursor de
+  edición, los saltos de línea, los colores y los caracteres anchos. No envía ninguna tecla ni ejecuta nunca la entrada. Un
+  indicador que aún se está imprimiendo, un comando en ejecución o un shell sin marcas de indicador listo mantienen el
+  borrado normal con vuelta a la esquina superior izquierda. Los programas en la pantalla alternativa, como vim, quedan
+  intactos; también un editor cuyo indicador ya pasó al historial, para no borrar parte de su entrada.
 
   Borrar historial y Restablecer terminal preguntan primero e indican cuántas líneas descartarían — salvo que el
   historial esté vacío o que `confirm-close = false` desactive la pregunta.
@@ -360,7 +369,7 @@ La integración del shell permite a Corta ver dónde empieza y termina cada coma
 para bash, tanto `~/.bashrc` como `~/.bash_profile` (o el archivo de inicio de sesión que lea bash); o
 `~/.config/fish/config.fish` — y **Quitar** elimina exactamente ese bloque. El bloque del archivo de inicio solo se instala
 cuando pulsas el botón. Las sesiones locales estándar de zsh también cargan automáticamente los hooks incluidos con Corta,
-sin editar tus archivos de inicio, cuando **Sugerencias de carpetas (zsh)** está activado (la opción predeterminada). Los
+sin editar tus archivos de inicio, cuando **Sugerencias de carpetas (zsh)** o **Sugerencias del historial (zsh)** está activado (la opción predeterminada). Los
 argumentos de zsh personalizados, bash, fish y los shells remotos no usan este arranque automático. Instala hooks
 compatibles en esos shells para tener allí los límites de los comandos.
 
@@ -371,7 +380,8 @@ Con los hooks cargados, de forma automática o mediante el archivo de inicio:
 
 - **Marcas de prompt.** Una línea fina a la izquierda de cada prompt, verde cuando el comando tuvo éxito y roja cuando
   falló. Un Retorno vacío no dibuja ninguna línea ni crea una entrada completada en el historial de comandos.
-- **Saltos.** ⌘↑ / ⌘↓ se mueven entre comandos; ⇧⌘↑ / ⇧⌘↓, entre los que fallaron.
+- **Saltos.** ⌘↑ / ⌘↓ se mueven entre comandos y también se detienen en las marcas que un programa pone con
+  `OSC 1337;SetMark` de iTerm2; ⇧⌘↑ / ⇧⌘↓, entre los que fallaron.
 - **La salida de un comando.** Desde la paleta de comandos: **Copiar la salida del último comando**,
   **Instantánea de la salida del comando en ejecución** (lo que una compilación ha impreso hasta ahora),
   **Exportar salida del comando…** a un archivo, y **Abrir referencia de archivo en la salida del comando**, que abre el
@@ -381,6 +391,10 @@ Con los hooks cargados, de forma automática o mediante el archivo de inicio:
   comando que la lista no puede mostrar entero — de más de una línea, cortado en el borde de la fila o con una tabulación —
   o cuyo texto cambió desde que la lista lo mostró se rellena en lugar de ejecutarse, para que quede completo en el prompt
   y se ejecute cuando pulses Retorno.
+- **Ventanas de historial y Acerca de.** El historial de comandos y **Corta ▸ Acerca de Corta** se abren centrados sobre la
+  ventana que los invoca, dentro del área útil de su pantalla. Una ventana ya abierta se queda donde la moviste. El tamaño
+  fijo del historial mantiene visibles la búsqueda y los filtros de directorio / proyecto / estado / host; un resultado vacío
+  muestra **Sin comandos** y el número de resultados.
 - **Notificaciones de tareas largas.** Con `notify-on-long-task = true`, un comando que tardó más de
   `notification-threshold` segundos (30) envía una notificación al terminar **mientras su ventana no es la ventana activa**,
   siempre que macOS haya concedido a Corta permiso de notificaciones. Actívalo en Ajustes ▸ General y comprueba allí el
@@ -411,11 +425,13 @@ Nada en la app los muestra todavía; **Ajustes ▸ Privacidad y seguridad ▸ Hi
 ## Sugerencias de carpetas (zsh)
 
 Corta incluye sugerencias de carpetas, activadas por defecto en las sesiones locales estándar de zsh. Escribe `cd ` para
-ver las carpetas del directorio actual como texto tenue bajo tu entrada. Sigue escribiendo para filtrar las carpetas;
+ver las carpetas del directorio actual en un panel compacto junto a tu entrada. Aparece debajo de la entrada cuando hay
+sitio, o encima cerca del borde inferior del panel. Una cápsula de cristal redondeada, con fondo tintado y borde, lo
+distingue de la salida anterior; puede tapar un poco esa salida durante un momento y no reserva filas del terminal. Sigue escribiendo para filtrar las carpetas;
 junto al cursor aparece un sufijo tenue. Por ejemplo, `cd De` puede sugerir `Developer/`. Las sugerencias son vistas
 previas: no forman parte de tu comando hasta que las aceptas.
 
-![Sugerencias de carpetas bajo cd, con marcas de comandos correctos, fallidos e interrumpidos](../../brand/directory-suggestions.png)
+![Panel de carpetas candidatas junto a cd, con marcas de comandos correctos, fallidos e interrumpidos](../../brand/directory-suggestions.png)
 
 Mientras hay una sugerencia visible:
 
@@ -423,12 +439,15 @@ Mientras hay una sugerencia visible:
 | --- | --- |
 | Izquierda / Derecha | Seleccionar la carpeta anterior / siguiente en lugar de mover el cursor de entrada. |
 | Tab | Completar la entrada con el directorio seleccionado, sin ejecutarlo. Sustituye al autocompletado nativo con Tab mientras las sugerencias están visibles. |
-| Esc | Cerrar las sugerencias de la entrada actual. Pulsa Esc antes de usar Izquierda / Derecha para editar el comando, u otra vez para la acción de Esc del propio shell. |
+| Esc | Cerrar las sugerencias de la entrada actual. Pulsa Esc antes de usar Izquierda / Derecha para editar el comando, u otra vez para la acción de Esc del propio shell. Con `bindkey -v`, la misma pulsación también entra en el modo de comandos. |
 | Arriba / Abajo | Mantener la navegación normal por el historial de comandos del shell. |
 | Mayús+Tab | Pasar a la asignación configurada en el shell. |
 | Retorno | Ejecutar solo la entrada real; nunca aceptar automáticamente una sugerencia tenue. |
 
-Puedes filtrar rutas relativas, subdirectorios y rutas `~/`. Las carpetas ocultas aparecen cuando escribes un punto como
+Puedes filtrar rutas relativas, subdirectorios y rutas `~/`. Cuando Tab rellena una carpeta que termina en `/`, sus
+subdirectorios pasan a ser los siguientes candidatos; repite para formar una ruta más profunda y pulsa Retorno cuando quieras
+ejecutar `cd`. Solo se ofrecen carpetas, así que una carpeta que solo contiene archivos no tiene más candidatos. Las
+carpetas ocultas aparecen cuando escribes un punto como
 prefijo. Las expresiones de shell complejas mantienen el autocompletado nativo. Bash y fish conservan su propio
 autocompletado; las sugerencias solo aparecen en un shell que Corta inició con sus hooks automáticos de zsh, nunca en
 máquinas remotas ni en comandos de shell personalizados, aunque la integración del shell esté instalada.
@@ -445,6 +464,35 @@ autocompletado nativos del shell. Vuelve a abrir el shell después de reactivarl
 inicio que borrar para los hooks locales automáticos. Si además instalaste la integración del shell manualmente, su botón
 **Quitar** elimina ese bloque aparte; no hace falta quitarlo para desactivar las sugerencias de carpetas.
 
+<a id="history-suggestions-zsh"></a>
+
+## Sugerencias del historial (zsh)
+
+En una sesión local estándar de zsh, al escribir el comienzo de un comando anterior aparece el resto, tenue, tras el cursor.
+Gana el comando de una sola línea más reciente que coincida. Por ejemplo, tras ejecutar `git status`, escribir `git st`
+sugiere `atus`. La indicación es solo una vista previa hasta que la aceptes.
+
+![El resto de un comando del historial local de zsh, tenue tras el cursor](../../brand/history-suggestions.png)
+
+| Tecla | Acción mientras la indicación está visible |
+| --- | --- |
+| Derecha / Fin | Añadir el resto sugerido al final de la entrada, sin ejecutar. |
+| Esc | Cerrar la indicación hasta que cambie la entrada. Con `bindkey -v`, la misma pulsación también entra en el modo de comandos. |
+| Tab / Mayús+Tab / Arriba / Abajo | Mantener la completación y el historial normales del shell. |
+| Retorno | Ejecutar solo la entrada real. |
+
+Una entrada vacía, el cursor en medio de la línea y las entradas de historial de varias líneas no muestran indicación.
+`cd ` mantiene las sugerencias de carpetas mientras están activadas y recibe indicaciones del historial cuando no lo están.
+La composición con un método de entrada oculta las indicaciones y deja disponibles los candidatos del propio método. Si
+zsh-autosuggestions está cargado, Corta le deja las sugerencias del historial. Bash, fish, los shells remotos y los comandos
+de inicio personalizados conservan su propia edición.
+
+Activadas por defecto. Desactiva **Ajustes ▸ Terminal ▸ Shell ▸ Sugerencias del historial (zsh)** o pon
+`history-suggestions = false` para ocultar las indicaciones y recuperar al instante las teclas nativas. Vuelve a abrir el
+shell después de activarlas. Las sugerencias de carpetas tienen su propio interruptor. Ambas usan envoltorios de inicio
+temporales y no cambian tus archivos de inicio. Corta usa el historial en memoria de zsh, nunca lee `HISTFILE` y nunca
+registra ni guarda el texto sugerido. Se omiten los restos de más de 128 caracteres Unicode.
+
 <a id="remote-work-ssh-and-sftp"></a>
 
 ## Trabajo remoto: SSH y SFTP
@@ -460,7 +508,9 @@ una implementación propia de SSH.
   una conexión nueva.
 - **Conectar.** El botón de globo de la barra de herramientas abre **Conectar con un host**, una hoja con un selector
   **Terminal / Archivos (SFTP)**: un terminal por SSH o el explorador de archivos. Escribe el host — un nombre, una
-  dirección, `user@host` o un alias de SSH. **Avanzado** contiene el usuario, el puerto y una clave privada; vacíos, los
+  dirección, `user@host` o un alias de SSH. El campo de host, el selector de modo, las sugerencias y los botones usan superficies
+  de cristal redondeadas; en una ventana pequeña la hoja se desplaza para que todos los campos y acciones queden a mano.
+  **Avanzado** contiene el usuario, el puerto y una clave privada; vacíos, los
   deciden tu `~/.ssh/config` y los valores predeterminados de OpenSSH. Una clave elegida se ofrece primero, y no se prueban
   otras claves de `ssh-agent`. La hoja muestra las conexiones recientes — con el puerto, la clave y cuándo las usaste por
   última vez — y los nombres `Host` de tu `~/.ssh/config`. Los hosts que solo aceptan git (`github.com`, o un `Host` con
@@ -702,3 +752,88 @@ enumera lo que Corta todavía no hace. Informa de cualquier otra cosa en
 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose). Para preguntas de uso, ve a
 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a) o pregunta en `#help` en el
 [Discord](https://discord.gg/QNdWfdwr7j).
+
+<a id="coding-agent-state-and-program-notifications"></a>
+
+## Estado de los agentes de código y notificaciones de programas
+
+**Hoy Claude Code es la única herramienta de línea de comandos con una integración dedicada del estado de las tareas.** Se
+desarrolló y validó con **Claude Code 2.1.310** instalado en macOS arm64; no es una garantía de compatibilidad para todas
+las versiones de Claude. Codex, Gemini CLI, pi, Kimi, Grok Build, Qwen Code, OpenCode y Aider no tienen un adaptador dedicado
+en Corta. Los protocolos genéricos de notificación y progreso están disponibles para cualquier programa; la detección de
+procesos no es una integración completa de agentes. Consulta el
+[alcance de compatibilidad y los límites de la verificación](../../CONFORMANCE.md#cli-signal-compatibility) (inglés).
+
+Por defecto, los paneles de agentes distinguen en su pestaña nativa Trabajando (color de acento), Esperando tu respuesta
+(naranja), Completado (verde), Error (rojo), Inactivo (gris) y Estado desconocido (un punto gris hueco). Inactivo significa que
+no se informa de ningún turno activo, incluso antes de empezar o después de parar; solo un `done` explícito significa que ha
+terminado. Un anillo de progreso sigue los informes OSC 7501 u OSC 9;4. El Dock cuenta los paneles en espera y muestra el
+progreso total. Abre la paleta de comandos o **Ventana → Agentes** para encontrar cada panel de agente en todas las ventanas;
+al elegir una entrada se enfoca. En la paleta, los agentes aparecen primero al explorar y después de los comandos que coinciden
+al buscar, y Retorno sigue ejecutando el comando resaltado: muévete con las flechas hasta un agente para saltar a él. Varios
+agentes en un panel se muestran con su estado más urgente. El estado y el nombre de la aplicación los declara el programa; no
+son identidades verificadas. Los metadatos genéricos OSC 21337 pueden añadir al estado actual un color indicador y una
+etiqueta cuando el título de la tarea está vacío. Sin estado de tarea, la etiqueta sigue siendo Estado desconocido.
+`status-color` solo se guarda como metadato; el texto de pestañas y menús nativos usa el color del sistema. Claude Code
+2.1.310 no activa este canal de metadatos.
+
+La consulta de estado OSC 7501 de Claude Code no necesita ningún ajuste en una sesión interactiva normal. Requiere Claude Code
+2.1.295 o posterior; la referencia comprobada por Corta es 2.1.310, no todo ese rango de versiones. El estado no atraviesa tmux
+activando `allow-passthrough`: Claude examina tmux por su cuenta. Las sesiones en segundo plano de Claude no informan
+OSC 7501 aunque estén conectadas; esto difiere de un panel oculto de Corta con una sesión interactiva. Quita
+`CLAUDE_CODE_DISABLE_TERMINAL_TITLE` para permitir la consulta y los informes. Consulta los
+[requisitos de terminal de Anthropic](https://code.claude.com/docs/en/terminal-config#see-session-status-in-your-terminal).
+Cuando un panel oculto de Corta pide permiso, hace una pregunta o necesita iniciar sesión, Corta publica un mensaje fijo.
+Para el texto propio de Claude Code, pon su `preferredNotifChannel` en `ghostty` (OSC 777), `iterm2` (OSC 9) o `kitty`
+(OSC 99) en el `settings.json` de Claude o en `/config` → Local notifications. `auto` no elige un canal de mensajes para
+Corta. `terminal_bell` envía BEL, `iterm2_with_bell` añade BEL a OSC 9, y `notifications_disabled` desactiva el canal de
+notificaciones de Claude, pero no los avisos 7501 de Corta. Corta se sigue identificando como Corta. Estos detalles propios de
+Claude se basan en la versión de referencia comprobada; su disponibilidad depende de la versión instalada. Los avisos de
+permiso explícitos de Claude suelen esperar unos seis segundos sin escribir; los recordatorios de finalización suelen esperar
+unos 60 segundos y requieren que no haya ningún agente en segundo plano en marcha. Son independientes de los informes de
+estado inmediatos. Consulta el [momento de las notificaciones](https://code.claude.com/docs/en/hooks#notification). Que Corta
+entienda OSC 9;4 no significa que Claude envíe progreso en Corta: el canal de progreso de 2.1.310 requiere
+`terminalProgressBarEnabled` y un terminal que reconozca como compatible; la identidad normal de Corta no se elige.
+
+Los programas sin soporte de estado se detectan por el nombre del proceso en primer plano (claude, claude-code, codex,
+gemini, aider, opencode); añade nombres con `agent-processes = my-agent,another-agent`. Estos paneles muestran Estado
+desconocido mientras el proceso está activo: la salida y el redibujado del indicador no prueban que una tarea avance. Volver
+al shell o una salida limpia del proceso significa Inactivo, no Completado; una salida con fallo conocida significa Error.
+Las notificaciones y BEL piden atención sin cambiar el estado de la tarea. El silencio por sí solo no significa que haya
+terminado. El ajuste existente de BEL (sonoro / visual / silencio) no cambia. Un límite de comando del shell informado
+también termina un estado y un progreso obsoletos cuando una herramienta caída no puede borrarlos. El estado de salida 130
+(o una sesión lanzada directamente que termina por SIGINT) significa interrumpido / Inactivo, no Completado; otras salidas
+distintas de cero conocidas significan Error. Un nuevo comando informado borra el resumen anterior. Sin un límite del shell
+ni el fin de la sesión, Corta no puede detectar un fallo silencioso solo a partir de la salida.
+
+`agent-status = false` oculta los indicadores de estado y la lista. `notify-from-programs = false` desactiva los avisos de
+programas y de atención de agentes. Los mensajes de programas se muestran como mensajes del panel bajo el nombre del panel en
+Corta, limitados y depurados, y agrupados en como mucho una entrega cada cinco segundos por panel. Mientras un panel sigue en
+un estado bloqueado informado, un aviso de programa retrasado no vuelve a alertar de una espera ya anunciada. Un aviso que
+llega antes de la primera entrega puede aportar su mensaje en su lugar. Se necesita el permiso de notificaciones de macOS;
+activa **Globo en el icono de la app** en los ajustes de notificaciones de la app para el recuento del Dock. El Centro de
+notificaciones puede conservar el texto y mostrarlo en la pantalla bloqueada. Hacer clic enfoca el panel; cerrar o reiniciar
+el panel cancela los avisos de programa pendientes. Salir de un episodio bloqueado cancela su aviso de atención fijo, mientras
+que los mensajes independientes de programas mantienen su propia vida. BEL no puede sustituir un texto de programa pendiente
+ni volver a alertar de una espera anunciada. La visibilidad se comprueba de nuevo antes del envío; la entrega posterior la
+controla macOS.
+
+<a id="programs-using-osc-extensions"></a>
+
+## Programas que usan extensiones OSC
+
+Usa `imgcat picture.png` de iTerm2 (o un GIF animado) para mostrar una imagen en línea; los GIF muestran su primer
+fotograma. Se aceptan tamaños en celdas, píxeles, porcentaje y automáticos, y por defecto se conserva la proporción. Las
+imágenes se desplazan con el texto; Borrar historial elimina las que están en el historial. Las descargas de archivos se
+rechazan.
+
+La integración del shell de VS Code usa los mismos registros de indicador y de comandos que los hooks de Corta. Los
+informes de host y directorio de iTerm2 son solo informativos para hosts remotos. Los programas de kitty pueden fijar colores
+y formas del puntero; al pasar sobre un enlace se sigue viendo una mano. Las escrituras en el portapapeles con OSC 52,
+iTerm2 Copy o el subconjunto de solo texto de OSC 5522 de kitty requieren `allow-clipboard-write = true`; las lecturas se
+rechazan siempre.
+
+`printf '\e]1337;RequestAttention=once\a'` hace rebotar el icono del Dock cuando Corta no está activo. `yes` sigue pidiendo
+atención hasta que se active, `no` lo cancela y `fireworks` se comporta como `once`. Los programas no pueden traer la ventana
+al frente. La [tabla de veredictos OSC](../../CONFORMANCE.md#osc-verdict-table) (inglés) registra cada familia admitida,
+ignorada y rechazada.

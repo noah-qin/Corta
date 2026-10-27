@@ -84,6 +84,37 @@ func benchmarkKeypressLatency() {
             + "(write -> PTY echo -> parse -> grid write; excludes vsync + display)")
 }
 
+/// Alternate snapshots of `flooded` and `control` from one
+/// `.userInteractive` thread, `iterations` of each, in nanoseconds.
+func sampleSnapshotPairs(
+    _ flooded: TerminalSession, _ control: TerminalSession, iterations: Int
+) -> (flooded: [UInt64], control: [UInt64]) {
+    let floodSamples = Mutex([UInt64]())
+    let controlSamples = Mutex([UInt64]())
+    floodSamples.withLock { $0.reserveCapacity(iterations) }
+    controlSamples.withLock { $0.reserveCapacity(iterations) }
+    let samplerDone = Mutex(false)
+    let sampler = Thread {
+        pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
+        for _ in 0..<iterations {
+            var start = DispatchTime.now()
+            _ = flooded.snapshot()
+            floodSamples.withLock {
+                $0.append(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)
+            }
+            start = DispatchTime.now()
+            _ = control.snapshot()
+            controlSamples.withLock {
+                $0.append(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)
+            }
+        }
+        samplerDone.withLock { $0 = true }
+    }
+    sampler.start()
+    while !samplerDone.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.01) }
+    return (floodSamples.withLock { $0 }, controlSamples.withLock { $0 })
+}
+
 /// What the render thread experiences when it asks for a grid while the
 /// reader thread is feeding a flood: `snapshot()` must wait for the session
 /// lock, which the reader holds across `feed` (in bounded slices). Samples
@@ -120,35 +151,9 @@ func benchmarkSnapshotLatencyUnderFlood() {
         _ = flooded.snapshot()
     }
 
-    let iterations = 2_000
-    let floodSamples = Mutex([UInt64]())
-    let controlSamples = Mutex([UInt64]())
-    floodSamples.withLock { $0.reserveCapacity(iterations) }
-    controlSamples.withLock { $0.reserveCapacity(iterations) }
-    let samplerDone = Mutex(false)
-    let sampler = Thread {
-        pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
-        for _ in 0..<iterations {
-            var start = DispatchTime.now()
-            _ = flooded.snapshot()
-            floodSamples.withLock {
-                $0.append(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)
-            }
-            start = DispatchTime.now()
-            _ = control.snapshot()
-            controlSamples.withLock {
-                $0.append(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)
-            }
-        }
-        samplerDone.withLock { $0 = true }
-    }
-    sampler.start()
-    while !samplerDone.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.01) }
-
-    guard let floodDistribution = LatencyDistribution(
-        samplesNanoseconds: floodSamples.withLock { $0 }),
-          let controlDistribution = LatencyDistribution(
-            samplesNanoseconds: controlSamples.withLock { $0 })
+    let samples = sampleSnapshotPairs(flooded, control, iterations: 2_000)
+    guard let floodDistribution = LatencyDistribution(samplesNanoseconds: samples.flooded),
+          let controlDistribution = LatencyDistribution(samplesNanoseconds: samples.control)
     else {
         print("snapshot latency under flood: NO DATA")
         return
@@ -166,8 +171,10 @@ func benchmarkSnapshotLatencyUnderFlood() {
 /// cat'ed through a real PTY while a `.userInteractive` thread takes the
 /// frame's reads at 240 Hz. Its base64 and zlib once ran under the session
 /// lock and held a snapshot for ~95 ms; they run with it released now.
-func benchmarkSnapshotLatencyUnderImage() {
-    let width = 3840, height = 2160
+/// A `width`×`height` RGBA image as kitty graphics `o=z` (zlib) chunks,
+/// between two lines of text: a gradient with noise, which compresses
+/// about as well as a photograph. Nil when zlib encoding fails.
+func kittyZlibImageStream(width: Int, height: Int) -> [UInt8]? {
     var seed: UInt32 = 1
     var pixels = [UInt8](repeating: 0, count: width * height * 4)
     for index in pixels.indices {
@@ -178,10 +185,7 @@ func benchmarkSnapshotLatencyUnderImage() {
     var deflated = [UInt8](repeating: 0, count: pixels.count + 1024)
     let deflatedCount = compression_encode_buffer(
         &deflated, deflated.count, pixels, pixels.count, nil, COMPRESSION_ZLIB)
-    guard deflatedCount > 0 else {
-        print("snapshot latency under a 4K image: SKIPPED (zlib encoding failed)")
-        return
-    }
+    guard deflatedCount > 0 else { return nil }
     var a: UInt32 = 1, b: UInt32 = 0
     for byte in pixels { a = (a + UInt32(byte)) % 65_521; b = (b + a) % 65_521 }
     let adler = b << 16 | a
@@ -198,19 +202,41 @@ func benchmarkSnapshotLatencyUnderImage() {
         offset = end
     }
     stream += Array("\r\nafter\r\n".utf8)
-    let file = FileManager.default.temporaryDirectory
-        .appendingPathComponent("corta-bench-image-\(getpid()).bin")
+    return stream
+}
+
+/// Why a benchmark could not set up its child.
+struct BenchmarkSetupFailure: Error {
+    let message: String
+}
+
+/// A `cat` session that will replay `stream`, written to `file` first.
+func catSession(playing stream: [UInt8], from file: URL) -> Result<TerminalSession, BenchmarkSetupFailure> {
     guard (try? Data(stream).write(to: file)) != nil else {
-        print("snapshot latency under a 4K image: SKIPPED (could not write the stream)")
+        return .failure(BenchmarkSetupFailure(message: "could not write the stream"))
+    }
+    do {
+        return .success(try TerminalSession(
+            executable: "/bin/cat", arguments: [file.path], size: TerminalSize(rows: 50, columns: 200)))
+    } catch {
+        return .failure(BenchmarkSetupFailure(message: "could not spawn /bin/cat: \(error)"))
+    }
+}
+
+func benchmarkSnapshotLatencyUnderImage() {
+    let width = 3840, height = 2160
+    guard let stream = kittyZlibImageStream(width: width, height: height) else {
+        print("snapshot latency under a 4K image: SKIPPED (zlib encoding failed)")
         return
     }
+    let file = FileManager.default.temporaryDirectory
+        .appendingPathComponent("corta-bench-image-\(getpid()).bin")
     defer { try? FileManager.default.removeItem(at: file) }
     let session: TerminalSession
-    do {
-        session = try TerminalSession(
-            executable: "/bin/cat", arguments: [file.path], size: TerminalSize(rows: 50, columns: 200))
-    } catch {
-        print("snapshot latency under a 4K image: SKIPPED (could not spawn /bin/cat: \(error))")
+    switch catSession(playing: stream, from: file) {
+    case .success(let started): session = started
+    case .failure(let reason):
+        print("snapshot latency under a 4K image: SKIPPED (\(reason.message))")
         return
     }
     let exited = Mutex(false)
@@ -477,9 +503,16 @@ final class EchoCounter: Sendable {
 /// `abortAfterConsecutiveTimeouts`, that many failures in a row means the
 /// session or the PTY is wedged, not slow, and the run stops with what it
 /// has rather than sit through the rest.
+struct EchoRun {
+    var samples: [UInt64]
+    var submitted: Int
+    var timedOut: Int
+    var aborted: Bool
+}
+
 func measureEchoRoundTrips(
     _ session: TerminalSession, counter: EchoCounter, iterations: Int, abortAfterConsecutiveTimeouts: Int?
-) -> (samples: [UInt64], submitted: Int, timedOut: Int, aborted: Bool) {
+) -> EchoRun {
     // Warm up: the first write pays for thread startup and PTY buffering
     // effects a steady-state loop shouldn't be charged for.
     let warmupTarget = counter.count + 1
@@ -512,9 +545,8 @@ func measureEchoRoundTrips(
         // no handling — every target is recomputed from the live count.
         _ = counter.wait(until: counter.count + 1, timeout: 0.2)
         if let limit = abortAfterConsecutiveTimeouts, consecutiveTimeouts >= limit {
-            return (samples, submitted, timedOut, true)
+            return EchoRun(samples: samples, submitted: submitted, timedOut: timedOut, aborted: true)
         }
     }
-    return (samples, submitted, timedOut, false)
+    return EchoRun(samples: samples, submitted: submitted, timedOut: timedOut, aborted: false)
 }
-

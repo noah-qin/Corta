@@ -17,6 +17,23 @@
 import AppKit
 import SwiftUI
 
+/// A save/status report shared by every "state plus one action" row on the
+/// settings page: the overall save line, the font's resolution, shell
+/// integration, directory history, and the notification-permission notice.
+///
+/// **Why an icon and a word, never a colour alone.** A green tick and a red
+/// cross are the same shape to a person who cannot separate those hues, and
+/// this is the only report several of these rows make. `StatusRowView`
+/// carries the symbol as the primary signal, the message as the detail, and
+/// tint as the third and least load-bearing one.
+struct RowStatus: Equatable {
+    enum Kind: Equatable { case none, saved, adjusted, failed }
+    var kind: Kind = .none
+    var message: String = ""
+    var actionTitle: String?
+    var secondaryActionTitle: String?
+}
+
 /// The one line on the settings page that says what just happened — reused
 /// for the overall save line, the font's resolution, shell integration,
 /// directory history, the notification-permission notice and the Quick

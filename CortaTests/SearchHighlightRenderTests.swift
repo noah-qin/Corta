@@ -26,7 +26,9 @@ import Testing
 /// scroll offset exactly like a selection does.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct SearchHighlightRenderTests {
+@Suite(
+    .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct SearchHighlightRenderTests {
     @discardableResult
     private static func draw(
         _ fixture: RenderFixture, grid: Grid, scrollOffset: Int,
@@ -35,12 +37,11 @@ import Testing
         let texture = MetalRenderTarget.make(
             device: fixture.renderer.backend.device, width: fixture.width, height: fixture.height)
         fixture.renderer.renderAndWait(
-            grid: grid, scrollOffset: scrollOffset,
-            rect: CGRect(x: 0, y: 0, width: fixture.width, height: fixture.height),
-            drawableSize: CGSize(width: fixture.width, height: fixture.height),
-            cursorVisible: false, selection: nil,
+            grid: grid, scrollOffset: scrollOffset, cursorVisible: false, selection: nil,
             searchMatches: searchMatches, currentSearchMatchIndex: currentSearchMatchIndex,
-            target: texture)
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: 0, y: 0, width: fixture.width, height: fixture.height),
+                drawableSize: CGSize(width: fixture.width, height: fixture.height)))
         return texture
     }
 

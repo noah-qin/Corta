@@ -220,7 +220,11 @@ enum ShellIntegrationScript {
           end
         end
         """#
+}
 
+// MARK: - Directory completion
+
+extension ShellIntegrationScript {
     static let zshDirectoryCompletion = #"""
         if [[ -o interactive && $TERM_PROGRAM == Corta && -z $__corta_cd_installed ]]; then
           typeset -g __corta_cd_installed=1 __corta_cd_revision=0 __corta_cd_index=1

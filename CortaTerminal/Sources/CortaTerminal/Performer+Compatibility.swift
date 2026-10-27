@@ -87,8 +87,8 @@ extension Performer {
         for (flag, code): (CellAttributes, String) in [
             (.bold, "1"), (.dim, "2"), (.italic, "3"),
             (.blink, "5"), (.reverse, "7"), (.invisible, "8"), (.strikethrough, "9"),
-        ] {
-            if pen.attributes.contains(flag) { sgr.append(code) }
+        ] where pen.attributes.contains(flag) {
+            sgr.append(code)
         }
         if pen.attributes.contains(.curlyUnderline) {
             sgr.append("4:3")
@@ -110,7 +110,7 @@ extension Performer {
             sgr.append(value)
         }
         state.outputBuffer.append(
-            contentsOf: Array("\u{1B}P1$r\(sgr.joined(separator:";"))m\u{1B}\\".utf8))
+            contentsOf: Array("\u{1B}P1$r\(sgr.joined(separator: ";"))m\u{1B}\\".utf8))
     }
 
 }

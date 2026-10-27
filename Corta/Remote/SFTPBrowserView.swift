@@ -119,6 +119,31 @@ struct SFTPBrowserView: View {
         .scrollBounceBehavior(.basedOnSize)
     }
 
+    /// ssh's own words, behind a Details disclosure, selectable.
+    @ViewBuilder
+    private func failureDetails(_ details: String) -> some View {
+        Button {
+            showFailureDetails.toggle()
+        } label: {
+            Label(L10n.text("panel.details"),
+                  systemImage: showFailureDetails ? "chevron.down" : "chevron.right")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("sftp-failure-details")
+        if showFailureDetails {
+            Text(details)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 6))
+        }
+    }
+
     /// A connection that failed, said the way a pane says it stopped
     /// (`PaneStatusPanel`): the kind of failure in a sentence, ssh's own
     /// words behind Details, and the two ways on — the fields again, or the
@@ -140,26 +165,7 @@ struct SFTPBrowserView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
-                    Button {
-                        showFailureDetails.toggle()
-                    } label: {
-                        Label(L10n.text("panel.details"),
-                              systemImage: showFailureDetails ? "chevron.down" : "chevron.right")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("sftp-failure-details")
-                    if showFailureDetails {
-                        Text(failure.details)
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(8)
-                            .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 6))
-                    }
+                    failureDetails(failure.details)
                     HStack(spacing: 10) {
                         Button(L10n.text("sftp.failure.edit")) { model.cancelConnect() }
                         Button(L10n.text("failure.button.retry")) { model.retry() }
@@ -197,7 +203,11 @@ struct SFTPBrowserView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - The browser
+}
+
+// MARK: - The browser
+
+extension SFTPBrowserView {
 
     private var browser: some View {
         VStack(spacing: 0) {
@@ -455,87 +465,6 @@ struct SFTPBrowserView: View {
         case .available(let free, _):
             // Whose space it is, said: the local disk is not the question here.
             Text(L10n.format("sftp.volume.freeRemote", SFTPBrowserModel.formattedByteCount(free)))
-        }
-    }
-
-    // MARK: - Conflict sheet
-
-    private struct ConflictSheet: View {
-        let prompt: SFTPBrowserModel.ConflictPrompt
-        let model: SFTPBrowserModel
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(L10n.text("sftp.conflict.title"))
-                    .font(.headline)
-                Text(message)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                HStack {
-                    Button(L10n.text("sftp.conflict.skip")) {
-                        model.resolveConflict(prompt.id, choice: .skip)
-                    }
-                    .keyboardShortcut(.cancelAction)
-                    Spacer()
-                    Button(L10n.text("sftp.conflict.keepBoth")) {
-                        model.resolveConflict(prompt.id, choice: .keepBoth)
-                    }
-                    if prompt.canResume {
-                        Button(L10n.text("sftp.conflict.resume")) {
-                            model.resolveConflict(prompt.id, choice: .resume)
-                        }
-                    }
-                    Button(L10n.text("sftp.conflict.overwrite")) {
-                        model.resolveConflict(prompt.id, choice: .overwrite)
-                    }
-                }
-            }
-            .padding(20)
-            .frame(minWidth: 420)
-        }
-
-        private var message: String {
-            let key =
-                prompt.partialOnly
-                ? "sftp.conflict.message.partial" : "sftp.conflict.message.destination"
-            return L10n.format(
-                key, prompt.path, prompt.destinationDescription, prompt.sourceDescription)
-        }
-    }
-
-    // MARK: - New directory / rename sheet
-
-    private struct TextPromptSheet: View {
-        let prompt: SFTPBrowserModel.TextPrompt
-        let model: SFTPBrowserModel
-        @State private var text: String
-
-        init(prompt: SFTPBrowserModel.TextPrompt, model: SFTPBrowserModel) {
-            self.prompt = prompt
-            self.model = model
-            _text = State(initialValue: prompt.initialText)
-        }
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(prompt.title)
-                    .font(.headline)
-                Text(prompt.message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("", text: $text)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { model.commitTextPrompt(text) }
-                HStack {
-                    Spacer()
-                    Button(L10n.text("common.cancel")) { model.textPrompt = nil }
-                        .keyboardShortcut(.cancelAction)
-                    Button(prompt.title) { model.commitTextPrompt(text) }
-                        .keyboardShortcut(.defaultAction)
-                }
-            }
-            .padding(20)
-            .frame(minWidth: 320)
         }
     }
 }

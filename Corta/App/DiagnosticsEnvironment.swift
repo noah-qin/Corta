@@ -69,10 +69,11 @@ nonisolated enum DiagnosticsEnvironment {
     ) -> MainStall? {
         guard enabled, let raw = value(.mainStall, in: environment) else { return nil }
         let parts = raw.split(separator: "/")
-        guard parts.count == 2, let ms = Double(parts[0]), let period = Double(parts[1]),
-            ms.isFinite, period.isFinite, ms > 0, ms <= 1000, period > ms
+        guard parts.count == 2, let stallMilliseconds = Double(parts[0]), let period = Double(parts[1]),
+            stallMilliseconds.isFinite, period.isFinite, stallMilliseconds > 0, stallMilliseconds <= 1000,
+            period > stallMilliseconds
         else { return nil }
-        return MainStall(milliseconds: ms, periodMilliseconds: period)
+        return MainStall(milliseconds: stallMilliseconds, periodMilliseconds: period)
     }
 
     /// What a full-screen window with one pane changes for direct

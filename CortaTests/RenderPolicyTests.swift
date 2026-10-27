@@ -82,6 +82,26 @@ struct RenderPolicyTests {
         policy.scrollingStateChanged(true)
         #expect(scheduler.preferredFrameRateRange.maximum == 10)
     }
+    /// The table, restated: pressure caps unless interaction outranks it,
+    /// interaction gets the panel's full rate, a quiet or background
+    /// window idles low, and an idle window on a 120 Hz panel draws at 60.
+    private static func expectDecision(for inputs: RenderPolicy.Inputs) {
+        let range = RenderPolicy.range(for: inputs)
+        let interacting = inputs.isTyping || inputs.isScrolling
+        let fps = inputs.maximumFramesPerSecond
+        if inputs.thermalState == .critical || (inputs.thermalState == .serious && !interacting) {
+            #expect(range.maximum == 20 && range.preferred == 10)
+        } else if interacting {
+            if fps == 120 {
+                #expect(range.minimum == 60 && range.maximum == 120 && range.preferred == 120)
+            } else { #expect(range == .default) }
+        } else if inputs.isLowPowerModeEnabled || !inputs.isWindowActive {
+            #expect(range.maximum == 30 && range.preferred == 15)
+        } else if fps == 120 {
+            #expect(range.maximum == 120 && range.preferred == 60)
+        } else { #expect(range == .default) }
+    }
+
     @Test func decisionTable() {
         for fps in [60, 120] {
             for thermal in [ProcessInfo.ThermalState.nominal, .fair, .serious, .critical] {
@@ -89,21 +109,10 @@ struct RenderPolicyTests {
                     for active in [false, true] {
                         for typing in [false, true] {
                             for scrolling in [false, true] {
-                                let range = RenderPolicy.range(for: .init(
+                                Self.expectDecision(for: .init(
                                     isScrolling: scrolling, isTyping: typing, thermalState: thermal,
                                     isLowPowerModeEnabled: lowPower, isWindowActive: active,
                                     maximumFramesPerSecond: fps))
-                                if thermal == .critical || (thermal == .serious && !typing && !scrolling) {
-                                    #expect(range.maximum == 20 && range.preferred == 10)
-                                } else if typing || scrolling {
-                                    if fps == 120 {
-                                        #expect(range.minimum == 60 && range.maximum == 120 && range.preferred == 120)
-                                    } else { #expect(range == .default) }
-                                } else if lowPower || !active {
-                                    #expect(range.maximum == 30 && range.preferred == 15)
-                                } else if fps == 120 {
-                                    #expect(range.maximum == 120 && range.preferred == 60)
-                                } else { #expect(range == .default) }
                             }
                         }
                     }

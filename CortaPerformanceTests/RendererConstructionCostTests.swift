@@ -36,7 +36,8 @@ extension PerformanceSuites {
             let font = CTFontCreateWithName("Menlo" as CFString, 12, nil)
             func footprint() -> UInt64 {
                 var info = task_vm_info_data_t()
-                var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+                var count = mach_msg_type_number_t(
+                    MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
                 let result = withUnsafeMutablePointer(to: &info) { pointer in
                     pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
                         task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
@@ -55,9 +56,12 @@ extension PerformanceSuites {
                 let renderers = try (0..<4).map { _ in
                     try TerminalRenderer(device: device, font: font, scale: 2, atlasStorageMode: mode)
                 }
-                let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
+                let elapsedMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
                 withExtendedLifetime(renderers) {
-                    report += "\(mode): texture allocated \(renderers.map(\.atlasAllocatedBytes)), device delta \(Int64(device.currentAllocatedSize) - Int64(allocated)), footprint delta \(Int64(footprint()) - Int64(before)), init \(ms) ms\n"
+                    report +=
+                        "\(mode): texture allocated \(renderers.map(\.atlasAllocatedBytes)), device delta "
+                            + "\(Int64(device.currentAllocatedSize) - Int64(allocated)), footprint delta "
+                            + "\(Int64(footprint()) - Int64(before)), init \(elapsedMilliseconds) ms\n"
                 }
             }
             try report.write(toFile: "/tmp/corta-atlas-storage.txt", atomically: true, encoding: .utf8)

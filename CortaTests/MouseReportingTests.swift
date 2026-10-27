@@ -46,7 +46,8 @@ struct MouseReportingTests {
         let ctrl = SGRMouse.Modifiers(control: true)
         #expect(SGRMouse.press(button: .left, column: 5, row: 3, modifiers: ctrl) == Array("\u{1B}[<16;6;4M".utf8))
         let shiftMeta = SGRMouse.Modifiers(shift: true, meta: true)
-        #expect(SGRMouse.press(button: .right, column: 0, row: 0, modifiers: shiftMeta) == Array("\u{1B}[<14;1;1M".utf8))
+        #expect(
+            SGRMouse.press(button: .right, column: 0, row: 0, modifiers: shiftMeta) == Array("\u{1B}[<14;1;1M".utf8))
         #expect(SGRMouse.wheel(up: true, column: 0, row: 0, modifiers: ctrl) == Array("\u{1B}[<80;1;1M".utf8))
     }
 
@@ -87,7 +88,9 @@ struct MouseReportingTests {
 extension MouseReportingTests {
     @Test func motionEncodesHeldAndUnheldButtons() {
         #expect(SGRMouse.motion(button: .left, column: 5, row: 3) == Array("\u{1B}[<32;6;4M".utf8))
-        #expect(SGRMouse.motion(button: .right, column: 0, row: 0, modifiers: .init(control: true)) == Array("\u{1B}[<50;1;1M".utf8))
+        #expect(
+            SGRMouse.motion(button: .right, column: 0, row: 0, modifiers: .init(control: true))
+                == Array("\u{1B}[<50;1;1M".utf8))
         #expect(SGRMouse.motion(button: nil, column: 5, row: 3) == Array("\u{1B}[<35;6;4M".utf8))
     }
 

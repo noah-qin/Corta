@@ -44,7 +44,9 @@ struct PresetSettingsView: View {
                         Button(L10n.text("ui.presets.open")) {
                             (NSApp.delegate as? AppDelegate)?.launchPreset(preset, inNewWindow: true)
                         }
-                        Button(L10n.text("ui.presets.edit")) { editor = PresetDraft(preset: preset, originalName: preset.name) }
+                        Button(L10n.text("ui.presets.edit")) {
+                            editor = PresetDraft(preset: preset, originalName: preset.name)
+                        }
                         Button { removing = preset.name } label: { Image(systemName: "trash") }
                             .help(L10n.text("ui.presets.remove"))
                             .accessibilityLabel(L10n.text("ui.presets.remove"))
@@ -59,7 +61,10 @@ struct PresetSettingsView: View {
             }
         }
         .sheet(item: $editor) { draft in PresetEditor(model: model, draft: draft) }
-        .alert(L10n.text("ui.presets.remove"), isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })) {
+        .alert(
+            L10n.text("ui.presets.remove"),
+            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })
+        ) {
             Button(L10n.text("common.cancel"), role: .cancel) { removing = nil }
             Button(L10n.text("ui.presets.remove"), role: .destructive) {
                 if let removing { model.removePreset(removing) }
@@ -93,7 +98,9 @@ private struct PresetEditor: View {
         _shell = State(initialValue: draft.preset.shell ?? "")
         _directory = State(initialValue: draft.preset.directory ?? "")
         _arguments = State(initialValue: draft.preset.arguments.joined(separator: " "))
-        _environment = State(initialValue: draft.preset.environment.keys.sorted().map { "\($0)=\(draft.preset.environment[$0] ?? "")" }.joined(separator: "\n"))
+        _environment = State(
+            initialValue: draft.preset.environment.keys.sorted().map { "\($0)=\(draft.preset.environment[$0] ?? "")" }
+                .joined(separator: "\n"))
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -131,7 +138,9 @@ private struct PresetEditor: View {
             guard let separator = line.firstIndex(of: "="), separator != line.startIndex else { error = true; return }
             let key = String(line[..<separator])
             let value = String(line[line.index(after: separator)...])
-            guard !key.contains(where: { $0.isWhitespace || $0 == "\0" }), !value.contains("\0") else { error = true; return }
+            guard !key.contains(where: { $0.isWhitespace || $0 == "\0" }), !value.contains("\0") else {
+                error = true; return
+            }
             preset.environment[key] = value
         }
         if model.savePreset(preset, replacing: draft.originalName) { dismiss() } else { error = true }

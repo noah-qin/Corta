@@ -63,6 +63,16 @@ struct SelectionTests {
         #expect(Selection.text(of: range, in: terminal.grid) == "one\ntwo\nthree")
     }
 
+    /// A narrowing resize can leave an anchor past the last column; its row
+    /// then contributes nothing, and the copy neither traps nor loses the rest.
+    @Test("a selection starting past the last column copies the rows after it")
+    func selectionStartingPastTheLastColumn() {
+        var terminal = Terminal(rows: 5, columns: 10)
+        terminal.feed(Array("abc\r\ndef".utf8))
+        let range = SelectionRange(anchor: point(0, 15), head: point(1, 2))
+        #expect(Selection.text(of: range, in: terminal.grid) == "\ndef")
+    }
+
     @Test("a wide character's spacer cell contributes no stray space")
     func wideSpacerCopiesNothing() {
         var terminal = Terminal(rows: 5, columns: 10)

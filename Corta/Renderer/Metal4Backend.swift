@@ -60,7 +60,10 @@ nonisolated enum Metal4Diagnostics {
     static func reportStalledQueue(droppedFrames: Int) {
         os_log(
             .fault, log: log,
-            "Metal 4 GPU work has not completed across %d consecutive frames (commit fault or hung GPU); dropping frames instead of blocking the render loop",
+            """
+            Metal 4 GPU work has not completed across %d consecutive frames (commit fault or hung GPU); \
+            dropping frames instead of blocking the render loop
+            """,
             droppedFrames)
     }
 }
@@ -115,10 +118,10 @@ public nonisolated final class Metal4Backend {
     let argumentTable: any MTL4ArgumentTable
     let residencySet: any MTLResidencySet
 
-    private let solidPipeline: MTLRenderPipelineState
-    private let glyphPipeline: MTLRenderPipelineState
+    private let solidPass: DrawPass
+    private let glyphPass: DrawPass
     /// Premultiplied-source blending, for colour glyphs and images.
-    private let colorGlyphPipeline: MTLRenderPipelineState
+    private let colorGlyphPass: DrawPass
     let sampler: MTLSamplerState
 
     /// Created once and re-pointed each frame: no per-frame allocation.
@@ -233,7 +236,12 @@ public nonisolated final class Metal4Backend {
     /// and resident, since MTL4 does neither for `gpuResourceID` bindings;
     /// `dropRetired` releases image textures once that frame completes;
     /// persistent atlases retain a `textureRetentionFrames` grace period.
-    var boundTextures: [ObjectIdentifier: (texture: MTLTexture, lastFrame: UInt64, retentionFrames: UInt64)] = [:]
+    var boundTextures: [ObjectIdentifier: BoundTexture] = [:]
+    struct BoundTexture {
+        var texture: MTLTexture
+        var lastFrame: UInt64
+        var retentionFrames: UInt64
+    }
     /// Grace frames before an unbound texture leaves the residency set. Zero
     /// would be correct but would commit the residency set twice a frame for
     /// an atlas bound every frame.
@@ -244,70 +252,6 @@ public nonisolated final class Metal4Backend {
     /// frame that last used them; they leave the residency set once the GPU
     /// completes it.
     var retired: [(frame: UInt64, allocation: any MTLAllocation)] = []
-
-    /// Instance storage for one pipeline kind, one buffer per slot. Draws
-    /// append (instances plus uniforms) to the frame's slot. A buffer grows
-    /// geometrically and is reused every frame after, never shrunk
-    /// (`PERFORMANCE.md` §3): a growing screen reallocates a handful of
-    /// times, not every frame.
-    final class InstanceBufferRing {
-        private var buffers: [MTLBuffer?] = Array(repeating: nil, count: Metal4Backend.frameSlotCount)
-        private var used = 0
-
-        func beginFrame() {
-            used = 0
-        }
-
-        /// Appends instances plus uniforms to `slot`, returning GPU addresses.
-        /// Growth replaces the buffer rather than write memory an earlier
-        /// draw of this frame still reads.
-        func append(
-            instances: UnsafeRawPointer, instanceByteCount: Int, uniforms: QuadUniforms, atlasRects: [SIMD4<UInt16>],
-            slot: Int, device: MTLDevice, residencySet: any MTLResidencySet,
-            retire: (MTLBuffer) -> Void
-        ) -> (instances: MTLGPUAddress, uniforms: MTLGPUAddress, rects: MTLGPUAddress)? {
-            let instanceOffset = Self.align(used)
-            let uniformOffset = Self.align(instanceOffset + instanceByteCount)
-            let rectOffset = Self.align(uniformOffset + MemoryLayout<QuadUniforms>.stride)
-            let needed = rectOffset + atlasRects.count * MemoryLayout<SIMD4<UInt16>>.stride
-            if buffers[slot] == nil || buffers[slot]!.length < needed {
-                let newLength = max(needed, (buffers[slot]?.length ?? 0) * 2)
-                guard
-                    let fresh = device.makeBuffer(length: newLength, options: .storageModeShared)
-                else { return nil }
-                if let old = buffers[slot] {
-                    // Stays resident until this frame completes: earlier draws
-                    // recorded its addresses.
-                    retire(old)
-                }
-                buffers[slot] = fresh
-                residencySet.addAllocation(fresh)
-                residencySet.commit()
-            }
-            guard let buffer = buffers[slot] else { return nil }
-            var uniforms = uniforms
-            buffer.contents().advanced(by: instanceOffset)
-                .copyMemory(from: instances, byteCount: instanceByteCount)
-            withUnsafeBytes(of: &uniforms) { raw in
-                guard let base = raw.baseAddress else { return }
-                buffer.contents().advanced(by: uniformOffset)
-                    .copyMemory(from: base, byteCount: raw.count)
-            }
-            atlasRects.withUnsafeBytes { raw in
-                if let base = raw.baseAddress, !raw.isEmpty {
-                    buffer.contents().advanced(by: rectOffset).copyMemory(from: base, byteCount: raw.count)
-                }
-            }
-            used = needed
-            return (buffer.gpuAddress + UInt64(instanceOffset), buffer.gpuAddress + UInt64(uniformOffset),
-                    buffer.gpuAddress + UInt64(atlasRects.isEmpty ? uniformOffset : rectOffset))
-        }
-
-        private static func align(_ offset: Int) -> Int {
-            // SIMD members need 16-byte alignment in the constant address space.
-            (offset + 15) & ~15
-        }
-    }
 
     var uploadedInstanceBytes = 0
     var uploadedRectangleBytes = 0
@@ -336,9 +280,6 @@ public nonisolated final class Metal4Backend {
         uploadedRectangleBytes += byteCount
         return buffer.gpuAddress
     }
-    private let solidRing = InstanceBufferRing()
-    private let glyphRing = InstanceBufferRing()
-    private let colorGlyphRing = InstanceBufferRing()
 
     static func isSupported(by device: MTLDevice) -> Bool {
         device.supportsFamily(.metal4)
@@ -356,20 +297,18 @@ public nonisolated final class Metal4Backend {
         let queueDescriptor = MTL4CommandQueueDescriptor()
         queueDescriptor.label = "Corta.metal4"
         self.queue = try device.makeMTL4CommandQueue(descriptor: queueDescriptor)
-        var commandBuffers: [any MTL4CommandBuffer] = []
-        var allocators: [any MTL4CommandAllocator] = []
-        for _ in 0..<Self.frameSlotCount {
+        self.commandBuffers = try (0..<Self.frameSlotCount).map { _ in
             guard let commandBuffer: any MTL4CommandBuffer = device.makeCommandBuffer() else {
                 throw Metal4BackendError.commandBufferUnavailable
             }
-            commandBuffers.append(commandBuffer)
+            return commandBuffer
+        }
+        self.allocators = try (0..<Self.frameSlotCount).map { _ in
             guard let allocator: any MTL4CommandAllocator = device.makeCommandAllocator() else {
                 throw Metal4BackendError.commandAllocatorUnavailable
             }
-            allocators.append(allocator)
+            return allocator
         }
-        self.commandBuffers = commandBuffers
-        self.allocators = allocators
         // Created at zero and signalled once, not created at one: libdispatch
         // traps when a semaphore is freed below its initial value, which is
         // exactly the state `deinit` leaves every slot in.
@@ -379,28 +318,37 @@ public nonisolated final class Metal4Backend {
             return semaphore
         }
 
-        let tableDescriptor = MTL4ArgumentTableDescriptor()
-        // buffer(0) instances, buffer(1) uniforms, buffer(2) pixel rectangles,
-        // texture(0) atlas,
-        // sampler(0) — as `Shaders.metal` declares.
-        tableDescriptor.maxBufferBindCount = 3
-        tableDescriptor.maxTextureBindCount = 1
-        tableDescriptor.maxSamplerStateBindCount = 1
-        tableDescriptor.initializeBindings = true
-        tableDescriptor.label = "Corta.quad"
-        self.argumentTable = try device.makeArgumentTable(descriptor: tableDescriptor)
+        self.argumentTable = try device.makeArgumentTable(descriptor: Self.argumentTableDescriptor())
 
         let residencyDescriptor = MTLResidencySetDescriptor()
         residencyDescriptor.label = "Corta.metal4"
-        self.residencySet = try device.makeResidencySet(descriptor: residencyDescriptor)
+        let residencySet = try device.makeResidencySet(descriptor: residencyDescriptor)
+        self.residencySet = residencySet
         queue.addResidencySet(residencySet)
 
         // One compile per process, shared by every pane.
         let pipelines = try QuadPipelineCache.entry(for: device)
-        self.solidPipeline = pipelines.solidPipeline
-        self.glyphPipeline = pipelines.glyphPipeline
-        self.colorGlyphPipeline = pipelines.colorGlyphPipeline
+        func pass(_ pipeline: MTLRenderPipelineState, label: String) -> DrawPass {
+            DrawPass(
+                ring: InstanceBufferRing(device: device, residencySet: residencySet), pipeline: pipeline,
+                label: label)
+        }
+        self.solidPass = pass(pipelines.solidPipeline, label: "Corta.solid")
+        self.glyphPass = pass(pipelines.glyphPipeline, label: "Corta.glyph")
+        self.colorGlyphPass = pass(pipelines.colorGlyphPipeline, label: "Corta.colorGlyph")
         self.sampler = pipelines.sampler
+    }
+
+    /// buffer(0) instances, buffer(1) uniforms, buffer(2) pixel rectangles,
+    /// texture(0) atlas, sampler(0) — as `Shaders.metal` declares.
+    private static func argumentTableDescriptor() -> MTL4ArgumentTableDescriptor {
+        let descriptor = MTL4ArgumentTableDescriptor()
+        descriptor.maxBufferBindCount = 3
+        descriptor.maxTextureBindCount = 1
+        descriptor.maxSamplerStateBindCount = 1
+        descriptor.initializeBindings = true
+        descriptor.label = "Corta.quad"
+        return descriptor
     }
 
     /// Releasing address-bound resources mid-execution is an `Invalid
@@ -413,7 +361,11 @@ public nonisolated final class Metal4Backend {
         }
     }
 
-    // MARK: - Frames
+}
+
+// MARK: - Frames
+
+nonisolated extension Metal4Backend {
 
     /// Opens a frame into `target`, clearing it, so an empty frame still
     /// clears. `label` names the capture. A frame whose slot is still busy is
@@ -429,13 +381,7 @@ public nonisolated final class Metal4Backend {
         let slot = nextSlot
         let wait: DispatchTime = consecutiveDroppedFrames > 0 ? .now() : .now() + slotWaitLimit
         guard slotSemaphores[slot].wait(timeout: wait) == .success else {
-            if stall == nil { stall = (SuspendingClock.now, completion.completed) }
-            consecutiveDroppedFrames += 1
-            droppedFrameCount += 1
-            if consecutiveDroppedFrames == Self.stalledQueueReportThreshold {
-                Metal4Diagnostics.reportStalledQueue(droppedFrames: consecutiveDroppedFrames)
-            }
-            encoder = nil
+            noteDroppedFrame()
             return false
         }
         consecutiveDroppedFrames = 0
@@ -476,16 +422,38 @@ public nonisolated final class Metal4Backend {
         lastPipeline = nil
         uploadedInstanceBytes = 0
         uploadedRectangleBytes = 0
-        solidRing.beginFrame()
-        glyphRing.beginFrame()
-        colorGlyphRing.beginFrame()
+        solidPass.ring.beginFrame()
+        glyphPass.ring.beginFrame()
+        colorGlyphPass.ring.beginFrame()
         return true
+    }
+
+    /// Keeps the existing submission-to-callback metric intact. Native
+    /// timestamps distinguish execution from a delayed feedback thread.
+    private static func recordGPUTimes(of feedback: any MTL4CommitFeedback) {
+        guard RenderMetrics.isEnabled, feedback.gpuStartTime > 0,
+            feedback.gpuEndTime >= feedback.gpuStartTime
+        else { return }
+        RenderMetrics.record(.gpuExecution, milliseconds: (feedback.gpuEndTime - feedback.gpuStartTime) * 1000)
+        RenderMetrics.record(
+            .gpuFeedbackDelay, milliseconds: max(0, CACurrentMediaTime() - feedback.gpuEndTime) * 1000)
+    }
+
+    /// The frame's slot stayed busy past the wait: nothing encodes, and a
+    /// run of drops is reported once.
+    private func noteDroppedFrame() {
+        if stall == nil { stall = (SuspendingClock.now, completion.completed) }
+        consecutiveDroppedFrames += 1
+        droppedFrameCount += 1
+        if consecutiveDroppedFrames == Self.stalledQueueReportThreshold {
+            Metal4Diagnostics.reportStalledQueue(droppedFrames: consecutiveDroppedFrames)
+        }
+        encoder = nil
     }
 
     func drawSolidQuads(_ instances: ContiguousArray<QuadInstance>, rect: CGRect, drawableSize: CGSize) {
         draw(
-            instances, ring: solidRing, pipeline: solidPipeline, atlas: nil,
-            rect: rect, drawableSize: drawableSize, label: "Corta.solid")
+            instances, as: solidPass, atlas: nil, rect: rect, drawableSize: drawableSize)
     }
 
     /// `atlasRectsVersion`: `atlasRects` is the glyph atlas's table at that
@@ -496,9 +464,8 @@ public nonisolated final class Metal4Backend {
         atlasRectsVersion: UInt64? = nil, rect: CGRect, drawableSize: CGSize
     ) {
         draw(
-            instances, ring: glyphRing, pipeline: glyphPipeline, atlas: atlas, atlasRects: atlasRects,
-            atlasRectsVersion: atlasRectsVersion,
-            rect: rect, drawableSize: drawableSize, label: "Corta.glyph")
+            instances, as: glyphPass, atlas: atlas, atlasRects: atlasRects, atlasRectsVersion: atlasRectsVersion,
+            rect: rect, drawableSize: drawableSize)
     }
 
     /// Untinted premultiplied sampling: colour glyphs and Kitty images.
@@ -508,16 +475,17 @@ public nonisolated final class Metal4Backend {
         imageUVRect: SIMD4<Float> = .zero, transient: Bool = false
     ) {
         draw(
-            instances, ring: colorGlyphRing, pipeline: colorGlyphPipeline, atlas: atlas, atlasRects: atlasRects,
+            instances, as: colorGlyphPass, atlas: atlas, atlasRects: atlasRects,
             atlasRectsVersion: atlasRectsVersion, imageUVRect: imageUVRect,
-            rect: rect, drawableSize: drawableSize, label: "Corta.colorGlyph", transientTexture: transient)
+            rect: rect, drawableSize: drawableSize, transientTexture: transient)
     }
 
     /// Commits and presents `drawable` (nil offscreen). `onCompleted` runs
     /// after the GPU finishes, with the commit's error — or at once with
     /// `.frameDropped` for a frame that was not drawn.
     func endFrame(
-        presenting drawable: (any MTLDrawable)?, echoSnapshotAt: TimeInterval? = nil, onCompleted: (@Sendable ((any Error)?) -> Void)?
+        presenting drawable: (any MTLDrawable)?, echoSnapshotAt: TimeInterval? = nil,
+        onCompleted: (@Sendable ((any Error)?) -> Void)?
     ) {
         guard let encoder else {
             // An unpresented drawable is never recycled (`FrameScheduler`),
@@ -559,15 +527,7 @@ public nonisolated final class Metal4Backend {
             completion.note(frame)
             slotReleased.signal()
             if let join { join.complete(feedback.error) } else { onCompleted?(feedback.error) }
-            // Keep the existing submission-to-callback metric intact. Native
-            // timestamps distinguish execution from a delayed feedback thread.
-            if RenderMetrics.isEnabled, feedback.gpuStartTime > 0,
-                feedback.gpuEndTime >= feedback.gpuStartTime {
-                RenderMetrics.record(.gpuExecution, milliseconds:
-                    (feedback.gpuEndTime - feedback.gpuStartTime) * 1000)
-                RenderMetrics.record(.gpuFeedbackDelay, milliseconds:
-                    max(0, CACurrentMediaTime() - feedback.gpuEndTime) * 1000)
-            }
+            Self.recordGPUTimes(of: feedback)
         }
         queue.commit([commandBuffer], options: options)
         if let copyTarget {

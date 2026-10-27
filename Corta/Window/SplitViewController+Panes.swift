@@ -117,7 +117,8 @@ extension SplitViewController {
         alert.informativeText =
             names.isEmpty
             ? L10n.text("close.running.single")
-            : L10n.format("close.running.multiple", ListFormatter.localizedString(byJoining: Array(Set(names)).sorted()))
+            : L10n.format(
+                "close.running.multiple", ListFormatter.localizedString(byJoining: Array(Set(names)).sorted()))
         alert.addButton(withTitle: L10n.text("close.running.closeAnyway"))
         alert.addButton(withTitle: L10n.text("common.cancel"))
         // Keep the destructive action explicit; Return defaults to Cancel.
@@ -127,7 +128,6 @@ extension SplitViewController {
         return alert
     }
 }
-
 
 extension SplitViewController {
     @objc func selectPreviousCortaTab(_: Any?) { selectAdjacentTab(offset: -1) }

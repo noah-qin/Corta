@@ -90,7 +90,12 @@ struct SSHAskpassRulesTests {
 struct SSHAskpassBrokerTests {
     /// What the prompter was asked, and what it answers.
     final class Recorder: Sendable {
-        let asked = Mutex<[(SSHAskpass.Question, String, String)]>([])
+        struct Asked {
+            var question: SSHAskpass.Question
+            var host: String
+            var prompt: String
+        }
+        let asked = Mutex<[Asked]>([])
         let cancelled = Mutex(false)
         let answer: String?
         let waitsForCancel: Bool
@@ -102,7 +107,7 @@ struct SSHAskpassBrokerTests {
 
         var prompter: SSHAskpassBroker.Prompter {
             { [self] question, host, prompt in
-                asked.withLock { $0.append((question, host, prompt)) }
+                asked.withLock { $0.append(Asked(question: question, host: host, prompt: prompt)) }
                 guard waitsForCancel else { return answer }
                 await withTaskCancellationHandler {
                     while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(10)) }
@@ -155,9 +160,9 @@ struct SSHAskpassBrokerTests {
         #expect(result.output == "s3cret\n")
         let asked = recorder.asked.withLock { $0 }
         #expect(asked.count == 1)
-        #expect(asked.first?.0 == .secret)
-        #expect(asked.first?.1 == "deploy@box:2222")
-        #expect(asked.first?.2 == "deploy@box's password:")
+        #expect(asked.first?.question == .secret)
+        #expect(asked.first?.host == "deploy@box:2222")
+        #expect(asked.first?.prompt == "deploy@box's password:")
     }
 
     /// OpenSSH reads a failed askpass as an empty password and asks again,
@@ -232,7 +237,7 @@ struct SSHAskpassBrokerTests {
         grant.admit(getpid())
         let result = await finish(try run(grant, prompt: "Allow use of key?", promptKind: "confirm"))
         #expect(result.status == 0)
-        #expect(recorder.asked.withLock { $0.first?.0 } == .confirm)
+        #expect(recorder.asked.withLock { $0.first?.question } == .confirm)
     }
 
     @Test func aWrongTokenIsNeverAsked() async throws {
@@ -289,12 +294,12 @@ struct SSHAskpassBrokerTests {
         defer { broker.stop() }
         let grant = try #require(broker.grant(host: "box"))
         grant.admit(getpid())
-        let process = try await run(grant, prompt: "Confirm user presence for key ED25519-SK", promptKind: "none")
+        let process = try run(grant, prompt: "Confirm user presence for key ED25519-SK", promptKind: "none")
         let deadline = SuspendingClock.now + .seconds(10) * testTimeoutScale
         while recorder.asked.withLock({ $0.isEmpty }), SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))
         }
-        #expect(recorder.asked.withLock { $0.first?.0 } == .notify)
+        #expect(recorder.asked.withLock { $0.first?.question } == .notify)
         process.terminate()
         _ = await finish(process)
         while !recorder.cancelled.withLock({ $0 }), SuspendingClock.now < deadline {
