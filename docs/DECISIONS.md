@@ -231,9 +231,9 @@ says which and why. The fallback cascade (PingFang SC, Apple Color Emoji) is
 unchanged: a family's own CJK glyphs are used when it has them. The picker
 is a list, not `NSFontPanel`: the panel offers every face, most of which
 the grid cannot use, and duplicates the size control. A cell is at least
-1.15 em tall (`CellMetrics.minimumLineHeight`): CJK families such as BIZ
-UDGothic and SimSong declare a one-em line with no leading, and at that
-height rows touch. SF Mono and Menlo declare more and are unaffected.
+`line-spacing` em tall (1.18 by default; `CellMetrics`): CJK families such
+as BIZ UDGothic and SimSong declare a one-em line with no leading, and at
+that height rows touch. A family that declares a taller line keeps it.
 Every face is drawn in its Regular weight, and bold in its own Bold (SF
 Mono's Semibold); SF Mono had been Medium to look as dense as Terminal.app,
 which left PingFang and every chosen family a step lighter beside it. No
