@@ -32,7 +32,7 @@ Metal 4 렌더링 · 네이티브 CJK / IME · SSH, SFTP, 원격 편집
 </div>
 
 > 이 문서는 영어판 [README.md](../../../README.md)의 커밋
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md)
+> [`bdcf6da`](https://github.com/noah-qin/Corta/blob/bdcf6daab52425e20f6e953a1b0de152d2dfe2bf/README.md)
 > 시점을 번역한 것입니다. 이후 영어판이 바뀌었거나 내용이 다르면 영어판을 따릅니다.
 
 ## 설치
@@ -81,6 +81,11 @@ zsh, bash, fish의 시작 파일에 설치하려면 **설정 ▸ 터미널 ▸ �
 [기능 참조](../../FEATURES.md)(영어)에 요구 사항과 제한과 함께 모든 기능이 나와 있으며, `main` 브랜치를 기준으로 합니다 —
 공개된 릴리스에는 아직 없는 항목도 있을 수 있습니다. iTerm2, Ghostty와 비교해 어떤지, 그리고 언제 그쪽을 고르는 것이 나은지는
 [Features → How Corta compares](../../FEATURES.md#how-corta-compares)(영어)에 있습니다.
+코딩 에이전트의 작업 상태는 개발 트리가 지금 **Claude Code만** 연동합니다. 다른 도구는 범용 프로토콜 지원과 프로세스 감지만 있고
+전용 상태 어댑터는 없습니다([범위와 한계](../../CONFORMANCE.md#cli-signal-compatibility), 영어). Claude Code 2.1.310으로 개발하고
+인수 테스트했습니다: 대화형 OSC 7501 상태와, Claude 메시지 문구를 위한 명시적인 채널 선택입니다. tmux, Claude 백그라운드 세션,
+터미널 제목 보고를 끈 경우에는 각각 별도의 제약이 있으며, 파서가 지원한다고 해서 실제 수명 주기 전체의 인수 테스트를 마쳤다는
+뜻은 아닙니다.
 macOS 전용이라는 점과 tmux 제어 모드, 내장 AI, 스크립팅 엔진을 두지 않는다는 점은
 [확정된 결정](../../DECISIONS.md)(영어)입니다. 일반적인 tmux 세션은 터미널 프로그램으로서 Corta 안에서 동작합니다.
 

@@ -32,7 +32,7 @@ Metal 4 渲染 · 原生中日韩输入法 · SSH、SFTP 与远程编辑
 </div>
 
 > 本文译自英文版 [README.md](../../../README.md)，对应提交
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md)。
+> [`bdcf6da`](https://github.com/noah-qin/Corta/blob/bdcf6daab52425e20f6e953a1b0de152d2dfe2bf/README.md)。
 > 此后英文版如有更新，或两者有出入，以英文版为准。
 
 ## 安装
@@ -81,6 +81,10 @@ shasum -a 256 -c Corta-x.y.z.dmg.sha256
 [功能参考](../../FEATURES.md)（英文）列出了全部功能及其要求和限制，描述的是 `main` 分支——
 已发布的版本不一定包含其中每一项。Corta 与 iTerm2、Ghostty 的比较，以及什么时候该选它们，见
 [Features → How Corta compares](../../FEATURES.md#how-corta-compares)（英文）。
+在编码代理的任务状态方面，开发树目前**只集成了 Claude Code**；其他工具只有通用协议支持和进程检测，没有专门的状态适配
+（[范围与限制](../../CONFORMANCE.md#cli-signal-compatibility)，英文）。它基于 Claude Code 2.1.310 开发和验收：交互式 OSC 7501 状态，
+并可明确选择通道来显示 Claude 的消息文字。tmux、Claude 后台会话和关闭终端标题报告各有单独的限制；解析器覆盖了某个协议，
+并不代表完整的实时生命周期都经过了验收。
 Corta 只做 macOS，不支持 tmux 控制模式、内置 AI 和脚本引擎，这些都是
 [已定的决策](../../DECISIONS.md)（英文）；普通的 tmux 会话作为终端程序在 Corta 里照常运行。
 

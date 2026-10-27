@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > 本文譯自英文版 [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md)，對應提交
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md)。
+> [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md)。
 > 此後英文版如有更新，或兩者有出入，以英文版為準。macOS 的提示文字以英文原文為準，中文為對照譯文。
 
 Corta 裝不起來、打不開，或者做了你以前的終端機不會做的事時，該怎麼辦。每一條都說明你會看到什麼、原因是什麼、
@@ -123,6 +123,24 @@ Corta 會保留已有的設定，並拒絕寫入這個檔案，因為寫入會�
 <a id="typing-and-rendering"></a>
 
 ## 輸入和算繪
+
+### 清除畫面後只剩游標，沒有提示符號
+
+如果 ⌘K 會擦掉正在等待的提示符號，請更新 Corta。有 shell 整合和就緒的提示符號結束標記時，清除畫面現在會保留顯示的提示符號
+和尚未送出的輸入，包括編輯游標。它不傳送 Return、Control-L 或任何其他輸入。對於沒有提示符號標記的 shell，請開啟 shell 整合；
+標準的本機 zsh 工作階段會隨內建的建議功能自動載入它。如果 shell 設定了 Control-L 重繪，它仍然是另一種選擇。
+備用螢幕程式，以及提示符號已捲入歷史的多行編輯器，會被刻意保持原樣。
+
+### 目錄補全在以 `/` 結尾的資料夾之後就停了
+
+只有子目錄才是候選；只包含檔案的目錄沒有下一層目錄補全。輸入子資料夾名稱的一部分，或在候選可見時再按一次 Tab。
+Tab 只填入路徑而不執行；Return 才執行 `cd`。隱藏資料夾需要點號前綴。如果某個已知的子資料夾沒有出現，請檢查對該目錄的存取權限，
+並在關閉 `directory-completion` 後與 shell 的原生補全比較。如果差異仍然存在，請回報具體的路徑形式和 shell。
+
+### 關於或命令歷史在遠離終端機的地方打開
+
+在目前版本的 Corta 中關閉並重新打開該視窗。兩者都會在呼叫它們的視窗上方置中打開，並限制在該顯示器的可用範圍內；
+它們不會放在整個螢幕的中央。已經打開的視窗保持你選擇的位置。
 
 ### 在 Claude Code 的斜線命令選單中按 Tab 沒有反應
 

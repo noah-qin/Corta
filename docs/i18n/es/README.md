@@ -32,7 +32,7 @@ Renderizado con Metal 4 · Entrada CJK / IME nativa · SSH, SFTP y edición remo
 </div>
 
 > Esta página es una traducción del [README.md](../../../README.md) en inglés, tal como estaba en el commit
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/README.md).
+> [`bdcf6da`](https://github.com/noah-qin/Corta/blob/bdcf6daab52425e20f6e953a1b0de152d2dfe2bf/README.md).
 > Si la versión en inglés ha cambiado desde entonces, o si ambas difieren, prevalece la versión en inglés.
 
 ## Instalación
@@ -85,6 +85,12 @@ Kitty, integración del shell y disposiciones restauradas: todo está ahí; la
 [referencia de funciones](../../FEATURES.md) (en inglés) lo enumera todo, con requisitos y limitaciones, y describe
 `main` — una versión publicada puede no incluir todavía todos los elementos. Cómo se compara Corta con iTerm2 y Ghostty,
 y cuándo elegir uno de ellos, está en [Features → How Corta compares](../../FEATURES.md#how-corta-compares) (en inglés).
+Para el estado de las tareas de agentes de código, el árbol de desarrollo integra hoy **solo Claude Code**; las demás herramientas
+tienen soporte genérico de protocolos y detección de procesos, sin adaptadores de estado dedicados
+([alcance y límites](../../CONFORMANCE.md#cli-signal-compatibility), en inglés). Desarrollado y validado con Claude Code 2.1.310:
+estado OSC 7501 en sesiones interactivas, con elección explícita del canal para el texto de los mensajes de Claude. tmux, las
+sesiones en segundo plano de Claude y la desactivación del título del terminal tienen restricciones aparte; que el analizador
+cubra un protocolo no implica que se haya validado todo el ciclo de vida en vivo.
 Que Corta sea solo para macOS y no incluya el modo de control de tmux, IA integrada ni un motor de scripts son
 [decisiones tomadas](../../DECISIONS.md) (en inglés); las sesiones normales de tmux se ejecutan dentro de Corta como
 programas de terminal.

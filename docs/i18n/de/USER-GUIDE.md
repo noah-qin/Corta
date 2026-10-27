@@ -1,21 +1,11 @@
 # Benutzerhandbuch
 
-> Aktuelle Ergänzung (ersetzt ältere Angaben): ⌘K erhält bei einem bereiten integrierten Shell-Prompt
-> Prompt, offene Eingabe und Bearbeitungscursor und verschiebt sie nach oben. Keine Taste wird gesendet,
-> nichts ausgeführt, der Verlauf bleibt erhalten. Alternativer Bildschirm und Eingaben mit Prompt im
-> Verlauf bleiben unverändert; ohne Bereitschaftsmarkierung gilt das bisherige Löschen. About und
-> Befehlsverlauf öffnen mittig über dem aufrufenden Fenster innerhalb des Bildschirms; offene Fenster
-> bleiben an ihrer Position. Verbindung, Palette, Verlauf, Ordnerauswahl und Ende-/Fehleranzeigen nutzen
-> runde Glasflächen. Kleine Verbindungsformulare scrollen, der Verlauf hat eine feste Größe. Tab ergänzt
-> nur den Pfad, führt nichts aus und bietet nach `/` die nächste Ordnerebene an. Reine Dateiordner haben
-> keine weiteren Ordnerkandidaten. Siehe [englische Referenz](../../USER-GUIDE.md); der übrige Übersetzungsstand bleibt wie unten angegeben.
-
 [Dokumentationsindex (Englisch)](../../README.md) · [Projektübersicht](README.md)
 
 🇺🇸 [English](../../USER-GUIDE.md) · 🇨🇳 [简体中文](../zh-CN/USER-GUIDE.md) · 🇭🇰 [繁體中文](../zh-Hant/USER-GUIDE.md) · 🇯🇵 [日本語](../ja/USER-GUIDE.md) · 🇰🇷 [한국어](../ko/USER-GUIDE.md) · 🇩🇪 [Deutsch](USER-GUIDE.md) · 🇫🇷 [Français](../fr/USER-GUIDE.md) · 🇪🇸 [Español](../es/USER-GUIDE.md) · 🇧🇷 [Português](../pt-BR/USER-GUIDE.md)
 
 > Diese Seite ist eine Übersetzung von [USER-GUIDE.md](../../USER-GUIDE.md) mit dem Stand von Commit
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/USER-GUIDE.md).
+> [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/USER-GUIDE.md).
 > Wurde die englische Fassung seitdem geändert oder weichen die beiden ab, gilt die englische.
 > Namen in der Oberfläche folgen Cortas deutscher Oberfläche; Konfigurationsschlüssel, Befehle und Code bleiben im Original.
 
@@ -34,6 +24,7 @@ und alle außer „Nächsten suchen“ und „Vorherigen suchen“ lassen sich �
 - [Shell-Integration](#shell-integration)
 - [Das Arbeitsverzeichnis](#the-working-directory)
 - [Verzeichnisvorschläge (zsh)](#directory-suggestions-zsh)
+- [Verlaufsvorschläge (zsh)](#history-suggestions-zsh)
 - [Arbeiten aus der Ferne: SSH und SFTP](#remote-work-ssh-and-sftp)
 - [Bilder im Terminal](#images-in-the-terminal)
 - [Die Befehlspalette](#the-command-palette)
@@ -43,6 +34,8 @@ und alle außer „Nächsten suchen“ und „Vorherigen suchen“ lassen sich �
 - [Einstellungen und die Konfigurationsdatei](#settings-and-the-config-file)
 - [Tastaturkurzbefehle](#keyboard-shortcuts)
 - [Wenn etwas schiefgeht](#when-something-goes-wrong)
+- [Status von Coding-Agenten und Programmbenachrichtigungen](#coding-agent-state-and-program-notifications)
+- [Programme mit OSC-Erweiterungen](#programs-using-osc-extensions)
 
 <a id="install-and-update"></a>
 
@@ -275,7 +268,7 @@ gewählte Cursorform und den Blinkstatus. Terminalprogramme können den Cursorst
 ### Kompakte Tab-Einrückung (zsh)
 
 Standardmäßige lokale zsh-Sitzungen laden die mitgelieferten Hooks automatisch, wenn die Verzeichnisvorschläge
-aktiviert sind (Standard). Du musst deine Startdateien nicht ändern. Wenn du eigene zsh-Argumente verwendest oder diesen
+oder die Verlaufsvorschläge aktiviert sind (beide standardmäßig an). Du musst deine Startdateien nicht ändern. Wenn du eigene zsh-Argumente verwendest oder diesen
 automatischen Start abgeschaltet hast, installiere oder aktualisiere die Shell-Integration unter Einstellungen →
 Terminal und öffne dann eine neue Shell. Mit geladenen Hooks fügt Tab in einer Befehlszeile, die nur Leerraum enthält,
 vier Leerzeichen ein. Tab nach Befehlstext behält die bestehende Vervollständigung. Das ist ein ZLE-Widget; die
@@ -325,16 +318,34 @@ oder, bei einer Verbindung, **Neu verbinden**; der Fehlertext des Systems steht 
 - **Einfügen.** ⌘V. Eingefügter Text wird als Einfügung markiert (Bracketed Paste), sodass eine Shell, die das unterstützt –
   zsh, fish, bash 5.1 oder neuer –, einen eingefügten Befehl einsetzt, ohne ihn auszuführen, bis du Return drückst. Hat
   das Programm Bracketed Paste nicht aktiviert (macOS’ eigenes `/bin/bash` 3.2 tut das nie), warnt Corta vor dem Einfügen
-  von Text, der einen Zeilenumbruch enthält. Eine große Einfügung, die die Shell noch abarbeitet, lässt sich mit ⌃C
-  abbrechen: Der noch nicht gesendete Teil wird verworfen, und der Interrupt geht direkt durch.
+  von Text, der einen Zeilenumbruch enthält. Auch bei aktivem Bracketed Paste warnt Corta vor einer Pipe in eine Shell
+  (oder `bash <(curl …)` und Verwandten), sudo, erzwungenem rekursivem Löschen, einer Fortsetzung mit Backslash oder
+  unsichtbaren / bidirektionalen Zeichen. Prüfe die Risikohinweise und die Textvorschau, bevor du **Einfügen** oder
+  **Abbrechen** wählst; versteckte Zeichen erscheinen als Codes wie `⟦U+202E⟧`. **Für diesen Bereich nicht mehr warnen**
+  gilt, bis dieser Bereich geschlossen wird. Mit `paste-warning = always` warnt Corta bei jedem mehrzeiligen Einfügen,
+  mit `off` gar nicht. Das sind vorsichtige Muster, kein Shell-Parser und keine Garantie, dass anderer Text sicher ist.
+  Eine große Einfügung, die die Shell noch abarbeitet, lässt sich mit ⌃C abbrechen: Der noch nicht gesendete Teil wird
+  verworfen, und der Interrupt geht direkt durch.
+- **Rechtsklick.** Der angeklickte Bereich bietet Suchen … und Befehlsausgabe kopieren für den abgeschlossenen Befehl,
+  dessen Ausgabe die angeklickte Zeile enthält; das Kopieren ist auf Prompts, auf dem alternativen Bildschirm
+  (Vollbildprogramme) und ohne Shell-Integration deaktiviert. Auf einem Link bietet er Link öffnen und Link kopieren, auf
+  einem `path:line:column`-Verweis Pfad öffnen und Pfad kopieren. Geöffnet wird mit denselben Linkprüfungen, demselben
+  eingestellten Editor und derselben Bestätigung für entfernte Hosts wie beim Klicken. Programme mit Mausmeldungen
+  erhalten Rechtsklicks weiterhin selbst.
 - **Text exportieren …** (⇧⌘S) sichert die Auswahl – oder, ohne Auswahl, den gesamten Verlauf und Bildschirm – in eine Datei.
 - **Löschen.** Drei Befehle, weil sie Verschiedenes verwerfen:
 
   | Befehl | Bildschirm | Verlauf | Modi und Farben |
   | --- | --- | --- | --- |
-  | Bildschirm löschen (⌘K) | gelöscht | behalten | behalten |
+  | Bildschirm löschen (⌘K) | gelöscht; bereiter Shell-Prompt und Eingabe bleiben | behalten | behalten |
   | Verlauf löschen | behalten | verworfen | behalten |
   | Terminal zurücksetzen | gelöscht | verworfen | zurückgesetzt |
+
+  Mit Shell-Integration verschiebt Bildschirm löschen den bereiten Prompt samt vollständiger Eingabe nach oben und behält
+  Bearbeitungscursor, Umbrüche, Farben und breite Zeichen. Es sendet keine Tasten und führt die Eingabe nie aus. Ein Prompt,
+  der noch ausgegeben wird, ein laufender Befehl oder eine Shell ohne Markierungen für einen bereiten Prompt behalten das
+  gewöhnliche Löschen mit Sprung nach oben links. Programme auf dem alternativen Bildschirm wie vim bleiben unverändert;
+  ebenso ein Editor, dessen Prompt bereits in den Verlauf gescrollt ist, damit kein Teil seiner Eingabe verloren geht.
 
   Verlauf löschen und Terminal zurücksetzen fragen zuerst und sagen, wie viele Zeilen sie verwerfen würden – außer
   der Verlauf ist leer oder `confirm-close = false` schaltet die Frage ab.
@@ -365,8 +376,8 @@ Mit der Shell-Integration sieht Corta, wo jeder Befehl beginnt und endet. Instal
 `~/.zshrc`; für bash sowohl `~/.bashrc` als auch `~/.bash_profile` (oder welche Login-Datei bash auch liest); oder
 `~/.config/fish/config.fish` –, und **Entfernen** nimmt genau diesen Block wieder heraus. Der Block in der Startdatei
 wird nur installiert, wenn du die Taste drückst. Standardmäßige lokale zsh-Sitzungen laden Cortas mitgelieferte Hooks
-außerdem automatisch, ohne deine Startdateien zu bearbeiten, wenn **Verzeichnisvorschläge (zsh)** aktiviert ist
-(Standard). Eigene zsh-Argumente, bash, fish und entfernte Shells nutzen diesen automatischen Start nicht. Installiere in
+außerdem automatisch, ohne deine Startdateien zu bearbeiten, wenn **Verzeichnisvorschläge (zsh)** oder
+**Verlaufsvorschläge (zsh)** aktiviert ist (Standard). Eigene zsh-Argumente, bash, fish und entfernte Shells nutzen diesen automatischen Start nicht. Installiere in
 diesen Shells kompatible Hooks, um dort Befehlsgrenzen zu erhalten.
 
 Meldet die Einstellung eine veraltete Integration, wähle **Aktualisieren** und öffne eine neue Shell. Nur die App zu
@@ -376,7 +387,8 @@ Mit geladenen Hooks, ob automatisch oder über die Startdatei:
 
 - **Prompt-Markierungen.** Eine dünne Linie links neben jedem Prompt, grün bei Erfolg des Befehls und rot bei Fehlschlag.
   Ein leeres Return zeichnet keine Linie und erzeugt keinen abgeschlossenen Eintrag im Befehlsverlauf.
-- **Springen.** ⌘↑ / ⌘↓ springen zwischen Befehlen; ⇧⌘↑ / ⇧⌘↓ zwischen den fehlgeschlagenen.
+- **Springen.** ⌘↑ / ⌘↓ springen zwischen Befehlen und halten auch an Markierungen, die ein Programm mit iTerm2s
+  `OSC 1337;SetMark` setzt; ⇧⌘↑ / ⇧⌘↓ springen zwischen den fehlgeschlagenen.
 - **Die Ausgabe eines Befehls.** Aus der Befehlspalette: **Ausgabe des letzten Befehls kopieren**,
   **Schnappschuss der laufenden Befehlsausgabe** (was ein Build bisher ausgegeben hat), **Befehlsausgabe exportieren…**
   in eine Datei und **Dateiverweis in Befehlsausgabe öffnen**, der das letzte ausgegebene `path:line` öffnet.
@@ -385,6 +397,10 @@ Mit geladenen Hooks, ob automatisch oder über die Startdatei:
   Befehl, den die Liste nicht vollständig zeigen kann – mehrzeilig, am Zeilenrand abgeschnitten oder mit einem
   Tabulator –, oder einer, dessen Text sich geändert hat, seit die Liste ihn zeigte, wird eingefügt statt ausgeführt,
   sodass er vollständig am Prompt steht und auf dein Return hin läuft.
+- **Verlaufs- und Infofenster.** Befehlsverlauf und **Corta ▸ Über Corta** öffnen zentriert über dem aufrufenden Fenster
+  und bleiben im nutzbaren Bereich seines Bildschirms. Ein bereits offenes Fenster bleibt dort, wohin du es geschoben hast.
+  Die feste Größe des Befehlsverlaufs hält die Suche und die Filter für Verzeichnis / Projekt / Status / Host sichtbar;
+  ein leeres Ergebnis zeigt **Keine Befehle** und die Anzahl der Treffer.
 - **Benachrichtigungen bei langen Aufgaben.** Mit `notify-on-long-task = true` meldet sich ein Befehl, der länger als
   `notification-threshold` Sekunden (30) lief, beim Abschluss mit einer Mitteilung, **wenn sein Fenster nicht das
   Hauptfenster ist** – vorausgesetzt, macOS hat Corta die Erlaubnis für Mitteilungen erteilt. Aktiviere das unter
@@ -416,11 +432,14 @@ und löscht sie.
 ## Verzeichnisvorschläge (zsh)
 
 Corta bringt Verzeichnisvorschläge mit, die in standardmäßigen lokalen zsh-Sitzungen aktiviert sind. Tippe `cd `, um die
-Ordner im aktuellen Verzeichnis als blassen Text unter deiner Eingabe zu sehen. Tippe weiter, um die Ordner zu filtern;
+Ordner im aktuellen Verzeichnis in einem kompakten Feld neben deiner Eingabe zu sehen. Es erscheint unter der Eingabe,
+wenn Platz ist, oder darüber nahe dem unteren Rand des Bereichs. Eine abgerundete Glaskapsel mit getöntem Hintergrund und
+Rand hebt es von früherer Ausgabe ab; es kann einen kleinen Teil dieser Ausgabe vorübergehend verdecken und belegt keine
+Terminalzeilen. Tippe weiter, um die Ordner zu filtern;
 neben dem Cursor erscheint ein blasses Suffix. So kann `cd De` zum Beispiel `Developer/` vorschlagen. Vorschläge sind
 Vorschauen: Sie gehören nicht zu deinem Befehl, bevor du sie übernimmst.
 
-![Verzeichnisvorschläge unter cd, mit Markierungen für erfolgreiche, fehlgeschlagene und abgebrochene Befehle](../../brand/directory-suggestions.png)
+![Feld mit Verzeichniskandidaten neben cd, mit Markierungen für erfolgreiche, fehlgeschlagene und abgebrochene Befehle](../../brand/directory-suggestions.png)
 
 Solange ein Vorschlag sichtbar ist:
 
@@ -428,12 +447,15 @@ Solange ein Vorschlag sichtbar ist:
 | --- | --- |
 | Links / Rechts | Den vorherigen / nächsten Ordner wählen, statt den Eingabecursor zu bewegen. |
 | Tab | Das gewählte Verzeichnis in die Eingabe übernehmen; nicht ausführen. Ersetzt die native Tab-Vervollständigung, solange Vorschläge sichtbar sind. |
-| Esc | Die Vorschläge für die aktuelle Eingabe schließen. Drücke Esc, bevor du mit Links / Rechts den Befehl bearbeitest, oder noch einmal für die eigene Esc-Aktion der Shell. |
+| Esc | Die Vorschläge für die aktuelle Eingabe schließen. Drücke Esc, bevor du mit Links / Rechts den Befehl bearbeitest, oder noch einmal für die eigene Esc-Aktion der Shell. Mit `bindkey -v` wechselt derselbe Druck auch in den Befehlsmodus. |
 | Hoch / Runter | Die normale Navigation im Befehlsverlauf der Shell beibehalten. |
 | Umschalt+Tab | An die in der Shell konfigurierte Belegung durchreichen. |
 | Return | Nur die tatsächliche Eingabe ausführen; nie automatisch einen blassen Vorschlag übernehmen. |
 
-Du kannst relative Pfade, Unterverzeichnisse und `~/`-Pfade filtern. Versteckte Ordner erscheinen, wenn du einen Punkt
+Du kannst relative Pfade, Unterverzeichnisse und `~/`-Pfade filtern. Nachdem Tab einen Ordner mit `/` am Ende
+eingefügt hat, werden seine Unterverzeichnisse die nächsten Kandidaten; wiederhole das für einen tieferen Pfad und drücke
+Return, wenn du `cd` ausführen willst. Angeboten werden nur Ordner, ein Ordner mit nur Dateien hat also keine weiteren
+Kandidaten. Versteckte Ordner erscheinen, wenn du einen Punkt
 voranstellst. Komplexe Shell-Ausdrücke behalten die native Vervollständigung. Bash und fish behalten ihre eigene
 Vervollständigung; Vorschläge erscheinen nur in einer Shell, die Corta mit seinen automatischen zsh-Hooks gestartet hat,
 nie auf entfernten Rechnern oder in eigenen Shell-Befehlen, selbst bei installierter Shell-Integration.
@@ -450,6 +472,34 @@ Shell steht wieder zur Verfügung. Öffne die Shell neu, nachdem du es wieder ak
 Hooks gibt es keinen Block in einer Startdatei zu löschen. Hast du die Shell-Integration zusätzlich manuell installiert,
 entfernt ihre Taste **Entfernen** diesen separaten Block; zum Abschalten der Verzeichnisvorschläge ist das nicht nötig.
 
+<a id="history-suggestions-zsh"></a>
+
+## Verlaufsvorschläge (zsh)
+
+Wenn du in einer standardmäßigen lokalen zsh-Sitzung den Anfang eines früheren Befehls tippst, erscheint sein Rest blass
+hinter dem Cursor. Der jüngste passende einzeilige Befehl gewinnt. Nach `git status` schlägt `git st` zum Beispiel `atus`
+vor. Der Hinweis ist nur eine Vorschau, bis du ihn übernimmst.
+
+![Ein Rest aus dem lokalen zsh-Verlauf, blass hinter dem Cursor](../../brand/history-suggestions.png)
+
+| Taste | Wirkung, solange der Hinweis sichtbar ist |
+| --- | --- |
+| Rechts / Ende | Den vorgeschlagenen Rest ans Ende der Eingabe anhängen, ohne auszuführen. |
+| Esc | Den Hinweis schließen, bis sich die Eingabe ändert. Mit `bindkey -v` wechselt derselbe Druck auch in den Befehlsmodus. |
+| Tab / Shift+Tab / Hoch / Runter | Die normale Vervollständigung und Verlaufsbelegung der Shell behalten. |
+| Return | Nur die tatsächliche Eingabe ausführen. |
+
+Leere Eingabe, ein Cursor mitten in der Zeile und mehrzeilige Verlaufseinträge zeigen keinen Hinweis. Bei `cd ` bleiben
+die Verzeichnisvorschläge, solange sie an sind; sind sie aus, erscheinen Verlaufshinweise. Während der Eingabe über eine
+Eingabemethode verschwinden die Hinweise, damit deren eigene Kandidaten verfügbar bleiben. Ist zsh-autosuggestions geladen,
+überlässt Corta ihm die Verlaufsvorschläge. Bash, fish, entfernte Shells und eigene Startbefehle behalten ihre Bearbeitung.
+
+Standardmäßig an. Schalte **Einstellungen ▸ Terminal ▸ Shell ▸ Verlaufsvorschläge (zsh)** aus oder setze
+`history-suggestions = false`, um Hinweise sofort auszublenden und die normalen Tasten wiederherzustellen. Öffne die Shell
+nach dem Einschalten neu. Die Verzeichnisvorschläge haben einen eigenen Schalter. Beide nutzen temporäre Start-Wrapper und
+lassen deine Startdateien unverändert. Corta nutzt den Verlauf im Speicher von zsh, liest nie `HISTFILE` und protokolliert
+oder speichert vorgeschlagenen Text nie. Reste mit mehr als 128 Unicode-Zeichen werden weggelassen.
+
 <a id="remote-work-ssh-and-sftp"></a>
 
 ## Arbeiten aus der Ferne: SSH und SFTP
@@ -465,7 +515,8 @@ keine eigene SSH-Implementierung.
   Verbindung noch einmal aus.
 - **Verbinden.** Die Globustaste der Symbolleiste öffnet **Mit Host verbinden**, einen Dialog mit einem Umschalter
   **Terminal / Dateien (SFTP)**: ein Terminal über SSH oder der Datei-Browser. Tippe den Host – einen Namen, eine Adresse,
-  `user@host` oder einen SSH-Alias. **Erweitert** enthält Benutzer, Port und privaten Schlüssel; leer entscheiden deine
+  `user@host` oder einen SSH-Alias. Hostfeld, Modusschalter, Vorschläge und Tasten nutzen abgerundete Glasflächen; in
+  einem kleinen Fenster scrollt das Blatt, damit alle Felder und Aktionen erreichbar bleiben. **Erweitert** enthält Benutzer, Port und privaten Schlüssel; leer entscheiden deine
   `~/.ssh/config` und die Standardwerte von OpenSSH. Ein gewählter Schlüssel wird zuerst angeboten, und andere Schlüssel
   im `ssh-agent` werden nicht versucht. Der Dialog listet deine jüngsten Verbindungen – mit Port, Schlüssel und wann du
   sie zuletzt genutzt hast – und die `Host`-Namen aus deiner `~/.ssh/config`. Hosts, die nur Git annehmen (`github.com`
@@ -711,3 +762,88 @@ Download, den macOS nicht öffnet, eine abgelehnte Schrift, ein Kurzbefehl, der 
 [GitHub Issues](https://github.com/noah-qin/Corta/issues/new/choose). Für Fragen zur Nutzung geh zu
 [Discussions → Q&A](https://github.com/noah-qin/Corta/discussions/categories/q-a) oder frag in `#help` im
 [Discord](https://discord.gg/QNdWfdwr7j).
+
+<a id="coding-agent-state-and-program-notifications"></a>
+
+## Status von Coding-Agenten und Programmbenachrichtigungen
+
+**Claude Code ist derzeit das einzige Kommandozeilenwerkzeug mit einer eigenen Integration des Aufgabenstatus.** Es wurde
+mit dem installierten **Claude Code 2.1.310** unter macOS arm64 entwickelt und abgenommen; das ist keine
+Kompatibilitätsgarantie für alle Claude-Versionen. Codex, Gemini CLI, pi, Kimi, Grok Build, Qwen Code, OpenCode und Aider
+haben in Corta keinen eigenen Adapter für den Aufgabenstatus. Allgemeine Protokolle für Benachrichtigungen und Fortschritt
+stehen jedem Programm offen; eine Prozesserkennung ist keine vollständige Agent-Integration. Siehe
+[Umfang der Kompatibilität und Grenzen der Prüfung](../../CONFORMANCE.md#cli-signal-compatibility) (Englisch).
+
+Standardmäßig unterscheiden Agent-Bereiche auf ihrem nativen Tab In Arbeit (Akzentfarbe), Wartet auf dich (orange), Fertig
+(grün), Fehlgeschlagen (rot), Untätig (grau) und Status unbekannt (hohler grauer Punkt). Untätig heißt, dass kein laufender
+Durchgang gemeldet ist – auch vor Beginn oder nach dem Ende der Arbeit; nur ein ausdrückliches `done` bedeutet Abschluss. Ein
+Fortschrittsring folgt Meldungen über OSC 7501 oder OSC 9;4. Das Dock zählt wartende Bereiche und zeigt den Gesamtfortschritt.
+Öffne die Befehlspalette oder **Fenster → Agenten**, um jeden Agent-Bereich in allen Fenstern zu finden; ein Eintrag fokussiert
+ihn. In der Palette stehen die Agenten beim Stöbern zuerst und beim Suchen nach den passenden Befehlen; Return führt weiterhin
+den markierten Befehl aus – wechsle mit den Pfeiltasten zu einem Agenten, um zu ihm zu springen. Mehrere Agenten in einem
+Bereich werden mit ihrem dringendsten Status gezeigt. Status und App-Namen meldet das Programm selbst; es sind keine
+geprüften Identitäten. Allgemeine OSC-21337-Metadaten können den aktuellen Status mit einer Anzeigefarbe und einer
+Statusbezeichnung ergänzen, wenn der Aufgabentitel leer ist. Ohne Aufgabenstatus bleibt die Bezeichnung Status unbekannt.
+`status-color` wird nur als Metadaten aufbewahrt; Text in nativen Tabs und Menüs nutzt die Systemfarbe. Claude Code 2.1.310
+aktiviert diesen Metadatenkanal nicht.
+
+Die Statusabfrage von Claude Code über OSC 7501 braucht in einer gewöhnlichen interaktiven Sitzung keine Einstellung. Sie
+erfordert Claude Code 2.1.295 oder neuer; Cortas geprüfte Referenz ist 2.1.310, nicht dieser ganze Versionsbereich. Mit
+`allow-passthrough` gelangt der Status nicht durch tmux: Claude prüft tmux selbst. Claudes Hintergrundsitzungen melden auch
+im angehängten Zustand kein OSC 7501; das unterscheidet sich von einem verborgenen Corta-Bereich mit einer interaktiven
+Sitzung. Entferne `CLAUDE_CODE_DISABLE_TERMINAL_TITLE`, um Abfrage und Meldung zu erlauben. Siehe
+[Anthropics Anforderungen an das Terminal](https://code.claude.com/docs/en/terminal-config#see-session-status-in-your-terminal).
+Wenn ein verborgener Corta-Bereich um Erlaubnis bittet, eine Frage stellt oder eine Anmeldung braucht, sendet Corta eine
+feste Nachricht. Für den eigenen Nachrichtentext von Claude Code setze dessen `preferredNotifChannel` in Claudes
+`settings.json` oder unter `/config` → Local notifications auf `ghostty` (OSC 777), `iterm2` (OSC 9) oder `kitty` (OSC 99).
+`auto` wählt für Corta keinen Nachrichtenkanal. `terminal_bell` sendet BEL, `iterm2_with_bell` ergänzt OSC 9 um BEL, und
+`notifications_disabled` schaltet Claudes eigenen Benachrichtigungskanal ab, nicht aber Cortas 7501-Hinweise. Corta weist
+sich weiterhin als Corta aus. Diese Claude-spezifischen Protokolldetails beruhen auf der geprüften Referenzversion; ob sie
+verfügbar sind, hängt von der installierten Claude-Version ab. Claudes ausdrückliche Erlaubnishinweise kommen meist nach
+etwa sechs Sekunden ohne Tippen; Erinnerungen an den Abschluss warten meist etwa 60 Sekunden und setzen voraus, dass kein
+Hintergrund-Agent läuft. Sie sind von den sofortigen Statusmeldungen getrennt. Siehe
+[zeitlicher Ablauf der Benachrichtigungen](https://code.claude.com/docs/en/hooks#notification). Dass Corta OSC 9;4 versteht,
+heißt nicht, dass Claude in Corta Fortschritt sendet: Der Fortschrittskanal von 2.1.310 braucht `terminalProgressBarEnabled`
+und ein Terminal, das er als fortschrittsfähig erkennt; Cortas normale Kennung gehört nicht dazu.
+
+Programme ohne Statusunterstützung erkennt Corta am Namen des Vordergrundprozesses (claude, claude-code, codex, gemini,
+aider, opencode); weitere Namen fügst du mit `agent-processes = my-agent,another-agent` hinzu. Solche Bereiche zeigen
+Status unbekannt, solange der Prozess aktiv ist: Ausgabe und neu gezeichnete Prompts beweisen nicht, dass eine Aufgabe
+läuft. Die Rückkehr zur Shell oder ein sauberes Prozessende bedeutet Untätig, nicht Fertig; ein bekannt fehlgeschlagenes
+Ende bedeutet Fehlgeschlagen. Benachrichtigungen und BEL bitten um Aufmerksamkeit, ohne den Aufgabenstatus zu ändern. Stille
+allein bedeutet keinen Abschluss. Die bisherige Einstellung für BEL (hörbar / sichtbar / stumm) bleibt unverändert. Eine
+gemeldete Befehlsgrenze der Shell beendet veralteten Status und Fortschritt auch dann, wenn ein abgestürztes Werkzeug kein
+Zurücksetzen mehr senden kann. Exit-Status 130 (oder eine direkt gestartete Sitzung, die durch SIGINT endet) bedeutet
+unterbrochen / Untätig, nicht Fertig; andere bekannte Exit-Status ungleich null bedeuten Fehlgeschlagen. Ein neu gemeldeter
+Befehl löscht die alte Zusammenfassung. Ohne Shell-Grenze oder Sitzungsende kann Corta einen stillen Absturz nicht allein an
+der Ausgabe erkennen.
+
+`agent-status = false` blendet Statusanzeigen und Liste aus. `notify-from-programs = false` schaltet Programm- und
+Agent-Hinweise ab. Programmnachrichten erscheinen als Nachrichten des Bereichs unter Cortas Bereichsnamen, gekürzt und
+bereinigt, und werden je Bereich zu höchstens einer Zustellung alle fünf Sekunden zusammengefasst. Solange ein Bereich in
+einem gemeldeten blockierten Zustand bleibt, alarmiert ein verspäteter Programmhinweis nicht erneut für eine bereits
+angekündigte Wartezeit. Ein Hinweis, der vor der ersten Zustellung eintrifft, kann stattdessen seine Nachricht liefern. Die
+Mitteilungsberechtigung von macOS ist nötig; für die Zahl im Dock aktiviere in den Mitteilungseinstellungen der App
+**Kennzeichen für App-Symbol**. Die Mitteilungszentrale kann Nachrichtentext aufbewahren und auf dem Sperrbildschirm zeigen.
+Ein Klick fokussiert den Bereich; Schließen oder Neustarten des Bereichs bricht wartende Programmhinweise ab. Das Verlassen
+eines blockierten Abschnitts bricht dessen festen Hinweis ab, während unabhängige Programmnachrichten ihre eigene Lebensdauer
+behalten. BEL kann wartenden Programmtext nicht ersetzen und eine angekündigte Wartezeit nicht erneut melden. Die
+Sichtbarkeit wird vor dem Absenden erneut geprüft; die Zustellung danach liegt bei macOS.
+
+<a id="programs-using-osc-extensions"></a>
+
+## Programme mit OSC-Erweiterungen
+
+Mit iTerm2s `imgcat picture.png` (oder einem animierten GIF) zeigst du ein eingebettetes Bild an; GIFs zeigen ihr erstes
+Bild. Größen in Zellen, Pixeln, Prozent und automatisch werden akzeptiert, das Seitenverhältnis bleibt standardmäßig
+erhalten. Bilder scrollen mit dem Text; Verlauf löschen entfernt die im Verlauf. Dateidownloads werden abgelehnt.
+
+Die Shell-Integration von VS Code nutzt dieselben Prompt- und Befehlsaufzeichnungen wie Cortas Hooks. Host- und
+Verzeichnismeldungen von iTerm2 sind für entfernte Hosts nur informativ. kitty-Programme können Farben und Zeigerformen
+setzen; über Links bleibt der Zeiger eine Hand. Schreiben in die Zwischenablage über OSC 52, iTerm2 Copy oder kittys
+reine Textvariante von OSC 5522 erfordert jeweils `allow-clipboard-write = true`; Lesen wird immer abgelehnt.
+
+`printf '\e]1337;RequestAttention=once\a'` lässt das Dock-Symbol hüpfen, wenn Corta nicht aktiv ist. `yes` fordert weiter
+Aufmerksamkeit an, bis Corta aktiviert wird, `no` bricht ab, und `fireworks` verhält sich wie `once`. Programme können das
+Fenster nicht nach vorn holen. Die [OSC-Entscheidungstabelle](../../CONFORMANCE.md#osc-verdict-table) (Englisch) verzeichnet
+jede unterstützte, ignorierte und abgelehnte Familie.

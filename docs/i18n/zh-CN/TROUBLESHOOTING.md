@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > 本文译自英文版 [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md)，对应提交
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md)。
+> [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md)。
 > 此后英文版如有更新，或两者有出入，以英文版为准。macOS 的提示文字以英文原文为准，中文为对照译文。
 
 Corta 装不上、打不开，或者做了你以前的终端不会做的事时，该怎么办。每一条都说明你会看到什么、原因是什么、
@@ -123,6 +123,24 @@ Corta 会保留已有的设置，并拒绝写入这个文件，因为写入会�
 <a id="typing-and-rendering"></a>
 
 ## 输入和渲染
+
+### 清除屏幕后只剩光标，没有提示符
+
+如果 ⌘K 会擦掉正在等待的提示符，请更新 Corta。有 shell 集成和就绪的提示符结束标记时，清除屏幕现在会保留显示的提示符
+和未提交的输入，包括编辑光标。它不发送 Return、Control-L 或任何其他输入。对于没有提示符标记的 shell，请开启 shell 集成；
+标准的本地 zsh 会话会随内置的补全功能自动加载它。如果 shell 配置了 Control-L 重绘，它仍然是另一种选择。
+备用屏幕程序，以及提示符已滚入历史的多行编辑器，会被有意保持原样。
+
+### 目录补全在以 `/` 结尾的文件夹之后就停了
+
+只有子目录才是候选；只包含文件的目录没有下一层目录补全。输入子文件夹名称的一部分，或在候选可见时再按一次 Tab。
+Tab 只填入路径而不执行；Return 才运行 `cd`。隐藏文件夹需要点号前缀。如果某个已知的子文件夹没有出现，请检查对该目录的访问权限，
+并在关闭 `directory-completion` 后与 shell 的原生补全对比。如果差异仍然存在，请报告具体的路径形式和 shell。
+
+### 关于或命令历史在远离终端的地方打开
+
+在当前版本的 Corta 中关闭并重新打开该窗口。两者都会在调用它们的窗口上方居中打开，并限制在该显示器的可用范围内；
+它们不会放在整个屏幕的中央。已经打开的窗口保持你选择的位置。
 
 ### 在 Claude Code 的斜杠命令菜单中按 Tab 没有反应
 

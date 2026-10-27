@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](../ja/TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > Esta página es una traducción de [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md), tal como estaba en el commit
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md).
+> [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md).
 > Si la versión en inglés ha cambiado desde entonces, o si ambas difieren, prevalece la versión en inglés.
 > Los mensajes de macOS van acompañados de su texto original en inglés.
 
@@ -136,6 +136,29 @@ cuanto vuelve a leerlo. La integración del shell hace lo mismo con un archivo r
 <a id="typing-and-rendering"></a>
 
 ## Escritura y renderizado
+
+### Borrar pantalla deja solo un cursor, sin indicador
+
+Actualiza Corta si ⌘K borra un indicador en espera. Con la integración del shell y una marca de final de indicador listo,
+Borrar pantalla conserva ahora el indicador mostrado y la entrada sin enviar, incluido su cursor de edición. No envía
+Retorno, Control-L ni ninguna otra entrada. Activa la integración del shell en un shell sin marcas de indicador; las sesiones
+locales estándar de zsh la cargan automáticamente con las sugerencias incluidas. El redibujado con Control-L del propio
+shell sigue siendo una alternativa cuando ese shell lo tiene configurado. Un programa en la pantalla alternativa, o un editor
+de varias líneas cuyo indicador ya está en el historial, se deja intacto a propósito.
+
+### Las sugerencias de carpetas se detienen tras una carpeta que termina en `/`
+
+Solo los subdirectorios son candidatos; un directorio que solo contiene archivos no tiene más sugerencias de carpetas.
+Escribe parte del nombre de una subcarpeta o vuelve a pulsar Tab cuando haya candidatos visibles. Tab rellena la ruta sin
+ejecutarla; Retorno ejecuta `cd`. Las carpetas ocultas necesitan un punto al principio. Si falta una subcarpeta conocida,
+comprueba el acceso a ese directorio y compara con la completación nativa del shell tras desactivar `directory-completion`.
+Si la diferencia persiste, informa de la forma exacta de la ruta y del shell.
+
+### Acerca de o el historial de comandos se abre lejos del terminal
+
+Cierra y vuelve a abrir la ventana en la versión actual de Corta. Ambas se abren centradas sobre la ventana que las invoca,
+dentro del área útil de su pantalla; no se colocan en el centro de toda la pantalla. Una ventana ya abierta conserva la
+posición que elegiste.
 
 ### Tab no hace nada en el menú de comandos con barra de Claude Code
 

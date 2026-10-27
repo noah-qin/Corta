@@ -5,7 +5,7 @@
 🇺🇸 [English](../../TROUBLESHOOTING.md) · 🇨🇳 [简体中文](../zh-CN/TROUBLESHOOTING.md) · 🇭🇰 [繁體中文](../zh-Hant/TROUBLESHOOTING.md) · 🇯🇵 [日本語](TROUBLESHOOTING.md) · 🇰🇷 [한국어](../ko/TROUBLESHOOTING.md) · 🇩🇪 [Deutsch](../de/TROUBLESHOOTING.md) · 🇫🇷 [Français](../fr/TROUBLESHOOTING.md) · 🇪🇸 [Español](../es/TROUBLESHOOTING.md) · 🇧🇷 [Português](../pt-BR/TROUBLESHOOTING.md)
 
 > このページは英語版 [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md) のコミット
-> [`6269301`](https://github.com/noah-qin/Corta/blob/626930199a323d9f5ac053746dcd95ba0db73484/docs/TROUBLESHOOTING.md)
+> [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md)
 > 時点の翻訳です。その後英語版が更新された場合や内容に食い違いがある場合は、英語版が正となります。
 > macOS のメッセージは英語の原文を併記しています。
 
@@ -130,6 +130,26 @@ Corta は、自分が起動された環境の `$SHELL`（なければ `/bin/zsh`
 <a id="typing-and-rendering"></a>
 
 ## 入力と描画
+
+### 画面を消去するとカーソルだけが残り、プロンプトが消える
+
+⌘K で待機中のプロンプトが消える場合は Corta をアップデートしてください。シェル統合と準備済みのプロンプト終端マーカーがあれば、
+画面を消去は表示中のプロンプトと未実行の入力を、編集カーソルも含めて保持します。Return、Control-L、そのほかの入力は送りません。
+プロンプトマーカーのないシェルでは、シェル統合を有効にしてください。標準のローカル zsh セッションは同梱の候補機能と一緒に自動で
+読み込みます。シェル側で設定していれば、シェル自身の Control-L による再描画も使えます。代替画面のプログラムや、プロンプトが
+すでに履歴にある複数行のエディタは、意図的にそのままにします。
+
+### `/` で終わるフォルダのあとでディレクトリ候補が止まる
+
+候補はサブディレクトリだけなので、ファイルしかないディレクトリには次のディレクトリ候補がありません。子フォルダ名の一部を入力するか、
+候補が見えているときにもう一度 Tab を押してください。Tab はパスを補完するだけで実行せず、`cd` を実行するのは Return です。
+隠しフォルダにはドットで始める必要があります。わかっている子フォルダが出ない場合は、そのディレクトリへのアクセス権を確認し、
+`directory-completion` をオフにしてシェルのネイティブな補完と比べてください。それでも違う場合は、正確なパスの形とシェルを報告してください。
+
+### 情報やコマンド履歴がターミナルから離れた場所に開く
+
+現在の Corta でそのウインドウを閉じて開き直してください。どちらも呼び出したウインドウの中央に、そのディスプレイの使用可能な範囲内で
+開き、画面全体の中央には置きません。すでに開いているウインドウは、選んだ位置のままです。
 
 ### Claude Code のスラッシュコマンドメニューで Tab が効かない
 
