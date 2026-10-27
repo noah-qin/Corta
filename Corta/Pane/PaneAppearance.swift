@@ -48,6 +48,12 @@ final class PaneAppearance: NSObject {
     weak var host: PaneAppearanceHost?
     private var isObserving = false
     private var fontSetObserver: NSObjectProtocol?
+    /// What `observe` registers and `stop` removes, by name, so nothing else
+    /// registered on this object is dropped with them.
+    private static let observedNotifications: [(Notification.Name, Selector)] = [
+        (ConfigurationStore.didChange, #selector(configurationChanged)),
+        (AppearanceController.didChange, #selector(appearanceChanged)),
+    ]
 
     init(host: PaneAppearanceHost? = nil) {
         self.host = host
@@ -72,14 +78,9 @@ final class PaneAppearance: NSObject {
     func observe() {
         guard !isObserving else { return }
         isObserving = true
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(configurationChanged),
-            name: ConfigurationStore.didChange, object: nil)
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(appearanceChanged),
-            name: AppearanceController.didChange, object: nil)
-        // `stop` removes these two by name, so nothing else registered on
-        // this object is dropped with them.
+        for (name, selector) in Self.observedNotifications {
+            NotificationCenter.default.addObserver(self, selector: selector, name: name, object: nil)
+        }
         // Not a selector: AppKit does not say which thread posts it.
         fontSetObserver = NotificationCenter.default.addObserver(
             forName: NSFont.fontSetChangedNotification, object: nil, queue: .main
@@ -100,8 +101,9 @@ final class PaneAppearance: NSObject {
 
     /// The pane closed.
     func stop() {
-        NotificationCenter.default.removeObserver(self, name: ConfigurationStore.didChange, object: nil)
-        NotificationCenter.default.removeObserver(self, name: AppearanceController.didChange, object: nil)
+        for (name, _) in Self.observedNotifications {
+            NotificationCenter.default.removeObserver(self, name: name, object: nil)
+        }
         if let fontSetObserver { NotificationCenter.default.removeObserver(fontSetObserver) }
         fontSetObserver = nil
         isObserving = false
