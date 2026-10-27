@@ -50,7 +50,8 @@ extension Performer {
             guard i + 1 < input.count else { return nil }
             if input[i + 1] == 92 { output.append(92); i += 2; continue }
             guard i + 3 < input.count, input[i + 1] == 120,
-                let value = UInt8(String(decoding: input[(i + 2)...(i + 3)], as: UTF8.self), radix: 16) else { return nil }
+                let value = UInt8(String(decoding: input[(i + 2)...(i + 3)], as: UTF8.self), radix: 16)
+            else { return nil }
             output.append(value); i += 4
         }
         return String(bytes: output, encoding: .utf8)
@@ -58,7 +59,9 @@ extension Performer {
 
     /// Hostless reports cannot turn a remote path into a local spawn target.
     mutating func reportedDirectory(_ path: String) {
-        guard path.hasPrefix("/"), !path.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) else { return }
+        guard path.hasPrefix("/"), !path.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) else {
+            return
+        }
         if let remote = state.remoteContext {
             state.remoteContext = RemoteContext(host: remote.host, directory: path,
                 provenance: remote.provenance, reportedAt: Date())
@@ -84,40 +87,14 @@ extension Performer {
         let value = pair.count == 2 ? String(pair[1]) : ""
         switch key {
         case "CurrentDir": reportedDirectory(value)
-        case "RemoteHost":
-            let host = String(value.split(separator: "@", omittingEmptySubsequences: false).last ?? "")
-            guard !host.isEmpty, host.utf8.count <= 255,
-                host.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || [45,46,58].contains($0) }) else { return }
-            if Self.isLocalHost(host, localNames: Self.localHostnames().union(state.hostnamesAtStart)) {
-                state.remoteContext = nil
-            } else {
-                state.remoteContext = RemoteContext(host: Self.normalizeHostname(host), directory: "",
-                    provenance: .osc7, reportedAt: Date())
-            }
+        case "RemoteHost": reportedRemoteHost(value)
         case "SetMark":
             guard !grid.isAlternateScreenActive else { return }
             grid.setMark(.prompt, atAbsoluteRow: grid.absoluteRow(ofScreenRow: grid.cursor.row))
         case "ClearScrollback": grid.clearScrollback()
-        case "CursorShape":
-            switch value {
-            case "0": grid.cursorStyle = .block
-            case "1": grid.cursorStyle = .bar
-            case "2": grid.cursorStyle = .underline
-            default: return
-            }
-            grid.cursorStyleIsExplicit = true
-        case "RequestAttention":
-            switch value {
-            case "yes": state.attention = .continuous
-            case "once", "fireworks": state.attention = .once
-            case "no": state.attention = .cancel
-            default: break
-            }
-        case "ReportCellSize":
-            let scale = grid.backingScale
-            guard grid.cellPixelHeight > 0, grid.cellPixelWidth > 0, scale.isFinite, scale > 0 else { return }
-            let report = "\u{1B}]1337;ReportCellSize=\(Double(grid.cellPixelHeight) / scale);\(Double(grid.cellPixelWidth) / scale);\(scale)\u{1B}\\"
-            state.outputBuffer += Array(report.utf8)
+        case "CursorShape": setCursorShape(value)
+        case "RequestAttention": requestAttention(value)
+        case "ReportCellSize": reportCellSize()
         case "Copy":
             guard value.hasPrefix(":") else { return }
             setClipboard(Array(("c;" + value.dropFirst()).utf8)[...])
@@ -126,6 +103,51 @@ extension Performer {
         case "StealFocus", "SetProfile", "SetBadgeFormat", "ReportVariable", "Custom": break
         default: break
         }
+    }
+
+    /// `RemoteHost=user@host`: a hostname of letters, digits, `-`, `.` and
+    /// `:` only; this machine's own names clear the remote context.
+    private mutating func reportedRemoteHost(_ value: String) {
+        let host = String(value.split(separator: "@", omittingEmptySubsequences: false).last ?? "")
+        guard !host.isEmpty, host.utf8.count <= 255,
+            host.utf8.allSatisfy({ byte in
+                (48...57).contains(byte) || (65...90).contains(byte) || (97...122).contains(byte)
+                    || [45, 46, 58].contains(byte)
+            }) else { return }
+        if Self.isLocalHost(host, localNames: Self.localHostnames().union(state.hostnamesAtStart)) {
+            state.remoteContext = nil
+        } else {
+            state.remoteContext = RemoteContext(host: Self.normalizeHostname(host), directory: "",
+                provenance: .osc7, reportedAt: Date())
+        }
+    }
+
+    private mutating func setCursorShape(_ value: String) {
+        switch value {
+        case "0": grid.cursorStyle = .block
+        case "1": grid.cursorStyle = .bar
+        case "2": grid.cursorStyle = .underline
+        default: return
+        }
+        grid.cursorStyleIsExplicit = true
+    }
+
+    private mutating func requestAttention(_ value: String) {
+        switch value {
+        case "yes": state.attention = .continuous
+        case "once", "fireworks": state.attention = .once
+        case "no": state.attention = .cancel
+        default: break
+        }
+    }
+
+    /// The cell size in points and the backing scale, all numeric state.
+    private mutating func reportCellSize() {
+        let scale = grid.backingScale
+        guard grid.cellPixelHeight > 0, grid.cellPixelWidth > 0, scale.isFinite, scale > 0 else { return }
+        let height = Double(grid.cellPixelHeight) / scale, width = Double(grid.cellPixelWidth) / scale
+        let report = "\u{1B}]1337;ReportCellSize=\(height);\(width);\(scale)\u{1B}\\"
+        state.outputBuffer += Array(report.utf8)
     }
 
     /// OSC 5522 is a transaction: publish once at the terminator. This text

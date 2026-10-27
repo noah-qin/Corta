@@ -116,11 +116,13 @@ final class RenderPolicy {
     /// - Parameter scheduleTypingExpiry: when typing stops counting as recent;
     ///   tests run it by hand.
     /// - Parameter now: the clock typing is timed on; tests supply their own.
-    init(scheduler: FrameScheduler, window: NSWindow?,
+    init(
+        scheduler: FrameScheduler, window: NSWindow?,
         scheduleTypingExpiry: @escaping (TimeInterval, DispatchWorkItem) -> Void = { delay, work in
             DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
         },
-        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
+        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    ) {
         self.scheduleTypingExpiry = scheduleTypingExpiry
         self.now = now
         self.scheduler = scheduler

@@ -32,8 +32,10 @@ import Testing
 ///
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded by
 /// design — see the type's comment.
-@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct ThemeColorRenderTests {
-    private typealias Pixel = (r: UInt8, g: UInt8, b: UInt8, a: UInt8)
+@Suite(
+    .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct ThemeColorRenderTests {
+    private typealias Pixel = MetalRenderTarget.Pixel
 
     private static func byte(_ value: Float) -> Int { Int((min(1, max(0, value)) * 255).rounded()) }
 
@@ -81,13 +83,12 @@ import Testing
         let texture = MetalRenderTarget.make(device: device, width: width, height: height)
         let background = variant.background
         renderer.renderAndWait(
-            grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-            drawableSize: CGSize(width: width, height: height), cursorVisible: cursorVisible,
-            selection: selection, searchMatches: searchMatches,
+            grid: grid, cursorVisible: cursorVisible, selection: selection, searchMatches: searchMatches,
             currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
-            target: texture,
-            clearColor: MTLClearColorMake(
-                Double(background.x), Double(background.y), Double(background.z), 1))
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                drawableSize: CGSize(width: width, height: height),
+                clearColor: MTLClearColorMake(Double(background.x), Double(background.y), Double(background.z), 1)))
         return Frame(texture: texture, cellWidth: cellWidth, cellHeight: cellHeight)
     }
 
@@ -212,7 +213,8 @@ import Testing
 
         // The rule sits two device pixels above the row's bottom, over the
         // selection; opaque, so it is the link colour alone.
-        let rule = MetalRenderTarget.pixel(of: frame.texture, x: frame.cellWidth + frame.cellWidth / 2, y: frame.cellHeight - 2)
+        let rule = MetalRenderTarget.pixel(
+            of: frame.texture, x: frame.cellWidth + frame.cellWidth / 2, y: frame.cellHeight - 2)
         #expect(Self.matches(rule, overlay.linkUnderline, over: background), "link: \(rule)")
     }
 
@@ -234,11 +236,11 @@ import Testing
         let texture = MetalRenderTarget.make(device: device, width: width, height: height)
         let background = variant.background
         renderer.renderAndWait(
-            grid: grid, rect: CGRect(x: margin, y: 0, width: cellWidth * grid.columns, height: height),
-            drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-            selection: nil, target: texture,
-            clearColor: MTLClearColorMake(
-                Double(background.x), Double(background.y), Double(background.z), 1))
+            grid: grid, cursorVisible: false, selection: nil,
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: margin, y: 0, width: cellWidth * grid.columns, height: height),
+                drawableSize: CGSize(width: width, height: height),
+                clearColor: MTLClearColorMake(Double(background.x), Double(background.y), Double(background.z), 1)))
         return (Frame(texture: texture, cellWidth: cellWidth, cellHeight: cellHeight), margin)
     }
 
@@ -249,7 +251,9 @@ import Testing
         grid.setMark(.promptInterrupted, atAbsoluteRow: grid.absoluteRow(ofScreenRow: 2))
         return grid
     }
+}
 
+extension ThemeColorRenderTests {
     /// The prompt marks: the theme's green and red for an outcome, and the
     /// midpoint of foreground and background for an interrupted command —
     /// drawn in the Metal pass, 6 points left of the grid, so they move with
@@ -370,14 +374,16 @@ import Testing
 
     /// WCAG 2 relative luminance of an sRGB colour.
     private static func luminance(_ color: SIMD4<Float>) -> Float {
-        func linear(_ c: Float) -> Float { c <= 0.04045 ? c / 12.92 : powf((c + 0.055) / 1.055, 2.4) }
+        func linear(_ channel: Float) -> Float {
+            channel <= 0.04045 ? channel / 12.92 : powf((channel + 0.055) / 1.055, 2.4)
+        }
         return 0.2126 * linear(color.x) + 0.7152 * linear(color.y) + 0.0722 * linear(color.z)
     }
 
     private static func contrast(_ a: SIMD4<Float>, _ b: SIMD4<Float>) -> Float {
-        let la = luminance(a)
-        let lb = luminance(b)
-        return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+        let luminanceA = luminance(a)
+        let luminanceB = luminance(b)
+        return (max(luminanceA, luminanceB) + 0.05) / (min(luminanceA, luminanceB) + 0.05)
     }
 
     private static func composite(_ color: SIMD4<Float>, over background: SIMD4<Float>) -> SIMD4<Float> {

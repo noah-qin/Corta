@@ -87,26 +87,26 @@ extension SFTPSession {
             finishHandshake(.success(message))
             return
         }
-        let resolved = state.withLock { state -> (
-            continuation: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>?,
-            wasCancelled: Bool,
-            unknown: Bool
-        ) in
+        enum Resolution { case awaited(ReplyContinuation), cancelled, unknown }
+        let resolved = state.withLock { state -> Resolution in
             if let entry = state.inFlight.removeValue(forKey: message.requestID) {
                 releaseWindowSlot(&state)
                 state.ids.resolved(entry.ticket)
-                return (entry.continuation, false, false)
+                return .awaited(entry.continuation)
             }
             if state.ids.acceptLateReply(message.requestID) {
                 // The late reply to a cancelled request: swallow it, and
                 // only now is the id safe to recycle.
-                return (nil, true, false)
+                return .cancelled
             }
-            return (nil, false, true)
+            return .unknown
         }
-        if let continuation = resolved.continuation {
+        switch resolved {
+        case .awaited(let continuation):
             continuation.resume(returning: .success(message))
-        } else if resolved.unknown {
+        case .cancelled:
+            break
+        case .unknown:
             tearDown(
                 with: .protocolViolation(
                     "a reply arrived for request-id \(message.requestID), which nothing sent"),

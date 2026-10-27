@@ -266,7 +266,9 @@ struct KittyGraphicsTests {
         terminal.feed(Array("\u{1B}[?1049l".utf8))
         #expect(terminal.grid.imagePlacements.orderedPlacements().count == 1)
     }
+}
 
+extension KittyGraphicsTests {
     @Test("a declared size with no matching payload is rejected rather than allocated for")
     func declaredSizeWithoutAMatchingPayloadIsRejected() {
         var terminal = Terminal(rows: 10, columns: 40)
@@ -298,7 +300,9 @@ struct KittyGraphicsTests {
         var terminal = Terminal(rows: 10, columns: 120)
         let control = "a=T,q=2,f=100,s=64,v=64"
         let payload =
-            "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAZUlEQVR42u3SMQ0AMAwDQSMxf1AF06goGukGSz96uJy2b0sjq99PZPX7WRBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQ+j8u7zaBAC9w5vsAAAAASUVORK5CYII"
+            "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAZUlEQVR42u3SMQ0AMAwDQSMxf1AF06goGukGSz96uJy2b0sjq99P"
+                + "ZPX7WRBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQ+j8u7zaBAC9w"
+                + "5vsAAAAASUVORK5CYII"
         #expect(payload.count % 4 != 0, "this capture is the unpadded case on purpose")
 
         terminal.feed(Self.apc(control, payload: payload))

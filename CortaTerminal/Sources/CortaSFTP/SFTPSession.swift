@@ -38,6 +38,9 @@ import Synchronization
 /// the new request's. Cancelled ids have their own budget: cancellation
 /// frees a window slot, but cannot free an unanswered wire id.
 public final class SFTPSession: @unchecked Sendable {
+    /// What a request's caller waits on: its reply, or the error that ended it.
+    typealias ReplyContinuation = CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>
+
     public struct Configuration: Sendable {
         /// The bound on requests sent but not yet answered. Past it,
         /// senders suspend in FIFO order. 32 is generous for latency
@@ -68,7 +71,7 @@ public final class SFTPSession: @unchecked Sendable {
         var inFlight:
             [UInt32: (
                 ticket: SFTPRequestIDLedger.Ticket,
-                continuation: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>
+                continuation: ReplyContinuation
             )] = [:]
         /// Window slots handed out and not yet given back — one per
         /// admitted sender, from `acquireRequestSlot` until its request is
@@ -90,7 +93,7 @@ public final class SFTPSession: @unchecked Sendable {
         var windowWaiters: [(token: UInt64, continuation: CheckedContinuation<Bool, Never>)] = []
         var nextWindowToken: UInt64 = 0
         /// The INIT handshake's continuation, while connect() is pending.
-        var handshake: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>?
+        var handshake: ReplyContinuation?
         /// Non-nil once the session is over: every later operation fails
         /// with this, and it is the error in-flight requests died with.
         var closed: SFTPError?
@@ -126,13 +129,9 @@ public final class SFTPSession: @unchecked Sendable {
 
     // MARK: - Lifecycle
 
-    /// Sends INIT and waits for VERSION. Starts the reader thread; a
-    /// session that is never connected still needs `close()` to release
-    /// the transport.
-    @discardableResult
-    public func connect() async throws(SFTPError) -> SFTPServerCapabilities {
-        // Reserve the entire lifecycle before starting any reader. Rejecting a
-        // second caller must neither start a reader nor cancel the first caller.
+    /// Reserves the entire lifecycle before any reader starts. Rejecting a
+    /// second caller must neither start a reader nor cancel the first caller.
+    private func admitConnect() throws(SFTPError) {
         let admissionError = state.withLock { state -> SFTPError? in
             if let closed = state.closed { return closed }
             guard !state.connectStarted else {
@@ -142,6 +141,38 @@ public final class SFTPSession: @unchecked Sendable {
             return nil
         }
         if let admissionError { throw admissionError }
+    }
+
+    /// The server's first reply, which must be a VERSION this client can
+    /// speak; anything else closes the session.
+    private func capabilities(fromHandshake reply: SFTPMessage) throws(SFTPError) -> SFTPServerCapabilities {
+        guard case .version(let version, let extensions) = reply.payload else {
+            close()
+            throw .protocolViolation("the server's first message was not VERSION")
+        }
+        // This client speaks version 3; a server answering lower predates
+        // the message set used here, and a higher version still speaks 3
+        // to a client that announced 3 (§4: the server replies with the
+        // lower of the two).
+        guard version >= SFTPCodec.protocolVersion else {
+            close()
+            throw .protocolViolation("the server speaks SFTP version \(version), below 3")
+        }
+        var byName: [String: [UInt8]] = [:]
+        for item in extensions { byName[item.nameString] = item.data }
+        return SFTPServerCapabilities(
+            version: version,
+            extensions: byName,
+            supportsStatVFS: byName[SFTPCodec.statVFSExtensionName] != nil,
+            supportsPosixRename: byName[SFTPCodec.posixRenameExtensionName] != nil)
+    }
+
+    /// Sends INIT and waits for VERSION. Starts the reader thread; a
+    /// session that is never connected still needs `close()` to release
+    /// the transport.
+    @discardableResult
+    public func connect() async throws(SFTPError) -> SFTPServerCapabilities {
+        try admitConnect()
 
         let message = SFTPMessage(
             type: SFTPCodec.MessageType.initialize, requestID: 0,
@@ -149,8 +180,7 @@ public final class SFTPSession: @unchecked Sendable {
         let frame = SFTPCodec.encodeFrame(message)
 
         let result = await withTaskCancellationHandler {
-            await withCheckedContinuation {
-                (continuation: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>) in
+            await withCheckedContinuation { (continuation: ReplyContinuation) in
                 let failure = state.withLock { state -> SFTPError? in
                     if let closed = state.closed { return closed }
                     if Task.isCancelled { return .cancelled }
@@ -173,26 +203,7 @@ public final class SFTPSession: @unchecked Sendable {
             self.close()
         }
 
-        let reply = try result.get()
-        guard case .version(let version, let extensions) = reply.payload else {
-            close()
-            throw .protocolViolation("the server's first message was not VERSION")
-        }
-        // This client speaks version 3; a server answering lower predates
-        // the message set used here, and a higher version still speaks 3
-        // to a client that announced 3 (§4: the server replies with the
-        // lower of the two).
-        guard version >= SFTPCodec.protocolVersion else {
-            close()
-            throw .protocolViolation("the server speaks SFTP version \(version), below 3")
-        }
-        var byName: [String: [UInt8]] = [:]
-        for item in extensions { byName[item.nameString] = item.data }
-        let info = SFTPServerCapabilities(
-            version: version,
-            extensions: byName,
-            supportsStatVFS: byName[SFTPCodec.statVFSExtensionName] != nil,
-            supportsPosixRename: byName[SFTPCodec.posixRenameExtensionName] != nil)
+        let info = try capabilities(fromHandshake: try result.get())
         let completionError = state.withLock { state -> SFTPError? in
             if let closed = state.closed { return closed }
             state.serverInfo = info
@@ -208,8 +219,11 @@ public final class SFTPSession: @unchecked Sendable {
     public func close() {
         tearDown(with: .cancelled, closingTransport: true)
     }
+}
 
-    // MARK: - Request plumbing
+// MARK: - Request plumbing
+
+extension SFTPSession {
 
     /// Sends one request and awaits its reply. Window admission, id
     /// allocation, continuation registration, the serialised write, and
@@ -221,8 +235,7 @@ public final class SFTPSession: @unchecked Sendable {
     ) async throws(SFTPError) -> SFTPMessage {
         let ticket = try await acquireRequestSlot()
         let result = await withTaskCancellationHandler {
-            await withCheckedContinuation {
-                (continuation: CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>) in
+            await withCheckedContinuation { (continuation: ReplyContinuation) in
                 let registered = state.withLock { state -> Bool in
                     if state.closed != nil {
                         return false
@@ -436,14 +449,15 @@ public final class SFTPSession: @unchecked Sendable {
     /// tearing down after a transport failure (closing it again is
     /// harmless but pointless).
     func tearDown(with error: SFTPError, closingTransport: Bool) {
-        let drained = state.withLock { state -> (
-            handshakes: [CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>],
-            requests: [CheckedContinuation<Result<SFTPMessage, SFTPError>, Never>],
-            waiters: [CheckedContinuation<Bool, Never>],
-            alreadyClosed: Bool
-        ) in
+        struct Drained {
+            var handshakes: [ReplyContinuation]
+            var requests: [ReplyContinuation]
+            var waiters: [CheckedContinuation<Bool, Never>]
+        }
+        // Nil when an earlier teardown already drained everything.
+        let drained = state.withLock { state -> Drained? in
             if state.closed != nil {
-                return ([], [], [], true)
+                return nil
             }
             state.closed = error
             let handshakes = state.handshake.map { [$0] } ?? []
@@ -454,9 +468,9 @@ public final class SFTPSession: @unchecked Sendable {
             let waiters = state.windowWaiters.map { $0.continuation }
             state.windowWaiters.removeAll()
             state.windowUsed = 0
-            return (handshakes, requests, waiters, false)
+            return Drained(handshakes: handshakes, requests: requests, waiters: waiters)
         }
-        guard !drained.alreadyClosed else { return }
+        guard let drained else { return }
         if closingTransport { transport.close() }
         for handshake in drained.handshakes { handshake.resume(returning: .failure(error)) }
         for request in drained.requests { request.resume(returning: .failure(error)) }

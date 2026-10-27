@@ -41,7 +41,9 @@ import Observation
     }
 
     var draft: Theme {
-        Theme(name: themeID, displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines), dark: dark, light: light)
+        Theme(
+            name: themeID, displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines), dark: dark,
+            light: light)
     }
     var canSave: Bool {
         let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)

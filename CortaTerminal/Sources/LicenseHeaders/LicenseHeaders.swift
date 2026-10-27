@@ -240,30 +240,33 @@ enum Glob {
         match(Array(pattern.unicodeScalars), 0, Array(path.unicodeScalars), 0)
     }
 
-    private static func match(_ p: [Unicode.Scalar], _ i: Int, _ s: [Unicode.Scalar], _ j: Int) -> Bool {
-        if i == p.count { return j == s.count }
-        if p[i] == "*", i + 1 < p.count, p[i + 1] == "*" {
-            // `**/` may match nothing at all; `**` may match across `/`.
-            let next = i + 2 < p.count && p[i + 2] == "/" ? i + 3 : i + 2
-            if next != i + 2, match(p, next, s, j) { return true }
-            var k = j
-            while k <= s.count {
-                if match(p, next, s, k) { return true }
-                k += 1
-            }
-            return false
+    private static func match(_ glob: [Unicode.Scalar], _ i: Int, _ text: [Unicode.Scalar], _ j: Int) -> Bool {
+        if i == glob.count { return j == text.count }
+        if glob[i] == "*", i + 1 < glob.count, glob[i + 1] == "*" { return matchAnyDepth(glob, i, text, j) }
+        if glob[i] == "*" { return matchWithinComponent(glob, i, text, j) }
+        guard j < text.count else { return false }
+        if glob[i] == "?" { return text[j] != "/" && match(glob, i + 1, text, j + 1) }
+        return glob[i] == text[j] && match(glob, i + 1, text, j + 1)
+    }
+
+    /// `**` at `i`: any number of components. `**/` may match nothing at
+    /// all; `**` may match across `/`.
+    private static func matchAnyDepth(_ glob: [Unicode.Scalar], _ i: Int, _ text: [Unicode.Scalar], _ j: Int) -> Bool {
+        let next = i + 2 < glob.count && glob[i + 2] == "/" ? i + 3 : i + 2
+        if next != i + 2, match(glob, next, text, j) { return true }
+        return (j...text.count).contains { match(glob, next, text, $0) }
+    }
+
+    /// `*` at `i`: any run of characters within one path component.
+    private static func matchWithinComponent(
+        _ glob: [Unicode.Scalar], _ i: Int, _ text: [Unicode.Scalar], _ j: Int
+    ) -> Bool {
+        var k = j
+        while k <= text.count {
+            if match(glob, i + 1, text, k) { return true }
+            if k == text.count || text[k] == "/" { break }
+            k += 1
         }
-        if p[i] == "*" {
-            var k = j
-            while k <= s.count {
-                if match(p, i + 1, s, k) { return true }
-                if k == s.count || s[k] == "/" { break }
-                k += 1
-            }
-            return false
-        }
-        guard j < s.count else { return false }
-        if p[i] == "?" { return s[j] != "/" && match(p, i + 1, s, j + 1) }
-        return p[i] == s[j] && match(p, i + 1, s, j + 1)
+        return false
     }
 }

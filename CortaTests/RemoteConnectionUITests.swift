@@ -133,11 +133,11 @@ struct RecentHostTimeTests {
     @Test("a recent's detail says what was set and when, leaving out what was not")
     func recentDetail() throws {
         let plain = try SSHTarget.parse(host: "box", user: "", port: "").get()
-        #expect(RemoteConnectForm.recentDetail(plain, lastUsed: nil, now: Date())
+        #expect(RemoteConnectSuggestionList.recentDetail(plain, lastUsed: nil, now: Date())
             == [L10n.text("ui.connect.userFromConfig"), L10n.text("ui.connect.identityDefault")]
                 .joined(separator: " · "))
         let full = try SSHTarget.parse(host: "box", user: "deploy", port: "2222").get()
-        let detail = RemoteConnectForm.recentDetail(
+        let detail = RemoteConnectSuggestionList.recentDetail(
             full, lastUsed: Date(timeIntervalSinceNow: -7200), now: Date())
         #expect(detail.hasPrefix(L10n.format("ui.connect.portValue", "2222")))
         #expect(detail.split(separator: "·").count == 3)

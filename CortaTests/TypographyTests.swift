@@ -16,7 +16,6 @@
 
 import AppKit
 import CoreText
-import CortaTerminal
 import Metal
 import Testing
 
@@ -152,7 +151,8 @@ struct TypographyConfigurationTests {
 /// What the atlas draws a character with, and where, under those
 /// preferences. `.serialized`: each builds a `GlyphAtlas`, single-threaded
 /// by design.
-@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+@Suite(
+    .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct TypographyAtlasTests {
     private static func atlas(_ options: TextOptions = TextOptions()) throws -> GlyphAtlas {
         let device = try #require(MTLCreateSystemDefaultDevice())

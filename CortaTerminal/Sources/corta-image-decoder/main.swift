@@ -56,7 +56,8 @@ func hasRestrictedSandboxSignature() -> Bool {
     var information: CFDictionary?
     guard SecCodeCopySelf([], &dynamic) == errSecSuccess, let dynamic,
         SecCodeCopyStaticCode(dynamic, [], &code) == errSecSuccess, let code,
-        SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &information) == errSecSuccess,
+        SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &information)
+            == errSecSuccess,
         let dictionary = information as? [String: Any],
         let entitlements = dictionary[kSecCodeInfoEntitlementsDict as String] as? [String: Any],
         entitlements["com.apple.security.app-sandbox"] as? Bool == true
@@ -70,13 +71,18 @@ guard hasRestrictedSandboxSignature() else { exit(3) }
 /// The decode the app did in process (`KittyImageRenderer.decodePNG`):
 /// the PNG/GIF signature, its matching ImageIO type, and the dimensions
 /// under the caps before the first frame is decoded. No other type is admitted.
-func decode(_ bytes: [UInt8], mapping: UnsafeMutableRawPointer? = nil,
+func decode(
+    _ bytes: [UInt8], mapping: UnsafeMutableRawPointer? = nil,
     expectedWidth: Int? = nil, expectedHeight: Int? = nil, stride: Int? = nil
 ) -> (width: Int, height: Int)? {
     let type: String
-    if bytes.starts(with: pngSignature) { type = "public.png" }
-    else if bytes.starts(with: Array("GIF87a".utf8)) || bytes.starts(with: Array("GIF89a".utf8)) { type = "com.compuserve.gif" }
-    else { return nil }
+    if bytes.starts(with: pngSignature) {
+        type = "public.png"
+    } else if bytes.starts(with: Array("GIF87a".utf8)) || bytes.starts(with: Array("GIF89a".utf8)) {
+        type = "com.compuserve.gif"
+    } else {
+        return nil
+    }
     let options = [kCGImageSourceTypeIdentifierHint: type] as CFDictionary
     guard let source = CGImageSourceCreateWithData(Data(bytes) as CFData, options),
         CGImageSourceGetType(source) as String? == type,

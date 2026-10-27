@@ -79,7 +79,7 @@ extension Performer {
 
     /// OSC 10/11/12 query: each 8-bit byte doubled to 16 bits, as xterm widens.
     mutating func reportDynamicColor(_ code: Int) {
-        let color: (red: UInt8, green: UInt8, blue: UInt8)
+        let color: RGB
         switch code {
         case 10: color = state.dynamicColors.foreground
         case 11: color = state.dynamicColors.background
@@ -94,7 +94,7 @@ extension Performer {
 
     /// `rgb:RRRR/GGGG/BBBB`, each 8-bit channel doubled to xterm's 16 bits —
     /// the body of every colour query's answer.
-    static func colorReport(_ color: (red: UInt8, green: UInt8, blue: UInt8)) -> String {
+    static func colorReport(_ color: RGB) -> String {
         func channel(_ value: UInt8) -> String {
             let hex = String(value, radix: 16)
             let byte = hex.count == 1 ? "0" + hex : hex
@@ -123,7 +123,7 @@ extension Performer {
     /// unreadable black-on-black where refusing leaves text legible. esctest's
     /// cases for them are expected failures (`CONFORMANCE.md` §3).
     static func parseColorSpecification(_ bytes: ArraySlice<UInt8>)
-        -> (red: UInt8, green: UInt8, blue: UInt8)?
+        -> RGB?
     {
         let text = String(decoding: bytes, as: UTF8.self)
         if text.hasPrefix("#") {
@@ -137,7 +137,7 @@ extension Performer {
                 guard let value = UInt32(String(slice), radix: 16) else { return nil }
                 channels.append(Self.scaleToByte(value, hexDigits: width))
             }
-            return (channels[0], channels[1], channels[2])
+            return RGB(red: channels[0], green: channels[1], blue: channels[2])
         }
         // Match the colon: `rgbi:` shares the prefix.
         guard text.hasPrefix("rgb:") else { return nil }
@@ -150,7 +150,7 @@ extension Performer {
             else { return nil }
             channels.append(Self.scaleToByte(value, hexDigits: part.count))
         }
-        return (channels[0], channels[1], channels[2])
+        return RGB(red: channels[0], green: channels[1], blue: channels[2])
     }
 
     // MARK: - OSC 4 / 104 — the indexed palette
@@ -239,7 +239,7 @@ extension Performer {
     }
 
     private mutating func reportSpecialColor(_ slot: SpecialColors.Slot) {
-        let body = Self.colorReport(state.specialColors.color(at: slot) ?? (0, 0, 0))
+        let body = Self.colorReport(state.specialColors.color(at: slot) ?? RGB(red: 0, green: 0, blue: 0))
         state.outputBuffer.append(
             contentsOf: Array("\u{1B}]5;\(slot.rawValue);\(body)\u{1B}\\".utf8))
     }

@@ -29,9 +29,10 @@ import Testing
 /// into the atlas's RGBA texture and draw through the color pipeline.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct ColorEmojiRenderTests {
+@Suite(
+    .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct ColorEmojiRenderTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
-
 
     /// Renders `grid` onto a fresh black texture sized exactly to the grid
     /// (same harness as `WideGlyphRenderTests`).
@@ -44,9 +45,10 @@ import Testing
             device: device, width: width, height: height)
 
         renderer.renderAndWait(
-            grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-            drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-            selection: nil, target: texture)
+            grid: grid, cursorVisible: false, selection: nil,
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                drawableSize: CGSize(width: width, height: height)))
         return texture
     }
 
@@ -91,13 +93,15 @@ import Testing
             return
         }
         let runAttributes = CTRunGetAttributes(runs[0]) as? [CFString: Any]
-        guard let fontAttribute = runAttributes?[kCTFontAttributeName] else {
+        // A cast to a CF type is never checked (`as?` always succeeds), so
+        // the type ID is what proves the attribute is a font.
+        guard let fontAttribute = runAttributes?[kCTFontAttributeName],
+            CFGetTypeID(fontAttribute as CFTypeRef) == CTFontGetTypeID()
+        else {
             Issue.record("the 中 run carries no font attribute")
             return
         }
-        // A run's font attribute is always a CTFont; the conditional above
-        // is only about the key's presence.
-        let runFont = fontAttribute as! CTFont
+        let runFont = unsafeDowncast(fontAttribute as CFTypeRef, to: CTFont.self)
         #expect((CTFontCopyPostScriptName(runFont) as String).hasPrefix("PingFangSC"))
         #expect(!CTFontGetSymbolicTraits(runFont).contains(.traitColorGlyphs))
     }

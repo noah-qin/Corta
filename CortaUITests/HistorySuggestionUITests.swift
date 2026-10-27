@@ -74,7 +74,8 @@ final class HistorySuggestionUITests: XCTestCase {
         guard let sources = TISCreateInputSourceList(nil, false)?.takeRetainedValue() as? [TISInputSource],
             let pinyin = sources.first(where: { source in
             guard let raw = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return false }
-            return Unmanaged<CFString>.fromOpaque(raw).takeUnretainedValue() as String == "com.apple.inputmethod.SCIM.ITABC"
+            let identifier = Unmanaged<CFString>.fromOpaque(raw).takeUnretainedValue() as String
+            return identifier == "com.apple.inputmethod.SCIM.ITABC"
         }) else { throw XCTSkip("No enabled Pinyin input source") }
         let previous = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
         addTeardownBlock { TISSelectInputSource(previous) }
@@ -101,7 +102,10 @@ final class HistorySuggestionUITests: XCTestCase {
         add(composition)
         let candidate = app.dialogs.buttons.firstMatch
         guard candidate.waitForExistence(timeout: 5) else {
-            throw XCTSkip("System Pinyin candidate AX is unavailable under synthesized input; no native composition/commit result claimed. Review the retained window capture manually.")
+            throw XCTSkip(
+                "System Pinyin candidate AX is unavailable under synthesized input; no native "
+                    + "composition/commit result claimed. Review the retained window capture manually."
+            )
         }
         let chosen = candidate.label
         XCTAssertTrue(chosen.unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) })

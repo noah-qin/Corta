@@ -20,31 +20,58 @@ extension ReleaseCheck {
     /// The volume name the committed Finder layout finds its background by.
     public static let diskImageVolumeName = "Corta"
 
+    /// What a mounted image holds, as the layout rules read it.
+    public struct DiskImageLayout: Sendable {
+        /// The root's entries.
+        public var entries: [String]
+        /// `.background`'s entries; nil when it is missing or not a directory.
+        public var backgroundEntries: [String]?
+        /// `.DS_Store` and `.background/background.tiff` are both plain files.
+        public var layoutFilesAreRegular: Bool
+        public var volumeName: String?
+        /// `Corta.app` is a directory, not a symlink.
+        public var appIsDirectory: Bool
+        /// Where the `Applications` symlink points; nil when it is not one.
+        public var applicationsTarget: String?
+        public var readOnly: Bool
+
+        public init(
+            entries: [String], backgroundEntries: [String]?, layoutFilesAreRegular: Bool, volumeName: String?,
+            appIsDirectory: Bool, applicationsTarget: String?, readOnly: Bool
+        ) {
+            self.entries = entries
+            self.backgroundEntries = backgroundEntries
+            self.layoutFilesAreRegular = layoutFilesAreRegular
+            self.volumeName = volumeName
+            self.appIsDirectory = appIsDirectory
+            self.applicationsTarget = applicationsTarget
+            self.readOnly = readOnly
+        }
+    }
+
     /// Root contents are an installable app, the drag-to-install link and
     /// the Finder window layout: `.DS_Store` and `.background` holding only
     /// `background.tiff`, both regular files, on a volume named Corta (D26).
-    public static func diskImageLayoutProblems(entries: [String], backgroundEntries: [String]?,
-                                                layoutFilesAreRegular: Bool, volumeName: String?,
-                                                appIsDirectory: Bool, applicationsTarget: String?,
-                                                readOnly: Bool) -> [String] {
+    public static func diskImageLayoutProblems(_ layout: DiskImageLayout) -> [String] {
         var problems: [String] = []
-        if volumeName != diskImageVolumeName {
-            problems.append("disk image volume must be named \(diskImageVolumeName), which its Finder layout depends on")
+        if layout.volumeName != diskImageVolumeName {
+            problems.append(
+                "disk image volume must be named \(diskImageVolumeName), which its Finder layout depends on")
         }
-        if entries.sorted() != [".DS_Store", ".background", "Applications", "Corta.app"] {
+        if layout.entries.sorted() != [".DS_Store", ".background", "Applications", "Corta.app"] {
             problems.append("disk image root must contain only Corta.app, Applications, .DS_Store and .background")
         }
-        if backgroundEntries != ["background.tiff"] {
+        if layout.backgroundEntries != ["background.tiff"] {
             problems.append(".background must be a directory holding only background.tiff")
         }
-        if !layoutFilesAreRegular {
+        if !layout.layoutFilesAreRegular {
             problems.append(".DS_Store and .background/background.tiff must be regular files")
         }
-        if !appIsDirectory { problems.append("Corta.app must be a directory, not a symlink") }
-        if applicationsTarget != "/Applications" {
+        if !layout.appIsDirectory { problems.append("Corta.app must be a directory, not a symlink") }
+        if layout.applicationsTarget != "/Applications" {
             problems.append("Applications must be a symlink to /Applications")
         }
-        if !readOnly { problems.append("disk image must be mounted read-only") }
+        if !layout.readOnly { problems.append("disk image must be mounted read-only") }
         return problems
     }
 
@@ -124,8 +151,9 @@ extension ReleaseCheck {
 
     /// Verify the image before mounting it. All new disk-image judgments live
     /// here, shared by package, feed validation and local checks (D26).
-    public static func inspectDiskImage(_ image: URL,
-                                       runner: @escaping ImageToolRunner = runImageTool) throws -> DiskImageMount {
+    public static func inspectDiskImage(
+        _ image: URL, runner: @escaping ImageToolRunner = runImageTool
+    ) throws -> DiskImageMount {
         let (problems, team) = signatureProblems(of: image, runner: runner)
         guard problems.isEmpty, let team else { throw ImageFailure(problems: problems) }
         let root: URL
@@ -155,13 +183,16 @@ extension ReleaseCheck {
         }
         let description = String(decoding: runner("/usr/bin/codesign", ["-dvv", image.path]).stderr, as: UTF8.self)
         let team = teamIdentifier(codesignDescription: description)
-        if !description.split(separator: "\n").contains(where: { $0.hasPrefix("Authority=Developer ID Application") }) || team == nil {
+        let developerID = description.split(separator: "\n")
+            .contains(where: { $0.hasPrefix("Authority=Developer ID Application") })
+        if !developerID || team == nil {
             problems.append("disk image must have a Developer ID Application signature and team")
         }
         if runner("/usr/bin/xcrun", ["stapler", "validate", image.path]).status != 0 {
             problems.append("disk image has no valid stapled notarization ticket")
         }
-        if runner("/usr/sbin/spctl", ["-a", "-t", "open", "--context", "context:primary-signature", image.path]).status != 0 {
+        let assessment = ["-a", "-t", "open", "--context", "context:primary-signature", image.path]
+        if runner("/usr/sbin/spctl", assessment).status != 0 {
             problems.append("Gatekeeper rejects the disk image")
         }
         let metadata = runner("/usr/bin/hdiutil", ["imageinfo", "-plist", image.path])
@@ -197,10 +228,13 @@ extension ReleaseCheck {
     /// Attaches the image read-only at a scratch mount point; the scratch
     /// directory is the mount's to remove.
     private static func attachReadOnly(_ image: URL, runner: ImageToolRunner) throws -> (root: URL, scratch: URL) {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("corta-image-" + UUID().uuidString)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "corta-image-" + UUID().uuidString)
         let mount = directory.appendingPathComponent("mount")
         try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: true)
-        let attached = runner("/usr/bin/hdiutil", ["attach", image.path, "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount.path])
+        let attached = runner(
+            "/usr/bin/hdiutil",
+            ["attach", image.path, "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount.path])
         guard attached.status == 0 else {
             // A failed attach can still have reached the mount stage.
             let detached = runner("/usr/bin/hdiutil", ["detach", mount.path])
@@ -234,9 +268,9 @@ extension ReleaseCheck {
                 as? FileAttributeType == .typeRegular
         }
         let volumeName = try? root.resourceValues(forKeys: [.volumeNameKey]).volumeName
-        return diskImageLayoutProblems(entries: entries ?? [], backgroundEntries: backgroundEntries,
-                                       layoutFilesAreRegular: layoutFilesAreRegular, volumeName: volumeName,
-                                       appIsDirectory: appType == .typeDirectory,
-                                       applicationsTarget: link, readOnly: readOnly)
+        return diskImageLayoutProblems(DiskImageLayout(
+            entries: entries ?? [], backgroundEntries: backgroundEntries,
+            layoutFilesAreRegular: layoutFilesAreRegular, volumeName: volumeName,
+            appIsDirectory: appType == .typeDirectory, applicationsTarget: link, readOnly: readOnly))
     }
 }

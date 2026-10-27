@@ -46,6 +46,9 @@ struct AcknowledgementsTests {
         let version = (sparkle["state"] as? [String: Any])?["version"] as? String
         #expect(
             version == AcknowledgementsView.sparkleVersion,
-            "Sparkle moved to \(version ?? "?"): copy its LICENSE into Corta/Acknowledgements/ and update sparkleVersion")
+            """
+            Sparkle moved to \(version ?? "?"): copy its LICENSE into \
+            Corta/Acknowledgements/ and update sparkleVersion
+            """)
     }
 }

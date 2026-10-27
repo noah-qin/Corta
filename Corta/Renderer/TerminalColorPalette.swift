@@ -43,23 +43,11 @@ nonisolated enum TerminalColorPalette {
     static var defaultForeground: SIMD4<Float> { active.foreground }
     static var defaultBackground: SIMD4<Float> { active.background }
     static var cursorColor: SIMD4<Float> { active.cursor }
-
-    /// Opaque: the canvas is content, not glass. At 0.72 every colour lost a
-    /// fifth of its contrast. The window and the layer are opaque too, so
-    /// lowering this alone would only darken the colours.
-    static let backgroundOpacity: Float = 1.0
-
-    static var clearColor: SIMD4<Float> {
-        let c = defaultBackground
-        return SIMD4<Float>(
-            c.x * backgroundOpacity, c.y * backgroundOpacity, c.z * backgroundOpacity,
-            backgroundOpacity)
-    }
 }
 
 /// OSC 4 overrides as a raw dictionary, so the common no-override path
 /// stays as cheap as having no override support (`DESIGN.md` §7).
-public typealias IndexedColorOverrides = [UInt8: (red: UInt8, green: UInt8, blue: UInt8)]
+public typealias IndexedColorOverrides = [UInt8: RGB]
 
 nonisolated extension Theme.Variant {
     /// On the variant so the render loop can hold it locally; the static path

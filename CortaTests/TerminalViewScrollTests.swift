@@ -31,16 +31,16 @@ struct TerminalViewScrollTests {
         deltaY: Int32, units: CGScrollEventUnit,
         phase: CGScrollPhase? = nil, momentumPhase: CGMomentumScrollPhase? = nil
     ) -> NSEvent {
-        let cg = CGEvent(
+        let cgEvent = CGEvent(
             scrollWheelEvent2Source: nil, units: units, wheelCount: 1,
             wheel1: deltaY, wheel2: 0, wheel3: 0)!
         if let phase {
-            cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: Int64(phase.rawValue))
+            cgEvent.setIntegerValueField(.scrollWheelEventScrollPhase, value: Int64(phase.rawValue))
         }
         if let momentumPhase {
-            cg.setIntegerValueField(.scrollWheelEventMomentumPhase, value: Int64(momentumPhase.rawValue))
+            cgEvent.setIntegerValueField(.scrollWheelEventMomentumPhase, value: Int64(momentumPhase.rawValue))
         }
-        return NSEvent(cgEvent: cg)!
+        return NSEvent(cgEvent: cgEvent)!
     }
 
     private static func makeView() -> TerminalView {

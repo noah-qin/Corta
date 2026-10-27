@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import Synchronization
 import Testing
 
 @testable import Corta
@@ -29,19 +30,19 @@ struct AppearanceControllerTests {
         AppearanceController.shared.start()
         // Let a launch-time appearance change settle before listening.
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-        var heard = 0
+        let heard = Mutex(0)
         let token = NotificationCenter.default.addObserver(
             forName: AppearanceController.didChange, object: nil, queue: nil
-        ) { _ in heard += 1 }
+        ) { _ in heard.withLock { $0 += 1 } }
         defer { NotificationCenter.default.removeObserver(token) }
         // Only this process hears it; no system setting changes.
         NSWorkspace.shared.notificationCenter.post(
             name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
             object: NSWorkspace.shared)
         let deadline = SuspendingClock.now + .seconds(TimeInterval(5 * testTimeoutScale))
-        while heard == 0, SuspendingClock.now < deadline {
+        while heard.withLock({ $0 }) == 0, SuspendingClock.now < deadline {
             RunLoop.main.run(until: Date().addingTimeInterval(0.01))
         }
-        #expect(heard >= 1)
+        #expect(heard.withLock { $0 } >= 1)
     }
 }

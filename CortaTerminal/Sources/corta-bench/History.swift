@@ -138,23 +138,36 @@ func benchmarkNonASCIISearchResponse() {
 
 func probeColdHistory() {
     var grid = makeColdHistory()
-    print("history before drain cells \(grid.scrollback.storedCellBytes) RSS \(currentResidentBytes()) footprint \(currentFootprintBytes())")
+    print(
+        "history before drain cells \(grid.scrollback.storedCellBytes) RSS "
+            + "\(currentResidentBytes()) footprint \(currentFootprintBytes())"
+    )
     let start = DispatchTime.now().uptimeNanoseconds
     grid.scrollback.compressColdBatches()
     var mallocStats = malloc_statistics_t()
     malloc_zone_statistics(nil, &mallocStats)
     print("malloc in use \(mallocStats.size_in_use) allocated \(mallocStats.size_allocated)")
-    print("history compressed cells \(grid.scrollback.storedCellBytes) capacity \(grid.scrollback.retainedCellCapacityBytes) RSS \(currentResidentBytes()) footprint \(currentFootprintBytes()) batches \(grid.scrollback.compressedBatchCount) encode ms \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)")
+    print(
+        "history compressed cells \(grid.scrollback.storedCellBytes) capacity "
+            + "\(grid.scrollback.retainedCellCapacityBytes) RSS \(currentResidentBytes()) footprint "
+            + "\(currentFootprintBytes()) batches \(grid.scrollback.compressedBatchCount) encode ms "
+            + "\(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)"
+    )
     for query in ["absent", "needle", "log 90000"] {
         for run in 0..<3 {
             let start = DispatchTime.now().uptimeNanoseconds
             let matches = Search.find(query, in: grid)
-            print("history search \(query) run \(run): \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6) ms count \(matches.count) RSS \(currentResidentBytes())")
+            print(
+                "history search \(query) run \(run): \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6) "
+                    + "ms count \(matches.count) RSS \(currentResidentBytes())"
+            )
         }
     }
     let reflow = DispatchTime.now().uptimeNanoseconds
     grid.resize(rows: 50, columns: 80)
-    print("history reflow ms \(Double(DispatchTime.now().uptimeNanoseconds - reflow) / 1e6) RSS \(currentResidentBytes())")
+    print(
+        "history reflow ms \(Double(DispatchTime.now().uptimeNanoseconds - reflow) / 1e6) RSS \(currentResidentBytes())"
+    )
 }
 
 /// `--search-only`: search over 100k plain lines, optionally compressed.
@@ -171,4 +184,3 @@ func probeSearchOnly() {
         print("search-only \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6) ms \(matches.count)")
     }
 }
-

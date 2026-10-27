@@ -26,7 +26,7 @@ import Testing
     // MARK: - Themes
 
     @Test("a theme defined in the config file is available by name")
-    func customThemeIsParsed() {
+    func customThemeIsParsed() throws {
         let (parsed, unknown) = Configuration.parse(
             """
             theme = midnight
@@ -36,7 +36,7 @@ import Testing
             """)
         #expect(unknown.isEmpty)
         #expect(parsed.customThemes.count == 1)
-        let theme = try! #require(Theme.named("midnight", in: parsed))
+        let theme = try #require(Theme.named("midnight", in: parsed))
         #expect(theme.displayName == "Midnight")
         #expect(theme.dark.background == Theme.color("#101018"))
         #expect(theme.dark.foreground == Theme.color("#e0e0f0"))
@@ -45,28 +45,28 @@ import Testing
     /// Anything unspecified inherits, so a two-line theme is a legal theme —
     /// requiring all nineteen colours would mean nobody ever writes one.
     @Test("unspecified colours inherit")
-    func customThemeInherits() {
+    func customThemeInherits() throws {
         let (parsed, _) = Configuration.parse(
             """
             theme.tint.inherit = solarized
             theme.tint.dark.cursor = #ff0000
             """)
-        let theme = try! #require(Theme.named("tint", in: parsed))
+        let theme = try #require(Theme.named("tint", in: parsed))
         #expect(theme.dark.cursor == Theme.color("#ff0000"))
         #expect(theme.dark.background == Theme.solarized.dark.background)
         #expect(theme.light.ansi == Theme.solarized.light.ansi)
     }
 
     @Test("a single ANSI slot can be overridden")
-    func customThemeOverridesOneANSISlot() {
+    func customThemeOverridesOneANSISlot() throws {
         let (parsed, _) = Configuration.parse("theme.x.dark.ansi1 = #123456")
-        let theme = try! #require(Theme.named("x", in: parsed))
+        let theme = try #require(Theme.named("x", in: parsed))
         #expect(theme.dark.ansi[1] == Theme.color("#123456"))
         #expect(theme.dark.ansi[2] == Theme.corta.dark.ansi[2])
     }
 
     @Test("a custom theme survives a write and re-read")
-    func customThemeRoundTrips() {
+    func customThemeRoundTrips() throws {
         let (parsed, _) = Configuration.parse(
             """
             theme = midnight
@@ -75,7 +75,7 @@ import Testing
             """)
         let (reparsed, _) = Configuration.parse(parsed.serialized())
         #expect(reparsed.theme == "midnight")
-        let theme = try! #require(Theme.named("midnight", in: reparsed))
+        let theme = try #require(Theme.named("midnight", in: reparsed))
         #expect(theme.displayName == "Midnight")
         #expect(theme.dark.background == Theme.color("#101018"))
         #expect(theme.dark.ansi == Theme.corta.dark.ansi)
@@ -86,7 +86,7 @@ import Testing
     /// the first fell back to the base theme — invisible above, where the
     /// table *is* the base's.
     @Test("a whole ANSI table survives a write and re-read")
-    func ansiTableRoundTrips() {
+    func ansiTableRoundTrips() throws {
         var lines = ["theme = probe"]
         for index in 0..<16 {
             lines.append("theme.probe.dark.ansi\(index) = #\(String(format: "%02x", 16 + index))3040")
@@ -95,25 +95,25 @@ import Testing
         let written = parsed.serialized()
         #expect(written.contains("theme.probe.dark.ansi = #103040, #113040"))
         let (reparsed, _) = Configuration.parse(written)
-        let theme = try! #require(Theme.named("probe", in: reparsed))
+        let theme = try #require(Theme.named("probe", in: reparsed))
         #expect(theme.dark.ansi == (0..<16).map { Theme.color("#\(String(format: "%02x", 16 + $0))3040")! })
 
         // A trailing comment after a list is still a comment.
         let (commented, unknown) = Configuration.parse(
             "theme.c.dark.ansi = #000, #f00 # red\ntheme.c.dark.background = #101018 # deep")
-        let c = try! #require(Theme.named("c", in: commented))
+        let commentedTheme = try #require(Theme.named("c", in: commented))
         #expect(unknown.isEmpty)
-        #expect(c.dark.ansi[1] == Theme.color("#f00"))
-        #expect(c.dark.background == Theme.color("#101018"))
+        #expect(commentedTheme.dark.ansi[1] == Theme.color("#f00"))
+        #expect(commentedTheme.dark.background == Theme.color("#101018"))
     }
 
     /// A half-typed theme must still render — a config file is hand-edited,
     /// and a bad colour must not black out the terminal.
     @Test("a malformed colour is preserved, not applied")
-    func malformedColourIsKeptAsUnknown() {
+    func malformedColourIsKeptAsUnknown() throws {
         let (parsed, unknown) = Configuration.parse("theme.x.dark.background = mauve")
         #expect(unknown.count == 1)
-        let theme = try! #require(Theme.named("x", in: parsed))
+        let theme = try #require(Theme.named("x", in: parsed))
         #expect(theme.dark.background == Theme.corta.dark.background)
     }
 
@@ -128,8 +128,8 @@ import Testing
     // MARK: - Shortcuts
 
     @Test("a shortcut parses and writes back as it was typed")
-    func shortcutRoundTrips() {
-        let shortcut = try! #require(Shortcut.parse("cmd+shift+d"))
+    func shortcutRoundTrips() throws {
+        let shortcut = try #require(Shortcut.parse("cmd+shift+d"))
         #expect(shortcut.key == "d")
         #expect(shortcut.modifiers == [.command, .shift])
         #expect(shortcut.text == "shift+cmd+d")
@@ -137,8 +137,8 @@ import Testing
     }
 
     @Test("named keys parse")
-    func namedKeys() {
-        let up = try! #require(Shortcut.parse("ctrl+alt+up"))
+    func namedKeys() throws {
+        let up = try #require(Shortcut.parse("ctrl+alt+up"))
         #expect(up.modifiers == [.control, .option])
         #expect(up.key == String(UnicodeScalar(NSUpArrowFunctionKey)!))
         #expect(up.text == "ctrl+alt+up")
@@ -154,8 +154,8 @@ import Testing
     /// AppKit takes an uppercase key equivalent to *mean* shift; setting both
     /// makes a menu item render "⇧⇧".
     @Test("a shifted letter becomes an uppercase key equivalent")
-    func menuFormFoldsShiftIntoTheLetter() {
-        let shortcut = try! #require(Shortcut.parse("cmd+shift+d"))
+    func menuFormFoldsShiftIntoTheLetter() throws {
+        let shortcut = try #require(Shortcut.parse("cmd+shift+d"))
         #expect(shortcut.menuKeyEquivalent == "D")
         #expect(shortcut.menuModifierMask == [.command])
     }
@@ -205,8 +205,8 @@ import Testing
     /// `matches` is what stops a rebound command leaving its old key behind:
     /// the modifiers must be exactly the shortcut's, not merely include them.
     @Test("a shortcut matches its own keystroke and nothing else")
-    func shortcutMatchesExactly() {
-        let commandV = try! #require(Shortcut.parse("cmd+v"))
+    func shortcutMatchesExactly() throws {
+        let commandV = try #require(Shortcut.parse("cmd+v"))
         #expect(commandV.matches(Self.event("v", modifiers: .command)))
         #expect(!commandV.matches(Self.event("v")))
         // The bug: a `contains(.command)` test called ⌘⇧V and ⌥⌘V pastes too.
@@ -218,10 +218,10 @@ import Testing
     /// sets for its own reasons (`.function`, `.numericPad`, Caps Lock) are
     /// not part of the notation and must not defeat a match.
     @Test("a shifted letter and AppKit's incidental flags still match")
-    func shortcutMatchingNormalises() {
-        let shifted = try! #require(Shortcut.parse("cmd+shift+d"))
+    func shortcutMatchingNormalises() throws {
+        let shifted = try #require(Shortcut.parse("cmd+shift+d"))
         #expect(shifted.matches(Self.event("D", ignoring: "D", modifiers: [.command, .shift])))
-        let up = try! #require(Shortcut.parse("cmd+up"))
+        let up = try #require(Shortcut.parse("cmd+up"))
         let scalar = String(UnicodeScalar(NSUpArrowFunctionKey)!)
         #expect(
             up.matches(
@@ -245,8 +245,8 @@ import Testing
     // MARK: - The palette's filter
 
     @Test("an abbreviation finds the command it abbreviates")
-    func paletteFuzzyMatching() {
-        let split = try! #require(
+    func paletteFuzzyMatching() throws {
+        let split = try #require(
             CommandPaletteModel.score("split pane right", query: "spr"))
         let unrelated = CommandPaletteModel.score("copy", query: "spr")
         #expect(unrelated == nil)
@@ -254,12 +254,14 @@ import Testing
     }
 
     @Test("a shorter title wins a tie")
-    func paletteRanksShorterTitlesFirst() {
-        let short = try! #require(CommandPaletteModel.score("copy", query: "cop"))
-        let long = try! #require(CommandPaletteModel.score("copy on select", query: "cop"))
+    func paletteRanksShorterTitlesFirst() throws {
+        let short = try #require(CommandPaletteModel.score("copy", query: "cop"))
+        let long = try #require(CommandPaletteModel.score("copy on select", query: "cop"))
         #expect(short > long)
     }
+}
 
+extension ThemeAndKeybindingTests {
     /// A command run from the palette is listed twice while browsing — under
     /// Recent and in its group. Keyed by command, the two rows shared an id
     /// and the arrow keys, stepping onto the second, jumped back to the
@@ -370,7 +372,6 @@ import Testing
         #expect(parsed.serialized().contains("bell = audible"))
     }
 }
-
 
 @MainActor struct TerminalFeedbackTests {
     @Test func canvasStaysOpaqueAcrossAppearanceChanges() {

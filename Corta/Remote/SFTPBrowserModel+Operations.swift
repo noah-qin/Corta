@@ -211,7 +211,6 @@ extension SFTPBrowserModel {
         }
     }
 
-
     var selectedEntries: [Entry] {
         entries.filter { selection.contains($0.id) }
     }

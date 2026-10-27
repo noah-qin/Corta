@@ -88,7 +88,7 @@ extension Performer {
         if let raw = options["size"], Int(raw) != bytes.count { return }
         guard let dimensions = KittyGraphics.encodedDimensions(bytes),
             KittyGraphics.dimensionsFit(width: dimensions.width, height: dimensions.height) else { return }
-        let cw = max(1, grid.cellPixelWidth), ch = max(1, grid.cellPixelHeight)
+        let cellWidth = max(1, grid.cellPixelWidth), cellHeight = max(1, grid.cellPixelHeight)
         func pixels(_ raw: String?, cell: Int, count: Int) -> Double? {
             guard let raw, raw != "auto" else { return nil }
             let unit = raw.hasSuffix("px") ? 2 : raw.hasSuffix("%") ? 1 : 0
@@ -96,22 +96,28 @@ extension Performer {
             guard let n = Double(number), n.isFinite, n > 0, n <= 1_000_000 else { return nil }
             return unit == 2 ? n : unit == 1 ? n / 100 * Double(count * cell) : n * Double(cell)
         }
-        let w = pixels(options["width"], cell: cw, count: grid.columns)
-        let h = pixels(options["height"], cell: ch, count: grid.rows)
+        let w = pixels(options["width"], cell: cellWidth, count: grid.columns)
+        let h = pixels(options["height"], cell: cellHeight, count: grid.rows)
         let naturalW = Double(dimensions.width), naturalH = Double(dimensions.height)
         var width = w ?? naturalW, height = h ?? naturalH
         if options["preserveAspectRatio"] != "0" {
             let scale: Double
-            if let w, let h { scale = min(w / naturalW, h / naturalH) }
-            else if let w { scale = w / naturalW }
-            else if let h { scale = h / naturalH }
-            else { scale = min(1, Double(grid.columns * cw) / naturalW) }
+            if let w, let h {
+                scale = min(w / naturalW, h / naturalH)
+            } else if let w {
+                scale = w / naturalW
+            } else if let h {
+                scale = h / naturalH
+            } else {
+                scale = min(1, Double(grid.columns * cellWidth) / naturalW)
+            }
             width = naturalW * scale; height = naturalH * scale
         }
         guard width.isFinite, height.isFinite, width > 0, height > 0,
             width <= 1_000_000, height <= 1_000_000 else { return }
         // The same 4096-cell extent kitty's `c=`/`r=` are clamped to.
-        let maxWidth = Double(Self.maximumImageCells * cw), maxHeight = Double(Self.maximumImageCells * ch)
+        let maxWidth = Double(Self.maximumImageCells * cellWidth),
+            maxHeight = Double(Self.maximumImageCells * cellHeight)
         if width > maxWidth || height > maxHeight {
             if options["preserveAspectRatio"] != "0" {
                 let fit = min(maxWidth / width, maxHeight / height)
@@ -124,7 +130,7 @@ extension Performer {
             width: 0, height: 0, bytes: bytes)
         guard let id = try? store(data, as: .init(rawValue: 0)) else { return }
         let display = KittyGraphics.DisplayHeader(imageID: id, placementID: .init(rawValue: id.rawValue),
-            columns: max(1, Int(ceil(width / Double(cw)))), rows: max(1, Int(ceil(height / Double(ch)))),
+            columns: max(1, Int(ceil(width / Double(cellWidth)))), rows: max(1, Int(ceil(height / Double(cellHeight)))),
             zIndex: 0, quiet: 2, displayPixelWidth: max(1, Int(width.rounded())),
             displayPixelHeight: max(1, Int(height.rounded())))
         placeAtCursor(display, respond: false)

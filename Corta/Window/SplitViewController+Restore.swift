@@ -26,25 +26,32 @@ extension SplitViewController {
     func windowState(frame: NSRect) -> WindowState? {
         // While zoomed the hierarchy holds one pane and the tree is incomplete;
         // save the layout recorded at zoom, or the splits are lost on disk.
-        let (tabGroupID, tabIndex, isSelectedTab) = tabState()
+        let tab = tabState()
         if let zoomed = layoutBeforeZoom {
             return WindowState(
-                frame: WindowState.Frame(frame), layout: zoomed, tabGroupID: tabGroupID,
-                tabIndex: tabIndex, isSelectedTab: isSelectedTab)
+                frame: WindowState.Frame(frame), layout: zoomed, tabGroupID: tab.groupID,
+                tabIndex: tab.index, isSelectedTab: tab.isSelected)
         }
         guard let root = layoutRoot else { return nil }
         return WindowState(
-            frame: WindowState.Frame(frame), layout: layout(of: root), tabGroupID: tabGroupID,
-            tabIndex: tabIndex, isSelectedTab: isSelectedTab)
+            frame: WindowState.Frame(frame), layout: layout(of: root), tabGroupID: tab.groupID,
+            tabIndex: tab.index, isSelectedTab: tab.isSelected)
     }
 
     /// This window's native tab group and index (in `tabbedWindows` order;
     /// AppKit doesn't number tabs), or nil if never tabbed.
-    private func tabState() -> (groupID: String?, index: Int?, isSelected: Bool) {
+    private struct TabState {
+        var groupID: String?
+        var index: Int?
+        var isSelected: Bool
+    }
+
+    private func tabState() -> TabState {
         guard let window = view.window, let tabbed = window.tabbedWindows, tabbed.count > 1
-        else { return (nil, nil, true) }
-        let index = tabbed.firstIndex(of: window)
-        return (window.tabbingIdentifier, index, window.tabGroup?.selectedWindow === window)
+        else { return TabState(groupID: nil, index: nil, isSelected: true) }
+        return TabState(
+            groupID: window.tabbingIdentifier, index: tabbed.firstIndex(of: window),
+            isSelected: window.tabGroup?.selectedWindow === window)
     }
 
     private func layout(of subtree: NSView) -> PaneLayout {

@@ -48,12 +48,12 @@ final class RemoteEditStore {
         /// the baseline "remote changed?" compares against.
         var remoteSize: UInt64?
         var remoteMTime: UInt32?
-        var remoteDigest: String? = nil
+        var remoteDigest: String?
         /// The local content last decided on — downloaded, uploaded, or
         /// dismissed as "not this edit" — the baseline a reopened copy's
         /// change is measured against. Persisted, so a dismissed edit is not
         /// offered again after a relaunch, and an undecided one is.
-        var approvedDigest: String? = nil
+        var approvedDigest: String?
         var lastOpenedAt: Date
         var openCount: Int
 

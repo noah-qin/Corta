@@ -35,42 +35,75 @@ struct BlockElementRenderTests {
     /// the requested one — measured, U+2588 inked 88% of its cell and an
     /// orange (255,140,0) averaged out to (203,111,0), which reads as pink.
     @Test func fullBlockInksItsWholeCellAtTheRequestedColour() throws {
-        let (inked, total, mean, texture) = try Self.render("\u{2588}")
-        if inked != total || mean != SIMD3<Int>(255, 140, 0), let texture {
+        let full = try Self.render("\u{2588}")
+        if full.inked != full.total || full.mean != SIMD3<Int>(255, 140, 0), let texture = full.texture {
             MetalRenderTarget.attachPNG(texture, named: "full-block-render.png")
         }
-        #expect(inked == total)
-        #expect(mean == SIMD3<Int>(255, 140, 0))
+        #expect(full.inked == full.total)
+        #expect(full.mean == SIMD3<Int>(255, 140, 0))
     }
 
     /// Halves have to tile: whatever rounding costs the top, the bottom gets.
     @Test func theTwoHalvesTileExactly() throws {
-        let (upper, total, _, upperTexture) = try Self.render("\u{2580}")
-        let (lower, _, _, lowerTexture) = try Self.render("\u{2584}")
-        if upper + lower != total {
-            if let upperTexture {
+        let upper = try Self.render("\u{2580}")
+        let lower = try Self.render("\u{2584}")
+        if upper.inked + lower.inked != upper.total {
+            if let upperTexture = upper.texture {
                 MetalRenderTarget.attachPNG(upperTexture, named: "upper-half-block-render.png")
             }
-            if let lowerTexture {
+            if let lowerTexture = lower.texture {
                 MetalRenderTarget.attachPNG(lowerTexture, named: "lower-half-block-render.png")
             }
         }
-        #expect(upper + lower == total)
+        #expect(upper.inked + lower.inked == upper.total)
     }
 
     /// Left and right halves likewise.
     @Test func theLeftAndRightHalvesTileExactly() throws {
-        let (left, total, _, leftTexture) = try Self.render("\u{258C}")
-        let (right, _, _, rightTexture) = try Self.render("\u{2590}")
-        if left + right != total {
-            if let leftTexture {
+        let left = try Self.render("\u{258C}")
+        let right = try Self.render("\u{2590}")
+        if left.inked + right.inked != left.total {
+            if let leftTexture = left.texture {
                 MetalRenderTarget.attachPNG(leftTexture, named: "left-half-block-render.png")
             }
-            if let rightTexture {
+            if let rightTexture = right.texture {
                 MetalRenderTarget.attachPNG(rightTexture, named: "right-half-block-render.png")
             }
         }
-        #expect(left + right == total)
+        #expect(left.inked + right.inked == left.total)
+    }
+
+    /// Three rows of five cells — `text` in white — rendered and read back.
+    private struct BoxFrame {
+        let texture: MTLTexture
+        let cellWidth: Int
+        let cellHeight: Int
+        private let bytes: [UInt8]
+        var width: Int { 5 * cellWidth }
+        var height: Int { 3 * cellHeight }
+
+        init(_ text: String, renderer: TerminalRenderer, device: MTLDevice) {
+            var terminal = Terminal(rows: 3, columns: 5)
+            terminal.feed(Array("\u{1B}[37m\(text)".utf8))
+            cellWidth = Int(renderer.metrics.cellWidth)
+            cellHeight = Int(renderer.metrics.cellHeight)
+            let width = 5 * cellWidth, height = 3 * cellHeight
+            texture = MetalRenderTarget.make(device: device, width: width, height: height)
+            renderer.renderAndWait(
+                grid: terminal.grid, cursorVisible: false, selection: nil,
+                into: FrameTarget(
+                    texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                    drawableSize: CGSize(width: width, height: height)))
+            var bytes = [UInt8](repeating: 0, count: width * height * 4)
+            texture.getBytes(&bytes, bytesPerRow: width * 4,
+                from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+            self.bytes = bytes
+        }
+
+        func ink(_ x: Int, _ y: Int) -> Bool {
+            let i = (y * width + x) * 4
+            return Int(bytes[i]) + Int(bytes[i + 1]) + Int(bytes[i + 2]) > 100
+        }
     }
 
     /// These are the exact kinds of borders in the Claude Code reproducer.
@@ -83,25 +116,14 @@ struct BlockElementRenderTests {
                     font: TerminalFont.primary(ofSize: size), scale: scale)
                 for (weight, border) in [(1, "┌───┐\r\n│   │\r\n└───┘"),
                                          (2, "┏━━━┓\r\n┃   ┃\r\n┗━━━┛")] {
-                    var terminal = Terminal(rows: 3, columns: 5)
-                    terminal.feed(Array("\u{1B}[37m\(border)".utf8))
-                    let w = Int(renderer.metrics.cellWidth), h = Int(renderer.metrics.cellHeight)
-                    let texture = MetalRenderTarget.make(device: device, width: 5 * w, height: 3 * h)
-                    renderer.renderAndWait(grid: terminal.grid,
-                        rect: CGRect(x: 0, y: 0, width: 5*w, height: 3*h),
-                        drawableSize: CGSize(width: 5*w, height: 3*h), cursorVisible: false,
-                        selection: nil, target: texture)
-                    var bytes = [UInt8](repeating: 0, count: 5*w*3*h*4)
-                    texture.getBytes(&bytes, bytesPerRow: 5*w*4,
-                        from: MTLRegionMake2D(0, 0, 5*w, 3*h), mipmapLevel: 0)
+                    let frame = BoxFrame(border, renderer: renderer, device: device)
+                    let w = frame.cellWidth, h = frame.cellHeight
                     let stroke = max(1, Int(scale)) * weight
                     let midX = (w-stroke)/2, midY = (h-stroke)/2
-                    func ink(_ x: Int, _ y: Int) -> Bool {
-                        let i = (y*5*w+x)*4
-                        return Int(bytes[i])+Int(bytes[i+1])+Int(bytes[i+2]) > 100
-                    }
+                    let ink = frame.ink
                     if size == 17 && scale == 2 {
-                        MetalRenderTarget.attachPNG(texture, named: "square-table-corners-17-2-weight-\(weight).png")
+                        MetalRenderTarget.attachPNG(
+                            frame.texture, named: "square-table-corners-17-2-weight-\(weight).png")
                     }
                     for x in midX..<(4*w+midX) {
                         #expect(ink(x, midY), "top border gap at \(x), size \(size), scale \(scale)")
@@ -142,22 +164,11 @@ struct BlockElementRenderTests {
             for scale: CGFloat in [1, 1.25, 1.5, 2, 3] {
                 let renderer = try TerminalRenderer(device: device,
                     font: TerminalFont.primary(ofSize: size), scale: scale)
-                var terminal = Terminal(rows: 3, columns: 5)
-                terminal.feed(Array("\u{1B}[37m╭───╮\r\n│   │\r\n╰───╯".utf8))
-                let w = Int(renderer.metrics.cellWidth), h = Int(renderer.metrics.cellHeight)
-                let width = 5 * w, height = 3 * h
-                let texture = MetalRenderTarget.make(device: device, width: width, height: height)
-                renderer.renderAndWait(grid: terminal.grid,
-                    rect: CGRect(x: 0, y: 0, width: width, height: height),
-                    drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-                    selection: nil, target: texture)
-                var bytes = [UInt8](repeating: 0, count: width * height * 4)
-                texture.getBytes(&bytes, bytesPerRow: width * 4,
-                    from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
-                func ink(_ x: Int, _ y: Int) -> Bool {
-                    let i = (y * width + x) * 4
-                    return Int(bytes[i]) + Int(bytes[i + 1]) + Int(bytes[i + 2]) > 100
-                }
+                let frame = BoxFrame("╭───╮\r\n│   │\r\n╰───╯", renderer: renderer, device: device)
+                let w = frame.cellWidth, h = frame.cellHeight
+                let width = frame.width, height = frame.height
+                let texture = frame.texture
+                let ink = frame.ink
                 let stroke = max(1, Int(scale))
                 let midX = (w - stroke) / 2, midY = (h - stroke) / 2
                 // Every ink pixel reachable from the middle of the top side.
@@ -167,11 +178,11 @@ struct BlockElementRenderTests {
                 while let (x, y) = queue.popLast() {
                     for dy in -1...1 {
                         for dx in -1...1 {
-                            let nx = x + dx, ny = y + dy
-                            guard nx >= 0, ny >= 0, nx < width, ny < height,
-                                !seen[ny * width + nx], ink(nx, ny) else { continue }
-                            seen[ny * width + nx] = true
-                            queue.append((nx, ny))
+                            let nextX = x + dx, nextY = y + dy
+                            guard nextX >= 0, nextY >= 0, nextX < width, nextY < height,
+                                !seen[nextY * width + nextX], ink(nextX, nextY) else { continue }
+                            seen[nextY * width + nextX] = true
+                            queue.append((nextX, nextY))
                         }
                     }
                 }
@@ -196,8 +207,8 @@ struct BlockElementRenderTests {
     /// Every corner's pieces stay inside the cell and inside the inline storage.
     @Test func roundedCornerPiecesStayInTheirCell() {
         for scalar: UInt32 in 0x256D...0x2570 {
-            for (width, height, scale): (Float, Float, Float) in
-                [(7, 15, 1), (17, 33, 2), (60, 120, 2), (115, 230, 3), (2, 4, 1)] {
+            for size: SIMD3<Float> in [[7, 15, 1], [17, 33, 2], [60, 120, 2], [115, 230, 3], [2, 4, 1]] {
+                let (width, height, scale) = (size.x, size.y, size.z)
                 guard let pieces = BoxDrawing.pieces(for: scalar, width: width,
                     height: height, scale: scale)
                 else {
@@ -215,8 +226,7 @@ struct BlockElementRenderTests {
     }
 
     @Test func faintTableStrokeHasUniformColorAcrossItsJunction() throws {
-        let (_, _, _, optionalTexture) = try Self.render("\u{1B}[2m─")
-        let texture = try #require(optionalTexture)
+        let texture = try #require(try Self.render("\u{1B}[2m─").texture)
         let width = texture.width, height = texture.height
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         texture.getBytes(&pixels, bytesPerRow: width * 4,
@@ -230,9 +240,14 @@ struct BlockElementRenderTests {
     /// Renders one cell holding `character` in (255,140,0) and reports how
     /// many pixels have ink, the cell's pixel count, its average colour, and
     /// the texture itself, so a failing test can attach it.
-    private static func render(
-        _ character: String
-    ) throws -> (inked: Int, total: Int, mean: SIMD3<Int>, texture: MTLTexture?) {
+    private struct Rendered {
+        var inked: Int
+        var total: Int
+        var mean: SIMD3<Int>
+        var texture: MTLTexture?
+    }
+
+    private static func render(_ character: String) throws -> Rendered {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
         let renderer = try TerminalRenderer(device: device, font: font, scale: 1)
@@ -245,9 +260,10 @@ struct BlockElementRenderTests {
         let texture = MetalRenderTarget.make(
             device: device, width: w, height: h)
         renderer.renderAndWait(
-            grid: grid, rect: CGRect(x: 0, y: 0, width: w, height: h),
-            drawableSize: CGSize(width: w, height: h), cursorVisible: false,
-            selection: nil, target: texture)
+            grid: grid, cursorVisible: false, selection: nil,
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: 0, y: 0, width: w, height: h),
+                drawableSize: CGSize(width: w, height: h)))
 
         var pixels = [UInt8](repeating: 0, count: w * h * 4)
         texture.getBytes(
@@ -260,6 +276,6 @@ struct BlockElementRenderTests {
             if red + green + blue > 30 { inked += 1 }
         }
         let count = w * h
-        return (inked, count, sum / SIMD3<Int>(repeating: count), texture)
+        return Rendered(inked: inked, total: count, mean: sum / SIMD3<Int>(repeating: count), texture: texture)
     }
 }

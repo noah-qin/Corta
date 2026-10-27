@@ -26,7 +26,9 @@ import Testing
 struct ShellIntegrationInstallerTests {
     private let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("corta-shell-integration-tests-\(UUID().uuidString)")
+
     private var file: URL { directory.appendingPathComponent(".zshrc") }
+
     private var installer: ShellIntegrationInstaller {
         ShellIntegrationInstaller(shell: .zsh, rcFileURL: file)
     }
@@ -262,6 +264,9 @@ struct ShellIntegrationInstallerTests {
             targets: [".bashrc", login].map { ShellIntegrationInstaller(shell: .bash, rcFileURL: url($0)) },
             others: others.map { ShellIntegrationInstaller(shell: .bash, rcFileURL: url($0)) })
     }
+}
+
+extension ShellIntegrationInstallerTests {
 
     private func read(_ name: String) throws -> String { try String(contentsOf: url(name), encoding: .utf8) }
 
@@ -306,7 +311,8 @@ struct ShellIntegrationInstallerTests {
         defer { removeDirectory() }
         let integration = try bashIntegration()
         #expect(integration.targets[0].install())
-        try "source ~/.iterm2_shell_integration.bash\n".write(to: url(".bash_profile"), atomically: true, encoding: .utf8)
+        try "source ~/.iterm2_shell_integration.bash\n".write(
+            to: url(".bash_profile"), atomically: true, encoding: .utf8)
         #expect(integration.status() == .conflicting("iTerm2"))
     }
 
@@ -332,7 +338,9 @@ struct ShellIntegrationInstallerTests {
         #expect(integration.install().isEmpty)
         #expect(try read(".bash_profile").hasPrefix("# Created by Corta"))
         #expect(integration.uninstall().isEmpty)
-        #expect(!FileManager.default.fileExists(atPath: url(".bash_profile").path), "an empty login file would hide ~/.profile")
+        #expect(
+            !FileManager.default.fileExists(atPath: url(".bash_profile").path),
+            "an empty login file would hide ~/.profile")
         #expect(FileManager.default.fileExists(atPath: url(".bashrc").path), "the user's own empty file was deleted")
     }
 

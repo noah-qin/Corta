@@ -29,7 +29,9 @@ struct RealClaudeLifecycleTests {
         var directory: URL
     }
 
-    private func launch(_ prompt: String, tools: String, extra: [String] = [], invalidAuth: Bool = false, crashFixture: Bool = false) throws -> Fixture {
+    private func launch(
+        _ prompt: String, tools: String, extra: [String] = [], invalidAuth: Bool = false, crashFixture: Bool = false
+    ) throws -> Fixture {
         let inherited = ProcessInfo.processInfo.environment
         let executable = try #require(inherited["CORTA_REAL_CLAUDE"])
         let cwd = try #require(inherited["CORTA_REAL_CWD"])
@@ -59,9 +61,11 @@ struct RealClaudeLifecycleTests {
             environment["CLAUDE_CODE_OAUTH_TOKEN"] = "corta-intentionally-invalid-acceptance-token"
             let config: [String: Any] = ["hasCompletedOnboarding": true, "theme": "dark",
                 "projects": [cwd: ["hasTrustDialogAccepted": true]]]
-            try JSONSerialization.data(withJSONObject: config).write(to: directory.appendingPathComponent(".claude.json"))
+            try JSONSerialization.data(withJSONObject: config).write(
+                to: directory.appendingPathComponent(".claude.json"))
         }
-        let settings = #"{"disableAllHooks":true,"preferredNotifChannel":"notifications_disabled","permissions":{"ask":["Bash"]}}"#
+        let settings =
+            #"{"disableAllHooks":true,"preferredNotifChannel":"notifications_disabled","permissions":{"ask":["Bash"]}}"#
         var command = [executable, "--no-chrome", "--strict-mcp-config", "--tools", tools,
             "--permission-mode", "manual", "--effort", "low", "--settings", settings,
             "--debug-file", directory.appendingPathComponent("debug.log").path] + extra + [prompt]
@@ -69,7 +73,10 @@ struct RealClaudeLifecycleTests {
             environment["CORTA_LIVE_PID_FILE"] = directory.appendingPathComponent("pid").path
             // A disposable integrated shell owns this exact child and emits
             // its actual wait status. SIGKILL prevents the CLI sending clear.
-            let shell = #"printf '\033]133;A\007\033]133;C\007'; "$@" <&0 & worker=$!; printf '%s' "$worker" > "$CORTA_LIVE_PID_FILE"; wait "$worker"; result=$?; printf '\033]133;D;%d\007\033]133;A\007' "$result"; exec /bin/cat"#
+            let shell =
+                #"printf '\033]133;A\007\033]133;C\007'; "$@" <&0 & worker=$!; printf "#
+                    + #"'%s' "$worker" > "$CORTA_LIVE_PID_FILE"; wait "$worker"; result=$?; "#
+                    + #"printf '\033]133;D;%d\007\033]133;A\007' "$result"; exec /bin/cat"#
             command = ["/bin/sh", "-c", shell, "corta-compatibility-fixture"] + command
         }
         let args = ["-q", "-F", directory.appendingPathComponent("transcript").path] + command
@@ -129,8 +136,12 @@ struct RealClaudeLifecycleTests {
     }
 
     @Test func realSubtaskIsIdentifiedAndClearedBeforeMainCompletion() throws {
-        let agents = #"{"compatibility-worker":{"description":"A worker used only for terminal status acceptance","prompt":"Reply only OK. Do not use tools.","tools":[],"model":"haiku"}}"#
-        let fixture = try launch("Use Agent exactly once with subagent_type compatibility-worker to ask it to reply OK. Wait for it, then reply only OK. Do not use other tools.",
+        let agents =
+            #"{"compatibility-worker":{"description":"A worker used only for terminal status "#
+                + #"acceptance","prompt":"Reply only OK. Do not use tools.","tools":[],"model":"haiku"}}"#
+        let fixture = try launch(
+            "Use Agent exactly once with subagent_type compatibility-worker to ask it to "
+                + "reply OK. Wait for it, then reply only OK. Do not use other tools.",
             tools: "Agent", extra: ["--agents", agents])
         defer { fixture.session.stop() }
         var childIDs = Set<String>()

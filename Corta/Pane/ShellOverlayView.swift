@@ -76,7 +76,9 @@ final class ShellOverlayView: NSView {
         for row in rows { addToolTip(row.rect.insetBy(dx: -3, dy: 0), owner: self, userData: nil) }
     }
 
-    @objc func view(_: NSView, stringForToolTip _: NSView.ToolTipTag, point: NSPoint, userData _: UnsafeMutableRawPointer?) -> String {
+    @objc func view(
+        _: NSView, stringForToolTip _: NSView.ToolTipTag, point: NSPoint, userData _: UnsafeMutableRawPointer?
+    ) -> String {
         statuses.first { $0.rect.insetBy(dx: -3, dy: 0).contains(point) }?.description ?? ""
     }
 
@@ -87,9 +89,11 @@ final class ShellOverlayView: NSView {
     /// - Parameter anchor: the input caret's rectangle in this view.
     /// - Parameter font: the terminal font used to measure and draw hints.
     /// - Parameter baseline: the text baseline offset within the anchor row.
-    func showCompletion(_ state: DirectoryCompletion?, history: HistorySuggestion? = nil, anchor: CGRect,
+    func showCompletion(
+        _ state: DirectoryCompletion?, history: HistorySuggestion? = nil, anchor: CGRect,
         font: NSFont = .monospacedSystemFont(ofSize: 14, weight: .regular), baseline: CGFloat = 12,
-        colors: CanvasTextColors = .current) {
+        colors: CanvasTextColors = .current
+    ) {
         let presentation = CompletionPresentation(
             state: state, history: history, anchor: anchor, bounds: bounds,
             font: font, baseline: baseline, composing: isInputComposing,
@@ -135,6 +139,14 @@ final class ShellOverlayView: NSView {
             removeCandidates()
             return
         }
+        showCandidates(state, anchor: anchor, font: font, baseline: baseline, colors: colors)
+    }
+
+    /// The candidate folders on a glass row under the caret, or above it
+    /// where the pane has no room below; left-aligned with the typed prefix.
+    private func showCandidates(
+        _ state: DirectoryCompletion, anchor: CGRect, font: NSFont, baseline: CGFloat, colors: HintColors
+    ) {
         let row = candidateRow ?? DirectoryCandidateRowView()
         let padding = DirectoryCandidateRowView.inset
         let margin = TerminalLayout.insets.left
@@ -218,7 +230,9 @@ private final class ShellGhostView: NSView {
     override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
     override func accessibilityLabel() -> String? { text }
     override func accessibilityValue() -> Any? { text }
-    override func accessibilityIdentifier() -> String { history ? "history-suggestion-preview" : "directory-completion-preview" }
+    override func accessibilityIdentifier() -> String {
+        history ? "history-suggestion-preview" : "directory-completion-preview"
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
@@ -312,7 +326,8 @@ private final class DirectoryCandidateRowView: NSView {
         context.drawPath(using: .fillStroke)
         let full = CTLineCreateWithAttributedString(content)
         let ellipsis = CTLineCreateWithAttributedString(token)
-        let line = CTLineCreateTruncatedLine(full, Double(max(0, bounds.width - 2 * Self.inset)), .end, ellipsis) ?? full
+        let line =
+            CTLineCreateTruncatedLine(full, Double(max(0, bounds.width - 2 * Self.inset)), .end, ellipsis) ?? full
         context.saveGState()
         context.clip(to: bounds.insetBy(dx: Self.inset, dy: 0))
         context.translateBy(x: Self.inset, y: baseline)

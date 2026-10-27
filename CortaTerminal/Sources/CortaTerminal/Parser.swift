@@ -175,22 +175,6 @@ public struct Parser: Sendable {
         return offset
     }
 
-    @inline(__always)
-    private static func asciiRunEnd(_ bytes: ArraySlice<UInt8>, from start: Int) -> Int {
-        bytes.withUnsafeBytes { raw in
-            var end = start + 1
-            while end + 16 <= raw.count {
-                let lanes = raw.loadUnaligned(fromByteOffset: end, as: SIMD16<UInt8>.self)
-                // Wrapping subtraction maps printable ASCII to 0...94;
-                // controls and non-ASCII all land above that interval.
-                if any((lanes &- SIMD16(repeating: 0x20)) .>= SIMD16(repeating: 0x5F)) { break }
-                end += 16
-            }
-            while end < raw.count, raw[end] >= 0x20, raw[end] < 0x7F { end += 1 }
-            return end
-        }
-    }
-
     public mutating func advance<P: ParserPerformer>(_ byte: UInt8, performer: inout P) {
         // "Anywhere" transitions, which outrank the current state. CAN and
         // SUB abort whatever is in progress; ESC restarts it. Without these a
@@ -231,15 +215,8 @@ public struct Parser: Sendable {
         case .oscIgnore: oscIgnore(byte)
         case .dcsEntry, .dcsParam, .dcsIntermediate, .dcsIgnore:
             dcs(byte)
-        case .dcsString:
-            if byte >= 0x20, byte != 0x7F {
-                if stringBuffer.count < Self.maxStringLength { stringBuffer.append(byte) }
-                else { stringBuffer.removeAll(keepingCapacity: true); state = .dcsIgnore }
-            }
-        case .dcsEscape:
-            if byte == 0x5C { performer.dcsDispatch(stringBuffer[...]); state = .ground }
-            else { state = .escape; escape(byte, performer: &performer) }
-            stringBuffer.removeAll(keepingCapacity: true)
+        case .dcsString: dcsString(byte)
+        case .dcsEscape: dcsEscape(byte, performer: &performer)
         case .sosPmString:
             break  // Consumed until ESC, handled above.
         case .apcString: apcString(byte)
@@ -250,7 +227,11 @@ public struct Parser: Sendable {
         }
     }
 
-    // MARK: - States
+}
+
+// MARK: - States
+
+extension Parser {
 
     private mutating func ground<P: ParserPerformer>(_ byte: UInt8, performer: inout P) {
         switch byte {
@@ -473,13 +454,37 @@ public struct Parser: Sendable {
         }
     }
 
+    /// A DECRQSS/XTGETTCAP body: printable bytes up to the cap, past which
+    /// the rest is ignored.
+    @inline(__always)
+    private mutating func dcsString(_ byte: UInt8) {
+        guard byte >= 0x20, byte != 0x7F else { return }
+        if stringBuffer.count < Self.maxStringLength {
+            stringBuffer.append(byte)
+        } else {
+            stringBuffer.removeAll(keepingCapacity: true); state = .dcsIgnore
+        }
+    }
+
+    /// ESC inside a DCS body: `\` completes ST and dispatches it; anything
+    /// else starts a new escape sequence and abandons the string.
+    @inline(__always)
+    private mutating func dcsEscape<P: ParserPerformer>(_ byte: UInt8, performer: inout P) {
+        if byte == 0x5C {
+            performer.dcsDispatch(stringBuffer[...]); state = .ground
+        } else {
+            state = .escape; escape(byte, performer: &performer)
+        }
+        stringBuffer.removeAll(keepingCapacity: true)
+    }
+
     /// Only the exact XTGETTCAP/DECRQSS introducers are collected. Other DCSs are dropped.
     private mutating func dcs(_ byte: UInt8) {
         if byte < 0x20 || byte == 0x7F { return }
-        if state == .dcsEntry, (byte == 0x2B || byte == 0x24) {
+        if state == .dcsEntry, byte == 0x2B || byte == 0x24 {
             stringBuffer = [byte]
             state = .dcsIntermediate
-        } else if state == .dcsIntermediate, (stringBuffer == [0x2B] || stringBuffer == [0x24]), byte == 0x71 {
+        } else if state == .dcsIntermediate, stringBuffer == [0x2B] || stringBuffer == [0x24], byte == 0x71 {
             stringBuffer.append(byte)
             state = .dcsString
         } else {

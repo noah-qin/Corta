@@ -112,19 +112,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         item(.selectAll, host)
         menu.addItem(.separator())
         item(.find, host)
-        var clickedCommand: CommandRecord?
-        if let event, let host, host.isOperable, let view = host.terminalView,
-            host.terminalRenderer != nil, let session = host.session
-        {
-            let grid = session.snapshot()
-            // Records index the main screen; an alternate screen's rows start
-            // again from zero and would name an unrelated old command.
-            if !grid.isAlternateScreenActive {
-                let point = host.pointer.documentPosition(for: event, in: view, grid: grid)
-                let row = grid.absoluteRow(ofScreenRow: point.row)
-                clickedCommand = Self.command(at: row, records: session.commandRecords.records)
-            }
-        }
+        let clickedCommand = event.flatMap(command(under:))
         let commandID = clickedCommand?.id
         contextItem(in: menu, key: "context.copyCommandOutput", enabled: clickedCommand != nil) { [weak self] in
             guard let self, let pane = self.host as? ViewController, let commandID,
@@ -132,28 +120,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             else { return }
             pane.shell.copyCommandOutput(for: record, pasteboard: self.pasteboard)
         }
-        if let event, let host, host.isOperable, let view = host.terminalView,
-            host.terminalRenderer != nil, host.session != nil
-        {
-            if let link = host.pointer.linkUnder(event, in: view) {
-                menu.addItem(.separator())
-                contextItem(in: menu, key: "context.openLink") { [weak host] in
-                    _ = host?.pointer.open(link)
-                }
-                contextItem(in: menu, key: "context.copyLink") { [weak self] in
-                    guard let target = PanePointer.target(of: link.url) else { return }
-                    self?.copyContextText(target.absoluteString)
-                }
-            } else if let reference = host.pointer.detectedReferenceUnder(event, in: view) {
-                menu.addItem(.separator())
-                contextItem(in: menu, key: "context.openPath") { [weak host] in
-                    host?.pointer.openDetected(reference)
-                }
-                contextItem(in: menu, key: "context.copyPath") { [weak self] in
-                    self?.copyContextText(reference.path)
-                }
-            }
-        }
+        if let event { addTargetItems(to: menu, under: event) }
         menu.addItem(.separator())
         item(.newTab, NSApp.delegate)
         if let splitController = host?.splitController {
@@ -165,6 +132,45 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             item(.close, splitController, title: closeTitle)
         }
         return menu
+    }
+
+    /// The recorded command whose prompt or output was right-clicked. Records
+    /// index the main screen; an alternate screen's rows start again from
+    /// zero and would name an unrelated old command.
+    private func command(under event: NSEvent) -> CommandRecord? {
+        guard let host, host.isOperable, let view = host.terminalView,
+            host.terminalRenderer != nil, let session = host.session
+        else { return nil }
+        let grid = session.snapshot()
+        guard !grid.isAlternateScreenActive else { return nil }
+        let point = host.pointer.documentPosition(for: event, in: view, grid: grid)
+        let row = grid.absoluteRow(ofScreenRow: point.row)
+        return Self.command(at: row, records: session.commandRecords.records)
+    }
+
+    /// Open and Copy for the link, or else the local path, under the click.
+    private func addTargetItems(to menu: NSMenu, under event: NSEvent) {
+        guard let host, host.isOperable, let view = host.terminalView,
+            host.terminalRenderer != nil, host.session != nil
+        else { return }
+        if let link = host.pointer.linkUnder(event, in: view) {
+            menu.addItem(.separator())
+            contextItem(in: menu, key: "context.openLink") { [weak host] in
+                _ = host?.pointer.open(link)
+            }
+            contextItem(in: menu, key: "context.copyLink") { [weak self] in
+                guard let target = PanePointer.target(of: link.url) else { return }
+                self?.copyContextText(target.absoluteString)
+            }
+        } else if let reference = host.pointer.detectedReferenceUnder(event, in: view) {
+            menu.addItem(.separator())
+            contextItem(in: menu, key: "context.openPath") { [weak host] in
+                host?.pointer.openDetected(reference)
+            }
+            contextItem(in: menu, key: "context.copyPath") { [weak self] in
+                self?.copyContextText(reference.path)
+            }
+        }
     }
 
     /// Absolute OSC 133 output rows, excluding the prompt and next command.
@@ -288,7 +294,11 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         }
     }
 
-    // MARK: - Clear and reset
+}
+
+// MARK: - Clear and reset
+
+extension PaneCommands {
 
     /// Clear Screen, Clear History and Reset Terminal — three names because
     /// "clear" means something different everywhere, and the menu says what
@@ -360,7 +370,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         host.terminalView?.showToast(L10n.text(notice))
     }
 
-    // MARK: - Menu validation
+    // MARK: Menu validation
 
     /// Greys out what this pane cannot do now: a disabled item says "not
     /// here" where a beep says nothing.

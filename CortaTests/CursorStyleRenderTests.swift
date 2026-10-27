@@ -27,7 +27,9 @@ import Testing
 /// steady.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct CursorStyleRenderTests {
+@Suite(
+    .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct CursorStyleRenderTests {
 
     /// Renders a 4x10 grid containing "abc" (cursor on row 0, column 3) with
     /// the given DECSCUSR parameter applied, and returns the texture. The
@@ -55,9 +57,10 @@ import Testing
             device: device, width: width, height: height)
 
         renderer.renderAndWait(
-            grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-            drawableSize: CGSize(width: width, height: height), cursorVisible: true, selection: nil,
-            target: texture)
+            grid: grid, cursorVisible: true, selection: nil,
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                drawableSize: CGSize(width: width, height: height)))
         return (texture, renderer)
     }
 

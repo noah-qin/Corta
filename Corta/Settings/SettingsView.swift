@@ -38,54 +38,6 @@ import SwiftUI
 /// and the two directions cannot disagree. The one exception is the
 /// open-file command's draft (`OpenFileCommandField`), which is validated
 /// on commit rather than per keystroke.
-/// The sidebar's selection, shared by the sidebar, the page and the window
-/// controller (which names the window after it).
-@MainActor @Observable
-final class SettingsNavigation {
-    var selection: SettingsView.Category = .general
-    var showHostDetails = false
-    var themeEditorRequest = 0
-}
-
-/// The category list. AppKit hosts it as the split view's sidebar item, which
-/// is what gives it the floating Liquid Glass sidebar; SwiftUI's own
-/// `NavigationSplitView` inside a hosting controller drew a flush, opaque one.
-struct SettingsSidebar: View {
-    @Bindable var navigation: SettingsNavigation
-
-    var body: some View {
-        List(
-            SettingsView.Category.allCases,
-            selection: Binding(
-                get: { navigation.selection },
-                set: { if let category = $0 { navigation.selection = category } })
-        ) { category in
-            SettingsSidebarRow(category: category).tag(category)
-        }
-        .listStyle(.sidebar)
-    }
-}
-
-/// A sidebar row the way System Settings draws one: the symbol white on a
-/// coloured rounded tile, then the name. Explicit colours rather than a
-/// `Label`'s accent tint — the tinted icons disappeared and came back for a
-/// few frames each time the window opened and became key.
-private struct SettingsSidebarRow: View {
-    let category: SettingsView.Category
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: category.symbol)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
-                .background(category.tileColor.gradient, in: .rect(cornerRadius: 6))
-                .accessibilityHidden(true)
-            Text(category.title)
-        }
-    }
-}
-
 struct SettingsView: View {
     @State private var themeEditor: ThemeEditorModel?
     @Bindable var model: SettingsModel
@@ -150,7 +102,9 @@ struct SettingsView: View {
             .onChange(of: navigation.themeEditorRequest) { _, _ in
                 themeEditor = ThemeEditorModel(source: model.previewTheme, editing: false)
             }
-            .sheet(isPresented: Binding(get: { navigation.showHostDetails }, set: { navigation.showHostDetails = $0 })) {
+            .sheet(isPresented: Binding(
+                get: { navigation.showHostDetails }, set: { navigation.showHostDetails = $0 })
+            ) {
                 VStack {
                     SystemStatusDetails(metrics: SystemMetricsStore.shared.snapshot, showMetrics: false)
                     Button(L10n.text("common.close")) { navigation.showHostDetails = false }
@@ -160,7 +114,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func page(_ category: Category) -> some View {
+    func page(_ category: Category) -> some View {
         switch category {
         case .general: generalPage
         case .appearance: appearancePage
@@ -190,7 +144,11 @@ struct SettingsView: View {
         .background(.bar)
     }
 
-    // MARK: - Appearance
+}
+
+// MARK: - Appearance
+
+extension SettingsView {
 
     private var appearancePage: some View {
         Form {
@@ -300,7 +258,8 @@ struct SettingsView: View {
                     .accessibilityIdentifier("cursor-blink")
                     .help(L10n.text("settings.help.cursor"))
                 LabeledContent(L10n.text("settings.label.preview")) {
-                    FontPreviewSwiftUIView(theme: model.previewTheme, font: model.previewFont, isDark: model.previewIsDark,
+                    FontPreviewSwiftUIView(
+                        theme: model.previewTheme, font: model.previewFont, isDark: model.previewIsDark,
                         cursorStyle: model.cursorShape.style(blinking: model.cursorBlink))
                         .accessibilityIdentifier("appearance-preview")
                         .accessibilityValue(model.previewIsDark ? "dark" : "light")
@@ -416,7 +375,8 @@ struct SettingsView: View {
                 }
                 Picker(L10n.text("ui.mouse.override"), selection: bind(\.mouseOverrideModifier)) {
                     ForEach(Configuration.MouseOverrideModifier.allCases, id: \.self) { value in
-                        Text(verbatim: value == .option ? "⌥ Option" : value == .shift ? "⇧ Shift" : "⌃ Control").tag(value)
+                        Text(verbatim: value == .option ? "⌥ Option" : value == .shift ? "⇧ Shift" : "⌃ Control")
+                            .tag(value)
                     }
                 }
                 Toggle(
@@ -472,138 +432,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Shortcuts
-
-    /// Every command's key, in the menu order; written as `bind.` keys.
-    private var shortcutsPage: some View {
-        Form {
-            Section(L10n.text("settings.section.commands")) {
-                ForEach(TerminalCommand.allCases, id: \.self) { command in
-                    LabeledContent(command.title) {
-                        HStack(spacing: 6) {
-                            ShortcutRecorder(value: model.keybindings[command], onChange: { model.setShortcut($0, for: command) })
-                            // Only where there is something to restore; the
-                            // slot stays, so the recorders line up.
-                            let isDefault = model.keybindings[command] == command.defaultShortcut
-                            Button {
-                                model.resetShortcut(command)
-                            } label: {
-                                Image(systemName: "arrow.counterclockwise")
-                            }
-                            .buttonStyle(.borderless)
-                            .help(L10n.text("ui.shortcut.reset"))
-                            .accessibilityLabel(L10n.text("ui.shortcut.reset"))
-                            .opacity(isDefault ? 0 : 1)
-                            .disabled(isDefault)
-                            .accessibilityHidden(isDefault)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var windowSection: some View {
-        Section(L10n.text("settings.section.window")) {
-            LabeledContent(L10n.text("settings.label.newWindow")) {
-                HStack(spacing: 6) {
-                    numberField(bind(model.columns, model.setColumns), width: 54)
-                    Text(verbatim: "×").foregroundStyle(.secondary)
-                    numberField(bind(model.rows, model.setRows), width: 54)
-                }
-            }
-            .help(L10n.text("settings.help.newWindow"))
-            Toggle(
-                L10n.text("settings.label.restoreWindows"),
-                isOn: bind(\.restoreWindows))
-        }
-    }
-
-    /// Untitled: it is the whole page, and the page already says its name.
-    private var quickTerminalSection: some View {
-        Section {
-            Toggle(
-                L10n.text("settings.label.quickTerminalHotkey"),
-                isOn: bind(\.quickTerminal)
-            )
-            .help(L10n.text("settings.help.quickTerminal"))
-            LabeledContent(L10n.text("ui.shortcut.global")) {
-                ShortcutRecorder(value: model.quickTerminalKey, onChange: model.setQuickTerminalKey)
-            }
-            // The switch already says "off"; the row is for which key, or
-            // why none.
-            if model.quickTerminalStatus.kind != .none {
-                StatusRowView(status: model.quickTerminalStatus)
-            }
-            Picker(
-                L10n.text("settings.label.quickTerminalPosition"),
-                selection: bind(\.quickTerminalPosition)
-            ) {
-                ForEach(Configuration.QuickTerminalPosition.allCases, id: \.self) { position in
-                    Text(L10n.text("settings.quickTerminalPosition.\(position.rawValue)"))
-                        .tag(position)
-                }
-            }
-            Picker(
-                L10n.text("settings.label.quickTerminalScreen"),
-                selection: bind(\.quickTerminalScreen)
-            ) {
-                ForEach(Configuration.QuickTerminalScreen.allCases, id: \.self) { screen in
-                    Text(L10n.text("settings.quickTerminalScreen.\(screen.rawValue)")).tag(screen)
-                }
-            }
-        }
-    }
-
-    private var notificationsSection: some View {
-        Section(L10n.text("settings.section.notifications")) {
-            Toggle(
-                L10n.text("settings.label.notifyOnLongTasks"),
-                isOn: bind(\.notifyOnLongTask)
-            )
-            .help(L10n.text("settings.help.notifyOnLongTasks"))
-            if model.notificationPermissionNotice.kind != .none {
-                StatusRowView(
-                    status: model.notificationPermissionNotice,
-                    action: model.openSystemNotificationSettings)
-            }
-            LabeledContent(L10n.text("settings.label.longerThan")) {
-                HStack(spacing: 6) {
-                    numberField(
-                        bind(model.notificationThreshold, model.setNotificationThreshold),
-                        width: 54)
-                    Text(L10n.text("settings.label.seconds")).foregroundStyle(.secondary)
-                }
-            }
-            .disabled(!model.notifyOnLongTask)
-        }
-    }
-
-    private var historySection: some View {
-        Section(L10n.text("settings.section.history")) {
-            Toggle(
-                L10n.text("settings.label.directoryHistory"),
-                isOn: bind(\.directoryHistory)
-            )
-            .help(L10n.text("settings.help.directoryHistory"))
-            LabeledContent(L10n.text("settings.label.directoryHistoryClear")) {
-                StatusRowView(
-                    status: model.directoryHistoryStatus,
-                    action: Self.action(if: model.directoryHistoryStatus.actionTitle != nil) {
-                        model.clearDirectoryHistory()
-                    })
-            }
-            // The hosts the connect dialogs offer under Recent.
-            LabeledContent(L10n.text("settings.label.recentHosts")) {
-                StatusRowView(
-                    status: model.recentHostsStatus,
-                    action: Self.action(if: model.recentHostsStatus.actionTitle != nil) {
-                        model.clearRecentHosts()
-                    })
-            }
-        }
-    }
-
     // MARK: - Helpers
 
     /// A binding that reads the model's current value and writes through
@@ -615,12 +443,12 @@ struct SettingsView: View {
     /// `@Sendable` closure, and a bound `SettingsModel` method is
     /// main-actor-isolated — handing it over directly is a warning today
     /// and an error once the isolation is checked strictly.
-    private func bind<Value>(_ value: Value, _ set: @escaping (Value) -> Void) -> Binding<Value> {
+    func bind<Value>(_ value: Value, _ set: @escaping (Value) -> Void) -> Binding<Value> {
         Binding(get: { value }, set: { set($0) })
     }
 
     /// A control over one configuration field, written as given.
-    private func bind<Value>(_ path: WritableKeyPath<Configuration, Value>) -> Binding<Value> {
+    func bind<Value>(_ path: WritableKeyPath<Configuration, Value>) -> Binding<Value> {
         Binding(get: { model.configuration[keyPath: path] }, set: { model.set(path, $0) })
     }
 
@@ -632,14 +460,14 @@ struct SettingsView: View {
     /// grouped form laid it out as a second, blank line under the field,
     /// which made every field row 11pt taller than a toggle row and sat the
     /// "×" and "seconds" beside it 5pt below the field's own baseline.
-    private func numberField(_ value: Binding<Int>, width: CGFloat) -> some View {
+    func numberField(_ value: Binding<Int>, width: CGFloat) -> some View {
         TextField("", value: value, format: .number)
             .labelsHidden()
             .frame(width: width)
             .multilineTextAlignment(.trailing)
     }
 
-    private func numberField(_ value: Binding<Double>, width: CGFloat) -> some View {
+    func numberField(_ value: Binding<Double>, width: CGFloat) -> some View {
         TextField("", value: value, format: .number)
             .labelsHidden()
             .frame(width: width)
@@ -648,7 +476,7 @@ struct SettingsView: View {
 
     /// `condition ? closure : nil`, spelled so the compiler doesn't have to
     /// unify a bound-method reference and `nil` inside a ternary.
-    private static func action(if condition: Bool, _ closure: @escaping () -> Void)
+    static func action(if condition: Bool, _ closure: @escaping () -> Void)
         -> (() -> Void)?
     {
         condition ? closure : nil
@@ -673,130 +501,5 @@ struct SettingsView: View {
                 .controlSize(.small)
         }
         .padding(EdgeInsets(top: 8, leading: 16, bottom: 11, trailing: 16))
-    }
-}
-
-/// The open-file command, validated when the edit is *finished*.
-///
-/// A text binding writes per keystroke, and the model validates and trims
-/// every write: an unclosed `{` was refused and the field snapped back, so
-/// `{file}` could not be typed one character at a time, and a trailing
-/// space was trimmed away before the next word could follow it — only a
-/// paste of the whole command ever got through. The draft lives here until
-/// Return or focus loss commits it. An edit that arrives from the config
-/// file replaces a draft the user has not touched; a draft they have is
-/// theirs until they commit it.
-private struct OpenFileCommandField: View {
-    let model: SettingsModel
-    @State private var draft: String
-    /// What the file said when the draft last agreed with it; a draft that
-    /// differs is the user's unfinished edit.
-    @State private var synced: String
-    @FocusState private var isEditing: Bool
-
-    init(model: SettingsModel) {
-        self.model = model
-        _draft = State(initialValue: model.openFileCommand)
-        _synced = State(initialValue: model.openFileCommand)
-    }
-
-    var body: some View {
-        TextField("", text: $draft)
-            .labelsHidden()
-            .focused($isEditing)
-            .onSubmit(commit)
-            .onChange(of: isEditing) { _, editing in
-                if !editing { commit() }
-            }
-            .onChange(of: model.openFileCommand) { _, value in
-                if draft == synced { draft = value }
-                synced = value
-            }
-            // The page can go away without resigning focus first.
-            .onDisappear(perform: commit)
-    }
-
-    private func commit() {
-        guard draft != synced else { return }
-        model.setOpenFileCommand(draft)
-        // A refused or trimmed value reads back as what the file holds.
-        synced = model.openFileCommand
-        draft = synced
-    }
-}
-
-/// A draft commits only on Return or blur, so partial hex values never reach the file.
-private struct InputSourceColorField: View {
-    let value: String
-    let direct: Bool
-    let model: SettingsModel
-    @State private var draft = ""
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        LabeledContent(L10n.text(direct ? "inputSource.color.direct" : "inputSource.color.ime")) {
-            TextField("", text: $draft, prompt: Text(L10n.text("inputSource.color.system")))
-                .labelsHidden()
-                .frame(width: 110)
-                .focused($focused)
-                .accessibilityIdentifier(direct ? "input-source-direct-color" : "input-source-ime-color")
-                .onSubmit { commit() }
-                .onChange(of: focused) { _, active in if !active { commit() } }
-                .onAppear { draft = value }
-                .onChange(of: value) { _, newValue in if !focused { draft = newValue } }
-                .help(L10n.text("inputSource.color.help"))
-        }
-    }
-
-    private func commit() {
-        model.setInputSourceColor(draft.trimmingCharacters(in: .whitespaces), direct: direct)
-        draft = direct ? model.inputSourceDirectColor : model.inputSourceIMEColor
-    }
-}
-
-private struct StatusNetworkInterfaceField: View {
-    @Bindable var model: SettingsModel
-    @State private var value = "auto"
-    var body: some View {
-        TextField(L10n.text("status.interface"), text: $value)
-            .accessibilityIdentifier("status-network-interface")
-            .onSubmit { model.setStatusNetworkInterface(value); value = model.statusNetworkInterface }
-            .onAppear { value = model.statusNetworkInterface }
-            .onChange(of: model.statusNetworkInterface) { _, name in value = name }
-            .help(L10n.text("status.network.help"))
-    }
-}
-
-/// A font family menu: the default first, then the catalog's families
-/// grouped as Apple's or the user's. The font and CJK font pickers.
-private struct FontFamilyPicker: View {
-    let title: String
-    let selection: Binding<String>
-    /// What the default reads as in the file: `system`, `auto`.
-    let defaultTag: String
-    let defaultLabel: String
-    let entries: [MonospacedFontCatalog.Entry]
-
-    var body: some View {
-        Picker(title, selection: selection) {
-            Text(defaultLabel).tag(defaultTag)
-            // A configured family the list lacks — not installed, not
-            // verified, or not measured yet — still shows as chosen.
-            if selection.wrappedValue != defaultTag && !entries.contains(where: { $0.name == selection.wrappedValue }) {
-                Text(selection.wrappedValue).tag(selection.wrappedValue)
-            }
-            let apple = entries.filter { $0.origin == .apple }
-            if !apple.isEmpty {
-                Section(L10n.text("settings.font.group.apple")) {
-                    ForEach(apple, id: \.name) { Text($0.name).tag($0.name) }
-                }
-            }
-            let user = entries.filter { $0.origin != .apple }
-            if !user.isEmpty {
-                Section(L10n.text("settings.font.group.user")) {
-                    ForEach(user, id: \.name) { Text($0.name).tag($0.name) }
-                }
-            }
-        }
     }
 }

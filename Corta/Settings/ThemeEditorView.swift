@@ -38,7 +38,8 @@ struct ThemeEditorView: View {
             ScrollView {
                 VStack(spacing: 8) {
                     ForEach(0..<19, id: \.self) { index in
-                        ThemeEditorColorRow(index: index, value: editor.color(index), onChange: { editor.setColor(index, $0) },
+                        ThemeEditorColorRow(
+                            index: index, value: editor.color(index), onChange: { editor.setColor(index, $0) },
                             onValidity: { valid in
                                 if valid { invalidFields.remove(index) } else { invalidFields.insert(index) }
                             })
@@ -74,7 +75,8 @@ private struct ThemeEditorColorRow: View {
             Text(label).frame(width: 130, alignment: .leading)
             Spacer()
             ColorPicker(label, selection: Binding(get: {
-                Color(nsColor: NSColor(srgbRed: CGFloat(value.x), green: CGFloat(value.y), blue: CGFloat(value.z), alpha: 1))
+                Color(nsColor: NSColor(
+                    srgbRed: CGFloat(value.x), green: CGFloat(value.y), blue: CGFloat(value.z), alpha: 1))
             }, set: { color in
                 guard let rgb = NSColor(color).usingColorSpace(.sRGB) else { return }
                 onChange(SIMD4(Float(rgb.redComponent), Float(rgb.greenComponent), Float(rgb.blueComponent), 1))
@@ -84,8 +86,7 @@ private struct ThemeEditorColorRow: View {
             TextField("HEX", text: $hex).font(.system(.body, design: .monospaced)).frame(width: 90)
                 .accessibilityIdentifier("theme-hex-\(index)")
                 .onChange(of: hex) { _, text in
-                    if let color = Theme.color(text) { onChange(color); onValidity(true) }
-                    else { onValidity(false) }
+                    if let color = Theme.color(text) { onChange(color); onValidity(true) } else { onValidity(false) }
                 }
         }
         .onAppear { hex = Theme.hex(value) }

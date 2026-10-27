@@ -93,7 +93,7 @@ extension TerminalSession {
     /// Under one lock: a get-then-set would race the reader's OSC 4 writes and
     /// could drop an override.
     public func updateIndexedPaletteDefaults(
-        to newDefaults: [(red: UInt8, green: UInt8, blue: UInt8)]
+        to newDefaults: [RGB]
     ) {
         registerStateWaiter { state.withLock { $0.terminal.indexedPalette.updateDefaults(to: newDefaults) } }
     }
@@ -202,10 +202,5 @@ extension TerminalSession {
 
     public func takeClipboardCopyRequest() -> ClipboardCopyRequest? {
         registerStateWaiter { state.withLock { $0.terminal.takeClipboardCopyRequest() } }
-    }
-
-    /// OSC 52; the app decides whether it reaches the pasteboard.
-    public func takeClipboardCopy() -> String? {
-        registerStateWaiter { state.withLock { $0.terminal.takeClipboardCopy() } }
     }
 }

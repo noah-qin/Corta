@@ -24,12 +24,17 @@ import OSLog
 ///
 /// | Stage | Interval | Where |
 /// | --- | --- | --- |
-/// | key event → bytes on the PTY | `keyDown` | `TerminalView.deliverBytes` (⌘/⌃ bypass, or declined by the IME), `.insertText` (most typing), `.doCommand(by:)` (terminal keys the IME answered with a command, encoded through `deliverBytes`) |
+/// | key event → bytes on the PTY | `keyDown` | `TerminalView.deliverBytes`, `.insertText`, `.doCommand(by:)` |
 /// | reader wakes, parses, writes the grid | `output` | `PaneFrameLoop.noteOutput` |
 /// | MainActor hop that wakes the display link | `wake` | `PaneFrameLoop.noteOutput` |
 /// | vsync callback, damage diff, instance build | `frame` | `FrameScheduler.metalDisplayLink(_:needsUpdate:)` |
 /// | encode + commit | `commit` | `PaneFrameLoop.render` |
 /// | GPU work through to completion | `gpu` | `PaneFrameLoop.render` |
+///
+/// A key event reaches the PTY through `deliverBytes` for a ⌘/⌃ bypass or a
+/// key the IME declined, `.insertText` for most typing, and
+/// `.doCommand(by:)` for terminal keys the IME answered with a command,
+/// encoded through `deliverBytes`.
 ///
 /// Every call sits behind `OSSignposter.isEnabled`, one atomic load when
 /// no trace is recording, so it is safe in release builds.

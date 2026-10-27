@@ -163,7 +163,9 @@ import Testing
     /// grid and `END120` clamps to the right edge and wraps; the ordered
     /// one signals only after the commit, so the text lands at column 100.
     @Test func childIsNotSignalledASizeTheGridHasNotAdopted() throws {
-        let script = #"printf '\033[?1049h'; trap 'printf "\033[2J\033[1;1HTOP120"; printf "\033[5;100HEND120"; printf "WINCH-DONE\n"' WINCH; printf 'ARMED\n'; while :; do sleep 0.05; done"#
+        let script =
+            #"printf '\033[?1049h'; trap 'printf "\033[2J\033[1;1HTOP120"; printf "\033[5;100HEND120"; "#
+                + #"printf "WINCH-DONE\n"' WINCH; printf 'ARMED\n'; while :; do sleep 0.05; done"#
         // Holds every queued resize until the test opens it; the only one
         // is the test's own.
         let gateOpen = Mutex(false)

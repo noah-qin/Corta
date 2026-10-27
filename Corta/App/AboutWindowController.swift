@@ -60,8 +60,10 @@ final class AboutWindowController: NSWindowController {
         showWindow(sender)
         if shouldCenter, let window, let screen = parent?.screen ?? window.screen ?? NSScreen.main {
             window.contentView?.layoutSubtreeIfNeeded()
+            // The middle of the screen, as other apps' About windows open —
+            // not over the window it was asked from.
             let visible = screen.visibleFrame
-            let target = parent?.frame ?? visible
+            let target = visible
             window.setFrameOrigin(NSPoint(
                 x: min(max(target.midX - window.frame.width / 2, visible.minX), visible.maxX - window.frame.width),
                 y: min(max(target.midY - window.frame.height / 2, visible.minY), visible.maxY - window.frame.height)))

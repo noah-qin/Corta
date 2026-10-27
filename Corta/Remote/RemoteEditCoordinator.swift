@@ -54,7 +54,7 @@ final class RemoteEditCoordinator {
     /// A local edit awaiting a decision.
     nonisolated struct PendingUpload: Identifiable, Equatable {
         let copy: RemoteEditStore.RemoteCopy
-        var contentDigest: String? = nil
+        var contentDigest: String?
         var id: String { copy.id }
         /// Display string for the prompt: the remote file this would land on.
         var remoteDisplay: String { "\(SSHTarget.displayName(forKey: copy.host)):\(copy.remotePath)" }
@@ -200,7 +200,11 @@ final class RemoteEditCoordinator {
         for (_, url) in approvedSnapshots { try? FileManager.default.removeItem(at: url) }
     }
 
-    // MARK: - Open for editing
+}
+
+// MARK: - Open for editing
+
+extension RemoteEditCoordinator {
 
     /// Downloads (or reuses) the managed copy of a remote file, records the
     /// open, starts watching, and opens the editor at `line`/`column`.
@@ -244,6 +248,20 @@ final class RemoteEditCoordinator {
         return true
     }
 
+    /// The manifest's copy of the file, re-secured, while its local file is
+    /// still there; nil otherwise.
+    private func existingCopy(host: String, remotePath: String) throws(SFTPError) -> RemoteEditStore.RemoteCopy? {
+        guard let copy = store.copy(host: host, remotePath: remotePath),
+            FileManager.default.fileExists(atPath: store.localURL(for: copy).path)
+        else { return nil }
+        do {
+            try store.secureCopy(at: store.localURL(for: copy))
+        } catch {
+            throw .localIOFailed(operation: "secure local copy", code: EACCES)
+        }
+        return copy
+    }
+
     /// The managed copy, downloading when there is no manifest entry or the
     /// copy's file is gone. A reused copy is *not* re-validated against the
     /// remote here: the upload path's pre-flight `lstat` is where remote
@@ -254,13 +272,7 @@ final class RemoteEditCoordinator {
     {
         await store.finishMaintenance()
         guard !Task.isCancelled else { throw .cancelled }
-        if let copy = store.copy(host: host, remotePath: remotePath),
-            FileManager.default.fileExists(atPath: store.localURL(for: copy).path)
-        {
-            do { try store.secureCopy(at: store.localURL(for: copy)) }
-            catch { throw .localIOFailed(operation: "secure local copy", code: EACCES) }
-            return copy
-        }
+        if let copy = try existingCopy(host: host, remotePath: remotePath) { return copy }
         // Records from a newer Corta name copies this build cannot see; its
         // downloads would set them aside and write where they live.
         if store.preservesNewerManifest {
@@ -439,7 +451,11 @@ final class RemoteEditCoordinator {
         }
     }
 
-    // MARK: - Local change detection
+}
+
+// MARK: - Local change detection
+
+extension RemoteEditCoordinator {
 
     func watch(_ copy: RemoteEditStore.RemoteCopy) {
         unwatch(copy.id, invalidatingDigest: false)
@@ -552,79 +568,3 @@ final class RemoteEditCoordinator {
 }
 
 // MARK: - The NSAlert presenter
-
-extension RemoteEditCoordinator.RemoteEditPresenter {
-    /// The production presenter: one alert per prompt, acting directly on
-    /// the coordinator. Alerts are app-modal (`runModal`) because the
-    /// change being asked about belongs to no particular window — the
-    /// editor that made it is another application entirely.
-    @MainActor
-    static func alerter(coordinator: RemoteEditCoordinator) -> Self {
-        Self(
-            promptUpload: { [weak coordinator] pending in
-                let alert = NSAlert()
-                alert.messageText = L10n.text("remoteEdit.changed.title")
-                alert.informativeText = L10n.format(
-                    "remoteEdit.changed.message", SFTPBrowserModel.displayName(pending.copy.remotePath), pending.copy.host)
-                alert.addButton(withTitle: L10n.text("remoteEdit.upload"))
-                alert.addButton(withTitle: L10n.text("remoteEdit.dismiss"))
-                if alert.runModal() == .alertFirstButtonReturn {
-                    coordinator?.upload(pending)
-                } else {
-                    coordinator?.dismissUpload(pending)
-                }
-            },
-            promptConflict: { [weak coordinator] conflict in
-                let alert = NSAlert()
-                alert.messageText = L10n.text("remoteEdit.conflict.title")
-                alert.informativeText =
-                    conflict.remoteDeleted
-                    ? L10n.format(
-                        "remoteEdit.conflict.deletedMessage",
-                        SFTPBrowserModel.displayName(conflict.copy.remotePath), conflict.copy.host,
-                        conflict.atDownloadDescription)
-                    : L10n.format(
-                        "remoteEdit.conflict.message",
-                        SFTPBrowserModel.displayName(conflict.copy.remotePath), conflict.copy.host,
-                        conflict.atDownloadDescription, conflict.remoteDescription)
-                alert.addButton(withTitle: L10n.text("remoteEdit.conflict.uploadAnyway"))
-                let redownload = alert.addButton(
-                    withTitle: L10n.text("remoteEdit.conflict.redownload"))
-                redownload.isEnabled = !conflict.remoteDeleted
-                alert.addButton(withTitle: L10n.text("remoteEdit.conflict.saveCopy"))
-                alert.addButton(withTitle: L10n.text("common.cancel"))
-                switch alert.runModal() {
-                case .alertFirstButtonReturn:
-                    coordinator?.resolveConflict(conflict.id, choice: .uploadAnyway)
-                case .alertSecondButtonReturn:
-                    coordinator?.resolveConflict(conflict.id, choice: .redownload)
-                case .alertThirdButtonReturn:
-                    let panel = NSSavePanel()
-                    panel.nameFieldStringValue = SFTPBrowserModel.localFileName(
-                        (conflict.copy.remotePath as NSString).lastPathComponent)
-                    guard panel.runModal() == .OK, let url = panel.url else {
-                        coordinator?.resolveConflict(conflict.id, choice: .dismiss)
-                        return
-                    }
-                    coordinator?.resolveConflict(conflict.id, choice: .saveCopyElsewhere(url))
-                default:
-                    coordinator?.resolveConflict(conflict.id, choice: .dismiss)
-                }
-            },
-            showError: { message in
-                let alert = NSAlert()
-                alert.messageText = message
-                alert.alertStyle = .warning
-                alert.runModal()
-            },
-            confirmConnection: { host, remotePath in
-                let alert = NSAlert()
-                alert.messageText = L10n.format("remoteEdit.connect.title", host)
-                alert.informativeText = L10n.format(
-                    "remoteEdit.connect.message", SFTPBrowserModel.displayName(remotePath), host)
-                alert.addButton(withTitle: L10n.text("sftp.host.connect"))
-                alert.addButton(withTitle: L10n.text("common.cancel"))
-                return alert.runModal() == .alertFirstButtonReturn
-            })
-    }
-}

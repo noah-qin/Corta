@@ -110,6 +110,22 @@ extension PaneCommands {
         alert.alertStyle = .warning
         alert.messageText = L10n.text("paste.warning.title")
         alert.informativeText = risks.map { L10n.text($0.localizationKey) }.joined(separator: "\n")
+        alert.accessoryView = Self.pastePreview(sanitized)
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = L10n.text("paste.warning.suppress")
+        alert.addButton(withTitle: L10n.text("common.paste"))
+        alert.addButton(withTitle: L10n.text("common.cancel"))
+        alert.present(for: host.view.window) { [weak self] response in
+            // The pane may have closed while the sheet was up.
+            guard response == .alertFirstButtonReturn, self?.host?.session != nil else { return }
+            if alert.suppressionButton?.state == .on { self?.suppressPasteWarnings = true }
+            self?.pasteNow(sanitized)
+        }
+    }
+
+    /// The text about to be pasted, its concealed scalars made visible, in a
+    /// rounded scrolling box for the warning's accessory view.
+    private static func pastePreview(_ text: String) -> NSView {
         let preview = NSTextView(frame: NSRect(x: 0, y: 0, width: 460, height: 160))
         preview.isEditable = false
         preview.drawsBackground = false
@@ -120,7 +136,7 @@ extension PaneCommands {
         preview.autoresizingMask = [.width]
         preview.textContainer?.widthTracksTextView = true
         preview.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        preview.string = Paste.visiblePreview(sanitized)
+        preview.string = Paste.visiblePreview(text)
         let scroll = NSScrollView(frame: preview.frame)
         scroll.hasVerticalScroller = true
         scroll.drawsBackground = false
@@ -142,17 +158,7 @@ extension PaneCommands {
         previewBox.layer?.cornerRadius = 10
         previewBox.layer?.masksToBounds = true
         previewBox.contentView = scroll
-        alert.accessoryView = previewBox
-        alert.showsSuppressionButton = true
-        alert.suppressionButton?.title = L10n.text("paste.warning.suppress")
-        alert.addButton(withTitle: L10n.text("common.paste"))
-        alert.addButton(withTitle: L10n.text("common.cancel"))
-        alert.present(for: host.view.window) { [weak self] response in
-            // The pane may have closed while the sheet was up.
-            guard response == .alertFirstButtonReturn, self?.host?.session != nil else { return }
-            if alert.suppressionButton?.state == .on { self?.suppressPasteWarnings = true }
-            self?.pasteNow(sanitized)
-        }
+        return previewBox
     }
 
     /// A paste in every way that matters, as in `pasteFromClipboard` —
@@ -183,9 +189,8 @@ extension PaneCommands {
         let grid = session.snapshot()
         let metrics = terminalRenderer.pointMetrics
         let position = PanePointer.documentPosition(
-            for: point, viewHeight: terminalView.bounds.height,
-            metrics: metrics, grid: grid,
-            scrollOffset: host.scrollOffset, topInset: host.topInset)
+            for: point, grid: grid, scrollOffset: host.scrollOffset,
+            in: GridGeometry(viewHeight: terminalView.bounds.height, metrics: metrics, topInset: host.topInset))
         let range = Selection.range(at: position, unit: .word, in: grid)
         let text = Selection.text(of: range, in: grid)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -213,10 +218,10 @@ extension PaneCommands {
     func sendPaste(_ sanitized: String) {
         let bracketed = bracketedPasteEnabled()
         guard let session = host?.session else { return }
-        switch session.write(
+        let outcome = session.write(
             paste: Paste.chunks(for: sanitized, bracketedPasteEnabled: bracketed),
             closing: Paste.closing(bracketedPasteEnabled: bracketed))
-        {
+        switch outcome {
         case .accepted:
             host?.terminalView?.noteUserInput()
         case .backpressured:

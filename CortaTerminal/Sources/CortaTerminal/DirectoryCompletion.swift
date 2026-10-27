@@ -43,7 +43,8 @@ public struct DirectoryCompletion: Equatable, Sendable {
         let hasPrefix = fields.count > 2 && fields[2].hasPrefix("p=")
         let encodedPrefix = hasPrefix ? String(fields[2].dropFirst(2)) : ""
         guard let prefix = encodedPrefix.removingPercentEncoding, prefix.utf8.count <= 512,
-            !prefix.unicodeScalars.contains(where: { $0.value < 32 || (127...159).contains($0.value) }) else { return nil }
+            !prefix.unicodeScalars.contains(where: { $0.value < 32 || (127...159).contains($0.value) })
+        else { return nil }
         let nameFields = fields.dropFirst(hasPrefix ? 3 : 2)
         guard nameFields.count <= 20 else { return nil }
         var names: [String] = []

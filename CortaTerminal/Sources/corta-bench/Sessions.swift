@@ -116,6 +116,23 @@ func runSimulatedDrag(
     return result
 }
 
+/// Fills the scrollback to its 100k limit through the real PTY. The lines
+/// wrap at 120 columns (124 chars), matching `benchmarkReflowCost`'s
+/// corpus — a non-wrapping fill reflows far cheaper and would understate
+/// the worst case the resize comparison exists to bound. Kernel echo plus
+/// `cat`'s own output push several rows per written line; the write cap
+/// only bounds a broken pipe.
+func fillScrollback(_ session: TerminalSession) {
+    let line = Array((String(repeating: "the quick brown fox jumps over ", count: 4) + "\r\n").utf8)
+    var written = 0
+    while session.snapshot().scrollback.totalPushed < 100_000, written < 150_000 {
+        for _ in 0..<500 { session.write(line) }
+        written += 500
+        usleep(20_000)
+    }
+    awaitQuiet(session)
+}
+
 func benchmarkResizeStrategies() {
     let session: TerminalSession
     do {
@@ -157,23 +174,13 @@ func benchmarkResizeStrategies() {
     print("resize delivery strategies, scripted drag 120 -> 80 columns:")
     dragPair("empty scrollback")
 
-    // Fill the scrollback to its 100k limit through the real PTY. The lines
-    // wrap at 120 columns (124 chars), matching `benchmarkReflowCost`'s
-    // corpus — a non-wrapping fill reflows far cheaper and would understate
-    // the worst case this comparison exists to bound. Kernel echo plus
-    // `cat`'s own output push several rows per written line; the write cap
-    // only bounds a broken pipe.
-    let line = Array((String(repeating: "the quick brown fox jumps over ", count: 4) + "\r\n").utf8)
-    var written = 0
-    while session.snapshot().scrollback.totalPushed < 100_000, written < 150_000 {
-        for _ in 0..<500 { session.write(line) }
-        written += 500
-        usleep(20_000)
-    }
-    awaitQuiet(session)
+    fillScrollback(session)
     let filled = session.snapshot().scrollback.totalPushed
     if filled < 100_000 {
-        print("  warning: scrollback fill stalled at \(filled) pushed rows; full-scrollback run is lower-cost than intended")
+        print(
+            "  warning: scrollback fill stalled at \(filled) pushed "
+                + "rows; full-scrollback run is lower-cost than intended"
+        )
     }
     dragPair("100k-line scrollback")
 }
@@ -213,7 +220,9 @@ func benchmarkWriteBackpressure() {
     print(
         "write backpressure (child not reading): caller-side cost of 1 MB write with full pty buffer: "
             + "\(String(format: "%.1f", Double(timedElapsed) / 1e6)) ms "
-            + "(\(prefill) MB pre-fill cost the caller \(String(format: "%.1f", Double(prefillElapsed) / 1e6)) ms in total)")
+            + "(\(prefill) MB pre-fill cost the caller "
+            + "\(String(format: "%.1f", Double(prefillElapsed) / 1e6)) ms in total)"
+    )
 
     // Release the kernel's buffered input before the bench exits.
     session.stop()
@@ -221,6 +230,41 @@ func benchmarkWriteBackpressure() {
 }
 
 /// Actual build/find children; parent CPU excludes their compilation/traversal.
+/// User plus system CPU seconds in `usage`.
+func cpuSeconds(_ usage: rusage) -> Double {
+    Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec)
+        + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1e6
+}
+
+/// Runs one shell workload in a session to its exit, and prints its wall
+/// time and the CPU it cost this process (the reader).
+func runRealProducer(_ name: String, command: String, round: Int, priority: TerminalSession.ReaderPriority) {
+    do {
+        var before = rusage()
+        _ = getrusage(RUSAGE_SELF, &before)
+        let start = DispatchTime.now().uptimeNanoseconds
+        let session = try TerminalSession(executable: "/bin/sh", arguments: ["-c", command],
+            size: TerminalSize(rows: 4, columns: 200))
+        let done = DispatchSemaphore(value: 0)
+        let outcome = Mutex<ProcessExit?>(nil)
+        session.onChildExit = { exit in outcome.withLock { $0 = exit }; done.signal() }
+        session.setReaderPriority(priority)
+        session.start()
+        let finished = done.wait(timeout: .now() + 180) == .success
+        var after = rusage()
+        _ = getrusage(RUSAGE_SELF, &after)
+        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
+        print(
+            "real-producer \(name) round=\(round) reader=\(session.readerPriority) "
+                + "finished=\(finished) exit=\(String(describing: outcome.withLock { $0 })) "
+                + "elapsed=\(String(format: "%.3f", elapsed))s "
+                + "parentCPU=\(String(format: "%.6f", cpuSeconds(after) - cpuSeconds(before)))s"
+        )
+        fflush(stdout)
+        session.stop()
+    } catch { print("real-producer failed: \(error)") }
+}
+
 func benchmarkRealReaderProducers(priority: TerminalSession.ReaderPriority) {
     let root = "/tmp/corta-reader-producers"
     let repositoryIndex = CommandLine.arguments.firstIndex(of: "--repository")
@@ -237,34 +281,14 @@ func benchmarkRealReaderProducers(priority: TerminalSession.ReaderPriority) {
     } else {
         find = "for n in 1 2 3 4 5 6 7 8 9 10; do /usr/bin/find '\(root)/tree' -type f; done"
     }
-    func cpu(_ usage: rusage) -> Double {
-        Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec)
-            + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1e6
-    }
     for round in 1...3 {
         let build = "\(root)/build-\(priority)-\(round)-\(UUID().uuidString)"
-        let workloads = [("swift-build", "/usr/bin/swift build -v --package-path \(package) --scratch-path \(quote(build))"),
-            ("find", find)]
+        let workloads = [
+            ("swift-build", "/usr/bin/swift build -v --package-path \(package) --scratch-path \(quote(build))"),
+            ("find", find),
+        ]
         for (name, command) in workloads {
-            do {
-                var before = rusage()
-                _ = getrusage(RUSAGE_SELF, &before)
-                let start = DispatchTime.now().uptimeNanoseconds
-                let session = try TerminalSession(executable: "/bin/sh", arguments: ["-c", command],
-                    size: TerminalSize(rows: 4, columns: 200))
-                let done = DispatchSemaphore(value: 0)
-                let outcome = Mutex<ProcessExit?>(nil)
-                session.onChildExit = { exit in outcome.withLock { $0 = exit }; done.signal() }
-                session.setReaderPriority(priority)
-                session.start()
-                let finished = done.wait(timeout: .now() + 180) == .success
-                var after = rusage()
-                _ = getrusage(RUSAGE_SELF, &after)
-                let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9
-                print("real-producer \(name) round=\(round) reader=\(session.readerPriority) finished=\(finished) exit=\(String(describing: outcome.withLock { $0 })) elapsed=\(String(format: "%.3f", elapsed))s parentCPU=\(String(format: "%.6f", cpu(after)-cpu(before)))s")
-                fflush(stdout)
-                session.stop()
-            } catch { print("real-producer failed: \(error)") }
+            runRealProducer(name, command: command, round: round, priority: priority)
         }
     }
 }
@@ -317,6 +341,44 @@ func benchmarkReaderProducer(priority: TerminalSession.ReaderPriority) {
 /// launch. (`/bin/true` is not a binary on macOS 26 — only `/usr/bin/true`
 /// exists; spawning the former fails with ENOENT.) Events are awaited on a semaphore signalled
 /// by the callback itself, so the numbers carry no polling quantisation.
+/// One spawn-to-first-event latency: the child's exit or its first output.
+func measureFirstEvent(executable: String, arguments: [String], waitForExit: Bool, label: String, iterations: Int) {
+    var samples: [UInt64] = []
+    samples.reserveCapacity(iterations)
+    var timedOut = 0
+    var failedSpawns = 0
+    for _ in 0..<iterations {
+        guard let session = try? TerminalSession(executable: executable, arguments: arguments)
+        else {
+            failedSpawns += 1
+            Thread.sleep(forTimeInterval: 0.1)
+            continue
+        }
+        let semaphore = DispatchSemaphore(value: 0)
+        let start = DispatchTime.now()
+        if waitForExit {
+            session.onChildExit = { _ in semaphore.signal() }
+        } else {
+            session.onOutput = { semaphore.signal() }
+        }
+        session.start()
+        if semaphore.wait(timeout: .now() + 10) == .success {
+            samples.append(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)
+        } else {
+            timedOut += 1
+        }
+        session.stop()
+    }
+    guard let distribution = LatencyDistribution(samplesNanoseconds: samples) else {
+        print("spawn decomposition [\(label)]: NO DATA (\(timedOut) timed out, \(failedSpawns) spawn failures)")
+        return
+    }
+    print(
+        "spawn decomposition [\(label)]: \(distribution.description)"
+            + (timedOut > 0 ? " [\(timedOut) timed out]" : "")
+            + (failedSpawns > 0 ? " [\(failedSpawns) spawn failures]" : ""))
+}
+
 func benchmarkSessionSpawnDecomposition() {
     let iterations = 30
 
@@ -344,49 +406,21 @@ func benchmarkSessionSpawnDecomposition() {
             "spawn decomposition [(a) PTY spawn handshake]: \(distribution.description)"
                 + (failedSpawns > 0 ? " [\(failedSpawns) spawns failed, first: \(firstFailure ?? "?")]" : ""))
     } else {
-        print("spawn decomposition [(a) PTY spawn handshake]: NO DATA (\(failedSpawns) failed, first: \(firstFailure ?? "?"))")
-    }
-
-    func measureFirstEvent(executable: String, arguments: [String], waitForExit: Bool, label: String) {
-        var samples: [UInt64] = []
-        samples.reserveCapacity(iterations)
-        var timedOut = 0
-        var failedSpawns = 0
-        for _ in 0..<iterations {
-            guard let session = try? TerminalSession(executable: executable, arguments: arguments)
-            else {
-                failedSpawns += 1
-                Thread.sleep(forTimeInterval: 0.1)
-                continue
-            }
-            let semaphore = DispatchSemaphore(value: 0)
-            let start = DispatchTime.now()
-            if waitForExit {
-                session.onChildExit = { _ in semaphore.signal() }
-            } else {
-                session.onOutput = { semaphore.signal() }
-            }
-            session.start()
-            if semaphore.wait(timeout: .now() + 10) == .success {
-                samples.append(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)
-            } else {
-                timedOut += 1
-            }
-            session.stop()
-        }
-        guard let distribution = LatencyDistribution(samplesNanoseconds: samples) else {
-            print("spawn decomposition [\(label)]: NO DATA (\(timedOut) timed out, \(failedSpawns) spawn failures)")
-            return
-        }
         print(
-            "spawn decomposition [\(label)]: \(distribution.description)"
-                + (timedOut > 0 ? " [\(timedOut) timed out]" : "")
-                + (failedSpawns > 0 ? " [\(failedSpawns) spawn failures]" : ""))
+            "spawn decomposition [(a) PTY spawn handshake]: NO DATA "
+                + "(\(failedSpawns) failed, first: \(firstFailure ?? "?"))"
+        )
     }
 
-    measureFirstEvent(executable: "/usr/bin/true", arguments: [], waitForExit: true, label: "(b) exec floor, /usr/bin/true -> exit")
-    measureFirstEvent(executable: "/bin/zsh", arguments: ["-f"], waitForExit: false, label: "(c) zsh -f -> first output")
-    measureFirstEvent(executable: "/bin/zsh", arguments: ["-l"], waitForExit: false, label: "(d) zsh -l -> first output (as the app spawns it)")
+    measureFirstEvent(
+        executable: "/usr/bin/true", arguments: [], waitForExit: true,
+        label: "(b) exec floor, /usr/bin/true -> exit", iterations: iterations)
+    measureFirstEvent(
+        executable: "/bin/zsh", arguments: ["-f"], waitForExit: false,
+        label: "(c) zsh -f -> first output", iterations: iterations)
+    measureFirstEvent(
+        executable: "/bin/zsh", arguments: ["-l"], waitForExit: false,
+        label: "(d) zsh -l -> first output (as the app spawns it)", iterations: iterations)
 }
 
 /// The per-pane cost below the app: a PTY pair, a corta-exec helper exec, a
@@ -402,7 +436,10 @@ func benchmarkMultiPaneFixedCost() {
     defer { sessions.forEach { $0.stop() } }
     var previous = Int64(currentResidentBytes())
     var previousThreads = currentThreadCount()
-    print("multi-pane fixed cost: 0 panes, resident \(String(format: "%.1f", Double(previous) / 1_048_576)) MB, threads \(previousThreads)")
+    print(
+        "multi-pane fixed cost: 0 panes, resident "
+            + "\(String(format: "%.1f", Double(previous) / 1_048_576)) MB, threads \(previousThreads)"
+    )
     for target in [1, 2, 4] {
         while sessions.count < target {
             guard let session = try? TerminalSession(
@@ -434,7 +471,8 @@ func benchmarkReaderQoS() {
     let thread = Thread {
         let qos = utility ? QOS_CLASS_UTILITY : QOS_CLASS_USER_INITIATED
         print(
-            "reader QoS benchmark: \(utility ? "utility" : "user-initiated"), set=\(pthread_set_qos_class_self_np(qos, 0))"
+            "reader QoS benchmark: \(utility ? "utility" : "user-initiated"), "
+                + "set=\(pthread_set_qos_class_self_np(qos, 0))"
         )
         if CommandLine.arguments.contains("--real-producers") {
             benchmarkRealReaderProducers(priority: utility ? .background : .interactive)
@@ -448,4 +486,3 @@ func benchmarkReaderQoS() {
     thread.start()
     finished.wait()
 }
-

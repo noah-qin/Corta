@@ -23,36 +23,62 @@ import CortaTerminal
 struct DirectoryCompletionSessionTests {
     @Test("startup folders a crashed run left are removed once a day old, and nothing else")
     func staleStartupFoldersAreRemoved() throws {
-        let fm = FileManager.default
-        let root = fm.temporaryDirectory.appendingPathComponent("corta-stale-\(UUID().uuidString)")
-        defer { try? fm.removeItem(at: root) }
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent("corta-stale-\(UUID().uuidString)")
+        defer { try? fileManager.removeItem(at: root) }
         let old = root.appendingPathComponent(ZshBootstrap.folderPrefix + "old")
         let fresh = root.appendingPathComponent(ZshBootstrap.folderPrefix + "fresh")
         let other = root.appendingPathComponent("someone-else")
-        for url in [old, fresh, other] { try fm.createDirectory(at: url, withIntermediateDirectories: true) }
+        for url in [old, fresh, other] { try fileManager.createDirectory(at: url, withIntermediateDirectories: true) }
         let now = Date()
         let dayAgo = now.addingTimeInterval(-ZshBootstrap.staleAge - 60)
-        try fm.setAttributes([.modificationDate: dayAgo], ofItemAtPath: old.path)
-        try fm.setAttributes([.modificationDate: dayAgo], ofItemAtPath: other.path)
+        try fileManager.setAttributes([.modificationDate: dayAgo], ofItemAtPath: old.path)
+        try fileManager.setAttributes([.modificationDate: dayAgo], ofItemAtPath: other.path)
         ZshBootstrap.removeStaleFolders(in: root, now: now)
-        #expect(!fm.fileExists(atPath: old.path))
-        #expect(fm.fileExists(atPath: fresh.path), "the other build may be starting a shell from it")
-        #expect(fm.fileExists(atPath: other.path))
+        #expect(!fileManager.fileExists(atPath: old.path))
+        #expect(fileManager.fileExists(atPath: fresh.path), "the other build may be starting a shell from it")
+        #expect(fileManager.fileExists(atPath: other.path))
+    }
+
+    /// A home of folders to complete — plain, nested, linked, with spaces,
+    /// a quote and a leading dash — a file, and a `.zshrc` that must not
+    /// change.
+    private static func makeCompletionHome() throws -> URL {
+        let fileManager = FileManager.default
+        let home = fileManager.temporaryDirectory.appendingPathComponent("corta-cd-session-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: home, withIntermediateDirectories: true)
+        for name in ["Alpha", "Another", "空格 中文", "quote'name", ".hidden", "-dash"] {
+            try fileManager.createDirectory(at: home.appendingPathComponent(name), withIntermediateDirectories: true)
+        }
+        try fileManager.createDirectory(
+            at: home.appendingPathComponent("Another/Child/Grandchild"), withIntermediateDirectories: true)
+        try fileManager.createSymbolicLink(
+            at: home.appendingPathComponent("Linked"), withDestinationURL: home.appendingPathComponent("Alpha"))
+        try "not a directory".write(to: home.appendingPathComponent("file"), atomically: true, encoding: .utf8)
+        try "PS1='READY> '\n".write(to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+        return home
+    }
+
+    /// Polls `predicate` for up to five seconds; a timeout fails with the
+    /// screen.
+    private static func wait(for session: TerminalSession, until predicate: () -> Bool) throws {
+        let end = SuspendingClock.now + .seconds(5 * Double(testTimeoutScale))
+        while SuspendingClock.now < end {
+            if predicate() { return }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        try #require(Bool(false), "\(session.snapshot().dump())")
     }
 
     @Test func shellOwnsFilteringAndAcceptance() throws {
-        let fm = FileManager.default
-        let home = fm.temporaryDirectory.appendingPathComponent("corta-cd-session-\(UUID().uuidString)")
-        try fm.createDirectory(at: home, withIntermediateDirectories: true)
-        defer { try? fm.removeItem(at: home) }
-        for name in ["Alpha", "Another", "空格 中文", "quote'name", ".hidden", "-dash"] {
-            try fm.createDirectory(at: home.appendingPathComponent(name), withIntermediateDirectories: true)
-        }
-        try fm.createDirectory(at: home.appendingPathComponent("Another/Child/Grandchild"), withIntermediateDirectories: true)
-        try fm.createSymbolicLink(at: home.appendingPathComponent("Linked"), withDestinationURL: home.appendingPathComponent("Alpha"))
-        try "not a directory".write(to: home.appendingPathComponent("file"), atomically: true, encoding: .utf8)
-        try "PS1='READY> '\n".write(to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
-        let (env, made, token) = ZshBootstrap.prepare(["HOME": home.path, "ZDOTDIR": home.path, "PATH": "/bin:/usr/bin", "TERM": "xterm-256color", "LANG": "en_US.UTF-8", "TERM_PROGRAM": "Corta"], executable: "/bin/zsh", arguments: ["-l"])
+        let home = try Self.makeCompletionHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let environment = [
+            "HOME": home.path, "ZDOTDIR": home.path, "PATH": "/bin:/usr/bin", "TERM": "xterm-256color",
+            "LANG": "en_US.UTF-8", "TERM_PROGRAM": "Corta",
+        ]
+        let prepared = ZshBootstrap.prepare(environment, executable: "/bin/zsh", arguments: ["-l"])
+        let env = prepared.environment, made = prepared.folder, token = prepared.token
         let folder = try #require(made)
         defer { ZshBootstrap.remove(folder) }
         let session = try TerminalSession(executable: "/bin/zsh", arguments: ["-l"], environment: env,
@@ -60,14 +86,7 @@ struct DirectoryCompletionSessionTests {
             directoryCompletionToken: token)
         defer { session.stop() }
         session.start()
-        func wait(_ predicate: () -> Bool) throws {
-            let end = SuspendingClock.now + .seconds(5 * Double(testTimeoutScale))
-            while SuspendingClock.now < end {
-                if predicate() { return }
-                Thread.sleep(forTimeInterval: 0.01)
-            }
-            try #require(Bool(false), "\(session.snapshot().dump())")
-        }
+        func wait(_ predicate: () -> Bool) throws { try Self.wait(for: session, until: predicate) }
         func write(_ value: String) { session.write(Array(value.utf8)) }
         try wait { session.promptEndPosition != nil }
         write("cd ")
@@ -92,40 +111,34 @@ struct DirectoryCompletionSessionTests {
         try wait { session.currentDirectory?.hasSuffix("/Another/Child/Grandchild") == true }
         write("cd ../../..\r")
         try wait { session.currentDirectory?.hasSuffix(home.lastPathComponent) == true }
-        write("cd 空")
-        try wait { session.directoryCompletion?.candidates == ["空格 中文/"] }
-        write("\u{1b}[99~\r")
-        try wait { session.currentDirectory?.hasSuffix("/空格 中文") == true }
-        write("cd ..\r")
-        try wait { session.currentDirectory?.hasSuffix(home.lastPathComponent) == true }
-        write("cd quote")
-        try wait { session.directoryCompletion?.candidates == ["quote'name/"] }
-        write("\u{1b}[99~\r")
-        try wait { session.currentDirectory?.hasSuffix("/quote'name") == true }
-        write("cd ..\r")
-        try wait { session.currentDirectory?.hasSuffix(home.lastPathComponent) == true }
-        write("cd -d")
-        try wait { session.directoryCompletion?.candidates == ["-dash/"] }
-        write("\u{1b}[99~\r")
-        try wait { session.currentDirectory?.hasSuffix("/-dash") == true }
+        // Names a shell would split, quote or read as an option.
+        for (typed, name) in [("空", "空格 中文"), ("quote", "quote'name"), ("-d", "-dash")] {
+            write("cd \(typed)")
+            try wait { session.directoryCompletion?.candidates == ["\(name)/"] }
+            write("\u{1b}[99~\r")
+            try wait { session.currentDirectory?.hasSuffix("/\(name)") == true }
+            write("cd ..\r")
+            try wait { session.currentDirectory?.hasSuffix(home.lastPathComponent) == true }
+        }
         #expect(try String(contentsOf: home.appendingPathComponent(".zshrc"), encoding: .utf8) == "PS1='READY> '\n")
     }
     /// macOS's /etc/zshrc sets HISTFILE from ZDOTDIR while ZDOTDIR still
     /// names the startup folder, so history was written there and deleted
     /// with it. The user's own choice of HISTFILE is kept.
     @Test(arguments: [nil, "custom_history"]) func historyStaysInTheUsersDirectory(chosen: String?) throws {
-        let fm = FileManager.default
-        let home = fm.temporaryDirectory.appendingPathComponent("corta-histfile-test-\(UUID().uuidString)")
-        try fm.createDirectory(at: home, withIntermediateDirectories: true)
-        defer { try? fm.removeItem(at: home) }
+        let fileManager = FileManager.default
+        let home = fileManager.temporaryDirectory.appendingPathComponent("corta-histfile-test-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: home) }
         let seen = home.appendingPathComponent("seen")
         // In .zshrc, as on any Mac: /etc/zshrc overrides an earlier choice.
         let choice = chosen.map { "HISTFILE='\(home.appendingPathComponent($0).path)'\n" } ?? ""
         try (choice + "print -r -- $HISTFILE > '\(seen.path)'\n")
             .write(to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
-        let (env, made, _) = ZshBootstrap.prepare(
+        let prepared = ZshBootstrap.prepare(
             ["HOME": home.path, "PATH": "/bin:/usr/bin", "TERM": "xterm-256color", "LANG": "en_US.UTF-8"],
             executable: "/bin/zsh", arguments: ["-l"])
+        let env = prepared.environment, made = prepared.folder
         let folder = try #require(made)
         defer { ZshBootstrap.remove(folder) }
         let session = try TerminalSession(executable: "/bin/zsh", arguments: ["-l"], environment: env,
@@ -142,18 +155,23 @@ struct DirectoryCompletionSessionTests {
     }
 
     @Test(arguments: [false, true]) func startupPreservesUserDotDirectory(explicit: Bool) throws {
-        let fm = FileManager.default
-        let home = fm.temporaryDirectory.appendingPathComponent("corta-zdotdir-test-\(UUID().uuidString)")
+        let fileManager = FileManager.default
+        let home = fileManager.temporaryDirectory.appendingPathComponent("corta-zdotdir-test-\(UUID().uuidString)")
         let dot = home.appendingPathComponent("dot")
-        try fm.createDirectory(at: dot, withIntermediateDirectories: true)
-        defer { try? fm.removeItem(at: home) }
+        try fileManager.createDirectory(at: dot, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: home) }
         let seen = home.appendingPathComponent("seen")
         let order = home.appendingPathComponent("order")
-        try "print -r -- ${+ZDOTDIR} > '\(seen.path)'\nZDOTDIR='\(dot.path)'\n".write(to: home.appendingPathComponent(".zshenv"), atomically: true, encoding: .utf8)
+        try "print -r -- ${+ZDOTDIR} > '\(seen.path)'\nZDOTDIR='\(dot.path)'\n".write(
+            to: home.appendingPathComponent(".zshenv"), atomically: true, encoding: .utf8)
         for (file, marker) in [(".zprofile", "profile"), (".zshrc", "rc"), (".zlogin", "login")] {
-            try "print -r -- \(marker) >> '\(order.path)'\n".write(to: dot.appendingPathComponent(file), atomically: true, encoding: .utf8)
+            try "print -r -- \(marker) >> '\(order.path)'\n".write(
+                to: dot.appendingPathComponent(file), atomically: true, encoding: .utf8)
         }
-        var original = ["HOME": home.path, "PATH": "/bin:/usr/bin", "TERM": "xterm-256color", "LANG": "en_US.UTF-8", "TERM_PROGRAM": "Corta"]
+        var original = [
+            "HOME": home.path, "PATH": "/bin:/usr/bin", "TERM": "xterm-256color", "LANG": "en_US.UTF-8",
+            "TERM_PROGRAM": "Corta",
+        ]
         if explicit { original["ZDOTDIR"] = home.path }
         let env = ZshBootstrap.environment(original, executable: "/bin/zsh", arguments: ["-l"])
         let session = try TerminalSession(executable: "/bin/zsh", arguments: ["-l"], environment: env,

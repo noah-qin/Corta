@@ -28,8 +28,9 @@ import Testing
 @Suite("CanvasPresent")
 struct CanvasPresentTests {
     private static func themeBackground() -> CGColor {
-        let bg = TerminalColorPalette.defaultBackground
-        return CGColor(srgbRed: CGFloat(bg.x), green: CGFloat(bg.y), blue: CGFloat(bg.z), alpha: 1)
+        let canvasColor = TerminalColorPalette.defaultBackground
+        return CGColor(
+            srgbRed: CGFloat(canvasColor.x), green: CGFloat(canvasColor.y), blue: CGFloat(canvasColor.z), alpha: 1)
     }
 
     /// The window shows its first frame a vsync after it orders front; what
@@ -128,14 +129,22 @@ struct CanvasPresentTests {
         #expect(!FrameScheduler.mayPause(stillPending: true, drawn: true))
     }
     @Test func echoGateRespectsWindowPauseAndRefreshInterval() {
-        #expect(FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.96, lastPresent: nil, maximumFPS: 60, isPaused: true))
-        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.94, lastPresent: nil, maximumFPS: 60, isPaused: true))
-        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: 10.01, lastPresent: nil, maximumFPS: 60, isPaused: true))
-        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: nil, lastPresent: nil, maximumFPS: 60, isPaused: true))
-        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: 9.99, maximumFPS: 60, isPaused: true))
-        #expect(FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: 9.99, maximumFPS: 120, isPaused: true))
-        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: 9.96, maximumFPS: 20, isPaused: true))
-        #expect(!FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: nil, maximumFPS: 60, isPaused: false))
+        #expect(
+            FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.96, lastPresent: nil, maximumFPS: 60, isPaused: true))
+        #expect(
+            !FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.94, lastPresent: nil, maximumFPS: 60, isPaused: true))
+        #expect(
+            !FrameScheduler.mayPresentEcho(now: 10, lastInput: 10.01, lastPresent: nil, maximumFPS: 60, isPaused: true))
+        #expect(
+            !FrameScheduler.mayPresentEcho(now: 10, lastInput: nil, lastPresent: nil, maximumFPS: 60, isPaused: true))
+        #expect(
+            !FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: 9.99, maximumFPS: 60, isPaused: true))
+        #expect(
+            FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: 9.99, maximumFPS: 120, isPaused: true))
+        #expect(
+            !FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: 9.96, maximumFPS: 20, isPaused: true))
+        #expect(
+            !FrameScheduler.mayPresentEcho(now: 10, lastInput: 9.99, lastPresent: nil, maximumFPS: 60, isPaused: false))
     }
 
     @Test func onDemandPacingDoesNotRetainTheScheduler() {

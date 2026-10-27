@@ -25,7 +25,9 @@ import Testing
 /// The selection's document rows (scrollback rows
 /// negative) are translated to viewport rows through the scroll offset and
 /// the scrollback's growth since the selection was recorded.
-@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct SelectionRendererTests {
+@Suite(
+    .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct SelectionRendererTests {
     @discardableResult
     private static func draw(
         _ fixture: RenderFixture, grid: Grid, scrollOffset: Int, selection: TerminalSelection?
@@ -33,11 +35,10 @@ import Testing
         let texture = MetalRenderTarget.make(
             device: fixture.renderer.backend.device, width: fixture.width, height: fixture.height)
         fixture.renderer.renderAndWait(
-            grid: grid, scrollOffset: scrollOffset,
-            rect: CGRect(x: 0, y: 0, width: fixture.width, height: fixture.height),
-            drawableSize: CGSize(width: fixture.width, height: fixture.height),
-            cursorVisible: false, selection: selection,
-            target: texture)
+            grid: grid, scrollOffset: scrollOffset, cursorVisible: false, selection: selection,
+            into: FrameTarget(
+                texture: texture, rect: CGRect(x: 0, y: 0, width: fixture.width, height: fixture.height),
+                drawableSize: CGSize(width: fixture.width, height: fixture.height)))
         return texture
     }
 
@@ -199,8 +200,8 @@ struct SelectionCellMappingTests {
             x: TerminalLayout.insets.left + 2.5 * Self.metrics.cellWidth,
             y: Self.topInset + 3.5 * Self.metrics.cellHeight)
         let position = PanePointer.documentPosition(
-            for: point, viewHeight: Self.exactHeight(rows: 30), metrics: Self.metrics,
-            grid: grid, scrollOffset: 0, topInset: Self.topInset)
+            for: point, grid: grid, scrollOffset: 0,
+            in: GridGeometry(viewHeight: Self.exactHeight(rows: 30), metrics: Self.metrics, topInset: Self.topInset))
         #expect(position.row == 3)
         #expect(position.column == 2)
     }
@@ -214,8 +215,10 @@ struct SelectionCellMappingTests {
             x: TerminalLayout.insets.left + 2.5 * Self.metrics.cellWidth,
             y: Self.topInset + 1.1 * Self.metrics.cellHeight)
         let position = PanePointer.documentPosition(
-            for: point, viewHeight: Self.exactHeight(rows: 30) + Self.metrics.cellHeight / 2,
-            metrics: Self.metrics, grid: grid, scrollOffset: 0, topInset: Self.topInset)
+            for: point, grid: grid, scrollOffset: 0,
+            in: GridGeometry(
+                viewHeight: Self.exactHeight(rows: 30) + Self.metrics.cellHeight / 2, metrics: Self.metrics,
+                topInset: Self.topInset))
         #expect(position.row == 1)
     }
 
@@ -228,18 +231,22 @@ struct SelectionCellMappingTests {
             x: TerminalLayout.insets.left + 2.5 * Self.metrics.cellWidth,
             y: Self.topInset + 1.1 * Self.metrics.cellHeight)
         let position = PanePointer.documentPosition(
-            for: point, viewHeight: Self.exactHeight(rows: 30) - 2 * Self.metrics.cellHeight,
-            metrics: Self.metrics, grid: grid, scrollOffset: 0, topInset: Self.topInset)
+            for: point, grid: grid, scrollOffset: 0,
+            in: GridGeometry(
+                viewHeight: Self.exactHeight(rows: 30) - 2 * Self.metrics.cellHeight, metrics: Self.metrics,
+                topInset: Self.topInset))
         #expect(position.row == 3)
     }
 
     @Test func inputCellFrameMatchesHitTestingDuringLiveResize() {
         let grid = Grid(rows: 30, columns: 120)
         for height in [Self.exactHeight(rows: 30) + 5, Self.exactHeight(rows: 30) - 2 * Self.metrics.cellHeight] {
-            let cell = PanePointer.cellFrame(row: 3, column: 2, viewHeight: height,
-                metrics: Self.metrics, rows: grid.rows, topInset: Self.topInset)
-            let position = PanePointer.documentPosition(for: CGPoint(x: cell.midX, y: cell.midY),
-                viewHeight: height, metrics: Self.metrics, grid: grid, scrollOffset: 0, topInset: Self.topInset)
+            let cell = PanePointer.cellFrame(
+                row: 3, column: 2, rows: grid.rows,
+                in: GridGeometry(viewHeight: height, metrics: Self.metrics, topInset: Self.topInset))
+            let position = PanePointer.documentPosition(
+                for: CGPoint(x: cell.midX, y: cell.midY), grid: grid, scrollOffset: 0,
+                in: GridGeometry(viewHeight: height, metrics: Self.metrics, topInset: Self.topInset))
             #expect(position.row == 3)
             #expect(position.column == 2)
             #expect(cell.height == Self.metrics.cellHeight)
@@ -252,8 +259,8 @@ struct SelectionCellMappingTests {
             x: TerminalLayout.insets.left + 1,
             y: Self.topInset + 1)
         let position = PanePointer.documentPosition(
-            for: point, viewHeight: Self.exactHeight(rows: 30), metrics: Self.metrics,
-            grid: grid, scrollOffset: 7, topInset: Self.topInset)
+            for: point, grid: grid, scrollOffset: 7,
+            in: GridGeometry(viewHeight: Self.exactHeight(rows: 30), metrics: Self.metrics, topInset: Self.topInset))
         #expect(position.row == -7, "viewport row 0 is document row -scrollOffset")
         #expect(position.column == 0)
     }
@@ -261,13 +268,13 @@ struct SelectionCellMappingTests {
     @Test func pointsOutsideTheGridClampToTheEdge() {
         let grid = Grid(rows: 30, columns: 120)
         let far = PanePointer.documentPosition(
-            for: CGPoint(x: 9_999, y: 9_999), viewHeight: Self.exactHeight(rows: 30),
-            metrics: Self.metrics, grid: grid, scrollOffset: 0, topInset: Self.topInset)
+            for: CGPoint(x: 9_999, y: 9_999), grid: grid, scrollOffset: 0,
+            in: GridGeometry(viewHeight: Self.exactHeight(rows: 30), metrics: Self.metrics, topInset: Self.topInset))
         #expect(far.row == 29)
         #expect(far.column == 119)
         let above = PanePointer.documentPosition(
-            for: CGPoint(x: -50, y: -50), viewHeight: Self.exactHeight(rows: 30),
-            metrics: Self.metrics, grid: grid, scrollOffset: 0, topInset: Self.topInset)
+            for: CGPoint(x: -50, y: -50), grid: grid, scrollOffset: 0,
+            in: GridGeometry(viewHeight: Self.exactHeight(rows: 30), metrics: Self.metrics, topInset: Self.topInset))
         #expect(above.row == 0)
         #expect(above.column == 0)
     }

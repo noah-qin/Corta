@@ -226,7 +226,7 @@ struct AccessibilityMappingTests {
     /// `accessibilityRange(for:)` is handed a **screen** point. Converting it
     /// as if it were a window point put every answer off by the window's
     /// origin, which on a second display is thousands of points.
-    @Test func hitTestingConvertsFromScreenNotWindow() {
+    @Test func hitTestingConvertsFromScreenNotWindow() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 400, y: 500, width: 400, height: 300),
             styleMask: [.titled], backing: .buffered, defer: false)
@@ -254,7 +254,7 @@ struct AccessibilityMappingTests {
             NSRect(origin: view.convert(viewPoint, to: nil), size: .zero)
         ).origin
         _ = view.accessibilityRange(for: screenPoint)
-        let got = try! #require(received)
+        let got = try #require(received)
         #expect(abs(got.x - viewPoint.x) < 0.5)
         #expect(abs(got.y - viewPoint.y) < 0.5)
     }
@@ -304,9 +304,9 @@ struct AccessibilityMappingTests {
         var terminal = Self.terminal()
         terminal.feed(Array("a中b".utf8))
         let snapshot = Self.snapshot(terminal)
-        #expect(snapshot.cellSpan(forOffset: 0) == (row: 0, column: 0, columns: 1))
-        #expect(snapshot.cellSpan(forOffset: 1) == (row: 0, column: 1, columns: 2))
-        #expect(snapshot.cellSpan(forOffset: 2) == (row: 0, column: 3, columns: 1))
+        #expect(snapshot.cellSpan(forOffset: 0) == .init(row: 0, column: 0, columns: 1))
+        #expect(snapshot.cellSpan(forOffset: 1) == .init(row: 0, column: 1, columns: 2))
+        #expect(snapshot.cellSpan(forOffset: 2) == .init(row: 0, column: 3, columns: 1))
     }
 
     /// A combining sequence adds UTF-16 units without adding columns, so its

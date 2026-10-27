@@ -163,7 +163,7 @@ public final class SFTPConnection: SFTPClient, @unchecked Sendable {
 
     /// The server's capabilities, from its VERSION answer; `nil` until
     /// `connect()` completes.
-    public var capabilities: SFTPServerCapabilities? {
+    var capabilities: SFTPServerCapabilities? {
         state.withLock { $0.capabilities }
     }
 

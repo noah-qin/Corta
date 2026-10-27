@@ -63,17 +63,17 @@ struct AgentTabViewTests {
             NSColor.clear.setFill()
             view.bounds.fill(using: .copy)
             view.draw(view.bounds)
-            var xs: [Int] = [], ys: [Int] = []
+            var inkColumns: [Int] = [], inkRows: [Int] = []
             for y in 0..<height {
                 for x in 0..<width {
                     if let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
                        color.blueComponent > 0.8, color.alphaComponent > 0.8 {
-                        xs.append(x); ys.append(y)
+                        inkColumns.append(x); inkRows.append(y)
                     }
                 }
             }
-            let left = try #require(xs.min()), right = try #require(xs.max())
-            let bottom = try #require(ys.min()), top = try #require(ys.max())
+            let left = try #require(inkColumns.min()), right = try #require(inkColumns.max())
+            let bottom = try #require(inkRows.min()), top = try #require(inkRows.max())
             #expect(abs(Double(left + right + 1) / 2 - Double(width) / 2) <= 0.5)
             #expect(abs(Double(bottom + top + 1) / 2 - Double(height) / 2) <= 0.5)
         }

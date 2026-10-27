@@ -43,13 +43,7 @@ nonisolated extension GlyphAtlas {
         for run in glyphRuns {
             let count = CTRunGetGlyphCount(run)
             guard count > 0 else { continue }
-            let attributes = CTRunGetAttributes(run) as? [CFString: Any]
-            var runFont: CTFont
-            if let value = attributes?[kCTFontAttributeName] {
-                runFont = value as! CTFont
-            } else {
-                runFont = requested
-            }
+            var runFont = Self.font(of: run, requested: requested)
             let isFallback = !CFEqual(runFont, requested)
             if isFallback { fallbackHits += 1 }
             // Bitmap fonts draw nothing through `CTFontDrawGlyphs`.
@@ -73,22 +67,43 @@ nonisolated extension GlyphAtlas {
                 isColor = false
             }
             if isFallback, !isColor {
-                if let lighter = Self.unbolded(runFont, under: requested, characters: characters, glyphCount: glyphs.count) {
-                    runFont = lighter.font
-                    glyphs = lighter.glyphs
-                }
-                if Self.isStandaloneSymbol(characters) {
-                    Self.centre(&positions, glyphs: glyphs, of: runFont, on: requested)
-                }
+                Self.settleFallback(
+                    &runFont, glyphs: &glyphs, positions: &positions, characters: characters, under: requested)
             }
             let kept = zip(glyphs, positions).filter { $0.0 != 0 }
             if kept.isEmpty, glyphs.contains(0) { sawNotdef = true }
             guard !kept.isEmpty else { continue }
-            runs.append(
-                (kept.map(\.0), kept.map(\.1), runFont, isColor,
-                 isColor ? run : nil, isColor ? line : nil))
+            runs.append(ShapedRun(
+                glyphs: kept.map(\.0), positions: kept.map(\.1), font: runFont, isColor: isColor,
+                ctRun: isColor ? run : nil, ctLine: isColor ? line : nil))
         }
         return (runs, sawNotdef)
+    }
+
+    /// The font Core Text resolved for `run`, or `requested` without one. A
+    /// cast to a CF type is never checked (`as?` always succeeds), so the
+    /// type ID is what proves the attribute is a font.
+    private static func font(of run: CTRun, requested: CTFont) -> CTFont {
+        let attributes = CTRunGetAttributes(run) as? [CFString: Any]
+        guard let value = attributes?[kCTFontAttributeName], CFGetTypeID(value as CFTypeRef) == CTFontGetTypeID()
+        else { return requested }
+        return unsafeDowncast(value as CFTypeRef, to: CTFont.self)
+    }
+
+    /// An outline fallback run set beside the primary's text: a bold face
+    /// swapped for its regular one (`unbolded`), and a standalone symbol
+    /// centred on the primary's axis (`centre`).
+    private static func settleFallback(
+        _ font: inout CTFont, glyphs: inout [CGGlyph], positions: inout [CGPoint], characters: [UniChar],
+        under requested: CTFont
+    ) {
+        if let lighter = unbolded(font, under: requested, characters: characters, glyphCount: glyphs.count) {
+            font = lighter.font
+            glyphs = lighter.glyphs
+        }
+        if isStandaloneSymbol(characters) {
+            centre(&positions, glyphs: glyphs, of: font, on: requested)
+        }
     }
 
     /// The style's face, with kana or Hangul's own face leading the cascade
@@ -232,23 +247,7 @@ nonisolated extension GlyphAtlas {
                 bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
                 bitmapInfo: CGImageAlphaInfo.none.rawValue)
         else { return GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero) }
-        Self.prepareForText(context)
-        context.setFillColor(gray: 1, alpha: 1)
-        if strokeWidth > 0 {
-            context.setStrokeColor(gray: 1, alpha: 1)
-            context.setLineWidth(strokeWidth)
-            context.setTextDrawingMode(.fillStroke)
-        }
-        // No CTM flip: the context's top-down buffer and y-up coordinates cancel,
-        // and the shader maps quad (0,0) to the region's top row. A flip drew
-        // every glyph upside down.
-        for run in runs {
-            var glyphs = run.glyphs
-            var positions = run.positions.map {
-                CGPoint(x: $0.x - bbox.minX, y: $0.y - bbox.minY)
-            }
-            CTFontDrawGlyphs(run.font, &glyphs, &positions, glyphs.count, context)
-        }
+        Self.drawOutlines(runs, in: context, from: bbox.origin, strokeWidth: strokeWidth)
 
         guard let data = context.data else {
             return GlyphInfo(uvRect: .zero, size: .zero, bearing: .zero)
@@ -309,12 +308,56 @@ nonisolated extension GlyphAtlas {
                 bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
                     | CGBitmapInfo.byteOrder32Little.rawValue)
         else { return empty }
-        Self.prepareForText(context)
+        Self.drawColorRuns(runs, in: context, from: bbox.origin, scale: fill)
+
+        guard let data = context.data else { return empty }
+        guard ensureHeight(.color, required: origin.y + height) else {
+            evict(colorPage)
+            return empty
+        }
+        colorTexture.replace(
+            region: MTLRegionMake2D(origin.x, origin.y, width, height),
+            mipmapLevel: 0, withBytes: data, bytesPerRow: width * 4)
+
+        return placed(at: origin, width: width, height: height, bearing: bbox.origin, in: colorPage, isColor: true)
+    }
+
+    /// White outlines into a grayscale context whose bottom-left is
+    /// `origin`; a synthetic bold strokes as well as fills.
+    ///
+    /// No CTM flip: the context's top-down buffer and y-up coordinates cancel,
+    /// and the shader maps quad (0,0) to the region's top row. A flip drew
+    /// every glyph upside down.
+    private static func drawOutlines(
+        _ runs: [ShapedRun], in context: CGContext, from origin: CGPoint, strokeWidth: CGFloat
+    ) {
+        prepareForText(context)
+        context.setFillColor(gray: 1, alpha: 1)
+        if strokeWidth > 0 {
+            context.setStrokeColor(gray: 1, alpha: 1)
+            context.setLineWidth(strokeWidth)
+            context.setTextDrawingMode(.fillStroke)
+        }
+        for run in runs {
+            var glyphs = run.glyphs
+            var positions = run.positions.map {
+                CGPoint(x: $0.x - origin.x, y: $0.y - origin.y)
+            }
+            CTFontDrawGlyphs(run.font, &glyphs, &positions, glyphs.count, context)
+        }
+    }
+
+    /// Bitmap runs by `CTRunDraw`, and any outline run in the cluster in
+    /// white, into an RGB context whose bottom-left is `origin`, scaled by
+    /// `scale`. No CTM flip, as in the grayscale path. Positions are in the
+    /// unscaled space the scale maps onto the bitmap.
+    private static func drawColorRuns(
+        _ runs: [ShapedRun], in context: CGContext, from origin: CGPoint, scale: CGFloat
+    ) {
+        prepareForText(context)
         context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
-        // No CTM flip, as in the grayscale path. Positions are in the
-        // unscaled space the scale maps onto the bitmap.
-        context.scaleBy(x: fill, y: fill)
-        let offset = CGPoint(x: bbox.minX / fill, y: bbox.minY / fill)
+        context.scaleBy(x: scale, y: scale)
+        let offset = CGPoint(x: origin.x / scale, y: origin.y / scale)
         for run in runs {
             if let ctRun = run.ctRun {
                 context.textPosition = CGPoint(x: -offset.x, y: -offset.y)
@@ -327,17 +370,6 @@ nonisolated extension GlyphAtlas {
                 CTFontDrawGlyphs(run.font, &glyphs, &positions, glyphs.count, context)
             }
         }
-
-        guard let data = context.data else { return empty }
-        guard ensureHeight(.color, required: origin.y + height) else {
-            evict(colorPage)
-            return empty
-        }
-        colorTexture.replace(
-            region: MTLRegionMake2D(origin.x, origin.y, width, height),
-            mipmapLevel: 0, withBytes: data, bytesPerRow: width * 4)
-
-        return placed(at: origin, width: width, height: height, bearing: bbox.origin, in: colorPage, isColor: true)
     }
 
     /// Where an outline run's glyphs draw, from the pen origin: a cluster's

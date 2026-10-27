@@ -180,7 +180,8 @@ public struct ImagePlacementTable: Sendable {
         placements[key] = KittyGraphics.Placement(
             id: header.placementID, imageID: header.imageID, row: row, column: column,
             columns: header.columns, rows: header.rows, baseScrollbackTotal: baseScrollbackTotal,
-            zIndex: header.zIndex, displayPixelWidth: header.displayPixelWidth, displayPixelHeight: header.displayPixelHeight)
+            zIndex: header.zIndex, displayPixelWidth: header.displayPixelWidth,
+            displayPixelHeight: header.displayPixelHeight)
         revision &+= 1
         return true
     }
@@ -283,8 +284,9 @@ public struct ImagePlacementTable: Sendable {
     /// Kitty's page-area rule: only fully contained images scroll; ones
     /// straddling a margin remain fixed. Clip source pixels at either margin.
     /// https://sw.kovidgoyal.net/kitty/graphics-protocol/#interaction-with-other-terminal-actions
-    mutating func scrollRegion(top: Int, bottom: Int, delta: Int,
-        scrollbackTotal: Int, cellPixelHeight: Int) {
+    mutating func scrollRegion(
+        top: Int, bottom: Int, delta: Int, scrollbackTotal: Int, cellPixelHeight: Int
+    ) {
         guard !placements.isEmpty else { return }
         var changed = false
         for key in placementOrder {

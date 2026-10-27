@@ -28,7 +28,9 @@ import Testing
 /// the frame and idle at ~0% CPU.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
-@Suite(.serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement)) struct DamageTrackingTests {
+@Suite(
+    .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+struct DamageTrackingTests {
     private static func makeRenderer() -> TerminalRenderer? {
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
         let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
@@ -40,6 +42,29 @@ import Testing
         return renderer
     }
 
+    /// SplitMix64: seeded, so a failing step reproduces.
+    private struct SplitMix64 {
+        var state: UInt64
+        mutating func next() -> UInt64 {
+            state &+= 0x9E37_79B9_7F4A_7C15
+            var z = state
+            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+            return z ^ (z >> 31)
+        }
+    }
+
+    /// Every field of every cached instance, for comparing two caches.
+    private static func flatten(_ arrays: [ContiguousArray<QuadInstance>]) -> [[Float]] {
+        arrays.map { array in
+            array.flatMap { instance in
+                [instance.origin.x, instance.origin.y, instance.size.x, instance.size.y,
+                 instance.color.x, instance.color.y, instance.color.z, instance.color.w,
+                 Float(instance.atlasIndex)]
+            }
+        }
+    }
+
     /// Whatever damage a frame carries, placing the rebuilt rows must leave
     /// the cache exactly as a full rebuild of the same grid would: typing
     /// (counts kept), a scroll (one row's count changes), and whole-screen
@@ -47,28 +72,8 @@ import Testing
     @Test func incrementalBuildsMatchAFullRebuild() throws {
         let renderer = try #require(Self.makeRenderer())
         var terminal = Terminal(rows: 12, columns: 40)
-        // SplitMix64: seeded, so a failing step reproduces.
-        struct Generator {
-            var state: UInt64
-            mutating func next() -> UInt64 {
-                state &+= 0x9E37_79B9_7F4A_7C15
-                var z = state
-                z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
-                z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
-                return z ^ (z >> 31)
-            }
-        }
-        var generator = Generator(state: 0x113)
+        var generator = SplitMix64(state: 0x113)
         let pieces = ["x", "y", "█", "▚", "░", "\u{1B}[41m \u{1B}[0m", "\u{1B}[7mr\u{1B}[0m", "\u{1B}[4mu\u{1B}[0m"]
-        func flatten(_ arrays: [ContiguousArray<QuadInstance>]) -> [[Float]] {
-            arrays.map { array in
-                array.flatMap { instance in
-                    [instance.origin.x, instance.origin.y, instance.size.x, instance.size.y,
-                     instance.color.x, instance.color.y, instance.color.z, instance.color.w,
-                     Float(instance.atlasIndex)]
-                }
-            }
-        }
         var cursorVisible = true
         renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: cursorVisible, selection: nil)
         for step in 0..<300 {
@@ -93,10 +98,10 @@ import Testing
             }
             terminal.feed(Array(text.utf8))
             renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: cursorVisible, selection: nil)
-            let incremental = flatten(renderer.cachedInstances)
+            let incremental = Self.flatten(renderer.cachedInstances)
             renderer.invalidate()
             renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: cursorVisible, selection: nil)
-            let full = flatten(renderer.cachedInstances)
+            let full = Self.flatten(renderer.cachedInstances)
             #expect(incremental == full, "step \(step)")
             if incremental != full { return }
         }
@@ -197,9 +202,10 @@ import Testing
 
         func draw() {
             renderer.renderAndWait(
-                grid: terminal.grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-                drawableSize: CGSize(width: width, height: height), cursorVisible: false,
-                selection: nil, target: texture)
+                grid: terminal.grid, cursorVisible: false, selection: nil,
+                into: FrameTarget(
+                    texture: texture, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                    drawableSize: CGSize(width: width, height: height)))
         }
 
         // Whether any pixel in a cell is non-black (a glyph was drawn there).
@@ -295,7 +301,9 @@ import Testing
         // two rebuilt rows, not one, and not the whole screen.
         #expect(renderer.lastRebuiltRowCount == 2)
     }
+}
 
+extension DamageTrackingTests {
     /// A scroll of the whole screen's height or more leaves nothing to
     /// shift — every row differs from the cache regardless — and must not
     /// crash trying to shift more rows than the cache holds.
@@ -331,6 +339,7 @@ import Testing
         #expect(renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil))
         #expect(renderer.lastRebuiltRowCount == 4)
     }
+
     @Test func regionAndHistoryScrollsMatchFullRebuild() throws {
         let renderer = try #require(Self.makeRenderer())
         var terminal = Terminal(rows: 12, columns: 40, scrollbackLimit: 100)
@@ -341,13 +350,6 @@ import Testing
             seed = seed &* 6364136223846793005 &+ 1
             return Int((seed >> 32) % UInt64(limit))
         }
-        func flattened(_ arrays: [ContiguousArray<QuadInstance>]) -> [[Float]] {
-            arrays.map { $0.flatMap { q in
-                [q.origin.x, q.origin.y, q.size.x, q.size.y,
-                 q.color.x, q.color.y, q.color.z, q.color.w,
-                 Float(q.atlasIndex)]
-            } }
-        }
         renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
         terminal.feed(Array("\u{1B}[2;11r\u{1B}[S".utf8))
         renderer.updateInstances(grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil)
@@ -356,7 +358,8 @@ import Testing
             switch random(8) {
             case 0, 1:
                 let top = random(6) + 1, bottom = 8 + random(4)
-                terminal.feed(Array("\u{1B}[\(top);\(bottom)r\u{1B}[\(random(3) + 1)\(random(2) == 0 ? "S" : "T")".utf8))
+                terminal.feed(
+                    Array("\u{1B}[\(top);\(bottom)r\u{1B}[\(random(3) + 1)\(random(2) == 0 ? "S" : "T")".utf8))
             case 2:
                 let before = terminal.grid.scrollback.totalPushed
                 terminal.feed(Array("\u{1B}[r\u{1B}[12;1H\r\nline\(step)".utf8))
@@ -375,12 +378,12 @@ import Testing
                 baseScrollbackTotal: terminal.grid.scrollback.totalPushed) : nil
             renderer.updateInstances(grid: terminal.grid, scrollOffset: offset,
                 cursorVisible: true, selection: selection)
-            let instances = flattened(renderer.cachedInstances)
+            let instances = Self.flatten(renderer.cachedInstances)
             let counts = renderer.cachedInstanceCounts
             renderer.invalidate()
             renderer.updateInstances(grid: terminal.grid, scrollOffset: offset,
                 cursorVisible: true, selection: selection)
-            #expect(flattened(renderer.cachedInstances) == instances, "step \(step), offset \(offset)")
+            #expect(Self.flatten(renderer.cachedInstances) == instances, "step \(step), offset \(offset)")
             #expect(renderer.cachedInstanceCounts == counts, "counts at step \(step)")
         }
     }
@@ -418,7 +421,7 @@ import Testing
         let instances = renderer.cachedInstances.map { $0.map { [$0.origin.x, $0.origin.y, Float($0.atlasIndex)] } }
         renderer.invalidate()
         renderer.updateInstances(grid: terminal.grid, scrollOffset: offset, cursorVisible: false, selection: nil)
-        #expect(renderer.cachedInstances.map { $0.map { [$0.origin.x, $0.origin.y, Float($0.atlasIndex)] } } == instances)
+        #expect(
+            renderer.cachedInstances.map { $0.map { [$0.origin.x, $0.origin.y, Float($0.atlasIndex)] } } == instances)
     }
-
 }

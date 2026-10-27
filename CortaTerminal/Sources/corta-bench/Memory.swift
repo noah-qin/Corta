@@ -39,8 +39,10 @@ func benchmarkScrollbackMemory() {
     let after = currentResidentBytes()
     print("compressed history footprint delta: \(Int64(footprintAfter) - Int64(footprintBefore)) bytes")
     print(
-        "memory @ 100k scrollback lines: \(String(format: "%.1f", Double(Int64(after) - Int64(before)) / 1_048_576)) MB "
-            + "(resident before \(String(format: "%.1f", megabytes(before))) MB, after \(String(format: "%.1f", megabytes(after))) MB)"
+        "memory @ 100k scrollback lines: "
+            + "\(String(format: "%.1f", Double(Int64(after) - Int64(before)) / 1_048_576)) MB "
+            + "(resident before \(String(format: "%.1f", megabytes(before))) "
+            + "MB, after \(String(format: "%.1f", megabytes(after))) MB)"
     )
 }
 
@@ -75,5 +77,8 @@ func diagnoseScrollbackFootprint() {
             + "x100k rows => \((allocatedBytes - usedBytes) * 100_000 / 1_048_576)MB slack, "
             + "\(usedBytes * 100_000 / 1_048_576)MB actual cell data, "
             + "\(allocatedBytes * 100_000 / 1_048_576)MB allocated cell storage")
-    print("diagnostic: sizeof(Line) = \(MemoryLayout<Line>.stride)B, x100k => \(MemoryLayout<Line>.stride * 100_000 / 1_048_576)MB for the outer array alone")
+    print(
+        "diagnostic: sizeof(Line) = \(MemoryLayout<Line>.stride)B, x100k => "
+            + "\(MemoryLayout<Line>.stride * 100_000 / 1_048_576)MB for the outer array alone"
+    )
 }

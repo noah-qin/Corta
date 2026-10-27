@@ -69,10 +69,17 @@ enum MetalRenderTarget {
     /// the numbers in the message — and the run continues on a 1x1 stand-in.
     /// Handing the numbers straight to Metal instead ends the process.
     /// One pixel of a `bgra8Unorm` target, as RGBA.
-    static func pixel(of texture: MTLTexture, x: Int, y: Int) -> (r: UInt8, g: UInt8, b: UInt8, a: UInt8) {
+    struct Pixel: Equatable {
+        var r: UInt8
+        var g: UInt8
+        var b: UInt8
+        var a: UInt8
+    }
+
+    static func pixel(of texture: MTLTexture, x: Int, y: Int) -> Pixel {
         var bytes = [UInt8](repeating: 0, count: 4)
         texture.getBytes(&bytes, bytesPerRow: 4, from: MTLRegionMake2D(x, y, 1, 1), mipmapLevel: 0)
-        return (r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
+        return Pixel(r: bytes[2], g: bytes[1], b: bytes[0], a: bytes[3])
     }
 
     static func make(device: MTLDevice, width: Int, height: Int) -> MTLTexture {
@@ -196,14 +203,21 @@ extension Metal4Backend {
     }
 }
 
+extension FrameTarget {
+    /// A frame cleared to opaque black, as most render tests draw.
+    init(texture: MTLTexture, rect: CGRect, drawableSize: CGSize) {
+        self.init(
+            texture: texture, rect: rect, drawableSize: drawableSize,
+            clearColor: MTLClearColorMake(0, 0, 0, 1))
+    }
+}
+
 extension TerminalRenderer {
     /// `render` into `target`, waited for, so its pixels can be read.
     /// Records an issue if the frame never completed.
     func renderAndWait(
         grid: Grid,
         scrollOffset: Int = 0,
-        rect: CGRect,
-        drawableSize: CGSize,
         cursorVisible: Bool,
         selection: TerminalSelection?,
         searchMatches: [TerminalSelection] = [],
@@ -211,19 +225,18 @@ extension TerminalRenderer {
         hoveredLink: TerminalSelection? = nil,
         indexedOverrides: IndexedColorOverrides = [:],
         indexedOverridesGeneration: UInt64 = 0,
-        target: MTLTexture,
-        clearColor: MTLClearColor = MTLClearColorMake(0, 0, 0, 1),
+        into frame: FrameTarget,
         sourceLocation: SourceLocation = #_sourceLocation
     ) {
         let done = DispatchSemaphore(value: 0)
         let failure = Mutex<(any Error)?>(nil)
         render(
-            grid: grid, scrollOffset: scrollOffset, rect: rect, drawableSize: drawableSize,
-            cursorVisible: cursorVisible, selection: selection, searchMatches: searchMatches,
+            grid: grid, scrollOffset: scrollOffset, cursorVisible: cursorVisible,
+            selection: selection, searchMatches: searchMatches,
             currentSearchMatchIndex: currentSearchMatchIndex, hoveredLink: hoveredLink,
             indexedOverrides: indexedOverrides,
             indexedOverridesGeneration: indexedOverridesGeneration,
-            target: target, clearColor: clearColor
+            into: frame
         ) { error in
             failure.withLock { $0 = error }
             done.signal()
@@ -237,7 +250,6 @@ extension TerminalRenderer {
         }
     }
 }
-
 
 /// A Menlo 14 renderer and a target sized to a `columns × rows` grid, for
 /// tests that sample a frame's pixels. `nil` without a Metal device.

@@ -117,7 +117,9 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
     }
     #endif
 
-    private init(host: String?, startDirectory: String?, suggestedHost: String? = nil, previewModel: SFTPBrowserModel? = nil) {
+    private init(
+        host: String?, startDirectory: String?, suggestedHost: String? = nil, previewModel: SFTPBrowserModel? = nil
+    ) {
         model = previewModel ?? SFTPBrowserModel(
             host: host, startDirectory: startDirectory, suggestedHost: suggestedHost)
         let window = Self.makeWindow()

@@ -50,8 +50,8 @@ public nonisolated enum QuadPipelineCache {
     /// device, pipeline and sampler objects are thread-safe, so sharing needs
     /// no further synchronisation.
     nonisolated final class Entry: Sendable {
-        /// Retained so the `ObjectIdentifier` key can't be recycled.
         // periphery:ignore - retained so the ObjectIdentifier key cannot be recycled
+        /// Retained so the `ObjectIdentifier` key can't be recycled.
         let device: MTLDevice
         let solidPipeline: MTLRenderPipelineState
         let glyphPipeline: MTLRenderPipelineState

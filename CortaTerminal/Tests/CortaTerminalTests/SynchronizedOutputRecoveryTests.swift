@@ -28,8 +28,9 @@ import Testing
 @Suite(.serialized) struct SynchronizedOutputRecoveryTests {
     @Test func resetAndBeginInOneBatchStillArmRecovery() throws {
         let timers = ManualTimers()
-        let session = try TerminalSession(executable: "/bin/sh", arguments: ["-c",
-            "printf '\\033[?2026hFIRST\\033[?2026l'; IFS= read -r line; printf '\\033c\\033[?2026hRESET-HELD'; sleep 30"], seams: timers.seams)
+        let script = "printf '\\033[?2026hFIRST\\033[?2026l'; IFS= read -r line; "
+            + "printf '\\033c\\033[?2026hRESET-HELD'; sleep 30"
+        let session = try TerminalSession(executable: "/bin/sh", arguments: ["-c", script], seams: timers.seams)
         defer { session.stop() }
         session.start()
         #expect(waitForGrid(session) { $0.contains("FIRST") }.contains("FIRST"))
@@ -38,7 +39,8 @@ import Testing
         timers.fire(0)
         session.write(Array("go\n".utf8))
         #expect(waitForGrid(session) { $0.contains("RESET-HELD") }.contains("RESET-HELD"))
-        #expect(waitForCondition(timers.count == 2, timeout: .seconds(30)), "RIS and a begin in one batch must arm a timer")
+        #expect(
+            waitForCondition(timers.count == 2, timeout: .seconds(30)), "RIS and a begin in one batch must arm a timer")
         timers.fire(1)
         #expect(!session.isSynchronizedOutputEnabled)
     }
@@ -58,8 +60,9 @@ import Testing
 
     @Test func anOldTimerCannotEndANewEpisodeAfterRIS() throws {
         let timers = ManualTimers()
-        let session = try TerminalSession(executable: "/bin/sh", arguments: ["-c",
-            "printf '\\033[?2026hFIRST\\033[?2026l'; IFS= read -r line; printf '\\033c\\033[?2026hNEW-HELD'; sleep 30"], seams: timers.seams)
+        let script = "printf '\\033[?2026hFIRST\\033[?2026l'; IFS= read -r line; "
+            + "printf '\\033c\\033[?2026hNEW-HELD'; sleep 30"
+        let session = try TerminalSession(executable: "/bin/sh", arguments: ["-c", script], seams: timers.seams)
         defer { session.stop() }
         session.start()
         #expect(waitForGrid(session) { $0.contains("FIRST") }.contains("FIRST"))

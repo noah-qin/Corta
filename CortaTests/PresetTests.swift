@@ -22,7 +22,7 @@ import Testing
 /// Named shell/directory/environment presets, as config-file data.
 struct PresetTests {
     @Test("a preset's three parts all parse")
-    func fullPreset() {
+    func fullPreset() throws {
         let (parsed, unknown) = Configuration.parse(
             """
             preset.api.shell = /bin/bash
@@ -32,7 +32,7 @@ struct PresetTests {
             preset.api.env.NO_COLOR = 1
             """)
         #expect(unknown.isEmpty)
-        let preset = try! #require(parsed.presets.first)
+        let preset = try #require(parsed.presets.first)
         #expect(preset.name == "api")
         #expect(preset.shell == "/bin/bash")
         #expect(preset.arguments == ["-l", "-i"])
@@ -43,9 +43,9 @@ struct PresetTests {
     /// A preset that only sets a directory is a legal preset — requiring all
     /// three fields would mean nobody writes one.
     @Test("a partial preset inherits the rest")
-    func partialPreset() {
+    func partialPreset() throws {
         let (parsed, _) = Configuration.parse("preset.notes.directory = /tmp")
-        let preset = try! #require(parsed.presets.first)
+        let preset = try #require(parsed.presets.first)
         #expect(preset.shell == nil)
         #expect(preset.arguments.isEmpty)
         #expect(preset.directory == "/tmp")

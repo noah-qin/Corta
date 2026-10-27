@@ -28,8 +28,12 @@ struct ProgramNotificationTests {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         #expect(settings.authorizationStatus == .authorized)
         #expect(settings.badgeSetting == .enabled)
-        print("Native notification settings: authorization=\(settings.authorizationStatus.rawValue) alert=\(settings.alertSetting.rawValue) badge=\(settings.badgeSetting.rawValue)")
+        print(
+            "Native notification settings: authorization=\(settings.authorizationStatus.rawValue) "
+                + "alert=\(settings.alertSetting.rawValue) badge=\(settings.badgeSetting.rawValue)"
+        )
     }
+
     @Test func floodCoalescesAndCancels() throws {
         let original = ConfigurationStore.shared.configuration
         var configuration = original
@@ -222,7 +226,9 @@ struct ProgramNotificationTests {
         retry.perform(); retry.cancel()
         #expect(delivered == 1)
     }
+}
 
+extension ProgramNotificationTests {
     private func settle(_ condition: () -> Bool) async -> Bool {
         let deadline = SuspendingClock.now + .seconds(3)
         while !condition(), SuspendingClock.now < deadline { try? await Task.sleep(for: .milliseconds(10)) }

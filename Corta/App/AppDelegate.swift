@@ -35,7 +35,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
-
     /// Nothing else retains a window controller, and dropping one takes its
     /// window and session down.
     private var windowControllers: [NSWindowController] = []
@@ -325,7 +324,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return false
     }
 
-    // MARK: - Restoring the arrangement
+}
+
+// MARK: - Restoring the arrangement
+
+extension AppDelegate {
 
     /// The setting, plus an escape hatch the UI tests set so each launch
     /// doesn't reopen the previous test's windows. A real launch never has it.

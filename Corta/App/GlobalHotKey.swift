@@ -92,7 +92,7 @@ final class GlobalHotKey {
     /// Shift-arrow (extending a selection).
     nonisolated static func isRegistrable(_ shortcut: Shortcut) -> Bool {
         let relevant: NSEvent.ModifierFlags = [.command, .control, .option]
-        guard !shortcut.modifiers.intersection(relevant).isEmpty else { return false }
+        guard !shortcut.modifiers.isDisjoint(with: relevant) else { return false }
         return keyCode(for: shortcut.key) != nil
     }
 

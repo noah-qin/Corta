@@ -63,13 +63,13 @@ public struct Color: Equatable, Hashable, Sendable {
     }
 
     /// The RGB components, or `nil` if this is not a direct colour.
-    public var components: (red: UInt8, green: UInt8, blue: UInt8)? {
+    public var components: RGB? {
         guard rawValue >> Self.kindShift == Kind.rgb.rawValue else { return nil }
         let payload = rawValue & Self.payloadMask
-        return (
-            UInt8(truncatingIfNeeded: payload >> 16),
-            UInt8(truncatingIfNeeded: payload >> 8),
-            UInt8(truncatingIfNeeded: payload)
+        return RGB(
+            red: UInt8(truncatingIfNeeded: payload >> 16),
+            green: UInt8(truncatingIfNeeded: payload >> 8),
+            blue: UInt8(truncatingIfNeeded: payload)
         )
     }
 }

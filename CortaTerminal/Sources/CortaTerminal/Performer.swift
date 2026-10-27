@@ -239,25 +239,44 @@ struct Performer: ParserPerformer, Sendable {
             case 49: grid.pen.background = .default
             case 90...97: grid.pen.foreground = .indexed(UInt8(code - 90 + 8))
             case 100...107: grid.pen.background = .indexed(UInt8(code - 100 + 8))
-            // A `where` binds to one pattern only; each needs its own.
-            case 38 where subparameterCount > 0, 48 where subparameterCount > 0, 58 where subparameterCount > 0:
-                if let color = Self.extendedColor(subparameters: parameters, after: index, count: subparameterCount) {
-                    if code == 38 { grid.pen.foreground = color } else if code == 48 { grid.pen.background = color } else { grid.setUnderlineColor(color) }
-                }
             case 59: grid.pen.underlineColorID = 0
             case 38, 48, 58:
-                guard let (color, consumed) = Self.extendedColor(parameters, at: index) else {
-                    // Malformed: the parameters that would say which colour
-                    // are missing. Stop rather than read the rest of the
-                    // sequence as attribute codes.
-                    return
-                }
-                if code == 38 { grid.pen.foreground = color } else if code == 48 { grid.pen.background = color } else { grid.setUnderlineColor(color) }
-                index += consumed - 1
+                // Malformed: the parameters that would say which colour are
+                // missing. Stop rather than read the rest of the sequence as
+                // attribute codes.
+                guard let consumed = applyExtendedColor(code, parameters, at: index, subparameters: subparameterCount)
+                else { return }
+                index += consumed
             default: break
             }
             index += 1 + subparameterCount
         }
+    }
+
+    /// SGR 38, 48 or 58 — foreground, background or underline colour — in
+    /// the colon form (its own subparameters) or the semicolon form (the
+    /// parameters after it). Returns how many parameters past its
+    /// subparameters it used, or nil when the semicolon form is malformed.
+    private mutating func applyExtendedColor(
+        _ code: UInt16, _ parameters: Parameters, at index: Int, subparameters: Int
+    ) -> Int? {
+        let color: Color?
+        let consumed: Int
+        if subparameters > 0 {
+            color = Self.extendedColor(subparameters: parameters, after: index, count: subparameters)
+            consumed = 0
+        } else {
+            guard let (found, count) = Self.extendedColor(parameters, at: index) else { return nil }
+            color = found
+            consumed = count - 1
+        }
+        switch (code, color) {
+        case (38, let color?): grid.pen.foreground = color
+        case (48, let color?): grid.pen.background = color
+        case (_, let color?): grid.setUnderlineColor(color)
+        default: break
+        }
+        return consumed
     }
 
     /// `SGR 4:n`: 0 none, 1 single, 2 double, 3 curly; 4 (dotted) and 5

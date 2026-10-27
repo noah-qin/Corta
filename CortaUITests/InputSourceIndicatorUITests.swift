@@ -33,27 +33,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
         UIFixtures.requireFixturePrompt(in: app)
         let badge = app.staticTexts["input-source-indicator"]
         XCTAssertTrue(badge.waitForExistence(timeout: 5), app.debugDescription)
-        // The launched grid agrees with the child, and a full screen of
-        // output still scrolls normally with the native overlay installed.
-        app.typeText("stty size\n")
-        expectation(for: NSPredicate { _, _ in
-            (app.textViews.firstMatch.value as? String)?.contains("18 60") == true
-        }, evaluatedWith: nil)
-        waitForExpectations(timeout: 5)
-        app.typeText("for i in {1..24}; do echo line-$i; done\n")
-        expectation(for: NSPredicate { _, _ in
-            (app.textViews.firstMatch.value as? String)?.contains("line-24") == true
-        }, evaluatedWith: nil)
-        waitForExpectations(timeout: 5)
-        XCTAssertFalse((app.textViews.firstMatch.value as? String)?.contains("\nline-1\n") == true)
-        let liveViewport = app.textViews.firstMatch.value as? String
-        app.typeKey(.home, modifierFlags: .shift)
-        XCTAssertNotEqual(app.textViews.firstMatch.value as? String, liveViewport)
-        // Toolbar placement stays visible in history; only a prompt overlay
-        // steps aside when the viewport leaves the command line.
-        XCTAssertTrue(badge.exists)
-        app.typeKey(.end, modifierFlags: .shift)
-        XCTAssertTrue(badge.waitForExistence(timeout: 5))
+        checkGridAndHistory(in: app, badge: badge)
         app.typeText("clear\n")
         XCTAssertTrue(badge.waitForExistence(timeout: 5))
         let initial = badge.frame
@@ -79,30 +59,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
         app.typeKey("c", modifierFlags: .control)
         app.typeText("printf '\\033[?1049l'\n")
         XCTAssertTrue(badge.waitForExistence(timeout: 5))
-        let appMenu = app.menuBars.firstMatch.menuBarItems.element(boundBy: 1)
-        appMenu.click(); appMenu.menuItems["Settings…"].click()
-        let settings = app.windows["Corta.Settings"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        waitForAbsence(badge)
-        settings.outlines.firstMatch.staticTexts["Keyboard & Mouse"].click()
-        let mode = settings.popUpButtons["input-source-indicator-mode"]
-        XCTAssertTrue(mode.waitForExistence(timeout: 5), settings.debugDescription)
-        mode.click(); mode.menuItems["Off"].click()
-        let config = try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
-        XCTAssertTrue(config.contains("input-source-indicator = off"))
-        mode.click(); mode.menuItems["Automatically"].click()
-        let position = settings.popUpButtons["input-source-indicator-position"]
-        XCTAssertTrue(position.exists)
-        position.click(); position.menuItems["Right edge of command line"].click()
-        XCTAssertTrue(try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
-            .contains("input-source-indicator-position = prompt"))
-        position.click(); position.menuItems["Window toolbar"].click()
-        let color = settings.textFields["input-source-direct-color"]
-        XCTAssertTrue(color.exists)
-        color.click(); color.typeText("#52b788"); color.typeKey(.return, modifierFlags: [])
-        let updated = try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
-        XCTAssertTrue(updated.contains("input-source-direct-color = #52b788"))
-        attach(settings, name: "input-source-settings")
+        let settings = try changeIndicatorSettings(in: app, stage: stage, badge: badge)
         settings.buttons[XCUIIdentifierCloseWindow].click()
         XCTAssertTrue(badge.waitForExistence(timeout: 5))
         app.typeKey("d", modifierFlags: .command)
@@ -128,14 +85,10 @@ final class InputSourceIndicatorUITests: XCTestCase {
         continueAfterFailure = false
         let previous = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
         addTeardownBlock { TISSelectInputSource(previous) }
-        guard let sources = TISCreateInputSourceList(nil, false)?.takeRetainedValue() as? [TISInputSource],
-            let pinyin = sources.first(where: { source in
-                guard let raw = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return false }
-                let id = Unmanaged<CFString>.fromOpaque(raw).takeUnretainedValue() as String
-                return id == "com.apple.inputmethod.SCIM.ITABC"
-            }) else { throw XCTSkip("No enabled Pinyin input source; no input sources installed") }
+        let pinyin = try Self.enabledPinyin()
         _ = LatinInputSource.select()
-        let app = UIFixtures.app(stage: try UIFixtures.stage("input-source-cjk"), runner: Self.self, usingTestTarget: true)
+        let app = UIFixtures.app(
+            stage: try UIFixtures.stage("input-source-cjk"), runner: Self.self, usingTestTarget: true)
         app.launch()
         defer { app.terminate() }
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
@@ -147,10 +100,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
         let candidateApp = XCUIApplication(bundleIdentifier: "com.apple.inputmethod.SCIM")
         let candidate = candidateApp.windows.firstMatch
         let exposed = candidate.waitForExistence(timeout: 5)
-        let beforeShot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        beforeShot.name = "pinyin-candidate-before-move"
-        beforeShot.lifetime = .keepAlways
-        add(beforeShot)
+        keepScreen(named: "pinyin-candidate-before-move")
         let before = exposed ? candidate.frame : .zero
         let window = app.windows.firstMatch
         let windowBefore = window.frame
@@ -161,19 +111,21 @@ final class InputSourceIndicatorUITests: XCTestCase {
         let after = exposed ? candidate.frame : .zero
         let delta = CGPoint(x: window.frame.minX - windowBefore.minX, y: window.frame.minY - windowBefore.minY)
         guard abs(delta.x) + abs(delta.y) > 40 else {
-            throw XCTSkip("XCTest did not move the window while the system candidate panel was active; no candidate-following result claimed")
+            throw XCTSkip(
+                "XCTest did not move the window while the system candidate "
+                    + "panel was active; no candidate-following result claimed"
+            )
         }
         if exposed {
             XCTAssertEqual(after.minX - before.minX, delta.x, accuracy: 8)
             XCTAssertEqual(after.minY - before.minY, delta.y, accuracy: 8)
         }
-        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        shot.name = "pinyin-candidate-follows-window"
-        shot.lifetime = .keepAlways
-        add(shot)
+        keepScreen(named: "pinyin-candidate-follows-window")
         app.typeKey(.escape, modifierFlags: [])
         app.typeKey("c", modifierFlags: .control)
-        if !exposed { throw XCTSkip("Candidate AX geometry unavailable; before/after screen captures require visual review") }
+        if !exposed {
+            throw XCTSkip("Candidate AX geometry unavailable; before/after screen captures require visual review")
+        }
     }
 
     @MainActor func testInstalledCJKInputSourcesUpdateWithoutTyping() throws {
@@ -219,7 +171,8 @@ final class InputSourceIndicatorUITests: XCTestCase {
         XCTAssertTrue(badge.waitForExistence(timeout: 5))
         let initial = badge.frame
         app.typeText(String(repeating: "x", count: 53))
-        expectation(for: NSPredicate { _, _ in badge.exists && badge.frame.minY > initial.minY + 3 }, evaluatedWith: nil)
+        expectation(
+            for: NSPredicate { _, _ in badge.exists && badge.frame.minY > initial.minY + 3 }, evaluatedWith: nil)
         waitForExpectations(timeout: 5)
         XCTAssertEqual(badge.frame.maxX, initial.maxX, accuracy: 1)
         attach(app.windows.firstMatch, name: "input-source-prompt-avoidance")
@@ -232,5 +185,81 @@ final class InputSourceIndicatorUITests: XCTestCase {
     @MainActor private func attach(_ window: XCUIElement, name: String) {
         let attachment = XCTAttachment(screenshot: window.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+    }
+
+    /// The launched grid agrees with the child, and a full screen of output
+    /// still scrolls normally with the native overlay installed; the
+    /// toolbar badge stays in history.
+    @MainActor private func checkGridAndHistory(in app: XCUIApplication, badge: XCUIElement) {
+        app.typeText("stty size\n")
+        expectation(for: NSPredicate { _, _ in
+            (app.textViews.firstMatch.value as? String)?.contains("18 60") == true
+        }, evaluatedWith: nil)
+        waitForExpectations(timeout: 5)
+        app.typeText("for i in {1..24}; do echo line-$i; done\n")
+        expectation(for: NSPredicate { _, _ in
+            (app.textViews.firstMatch.value as? String)?.contains("line-24") == true
+        }, evaluatedWith: nil)
+        waitForExpectations(timeout: 5)
+        XCTAssertFalse((app.textViews.firstMatch.value as? String)?.contains("\nline-1\n") == true)
+        let liveViewport = app.textViews.firstMatch.value as? String
+        app.typeKey(.home, modifierFlags: .shift)
+        XCTAssertNotEqual(app.textViews.firstMatch.value as? String, liveViewport)
+        // Toolbar placement stays visible in history; only a prompt overlay
+        // steps aside when the viewport leaves the command line.
+        XCTAssertTrue(badge.exists)
+        app.typeKey(.end, modifierFlags: .shift)
+        XCTAssertTrue(badge.waitForExistence(timeout: 5))
+    }
+
+    /// Off, Automatically, prompt and toolbar positions and a direct colour
+    /// through Settings, each written to the config file. Returns the
+    /// still-open Settings window.
+    @MainActor private func changeIndicatorSettings(
+        in app: XCUIApplication, stage: URL, badge: XCUIElement
+    ) throws -> XCUIElement {
+        let appMenu = app.menuBars.firstMatch.menuBarItems.element(boundBy: 1)
+        appMenu.click(); appMenu.menuItems["Settings…"].click()
+        let settings = app.windows["Corta.Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        waitForAbsence(badge)
+        settings.outlines.firstMatch.staticTexts["Keyboard & Mouse"].click()
+        let mode = settings.popUpButtons["input-source-indicator-mode"]
+        XCTAssertTrue(mode.waitForExistence(timeout: 5), settings.debugDescription)
+        mode.click(); mode.menuItems["Off"].click()
+        let config = try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
+        XCTAssertTrue(config.contains("input-source-indicator = off"))
+        mode.click(); mode.menuItems["Automatically"].click()
+        let position = settings.popUpButtons["input-source-indicator-position"]
+        XCTAssertTrue(position.exists)
+        position.click(); position.menuItems["Right edge of command line"].click()
+        XCTAssertTrue(try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
+            .contains("input-source-indicator-position = prompt"))
+        position.click(); position.menuItems["Window toolbar"].click()
+        let color = settings.textFields["input-source-direct-color"]
+        XCTAssertTrue(color.exists)
+        color.click(); color.typeText("#52b788"); color.typeKey(.return, modifierFlags: [])
+        let updated = try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
+        XCTAssertTrue(updated.contains("input-source-direct-color = #52b788"))
+        attach(settings, name: "input-source-settings")
+        return settings
+    }
+
+    /// The enabled Pinyin input source, or a skip.
+    private static func enabledPinyin() throws -> TISInputSource {
+        guard let sources = TISCreateInputSourceList(nil, false)?.takeRetainedValue() as? [TISInputSource],
+            let pinyin = sources.first(where: { source in
+                guard let raw = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return false }
+                let id = Unmanaged<CFString>.fromOpaque(raw).takeUnretainedValue() as String
+                return id == "com.apple.inputmethod.SCIM.ITABC"
+            }) else { throw XCTSkip("No enabled Pinyin input source; no input sources installed") }
+        return pinyin
+    }
+
+    @MainActor private func keepScreen(named name: String) {
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
     }
 }

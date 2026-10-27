@@ -61,8 +61,11 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
     private mutating func recordScroll(top: Int, bottom: Int, delta: Int) {
         let event = ScrollEvent(top: Int16(top), bottom: Int16(bottom), delta: Int16(delta))
         let index = Int(scrollEventsTotal % UInt64(Self.scrollEventCapacity))
-        if scrollEvents.count < Self.scrollEventCapacity { scrollEvents.append(event) }
-        else { scrollEvents[index] = event }
+        if scrollEvents.count < Self.scrollEventCapacity {
+            scrollEvents.append(event)
+        } else {
+            scrollEvents[index] = event
+        }
         scrollEventsTotal &+= 1
     }
 

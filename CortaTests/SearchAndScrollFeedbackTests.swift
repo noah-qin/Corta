@@ -105,10 +105,10 @@ struct SearchStabilityTests {
 /// The scroll-position pill: what it says, and that it says it in words.
 @MainActor
 struct ScrollPositionIndicatorTests {
-    @Test("it says how far back the viewport is") func reportsDistance() {
+    @Test("it says how far back the viewport is") func reportsDistance() throws {
         let indicator = ScrollPositionIndicator()
         indicator.update(linesBack: 12340, hasNewOutput: false)
-        let label = try! #require(indicator.accessibilityLabel())
+        let label = try #require(indicator.accessibilityLabel())
         #expect(label.contains(ScrollPositionIndicator.formatted(12340)))
         #expect(!indicator.hasNewOutput)
     }
@@ -116,12 +116,12 @@ struct ScrollPositionIndicatorTests {
     /// New output changes the **words**, not only the tint — a colour-only
     /// signal is no signal to a reader who cannot separate the two colours,
     /// the same rule the failure panel follows.
-    @Test("new output changes the words, not only the colour") func reportsNewOutput() {
+    @Test("new output changes the words, not only the colour") func reportsNewOutput() throws {
         let indicator = ScrollPositionIndicator()
         indicator.update(linesBack: 40, hasNewOutput: false)
-        let resting = try! #require(indicator.accessibilityLabel())
+        let resting = try #require(indicator.accessibilityLabel())
         indicator.update(linesBack: 40, hasNewOutput: true)
-        let alerted = try! #require(indicator.accessibilityLabel())
+        let alerted = try #require(indicator.accessibilityLabel())
         #expect(resting != alerted)
         #expect(alerted.contains(L10n.text("scrollback.newOutput")))
         #expect(indicator.hasNewOutput)
@@ -170,10 +170,10 @@ struct ScrollIndicatorIntegrationTests {
     /// A wheel notch, built the way `TerminalViewScrollTests` builds one —
     /// through `CGEvent`, which is where a real device's event comes from.
     private static func wheel(lines: Int32) -> NSEvent {
-        let cg = CGEvent(
+        let cgEvent = CGEvent(
             scrollWheelEvent2Source: nil, units: .line, wheelCount: 1,
             wheel1: lines, wheel2: 0, wheel3: 0)!
-        return NSEvent(cgEvent: cg)!
+        return NSEvent(cgEvent: cgEvent)!
     }
 
     /// Fills the pane's scrollback with output from its **own child**, so the

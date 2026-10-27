@@ -170,7 +170,7 @@ struct Metal4BackendTests {
         let texture = MetalRenderTarget.make(device: device, width: Self.width, height: Self.height)
         // Geometry past the rect: the scissor, not the instance data, clips it.
         let overflowing: ContiguousArray = [
-            QuadInstance(origin: .init(0, 0), size: .init(100, 100), color: .init(0, 0, 1, 1))
+            QuadInstance(origin: .init(0, 0), size: .init(100, 100), color: .init(0, 0, 1, 1)),
         ]
         #expect(
             backend.renderFrameAndWait(into: texture) {
@@ -231,8 +231,10 @@ struct Metal4BackendTests {
             count: 5000)
         #expect(
             backend.renderFrameAndWait(into: texture) {
-                $0.drawSolidQuads(left, rect: CGRect(origin: .zero, size: Self.drawableSize), drawableSize: Self.drawableSize)
-                $0.drawSolidQuads(many, rect: CGRect(origin: .zero, size: Self.drawableSize), drawableSize: Self.drawableSize)
+                $0.drawSolidQuads(
+                    left, rect: CGRect(origin: .zero, size: Self.drawableSize), drawableSize: Self.drawableSize)
+                $0.drawSolidQuads(
+                    many, rect: CGRect(origin: .zero, size: Self.drawableSize), drawableSize: Self.drawableSize)
             })
         #expect(MetalRenderTarget.pixel(of: texture, x: 5, y: 10).r == 255)
         #expect(MetalRenderTarget.pixel(of: texture, x: 30, y: 10).b == 255)
@@ -332,11 +334,13 @@ struct QuadPipelineCacheTests {
         try FileManager.default.setAttributes([.modificationDate: built], ofItemAtPath: executable.path)
         #expect(!QuadPipelineCache.archiveIsCurrent(at: archive, executableURL: executable))
         try Data().write(to: archive)
-        try FileManager.default.setAttributes([.modificationDate: built.addingTimeInterval(-1)], ofItemAtPath: archive.path)
+        try FileManager.default.setAttributes(
+            [.modificationDate: built.addingTimeInterval(-1)], ofItemAtPath: archive.path)
         #expect(!QuadPipelineCache.archiveIsCurrent(at: archive, executableURL: executable))
         try FileManager.default.setAttributes([.modificationDate: built], ofItemAtPath: archive.path)
         #expect(QuadPipelineCache.archiveIsCurrent(at: archive, executableURL: executable))
-        try FileManager.default.setAttributes([.modificationDate: built.addingTimeInterval(1)], ofItemAtPath: archive.path)
+        try FileManager.default.setAttributes(
+            [.modificationDate: built.addingTimeInterval(1)], ofItemAtPath: archive.path)
         #expect(QuadPipelineCache.archiveIsCurrent(at: archive, executableURL: executable))
         #expect(!QuadPipelineCache.archiveIsCurrent(at: archive, executableURL: nil))
         try FileManager.default.removeItem(at: executable)

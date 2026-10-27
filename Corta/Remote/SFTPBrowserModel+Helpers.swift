@@ -47,16 +47,17 @@ extension SFTPBrowserModel {
             default: "-"
             }
         var result = String(type)
-        // (read, write, execute, set-ID/sticky, its letter) per triple.
-        let triples: [(r: UInt32, w: UInt32, x: UInt32, special: UInt32, letter: Character)] = [
-            (0o400, 0o200, 0o100, 0o4000, "s"),  // owner, setuid
-            (0o040, 0o020, 0o010, 0o2000, "s"),  // group, setgid
-            (0o004, 0o002, 0o001, 0o1000, "t"),  // other, sticky
+        // Read, write, execute, set-ID/sticky, and that bit's letter.
+        struct Triple { var read, write, execute, special: UInt32; var letter: Character }
+        let triples = [
+            Triple(read: 0o400, write: 0o200, execute: 0o100, special: 0o4000, letter: "s"),  // owner, setuid
+            Triple(read: 0o040, write: 0o020, execute: 0o010, special: 0o2000, letter: "s"),  // group, setgid
+            Triple(read: 0o004, write: 0o002, execute: 0o001, special: 0o1000, letter: "t"),  // other, sticky
         ]
         for triple in triples {
-            result.append(mode & triple.r != 0 ? "r" : "-")
-            result.append(mode & triple.w != 0 ? "w" : "-")
-            let execute = mode & triple.x != 0
+            result.append(mode & triple.read != 0 ? "r" : "-")
+            result.append(mode & triple.write != 0 ? "w" : "-")
+            let execute = mode & triple.execute != 0
             if mode & triple.special != 0 {
                 result.append(
                     execute ? triple.letter : Character(triple.letter.uppercased()))

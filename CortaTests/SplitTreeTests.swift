@@ -55,14 +55,14 @@ struct SplitTreeTests {
         let tree = SplitTree(root: a)
         let b = leaf()
         let rootNode = tree.split(leaf: a, orientation: .columns, newLeaf: b)
-        let c = leaf()
+        let third = leaf()
 
-        let nested = tree.split(leaf: b, orientation: .rows, newLeaf: c)
+        let nested = tree.split(leaf: b, orientation: .rows, newLeaf: third)
 
         #expect(tree.root === rootNode)
         #expect(rootNode.subviews == [a, nested])
-        #expect(nested.subviews == [b, c])
-        #expect(tree.leaves == [a, b, c])
+        #expect(nested.subviews == [b, third])
+        #expect(tree.leaves == [a, b, third])
     }
 
     /// Closing one child of a two-child node collapses the node into the
@@ -85,10 +85,10 @@ struct SplitTreeTests {
         let tree = SplitTree(root: a)
         let b = leaf()
         let rootNode = tree.split(leaf: a, orientation: .columns, newLeaf: b)
-        let c = leaf()
-        tree.split(leaf: b, orientation: .rows, newLeaf: c)
+        let third = leaf()
+        tree.split(leaf: b, orientation: .rows, newLeaf: third)
 
-        let surviving = tree.close(leaf: c)
+        let surviving = tree.close(leaf: third)
 
         #expect(surviving === b)
         #expect(rootNode.subviews == [a, b])
@@ -112,8 +112,8 @@ struct SplitTreeTests {
         let tree = SplitTree(root: a)
         let b = leaf()
         let rootNode = tree.split(leaf: a, orientation: .columns, newLeaf: b)
-        let c = leaf()
-        let nested = tree.split(leaf: b, orientation: .rows, newLeaf: c)
+        let third = leaf()
+        let nested = tree.split(leaf: b, orientation: .rows, newLeaf: third)
         container.addSubview(rootNode)
 
         // A fills the left half; B sits over C on the right. AppKit's split
@@ -123,10 +123,10 @@ struct SplitTreeTests {
         a.frame = NSRect(x: 0, y: 0, width: 200, height: 140)
         nested.frame = NSRect(x: 200, y: 0, width: 200, height: 400)
         b.frame = NSRect(x: 0, y: 0, width: 200, height: 200)
-        c.frame = NSRect(x: 0, y: 200, width: 200, height: 200)
+        third.frame = NSRect(x: 0, y: 200, width: 200, height: 200)
 
-        #expect(tree.leaf(from: c, direction: .up, inContainer: container) === b)
-        #expect(tree.leaf(from: b, direction: .down, inContainer: container) === c)
+        #expect(tree.leaf(from: third, direction: .up, inContainer: container) === b)
+        #expect(tree.leaf(from: b, direction: .down, inContainer: container) === third)
         // A's center sits in the upper half, so B is nearer than C.
         #expect(tree.leaf(from: a, direction: .right, inContainer: container) === b)
         #expect(tree.leaf(from: b, direction: .left, inContainer: container) === a)
@@ -200,13 +200,13 @@ struct SplitTreeTests {
         let tree = SplitTree(root: a)
         let b = leaf()
         let rootNode = tree.split(leaf: a, orientation: .columns, newLeaf: b)
-        let c = leaf()
-        tree.split(leaf: b, orientation: .rows, newLeaf: c)
+        let third = leaf()
+        tree.split(leaf: b, orientation: .rows, newLeaf: third)
 
         let sizes: [ObjectIdentifier: CGSize] = [
             ObjectIdentifier(a): CGSize(width: 100, height: 50),
             ObjectIdentifier(b): CGSize(width: 80, height: 30),
-            ObjectIdentifier(c): CGSize(width: 60, height: 40),
+            ObjectIdentifier(third): CGSize(width: 60, height: 40),
         ]
         let size = tree.minimumSize(
             of: tree.root,

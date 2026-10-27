@@ -22,41 +22,33 @@ import Testing
 struct DiskImageTests {
     @Test func exactLayoutAndReadOnlyMount() {
         let root = ["Corta.app", "Applications", ".DS_Store", ".background"]
-        let background = ["background.tiff"]
-        #expect(ReleaseCheck.diskImageLayoutProblems(entries: root, backgroundEntries: background,
-            layoutFilesAreRegular: true, volumeName: "Corta",
-            appIsDirectory: true, applicationsTarget: "/Applications", readOnly: true).isEmpty)
+        let valid = ReleaseCheck.DiskImageLayout(
+            entries: root, backgroundEntries: ["background.tiff"], layoutFilesAreRegular: true,
+            volumeName: "Corta", appIsDirectory: true, applicationsTarget: "/Applications", readOnly: true)
+        #expect(ReleaseCheck.diskImageLayoutProblems(valid).isEmpty)
+        /// The valid layout with one thing changed is a problem.
+        func rejects(_ change: (inout ReleaseCheck.DiskImageLayout) -> Void) -> Bool {
+            var layout = valid
+            change(&layout)
+            return !ReleaseCheck.diskImageLayoutProblems(layout).isEmpty
+        }
         for entries in [["Corta.app", "Applications"], ["Corta.app", "Applications", ".background"],
                         root + [".fseventsd"], ["Other.app", "Applications", ".DS_Store", ".background"]] {
-            #expect(!ReleaseCheck.diskImageLayoutProblems(entries: entries, backgroundEntries: background,
-                layoutFilesAreRegular: true, volumeName: "Corta",
-                appIsDirectory: true, applicationsTarget: "/Applications", readOnly: true).isEmpty)
+            #expect(rejects { $0.entries = entries })
         }
         // A missing or non-directory .background is nil; extra files are rejected.
         for entries in [nil, [], ["background.tiff", "payload.sh"], ["background.png"]] as [[String]?] {
-            #expect(!ReleaseCheck.diskImageLayoutProblems(entries: root, backgroundEntries: entries,
-                layoutFilesAreRegular: true, volumeName: "Corta",
-                appIsDirectory: true, applicationsTarget: "/Applications", readOnly: true).isEmpty)
+            #expect(rejects { $0.backgroundEntries = entries })
         }
         // The layout's background is found through the volume name, and both
         // layout files must be plain files, never a link or a directory.
         for name in [nil, "Corta 1", "Corta 1.2.0"] as [String?] {
-            #expect(!ReleaseCheck.diskImageLayoutProblems(entries: root, backgroundEntries: background,
-                layoutFilesAreRegular: true, volumeName: name,
-                appIsDirectory: true, applicationsTarget: "/Applications", readOnly: true).isEmpty)
+            #expect(rejects { $0.volumeName = name })
         }
-        #expect(!ReleaseCheck.diskImageLayoutProblems(entries: root, backgroundEntries: background,
-            layoutFilesAreRegular: false, volumeName: "Corta",
-            appIsDirectory: true, applicationsTarget: "/Applications", readOnly: true).isEmpty)
-        #expect(!ReleaseCheck.diskImageLayoutProblems(entries: root, backgroundEntries: background,
-            layoutFilesAreRegular: true, volumeName: "Corta",
-            appIsDirectory: false, applicationsTarget: "/Applications", readOnly: true).isEmpty)
-        #expect(!ReleaseCheck.diskImageLayoutProblems(entries: root, backgroundEntries: background,
-            layoutFilesAreRegular: true, volumeName: "Corta",
-            appIsDirectory: true, applicationsTarget: "/tmp/Applications", readOnly: true).isEmpty)
-        #expect(!ReleaseCheck.diskImageLayoutProblems(entries: root, backgroundEntries: background,
-            layoutFilesAreRegular: true, volumeName: "Corta",
-            appIsDirectory: true, applicationsTarget: "/Applications", readOnly: false).isEmpty)
+        #expect(rejects { $0.layoutFilesAreRegular = false })
+        #expect(rejects { $0.appIsDirectory = false })
+        #expect(rejects { $0.applicationsTarget = "/tmp/Applications" })
+        #expect(rejects { $0.readOnly = false })
     }
 
     @Test func licenseMetadataAndDownloadURL() throws {
@@ -107,7 +99,9 @@ struct DiskImageTests {
             let runner: ReleaseCheck.ImageToolRunner = { command, arguments in
                 calls.append([command] + arguments)
                 switch arguments.first {
-                case "-dvv": return .init(status: 0, stderr: Data("Authority=Developer ID Application: Test\nTeamIdentifier=TEAM\n".utf8))
+                case "-dvv":
+                    return .init(
+                        status: 0, stderr: Data("Authority=Developer ID Application: Test\nTeamIdentifier=TEAM\n".utf8))
                 case "imageinfo": return .init(status: 0, stdout: metadata)
                 case "attach": return .init(status: attachStatus)
                 default: return .init(status: 0)

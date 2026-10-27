@@ -124,9 +124,9 @@ extension TerminalView {
         bindings[.paste]?.matches(event) ?? false
     }
 
+    // periphery:ignore - reached through the responder chain by selector
     /// The Edit menu's Paste; ⌘V arrives via `keyDown`. From
     /// `NSStandardKeyBindingProviding`, not an `NSResponder` override.
-    // periphery:ignore - reached through the responder chain by selector
     func paste(_: Any?) {
         onPaste?()
     }

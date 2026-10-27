@@ -25,6 +25,26 @@ import Testing
     .serialized, .metalSerialized,
     .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct SharedImageSamplingTests {
+    /// `source` blitted into a new texture made from `descriptor`, waited for.
+    private static func copy(
+        _ source: MTLTexture, into descriptor: MTLTextureDescriptor, device: MTLDevice
+    ) throws -> MTLTexture {
+        let destination = try #require(device.makeTexture(descriptor: descriptor))
+        let queue = try #require(device.makeCommandQueue())
+        let copy = try #require(queue.makeCommandBuffer())
+        let blit = try #require(copy.makeBlitCommandEncoder())
+        blit.copy(
+            from: source, sourceSlice: 0, sourceLevel: 0,
+            sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
+            sourceSize: MTLSize(width: source.width, height: source.height, depth: 1),
+            to: destination, destinationSlice: 0, destinationLevel: 0,
+            destinationOrigin: MTLOrigin(x: 0, y: 0, z: 0))
+        blit.endEncoding()
+        copy.commit()
+        copy.waitUntilCompleted()
+        return destination
+    }
+
     @Test func linearVersusTiledSampling() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let pixels = try #require(
@@ -34,8 +54,7 @@ struct SharedImageSamplingTests {
         memset(pixels.address, 255, pixels.length)
         let linear = try #require(pixels.texture(device: device, width: 4096, height: 4096))
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .bgra8Unorm,
-            width: 4096, height: 4096, mipmapped: false)
+            pixelFormat: .bgra8Unorm, width: 4096, height: 4096, mipmapped: false)
         descriptor.storageMode = .shared
         descriptor.usage = .shaderRead
         let tiled = try #require(device.makeTexture(descriptor: descriptor))
@@ -43,24 +62,12 @@ struct SharedImageSamplingTests {
             region: MTLRegionMake2D(0, 0, 4096, 4096), mipmapLevel: 0,
             withBytes: pixels.address, bytesPerRow: pixels.bytesPerRow)
         descriptor.storageMode = .private
-        let privateTexture = try #require(device.makeTexture(descriptor: descriptor))
-        let queue = try #require(device.makeCommandQueue())
-        let copy = try #require(queue.makeCommandBuffer())
-        let blit = try #require(copy.makeBlitCommandEncoder())
-        blit.copy(
-            from: linear, sourceSlice: 0, sourceLevel: 0,
-            sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
-            sourceSize: MTLSize(width: 4096, height: 4096, depth: 1),
-            to: privateTexture, destinationSlice: 0, destinationLevel: 0,
-            destinationOrigin: MTLOrigin(x: 0, y: 0, z: 0))
-        blit.endEncoding()
-        copy.commit()
-        copy.waitUntilCompleted()
+        let privateTexture = try Self.copy(linear, into: descriptor, device: device)
         let backend = try Metal4Backend(device: device)
         let target = MetalRenderTarget.make(device: device, width: 1024, height: 768)
         let rect = CGRect(x: 0, y: 0, width: 1024, height: 768)
         let quads: ContiguousArray = [
-            QuadInstance(origin: .zero, size: .init(1024, 768), color: .one, atlasIndex: .max)
+            QuadInstance(origin: .zero, size: .init(1024, 768), color: .one, atlasIndex: .max),
         ]
         var report =
             "4096x4096 BGRA sampled to 1024x768; submission-to-completion, same gpu metric boundary\n"

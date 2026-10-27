@@ -153,7 +153,9 @@ struct KittyGraphicsDeferredDecodeTests {
         let taken = terminal.takeDeferredImage()
         let deferred = try #require(taken)
         // The whole transmission now, final chunk included.
-        #expect(terminal.retainedImageBytes == deferred.decodedByteEstimate, "taking the decode out of the parse must not uncharge it")
+        #expect(
+            terminal.retainedImageBytes == deferred.decodedByteEstimate,
+            "taking the decode out of the parse must not uncharge it")
         #expect(terminal.retainedImageBytes > pending)
         terminal.completeDeferredImage(deferred.decode())
         #expect(terminal.retainedImageBytes == terminal.grid.retainedImageBytes)

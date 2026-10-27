@@ -300,7 +300,9 @@ struct TerminalViewKeyEncodingTests {
             TerminalView.bytes(for: controlKeypadFour, applicationKeypad: true)
                 == Array("4".utf8))
     }
+}
 
+extension TerminalViewKeyEncodingTests {
     // MARK: - Kitty keyboard protocol
 
     /// A Neovim mapping that binds `Ctrl+I` and

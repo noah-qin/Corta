@@ -30,7 +30,9 @@ import Testing
         #expect(source("com.apple.inputmethod.SCIM.ITABC", "zh-Hans").kind == .ime)
         #expect(source("com.apple.inputmethod.TCIM.Zhuyin", "zh-Hant").badge == "中")
         #expect(source("com.apple.inputmethod.Kotoeri.Japanese", "ja").badge == "あ")
-        #expect(source("com.apple.inputmethod.Kotoeri.Roman", "ja", mode: "com.apple.inputmethod.Japanese.Roman").kind == .direct)
+        #expect(
+            source("com.apple.inputmethod.Kotoeri.Roman", "ja", mode: "com.apple.inputmethod.Japanese.Roman").kind
+                == .direct)
         #expect(source("com.apple.inputmethod.Korean.2SetKorean", "ko").badge == "한")
         #expect(source("im.rime.inputmethod.Squirrel", "zh-Hans").kind == .unknown)
         #expect(source("com.sogou.inputmethod.sogou", "zh-Hans", mode: "private.ASCII").kind == .unknown)
@@ -62,9 +64,10 @@ import Testing
         let terminal = Terminal(rows: 4, columns: 30)
         func update(_ mode: Configuration.InputSourceIndicatorMode = .auto) {
             var config = Configuration(); config.inputSourceIndicator = mode
-            indicator.update(grid: terminal.grid, hasIntegration: true, promptRow: 0, focused: true,
-                scrollOffset: 0, configuration: config, canvas: .current, cellSize: CGSize(width: 8, height: 16),
-                topInset: 0, compositionRect: nil)
+            let frame = PaneInputSourceIndicator.FrameState(
+                grid: terminal.grid, hasIntegration: true, promptRow: 0, focused: true, scrollOffset: 0,
+                cellSize: CGSize(width: 8, height: 16), topInset: 0, compositionRect: nil)
+            indicator.update(frame, configuration: config, canvas: .current)
         }
         update(); #expect(indicator.view.isHidden)
         update(.always); #expect(!indicator.view.isHidden)
@@ -92,7 +95,9 @@ import Testing
     }
 
     @Test func configurationRoundTripsColorsAndInvalidValuesSurvive() {
-        let parsed = Configuration.parse("input-source-indicator = always\ninput-source-indicator-position = prompt\ninput-source-direct-color = #abc\ninput-source-ime-color = #123456")
+        let parsed = Configuration.parse(
+            "input-source-indicator = always\ninput-source-indicator-position = prompt\n"
+                + "input-source-direct-color = #abc\ninput-source-ime-color = #123456")
         #expect(parsed.unknown.isEmpty)
         #expect(parsed.configuration.inputSourceIndicator == .always)
         #expect(parsed.configuration.inputSourceIndicatorPosition == .prompt)
@@ -168,22 +173,27 @@ import Testing
         var reads = 0
         indicator.sourceProvider = {
             reads += 1
-            return .classify(identifier: "com.apple.keylayout.ABC", name: "ABC", languages: ["en"], isKeyboardLayout: true, mode: nil)
+            return .classify(
+                identifier: "com.apple.keylayout.ABC", name: "ABC", languages: ["en"], isKeyboardLayout: true, mode: nil
+            )
         }
         indicator.enabledSourcesProvider = { true }
         indicator.start()
         indicator.start()
         #expect(reads == 1)
         var terminal = Terminal(rows: 4, columns: 30)
-        func update(integration: Bool = true, prompt: Int? = 0, focus: Bool = true, scroll: Int = 0,
+        func update(
+            integration: Bool = true, prompt: Int? = 0, focus: Bool = true, scroll: Int = 0,
             mode: Configuration.InputSourceIndicatorMode = .auto,
-            position: Configuration.InputSourceIndicatorPosition = .prompt) {
+            position: Configuration.InputSourceIndicatorPosition = .prompt
+        ) {
             var config = Configuration()
             config.inputSourceIndicator = mode
             config.inputSourceIndicatorPosition = position
-            indicator.update(grid: terminal.grid, hasIntegration: integration, promptRow: prompt,
-                focused: focus, scrollOffset: scroll, configuration: config, canvas: .current,
-                cellSize: CGSize(width: 8, height: 16), topInset: 0, compositionRect: nil)
+            let frame = PaneInputSourceIndicator.FrameState(
+                grid: terminal.grid, hasIntegration: integration, promptRow: prompt, focused: focus,
+                scrollOffset: scroll, cellSize: CGSize(width: 8, height: 16), topInset: 0, compositionRect: nil)
+            indicator.update(frame, configuration: config, canvas: .current)
         }
         // On the grid, the badge steps aside for a running command, history
         // and the alternate screen.

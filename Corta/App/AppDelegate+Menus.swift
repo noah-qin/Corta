@@ -201,7 +201,8 @@ extension AppDelegate {
     /// `NSApp.windowsMenu`: AppKit appends the window list and the tab items.
     private func makeWindowMenu() -> NSMenu {
         let menu = NSMenu(title: L10n.text("menu.window"))
-        menu.addItem(withTitle: L10n.text("menu.minimize"), action: #selector(NSWindow.performMiniaturize(_:)), key: "m")
+        menu.addItem(
+            withTitle: L10n.text("menu.minimize"), action: #selector(NSWindow.performMiniaturize(_:)), key: "m")
         menu.addItem(withTitle: L10n.text("menu.zoom"), action: #selector(NSWindow.performZoom(_:)))
         menu.addItem(.separator())
         let agents = NSMenuItem(title: L10n.text("agent.list"), action: nil, keyEquivalent: "")
@@ -215,11 +216,15 @@ extension AppDelegate {
     /// Keyboard Shortcuts (⌘/, as elsewhere) opens `ShortcutsWindowController`.
     private func makeHelpMenu() -> NSMenu {
         let help = NSMenu(title: L10n.text("menu.help"))
-        help.addItem(withTitle: L10n.text("menu.cortaHelp"), action: #selector(showHelpDocumentation(_:)), key: "?", target: self)
+        help.addItem(
+            withTitle: L10n.text("menu.cortaHelp"), action: #selector(showHelpDocumentation(_:)), key: "?", target: self
+        )
         help.addItem(.separator())
-        help.addItem(withTitle: L10n.text("shortcuts.title"), action: #selector(showShortcutsWindow(_:)), key: "/", target: self)
+        help.addItem(
+            withTitle: L10n.text("shortcuts.title"), action: #selector(showShortcutsWindow(_:)), key: "/", target: self)
         #if DEBUG
-        help.addItem(withTitle: L10n.text("ui.demo.title"), action: #selector(showSFTPDevelopmentPreview(_:)), target: self)
+        help.addItem(
+            withTitle: L10n.text("ui.demo.title"), action: #selector(showSFTPDevelopmentPreview(_:)), target: self)
         #endif
         return help
     }
@@ -302,7 +307,10 @@ extension AppDelegate {
     func rebuildThemeMenu(_ menu: NSMenu) {
         menu.removeAllItems()
         for (index, appearance) in Configuration.Appearance.allCases.enumerated() {
-            let title = appearance == .auto ? L10n.text("settings.appearance.followSystem") : L10n.text("settings.appearance.\(appearance.rawValue)")
+            let title =
+                appearance == .auto
+                ? L10n.text("settings.appearance.followSystem")
+                : L10n.text("settings.appearance.\(appearance.rawValue)")
             let item = NSMenuItem(
                 title: title, action: #selector(selectAppearance(_:)), keyEquivalent: "")
             item.tag = index

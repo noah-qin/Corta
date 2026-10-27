@@ -287,7 +287,6 @@ final class SFTPBrowserModel {
         onTitleChange?(title)
     }
 
-
     // MARK: - Drags to Finder
 
     /// Staging folders made for drags to Finder; the controller removes

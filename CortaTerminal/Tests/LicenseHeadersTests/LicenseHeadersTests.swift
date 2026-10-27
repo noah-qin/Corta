@@ -101,7 +101,9 @@ struct LicenseHeaderRuleTests {
 
 @Suite("Checking a header")
 struct LicenseHeaderCheckTests {
-    private static func file(year: Int = 2026, style: LicenseHeaders.CommentStyle = .slashes, body: String = "import Foundation\n") -> String {
+    private static func file(
+        year: Int = 2026, style: LicenseHeaders.CommentStyle = .slashes, body: String = "import Foundation\n"
+    ) -> String {
         LicenseHeaders.header(year: year, style: style).joined(separator: "\n") + "\n\n" + body
     }
 
@@ -164,7 +166,8 @@ struct LicenseHeaderFixTests {
 
     @Test("a missing header is added, followed by one blank line")
     func adds() throws {
-        let fixed = try #require(LicenseHeaders.fixed("\n\nimport Foundation\n", style: .slashes, year: 2026, currentYear: 2026))
+        let fixed = try #require(
+            LicenseHeaders.fixed("\n\nimport Foundation\n", style: .slashes, year: 2026, currentYear: 2026))
         #expect(fixed == Self.header + "\n\nimport Foundation\n")
     }
 
@@ -184,13 +187,16 @@ struct LicenseHeaderFixTests {
 
     @Test("an ordinary leading comment is kept, below the header")
     func keepsOrdinaryComment() throws {
-        let fixed = try #require(LicenseHeaders.fixed("// Reports the GPU families.\nimport Metal\n", style: .slashes, year: 2026, currentYear: 2026))
+        let fixed = try #require(
+            LicenseHeaders.fixed(
+                "// Reports the GPU families.\nimport Metal\n", style: .slashes, year: 2026, currentYear: 2026))
         #expect(fixed == Self.header + "\n\n// Reports the GPU families.\nimport Metal\n")
     }
 
     @Test("the shebang stays the first line")
     func shebang() throws {
-        let fixed = try #require(LicenseHeaders.fixed("#!/bin/bash\nset -eu\n", style: .hash, year: 2026, currentYear: 2026))
+        let fixed = try #require(
+            LicenseHeaders.fixed("#!/bin/bash\nset -eu\n", style: .hash, year: 2026, currentYear: 2026))
         let lines = fixed.components(separatedBy: "\n")
         #expect(lines[0] == "#!/bin/bash")
         #expect(lines[1] == "# Copyright 2026 Noah Qin")
@@ -200,7 +206,10 @@ struct LicenseHeaderFixTests {
 
     @Test("swift-tools-version stays the manifest's first line")
     func manifest() throws {
-        let fixed = try #require(LicenseHeaders.fixed("// swift-tools-version: 6.2\n\nimport PackageDescription\n", style: .slashes, year: 2026, currentYear: 2026))
+        let fixed = try #require(
+            LicenseHeaders.fixed(
+                "// swift-tools-version: 6.2\n\nimport PackageDescription\n", style: .slashes, year: 2026,
+                currentYear: 2026))
         #expect(fixed.hasPrefix("// swift-tools-version: 6.2\n// Copyright 2026 Noah Qin\n"))
         #expect(LicenseHeaders.check(fixed, style: .slashes, currentYear: 2026) == nil)
     }

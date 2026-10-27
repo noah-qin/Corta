@@ -76,14 +76,15 @@ extension SFTPTransferEngine {
         /// not a single path component.
         public var skipped: [Skipped]
 
+        public enum SkipReason: Equatable, Sendable {
+            case symbolicLink
+            case notARegularFile
+            case unsafeName
+        }
+
         public struct Skipped: Equatable, Sendable {
-            public enum Reason: Equatable, Sendable {
-                case symbolicLink
-                case notARegularFile
-                case unsafeName
-            }
             public var relativePath: String
-            public var reason: Reason
+            public var reason: SkipReason
         }
 
         public init(
@@ -338,15 +339,11 @@ extension SFTPTransferEngine {
         return plan
     }
 
-    /// Depth-first over the local tree without following symbolic links;
-    /// the plan lists directories parents-first so remote `MKDIR`s land in
-    /// order.
-    static func enumerateLocal(root: URL) throws(SFTPError) -> TreePlan {
-        var plan = TreePlan()
-        // The enumerator yields nothing for a root that is missing or
-        // unreadable, which looked exactly like an empty folder: a folder
-        // moved away while its upload was queued created an empty remote
-        // directory and reported success.
+    /// The enumerator yields nothing for a root that is missing or
+    /// unreadable, which looked exactly like an empty folder: a folder
+    /// moved away while its upload was queued created an empty remote
+    /// directory and reported success. So the root is checked first.
+    private static func checkReadableDirectory(_ root: URL) throws(SFTPError) {
         var rootInfo = Darwin.stat()
         guard fstatat(AT_FDCWD, root.path, &rootInfo, 0) == 0 else {
             throw .localIOFailed(operation: "opendir", code: errno)
@@ -357,6 +354,14 @@ extension SFTPTransferEngine {
         guard Darwin.access(root.path, R_OK | X_OK) == 0 else {
             throw .localIOFailed(operation: "opendir", code: errno)
         }
+    }
+
+    /// Depth-first over the local tree without following symbolic links;
+    /// the plan lists directories parents-first so remote `MKDIR`s land in
+    /// order.
+    static func enumerateLocal(root: URL) throws(SFTPError) -> TreePlan {
+        var plan = TreePlan()
+        try checkReadableDirectory(root)
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
         // A subdirectory that cannot be read is a tree that cannot be
         // uploaded whole: the walk stops and says so, rather than reporting

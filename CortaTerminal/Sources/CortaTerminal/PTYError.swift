@@ -47,7 +47,7 @@ extension PTYError: CustomStringConvertible {
     }
 
     private static func message(_ code: Int32) -> String {
-        guard let c = strerror(code) else { return "errno \(code)" }
-        return "\(String(cString: c)) (errno \(code))"
+        guard let text = strerror(code) else { return "errno \(code)" }
+        return "\(String(cString: text)) (errno \(code))"
     }
 }

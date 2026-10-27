@@ -576,7 +576,6 @@ func displayWidth(of scalar: Unicode.Scalar) -> Int {
     return 1
 }
 
-
 /// Bases of standardized emoji presentation sequences, Unicode 17.0.
 /// Source: https://www.unicode.org/Public/17.0.0/ucd/emoji/emoji-variation-sequences.txt
 /// Scalar width stays unchanged; a valid base + VS16 cluster takes two cells.
@@ -772,9 +771,13 @@ func supportsEmojiPresentation(_ scalar: UInt32) -> Bool {
     while low < high {
         let mid = (low + high) / 2
         let range = emojiPresentationBases[mid]
-        if scalar < range.0 { high = mid }
-        else if scalar > range.1 { low = mid + 1 }
-        else { return true }
+        if scalar < range.0 {
+            high = mid
+        } else if scalar > range.1 {
+            low = mid + 1
+        } else {
+            return true
+        }
     }
     return false
 }

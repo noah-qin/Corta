@@ -26,15 +26,15 @@ public struct SpecialColors: Sendable, Equatable {
         case italic = 4
     }
 
-    public internal(set) var overrides: [Slot: (red: UInt8, green: UInt8, blue: UInt8)] = [:]
+    public internal(set) var overrides: [Slot: RGB] = [:]
 
     public init() {}
 
-    public func color(at slot: Slot) -> (red: UInt8, green: UInt8, blue: UInt8)? {
+    public func color(at slot: Slot) -> RGB? {
         overrides[slot]
     }
 
-    mutating func setOverride(_ slot: Slot, to color: (red: UInt8, green: UInt8, blue: UInt8)) {
+    mutating func setOverride(_ slot: Slot, to color: RGB) {
         overrides[slot] = color
     }
 

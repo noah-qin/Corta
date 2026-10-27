@@ -51,7 +51,9 @@ struct KittyPNGDecodeTests {
         #expect(decoded.bgra.count == 4 * 3 * 4)
     }
 
-    @Test("another ImageIO format sent as a PNG is refused", arguments: ["public.tiff", "public.jpeg", "com.microsoft.bmp"])
+    @Test(
+        "another ImageIO format sent as a PNG is refused",
+        arguments: ["public.tiff", "public.jpeg", "com.microsoft.bmp"])
     func otherFormatsAreRefused(type: String) throws {
         let bytes = try Self.encoded(as: type)
         // ImageIO itself reads it, so the refusal is ours.

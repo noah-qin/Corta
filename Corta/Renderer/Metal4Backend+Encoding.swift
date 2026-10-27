@@ -23,15 +23,13 @@ nonisolated extension Metal4Backend {
 
     func draw(
         _ instances: ContiguousArray<QuadInstance>,
-        ring: InstanceBufferRing,
-        pipeline: MTLRenderPipelineState,
+        as pass: DrawPass,
         atlas: MTLTexture?,
         atlasRects: [SIMD4<UInt16>] = [],
         atlasRectsVersion: UInt64? = nil,
         imageUVRect: SIMD4<Float> = .zero,
         rect: CGRect,
         drawableSize: CGSize,
-        label: String,
         transientTexture: Bool = false
     ) {
         // The pass (and its clear) opened in `beginFrame`.
@@ -49,7 +47,7 @@ nonisolated extension Metal4Backend {
         guard
             upload(
                 instances, uniforms: uniforms, atlasRects: atlasRects, atlasRectsVersion: atlasRectsVersion,
-                through: ring)
+                through: pass.ring)
         else { return }
         if let atlas {
             makeResident(atlas, transient: transientTexture)
@@ -57,13 +55,13 @@ nonisolated extension Metal4Backend {
             argumentTable.setSamplerState(sampler.gpuResourceID, index: 0)
         }
 
-        if lastPipeline !== pipeline {
-            encoder.setRenderPipelineState(pipeline)
-            lastPipeline = pipeline
+        if lastPipeline !== pass.pipeline {
+            encoder.setRenderPipelineState(pass.pipeline)
+            lastPipeline = pass.pipeline
         }
         encoder.setArgumentTable(argumentTable, stages: [.vertex, .fragment])
         setScissorAndViewport(scissor, drawableSize: drawableSize, on: encoder)
-        encoder.pushDebugGroup(label)
+        encoder.pushDebugGroup(pass.label)
         encoder.drawPrimitives(
             primitiveType: .triangleStrip, vertexStart: 0, vertexCount: 4,
             instanceCount: instances.count)
@@ -88,7 +86,6 @@ nonisolated extension Metal4Backend {
         _ instances: ContiguousArray<QuadInstance>, uniforms: QuadUniforms, atlasRects: [SIMD4<UInt16>],
         atlasRectsVersion: UInt64?, through ring: InstanceBufferRing
     ) -> Bool {
-        let instanceByteCount = MemoryLayout<QuadInstance>.stride * instances.count
         var tableAddress: MTLGPUAddress?
         if let atlasRectsVersion, !atlasRects.isEmpty {
             guard let address = rectangleTableAddress(atlasRects, version: atlasRectsVersion) else { return false }
@@ -96,21 +93,19 @@ nonisolated extension Metal4Backend {
         }
         let copiedRects = tableAddress == nil ? atlasRects : []
         guard
-            let addresses = instances.withUnsafeBytes({ raw -> (MTLGPUAddress, MTLGPUAddress, MTLGPUAddress)? in
-                guard let base = raw.baseAddress else { return nil }
-                return ring.append(
-                    instances: base, instanceByteCount: instanceByteCount, uniforms: uniforms, atlasRects: copiedRects,
-                    slot: currentSlot, device: device, residencySet: residencySet
+            let addresses = instances.withUnsafeBytes({ raw -> InstanceBufferRing.UploadAddresses? in
+                ring.append(
+                    instances: raw, uniforms: uniforms, atlasRects: copiedRects, slot: currentSlot
                 ) { [self] buffer in
                     retired.append((frame: frameNumber, allocation: buffer))
                 }
             })
         else { return false }
-        uploadedInstanceBytes += instanceByteCount
+        uploadedInstanceBytes += MemoryLayout<QuadInstance>.stride * instances.count
         uploadedRectangleBytes += copiedRects.count * MemoryLayout<SIMD4<UInt16>>.stride
-        argumentTable.setAddress(addresses.0, index: 0)
-        argumentTable.setAddress(addresses.1, index: 1)
-        argumentTable.setAddress(tableAddress ?? addresses.2, index: 2)
+        argumentTable.setAddress(addresses.instances, index: 0)
+        argumentTable.setAddress(addresses.uniforms, index: 1)
+        argumentTable.setAddress(tableAddress ?? addresses.rects, index: 2)
         return true
     }
 
@@ -150,7 +145,7 @@ nonisolated extension Metal4Backend {
     func retireTexture(_ texture: MTLTexture) {
         let id = ObjectIdentifier(texture)
         guard let entry = boundTextures[id] else { return }
-        boundTextures[id] = (texture: entry.texture, lastFrame: entry.lastFrame, retentionFrames: 0)
+        boundTextures[id] = BoundTexture(texture: entry.texture, lastFrame: entry.lastFrame, retentionFrames: 0)
     }
 
     /// See `boundTextures`.
@@ -160,8 +155,8 @@ nonisolated extension Metal4Backend {
             residencySet.addAllocation(texture)
             residencySet.commit()
         }
-        boundTextures[id] = (texture: texture, lastFrame: frameNumber,
-            retentionFrames: transient ? 0 : Self.textureRetentionFrames)
+        boundTextures[id] = BoundTexture(
+            texture: texture, lastFrame: frameNumber, retentionFrames: transient ? 0 : Self.textureRetentionFrames)
     }
 
     /// Releases retired resources whose retiring frame has completed.

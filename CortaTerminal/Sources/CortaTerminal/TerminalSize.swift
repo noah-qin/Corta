@@ -63,12 +63,12 @@ public struct TerminalSize: Equatable, Sendable {
         )
     }
 
-    init(_ ws: Darwin.winsize) {
+    init(_ size: Darwin.winsize) {
         self.init(
-            rows: ws.ws_row,
-            columns: ws.ws_col,
-            pixelWidth: ws.ws_xpixel,
-            pixelHeight: ws.ws_ypixel
+            rows: size.ws_row,
+            columns: size.ws_col,
+            pixelWidth: size.ws_xpixel,
+            pixelHeight: size.ws_ypixel
         )
     }
 }

@@ -27,3 +27,77 @@ included:
 excluded:
   - .build
   - CortaTerminal/.build
+  # Generated from the Unicode Character Database and marked "do not edit
+  # by hand": its length is the table's, and its layout is the generator's.
+  - CortaTerminal/Sources/CortaTerminal/CharacterWidth.swift
+
+# A brace that follows a wrapped condition, signature or type header sits
+# on a line of its own, so the first statement of the body does not line
+# up with the continuation above it. That is the house style (over a
+# hundred instances); every single-line header keeps its brace inline.
+opening_brace:
+  ignore_multiline_statement_conditions: true
+  ignore_multiline_function_signatures: true
+  ignore_multiline_type_headers: true
+
+# A multi-line string literal here is content, not code: the shell
+# integration scripts are emitted byte for byte, and the installer calls an
+# installed copy outdated when its bytes differ, so a wrapped line would
+# flag every existing installation. Every other line keeps the limit.
+line_length:
+  ignores_multiline_strings: true
+
+# Short names that are the domain's own notation, not abbreviations:
+# coordinates and sizes, colour channels, loop indices and counts, a POSIX
+# descriptor, and English words that read as labels (`page(up:)`,
+# `word(at:)`, `.ok`). Anything else spells itself out.
+identifier_name:
+  excluded:
+    - "^(id|fd|i|j|k|n|x|y|z|w|h|dx|dy|x0|x1|y0|y1|uv|r|g|b|a)$"
+    - "^(up|on|at|to|as|ok)$"
+
+# The limits below stay at their defaults; two options change what is
+# measured, to match how this tree is written.
+#
+# Most declarations carry a doc comment saying why (DocC builds without
+# warnings), so a file is measured in lines of code, not of prose.
+file_length:
+  ignore_comment_only_lines: true
+
+# The VT, OSC and key dispatchers are flat `switch` tables, one action per
+# code; each `case` is a row, not a branch a reader has to hold.
+cyclomatic_complexity:
+  ignores_case_statements: true
+
+# A helper type lives inside the type it serves, even when that type is
+# itself nested (`Scrollback.Cache.State`, `TerminalSession.IOFailure
+# .Operation`). Hoisting it would widen a private type to file scope or
+# rename public API, so two levels are allowed; a third is not.
+nesting:
+  type_level: 2
+
+# A collection literal ends in a comma when its closing bracket stands on
+# a line of its own, and takes none when the bracket follows the last
+# element on the same line. The tree is consistent about both, and neither
+# `trailing_comma` mode can say it: the default would strip about two
+# hundred commas, `mandatory_comma` would write `,]` some forty times. The
+# two custom rules below hold the convention instead.
+disabled_rules:
+  - trailing_comma
+  # Bytes from the PTY, a child process or an SFTP server decode with
+  # `String(decoding:as:)` on purpose: an invalid sequence becomes U+FFFD
+  # (`docs/SECURITY.md`), where the failable initialiser the rule asks for
+  # would drop a whole title, field or message for one bad byte.
+  - optional_data_string_conversion
+
+custom_rules:
+  comma_before_inline_bracket:
+    name: "Trailing Comma Before Inline Bracket"
+    regex: ',[ \t]*\]'
+    excluded_match_kinds: [string, comment, doccomment]
+    message: "A literal whose closing bracket follows its last element takes no trailing comma"
+  missing_trailing_comma:
+    name: "Missing Trailing Comma"
+    regex: '[^,\[\s][ \t]*\n[ \t]*\]'
+    excluded_match_kinds: [string, comment, doccomment]
+    message: "A literal whose closing bracket stands on its own line ends its last element with a comma"

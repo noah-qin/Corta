@@ -418,7 +418,8 @@ nonisolated final class GlyphAtlas {
         self.atlasPixelSize = size
         self.isDegraded = size < atlasPixelSize
 
-        (self.asciiPage, self.shapedPage, self.colorPage) = Self.makePages(atlasPixelSize: size, font: base)
+        let pages = Self.makePages(atlasPixelSize: size, font: base)
+        (self.asciiPage, self.shapedPage, self.colorPage) = (pages.ascii, pages.shaped, pages.color)
         asciiTable = .allocate(capacity: 4 << 7)
         asciiTable.initialize(repeating: nil)
 
@@ -427,10 +428,19 @@ nonisolated final class GlyphAtlas {
             region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)
     }
 
+    enum TextureKind: Hashable { case grayscale, color }
+    /// Failed retirement allocation must never let a later miss overwrite
+    /// texels referenced by an in-flight frame.
+    var blockedTextureWrites: Set<TextureKind> = []
+
     deinit {
         asciiTable.deallocate()
     }
+}
 
+// MARK: - Faces, pages and the ASCII table
+
+nonisolated extension GlyphAtlas {
     /// Two cells of `font`, which is already in pixels: the renderer's box
     /// for a wide glyph, so an emoji drawn to fit it is never scaled on the
     /// GPU.
@@ -439,9 +449,15 @@ nonisolated final class GlyphAtlas {
         return CGSize(width: metrics.cellWidth * 2, height: metrics.cellHeight)
     }
 
+    private struct Pages {
+        var ascii: AtlasPage
+        var shaped: AtlasPage
+        var color: AtlasPage
+    }
+
     /// The three pages' fixed regions, fresh each call so `init` and `reset`
     /// never rewind them by hand.
-    private static func makePages(atlasPixelSize: Int, font: CTFont) -> (ascii: AtlasPage, shaped: AtlasPage, color: AtlasPage) {
+    private static func makePages(atlasPixelSize: Int, font: CTFont) -> Pages {
         let metrics = CellMetrics(font: font)
         // Reserve complete shelves for 95 printable glyphs in each face. Keep
         // the tiny test/fallback atlas split, so eviction remains exercised.
@@ -457,7 +473,7 @@ nonisolated final class GlyphAtlas {
             reservedFirstRow: false)
         let color = AtlasPage(
             regionOrigin: (0, 0), regionSize: (atlasPixelSize, atlasPixelSize), reservedFirstRow: false)
-        return (ascii, shaped, color)
+        return Pages(ascii: ascii, shaped: shaped, color: color)
     }
 
     /// Re-points the atlas at a new font, shrinking textures and keeping pipelines:
@@ -468,7 +484,8 @@ nonisolated final class GlyphAtlas {
         (fonts, isSyntheticBold) = Self.faces(of: base, cjk: options.cjkFamily)
         (kanaFonts, hangulFonts) = Self.scriptFaces(of: fonts, cjk: options.cjkFamily)
         colorBox = Self.colorBox(for: base, lineSpacing: options.lineSpacing)
-        (asciiPage, shapedPage, colorPage) = Self.makePages(atlasPixelSize: atlasPixelSize, font: base)
+        let pages = Self.makePages(atlasPixelSize: atlasPixelSize, font: base)
+        (asciiPage, shapedPage, colorPage) = (pages.ascii, pages.shaped, pages.color)
         asciiTable.update(repeating: nil)
         evictionCount += 1
         generation += 1
@@ -526,8 +543,8 @@ nonisolated final class GlyphAtlas {
         }
         var utf16 = [UniChar(scalar)]
         var glyphs: [CGGlyph] = [0]
-        let f = fonts[Int(style.rawValue)]
-        let mapped = CTFontGetGlyphsForCharacters(f, &utf16, &glyphs, 1)
+        let styleFont = fonts[Int(style.rawValue)]
+        let mapped = CTFontGetGlyphsForCharacters(styleFont, &utf16, &glyphs, 1)
         fastPathHits += 1
         guard mapped, glyphs[0] != 0 else {
             // Unmapped by the primary face, and the fast path has no cascade:
@@ -537,7 +554,7 @@ nonisolated final class GlyphAtlas {
             return missing
         }
         let info = rasterize(
-            [(glyphs: glyphs, positions: [CGPoint.zero], font: f, isColor: false, ctRun: nil, ctLine: nil)],
+            [ShapedRun(glyphs: glyphs, positions: [CGPoint.zero], font: styleFont, isColor: false)],
             style: style, page: asciiPage)
         store(info, forASCII: scalar, style: style, at: index)
         return info
@@ -607,14 +624,14 @@ nonisolated final class GlyphAtlas {
     /// `ctLine` is held only to keep `ctRun` valid: a run's glyph storage
     /// belongs to its line, and once the line was freed
     /// `CTRunGetImageBounds` crashed intermittently.
-    typealias ShapedRun = (
-        glyphs: [CGGlyph], positions: [CGPoint], font: CTFont, isColor: Bool,
-        ctRun: CTRun?, ctLine: CTLine?
-    )
-
-    enum TextureKind: Hashable { case grayscale, color }
-    /// Failed retirement allocation must never let a later miss overwrite
-    /// texels referenced by an in-flight frame.
-    var blockedTextureWrites: Set<TextureKind> = []
+    struct ShapedRun {
+        var glyphs: [CGGlyph]
+        var positions: [CGPoint]
+        var font: CTFont
+        var isColor: Bool
+        var ctRun: CTRun?
+        // periphery:ignore - never read: held so `ctRun`'s storage outlives the line it came from.
+        var ctLine: CTLine?
+    }
 
 }

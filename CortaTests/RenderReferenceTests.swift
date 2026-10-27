@@ -95,7 +95,7 @@ struct RenderReferenceTests {
             atlasIndex: 2),
     ]
     static let colorInstances: ContiguousArray<QuadInstance> = [
-        QuadInstance(origin: .init(20, 8), size: .init(24, 24), color: .one, atlasIndex: 1)
+        QuadInstance(origin: .init(20, 8), size: .init(24, 24), color: .one, atlasIndex: 1),
     ]
 
     /// A 4x2-pixel RGBA image, transmitted and placed over 4x2 cells.
@@ -201,7 +201,8 @@ struct RenderReferenceTests {
             return
         }
         guard let expected = readPNG(url, width: texture.width, height: texture.height) else {
-            Issue.record("no \(texture.width)x\(texture.height) reference at \(url.path)", sourceLocation: sourceLocation)
+            Issue.record(
+                "no \(texture.width)x\(texture.height) reference at \(url.path)", sourceLocation: sourceLocation)
             return
         }
         var mismatches = 0
@@ -227,8 +228,11 @@ struct RenderReferenceTests {
         let completed = backend.renderFrameAndWait(into: target, clearColor: clearColor) { backend in
             guard !empty else { return }
             backend.drawSolidQuads(solidInstances, rect: rect, drawableSize: drawableSize)
-            backend.drawGlyphQuads(glyphInstances, atlas: coverage, atlasRects: [.init(0, 0, 16, 16), .init(4, 4, 8, 8)], rect: rect, drawableSize: drawableSize)
-            backend.drawColorQuads(colorInstances, atlas: color, atlasRects: [.init(0, 0, 16, 16)], rect: rect, drawableSize: drawableSize)
+            backend.drawGlyphQuads(
+                glyphInstances, atlas: coverage, atlasRects: [.init(0, 0, 16, 16), .init(4, 4, 8, 8)], rect: rect,
+                drawableSize: drawableSize)
+            backend.drawColorQuads(
+                colorInstances, atlas: color, atlasRects: [.init(0, 0, 16, 16)], rect: rect, drawableSize: drawableSize)
         }
         #expect(completed, "the frame never completed")
         return target
@@ -257,10 +261,9 @@ struct RenderReferenceTests {
 
         func frame() {
             renderer.renderAndWait(
-                grid: grid, rect: CGRect(origin: .zero, size: size), drawableSize: size,
-                cursorVisible: true, selection: overlaySelection,
-                searchMatches: overlaySearchMatches, currentSearchMatchIndex: 0,
-                hoveredLink: overlayHoveredLink, target: target)
+                grid: grid, cursorVisible: true, selection: overlaySelection, searchMatches: overlaySearchMatches,
+                currentSearchMatchIndex: 0, hoveredLink: overlayHoveredLink,
+                into: FrameTarget(texture: target, rect: CGRect(origin: .zero, size: size), drawableSize: size))
         }
         frame()
         #expect(decoded.wait(timeout: .now() + frameCompletionTimeout) == .success, "the Kitty image never decoded")

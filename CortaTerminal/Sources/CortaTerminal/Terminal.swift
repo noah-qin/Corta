@@ -201,8 +201,12 @@ public struct Terminal: Sendable {
         let changed = performer.state.isDark != isDark
         performer.state.isDark = isDark
         performer.state.dynamicColorDefaults = colors
-        if !performer.state.dynamicColorOverrides.contains(10) { performer.state.dynamicColors.foreground = colors.foreground }
-        if !performer.state.dynamicColorOverrides.contains(11) { performer.state.dynamicColors.background = colors.background }
+        if !performer.state.dynamicColorOverrides.contains(10) {
+            performer.state.dynamicColors.foreground = colors.foreground
+        }
+        if !performer.state.dynamicColorOverrides.contains(11) {
+            performer.state.dynamicColors.background = colors.background
+        }
         if !performer.state.dynamicColorOverrides.contains(12) { performer.state.dynamicColors.cursor = colors.cursor }
         performer.state.dynamicColors.selection = colors.selection
         if changed, performer.state.colorSchemeReportingEnabled {
@@ -238,7 +242,8 @@ public struct Terminal: Sendable {
     }
 
     public var pointerShape: String? {
-        performer.grid.isAlternateScreenActive ? performer.state.pointerAlternate.current : performer.state.pointerMain.current
+        performer.grid.isAlternateScreenActive
+            ? performer.state.pointerAlternate.current : performer.state.pointerMain.current
     }
     public mutating func takeProgramAttention() -> ProgramAttention? {
         defer { performer.state.attention = nil }

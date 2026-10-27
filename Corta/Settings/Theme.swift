@@ -44,8 +44,8 @@ nonisolated extension Theme.Variant {
     /// OSC 10/11/12 answers from the live variant, not the other one.
     var dynamicColors: DynamicColors {
         func byte(_ component: Float) -> UInt8 { UInt8((component * 255).rounded()) }
-        func triple(_ color: SIMD4<Float>) -> (red: UInt8, green: UInt8, blue: UInt8) {
-            (byte(color.x), byte(color.y), byte(color.z))
+        func triple(_ color: SIMD4<Float>) -> RGB {
+            RGB(red: byte(color.x), green: byte(color.y), blue: byte(color.z))
         }
         var colors = DynamicColors(
             foreground: triple(foreground), background: triple(background), cursor: triple(cursor))
@@ -58,8 +58,8 @@ nonisolated extension Theme.Variant {
     /// with. Overrides are painted too, so query and paint always agree.
     var indexedPaletteDefaults: IndexedPalette {
         func byte(_ component: Float) -> UInt8 { UInt8((component * 255).rounded()) }
-        func triple(_ color: SIMD4<Float>) -> (red: UInt8, green: UInt8, blue: UInt8) {
-            (byte(color.x), byte(color.y), byte(color.z))
+        func triple(_ color: SIMD4<Float>) -> RGB {
+            RGB(red: byte(color.x), green: byte(color.y), blue: byte(color.z))
         }
         var defaults = IndexedPalette.xtermDefaults()
         for (index, color) in ansi.enumerated() where index < 16 {

@@ -246,7 +246,8 @@ final class TaskNotifier {
         content.title = title
         // An exit status is safe to show; command text is not.
         let outcome =
-            lastExitStatus.map { $0 == 0 ? L10n.text("notification.finished") : L10n.format("notification.failed", $0) } ?? L10n.text("notification.finished")
+            lastExitStatus.map { $0 == 0 ? L10n.text("notification.finished") : L10n.format("notification.failed", $0) }
+            ?? L10n.text("notification.finished")
         lastExitStatus = nil
         content.body = L10n.format("notification.body", outcome, Self.duration(elapsed))
         content.sound = nil
@@ -270,7 +271,8 @@ final class TaskNotifier {
         let minutes = total / 60
         let remainder = total % 60
         if minutes < 60 {
-            return remainder == 0 ? L10n.format("duration.minutes", minutes) : L10n.format("duration.minutesSeconds", minutes, remainder)
+            return remainder == 0
+                ? L10n.format("duration.minutes", minutes) : L10n.format("duration.minutesSeconds", minutes, remainder)
         }
         let hours = minutes / 60
         return L10n.format("duration.hoursMinutes", hours, minutes % 60)
@@ -280,8 +282,7 @@ final class TaskNotifier {
     private func requestAuthorizationOnce() {
         guard !Self.didRequestAuthorization else { return }
         Self.didRequestAuthorization = true
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) {
-            granted, _ in
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
             // Keep the result, so the setting never claims "on" falsely.
             Task { @MainActor in
                 let state: Permission = granted ? .granted : .denied

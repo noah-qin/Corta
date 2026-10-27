@@ -71,16 +71,22 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
             }
         }
         let enabled = ConfigurationStore.shared.configuration.agentStatus
-        let panes = panes
-        var waiting = 0
-        var values: [Double] = []
+        refreshTabs(enabled: enabled)
+        refreshDock(enabled: enabled, directory: directory)
+        NotificationCenter.default.post(name: didChange, object: nil)
+    }
+
+    /// Each window's tab shows its most urgent pane status, or its progress.
+    private static func refreshTabs(enabled: Bool) {
         for window in NSApp.windows {
             guard let split = window.contentViewController as? SplitViewController else { continue }
             let statuses = enabled ? split.panes.compactMap { $0.agents.status } : []
             let status = statuses.max { $0.urgency < $1.urgency }
             let progress = enabled ? split.panes.compactMap { $0.agents.progress }.first : nil
             if status != nil || progress != nil {
-                let view = (window.tab.accessoryView as? AgentTabView) ?? AgentTabView(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
+                let view =
+                    (window.tab.accessoryView as? AgentTabView)
+                    ?? AgentTabView(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
                 guard view.status != status || view.progress != progress || window.tab.accessoryView !== view
                 else { continue }
                 view.status = status; view.progress = progress
@@ -93,6 +99,13 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
                 window.tab.accessoryView = view
             } else { window.tab.accessoryView = nil }
         }
+    }
+
+    /// The Dock badge counts the panes waiting on the user; the Dock tile
+    /// shows the panes' mean progress. Redrawn only when either changes.
+    private static func refreshDock(enabled: Bool, directory: AgentDirectory) {
+        var waiting = 0
+        var values: [Double] = []
         if enabled {
             for pane in panes {
                 if pane.agents.status?.state == .blocked { waiting += 1 }
@@ -104,22 +117,20 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         let badge = waiting > 0 ? String(waiting) : nil
         let progress = values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
         let percent = progress.map { Int(($0 * 100).rounded()) }
-        if badge != directory.drawnBadge || percent != directory.drawnDockPercent {
-            directory.drawnBadge = badge
-            directory.drawnDockPercent = percent
-            NSApp.dockTile.badgeLabel = badge
-            if let progress {
-                let view = directory.dockView ?? AgentDockView(frame: NSRect(origin: .zero, size: NSApp.dockTile.size))
-                directory.dockView = view
-                view.progress = progress
-                NSApp.dockTile.contentView = view
-            } else {
-                NSApp.dockTile.contentView = nil
-                directory.dockView = nil
-            }
-            NSApp.dockTile.display()
+        guard badge != directory.drawnBadge || percent != directory.drawnDockPercent else { return }
+        directory.drawnBadge = badge
+        directory.drawnDockPercent = percent
+        NSApp.dockTile.badgeLabel = badge
+        if let progress {
+            let view = directory.dockView ?? AgentDockView(frame: NSRect(origin: .zero, size: NSApp.dockTile.size))
+            directory.dockView = view
+            view.progress = progress
+            NSApp.dockTile.contentView = view
+        } else {
+            NSApp.dockTile.contentView = nil
+            directory.dockView = nil
         }
-        NotificationCenter.default.post(name: didChange, object: nil)
+        NSApp.dockTile.display()
     }
 
     static func menu() -> NSMenu {

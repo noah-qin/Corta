@@ -61,8 +61,9 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     /// would lose `RenderPolicy`'s rate.
     private var desiredFrameRateRange = CAFrameRateRange.default
 
-    init(metalLayer: CAMetalLayer,
-        driver: DiagnosticsEnvironment.FrameDriver = DiagnosticsEnvironment.frameDriver()) {
+    init(
+        metalLayer: CAMetalLayer, driver: DiagnosticsEnvironment.FrameDriver = DiagnosticsEnvironment.frameDriver()
+    ) {
         self.driver = driver
         self.metalLayer = metalLayer
         super.init()
@@ -132,8 +133,9 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
 
     /// Pure echo/rate gate: output outside this window and all continuous
     /// streams stay paced by the link. Immediate echoes require a paused link.
-    static func mayPresentEcho(now: CFTimeInterval, lastInput: CFTimeInterval?,
-        lastPresent: CFTimeInterval?, maximumFPS: Int, isPaused: Bool) -> Bool {
+    static func mayPresentEcho(
+        now: CFTimeInterval, lastInput: CFTimeInterval?, lastPresent: CFTimeInterval?, maximumFPS: Int, isPaused: Bool
+    ) -> Bool {
         guard isPaused, let lastInput, now >= lastInput,
             now - lastInput <= echoWindow else { return false }
         return lastPresent.map { now - $0 >= 1 / Double(max(1, maximumFPS)) } ?? true
@@ -259,10 +261,10 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         let frameStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil
         defer {
             if let frameStart {
-                let ms =
+                let frameMilliseconds =
                     Double(DispatchTime.now().uptimeNanoseconds - frameStart.uptimeNanoseconds)
                     / 1_000_000
-                RenderMetrics.record(.cpuFrame, milliseconds: ms)
+                RenderMetrics.record(.cpuFrame, milliseconds: frameMilliseconds)
             }
         }
         // With no acquire to time, lateness past the target timestamp is the

@@ -151,15 +151,18 @@ struct SFTPProtocolTests {
     @Test("SETSTAT, FSETSTAT and MKDIR carry ATTRS")
     func attributeCarryingRequests() throws {
         let attrs = SFTPAttributes(permissions: 0o100644)
-        let cases: [(UInt8, SFTPPayload, [UInt8])] = [
-            (9, .setstat(path: [0x2f], attributes: attrs), s("/") + be32(4) + be32(0o100644)),
-            (10, .fsetstat(handle: [0x2f], attributes: attrs), s("/") + be32(4) + be32(0o100644)),
-            (14, .mkdir(path: [0x2f], attributes: attrs), s("/") + be32(4) + be32(0o100644)),
+        // The packet type, the request, and the body after its request-id.
+        struct Case { var type: UInt8; var payload: SFTPPayload; var tail: [UInt8] }
+        let tail = s("/") + be32(4) + be32(0o100644)
+        let cases = [
+            Case(type: 9, payload: .setstat(path: [0x2f], attributes: attrs), tail: tail),
+            Case(type: 10, payload: .fsetstat(handle: [0x2f], attributes: attrs), tail: tail),
+            Case(type: 14, payload: .mkdir(path: [0x2f], attributes: attrs), tail: tail),
         ]
-        for (type, payload, tail) in cases {
-            let message = SFTPMessage(requestID: 1, request: payload)
-            #expect(SFTPCodec.encodeFrame(message) == frame([type] + be32(1) + tail))
-            #expect(try SFTPCodec.decodeFrame([type] + be32(1) + tail) == message)
+        for item in cases {
+            let message = SFTPMessage(requestID: 1, request: item.payload)
+            #expect(SFTPCodec.encodeFrame(message) == frame([item.type] + be32(1) + item.tail))
+            #expect(try SFTPCodec.decodeFrame([item.type] + be32(1) + item.tail) == message)
         }
     }
 
@@ -244,7 +247,9 @@ struct SFTPProtocolTests {
         #expect(decoded.payload == .name([entry]))
         #expect(SFTPCodec.encodeFrame(decoded) == frame(body))
     }
+}
 
+extension SFTPProtocolTests {
     // MARK: - ATTRS
 
     @Test("ATTRS encodes every field in flag order")

@@ -90,15 +90,11 @@ struct TerminalAccessibilitySnapshot {
         self.rowBoundaries = rowBoundaries
         self.rowLengths = rowLengths
 
-        // Stored properties aren't all set yet, so this calls the static rule.
-        func offset(documentRow: Int, column: Int) -> Int {
-            Self.offset(
-                documentRow: documentRow, column: column, lineStarts: lineStarts,
-                rowBoundaries: rowBoundaries, rowLengths: rowLengths,
-                textLength: text.utf16.count, scrollOffset: scrollOffset)
-        }
-
-        self.cursorOffset = offset(documentRow: grid.cursor.row, column: grid.cursor.column)
+        // Stored properties aren't all set yet, so this asks a local index.
+        let index = RowIndex(
+            lineStarts: lineStarts, rowBoundaries: rowBoundaries, rowLengths: rowLengths,
+            textLength: text.utf16.count, scrollOffset: scrollOffset)
+        self.cursorOffset = index.offset(documentRow: grid.cursor.row, column: grid.cursor.column)
         if let selection {
             // Both ends of a selection are cells it includes; an NSRange
             // ends after its last unit. The end is therefore the boundary
@@ -106,77 +102,82 @@ struct TerminalAccessibilitySnapshot {
             // grapheme, however many UTF-16 units or columns it takes.
             let lower = min(selection.start, selection.end)
             let upper = max(selection.start, selection.end)
-            let start = offset(documentRow: lower.row, column: lower.column)
-            let end = Self.offset(
-                after: upper.column, documentRow: upper.row, lineStarts: lineStarts,
-                rowBoundaries: rowBoundaries, rowLengths: rowLengths,
-                textLength: text.utf16.count, scrollOffset: scrollOffset)
+            let start = index.offset(documentRow: lower.row, column: lower.column)
+            let end = index.offset(after: upper.column, documentRow: upper.row)
             self.selectedRange = NSRange(location: min(start, end), length: abs(end - start))
         } else {
             self.selectedRange = NSRange(location: cursorOffset, length: 0)
         }
     }
 
-    /// Clamps to the viewport's ends and the row's trimmed tail, so an
-    /// off-screen selection reports its visible part.
-    private static func offset(
-        documentRow: Int, column: Int, lineStarts: [Int],
-        rowBoundaries: [[(offset: Int, column: Int)]], rowLengths: [Int],
-        textLength: Int, scrollOffset: Int
-    ) -> Int {
-        let row = documentRow + scrollOffset
-        guard row >= 0 else { return 0 }
-        guard row < lineStarts.count else { return textLength }
-        let start = lineStarts[row]
-        if let exact = rowBoundaries[row].last(where: { $0.column <= column }) {
-            return start + (exact.column == column ? exact.offset : rowLengths[row])
-        }
-        return start + min(rowLengths[row], max(0, column))
-    }
+    /// The row tables, for turning a document cell into a UTF-16 offset.
+    private struct RowIndex {
+        let lineStarts: [Int]
+        let rowBoundaries: [[(offset: Int, column: Int)]]
+        let rowLengths: [Int]
+        let textLength: Int
+        let scrollOffset: Int
 
-    /// The offset just past the character in `column`: the next
-    /// character's start, or the row's end when it is the last. A column
-    /// past the trimmed tail ends at the row's end; rows off the viewport
-    /// clamp to its ends.
-    private static func offset(
-        after column: Int, documentRow: Int, lineStarts: [Int],
-        rowBoundaries: [[(offset: Int, column: Int)]], rowLengths: [Int],
-        textLength: Int, scrollOffset: Int
-    ) -> Int {
-        let row = documentRow + scrollOffset
-        guard row >= 0 else { return 0 }
-        guard row < lineStarts.count else { return textLength }
-        let start = lineStarts[row]
-        let boundaries = rowBoundaries[row]
-        guard let index = boundaries.lastIndex(where: { $0.column <= column }) else {
-            return start + min(rowLengths[row], max(0, column + 1))
+        /// Clamps to the viewport's ends and the row's trimmed tail, so an
+        /// off-screen selection reports its visible part.
+        func offset(documentRow: Int, column: Int) -> Int {
+            let row = documentRow + scrollOffset
+            guard row >= 0 else { return 0 }
+            guard row < lineStarts.count else { return textLength }
+            let start = lineStarts[row]
+            if let exact = rowBoundaries[row].last(where: { $0.column <= column }) {
+                return start + (exact.column == column ? exact.offset : rowLengths[row])
+            }
+            return start + min(rowLengths[row], max(0, column))
         }
-        let next = index + 1 < boundaries.count ? boundaries[index + 1].offset : rowLengths[row]
-        return start + next
+
+        /// The offset just past the character in `column`: the next
+        /// character's start, or the row's end when it is the last. A column
+        /// past the trimmed tail ends at the row's end; rows off the viewport
+        /// clamp to its ends.
+        func offset(after column: Int, documentRow: Int) -> Int {
+            let row = documentRow + scrollOffset
+            guard row >= 0 else { return 0 }
+            guard row < lineStarts.count else { return textLength }
+            let start = lineStarts[row]
+            let boundaries = rowBoundaries[row]
+            guard let index = boundaries.lastIndex(where: { $0.column <= column }) else {
+                return start + min(rowLengths[row], max(0, column + 1))
+            }
+            let next = index + 1 < boundaries.count ? boundaries[index + 1].offset : rowLengths[row]
+            return start + next
+        }
     }
 
     // MARK: - The two conversions
 
     func offset(documentRow: Int, column: Int) -> Int {
-        Self.offset(
-            documentRow: documentRow, column: column, lineStarts: lineStarts,
-            rowBoundaries: rowBoundaries, rowLengths: rowLengths,
-            textLength: text.utf16.count, scrollOffset: scrollOffset)
+        RowIndex(
+            lineStarts: lineStarts, rowBoundaries: rowBoundaries, rowLengths: rowLengths,
+            textLength: text.utf16.count, scrollOffset: scrollOffset
+        ).offset(documentRow: documentRow, column: column)
+    }
+
+    /// A cell and how many columns its character occupies.
+    struct CellSpan: Equatable {
+        var row: Int
+        var column: Int
+        var columns: Int
     }
 
     /// The cell an offset falls in and its width in columns: one for ASCII
     /// and combining sequences, two for wide characters. Drawing a range
     /// needs the width, or it clips half a CJK character.
-    func cellSpan(forOffset offset: Int) -> (row: Int, column: Int, columns: Int) {
+    func cellSpan(forOffset offset: Int) -> CellSpan {
         let cell = cell(forOffset: offset)
-        guard row(cell.row) else { return (cell.row, cell.column, 1) }
+        guard row(cell.row) else { return CellSpan(row: cell.row, column: cell.column, columns: 1) }
         let boundaries = rowBoundaries[cell.row]
         guard let index = boundaries.lastIndex(where: { $0.column <= cell.column })
-        else { return (cell.row, cell.column, 1) }
+        else { return CellSpan(row: cell.row, column: cell.column, columns: 1) }
         let next = index + 1 < boundaries.count ? boundaries[index + 1].column : nil
         // Width is the gap to the next character; one at the row's end.
         let width = next.map { max(1, $0 - boundaries[index].column) } ?? 1
-        return (cell.row, cell.column, width)
+        return CellSpan(row: cell.row, column: cell.column, columns: width)
     }
 
     private func row(_ index: Int) -> Bool { index >= 0 && index < rowBoundaries.count }

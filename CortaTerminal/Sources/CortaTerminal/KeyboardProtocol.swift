@@ -50,7 +50,7 @@ struct KeyboardProtocolStack: Sendable, Equatable {
     /// Never empty: the base entry is the legacy encoding.
     var current: KeyboardEnhancementFlags { stack[stack.count - 1] }
 
-    public var depth: Int { stack.count }
+    var depth: Int { stack.count }
 
     /// `CSI > flags u`. At the cap the oldest entry goes, so a program that
     /// never pops is not stuck at what it last set.

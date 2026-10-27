@@ -70,7 +70,8 @@ public final class PTY: @unchecked Sendable {
         workingDirectory: String? = nil,
         terminationHandler: (@Sendable (ProcessExit) -> Void)? = nil
     ) throws(PTYError) -> PTY {
-        let (primary, replica, path) = try openPair()
+        let pair = try openPair()
+        let (primary, replica, path) = (pair.primary, pair.replica, pair.path)
 
         var windowSize = size.winsize
         guard ioctl(replica, TIOCSWINSZ, &windowSize) == 0 else {
@@ -84,13 +85,10 @@ public final class PTY: @unchecked Sendable {
         let pid: pid_t
         do {
             pid = try Spawn.child(
-                executable: executable,
-                arguments: arguments,
-                environment: environment,
-                replicaPath: path,
-                parentReplica: replica,
-                workingDirectory: workingDirectory
-            )
+                Spawn.Command(
+                    executable: executable, arguments: arguments, environment: environment,
+                    workingDirectory: workingDirectory),
+                replicaPath: path, parentReplica: replica)
         } catch {
             Darwin.close(primary)
             throw error
@@ -134,9 +132,14 @@ public final class PTY: @unchecked Sendable {
         if state.withLock({ $0.exit == nil }) { exited.leave() }
     }
 
-    private static func openPair() throws(PTYError) -> (
-        primary: Int32, replica: Int32, path: String
-    ) {
+    /// A pseudo-terminal's two descriptors and the replica's device path.
+    private struct Pair {
+        var primary: Int32
+        var replica: Int32
+        var path: String
+    }
+
+    private static func openPair() throws(PTYError) -> Pair {
         let primary = posix_openpt(O_RDWR | O_NOCTTY)
         guard primary >= 0 else { throw .openFailed(code: errno) }
         // So no other child this process starts (a `Process`, another session)
@@ -166,7 +169,7 @@ public final class PTY: @unchecked Sendable {
             throw .openFailed(code: code)
         }
         _ = fcntl(replica, F_SETFD, FD_CLOEXEC)
-        return (primary, replica, path)
+        return Pair(primary: primary, replica: replica, path: path)
     }
 
     // MARK: - I/O
@@ -277,7 +280,11 @@ public final class PTY: @unchecked Sendable {
         return TerminalSize(windowSize)
     }
 
-    // MARK: - Child lifecycle
+}
+
+// MARK: - Child lifecycle
+
+extension PTY {
 
     public var exitStatus: ProcessExit? { state.withLock { $0.exit } }
 

@@ -20,24 +20,24 @@
 public struct IndexedPalette: Sendable, Equatable {
     // Private setter: `color(at:)` indexes with any `UInt8`, so a shrunk array
     // would trap on the next query.
-    public private(set) var defaults: [(red: UInt8, green: UInt8, blue: UInt8)]
-    public internal(set) var overrides: [UInt8: (red: UInt8, green: UInt8, blue: UInt8)] = [:]
+    public private(set) var defaults: [RGB]
+    public internal(set) var overrides: [UInt8: RGB] = [:]
 
     /// An override changes what an index resolves to, not any `Cell`, so cell
     /// revisions never see it; the renderer compares this instead. A theme
     /// reseed invalidates on its own path.
     public private(set) var overridesGeneration: UInt64 = 0
 
-    public init(defaults: [(red: UInt8, green: UInt8, blue: UInt8)] = IndexedPalette.xtermDefaults()) {
+    public init(defaults: [RGB] = IndexedPalette.xtermDefaults()) {
         precondition(defaults.count == 256, "IndexedPalette.defaults must name all 256 indices")
         self.defaults = defaults
     }
 
-    public func color(at index: UInt8) -> (red: UInt8, green: UInt8, blue: UInt8) {
+    public func color(at index: UInt8) -> RGB {
         overrides[index] ?? defaults[Int(index)]
     }
 
-    mutating func setOverride(_ index: UInt8, to color: (red: UInt8, green: UInt8, blue: UInt8)) {
+    mutating func setOverride(_ index: UInt8, to color: RGB) {
         overrides[index] = color
         overridesGeneration &+= 1
     }
@@ -45,7 +45,7 @@ public struct IndexedPalette: Sendable, Equatable {
     /// For a live theme switch: a program's overrides survive. RIS assigns a
     /// whole new palette instead.
     public mutating func updateDefaults(
-        to newDefaults: [(red: UInt8, green: UInt8, blue: UInt8)]
+        to newDefaults: [RGB]
     ) {
         precondition(newDefaults.count == 256, "IndexedPalette.defaults must name all 256 indices")
         defaults = newDefaults
@@ -65,16 +65,15 @@ public struct IndexedPalette: Sendable, Equatable {
 
     /// 0–15 are placeholders the app replaces with the theme's colours. Public
     /// for the app target's `Theme.Variant.indexedPaletteDefaults`.
-    public static func xtermDefaults() -> [(red: UInt8, green: UInt8, blue: UInt8)] {
-        var values: [(red: UInt8, green: UInt8, blue: UInt8)] = Array(
-            repeating: (0, 0, 0), count: 256)
+    public static func xtermDefaults() -> [RGB] {
+        var values = Array(repeating: RGB(red: 0, green: 0, blue: 0), count: 256)
         let levels: [UInt8] = [0, 95, 135, 175, 215, 255]
         for i in 0..<216 {
-            values[16 + i] = (levels[i / 36], levels[(i / 6) % 6], levels[i % 6])
+            values[16 + i] = RGB(red: levels[i / 36], green: levels[(i / 6) % 6], blue: levels[i % 6])
         }
         for i in 0..<24 {
             let level = UInt8(8 + i * 10)
-            values[232 + i] = (level, level, level)
+            values[232 + i] = RGB(red: level, green: level, blue: level)
         }
         return values
     }

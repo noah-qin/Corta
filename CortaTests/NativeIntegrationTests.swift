@@ -46,7 +46,7 @@ struct NativeIntegrationTests {
         pasteboard.clearContents()
         _ = pasteboard.writeObjects([
             NSURL(fileURLWithPath: "/tmp/one file"),
-            NSURL(fileURLWithPath: "/tmp/two")
+            NSURL(fileURLWithPath: "/tmp/two"),
         ])
         #expect(TerminalView.droppedPaths(from: pasteboard) == ["/tmp/one file", "/tmp/two"])
 

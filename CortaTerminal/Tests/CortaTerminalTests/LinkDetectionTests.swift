@@ -152,20 +152,26 @@ struct LinkDetectionTests {
 
     @Test("the shapes tools actually emit")
     func realWorldShapes() {
-        let cases: [(String, String, Int, Int?)] = [
-            ("src/main.rs:42:17: error: no", "src/main.rs", 42, 17),
-            ("Corta/ViewController.swift:1209", "Corta/ViewController.swift", 1209, nil),
-            ("/usr/include/stdio.h:100:", "/usr/include/stdio.h", 100, nil),
-            ("./build.sh:7: syntax", "./build.sh", 7, nil),
-            ("~/notes.md:3", "~/notes.md", 3, nil),
-            ("Makefile:12: warning", "Makefile", 12, nil),
+        struct Case {
+            var text: String, path: String, number: Int, column: Int?
+            init(_ text: String, _ path: String, _ number: Int, _ column: Int?) {
+                self.text = text; self.path = path; self.number = number; self.column = column
+            }
+        }
+        let cases = [
+            Case("src/main.rs:42:17: error: no", "src/main.rs", 42, 17),
+            Case("Corta/ViewController.swift:1209", "Corta/ViewController.swift", 1209, nil),
+            Case("/usr/include/stdio.h:100:", "/usr/include/stdio.h", 100, nil),
+            Case("./build.sh:7: syntax", "./build.sh", 7, nil),
+            Case("~/notes.md:3", "~/notes.md", 3, nil),
+            Case("Makefile:12: warning", "Makefile", 12, nil),
         ]
-        for (text, path, number, column) in cases {
-            let found = FileReferenceDetection.references(in: Self.line(text))
-            #expect(found.count == 1, "\(text)")
-            #expect(found.first?.path == path, "\(text)")
-            #expect(found.first?.line == number, "\(text)")
-            #expect(found.first?.column == column, "\(text)")
+        for item in cases {
+            let found = FileReferenceDetection.references(in: Self.line(item.text))
+            #expect(found.count == 1, "\(item.text)")
+            #expect(found.first?.path == item.path, "\(item.text)")
+            #expect(found.first?.line == item.number, "\(item.text)")
+            #expect(found.first?.column == item.column, "\(item.text)")
         }
     }
 
@@ -202,9 +208,9 @@ struct LinkDetectionTests {
     }
 
     @Test("the span covers the whole reference")
-    func spanCoversTheMatch() {
+    func spanCoversTheMatch() throws {
         let found = FileReferenceDetection.references(in: Self.line("x src/a.rs:9:2 y"))
-        let reference = try! #require(found.first)
+        let reference = try #require(found.first)
         #expect(reference.range.start.column == 2)
         #expect(reference.range.end.column == 2 + "src/a.rs:9:2".count - 1)
     }
@@ -219,10 +225,6 @@ struct LinkDetectionTests {
     }
 
     // MARK: - File references
-
-    /// The pattern the possessive one replaced, kept to prove the two agree.
-    private static let quadraticPattern = try! NSRegularExpression(
-        pattern: #"(?<![^\s(\[<'"])([~./]?[\w.+\-/]*[\w.+\-]+):(\d{1,9})(?!\d)(?::(\d{1,9})(?!\d))?"#)
 
     @Test("a 100,000-cell token with no colon is scanned in linear time")
     func longTokenWithoutColonIsLinear() {
@@ -275,23 +277,28 @@ struct LinkDetectionTests {
     }
 
     @Test("the linear pattern finds exactly what the quadratic one did")
-    func linearPatternMatchesTheOldOne() {
+    func linearPatternMatchesTheOldOne() throws {
+        // The pattern the possessive one replaced, kept to prove the two agree.
+        let quadraticPattern = try NSRegularExpression(
+            pattern: #"(?<![^\s(\[<'"])([~./]?[\w.+\-/]*[\w.+\-]+):(\d{1,9})(?!\d)(?::(\d{1,9})(?!\d))?"#)
         var generator = SystemRandomNumberGenerator()
         let alphabet = Array("ab./~-+_:19 (\"'<[x")
-        var samples = ["src/main.swift:12", "./a/b.rs:3:4", "/:1", "~:2", "a/:3", ".:4", "~/x:5", "(f.c:6)", "u+v-w:7:8", "x//y:9"]
+        var samples = [
+            "src/main.swift:12", "./a/b.rs:3:4", "/:1", "~:2", "a/:3", ".:4", "~/x:5", "(f.c:6)", "u+v-w:7:8", "x//y:9",
+        ]
         for _ in 0..<2_000 {
             samples.append(String((0..<Int.random(in: 1...24, using: &generator)).map { _ in
                 alphabet.randomElement(using: &generator)!
             }))
         }
         for text in samples {
-            let ns = text as NSString
+            let nsText = text as NSString
             // Group 1, through the same filters `references(in:)` applies.
-            let expected = Self.quadraticPattern.matches(
-                in: text, range: NSRange(location: 0, length: ns.length)
+            let expected = quadraticPattern.matches(
+                in: text, range: NSRange(location: 0, length: nsText.length)
             ).compactMap { match -> String? in
-                let path = ns.substring(with: match.range(at: 1))
-                guard let line = Int(ns.substring(with: match.range(at: 2))), line > 0,
+                let path = nsText.substring(with: match.range(at: 1))
+                guard let line = Int(nsText.substring(with: match.range(at: 2))), line > 0,
                     path.contains(where: { $0.isLetter || $0 == "/" || $0 == "~" || $0 == "_" })
                 else { return nil }
                 return path

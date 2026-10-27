@@ -145,7 +145,6 @@ struct WideWriteTests {
     }
 }
 
-
 struct EmojiPresentationWidthTests {
     @Test func claudeTableEmojiBordersStayInTheSameColumn() {
         for emoji in ["✅", "❌", "⚠️", "👨‍👩‍👧", "🇨🇳"] {

@@ -129,7 +129,9 @@ final class CommandPaletteModel {
         rows =
             query.isEmpty
             ? browsingRows(row: row) : searchRows(matching: query.lowercased(), row: row)
-        let agents = agentEntries().filter { query.isEmpty || Self.score($0.title.lowercased(), query: query.lowercased()) != nil }
+        let agents = agentEntries().filter {
+            query.isEmpty || Self.score($0.title.lowercased(), query: query.lowercased()) != nil
+        }
         if !agents.isEmpty {
             // Listed first while browsing; under a query, below the commands it
             // matched, since a long pane title matches most short queries.
@@ -172,8 +174,13 @@ final class CommandPaletteModel {
     private func searchRows(matching query: String, row: (TerminalCommand, Bool) -> Row) -> [Row] {
         let categoryTitles = Dictionary(
             uniqueKeysWithValues: CommandCategory.allCases.map { ($0, $0.title.lowercased()) })
+        struct Match {
+            var command: TerminalCommand
+            var onTitle: Bool
+            var score: Int
+        }
         return TerminalCommand.allCases
-            .compactMap { command -> (command: TerminalCommand, onTitle: Bool, score: Int)? in
+            .compactMap { command -> Match? in
                 let onTitle = Self.score(command.title.lowercased(), query: query)
                 // Only when the title missed: most keystrokes need none of it.
                 guard
@@ -190,7 +197,7 @@ final class CommandPaletteModel {
                 let recency =
                     recentCommands.firstIndex(of: command)
                     .map { Self.recentLimit - $0 } ?? 0
-                return (command, onTitle != nil, score + recency)
+                return Match(command: command, onTitle: onTitle != nil, score: score + recency)
             }
             // A title match leads whatever the scores: they grow with the
             // query, so no fixed penalty could keep the two apart.

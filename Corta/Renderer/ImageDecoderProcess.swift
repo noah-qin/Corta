@@ -40,10 +40,10 @@ nonisolated enum ImageDecoderProcess {
     /// running after this is killed and the image is not drawn.
     static let timeout: Duration = .seconds(10)
 
-    /// Owns the anonymous mapping until its Metal buffer's final owner releases it.
-    /// The decode worker writes it before publication; afterwards pixels are immutable.
     // The decode worker is the sole writer before publication; Metal only
     // samples immutable pixels and may release ownership on its completion thread.
+    /// Owns the anonymous mapping until its Metal buffer's final owner releases it.
+    /// The decode worker writes it before publication; afterwards pixels are immutable.
     final class SharedPixels: @unchecked Sendable {
         /// Transient: a mapping lives only until its pixels reach a private
         /// texture, which the renderer's texture budgets account for.
@@ -176,44 +176,13 @@ nonisolated enum ImageDecoderProcess {
         else {
             return nil
         }
-        var toChild: [Int32] = [-1, -1]
-        var fromChild: [Int32] = [-1, -1]
-        guard pipe(&toChild) == 0 else { return nil }
-        guard pipe(&fromChild) == 0 else {
-            close(toChild[0])
-            close(toChild[1])
-            return nil
-        }
-        guard normalizeDescriptors(&toChild), normalizeDescriptors(&fromChild) else {
-            for fd in toChild + fromChild { close(fd) }
-            return nil
-        }
-
-        var actions: posix_spawn_file_actions_t?
-        posix_spawn_file_actions_init(&actions)
-        defer { posix_spawn_file_actions_destroy(&actions) }
-        posix_spawn_file_actions_adddup2(&actions, toChild[0], 0)
-        posix_spawn_file_actions_adddup2(&actions, fromChild[1], 1)
-        posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0)
-        posix_spawn_file_actions_adddup2(&actions, pixels.descriptor, 3)
-        var attributes: posix_spawnattr_t?
-        posix_spawnattr_init(&attributes)
-        defer { posix_spawnattr_destroy(&attributes) }
-        posix_spawnattr_setflags(
-            &attributes,
-            Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSID | POSIX_SPAWN_SETSIGDEF
-                | POSIX_SPAWN_SETSIGMASK))
-        resetSignals(of: &attributes)
-
-        let argv0 = strdup(helper)
-        defer { free(argv0) }
-        let argv: [UnsafeMutablePointer<CChar>?] = [argv0, nil]
-        let envp: [UnsafeMutablePointer<CChar>?] = [nil]
-        var pid: pid_t = 0
-        let spawned = posix_spawn(&pid, helper, &actions, &attributes, argv, envp)
+        guard let pipes = makePipes() else { return nil }
+        let toChild = pipes.toChild
+        let fromChild = pipes.fromChild
+        let spawned = spawn(helper, stdin: toChild[0], stdout: fromChild[1], pixels: pixels.descriptor)
         close(toChild[0])
         close(fromChild[1])
-        guard spawned == 0 else {
+        guard let pid = spawned else {
             close(toChild[1])
             close(fromChild[0])
             return nil
@@ -235,6 +204,60 @@ nonisolated enum ImageDecoderProcess {
             reported.height == dimensions.height
         else { return nil }
         return Decoded(width: reported.width, height: reported.height, pixels: pixels)
+    }
+
+}
+
+// MARK: - The helper process
+
+nonisolated extension ImageDecoderProcess {
+    /// A pipe to the helper and one from it, every end clear of the
+    /// descriptors the child is given (`normalizeDescriptors`). `nil`, with
+    /// nothing left open, on failure.
+    private static func makePipes() -> (toChild: [Int32], fromChild: [Int32])? {
+        var toChild: [Int32] = [-1, -1]
+        var fromChild: [Int32] = [-1, -1]
+        guard pipe(&toChild) == 0 else { return nil }
+        guard pipe(&fromChild) == 0 else {
+            close(toChild[0])
+            close(toChild[1])
+            return nil
+        }
+        guard normalizeDescriptors(&toChild), normalizeDescriptors(&fromChild) else {
+            for fd in toChild + fromChild { close(fd) }
+            return nil
+        }
+        return (toChild, fromChild)
+    }
+
+    /// Starts `helper` with `stdin` and `stdout`, `/dev/null` for stderr and
+    /// the pixel memory as descriptor 3 — nothing else inherited, an empty
+    /// environment, its own session and default signals. `nil` if the spawn
+    /// failed. The caller closes the child's ends either way.
+    private static func spawn(_ helper: String, stdin: Int32, stdout: Int32, pixels: Int32) -> pid_t? {
+        var actions: posix_spawn_file_actions_t?
+        posix_spawn_file_actions_init(&actions)
+        defer { posix_spawn_file_actions_destroy(&actions) }
+        posix_spawn_file_actions_adddup2(&actions, stdin, 0)
+        posix_spawn_file_actions_adddup2(&actions, stdout, 1)
+        posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0)
+        posix_spawn_file_actions_adddup2(&actions, pixels, 3)
+        var attributes: posix_spawnattr_t?
+        posix_spawnattr_init(&attributes)
+        defer { posix_spawnattr_destroy(&attributes) }
+        posix_spawnattr_setflags(
+            &attributes,
+            Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSID | POSIX_SPAWN_SETSIGDEF
+                | POSIX_SPAWN_SETSIGMASK))
+        resetSignals(of: &attributes)
+
+        let argv0 = strdup(helper)
+        defer { free(argv0) }
+        let argv: [UnsafeMutablePointer<CChar>?] = [argv0, nil]
+        let envp: [UnsafeMutablePointer<CChar>?] = [nil]
+        var pid: pid_t = 0
+        guard posix_spawn(&pid, helper, &actions, &attributes, argv, envp) == 0 else { return nil }
+        return pid
     }
 
     /// Sleeps in the kernel until `pid` exits or `deadline` passes, then
@@ -319,33 +342,53 @@ nonisolated enum ImageDecoderProcess {
                 if errno == EINTR { continue }
                 return nil
             }
-            if writerOpen, descriptors.count > 1, descriptors[1].revents != 0 {
-                let count = input.withUnsafeBytes { buffer in
-                    Darwin.write(writer, buffer.baseAddress! + written, buffer.count - written)
-                }
-                if count > 0 {
-                    written += count
-                } else if count < 0, errno != EAGAIN, errno != EINTR {
-                    // The decoder stopped reading (it refused the input and
-                    // exited); its exit status is the verdict.
-                    written = input.count
-                }
-                if written == input.count {
-                    close(writer)
-                    writerOpen = false
-                }
+            if writerOpen, descriptors.count > 1, descriptors[1].revents != 0,
+                writeNext(input, to: writer, written: &written) {
+                close(writer)
+                writerOpen = false
             }
             if descriptors[0].revents != 0 {
-                let count = chunk.withUnsafeMutableBytes { Darwin.read(reader, $0.baseAddress, $0.count) }
-                if count == 0 { return output }
-                if count > 0 {
-                    guard output.count + count <= limit else { return nil }
-                    output.append(contentsOf: chunk[0..<count])
-                } else if errno != EAGAIN, errno != EINTR {
-                    return nil
+                switch readNext(from: reader, into: &output, chunk: &chunk, limit: limit) {
+                case .more: break
+                case .finished: return output
+                case .failed: return nil
                 }
             }
         }
+    }
+
+    /// One non-blocking write of what is left of `input`.
+    /// - Returns: whether all of it is written. A decoder that stopped
+    ///   reading (it refused the input and exited) counts as all: its exit
+    ///   status is the verdict.
+    private static func writeNext(_ input: [UInt8], to writer: Int32, written: inout Int) -> Bool {
+        let count = input.withUnsafeBytes { buffer in
+            Darwin.write(writer, buffer.baseAddress! + written, buffer.count - written)
+        }
+        if count > 0 {
+            written += count
+        } else if count < 0, errno != EAGAIN, errno != EINTR {
+            written = input.count
+        }
+        return written == input.count
+    }
+
+    private enum ReadStep { case more, finished, failed }
+
+    /// One non-blocking read into `output`: `.finished` at end of file,
+    /// `.failed` on an error or past `limit`.
+    private static func readNext(
+        from reader: Int32, into output: inout [UInt8], chunk: inout [UInt8], limit: Int
+    ) -> ReadStep {
+        let count = chunk.withUnsafeMutableBytes { Darwin.read(reader, $0.baseAddress, $0.count) }
+        if count == 0 { return .finished }
+        if count > 0 {
+            guard output.count + count <= limit else { return .failed }
+            output.append(contentsOf: chunk[0..<count])
+        } else if errno != EAGAIN, errno != EINTR {
+            return .failed
+        }
+        return .more
     }
 
     /// Exactly the bounded success header, never pixel data on stdout.

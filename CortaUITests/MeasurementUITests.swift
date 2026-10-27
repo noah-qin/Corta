@@ -46,7 +46,9 @@ final class MeasurementUITests: XCTestCase {
     /// anywhere but write only its own container, which the app cannot
     /// read — so the app creates the file and removes it on request.
     private var metricsFile: URL!
+
     private var previousInputSource: TISInputSource?
+
     private var measurementStage: URL!
 
     override func setUpWithError() throws {
@@ -99,6 +101,112 @@ final class MeasurementUITests: XCTestCase {
         app.terminate()
     }
 
+    /// Interactive only: kept out of background runs like the other UI
+    /// measurements. A region flood and a sustained history gesture each
+    /// fill their own frame/GPU rings.
+    @MainActor
+    func testRegionAndHistoryScrolling() throws {
+        var app = try launchSettled()
+        app.typeText("printf '\\033[1;39r'; while :; do printf 'region line\\r\\n'; done\n")
+        pause(22)
+        app.typeKey("c", modifierFlags: .control)
+        report(try waitForMetrics(["cpuFrame", "gpu"], timeout: 10).map { "region scroll \($0)" })
+        app.typeText("printf '\\033[r'\n")
+        removeMetricsFile(through: app)
+        app.terminate()
+
+        app = try launchSettled()
+        app.typeText("i=0; while [ $i -lt 10000 ]; do printf 'history %s\\r\\n' \"$i\"; i=$((i+1)); done\n")
+        pause(3)
+        let terminal = app.textViews.firstMatch
+        let liveViewport = terminal.value as? String
+        app.typeKey(.pageUp, modifierFlags: .shift)
+        XCTAssertNotEqual(terminal.value as? String, liveViewport, "history navigation must change the viewport")
+        for step in 0..<700 {
+            // Keyboard navigation avoids XCTest wheel synthesis against an
+            // unavailable display rect. Reverse before either end clamps.
+            app.typeKey((step / 100).isMultiple(of: 2) ? .pageUp : .pageDown, modifierFlags: .shift)
+            pause(0.03)
+        }
+        report(try waitForMetrics(["cpuFrame", "gpu"], timeout: 10).map { "history scroll \($0)" })
+        removeMetricsFile(through: app)
+        app.terminate()
+    }
+
+    // MARK: - Recovery: closing a window returns its memory
+
+    /// Opens and closes a window per iteration after a short flood has
+    /// grown the first one's scrollback. A physical-memory figure that
+    /// climbs with every iteration is a leak; one that stays flat is the
+    /// window's memory coming back.
+    @MainActor
+    func testOpenAndCloseWindowReturnsMemory() throws {
+        let app = try launchSettled(renderMetrics: false)
+        app.typeText("yes | head -n 200000\n")
+        pause(3)
+        measure(metrics: [XCTMemoryMetric(application: app)]) {
+            app.typeKey("n", modifierFlags: .command)
+            pause(1.5)
+            // Both counts checked: a keystroke that never lands measures
+            // nothing and looks like a flat line.
+            XCTAssertEqual(app.windows.count, 2, "⌘N did not open a window")
+            app.typeText("yes | head -n 200000\n")
+            pause(2)
+            app.typeKey("w", modifierFlags: .command)
+            pause(1.5)
+            XCTAssertEqual(app.windows.count, 1, "⌘W left the new window open")
+        }
+        app.terminate()
+    }
+
+    // MARK: - Keypress to glass (§5.7)
+
+    /// 320 digits about 150 ms apart; the app closes each sample when the
+    /// frame with its echo is on the glass (`MTLDrawable.presentedTime`)
+    /// and writes the distribution once 200 have landed. Synthetic events
+    /// are stamped when XCTest posts them, so the keyboard's HID stage is
+    /// not in the number: it is a lower bound on what a finger sees, and a
+    /// person typing is the `--manual` command in `PERFORMANCE.md` §5.7.
+    /// Stops the moment Corta is not frontmost rather than typing
+    /// elsewhere.
+    @MainActor
+    func testKeypressToGlass() throws {
+        try typeAndReport(try launchSettled(), label: "scripted keypress→glass")
+    }
+
+    /// The same in full screen, one pane (#285). With
+    /// `TEST_RUNNER_CORTA_DIRECT_FULLSCREEN` under Benchmark, the spike's
+    /// blockers are removed too, so the three-way comparison is this test
+    /// with and without it, alternated with `testKeypressToGlass`.
+    @MainActor
+    func testKeypressToGlassFullScreen() throws {
+        let app = try launchSettled()
+        try enterFullScreen(app)
+        let blockers = ProcessInfo.processInfo.environment["CORTA_DIRECT_FULLSCREEN"] ?? "none"
+        try typeAndReport(app, label: "full-screen (direct: \(blockers)) keypress→glass")
+    }
+
+    /// Launched-app checks for the input/render path, kept out of CI.
+    @MainActor
+    func testMenuPaste() throws {
+        let app = try launchSettled(renderMetrics: false)
+        defer { app.terminate() }
+        let clipboard = NSPasteboard.general
+        let saved = (clipboard.pasteboardItems ?? []).map { item -> NSPasteboardItem in
+            let copy = NSPasteboardItem()
+            for type in item.types { if let data = item.data(forType: type) { copy.setData(data, forType: type) } }
+            return copy
+        }
+        addTeardownBlock { clipboard.clearContents()
+            clipboard.writeObjects(saved) }
+        clipboard.clearContents()
+        clipboard.setString("paste-check-280", forType: .string)
+        app.typeKey("v", modifierFlags: .command)
+        pause(0.5)
+        XCTAssertTrue((app.textViews.firstMatch.value as? String)?.contains("paste-check-280") == true)
+        app.typeKey("c", modifierFlags: .control)
+    }
+
     /// Controlled shell records only its app parent PID for an external,
     /// app-only Activity Monitor trace. Rendering must stay occluded.
     @MainActor func testOccludedFloodCPUAndWakeups() throws {
@@ -130,7 +238,9 @@ final class MeasurementUITests: XCTestCase {
     // MARK: - P11 / P07: a sustained flood, 1, 2 and 4 panes
 
     @MainActor func testFloodOnePane() throws { try flood(panes: 1) }
+
     @MainActor func testFloodTwoPanes() throws { try flood(panes: 2) }
+
     @MainActor func testFloodFourPanes() throws { try flood(panes: 4) }
 
     /// `yes` in every pane for about twenty seconds — a 600-frame ring at
@@ -171,38 +281,6 @@ final class MeasurementUITests: XCTestCase {
         app.terminate()
     }
 
-    /// Interactive only: kept out of background runs like the other UI
-    /// measurements. A region flood and a sustained history gesture each
-    /// fill their own frame/GPU rings.
-    @MainActor
-    func testRegionAndHistoryScrolling() throws {
-        var app = try launchSettled()
-        app.typeText("printf '\\033[1;39r'; while :; do printf 'region line\\r\\n'; done\n")
-        pause(22)
-        app.typeKey("c", modifierFlags: .control)
-        report(try waitForMetrics(["cpuFrame", "gpu"], timeout: 10).map { "region scroll \($0)" })
-        app.typeText("printf '\\033[r'\n")
-        removeMetricsFile(through: app)
-        app.terminate()
-
-        app = try launchSettled()
-        app.typeText("i=0; while [ $i -lt 10000 ]; do printf 'history %s\\r\\n' \"$i\"; i=$((i+1)); done\n")
-        pause(3)
-        let terminal = app.textViews.firstMatch
-        let liveViewport = terminal.value as? String
-        app.typeKey(.pageUp, modifierFlags: .shift)
-        XCTAssertNotEqual(terminal.value as? String, liveViewport, "history navigation must change the viewport")
-        for step in 0..<700 {
-            // Keyboard navigation avoids XCTest wheel synthesis against an
-            // unavailable display rect. Reverse before either end clamps.
-            app.typeKey((step / 100).isMultiple(of: 2) ? .pageUp : .pageDown, modifierFlags: .shift)
-            pause(0.03)
-        }
-        report(try waitForMetrics(["cpuFrame", "gpu"], timeout: 10).map { "history scroll \($0)" })
-        removeMetricsFile(through: app)
-        app.terminate()
-    }
-
     @MainActor func testFourPanePromptMemory() throws {
         let app = try launchSettled(renderMetrics: false)
         _ = split(app, into: 4)
@@ -213,33 +291,9 @@ final class MeasurementUITests: XCTestCase {
         }
         app.terminate()
     }
+}
 
-    // MARK: - Recovery: closing a window returns its memory
-
-    /// Opens and closes a window per iteration after a short flood has
-    /// grown the first one's scrollback. A physical-memory figure that
-    /// climbs with every iteration is a leak; one that stays flat is the
-    /// window's memory coming back.
-    @MainActor
-    func testOpenAndCloseWindowReturnsMemory() throws {
-        let app = try launchSettled(renderMetrics: false)
-        app.typeText("yes | head -n 200000\n")
-        pause(3)
-        measure(metrics: [XCTMemoryMetric(application: app)]) {
-            app.typeKey("n", modifierFlags: .command)
-            pause(1.5)
-            // Both counts checked: a keystroke that never lands measures
-            // nothing and looks like a flat line.
-            XCTAssertEqual(app.windows.count, 2, "⌘N did not open a window")
-            app.typeText("yes | head -n 200000\n")
-            pause(2)
-            app.typeKey("w", modifierFlags: .command)
-            pause(1.5)
-            XCTAssertEqual(app.windows.count, 1, "⌘W left the new window open")
-        }
-        app.terminate()
-    }
-
+extension MeasurementUITests {
     @MainActor func testKitty4096PNGToGlass() throws {
         let previous = LatinInputSource.select()
         addTeardownBlock { LatinInputSource.restore(previous) }
@@ -271,33 +325,6 @@ final class MeasurementUITests: XCTestCase {
             add(shot)
             app.terminate()
         }
-    }
-
-    // MARK: - Keypress to glass (§5.7)
-
-    /// 320 digits about 150 ms apart; the app closes each sample when the
-    /// frame with its echo is on the glass (`MTLDrawable.presentedTime`)
-    /// and writes the distribution once 200 have landed. Synthetic events
-    /// are stamped when XCTest posts them, so the keyboard's HID stage is
-    /// not in the number: it is a lower bound on what a finger sees, and a
-    /// person typing is the `--manual` command in `PERFORMANCE.md` §5.7.
-    /// Stops the moment Corta is not frontmost rather than typing
-    /// elsewhere.
-    @MainActor
-    func testKeypressToGlass() throws {
-        try typeAndReport(try launchSettled(), label: "scripted keypress→glass")
-    }
-
-    /// The same in full screen, one pane (#285). With
-    /// `TEST_RUNNER_CORTA_DIRECT_FULLSCREEN` under Benchmark, the spike's
-    /// blockers are removed too, so the three-way comparison is this test
-    /// with and without it, alternated with `testKeypressToGlass`.
-    @MainActor
-    func testKeypressToGlassFullScreen() throws {
-        let app = try launchSettled()
-        try enterFullScreen(app)
-        let blockers = ProcessInfo.processInfo.environment["CORTA_DIRECT_FULLSCREEN"] ?? "none"
-        try typeAndReport(app, label: "full-screen (direct: \(blockers)) keypress→glass")
     }
 
     /// ⌃⌘F, then waits for the window to cover the screen; keeps a
@@ -334,7 +361,8 @@ final class MeasurementUITests: XCTestCase {
         guard (32...2000).contains(count) else { return XCTFail("keypress count must be 32...2000") }
         for index in 0..<count {
             guard app.state == .runningForeground else {
-                return XCTFail("Corta left the foreground (state \(app.state.rawValue)) after \(index) keystrokes; typing stopped")
+                return XCTFail(
+                    "Corta left the foreground (state \(app.state.rawValue)) after \(index) keystrokes; typing stopped")
             }
             // A digit: what earlier runs typed, and what a CJK input
             // method passes straight through if one is still selected.
@@ -346,27 +374,6 @@ final class MeasurementUITests: XCTestCase {
         app.typeKey("u", modifierFlags: .control)  // clear the line of digits
         removeMetricsFile(through: app)
         app.terminate()
-    }
-
-    /// Launched-app checks for the input/render path, kept out of CI.
-    @MainActor
-    func testMenuPaste() throws {
-        let app = try launchSettled(renderMetrics: false)
-        defer { app.terminate() }
-        let clipboard = NSPasteboard.general
-        let saved = (clipboard.pasteboardItems ?? []).map { item -> NSPasteboardItem in
-            let copy = NSPasteboardItem()
-            for type in item.types { if let data = item.data(forType: type) { copy.setData(data, forType: type) } }
-            return copy
-        }
-        addTeardownBlock { clipboard.clearContents()
-            clipboard.writeObjects(saved) }
-        clipboard.clearContents()
-        clipboard.setString("paste-check-280", forType: .string)
-        app.typeKey("v", modifierFlags: .command)
-        pause(0.5)
-        XCTAssertTrue((app.textViews.firstMatch.value as? String)?.contains("paste-check-280") == true)
-        app.typeKey("c", modifierFlags: .control)
     }
 
     // MARK: - Harness
@@ -387,7 +394,9 @@ final class MeasurementUITests: XCTestCase {
         let runner = ProcessInfo.processInfo.environment
         app.launchEnvironment["SHELL"] = runner["CORTA_MEASUREMENT_SHELL"] ?? "/bin/sh"
         if renderMetrics { app.launchEnvironment["CORTA_RENDER_METRICS"] = metricsFile.path }
-        for key in ["CORTA_MAX_DRAWABLES", "CORTA_FRAME_LATENCY", "CORTA_RENDER_METRICS_KEYSTROKES", "CORTA_FRAME_DRIVER", "CORTA_MAIN_STALL", "CORTA_DIRECT_FULLSCREEN",
+        for key in [
+            "CORTA_MAX_DRAWABLES", "CORTA_FRAME_LATENCY", "CORTA_RENDER_METRICS_KEYSTROKES", "CORTA_FRAME_DRIVER",
+            "CORTA_MAIN_STALL", "CORTA_DIRECT_FULLSCREEN",
         ] {
             if let value = runner[key] { app.launchEnvironment[key] = value }
         }
@@ -486,7 +495,7 @@ final class MeasurementUITests: XCTestCase {
             guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else { return "?" }
             return String(decoding: buffer.prefix { $0 != 0 }.map(UInt8.init), as: UTF8.self)
         }
-        let os = ProcessInfo.processInfo.operatingSystemVersionString
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
         // The runner is built with the configuration the app is, so its
         // flags say which one this run used.
         #if DEBUG
@@ -496,9 +505,10 @@ final class MeasurementUITests: XCTestCase {
         #endif
         let runner = ProcessInfo.processInfo.environment
         return [
-            "machine: \(sysctl("hw.model")) / \(sysctl("machdep.cpu.brand_string")); macOS \(os)",
+            "machine: \(sysctl("hw.model")) / \(sysctl("machdep.cpu.brand_string")); macOS \(osVersion)",
             "build: \(build)",
-            "max drawables: \(runner["CORTA_MAX_DRAWABLES"] ?? "default"); frame latency: \(runner["CORTA_FRAME_LATENCY"] ?? "default")",
+            "max drawables: \(runner["CORTA_MAX_DRAWABLES"] ?? "default"); "
+                + "frame latency: \(runner["CORTA_FRAME_LATENCY"] ?? "default")",
         ]
     }
 

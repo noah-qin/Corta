@@ -105,7 +105,9 @@ nonisolated enum RenderMetrics {
             let limit: Int
             switch metric {
             case .imageToPresent: limit = 1
-            case .keypressToPresent, .keyDelivery, .keypressToOutput, .presentationSlip, .echoToMain, .outputToFrame, .mainToFrame, .frameToGlass, .wakeHop, .callbackLead, .firstAfterResume, .resumeToCallback, .frameInterval:
+            case .keypressToPresent, .keyDelivery, .keypressToOutput, .presentationSlip, .echoToMain, .outputToFrame,
+                .mainToFrame, .frameToGlass, .wakeHop, .callbackLead, .firstAfterResume, .resumeToCallback,
+                .frameInterval:
                 limit = keystrokeCapacity
             case .drawableWait, .cpuFrame, .gpu, .gpuExecution, .gpuFeedbackDelay:
                 limit = capacity
@@ -145,7 +147,10 @@ nonisolated enum RenderMetrics {
         let max = sorted[count - 1]
         let conditions = state.withLock { $0.conditions }?.description ?? "conditions=unavailable"
         os_log(
-            "%{public}@: n=%{public}d avg=%{public}.2fms p50=%{public}.2fms p95=%{public}.2fms p99=%{public}.2fms max=%{public}.2fms %{public}@",
+            """
+            %{public}@: n=%{public}d avg=%{public}.2fms p50=%{public}.2fms p95=%{public}.2fms \
+            p99=%{public}.2fms max=%{public}.2fms %{public}@
+            """,
             log: log, type: .default, metric.rawValue, count, avg, p50, p95, p99, max, conditions)
         if let outputFile {
             let line = String(

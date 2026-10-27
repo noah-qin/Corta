@@ -286,11 +286,13 @@ final class PaneFrameLoop {
         let background = renderer.renderedBackground
         let commit = InputLatencySignposts.begin(.commit)
         let accepted = trackPreparedPresentation(of: drawable, generation: generation)
-        let drawn = renderer.draw(
-            rect: rect, drawableSize: drawableSize, target: drawable.texture,
+        let frame = FrameTarget(
+            texture: drawable.texture, rect: rect, drawableSize: drawableSize,
             clearColor: MTLClearColorMake(
                 Double(background.x), Double(background.y), Double(background.z),
-                Double(background.w)),
+                Double(background.w)))
+        let drawn = renderer.draw(
+            frame,
             // For Metal System Trace: ties a command buffer to its pane.
             drawable: drawable, label: "Corta.frame.\(ObjectIdentifier(self).hashValue)",
             onCompleted: onCompleted)
@@ -299,7 +301,11 @@ final class PaneFrameLoop {
         watchGPU(generation: generation, backendGeneration: backendGeneration)
         return drawn
     }
+}
 
+// MARK: - GPU recovery and presentation
+
+extension PaneFrameLoop {
     /// Rebuilds a backend that needs it, resetting the GPU watch. False when
     /// recovery is exhausted: rendering stops and the drawable is presented
     /// unchanged, since an unpresented one is never recycled.
@@ -333,10 +339,10 @@ final class PaneFrameLoop {
             feedback.complete(submission)
             InputLatencySignposts.end(.gpu, gpu)
             if let gpuStart {
-                let ms =
+                let gpuMilliseconds =
                     Double(DispatchTime.now().uptimeNanoseconds - gpuStart.uptimeNanoseconds)
                     / 1_000_000
-                RenderMetrics.record(.gpu, milliseconds: ms)
+                RenderMetrics.record(.gpu, milliseconds: gpuMilliseconds)
             }
             // Feedback may arrive after the scheduler parks. A callback
             // from an old session/queue must not invalidate a replacement.

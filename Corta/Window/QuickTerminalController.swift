@@ -86,8 +86,7 @@ final class QuickTerminalController {
         guard observers.isEmpty else { return }
         let center = notificationCenter
         observers = [
-            center.addObserver(forName: ConfigurationStore.didChange, object: nil, queue: .main) {
-                [weak self] _ in
+            center.addObserver(forName: ConfigurationStore.didChange, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.applyConfiguration() }
             },
             center.addObserver(
@@ -331,7 +330,11 @@ final class QuickTerminalController {
         }
     }
 
-    // MARK: - Geometry
+}
+
+// MARK: - Geometry
+
+extension QuickTerminalController {
 
     static func screen(for rule: Configuration.QuickTerminalScreen) -> NSScreen? {
         switch rule {

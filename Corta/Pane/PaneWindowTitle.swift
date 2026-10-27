@@ -178,8 +178,7 @@ final class PaneWindowTitle {
         // rather than leave this pane without its proxy icon until the next
         // `cd`; a newer path in the meantime supersedes the retry.
         guard admitted else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.directoryProbeRetryDelay) {
-                [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.directoryProbeRetryDelay) { [weak self] in
                 guard let self, !self.isStopped, generation == self.directoryProbeGeneration
                 else { return }
                 self.probeRepresentedDirectory(path)

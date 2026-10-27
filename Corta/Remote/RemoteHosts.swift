@@ -99,7 +99,13 @@ nonisolated enum SSHConfigHosts {
     /// One file's `Host` names and `Include` arguments, in order, and the
     /// names whose block makes them git hosts (`User git`, a git
     /// `HostName`).
-    static func parse(_ text: String) -> (hosts: [String], includes: [String], gitHosts: Set<String>) {
+    struct Parsed {
+        var hosts: [String]
+        var includes: [String]
+        var gitHosts: Set<String>
+    }
+
+    static func parse(_ text: String) -> Parsed {
         var hosts: [String] = []
         var includes: [String] = []
         var gitHosts: Set<String> = []
@@ -127,7 +133,7 @@ nonisolated enum SSHConfigHosts {
                 continue
             }
         }
-        return (hosts, includes, gitHosts)
+        return Parsed(hosts: hosts, includes: includes, gitHosts: gitHosts)
     }
 
     /// `ssh_config`'s word splitting, as far as `Host` and `Include` need

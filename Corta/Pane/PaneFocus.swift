@@ -321,7 +321,11 @@ final class PaneFocus: NSObject {
     /// Stronger recoloured the text underneath.
     static let focusHighlightAlpha: CGFloat = 0.05
 
-    // MARK: - Focus reporting
+}
+
+// MARK: - Focus reporting
+
+extension PaneFocus {
 
     /// Reports only real changes; AppKit's key and responder churn would
     /// otherwise stream reports. Two fixed byte strings, no stream text
@@ -335,14 +339,16 @@ final class PaneFocus: NSObject {
         session.writeFocusReport(isFocused: focused)
     }
 
+    private static let windowNotifications = [
+        NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+        NSWindow.didChangeOcclusionStateNotification,
+    ]
+
     /// Filtered to this pane's window, or every pane reports every window.
     func observeWindows() {
         guard !isObservingWindows else { return }
         isObservingWindows = true
-        for name in [
-            NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
-            NSWindow.didChangeOcclusionStateNotification,
-        ] {
+        for name in Self.windowNotifications {
             NotificationCenter.default.addObserver(
                 self, selector: #selector(windowFocusChanged(_:)), name: name, object: nil)
         }
@@ -359,7 +365,10 @@ final class PaneFocus: NSObject {
     /// The pane closed.
     func stop() {
         stopCursorBlink()
-        NotificationCenter.default.removeObserver(self)
+        // By name: only what `observeWindows` registered.
+        for name in Self.windowNotifications {
+            NotificationCenter.default.removeObserver(self, name: name, object: nil)
+        }
         isObservingWindows = false
     }
 

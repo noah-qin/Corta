@@ -78,6 +78,8 @@ final class PaneAppearance: NSObject {
         NotificationCenter.default.addObserver(
             self, selector: #selector(appearanceChanged),
             name: AppearanceController.didChange, object: nil)
+        // `stop` removes these two by name, so nothing else registered on
+        // this object is dropped with them.
         // Not a selector: AppKit does not say which thread posts it.
         fontSetObserver = NotificationCenter.default.addObserver(
             forName: NSFont.fontSetChangedNotification, object: nil, queue: .main
@@ -98,7 +100,8 @@ final class PaneAppearance: NSObject {
 
     /// The pane closed.
     func stop() {
-        NotificationCenter.default.removeObserver(self)
+        NotificationCenter.default.removeObserver(self, name: ConfigurationStore.didChange, object: nil)
+        NotificationCenter.default.removeObserver(self, name: AppearanceController.didChange, object: nil)
         if let fontSetObserver { NotificationCenter.default.removeObserver(fontSetObserver) }
         fontSetObserver = nil
         isObserving = false

@@ -91,8 +91,10 @@ struct SFTPSSHIntegrationTests {
     @Test("a key passphrase is asked through SSH_ASKPASS and signs in")
     func passphraseThroughAskpass() async throws {
         let (environment, log) = try askpass(answering: "corta pass phrase")
-        let connection = SFTPConnection(host: "fixture", arguments: ["-F", root.appendingPathComponent("locked.conf").path,
-            "-s", "--", "fixture", "sftp"], environment: environment)
+        let connection = SFTPConnection(
+            host: "fixture",
+            arguments: ["-F", root.appendingPathComponent("locked.conf").path, "-s", "--", "fixture", "sftp"],
+            environment: environment)
         defer { connection.close() }
         #expect(try await connection.connect().version == 3)
         #expect(try String(contentsOf: log, encoding: .utf8).contains("passphrase"))
@@ -101,8 +103,10 @@ struct SFTPSSHIntegrationTests {
     @Test("a wrong passphrase through SSH_ASKPASS is an authentication failure")
     func wrongPassphraseThroughAskpass() async throws {
         let (environment, _) = try askpass(answering: "not it")
-        let connection = SFTPConnection(host: "fixture", arguments: ["-F", root.appendingPathComponent("locked.conf").path,
-            "-s", "--", "fixture", "sftp"], environment: environment)
+        let connection = SFTPConnection(
+            host: "fixture",
+            arguments: ["-F", root.appendingPathComponent("locked.conf").path, "-s", "--", "fixture", "sftp"],
+            environment: environment)
         defer { connection.close() }
         await #expect(throws: SFTPError.self) { try await connection.connect() }
     }
@@ -114,8 +118,10 @@ struct SFTPSSHIntegrationTests {
         let known = root.appendingPathComponent("tofu_known_hosts")
         try? FileManager.default.removeItem(at: known)
         let (environment, log) = try askpass(answering: "yes")
-        let connection = SFTPConnection(host: "fixture", arguments: ["-F", root.appendingPathComponent("tofu.conf").path,
-            "-s", "--", "fixture", "sftp"], environment: environment)
+        let connection = SFTPConnection(
+            host: "fixture",
+            arguments: ["-F", root.appendingPathComponent("tofu.conf").path, "-s", "--", "fixture", "sftp"],
+            environment: environment)
         defer { connection.close() }
         #expect(try await connection.connect().version == 3)
         let asked = try String(contentsOf: log, encoding: .utf8)

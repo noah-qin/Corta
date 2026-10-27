@@ -36,6 +36,23 @@ protocol PanePointerHost: AnyObject {
     func invalidateDisplay()
 }
 
+/// Where the grid sits in the terminal view, for mapping between points
+/// and cells: top-anchored when it fits, bottom-anchored while it overflows
+/// (`PaneFrameLoop.contentRect`).
+nonisolated struct GridGeometry {
+    var viewHeight: CGFloat
+    var metrics: CellMetrics
+    var topInset: CGFloat
+
+    /// The top of a grid of `rows` rows, in view points.
+    func gridTop(rows: Int) -> CGFloat {
+        let gridHeight = CGFloat(rows) * metrics.cellHeight
+        return topInset + gridHeight <= viewHeight - TerminalLayout.insets.bottom
+            ? topInset
+            : viewHeight - TerminalLayout.insets.bottom - gridHeight
+    }
+}
+
 /// The pointer and the viewport in one pane: scrolling (wheel, keys and the
 /// scroll-position pill), mouse selection and its auto-scroll, link hover
 /// and opening, and `path:line` references followed to local files. Mouse
@@ -176,9 +193,10 @@ final class PanePointer: NSObject {
             guard let self, let terminalRenderer, session != nil, let terminalView
             else { return (column: 0, row: 0) }
             let position = Self.documentPosition(
-                for: point, viewHeight: terminalView.bounds.height,
-                metrics: terminalRenderer.pointMetrics, grid: session.snapshot(), scrollOffset: 0,
-                topInset: topInset)
+                for: point, grid: session.snapshot(), scrollOffset: 0,
+                in: GridGeometry(
+                    viewHeight: terminalView.bounds.height, metrics: terminalRenderer.pointMetrics,
+                    topInset: topInset))
             return (position.column, position.row)
         }
     }
@@ -186,16 +204,18 @@ final class PanePointer: NSObject {
     /// A screen cell's rect in the terminal view's coordinates.
     private func cellRect(row: Int, column: Int, rows: Int) -> CGRect? {
         guard let terminalRenderer, let terminalView else { return nil }
-        return Self.cellFrame(row: row, column: column, viewHeight: terminalView.bounds.height,
-            metrics: terminalRenderer.pointMetrics, rows: rows, topInset: topInset)
+        return Self.cellFrame(
+            row: row, column: column, rows: rows,
+            in: GridGeometry(
+                viewHeight: terminalView.bounds.height, metrics: terminalRenderer.pointMetrics, topInset: topInset))
     }
 
     /// IME, accessibility and pointer hit testing share the renderer's anchor,
     /// including a grid that temporarily overflows during a live resize.
-    nonisolated static func cellFrame(row: Int, column: Int, viewHeight: CGFloat,
-        metrics: CellMetrics, rows: Int, topInset: CGFloat) -> CGRect {
-        let rect = PaneFrameLoop.contentRect(in: CGSize(width: 0, height: viewHeight), scale: 1,
-            gridHeight: CGFloat(rows) * metrics.cellHeight, topInset: topInset)
+    nonisolated static func cellFrame(row: Int, column: Int, rows: Int, in geometry: GridGeometry) -> CGRect {
+        let metrics = geometry.metrics
+        let rect = PaneFrameLoop.contentRect(in: CGSize(width: 0, height: geometry.viewHeight), scale: 1,
+            gridHeight: CGFloat(rows) * metrics.cellHeight, topInset: geometry.topInset)
         return CGRect(x: TerminalLayout.insets.left + CGFloat(column) * metrics.cellWidth,
             y: rect.minY + CGFloat(row) * metrics.cellHeight,
             width: metrics.cellWidth, height: metrics.cellHeight)

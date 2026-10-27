@@ -28,8 +28,14 @@ public enum LinkDetection {
     }
 
     /// Detection only; `NSWorkspace` parses before opening.
-    private static let pattern = try! NSRegularExpression(
-        pattern: #"(?:https?://|mailto:)\S+"#, options: [.caseInsensitive])
+    private static let pattern: NSRegularExpression = {
+        do {
+            return try NSRegularExpression(pattern: #"(?:https?://|mailto:)\S+"#, options: [.caseInsensitive])
+        } catch {
+            // A literal that does not compile is a build defect, not input.
+            fatalError("LinkDetection.pattern does not compile: \(error)")
+        }
+    }()
 
     /// This runs on every mouse move; a megabyte minified line must not become
     /// an unbounded regex pass on the main thread. Past it, only OSC 8 links

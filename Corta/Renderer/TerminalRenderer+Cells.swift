@@ -23,50 +23,41 @@ nonisolated extension TerminalRenderer {
     /// The per-cell loop, for damaged rows only. A wide glyph is scaled to fit
     /// its two-cell box — the CJK fallback font is never exactly two advances
     /// wide; a side-table cluster is shaped as one run into the same box.
-    func appendRowInstances(
+    ///
+    /// Three outputs, one per pipeline, appended to in place: the row cache
+    /// passes its stored arrays and splices them per row by key path, so
+    /// bundling them into one value would move every hot-path access.
+    func appendRowInstances(  // swiftlint:disable:this function_parameter_count
         line: Line, row: Int, graphemes: GraphemeTable,
         background: inout ContiguousArray<QuadInstance>, glyphs: inout ContiguousArray<QuadInstance>,
         colorGlyphs: inout ContiguousArray<QuadInstance>
     ) {
-        let cell = SIMD2<Float>(Float(metricsValue.cellWidth), Float(metricsValue.cellHeight))
         // Once per row: the property retains the ANSI array on every touch.
-        let palette = framePalette
-        let overrides = indexedOverrides
-        let underlineColors = frameUnderlineColors
-        let selectionForeground = frameSelectionForeground
-        let cursorText = frameDynamicColors?.cursorText ?? .default
-        let cursor = blockCursorColumns(in: line, row: row, cell: cell, palette: palette, into: &background)
+        let paint = RowPaint(
+            cell: SIMD2<Float>(Float(metricsValue.cellWidth), Float(metricsValue.cellHeight)),
+            palette: framePalette, overrides: indexedOverrides, underlineColors: frameUnderlineColors,
+            selectionForeground: frameSelectionForeground,
+            cursorText: frameDynamicColors?.cursorText ?? .default)
+        let cell = paint.cell
+        let cursor = blockCursorColumns(in: line, row: row, cell: cell, palette: paint.palette, into: &background)
         let selected = frameSelectedColumns.indices.contains(row) ? frameSelectedColumns[row] : 0..<0
         var colors = CellColors()
         for column in 0..<line.count {
             let current = line[column]
             let attributes = current.attributes
             let underCursor = cursor.contains(column)
-            colors.update(for: current, underCursor: underCursor, palette: palette, overrides: overrides,
-                selectionColor: selected.contains(column) ? selectionForeground : .default,
-                cursorText: cursorText)
+            colors.update(for: current, underCursor: underCursor, selected: selected.contains(column), paint: paint)
             let origin = SIMD2<Float>(Float(column) * cell.x, Float(row) * cell.y)
             let reversed = attributes.contains(.reverse)
             if underCursor || !(reversed ? current.foreground : current.background).isDefault || reversed {
                 background.append(QuadInstance(origin: origin, size: cell, rgba: colors.packedBackground))
             }
-            appendRules(for: current, at: origin, cell: cell, color: colors.foreground,
-                underlineColors: underlineColors, palette: palette, overrides: overrides, into: &background)
+            appendRules(for: current, at: origin, color: colors.foreground, paint: paint, into: &background)
             guard !attributes.contains(.invisible), !attributes.contains(.wideSpacer) else { continue }
-            if appendGeometry(
-                for: current.scalar, wide: attributes.contains(.wide), at: origin, cell: cell, colors: colors,
-                into: &background)
-            {
+            if appendGeometry(for: current, at: origin, cell: cell, colors: colors, into: &background) {
                 continue
             }
-            let found: GlyphAtlas.GlyphInfo?
-            if current.grapheme.isNone, current.scalar < 0x80 {
-                // The common case stays in the loop: an index into the ASCII table.
-                found = current.scalar == 0x20 ? nil : glyphAtlas.glyph(forASCII: current.scalar, style: Self.style(of: attributes))
-            } else {
-                found = glyph(for: current, graphemes: graphemes)
-            }
-            guard let info = found else { continue }
+            guard let info = cellGlyph(for: current, graphemes: graphemes) else { continue }
             let isWide = attributes.contains(.wide)
             // No font covers it: a hollow box, not a silent gap.
             if info.isMissing {
@@ -86,6 +77,18 @@ nonisolated extension TerminalRenderer {
         }
     }
 
+    /// What every cell of one row is coloured from, read once per row.
+    private struct RowPaint {
+        let cell: SIMD2<Float>
+        let palette: Theme.Variant
+        let overrides: IndexedColorOverrides
+        let underlineColors: UnderlineColorTable
+        /// The program's colour for selected text, or default.
+        let selectionForeground: Color
+        /// OSC 12's text-under-cursor colour, or default.
+        let cursorText: Color
+    }
+
     /// The colours a cell draws with. Raw roles, colour rendition bits and
     /// cursor coverage fully determine both, so they are resolved again only
     /// when those change: two integer words compared per cell instead of
@@ -98,28 +101,30 @@ nonisolated extension TerminalRenderer {
         private(set) var packedBackground: UInt32 = 0
 
         @inline(__always)
-        mutating func update(
-            for cell: Cell, underCursor: Bool, palette: Theme.Variant, overrides: IndexedColorOverrides, selectionColor: Color, cursorText: Color
-        ) {
+        mutating func update(for cell: Cell, underCursor: Bool, selected: Bool, paint: RowPaint) {
             let attributes = cell.attributes
+            let selectionColor = selected ? paint.selectionForeground : .default
             let key = SIMD2<UInt64>(
                 UInt64(cell.foreground.rawValue) << 32 | UInt64(cell.background.rawValue),
-                UInt64(selectionColor.rawValue) << 32 | UInt64(attributes.rawValue & TerminalRenderer.colorAttributeMask) << 1 | (underCursor ? 1 : 0))
+                UInt64(selectionColor.rawValue) << 32
+                    | UInt64(attributes.rawValue & TerminalRenderer.colorAttributeMask) << 1 | (underCursor ? 1 : 0))
             guard key != self.key else { return }
             self.key = key
             // Resolve roles before reversing: the two default roles differ.
-            let resolvedFg = palette.resolveForeground(cell.foreground, indexedOverrides: overrides)
-            let resolvedBg = palette.resolveBackground(cell.background, indexedOverrides: overrides)
+            let resolvedFg = paint.palette.resolveForeground(cell.foreground, indexedOverrides: paint.overrides)
+            let resolvedBg = paint.palette.resolveBackground(cell.background, indexedOverrides: paint.overrides)
             let reversed = attributes.contains(.reverse)
             foreground = reversed ? resolvedBg : resolvedFg
             background = reversed ? resolvedFg : resolvedBg
             if attributes.contains(.dim) { foreground.w *= TerminalRenderer.dimAlpha }
-            if !selectionColor.isDefault { foreground = palette.resolveForeground(selectionColor, indexedOverrides: overrides) }
+            if !selectionColor.isDefault {
+                foreground = paint.palette.resolveForeground(selectionColor, indexedOverrides: paint.overrides)
+            }
             if underCursor {
-                foreground = cursorText.components.map {
+                foreground = paint.cursorText.components.map {
                     SIMD4<Float>(Float($0.red) / 255, Float($0.green) / 255, Float($0.blue) / 255, 1)
-                } ?? palette.background
-                background = palette.cursor
+                } ?? paint.palette.background
+                background = paint.palette.cursor
             }
             packedForeground = QuadInstance.packColor(foreground)
             packedBackground = QuadInstance.packColor(background)
@@ -160,18 +165,18 @@ nonisolated extension TerminalRenderer {
     /// draws them too, so they span a wide character.
     @inline(__always)
     private func appendRules(
-        for cell: Cell, at origin: SIMD2<Float>, cell size: SIMD2<Float>, color: SIMD4<Float>,
-        underlineColors: UnderlineColorTable, palette: Theme.Variant, overrides: IndexedColorOverrides,
+        for cell: Cell, at origin: SIMD2<Float>, color: SIMD4<Float>, paint: RowPaint,
         into background: inout ContiguousArray<QuadInstance>
     ) {
         let attributes = cell.attributes
+        let size = paint.cell
         // One test for the group, the common case.
         guard !attributes.isDisjoint(with: Self.ruleAttributes) || !cell.hyperlink.isNone,
             !attributes.contains(.invisible)
         else { return }
         let underlineColor = cell.underlineColorID == 0 ? color :
-            underlineColors.color(for: cell.underlineColorID).map {
-                palette.resolveForeground($0, indexedOverrides: overrides)
+            paint.underlineColors.color(for: cell.underlineColorID).map {
+                paint.palette.resolveForeground($0, indexedOverrides: paint.overrides)
             } ?? color
         let baseline = Float(metricsValue.baselineOffset)
         let thickness = max(1, Float(scaleValue).rounded(.down))
@@ -247,26 +252,28 @@ nonisolated extension TerminalRenderer {
     /// Box drawing and block elements as geometry, not glyphs: glyphs fall
     /// short of rounded-up cells and leave a grid of gaps between them
     /// (`BlockElements`). False for any other scalar.
-    @inline(__always)
     ///
     /// A wide one (`ambiguous-width = wide`) spans both its cells, as CJK
     /// terminals draw it; the width is widened only here, off the common path.
+    @inline(__always)
     private func appendGeometry(
-        for scalar: UInt32, wide: Bool, at origin: SIMD2<Float>, cell narrow: SIMD2<Float>, colors: CellColors,
+        for source: Cell, at origin: SIMD2<Float>, cell narrow: SIMD2<Float>, colors: CellColors,
         into background: inout ContiguousArray<QuadInstance>
     ) -> Bool {
-        let fg = colors.foreground
+        let scalar = source.scalar
+        let wide = source.attributes.contains(.wide)
+        let textColor = colors.foreground
         if scalar >= 0x2500, scalar <= 0x257F {
             let cell = wide ? SIMD2<Float>(narrow.x * 2, narrow.y) : narrow
             guard let pieces = BoxDrawing.pieces(for: scalar, width: cell.x, height: cell.y, scale: Float(scaleValue))
             else { return false }
             // Stroke arms overlap at junctions. Resolve faint text over its
             // cell background once, so overlap cannot brighten it.
-            let bg = colors.background
+            let cellBackground = colors.background
             let stroke = SIMD4<Float>(
-                fg.x * fg.w + bg.x * (1 - fg.w),
-                fg.y * fg.w + bg.y * (1 - fg.w),
-                fg.z * fg.w + bg.z * (1 - fg.w), 1)
+                textColor.x * textColor.w + cellBackground.x * (1 - textColor.w),
+                textColor.y * textColor.w + cellBackground.y * (1 - textColor.w),
+                textColor.z * textColor.w + cellBackground.z * (1 - textColor.w), 1)
             for piece in pieces {
                 background.append(QuadInstance(
                     origin: .init(origin.x + piece.x, origin.y + piece.y),
@@ -281,7 +288,7 @@ nonisolated extension TerminalRenderer {
                 QuadInstance(
                     origin: .init(origin.x + piece.rect.x * cell.x, origin.y + piece.rect.y * cell.y),
                     size: .init(piece.rect.z * cell.x, piece.rect.w * cell.y),
-                    color: .init(fg.x, fg.y, fg.z, fg.w * piece.alpha)))
+                    color: .init(textColor.x, textColor.y, textColor.z, textColor.w * piece.alpha)))
         }
         return true
     }
@@ -289,6 +296,15 @@ nonisolated extension TerminalRenderer {
     @inline(__always)
     private static func style(of attributes: CellAttributes) -> GlyphAtlas.Style {
         GlyphAtlas.Style(bold: attributes.contains(.bold), italic: attributes.contains(.italic))
+    }
+
+    /// The atlas entry a cell draws, or `nil` for a blank one. The common
+    /// case stays in the cell loop: an index into the ASCII table.
+    @inline(__always)
+    private func cellGlyph(for cell: Cell, graphemes: GraphemeTable) -> GlyphAtlas.GlyphInfo? {
+        guard cell.grapheme.isNone, cell.scalar < 0x80 else { return glyph(for: cell, graphemes: graphemes) }
+        guard cell.scalar != 0x20 else { return nil }
+        return glyphAtlas.glyph(forASCII: cell.scalar, style: Self.style(of: cell.attributes))
     }
 
     /// The atlas entry a cell outside the ASCII fast path draws, or `nil`

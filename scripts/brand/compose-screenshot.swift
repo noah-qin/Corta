@@ -64,7 +64,16 @@ func save(_ image: NSImage, size: NSSize, to path: String) {
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     image.draw(in: NSRect(origin: .zero, size: size))
     NSGraphicsContext.restoreGraphicsState()
-    try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: path))
+    guard let png = rep.representation(using: .png, properties: [:]) else {
+        FileHandle.standardError.write(Data("could not encode \(path) as PNG\n".utf8))
+        exit(1)
+    }
+    do {
+        try png.write(to: URL(fileURLWithPath: path))
+    } catch {
+        FileHandle.standardError.write(Data("could not write \(path): \(error.localizedDescription)\n".utf8))
+        exit(1)
+    }
 }
 
 /// The window, drawn at `rect` with the shadow macOS gives a key window.
@@ -93,6 +102,20 @@ func plain(_ windowPath: String, _ out: String) {
     save(image, size: size, to: out)
 }
 
+/// Centred system-font text in one of the poster's greys.
+func posterText(
+    _ string: String, size: CGFloat, weight: NSFont.Weight, white: CGFloat, kern: CGFloat? = nil
+) -> NSAttributedString {
+    let center = NSMutableParagraphStyle()
+    center.alignment = .center
+    var attributes: [NSAttributedString.Key: Any] = [
+        .font: NSFont.systemFont(ofSize: size, weight: weight),
+        .foregroundColor: NSColor(white: white, alpha: 1), .paragraphStyle: center,
+    ]
+    if let kern { attributes[.kern] = kern }
+    return NSAttributedString(string: string, attributes: attributes)
+}
+
 func poster(_ windowPath: String, _ out: String, title: String, subtitle: String) {
     let window = load(windowPath)
     let size = NSSize(width: 1620, height: 2160)
@@ -101,21 +124,9 @@ func poster(_ windowPath: String, _ out: String, title: String, subtitle: String
     let windowSize = NSSize(
         width: CGFloat(window.pixelsWide) * scale, height: CGFloat(window.pixelsHigh) * scale)
 
-    let titleFont = NSFont.systemFont(ofSize: 92, weight: .bold)
-    let subtitleFont = NSFont.systemFont(ofSize: 42, weight: .medium)
-    let center = NSMutableParagraphStyle()
-    center.alignment = .center
-    let titleText = NSAttributedString(string: title, attributes: [
-        .font: titleFont, .foregroundColor: NSColor(white: 0.11, alpha: 1), .paragraphStyle: center,
-        .kern: -1.5,
-    ])
-    let subtitleText = NSAttributedString(string: subtitle, attributes: [
-        .font: subtitleFont, .foregroundColor: NSColor(white: 0.36, alpha: 1), .paragraphStyle: center,
-    ])
-    let footerText = NSAttributedString(string: "Corta · github.com/noah-qin/Corta", attributes: [
-        .font: NSFont.systemFont(ofSize: 34, weight: .regular),
-        .foregroundColor: NSColor(white: 0.42, alpha: 1), .paragraphStyle: center,
-    ])
+    let titleText = posterText(title, size: 92, weight: .bold, white: 0.11, kern: -1.5)
+    let subtitleText = posterText(subtitle, size: 42, weight: .medium, white: 0.36)
+    let footerText = posterText("Corta · github.com/noah-qin/Corta", size: 34, weight: .regular, white: 0.42)
     let textWidth: CGFloat = 1380
     let titleHeight = ceil(titleText.boundingRect(
         with: NSSize(width: textWidth, height: 1000), options: .usesLineFragmentOrigin).height)
@@ -155,22 +166,22 @@ func poster(_ windowPath: String, _ out: String, title: String, subtitle: String
 func overlay(_ windowPath: String, _ floatingPath: String, dx: CGFloat, dy: CGFloat, _ out: String) {
     let window = load(windowPath)
     let floating = load(floatingPath)
-    let ww = CGFloat(window.pixelsWide), wh = CGFloat(window.pixelsHigh)
-    let fw = CGFloat(floating.pixelsWide), fh = CGFloat(floating.pixelsHigh)
+    let windowWidth = CGFloat(window.pixelsWide), windowHeight = CGFloat(window.pixelsHigh)
+    let floatingWidth = CGFloat(floating.pixelsWide), floatingHeight = CGFloat(floating.pixelsHigh)
     // A popover may hang past the window's edge, as it does on screen: the
     // canvas grows to hold it, transparent where neither is.
     let extra: CGFloat = 40
-    let width = max(ww, dx + fw + extra), height = max(wh, dy + fh + extra)
+    let width = max(windowWidth, dx + floatingWidth + extra), height = max(windowHeight, dy + floatingHeight + extra)
     let size = NSSize(width: width, height: height)
     let image = NSImage(size: size, flipped: false) { _ in
-        window.draw(in: NSRect(x: 0, y: height - wh, width: ww, height: wh))
+        window.draw(in: NSRect(x: 0, y: height - windowHeight, width: windowWidth, height: windowHeight))
         NSGraphicsContext.saveGraphicsState()
         let shadow = NSShadow()
         shadow.shadowColor = NSColor.black.withAlphaComponent(0.22)
         shadow.shadowBlurRadius = 36
         shadow.shadowOffset = NSSize(width: 0, height: -10)
         shadow.set()
-        floating.draw(in: NSRect(x: dx, y: height - dy - fh, width: fw, height: fh))
+        floating.draw(in: NSRect(x: dx, y: height - dy - floatingHeight, width: floatingWidth, height: floatingHeight))
         NSGraphicsContext.restoreGraphicsState()
         return true
     }

@@ -126,12 +126,10 @@ struct ReflowTests {
         // cell count that includes the wide lead also includes its spacer.
         for index in 0..<grid.rows {
             let line = grid.line(index)
-            for column in 0..<line.count {
-                if line[column].attributes.contains(.wide) {
-                    #expect(column + 1 < line.count || column + 1 == grid.columns)
-                    if column + 1 < line.count {
-                        #expect(line[column + 1].attributes.contains(.wideSpacer))
-                    }
+            for column in 0..<line.count where line[column].attributes.contains(.wide) {
+                #expect(column + 1 < line.count || column + 1 == grid.columns)
+                if column + 1 < line.count {
+                    #expect(line[column + 1].attributes.contains(.wideSpacer))
                 }
             }
         }

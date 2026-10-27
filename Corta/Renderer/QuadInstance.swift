@@ -38,7 +38,7 @@ nonisolated struct QuadInstance {
         self.origin = origin; self.size = size; self.rgba = rgba; self.atlasIndex = atlasIndex
     }
     static func packColor(_ color: SIMD4<Float>) -> UInt32 {
-        func byte(_ v: Float) -> UInt32 { UInt32((min(1, max(0, v)) * 255).rounded()) }
+        func byte(_ component: Float) -> UInt32 { UInt32((min(1, max(0, component)) * 255).rounded()) }
         return byte(color.x) | byte(color.y) << 8 | byte(color.z) << 16 | byte(color.w) << 24
     }
 

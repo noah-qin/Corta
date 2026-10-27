@@ -72,31 +72,56 @@ extension Grid {
         ReversedLogicalLineSpanSequence(grid: self)
     }
 
+    /// One logical line as ASCII bytes, with the grid row and column each
+    /// byte came from. Kept across a sweep, so a search allocates once.
+    struct ASCIILine {
+        var text = ContiguousArray<UInt8>()
+        var rows = ContiguousArray<Int32>()
+        var columns = ContiguousArray<Int32>()
+
+        mutating func removeAll() {
+            text.removeAll(keepingCapacity: true)
+            rows.removeAll(keepingCapacity: true)
+            columns.removeAll(keepingCapacity: true)
+        }
+
+        @inline(__always)
+        mutating func append(_ byte: UInt8, row: Int32, column: Int32) {
+            text.append(byte)
+            rows.append(row)
+            columns.append(column)
+        }
+
+        /// Drops the blanks a row ends in, back to `start`.
+        mutating func trimTrailingBlanks(after start: Int) {
+            while text.count > start, text.last == 0x20 {
+                text.removeLast()
+                rows.removeLast()
+                columns.removeLast()
+            }
+        }
+    }
+
     /// The chain as ASCII bytes plus each byte's position, into the caller's
     /// buffers (replaced, not appended) so a sweep allocates once. `false` at the
     /// first cell ASCII cannot hold; the caller then falls back. Trims like
     /// `joinedLogicalLine`. The span must already be one wrap chain — unchecked.
     func fillWithASCIILogicalLine(
-        firstRow: Int, lastRow: Int,
-        text: inout ContiguousArray<UInt8>,
-        rows: inout ContiguousArray<Int32>,
-        columns: inout ContiguousArray<Int32>,
+        firstRow: Int, lastRow: Int, into line: inout ASCIILine,
         historyReader: inout Scrollback.ASCIIReader,
         nonASCIIIsOpaque: (UInt32) -> Bool = { _ in false }
     ) -> Bool {
-        text.removeAll(keepingCapacity: true)
-        rows.removeAll(keepingCapacity: true)
-        columns.removeAll(keepingCapacity: true)
+        line.removeAll()
         var row = firstRow
         while row <= lastRow {
-            let rowStart = text.count
+            let rowStart = line.text.count
             if row < 0 {
-                guard scrollback.appendASCIIRow(at: scrollback.count + row, documentRow: row,
-                    text: &text, rows: &rows, columns: &columns, reader: &historyReader, nonASCIIIsOpaque: nonASCIIIsOpaque) else { return false }
+                guard scrollback.appendASCIIRow(
+                    at: scrollback.count + row, documentRow: row, into: &line, reader: &historyReader,
+                    nonASCIIIsOpaque: nonASCIIIsOpaque)
+                else { return false }
                 if row == lastRow || !scrollback.isWrapped(at: scrollback.count + row) {
-                    while text.count > rowStart, text.last == 0x20 {
-                        text.removeLast(); rows.removeLast(); columns.removeLast()
-                    }
+                    line.trimTrailingBlanks(after: rowStart)
                 }
                 row += 1
                 continue
@@ -110,24 +135,19 @@ extension Grid {
                 if cell.attributes.contains(.wideSpacer) { continue }
                 // A field test, not a lookup — the per-cell cost must stay here.
                 guard cell.grapheme.isNone else { return false }
+                let byte: UInt8
                 if cell.scalar < 0x80 {
-                    text.append(UInt8(truncatingIfNeeded: cell.scalar))
+                    byte = UInt8(truncatingIfNeeded: cell.scalar)
                 } else {
                     guard nonASCIIIsOpaque(cell.scalar) else { return false }
                     // A nonmatching separator preserves positions and prevents
                     // an ASCII query from spanning an intervening Unicode cell.
-                    text.append(0x80)
+                    byte = 0x80
                 }
-                rows.append(Int32(row))
-                columns.append(Int32(column))
+                line.append(byte, row: Int32(row), column: Int32(column))
             }
-            let continuesToNext = row != lastRow && currentLine.wrapped
-            if !continuesToNext {
-                while text.count > rowStart, text.last == 0x20 {
-                    text.removeLast()
-                    rows.removeLast()
-                    columns.removeLast()
-                }
+            if row == lastRow || !currentLine.wrapped {
+                line.trimTrailingBlanks(after: rowStart)
             }
             row += 1
         }
@@ -295,7 +315,6 @@ public struct ReversedLogicalLineSequence: Sequence {
         }
     }
 }
-
 
 struct LogicalLineSpan: Sendable, Equatable {
     let firstRow: Int

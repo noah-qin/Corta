@@ -45,7 +45,7 @@ protocol PaneSearchHost: AnyObject {
 /// chain, which the pane forwards here (`performFindPanelAction(_:)`) — and
 /// `TerminalView.onSearchKey` for Esc, which has no menu item and must never
 /// reach the child while the bar is open.
-final class PaneSearch: NSObject, NSSearchFieldDelegate {
+final class PaneSearch: NSObject {
     weak var host: PaneSearchHost?
 
     /// The hosted `SearchBarView`, while the bar is open.
@@ -194,6 +194,36 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
 
     // MARK: - The bar
 
+    /// The bar's text field, bare: the glass pill is the container, and a
+    /// bezel would draw a second rounded rect, focus ring and magnifying
+    /// glass inside it.
+    private func makeField() -> NSSearchField {
+        let field = NSSearchField()
+        field.placeholderString = L10n.text("search.placeholder")
+        field.sendsWholeSearchString = false
+        field.sendsSearchStringImmediately = true
+        field.delegate = self
+        field.isBezeled = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = .systemFont(ofSize: 12)
+        (field.cell as? NSSearchFieldCell)?.searchButtonCell = nil
+        (field.cell as? NSSearchFieldCell)?.cancelButtonCell = nil
+        return field
+    }
+
+    /// The bar's toggles, empty count and buttons, for a newly shown bar.
+    private func resetBarModel() {
+        barModel.caseSensitive = caseSensitive
+        barModel.regex = regex
+        barModel.countText = ""
+        barModel.onToggleCase = { [weak self] in self?.toggleSearchCase() }
+        barModel.onToggleRegex = { [weak self] in self?.toggleSearchRegex() }
+        barModel.onPrevious = { [weak self] in self?.showPreviousMatch() }
+        barModel.onNext = { [weak self] in self?.showNextMatch() }
+        barModel.onClose = { [weak self] in self?.close() }
+    }
+
     /// Shows the bar or refocuses its field, remembering the scroll position
     /// for close.
     func show() {
@@ -211,27 +241,8 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
         regex = ConfigurationStore.shared.configuration.searchRegex
 
-        let field = NSSearchField()
-        field.placeholderString = L10n.text("search.placeholder")
-        field.sendsWholeSearchString = false
-        field.sendsSearchStringImmediately = true
-        field.delegate = self
-        // The glass pill is the container; a bezel would draw a second rounded
-        // rect, focus ring and magnifying glass inside it.
-        field.isBezeled = false
-        field.drawsBackground = false
-        field.focusRingType = .none
-        field.font = .systemFont(ofSize: 12)
-        (field.cell as? NSSearchFieldCell)?.searchButtonCell = nil
-        (field.cell as? NSSearchFieldCell)?.cancelButtonCell = nil
-        barModel.caseSensitive = caseSensitive
-        barModel.regex = regex
-        barModel.countText = ""
-        barModel.onToggleCase = { [weak self] in self?.toggleSearchCase() }
-        barModel.onToggleRegex = { [weak self] in self?.toggleSearchRegex() }
-        barModel.onPrevious = { [weak self] in self?.showPreviousMatch() }
-        barModel.onNext = { [weak self] in self?.showNextMatch() }
-        barModel.onClose = { [weak self] in self?.close() }
+        let field = makeField()
+        resetBarModel()
 
         let container = SearchBarView.hostingView(model: barModel, field: field)
         view.addSubview(container)
@@ -310,94 +321,11 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         host?.view.window?.makeFirstResponder(host?.terminalView)
     }
 
-    // MARK: - Placement
+}
 
-    /// Gap between a bottom-placed bar and the pane's bottom edge.
-    private static let bottomMargin: CGFloat = 10
+// MARK: - Matching
 
-    /// Keeps the bar off what the user is looking at. Top-right is home; while
-    /// the cursor or the current match would sit under it there, it moves to
-    /// the bottom-right, and comes back once the top is clear. A pane too short
-    /// for either to be clear stays where it is.
-    ///
-    /// Called when the bar opens, when output arrives, when the viewport
-    /// scrolls and when the current match changes — a few rect comparisons,
-    /// on the main thread, only while a bar is open.
-    func placeClearOfContent() {
-        guard let container = bar, let top = topConstraint, let bottom = bottomConstraint,
-            let host, let terminalView = host.terminalView
-        else { return }
-        let view = host.view
-        let topInset = host.topInset
-        // A tab bar appearing moves the chrome; keep the top slot under it.
-        if top.constant != topInset + 2 { top.constant = topInset + 2 }
-        let size = container.frame.size
-        guard size.width > 0, size.height > 0 else { return }
-        let bounds = view.bounds
-        let x = bounds.maxX - 14 - size.width
-        // In `view`'s own coordinates, whichever way up it is.
-        func frame(distanceFromTop: CGFloat) -> CGRect {
-            let y =
-                view.isFlipped ? distanceFromTop : bounds.height - distanceFromTop - size.height
-            return CGRect(x: x, y: y, width: size.width, height: size.height)
-        }
-        let topFrame = frame(distanceFromTop: topInset + 2)
-        let bottomFrame = frame(
-            distanceFromTop: bounds.height - Self.bottomMargin - size.height)
-
-        var obstacles: [CGRect] = []
-        if host.scrollOffset == 0, let cursor = terminalView.cursorRectProvider?() {
-            obstacles.append(terminalView.convert(cursor, to: view))
-        }
-        if let match = currentMatchRect(in: terminalView, host: host) {
-            obstacles.append(terminalView.convert(match, to: view))
-        }
-        func isClear(_ frame: CGRect) -> Bool {
-            // A little slack, so a row brushing the pill's shadow counts.
-            let padded = frame.insetBy(dx: -4, dy: -4)
-            return !obstacles.contains { $0.intersects(padded) }
-        }
-        let wantsBottom: Bool
-        if isClear(topFrame) {
-            wantsBottom = false
-        } else if isClear(bottomFrame) {
-            wantsBottom = true
-        } else {
-            return
-        }
-        guard wantsBottom != bottom.isActive else { return }
-        top.isActive = !wantsBottom
-        bottom.isActive = wantsBottom
-        // A fade, not a slide across the output; at once under Reduce Motion.
-        container.alphaValue = 0
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = SystemAccessibility.duration(0.15)
-            container.animator().alphaValue = 1
-        }
-    }
-
-    /// The current match's first visible row, in terminal-view coordinates;
-    /// `nil` when there is none or it is scrolled out of view.
-    private func currentMatchRect(in terminalView: TerminalView, host: PaneSearchHost) -> CGRect? {
-        guard let index = currentMatchIndex, matches.indices.contains(index),
-            let grid = host.snapshot()
-        else { return nil }
-        let match = matches[index]
-        let cell = terminalView.cellSize
-        let screenRow = liveRow(match.start.row, in: grid) + host.scrollOffset
-        guard screenRow >= 0, screenRow < grid.rows else { return nil }
-        // A match that wraps covers the rest of its first row.
-        let endColumn =
-            match.end.row == match.start.row
-            ? match.end.column + 1 : grid.columns
-        return CGRect(
-            x: TerminalLayout.insets.left + CGFloat(match.start.column) * cell.width,
-            y: host.topInset + CGFloat(screenRow) * cell.height,
-            width: CGFloat(max(1, endColumn - match.start.column)) * cell.width,
-            height: cell.height)
-    }
-
-    // MARK: - Matching
+extension PaneSearch {
 
     /// Re-runs the query off the main thread, recomputing rather than patching.
     /// `scrollsToMatch` jumps a fresh query to the newest match; a refresh
@@ -492,35 +420,6 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         }
     }
 
-    /// One sweep in either mode, pure and `nonisolated` so both detached
-    /// tasks share it.
-    nonisolated static func sweep(
-        _ query: String, in grid: Grid, caseSensitive: Bool, regex: Bool
-    ) -> SweepOutcome {
-        guard regex else {
-            let matches = Search.find(
-                query, in: grid, caseSensitive: caseSensitive,
-                maxMatches: Search.defaultMatchLimit, shouldStop: { Task.isCancelled })
-            return SweepOutcome(
-                matches: matches,
-                status: matches.count >= Search.defaultMatchLimit ? .incomplete : .complete)
-        }
-        // An invalid or catastrophic-backtracking pattern is its own state, not
-        // "no results": the search never ran.
-        guard Search.isValidRegex(query, caseSensitive: caseSensitive) else {
-            return SweepOutcome(matches: [], status: .invalidPattern)
-        }
-        guard !Search.isCatastrophic(query) else {
-            return SweepOutcome(matches: [], status: .patternTooSlow)
-        }
-        let result = Search.findRegex(
-            query, in: grid, caseSensitive: caseSensitive,
-            maxMatches: Search.defaultMatchLimit, shouldStop: { Task.isCancelled })
-        return SweepOutcome(
-            matches: result.matches,
-            status: result.isIncomplete ? .incomplete : .complete)
-    }
-
     /// Applies a sweep only if it is still current; a newer query or a
     /// closed bar may have made the grid or `field` stale.
     func applyResults(
@@ -555,26 +454,6 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
             needsRefresh = false
             scheduleBackgroundRefresh()
         }
-    }
-
-    /// The match nearest a remembered absolute row: the exact line may be
-    /// evicted or rewritten, and a neighbour beats losing the place.
-    nonisolated static func index(
-        closestTo anchor: Int?, in matches: [SelectionRange], totalPushed: Int
-    ) -> Int? {
-        guard !matches.isEmpty else { return nil }
-        guard let anchor else { return matches.count - 1 }
-        var best = 0
-        var bestDistance = Int.max
-        for (index, match) in matches.enumerated() {
-            let distance = abs(
-                ScrollbackCoordinates.absoluteRow(match.start.row, totalPushed: totalPushed) - anchor)
-            if distance < bestDistance {
-                bestDistance = distance
-                best = index
-            }
-        }
-        return best
     }
 
     private func noteCurrentMatchAnchor(totalPushed: Int) {
@@ -637,7 +516,7 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
     }
 
     /// A match row where it is now, after the output since its sweep.
-    private func liveRow(_ row: Int, in grid: Grid) -> Int {
+    func liveRow(_ row: Int, in grid: Grid) -> Int {
         ScrollbackCoordinates.reanchoredRow(
             row, from: matchesTotalPushed, to: grid.scrollback.totalPushed)
     }
@@ -683,28 +562,5 @@ final class PaneSearch: NSObject, NSSearchFieldDelegate {
         barModel.regex = regex
         currentMatchAnchor = nil
         updateResults(scrollsToMatch: true)
-    }
-
-    // MARK: - NSSearchFieldDelegate
-
-    func controlTextDidChange(_ notification: Notification) {
-        guard (notification.object as? NSTextField) === field else { return }
-        updateResults(scrollsToMatch: true)
-    }
-
-    /// Return is next match; Esc (sent as `cancelOperation:`) closes the bar.
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector)
-        -> Bool
-    {
-        guard control === field else { return false }
-        if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-            showNextMatch()
-            return true
-        }
-        if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-            close()
-            return true
-        }
-        return false
     }
 }

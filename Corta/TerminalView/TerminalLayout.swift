@@ -49,10 +49,14 @@ nonisolated enum TerminalLayout {
     /// corners round; an interior corner stays square at the divider.
     /// Booleans, not `CACornerMask`: `TerminalView`'s layer is flipped and
     /// the focus ring's isn't, so each maps its own corners.
-    static func exteriorEdges(paneFrameInWindow frame: NSRect, windowSize: NSSize)
-        -> (top: Bool, left: Bool, right: Bool)
-    {
-        (
+    struct ExteriorEdges {
+        var top: Bool
+        var left: Bool
+        var right: Bool
+    }
+
+    static func exteriorEdges(paneFrameInWindow frame: NSRect, windowSize: NSSize) -> ExteriorEdges {
+        ExteriorEdges(
             top: abs(frame.maxY - windowSize.height) < 1,
             left: abs(frame.minX) < 1,
             right: abs(frame.maxX - windowSize.width) < 1

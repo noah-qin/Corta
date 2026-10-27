@@ -124,7 +124,8 @@ final class ContextMenuAndPasteUITests: XCTestCase {
         let row = try XCTUnwrap(lines.firstIndex(of: text))
         let font = try XCTUnwrap(NSFont(name: "Menlo", size: 14)) as CTFont
         let scale = NSScreen.main?.backingScaleFactor ?? 2
-        let height = (max(CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font), 14 * 1.18) * scale).rounded(.up) / scale
+        let lineHeight = max(CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font), 14 * 1.18)
+        let height = (lineHeight * scale).rounded(.up) / scale
         let width = (terminal.frame.width - 20) / CGFloat(columns)
         return terminal.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
             dx: 10 + width * 2.5,

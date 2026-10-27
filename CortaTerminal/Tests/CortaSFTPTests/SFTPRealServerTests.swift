@@ -60,7 +60,8 @@ struct SFTPRealServerTests {
         try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
         let target = root.appendingPathComponent("target")
         try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
-        try FileManager.default.createSymbolicLink(at: target.appendingPathComponent("src"), withDestinationURL: outside)
+        try FileManager.default.createSymbolicLink(
+            at: target.appendingPathComponent("src"), withDestinationURL: outside)
         await #expect(throws: SFTPError.self) {
             try await client.downloadDirectory(remotePath: root.appendingPathComponent("srv/app").path,
                 to: target, policy: .overwrite, progress: nil)
@@ -255,7 +256,9 @@ struct SFTPRealServerTests {
         #expect(Engine.uploadMode(destination: typeless, linkTarget: nil, stamp: stamp) == .keep(0o600))
         #expect(Engine.uploadMode(destination: nil, linkTarget: nil, stamp: stamp) == .create(0o755))
     }
+}
 
+extension SFTPRealServerTests {
     /// A tree goes up and comes back: nested directories, an empty one,
     /// files of several sizes; a symbolic link and a socket-like special
     /// are skipped and *reported*, never followed; the result is
@@ -284,7 +287,7 @@ struct SFTPRealServerTests {
         let progressBox = Mutex<SFTPTransferEngine.DirectoryTransferProgress?>(nil)
         let up = try await client.uploadDirectory(
             from: source, to: remote, policy: .fail,
-            progress: { p in progressBox.withLock { $0 = p } })
+            progress: { progress in progressBox.withLock { $0 = progress } })
         let lastProgress = progressBox.withLock { $0 }
         #expect(up.filesTransferred == 3)
         #expect(up.directoriesCreated == 4, "uploaded, a, a/b, empty")

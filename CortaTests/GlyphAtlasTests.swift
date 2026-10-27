@@ -113,7 +113,8 @@ import Testing
     @Test("color-page eviction invalidates emoji keys and preserves shaped keys")
     func emojiCacheFollowsOwningPage() throws {
         let device = try #require(Self.makeDevice())
-        let atlas = try GlyphAtlas(device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil), atlasPixelSize: 64)
+        let atlas = try GlyphAtlas(
+            device: device, font: CTFontCreateWithName("Menlo" as CFString, 14, nil), atlasPixelSize: 64)
         _ = atlas.glyph(shaping: 0x4E00, style: .regular)
         let first = try #require(atlas.glyph(shaping: 0x1F600, style: .regular))
         #expect(first.isColor)
@@ -167,13 +168,15 @@ import Testing
 
         let report =
             "glyph atlas cold init: \(String(format: "%.3f", initMs)) ms\n"
-            + "first simulated frame (120 columns of printable ASCII, plain style): \(String(format: "%.3f", firstFrameMs)) ms\n"
+            + "first simulated frame (120 columns of printable ASCII, "
+            + "plain style): \(String(format: "%.3f", firstFrameMs)) ms\n"
         let outputPath =
             ProcessInfo.processInfo.environment["CORTA_ATLAS_BASELINE_OUTPUT"]
             ?? "/tmp/corta-atlas-cold-startup-baseline.txt"
         try? report.write(toFile: outputPath, atomically: true, encoding: .utf8)
         #expect(initMs >= 0)  // always true; the measurement is the point
     }
+
     /// A committed frame recorded UVs into the atlas's textures, and a font
     /// change rewrote them before the GPU read them: the old frame drew the
     /// new font's glyphs. While frames are in flight the atlas moves to
@@ -261,7 +264,9 @@ import Testing
         #expect(atlas.fastPathHits > 0)
         #expect(atlas.shapingHits == 0)
     }
+}
 
+extension GlyphAtlasTests {
     @Test func nonASCIIGoesThroughTheShapingCacheAndIsCachedAfterOnce() throws {
         guard let device = Self.makeDevice() else {
             Issue.record("No Metal device available in this environment")
@@ -396,7 +401,9 @@ import Testing
         // the ASCII page survived the shaped page's eviction, this count is
         // unchanged.
         _ = atlas.glyph(forASCII: UInt32(Character("A").asciiValue!), style: .regular)
-        #expect(atlas.fastPathHits == asciiHitsBeforeOverflow, "the ASCII cache must have survived the shaped page's eviction")
+        #expect(
+            atlas.fastPathHits == asciiHitsBeforeOverflow,
+            "the ASCII cache must have survived the shaped page's eviction")
     }
 
     /// The same claim in the other direction: exhausting the ASCII page
@@ -424,10 +431,14 @@ import Testing
                 }
             }
         }
-        #expect(atlas.evictionCount > 0, "four styles of the printable ASCII range must overflow the ASCII page's half of a 64x64 atlas")
+        #expect(
+            atlas.evictionCount > 0,
+            "four styles of the printable ASCII range must overflow the ASCII page's half of a 64x64 atlas")
 
         _ = atlas.glyph(shaping: 0x4E00, style: .regular)
-        #expect(atlas.shapingHits == shapingHitsBeforeOverflow, "the shaped-page cache must have survived the ASCII page's eviction")
+        #expect(
+            atlas.shapingHits == shapingHitsBeforeOverflow,
+            "the shaped-page cache must have survived the ASCII page's eviction")
     }
 
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))

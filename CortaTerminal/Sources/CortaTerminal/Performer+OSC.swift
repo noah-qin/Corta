@@ -30,120 +30,130 @@ extension Performer {
     static let itermFileEnd = Array("1337;FileEnd".utf8)
 
     public mutating func oscDispatch(_ bytes: ArraySlice<UInt8>) {
-        if bytes.isEmpty { state.clipboardTransfer = nil }
-        // A multipart image survives only its own parts/end; unrelated OSCs
-        // cannot leave a large abandoned allocation behind.
-        if state.itermImage != nil, !bytes.starts(with: Self.itermFilePart),
-            !bytes.elementsEqual(Self.itermFileEnd) {
-            state.itermImage = nil
-        }
+        dropAbandonedTransfers(before: bytes)
         guard let separator = bytes.firstIndex(of: 0x3B) else {
-            // A bare code: only OSC 104/105 ("reset everything") uses one — the
-            // form xterm itself sends.
-            if let code = Self.parseOSCCode(bytes) {
-                if code == 104 {
-                    resetIndexedColors(bytes[bytes.endIndex...])
-                } else if [110, 111, 112, 117, 119].contains(code) {
-                    resetDynamicColor(code)
-                } else if code == 105 {
-                    resetSpecialColors(bytes[bytes.endIndex...])
-                }
-            }
+            if let code = Self.parseOSCCode(bytes) { resetWithoutPayload(code, bytes[bytes.endIndex...]) }
             return
         }
 
         guard let code = Self.parseOSCCode(bytes[..<separator]) else { return }
         let payload = bytes[bytes.index(after: separator)...]
+        let text = { String(decoding: payload, as: UTF8.self) }
 
         switch code {
-        case 0:
-            state.iconName = String(decoding: payload, as: UTF8.self)
-            state.windowTitle = String(decoding: payload, as: UTF8.self)
-        case 1:
-            state.iconName = String(decoding: payload, as: UTF8.self)
-        case 2:
-            state.windowTitle = String(decoding: payload, as: UTF8.self)
-        case 7:
-            setWorkingDirectory(payload)
-        case 7501:
-            if payload.elementsEqual([0x3F]) {
-                state.outputBuffer += [0x1B, 0x5D, 0x37, 0x35, 0x30, 0x31, 0x3B, 0x3F, 0x1B, 0x5C]
-            } else { state.programSignals.status(String(decoding: payload, as: UTF8.self)) }
-        case 9:
-            if payload.elementsEqual(Array("12".utf8)) {
-                shellIntegration([0x41][...])
-            } else { state.programSignals.iterm(String(decoding: payload, as: UTF8.self)) }
-        case 633:
-            vscodeIntegration(payload)
-        case 1337:
-            itermExtension(payload)
-        case 21:
-            kittyColors(payload)
-        case 22:
-            pointerShape(payload)
-        case 5522:
-            extendedClipboard(payload)
-        case 3, 6, 51, 106, 113, 114, 115, 116, 118, 3008:
-            break // Accepted and ignored; see CONFORMANCE.md.
-        case 46, 50, 5113:
-            break // Refused: stream-selected files/fonts.
-        case 66:
-            break // Deferred until multi-cell glyph rendering is designed.
-        case 777:
-            let parts = String(decoding: payload, as: UTF8.self).split(separator: ";", maxSplits: 2, omittingEmptySubsequences: false)
-            if parts.count == 3, parts[0] == "notify" {
-                var notice = DesktopNotification()
-                notice.title = ProgramText.clean(String(parts[1]), limit: 192)
-                notice.body = ProgramText.clean(String(parts[2]), limit: 2048)
-                if !notice.title.isEmpty || !notice.body.isEmpty { state.programSignals.notification = notice }
-            }
-        case 99:
-            state.outputBuffer += state.programSignals.kitty(String(decoding: payload, as: UTF8.self))
-        case 21337:
-            state.programSignals.tabStatus(String(decoding: payload, as: UTF8.self))
-        case 52:
-            setClipboard(payload)
-        case 133:
-            shellIntegration(payload)
-        case 134:
-            guard !grid.isAlternateScreenActive, !state.isCommandRunning,
-                let token = directoryCompletionToken,
-                let report = DirectoryCompletion.untokened(payload, expected: token) else { return }
-            let text = String(decoding: report, as: UTF8.self)
-            state.directoryCompletion = nil
-            state.historySuggestion = nil
-            if text.hasPrefix("h;") {
-                if let suggestion = HistorySuggestion(payload: text), !suggestion.suffix.isEmpty {
-                    state.historySuggestion = suggestion
-                }
-            } else {
-                state.directoryCompletion = DirectoryCompletion(payload: text)
-            }
-        case 8:
-            setHyperlink(payload)
-        case 4:
-            handleIndexedColor(payload)
-        case 104:
-            resetIndexedColors(payload)
-        case 5:
-            // Implemented because xterm documents the `Pc` values (0 bold …
-            // 4 italic), unlike the colour spaces OSC 10/11/12 refuse.
-            handleSpecialColor(payload)
-        case 105:
-            resetSpecialColors(payload)
-        case 110, 111, 112, 117, 119:
+        case 0: state.iconName = text(); state.windowTitle = text()
+        case 1: state.iconName = text()
+        case 2: state.windowTitle = text()
+        case 7: setWorkingDirectory(payload)
+        case 7501: programStatus(payload)
+        case 9: conEmu(payload)
+        case 633: vscodeIntegration(payload)
+        case 1337: itermExtension(payload)
+        case 21: kittyColors(payload)
+        case 22: pointerShape(payload)
+        case 5522: extendedClipboard(payload)
+        case 3, 6, 51, 106, 113, 114, 115, 116, 118, 3008: break  // Accepted and ignored; see CONFORMANCE.md.
+        case 46, 50, 5113: break  // Refused: stream-selected files/fonts.
+        case 66: break  // Deferred until multi-cell glyph rendering is designed.
+        case 777: rxvtNotification(payload)
+        case 99: state.outputBuffer += state.programSignals.kitty(text())
+        case 21337: state.programSignals.tabStatus(text())
+        case 52: setClipboard(payload)
+        case 133: shellIntegration(payload)
+        case 134: shellSuggestion(payload)
+        case 8: setHyperlink(payload)
+        case 4: handleIndexedColor(payload)
+        case 104: resetIndexedColors(payload)
+        // Implemented because xterm documents the `Pc` values (0 bold …
+        // 4 italic), unlike the colour spaces OSC 10/11/12 refuse.
+        case 5: handleSpecialColor(payload)
+        case 105: resetSpecialColors(payload)
+        case 110, 111, 112, 117, 119: resetDynamicColor(code)
+        case 13, 14, 15, 16, 18: break  // Pointer/Tektronix colours have no corresponding surface.
+        case 10, 11, 12, 17, 19: dynamicColor(code, payload)
+        default: break
+        }
+    }
+
+    /// An empty OSC ends a clipboard transfer. A multipart image survives
+    /// only its own parts and end, so unrelated OSCs cannot leave a large
+    /// abandoned allocation behind.
+    private mutating func dropAbandonedTransfers(before bytes: ArraySlice<UInt8>) {
+        if bytes.isEmpty { state.clipboardTransfer = nil }
+        if state.itermImage != nil, !bytes.starts(with: Self.itermFilePart),
+            !bytes.elementsEqual(Self.itermFileEnd) {
+            state.itermImage = nil
+        }
+    }
+
+    /// A bare code: only OSC 104/105 ("reset everything") uses one — the
+    /// form xterm itself sends.
+    private mutating func resetWithoutPayload(_ code: Int, _ empty: ArraySlice<UInt8>) {
+        if code == 104 {
+            resetIndexedColors(empty)
+        } else if [110, 111, 112, 117, 119].contains(code) {
             resetDynamicColor(code)
-        case 13, 14, 15, 16, 18:
-            break // Pointer/Tektronix colours have no corresponding surface.
-        case 10, 11, 12, 17, 19:
-            // `?` queries; numeric state, so nothing the stream supplied is echoed.
-            if payload.count == 1, payload.first == 0x3F {
-                reportDynamicColor(code)
-            } else {
-                setDynamicColor(code, specification: payload)
+        } else if code == 105 {
+            resetSpecialColors(empty)
+        }
+    }
+
+    /// OSC 7501: `?` is answered with the fixed probe reply; anything else
+    /// is a status report.
+    private mutating func programStatus(_ payload: ArraySlice<UInt8>) {
+        if payload.elementsEqual([0x3F]) {
+            state.outputBuffer += [0x1B, 0x5D, 0x37, 0x35, 0x30, 0x31, 0x3B, 0x3F, 0x1B, 0x5C]
+        } else {
+            state.programSignals.status(String(decoding: payload, as: UTF8.self))
+        }
+    }
+
+    /// OSC 9: ConEmu's `12` marks a prompt; the rest is iTerm2 notifications
+    /// and ConEmu progress.
+    private mutating func conEmu(_ payload: ArraySlice<UInt8>) {
+        if payload.elementsEqual(Array("12".utf8)) {
+            shellIntegration([0x41][...])
+        } else {
+            state.programSignals.iterm(String(decoding: payload, as: UTF8.self))
+        }
+    }
+
+    /// OSC 777 `notify;title;body`, rxvt's desktop notification.
+    private mutating func rxvtNotification(_ payload: ArraySlice<UInt8>) {
+        let parts = String(decoding: payload, as: UTF8.self).split(
+            separator: ";", maxSplits: 2, omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "notify" else { return }
+        var notice = DesktopNotification()
+        notice.title = ProgramText.clean(String(parts[1]), limit: 192)
+        notice.body = ProgramText.clean(String(parts[2]), limit: 2048)
+        if !notice.title.isEmpty || !notice.body.isEmpty { state.programSignals.notification = notice }
+    }
+
+    /// OSC 134, the integrated shell's directory completion or history
+    /// suggestion, accepted only with this session's token.
+    private mutating func shellSuggestion(_ payload: ArraySlice<UInt8>) {
+        guard !grid.isAlternateScreenActive, !state.isCommandRunning,
+            let token = directoryCompletionToken,
+            let report = DirectoryCompletion.untokened(payload, expected: token) else { return }
+        let text = String(decoding: report, as: UTF8.self)
+        state.directoryCompletion = nil
+        state.historySuggestion = nil
+        if text.hasPrefix("h;") {
+            if let suggestion = HistorySuggestion(payload: text), !suggestion.suffix.isEmpty {
+                state.historySuggestion = suggestion
             }
-        default:
-            break
+        } else {
+            state.directoryCompletion = DirectoryCompletion(payload: text)
+        }
+    }
+
+    /// OSC 10–12, 17, 19. `?` queries; numeric state, so nothing the stream
+    /// supplied is echoed.
+    private mutating func dynamicColor(_ code: Int, _ payload: ArraySlice<UInt8>) {
+        if payload.count == 1, payload.first == 0x3F {
+            reportDynamicColor(code)
+        } else {
+            setDynamicColor(code, specification: payload)
         }
     }
 

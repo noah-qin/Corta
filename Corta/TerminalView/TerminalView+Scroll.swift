@@ -65,7 +65,9 @@ extension TerminalView {
         // one report per line accumulated, as for local scrolling. One per
         // event sent a trackpad's every point-sized delta, momentum included,
         // as a whole notch — vim and tmux scrolled many times too fast.
-        if effectiveMouseTrackingMode != .off, !overridesMouseReporting(event), cellSize.width > 0, cellSize.height > 0 {
+        if effectiveMouseTrackingMode != .off, !overridesMouseReporting(event),
+            cellSize.width > 0, cellSize.height > 0
+        {
             let lines = scrollWheelAccumulator.lines(for: event)
             guard lines != 0 else { return }
             let (column, row) = cellUnder(event)

@@ -43,10 +43,11 @@ struct CursorCaptureTests {
         let target = MetalRenderTarget.make(device: device, width: width, height: height)
         await withCheckedContinuation { continuation in
             renderer.render(
-                grid: grid, rect: CGRect(x: 0, y: 0, width: width, height: height),
-                drawableSize: CGSize(width: width, height: height), cursorVisible: true,
-                selection: nil, target: target, clearColor: MTLClearColorMake(0, 0, 0, 1)
-            ) { _ in continuation.resume() }
+                grid: grid, cursorVisible: true, selection: nil,
+                into: FrameTarget(
+                    texture: target, rect: CGRect(x: 0, y: 0, width: width, height: height),
+                    drawableSize: CGSize(width: width, height: height),
+                    clearColor: MTLClearColorMake(0, 0, 0, 1))) { _ in continuation.resume() }
         }
         let captured = await renderer.cursorImageAsync(grid: grid)
         let capture = try #require(captured)

@@ -27,9 +27,17 @@ struct CommandOutputTests {
     /// A terminal with real `OSC 133` marks, driven the way a shell with
     /// integration configured drives them: `A` at each prompt, `D;status`
     /// when the command finishes.
-    private static func session(commands: [(command: String, output: [String], status: Int)])
-        -> Terminal
-    {
+    /// One command a test session runs: its line, its output rows and its status.
+    private struct Run {
+        var command: String
+        var output: [String]
+        var status: Int
+        init(_ command: String, _ output: [String], _ status: Int) {
+            self.command = command; self.output = output; self.status = status
+        }
+    }
+
+    private static func session(commands: [Run]) -> Terminal {
         var terminal = Terminal(rows: 24, columns: 40, scrollbackLimit: 500)
         for entry in commands {
             terminal.feed(Array("\u{1B}]133;A\u{7}$ \(entry.command)\r\n".utf8))
@@ -44,7 +52,7 @@ struct CommandOutputTests {
 
     @Test func contextCommandUsesClickedOutputInsteadOfLastCommand() throws {
         let terminal = Self.session(commands: [
-            ("echo one", ["one"], 0), ("echo two", ["two"], 0),
+            Run("echo one", ["one"], 0), Run("echo two", ["two"], 0),
         ])
         let records = terminal.commandRecords.records
         let first = try #require(records.first)
@@ -63,8 +71,8 @@ struct CommandOutputTests {
     @Test("prompt rows and failed prompt rows are both found")
     func marksAreRecorded() {
         let terminal = Self.session(commands: [
-            ("true", ["ok"], 0),
-            ("false", ["boom"], 1),
+            Run("true", ["ok"], 0),
+            Run("false", ["boom"], 1),
         ])
         let grid = terminal.grid
         #expect(grid.promptRows.count == 3)  // two commands plus the live prompt
@@ -74,7 +82,7 @@ struct CommandOutputTests {
 
     @Test("a session where nothing failed has no failed prompts")
     func noFailuresMeansNoRows() {
-        let terminal = Self.session(commands: [("true", ["ok"], 0)])
+        let terminal = Self.session(commands: [Run("true", ["ok"], 0)])
         #expect(terminal.grid.failedPromptRows.isEmpty)
     }
 
@@ -83,10 +91,11 @@ struct CommandOutputTests {
     @Test("the last command's output is the rows between the two prompts")
     func lastOutputIsBetweenPrompts() throws {
         let terminal = Self.session(commands: [
-            ("echo one", ["one"], 0),
-            ("echo two", ["two", "and more"], 0),
+            Run("echo one", ["one"], 0),
+            Run("echo two", ["two", "and more"], 0),
         ])
-        let text = try #require(PaneShellIntegration.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0))
+        let text = try #require(
+            PaneShellIntegration.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0))
         #expect(text.contains("two"))
         #expect(text.contains("and more"))
         // Not the command line itself, and not the earlier command's output.
@@ -101,10 +110,11 @@ struct CommandOutputTests {
     func outputSpanningTheScrollback() throws {
         let lines = (0..<80).map { "line\($0)" }
         let terminal = Self.session(commands: [
-            ("short", ["ignored"], 0),
-            ("long", lines, 0),
+            Run("short", ["ignored"], 0),
+            Run("long", lines, 0),
         ])
-        let text = try #require(PaneShellIntegration.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0))
+        let text = try #require(
+            PaneShellIntegration.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0))
         #expect(text.contains("line0"))
         #expect(text.contains("line79"))
         #expect(!text.contains("ignored"))
@@ -146,7 +156,7 @@ struct CommandOutputTests {
     /// would land the viewport a line below where the user asked to be.
     @Test("an output mark is not a prompt")
     func outputMarksAreNotPrompts() {
-        let terminal = Self.session(commands: [("echo hi", ["hi"], 0)])
+        let terminal = Self.session(commands: [Run("echo hi", ["hi"], 0)])
         let grid = terminal.grid
         #expect(grid.outputStartRows.count == 1)
         #expect(!grid.promptRows.contains(grid.outputStartRows[0]))
@@ -168,11 +178,13 @@ struct CommandOutputTests {
         terminal.feed(Array("\u{1B}]133;A\u{7}$ ".utf8))
         let grid = terminal.grid
 
-        let latest = try #require(PaneShellIntegration.commandOutput(in: grid, records: terminal.commandRecords, scrollOffset: 0))
+        let latest = try #require(
+            PaneShellIntegration.commandOutput(in: grid, records: terminal.commandRecords, scrollOffset: 0))
         #expect(latest.contains("out5-0"))
 
         // Scrolled up far enough that an earlier command fills the viewport.
-        let scrolled = try #require(PaneShellIntegration.commandOutput(in: grid, records: terminal.commandRecords, scrollOffset: 18))
+        let scrolled = try #require(
+            PaneShellIntegration.commandOutput(in: grid, records: terminal.commandRecords, scrollOffset: 18))
         #expect(!scrolled.contains("out5-0"))
         #expect(scrolled.contains("out"))
     }
@@ -189,15 +201,18 @@ struct CommandOutputTests {
 
         var fresh = Terminal(rows: 24, columns: 40, scrollbackLimit: 100)
         fresh.feed(Array("\u{1B}]133;A\u{7}$ ".utf8))
-        #expect(PaneShellIntegration.commandOutput(in: fresh.grid, records: fresh.commandRecords, scrollOffset: 0) == nil)
+        #expect(
+            PaneShellIntegration.commandOutput(in: fresh.grid, records: fresh.commandRecords, scrollOffset: 0) == nil)
     }
 
     /// A command that printed nothing has an empty range, not a range over
     /// the next prompt.
     @Test("a command that printed nothing yields no output")
     func silentCommand() {
-        let terminal = Self.session(commands: [("true", [], 0)])
-        #expect(PaneShellIntegration.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0) == nil)
+        let terminal = Self.session(commands: [Run("true", [], 0)])
+        #expect(
+            PaneShellIntegration.commandOutput(in: terminal.grid, records: terminal.commandRecords, scrollOffset: 0)
+                == nil)
     }
 
     // MARK: - Command line text recovery

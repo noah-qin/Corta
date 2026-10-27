@@ -105,9 +105,10 @@ public enum ReleaseCheck {
             }
             guard text("shortVersionString") == version else { continue }
             let length = item.elements(forName: "enclosure").first?.attribute(forName: "length")?.stringValue
+            let url = item.elements(forName: "enclosure").first?.attribute(forName: "url")?.stringValue
             return AppcastItem(build: text("version"), length: length ?? "",
                                hardwareRequirements: text("hardwareRequirements"),
-                               url: item.elements(forName: "enclosure").first?.attribute(forName: "url")?.stringValue ?? "")
+                               url: url ?? "")
         }
         return nil
     }

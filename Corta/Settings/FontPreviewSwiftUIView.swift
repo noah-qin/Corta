@@ -38,7 +38,7 @@ struct FontPreviewSwiftUIView: View {
                     .font(Font(nsFont))
                     .foregroundStyle(Self.color(variant.foreground))
                 if let cursorStyle {
-                    if cursorStyle == .blinkingBlock || cursorStyle == .blinkingBar || cursorStyle == .blinkingUnderline {
+                    if [.blinkingBlock, .blinkingBar, .blinkingUnderline].contains(cursorStyle) {
                         TimelineView(.periodic(from: .now, by: 0.5)) { context in
                             previewCursor(cursorStyle)
                                 .opacity(Int(context.date.timeIntervalSinceReferenceDate * 2) % 2 == 0 ? 1 : 0)

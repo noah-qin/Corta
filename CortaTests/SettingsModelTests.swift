@@ -124,11 +124,15 @@ struct SettingsModelTests {
         let model = SettingsModel()
         let original = ConfigurationStore.shared.configuration.quickTerminalKey
         defer { model.setQuickTerminalKey(original) }
-        model.setQuickTerminalKey(try #require(Shortcut.parse("shift+a")))
+        // Unwrapped on their own: passed straight to the `Shortcut?`
+        // parameter, `#require` checked the optional it was wrapped into.
+        let shiftOnly: Shortcut = try #require(Shortcut.parse("shift+a"))
+        let controlShift: Shortcut = try #require(Shortcut.parse("ctrl+shift+a"))
+        model.setQuickTerminalKey(shiftOnly)
         #expect(model.saveStatus.message == L10n.text("ui.shortcut.modifierRequired"))
-        #expect(ConfigurationStore.shared.configuration.quickTerminalKey != Shortcut.parse("shift+a"))
-        model.setQuickTerminalKey(try #require(Shortcut.parse("ctrl+shift+a")))
-        #expect(ConfigurationStore.shared.configuration.quickTerminalKey == Shortcut.parse("ctrl+shift+a"))
+        #expect(ConfigurationStore.shared.configuration.quickTerminalKey != shiftOnly)
+        model.setQuickTerminalKey(controlShift)
+        #expect(ConfigurationStore.shared.configuration.quickTerminalKey == controlShift)
     }
 
     @Test("a font size outside 10...24 is clamped")
@@ -266,7 +270,6 @@ struct SettingsModelTests {
         #expect((model.directoryHistoryStatus.actionTitle != nil) == hasHistory)
     }
 }
-
 
 extension SettingsModelTests {
     @Test func commandHistoryBounds() {
