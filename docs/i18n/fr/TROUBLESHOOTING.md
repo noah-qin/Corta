@@ -157,11 +157,12 @@ l’exécuter ; Retour lance `cd`. Les dossiers cachés demandent un point au d�
 l’accès à ce dossier et comparez avec la complétion native du shell après avoir désactivé `directory-completion`. Si la
 différence persiste, signalez la forme exacte du chemin et le shell.
 
-### À propos ou l’historique des commandes s’ouvre loin du terminal
+### L’historique des commandes s’ouvre loin du terminal
 
-Fermez puis rouvrez la fenêtre dans la version actuelle de Corta. Les deux s’ouvrent centrées sur la fenêtre qui les appelle,
-dans la zone utilisable de son écran ; elles ne sont pas placées au centre de l’écran entier. Une fenêtre déjà ouverte garde
-la position que vous avez choisie.
+Fermez-le puis rouvrez-le dans la version actuelle de Corta. Il s’ouvre centré sur la fenêtre qui l’appelle, dans la
+zone utilisable de cet écran ; il n’est pas placé au centre de l’écran entier. À propos de Corta est l’exception voulue :
+il s’ouvre au milieu de l’écran, comme la fenêtre À propos des autres apps. Une fenêtre déjà ouverte garde la position
+que vous avez choisie.
 
 ### Tab ne fait rien dans le menu des commandes slash de Claude Code
 

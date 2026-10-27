@@ -381,8 +381,8 @@ Com os hooks carregados, automaticamente ou pelo arquivo de inicialização:
   lista não consegue mostrar inteiro — com mais de uma linha, cortado na borda da linha ou com uma tabulação — ou cujo texto
   mudou desde que a lista o mostrou é preenchido em vez de executado, para que fique inteiro no prompt e rode quando você
   der Return.
-- **Janelas de histórico e Sobre.** O histórico de comandos e **Corta ▸ Sobre o Corta** abrem centralizados sobre a janela
-  que os chamou, dentro da área útil da sua tela. Uma janela já aberta fica onde você a deixou. O tamanho fixo do histórico
+- **Janelas de histórico e Sobre.** O histórico de comandos abre centralizado sobre a janela que o chamou, dentro da área
+  útil da sua tela; **Corta ▸ Sobre o Corta** abre no centro dessa tela, como a janela Sobre de outros apps. Uma janela já aberta fica onde você a deixou. O tamanho fixo do histórico
   mantém visíveis a busca e os filtros de diretório / projeto / estado / host; um resultado vazio mostra **Nenhum comando** e
   a contagem de resultados.
 - **Notificações de tarefas longas.** Com `notify-on-long-task = true`, um comando que rodou mais de

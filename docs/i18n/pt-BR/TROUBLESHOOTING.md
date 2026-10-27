@@ -152,10 +152,11 @@ Return executa o `cd`. Pastas ocultas precisam de um ponto no início. Se uma su
 acesso a esse diretório e compare com a completação nativa do shell depois de desativar `directory-completion`. Se a
 diferença continuar, informe o formato exato do caminho e o shell.
 
-### Sobre ou o histórico de comandos abre longe do terminal
+### O histórico de comandos abre longe do terminal
 
-Feche e reabra a janela na versão atual do Corta. Ambas abrem centralizadas sobre a janela que as chamou, dentro da área útil
-da sua tela; não ficam no centro da tela inteira. Uma janela já aberta mantém a posição que você escolheu.
+Feche e reabra o histórico na versão atual do Corta. Ele abre centralizado sobre a janela que o chamou, dentro da área
+útil dessa tela; não fica no centro da tela inteira. Sobre o Corta é a exceção proposital: abre no centro da tela, como a
+janela Sobre de outros apps. Uma janela já aberta mantém a posição que você escolheu.
 
 ### Tab não faz nada no menu de comandos com barra do Claude Code
 

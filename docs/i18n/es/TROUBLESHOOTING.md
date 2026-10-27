@@ -154,11 +154,12 @@ ejecutarla; Retorno ejecuta `cd`. Las carpetas ocultas necesitan un punto al pri
 comprueba el acceso a ese directorio y compara con la completación nativa del shell tras desactivar `directory-completion`.
 Si la diferencia persiste, informa de la forma exacta de la ruta y del shell.
 
-### Acerca de o el historial de comandos se abre lejos del terminal
+### El historial de comandos se abre lejos del terminal
 
-Cierra y vuelve a abrir la ventana en la versión actual de Corta. Ambas se abren centradas sobre la ventana que las invoca,
-dentro del área útil de su pantalla; no se colocan en el centro de toda la pantalla. Una ventana ya abierta conserva la
-posición que elegiste.
+Ciérralo y vuelve a abrirlo en la versión actual de Corta. Se abre centrado sobre la ventana que lo invoca, dentro del
+área útil de esa pantalla; no se coloca en el centro de toda la pantalla. Acerca de Corta es la excepción a propósito: se
+abre en el centro de la pantalla, como la ventana Acerca de de otras apps. Una ventana ya abierta conserva la posición
+que elegiste.
 
 ### Tab no hace nada en el menú de comandos con barra de Claude Code
 

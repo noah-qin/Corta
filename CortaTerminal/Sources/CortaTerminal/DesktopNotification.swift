@@ -143,8 +143,7 @@ struct ProgramSignals: Sendable {
             closeKittyNotification(id)
         case let type where type == "title" || type == "body":
             appendKittyChunk(
-                String(payload[payload.index(after: separator)...]), id: id, isTitle: type == "title",
-                fields: fields)
+                payload[payload.index(after: separator)...], id: id, isTitle: type == "title", fields: fields)
         default:
             break
         }
@@ -179,15 +178,16 @@ struct ProgramSignals: Sendable {
     }
 
     /// One title or body chunk; `d=0` says more follow. An oversized
-    /// notification is dropped whole, and its later chunks with it.
-    private mutating func appendKittyChunk(_ raw: String, id: String, isTitle: Bool, fields: [String: String]) {
+    /// notification is dropped whole, and its later chunks with it. The
+    /// chunk stays a slice until it has passed both checks.
+    private mutating func appendKittyChunk(_ chunk: Substring, id: String, isTitle: Bool, fields: [String: String]) {
         if chunks[id] == nil { evictOldestChunkIfFull() }
         let continues = fields["d"] == "0"
         if chunkBytes[id] == -1 {
             if !continues { chunks[id] = nil; chunkBytes[id] = nil }
             return
         }
-        let total = (chunkBytes[id] ?? 0) + raw.utf8.count
+        let total = (chunkBytes[id] ?? 0) + chunk.utf8.count
         guard total <= Self.chunkLimit else {
             if continues, !chunkOrder.contains(id) { chunkOrder.append(id) }
             chunks[id] = continues ? DesktopNotification() : nil
@@ -195,6 +195,7 @@ struct ProgramSignals: Sendable {
             return
         }
         // `e=1` is base64; one that does not decode drops the notification.
+        let raw = String(chunk)
         let text = fields["e"] == "1" ? ProgramText.decoded(raw, limit: 3072) : ProgramText.clean(raw, limit: 3072)
         guard let text else {
             chunks[id] = nil; chunkBytes[id] = nil; return

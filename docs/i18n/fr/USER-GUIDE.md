@@ -398,8 +398,9 @@ Une fois les hooks chargés, automatiquement ou via le fichier de démarrage :
   Une commande que la liste ne peut pas montrer entière — sur plusieurs lignes, coupée au bord de la ligne ou contenant
   une tabulation — ou dont le texte a changé depuis que la liste l’a affichée est remplie plutôt qu’exécutée, pour qu’elle
   soit entièrement à l’invite et ne s’exécute que sur votre Retour.
-- **Fenêtres d’historique et À propos.** L’historique des commandes et **Corta ▸ À propos de Corta** s’ouvrent centrés
-  sur la fenêtre qui les appelle, dans la zone utilisable de son écran. Une fenêtre déjà ouverte reste là où vous l’avez
+- **Fenêtres d’historique et À propos.** L’historique des commandes s’ouvre centré sur la fenêtre qui l’appelle, dans la
+  zone utilisable de son écran ; **Corta ▸ À propos de Corta** s’ouvre au milieu de cet écran, comme la fenêtre À propos
+  des autres apps. Une fenêtre déjà ouverte reste là où vous l’avez
   placée. La taille fixe de l’historique garde visibles la recherche et les filtres dossier / projet / état / hôte ; un
   résultat vide affiche **Aucune commande** et le nombre de résultats.
 - **Notifications des tâches longues.** Avec `notify-on-long-task = true`, une commande ayant duré plus de

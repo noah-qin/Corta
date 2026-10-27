@@ -69,8 +69,9 @@ final class SystemStatusBar: NSView {
     func stop() {
         popover?.close()
         SystemMetricsStore.shared.setActive(false, client: client)
-        // By name: a view can carry registrations AppKit made, which a bare
-        // `removeObserver(self)` would take with it.
+        // By name: the view outlives `stop`, and it can carry registrations
+        // AppKit made, which a bare `removeObserver(self)` would take with
+        // it. Only `deinit`, where nothing is left to notify, removes all.
         for name in Self.observedNotifications {
             NotificationCenter.default.removeObserver(self, name: name, object: nil)
         }

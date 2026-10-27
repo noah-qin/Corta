@@ -168,12 +168,13 @@ is missing, check access to that directory and compare with native shell
 completion after disabling `directory-completion`. Report the exact path
 shape and shell if the difference persists.
 
-### About or Command History opens away from the terminal
+### Command History opens away from the terminal
 
-Close and reopen the window in the current Corta build. Both open centered
-over the window that invoked them and are constrained to its display's usable
-area; they are not positioned at the center of the whole screen. An already
-open window keeps the position you chose.
+Close and reopen it in the current Corta build. It opens centered over the
+window that invoked it and is constrained to that display's usable area; it
+is not positioned at the center of the whole screen. About Corta is the
+exception on purpose: it opens in the middle of the display, as other apps'
+About windows do. An already open window keeps the position you chose.
 
 
 ### Tab does nothing in Claude Code's slash-command menu

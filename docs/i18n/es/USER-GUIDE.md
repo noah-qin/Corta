@@ -391,8 +391,9 @@ Con los hooks cargados, de forma automática o mediante el archivo de inicio:
   comando que la lista no puede mostrar entero — de más de una línea, cortado en el borde de la fila o con una tabulación —
   o cuyo texto cambió desde que la lista lo mostró se rellena en lugar de ejecutarse, para que quede completo en el prompt
   y se ejecute cuando pulses Retorno.
-- **Ventanas de historial y Acerca de.** El historial de comandos y **Corta ▸ Acerca de Corta** se abren centrados sobre la
-  ventana que los invoca, dentro del área útil de su pantalla. Una ventana ya abierta se queda donde la moviste. El tamaño
+- **Ventanas de historial y Acerca de.** El historial de comandos se abre centrado sobre la ventana que lo invoca, dentro
+  del área útil de su pantalla; **Corta ▸ Acerca de Corta** se abre en el centro de esa pantalla, como la ventana Acerca de
+  de otras apps. Una ventana ya abierta se queda donde la moviste. El tamaño
   fijo del historial mantiene visibles la búsqueda y los filtros de directorio / proyecto / estado / host; un resultado vacío
   muestra **Sin comandos** y el número de resultados.
 - **Notificaciones de tareas largas.** Con `notify-on-long-task = true`, un comando que tardó más de
