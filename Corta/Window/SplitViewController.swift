@@ -22,7 +22,17 @@ import CortaTerminal
 /// that routes input to one of them. Window-level setup lives here, since
 /// N panes still share one window.
 final class SplitViewController: NSViewController {
-    private(set) var tree: SplitTree!
+    /// The terminal mode's split tree. It stays whole while Space shows,
+    /// its root simply out of the window.
+    private(set) var terminalTree: SplitTree!
+    /// The tree on screen: Space's grid while Space shows, else the
+    /// terminal mode's. What focus moves, keyboard resizing and Equalize act
+    /// on.
+    var tree: SplitTree! { space.isActive ? space.gridTree : terminalTree }
+    /// Space's project sessions and grid; see `CortaSpaceController`.
+    lazy var space = CortaSpaceController(host: self)
+    /// Where content above the optional status bar ends.
+    var statusBarTopAnchor: NSLayoutYAxisAnchor { systemStatusBar.topAnchor }
     /// The pane filling the window, or `nil`. Zoom is temporary: the tree,
     /// the processes and the saved layout are untouched, which is why it is
     /// one reference rather than a second tree.
@@ -114,7 +124,7 @@ final class SplitViewController: NSViewController {
             workingDirectory: pendingRestore?.layout.firstDirectory ?? setup.workingDirectory,
             initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
         focusedPane = pane
-        tree = SplitTree(root: pane.view)
+        terminalTree = SplitTree(root: pane.view)
         systemStatusBar.onVisibilityChange = { [weak self] in self?.updateStatusBarLayout() }
         installRoot()
     }
@@ -205,6 +215,10 @@ final class SplitViewController: NSViewController {
             pendingRestore = nil
             view.layoutSubtreeIfNeeded()
             self.restore(layout: restore.layout)
+            // After the window shows: Space measures its grid in it.
+            if restore.isSpace {
+                DispatchQueue.main.async { [weak self] in self?.space.setActive(true) }
+            }
         }
     }
 
@@ -250,7 +264,7 @@ final class SplitViewController: NSViewController {
         let requested = DirectFullScreen.requested
         let active = requested.active(
             isFullScreen: view.window?.styleMask.contains(.fullScreen) ?? false,
-            paneCount: panes.count)
+            paneCount: visiblePaneCount)
         let previous = directPresentation
         directPresentation = active
         for pane in panes {
@@ -289,7 +303,7 @@ final class SplitViewController: NSViewController {
 
     /// Creates a pane and its session, force-loading the view so the shell
     /// spawns at the target grid size and directory rather than reflowing.
-    private func makePane(
+    func makePane(
         workingDirectory: String?, initialGridSize: TerminalSize?, preset: Preset? = nil
     ) -> ViewController {
         let pane = ViewController()
@@ -305,15 +319,16 @@ final class SplitViewController: NSViewController {
         return pane
     }
 
-    func pane(forLeaf leaf: NSView) -> ViewController? {
-        panes.first { $0.view === leaf }
-    }
-
     /// The terminal root changes identity on the first split and last collapse;
     /// the optional status bar remains anchored beneath it.
-    private func installRoot() {
+    func installRoot() {
+        // Space installs its own content; the terminal tree waits out of view.
+        guard !space.isActive else {
+            updateDirectPresentation()
+            return
+        }
         // A zoomed pane fills the view; the tree stays intact, just detached.
-        let root = zoomedPane?.view ?? tree.root
+        let root = zoomedPane?.view ?? terminalTree.root
         guard root.superview !== view else { return }
         view.subviews.filter { $0 !== systemStatusBar }.forEach { $0.removeFromSuperview() }
         if systemStatusBar.superview == nil {
@@ -355,12 +370,17 @@ final class SplitViewController: NSViewController {
 // MARK: - Zoom
 
 extension SplitViewController {
-    /// The split tree, never whatever is on screen.
-    var layoutRoot: NSView? { tree?.root }
+    /// The terminal mode's split tree, never whatever is on screen: what
+    /// the saved arrangement describes.
+    var layoutRoot: NSView? { terminalTree?.root }
 
     var isPaneZoomed: Bool { zoomedPane != nil }
 
     @objc func toggleZoomPane(_: Any?) {
+        if space.isActive {
+            space.toggleMaximize()
+            return
+        }
         if zoomedPane != nil {
             unzoomPane()
         } else {
@@ -370,7 +390,7 @@ extension SplitViewController {
 
     /// Fills the window with the focused pane; a no-op with one pane.
     func zoomFocusedPane() {
-        guard hasMultiplePanes, let pane = focusedPane, zoomedPane == nil,
+        guard !space.isActive, hasMultiplePanes, let pane = focusedPane, zoomedPane == nil,
             let superview = pane.view.superview,
             let index = superview.subviews.firstIndex(of: pane.view)
         else { return }
@@ -440,6 +460,10 @@ extension SplitViewController {
     func splitFocusedPane(
         orientation: SplitOrientation, workingDirectory: String? = nil, preset: Preset? = nil
     ) {
+        if space.isActive {
+            space.newSession(preset: preset, directory: workingDirectory)
+            return
+        }
         guard let focusedPane else { return }
         defer { noteLayoutChanged() }
         unzoomPane()
@@ -453,10 +477,10 @@ extension SplitViewController {
         // A window's temporary zoom also applies to newly created panes.
         pane.setFontSize(focusedPane.fontSize)
         pane.isFontSizeZoomed = focusedPane.isFontSizeZoomed
-        let node = tree.split(
+        let node = terminalTree.split(
             leaf: focusedPane.view, orientation: orientation, newLeaf: pane.view)
         node.delegate = self
-        if node === tree.root { installRoot() }
+        if node === terminalTree.root { installRoot() }
         node.frame = oldFrame
         let (firstFrame, secondFrame) = halvedFrames(of: oldFrame, orientation: orientation)
         focusedPane.view.frame = firstFrame
@@ -498,6 +522,7 @@ extension SplitViewController {
     /// ⌘W closes the focused pane; with one pane left it is the window's
     /// own close (a tab closes the tab).
     @objc func performClose(_ sender: Any?) {
+        if performSpaceClose(sender) { return }
         guard hasMultiplePanes, let focusedPane else {
             // `windowShouldClose` asks for confirmation; asking here would ask twice.
             view.window?.performClose(sender)
@@ -520,12 +545,16 @@ extension SplitViewController {
     }
 
     func closePane(_ pane: ViewController) {
+        if space.owns(pane) {
+            space.removeSession(pane)
+            return
+        }
         defer { noteLayoutChanged() }
         unzoomIfNeeded(closing: pane)
         // Before the tree changes, while its split still exists.
         noteClosing(pane)
         pane.teardown()
-        let survivingSubtree = tree.close(leaf: pane.view)
+        let survivingSubtree = terminalTree.close(leaf: pane.view)
         pane.removeFromParent()
         installRoot()
         updateWindowMinSize()
@@ -545,6 +574,7 @@ extension SplitViewController {
     /// Whole-window teardown for closes that bypass `closePane` (red button,
     /// tab close, ⌘Q). Idempotent per pane.
     func teardown() {
+        space.stop()
         systemStatusBar.stop()
         for pane in panes { pane.teardown() }
     }

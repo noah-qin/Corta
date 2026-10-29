@@ -45,7 +45,7 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
     /// item — and anything else is refused here as well, because a window
     /// over a local pane would be a silent local file manager wearing a
     /// remote UI.
-    static func show(for state: PaneRemoteState) {
+    static func show(for state: PaneRemoteState, project: String? = nil) {
         switch state {
         case .remote(let reported, let directory, _):
             // Child output: a bare host or `user@host`, never a port or a
@@ -56,7 +56,7 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
                 return
             }
             if RemoteHostConsent.isConfirmed(host) {
-                let controller = SFTPBrowserController(host: host, startDirectory: directory)
+                let controller = SFTPBrowserController(host: host, startDirectory: directory, project: project)
                 byHost[host] = controller
                 controller.present()
                 return
@@ -67,7 +67,7 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
             // editable and its provenance stated; the answer is remembered
             // for the run.
             let controller = SFTPBrowserController(
-                host: nil, startDirectory: directory, suggestedHost: host)
+                host: nil, startDirectory: directory, suggestedHost: host, project: project)
             unconnected[ObjectIdentifier(controller)] = controller
             controller.present()
         case .connected(let key, let directory):
@@ -75,12 +75,12 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
             // own consent, as `open` takes it — in the directory the far end
             // reported, if it has.
             guard let target = SSHTarget(key: key) else { return }
-            open(target, startDirectory: directory)
+            open(target, startDirectory: directory, project: project)
         case .remoteUnknown:
             // The host is genuinely not known, and the rule stands:
             // never the launcher's argv (aliases and `~/.ssh/config` names
             // read back wrong), never the screen. The window asks.
-            let controller = SFTPBrowserController(host: nil, startDirectory: nil)
+            let controller = SFTPBrowserController(host: nil, startDirectory: nil, project: project)
             unconnected[ObjectIdentifier(controller)] = controller
             controller.present()
         case .local, .unknown:
@@ -92,14 +92,17 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
     /// picked, which is consent to connect to it. An open window for the
     /// same target — user, port and key alike — is brought forward rather
     /// than a second session started; another key is another window.
-    static func open(_ target: SSHTarget, startDirectory: String? = nil) {
+    ///
+    /// `project` names the Space project it was opened from, in the window's
+    /// subtitle; a window already open for the target keeps its own.
+    static func open(_ target: SSHTarget, startDirectory: String? = nil, project: String? = nil) {
         let host = target.key
         if let open = byHost[host] {
             open.present()
             return
         }
         RemoteHostConsent.confirm(host)
-        let controller = SFTPBrowserController(host: host, startDirectory: startDirectory)
+        let controller = SFTPBrowserController(host: host, startDirectory: startDirectory, project: project)
         byHost[host] = controller
         controller.present()
     }
@@ -118,7 +121,8 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
     #endif
 
     private init(
-        host: String?, startDirectory: String?, suggestedHost: String? = nil, previewModel: SFTPBrowserModel? = nil
+        host: String?, startDirectory: String?, suggestedHost: String? = nil, project: String? = nil,
+        previewModel: SFTPBrowserModel? = nil
     ) {
         model = previewModel ?? SFTPBrowserModel(
             host: host, startDirectory: startDirectory, suggestedHost: suggestedHost)
@@ -132,7 +136,9 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         // path is the breadcrumb's, not repeated here.
         model.onTitleChange = { [weak window] title in
             window?.title = isPreview ? L10n.text("ui.demo.windowTitle") : title
-            window?.subtitle = isPreview ? "demo.invalid" : "SFTP"
+            // The Space project it serves, so windows for several projects
+            // tell apart in the Window menu and Mission Control.
+            window?.subtitle = isPreview ? "demo.invalid" : project.map { "SFTP · " + $0 } ?? "SFTP"
         }
         model.publishTitle()
         if isPreview { return }

@@ -304,6 +304,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // their saved directories, so no first window is opened to replace.
         if !restoreWindowsIfConfigured() { openWindow(workingDirectory: nil) }
         #if DEBUG
+        if CommandLine.arguments.contains("--space-preview") {
+            DispatchQueue.main.async { [weak self] in
+                let host = self?.terminalWindowControllers.first?.contentViewController as? SplitViewController
+                host?.space.setActive(true)
+            }
+        }
         if CommandLine.arguments.contains("--sftp-preview") { SFTPBrowserController.showDevelopmentPreview() }
         if CommandLine.arguments.contains("--glass-preview") { GlassAppearancePreview.show() }
         #endif

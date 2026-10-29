@@ -810,6 +810,24 @@ Never change global hotkeys, secure-input state, shell startup files or
 dependencies and per-process environments. Use temporary directories for
 fixtures and clean up the resources you create.
 
+### Space
+
+`SpaceGridTests` cover the grid's rules — drop edges, the split minimum,
+automatic placement and least recently used, column and row arrangement,
+`space.json`'s validation, sizes and round trip, session names — and the
+remote-drop rule (same host, user and port; control characters refused),
+without a window. `CortaSpaceTests` drive Space in real windows with real
+shells: Space takes the screen and the terminal mode gets its frame, tree and
+every process back; new sessions split until the limit and then replace the
+least recently used; edge drops; hiding, filling and ending; projects and
+what is saved; one Space per app. `CortaSpaceUITests` is the launched-app
+check (D14): a scratch stage's `space.json`, then clicks, renames, hovers, the
+sidebar toggle and full screen, with screenshots attached. The sidebar's
+choose-then-show interaction, undo, and remote-file drags are checked by hand
+in the launched app; record which in the pull request.
+
+`./scripts/build-and-run.sh --space-preview` opens the Debug build in Space.
+
 ### The SFTP browser without a server
 
 Debug builds offer **Help ▸ SFTP Development Preview**, or launch with

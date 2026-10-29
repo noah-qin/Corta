@@ -51,7 +51,14 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     }
     static func focus(_ id: UUID) {
         guard let pane = panes.first(where: { $0.taskNotifier.paneID == id }),
-              let window = pane.view.window else { return }
+              let host = pane.splitController, let window = host.toolbarWindow else { return }
+        // The pane is in whichever mode it belongs to; show that mode.
+        if let (_, session) = host.space.session(for: pane) {
+            host.space.setActive(true)
+            host.space.show(session)
+        } else if host.space.isActive {
+            host.space.setActive(false)
+        }
         NSApp.activate()
         window.tabGroup?.selectedWindow = window
         window.makeKeyAndOrderFront(nil)

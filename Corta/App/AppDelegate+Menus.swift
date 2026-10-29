@@ -87,6 +87,7 @@ extension AppDelegate {
         let menu = NSMenu(title: L10n.text("menu.file"))
         menu.addItem(item(for: .newWindow))
         menu.addItem(item(for: .newTab))
+        menu.addItem(item(for: .openProject))
         menu.addItem(.separator())
         menu.addItem(item(for: .close))
         menu.addItem(.separator())
@@ -173,6 +174,18 @@ extension AppDelegate {
     /// Settings menu would duplicate the app menu's ⌘,.
     private func makeViewMenu() -> NSMenu {
         let view = NSMenu(title: L10n.text("menu.view"))
+        // Space and its sidebar first, as the toolbar's leading items are.
+        view.addItem(item(for: .toggleSpace))
+        // Show or Hide Sidebar by state; enabled only while Space shows.
+        view.addItem(
+            withTitle: L10n.text("menu.toggleSidebar"),
+            action: #selector(SplitViewController.toggleSpaceSidebar(_:)), key: "s", modifiers: [.command, .control])
+        view.addItem(
+            withTitle: L10n.text("space.arrange.columns"),
+            action: #selector(SplitViewController.arrangeSpaceInColumns(_:)))
+        view.addItem(
+            withTitle: L10n.text("space.arrange.rows"), action: #selector(SplitViewController.arrangeSpaceInRows(_:)))
+        view.addItem(.separator())
         for command in [TerminalCommand.increaseFontSize, .decreaseFontSize, .resetFontSize] {
             view.addItem(item(for: command))
         }

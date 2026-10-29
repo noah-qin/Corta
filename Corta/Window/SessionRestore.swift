@@ -38,6 +38,8 @@ nonisolated struct WindowState: Equatable, Sendable {
     /// Frontmost in its group; decodes `true` for untabbed or older data.
     var isSelectedTab: Bool
     var customTabTitle: String?
+    /// The window showed Space; its sessions are `SpaceStore`'s, not here.
+    var isSpace = false
 
     init(
         frame: Frame, layout: PaneLayout, tabGroupID: String? = nil, tabIndex: Int? = nil,
@@ -116,7 +118,7 @@ nonisolated struct WindowState: Equatable, Sendable {
 
 nonisolated extension WindowState: Codable {
     private enum CodingKeys: String, CodingKey {
-        case version, id, frame, layout, tabGroupID, tabIndex, isSelectedTab, customTabTitle
+        case version, id, frame, layout, tabGroupID, tabIndex, isSelectedTab, customTabTitle, isSpace
     }
 
     init(from decoder: Decoder) throws {
@@ -129,6 +131,7 @@ nonisolated extension WindowState: Codable {
         tabGroupID = try container.decodeIfPresent(String.self, forKey: .tabGroupID)
         tabIndex = try container.decodeIfPresent(Int.self, forKey: .tabIndex)
         isSelectedTab = try container.decodeIfPresent(Bool.self, forKey: .isSelectedTab) ?? true
+        isSpace = try container.decodeIfPresent(Bool.self, forKey: .isSpace) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -141,6 +144,7 @@ nonisolated extension WindowState: Codable {
         try container.encodeIfPresent(tabGroupID, forKey: .tabGroupID)
         try container.encodeIfPresent(tabIndex, forKey: .tabIndex)
         try container.encode(isSelectedTab, forKey: .isSelectedTab)
+        if isSpace { try container.encode(isSpace, forKey: .isSpace) }
     }
 }
 

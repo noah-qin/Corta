@@ -12,6 +12,7 @@ repository root.
 | `corta-pangolin-mascot.png` | Transparent mascot master, 1254 × 1254                           |
 | `corta-pangolin-loop.gif`   | Looping mascot animation, 360 × 360                              |
 | `session-ended.png` | Ended session: the centered glass status panel over dimmed, retained output, from an isolated local-zsh UI fixture |
+| `space.png` | Space with two projects, one open with three sessions in the grid, from the development build with a scratch `CORTA_STAGE_DIR` and `ZDOTDIR` |
 | `screenshot.png`            | The README screenshot — light theme, a clean demo shell          |
 | `input-source-indicator.png` | Independent Chinese input-source badge, separated from toolbar action buttons, from an isolated demo shell |
 | `input-source-long-command.png` | Right-edge badge moved below a long command, without changing the grid |

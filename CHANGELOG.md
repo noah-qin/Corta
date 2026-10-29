@@ -10,6 +10,19 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- Space: project folders with their own local, SSH and agent CLI sessions,
+  up to six at once in a free split grid of rounded panels beside a sidebar
+  that shows every session's state. Switch with the toolbar's mode button,
+  View ▸ Show Space (⌥⌘S) or File ▸ Open Project… (⌘O); Space fills the
+  screen, and the terminal mode's window, tabs and splits come back as they
+  were, still running. Drop sessions on a panel's edge or middle, arrange in
+  columns or rows, undo any placement; rename sessions; browse a remote
+  session's files and drag a file's path into a terminal on its host.
+  Projects, sessions and grids are restored after a restart.
+  `space-panel-limit` caps the panels on screen.
+
 ### Changed
 
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).

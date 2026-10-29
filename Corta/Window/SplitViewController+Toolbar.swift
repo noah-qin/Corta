@@ -34,21 +34,52 @@ extension SplitViewController: NSToolbarDelegate {
         window.toolbarStyle = .unifiedCompact
         window.toolbar = toolbar
         // The Quick Terminal is one panel, never a tab group: there "+" could
-        // only open an unrelated window behind it.
-        if window is NSPanel,
-            let index = toolbar.items.firstIndex(where: { $0.itemIdentifier == .cortaNewTab })
-        {
-            toolbar.removeItem(at: index)
+        // only open an unrelated window behind it, and it has no Space.
+        if window is NSPanel {
+            for identifier in [NSToolbarItem.Identifier.cortaNewTab, .cortaSpace, .cortaSpaceSidebar] {
+                if let index = toolbar.items.firstIndex(where: { $0.itemIdentifier == identifier }) {
+                    toolbar.removeItem(at: index)
+                }
+            }
         }
+        updateToolbarForMode()
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .cortaConnect, .cortaNewTab]
+        // A fixed space keeps the mode button its own glass, apart from the
+        // connect and new-session group.
+        [.cortaSpaceSidebar, .flexibleSpace, .cortaSpace, .space, .cortaConnect, .cortaNewTab]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .space, .cortaConnect, .cortaNewTab, .cortaInputSource]
+        [.flexibleSpace, .space, .cortaSpaceSidebar, .cortaSpace, .cortaConnect, .cortaNewTab, .cortaInputSource]
     }
+
+    /// The sidebar's items show only with Space's sidebar; "+" and the
+    /// connect button act on the mode on screen — a tab in the terminal
+    /// mode, a session of the project in Space — and say so.
+    func updateToolbarForMode() {
+        guard let toolbar = toolbarWindow?.toolbar else { return }
+        let inSpace = space.isActive
+        for item in toolbar.items {
+            switch item.itemIdentifier {
+            case .cortaSpaceSidebar:
+                item.isHidden = !inSpace
+            case .cortaSpace:
+                space.configureModeItem(item)
+            case .cortaNewTab:
+                item.label = inSpace ? L10n.text("space.newSession") : TerminalCommand.newTab.title
+                item.paletteLabel = item.label
+                item.toolTip = item.label
+            case .cortaConnect:
+                item.toolTip = L10n.text(inSpace ? "space.connectSSH" : "ui.toolbar.connectHelp")
+            default:
+                break
+            }
+        }
+    }
+
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        if let item = space.toolbarItem(identifier) { return item }
         if identifier == .cortaInputSource {
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.label = L10n.text("inputSource.settings.title")
@@ -138,7 +169,35 @@ extension SplitViewController: NSToolbarDelegate {
         }
     }
 
+    /// View ▸ Show Space / Show Terminal: the toolbar's mode switch.
+    @objc func toggleSpaceMode(_: Any?) {
+        space.setActive(!space.isActive)
+    }
+
+    /// View ▸ Show/Hide Sidebar and the toolbar's sidebar button. The window
+    /// answers it, being always in the responder chain, and hands it to
+    /// Space's split.
+    @objc func toggleSpaceSidebar(_: Any?) {
+        guard space.isActive else { return }
+        space.splitController.toggleSidebar(nil)
+    }
+
+    /// View ▸ Arrange in Columns: each column of the grid its own heights.
+    @objc func arrangeSpaceInColumns(_: Any?) { space.arrange(inColumns: true) }
+
+    /// View ▸ Arrange in Rows: each row of the grid its own widths.
+    @objc func arrangeSpaceInRows(_: Any?) { space.arrange(inColumns: false) }
+
+    /// File ▸ Open Project…: a folder for Space, which shows if it was not.
+    @objc func openSpaceProject(_: Any?) {
+        space.chooseProject()
+    }
+
     @objc private func newTabInThisWindow(_ sender: Any?) {
+        if space.isActive {
+            space.newSession()
+            return
+        }
         guard let window = toolbarWindow else { return }
         (NSApp.delegate as? AppDelegate)?.newTab(beside: window, sender: sender)
     }
@@ -146,6 +205,10 @@ extension SplitViewController: NSToolbarDelegate {
     /// The connect dialog; from a remote pane, with that host's files
     /// offered first — Return opens them, as the old Files button did.
     @objc private func connectRemote(_ sender: Any?) {
+        if space.isActive {
+            space.connectSession()
+            return
+        }
         var paneFiles: RemoteConnectPaneFiles?
         if let pane = focusedPane, pane.remote.canBrowseFiles {
             paneFiles = RemoteConnectPaneFiles(

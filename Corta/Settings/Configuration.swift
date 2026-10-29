@@ -162,6 +162,7 @@ nonisolated struct Configuration: Equatable, Sendable {
     var bell: BellMode = .visual
     var notifyOnLongTask: Bool = false
     var notifyFromPrograms = true
+    var spacePanelLimit = 6
     var agentStatus = true
     /// Additional comma-separated foreground executable names.
     var agentProcesses = ""

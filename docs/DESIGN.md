@@ -92,6 +92,22 @@ owning a binary split tree whose leaves are `ViewController` +
 `AppDelegate` retains the window controllers until their windows close).
 Nothing is shared between windows — that is what D07 buys.
 
+Space (D30) is a second view of the same window. Its sessions are panes of
+this `SplitViewController` too, so focus, input, close and the agent
+directory need nothing new; the controller keeps the terminal mode's
+`terminalTree`, and `tree` is Space's grid while Space shows.
+`CortaSpaceController` owns the projects (`SpaceProject`, `SpaceSession`);
+each project keeps its own free `SplitTree` of panel cards (`SpacePaneView`),
+changed in place — a split, a close, a replacement — so untouched panels keep
+their drawables, and saved as a `SpaceLayoutRecord`. `SpaceGrid` holds the
+rules: edges, the 64 × 18 minimum, automatic placement, least recently used.
+The window is islands on the background behind pages: the sidebar's
+(`SpaceIslandView`) and the opaque panel cards, in the content layer; glass
+is left to the toolbar and the undo note. A session off screen keeps reading
+its PTY at the grid's size (`resizeSessionOffScreen`). `SpaceStore` writes
+the project list to Application Support; nothing is read from or written to
+a project folder. Layout changes register on the window's undo manager.
+
 The two thread boundaries are the interesting part of this diagram:
 
 - **PTY/parse → render** is a snapshot taken at vsync, not a push. The

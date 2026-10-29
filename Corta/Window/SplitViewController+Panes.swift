@@ -34,8 +34,7 @@ extension SplitViewController {
     /// - Parameter vertical: move a vertical divider (change widths), owned
     ///   by the nearest ancestor split that way.
     private func resizeFocusedPane(vertical: Bool, steps: CGFloat) {
-        guard let focusedPane else { return }
-        var child: NSView = focusedPane.view
+        guard let focusedPane, var child = leafView(of: focusedPane) else { return }
         var node = child.superview as? NSSplitView
         while let current = node, current.isVertical != vertical {
             child = current
@@ -59,7 +58,11 @@ extension SplitViewController {
 
     /// Halves every node, back to a fresh split's layout.
     @objc func equalizePanes(_: Any?) {
-        equalize(view.subviews.first)
+        if space.isActive {
+            space.equalizeGrid()
+        } else {
+            equalize(view.subviews.first)
+        }
         deliverPaneSizes()
     }
 

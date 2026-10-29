@@ -45,6 +45,7 @@ Status of every entry below is **accepted** unless it says otherwise.
 | [D27](#d27--sftp-asks-through-opensshs-own-askpass-answered-by-corta) | SFTP asks through OpenSSH's `SSH_ASKPASS`; nothing is stored | Accepted |
 | [D28](#d28--local-tools-are-swift-ci-only-glue-may-be-python) | Local tools are Swift; CI-only glue may be Python | Accepted |
 | [D29](#d29--no-homebrew-cask-until-homebrewcask-accepts-one) | No Homebrew cask until `homebrew/cask` accepts one | Accepted |
+| [D30](#d30--space-is-a-second-view-of-one-windows-sessions-not-a-multiplexer) | Space is a second view of one window's sessions, not a multiplexer | Accepted |
 
 ---
 
@@ -652,6 +653,13 @@ chrome well; a line of text does not.
 **Consequence.** Reopen with a design for what the titlebar band should
 show (a solid theme colour, say) rather than with the API alone.
 
+**Space presentation exception.** Space (D30) starts its grid below the
+toolbar, in the content safe area, so no terminal text is under the
+titlebar; its titlebar is therefore transparent over the window's own
+background and the sidebar's glass card. The terminal mode keeps the
+opaque titlebar. Neither mode mirrors terminal text with a background
+extension.
+
 ## D25 — Metal frames present on their own, not with the transaction
 
 **Decision.** The terminal's `CAMetalLayer` keeps `presentsWithTransaction`
@@ -808,3 +816,46 @@ stars lets a user submit the cask, 225 lets the maintainer — or when
 Homebrew's maintainers accept it as a notability exception. The cask then
 sets `auto_updates true` so `brew upgrade` leaves updates to Sparkle, and
 `depends_on macos: ">= :tahoe"` with `depends_on arch: :arm64` (D21).
+
+## D30 — Space is a second view of one window's sessions, not a multiplexer
+
+**Decision.** Space shows project folders and their sessions in a sidebar
+and up to six of them in a free split grid. It is a mode of an ordinary terminal
+window: every session is a pane of that window, as a split's is, and it
+ends when the window closes. The terminal mode's split tree is kept whole
+while Space shows and the reverse; switching changes what is on screen and
+the window's frame — Space takes the screen's visible frame, and the
+terminal mode gets its own back, so its shells return at the size they
+left at — never a process. There is one Space in the app — the
+window that first shows it holds its sessions, and asking for Space in
+another window brings that one forward. What survives a quit is a list:
+the folders and, for each, its sessions' directories, preset names or SSH
+destinations, the user's names for them, and the grid's split tree, in
+`Application Support/space.json` (`CONFIGURATION.md` §8). A restored
+session is a fresh shell, the configured preset, or the same SSH
+connection; an agent CLI resumes its own conversation (`claude --continue`).
+
+**Why.** Keeping the processes alive past their window, to attach to again,
+is the multiplexer D09 rules out; a list of what to start again is the
+part of it a project view needs. One Space, not one per window, so a
+folder cannot be open twice with two sets of sessions. Nothing is read from
+or written to the project folder: a folder may come from anyone's
+repository, and a file there naming sessions would be a way to make Corta
+run them (`SECURITY.md` §4.6).
+
+The grid is a free split tree, the terminal mode's own: a session dropped on
+a panel's edge splits it there. No split leaves a panel smaller than 64 × 18
+cells; with no room, or at `space-panel-limit` (at most six), a session takes
+the least recently used panel's place, never the focused one's. Not 80 × 24,
+which beside the sidebar on a 14-inch display leaves room for one panel, so
+the grid would never be one. Six, because a 14-inch display holds six at the
+minimum and a larger one would hold more than a person reads at once. A tiled
+grid shares one axis, so columns (own heights) and rows (own widths) are a
+choice the user makes, not one the grid makes for them.
+
+**What it costs.** Quitting ends Space's sessions like any other pane's;
+their scrollback is not restored. A session cannot move to another window.
+
+**Consequence.** Reopen with a design for sessions that outlive a window
+that does not reopen D09, or with a measured case where 64 × 18 breaks a
+program the grid is for.

@@ -283,8 +283,9 @@ final class PaneFocus: NSObject {
     /// The indicators for the pane's focus now, and the report to the child.
     func applyAppearance() {
         guard let host else { return }
-        // One pane needs neither.
-        let inSplit = host.splitController?.hasMultiplePanes == true
+        // One pane needs neither; nor does Space, whose cards outline the
+        // focused one themselves.
+        let inSplit = host.splitController.map { $0.hasMultiplePanes && !$0.space.isActive } ?? false
         // The dim is structural and stays while the app is inactive; ring and
         // highlight follow `hasUserFocus`, so cmd-tab leaves no false ring.
         dimView?.isHidden = host.isFocusedPane || !inSplit

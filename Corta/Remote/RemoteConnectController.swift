@@ -69,6 +69,7 @@ struct RemoteConnectPaneFiles {
 final class RemoteConnectController: NSWindowController {
     static let shared = RemoteConnectController()
     private let draft = RemoteConnectDraft()
+    private var sessionDestination: ((Preset) -> Void)?
 
     private init() {
         let window = NSPanel(
@@ -94,7 +95,10 @@ final class RemoteConnectController: NSWindowController {
     ///   - mode: the initially selected connection destination.
     ///   - sender: the control or menu item opening the dialog.
     ///   - paneFiles: the focused pane's host, when it is remote.
-    func show(_ mode: RemoteConnectMode, sender: Any?, paneFiles: RemoteConnectPaneFiles? = nil) {
+    func show(
+        _ mode: RemoteConnectMode, sender: Any?, paneFiles: RemoteConnectPaneFiles? = nil,
+        sessionDestination: ((Preset) -> Void)? = nil
+    ) {
         guard let window else { return }
         if window.isVisible {
             (window.sheetParent ?? window).makeKeyAndOrderFront(sender)
@@ -102,6 +106,7 @@ final class RemoteConnectController: NSWindowController {
         }
         // A fresh dialog each time: a host left over from the last one is a
         // connection nobody asked for.
+        self.sessionDestination = sessionDestination
         draft.reset(mode: mode, paneFiles: paneFiles)
         window.title = L10n.text("ui.connect.title")
         if let parent = NSApp.keyWindow ?? NSApp.mainWindow, parent.isVisible,
@@ -121,6 +126,7 @@ final class RemoteConnectController: NSWindowController {
     }
 
     override func close() {
+        sessionDestination = nil
         if let window, let parent = window.sheetParent {
             parent.endSheet(window)
         } else {
@@ -141,13 +147,16 @@ final class RemoteConnectController: NSWindowController {
         case .success(let value): target = value
         case .failure(let problem): return problem
         }
+        let destination = sessionDestination
         close()
         switch mode {
         case .ssh:
             // Recorded once the connection is established, by the pane
             // (`PaneRemote.watchForEstablishedConnection`).
-            (NSApp.delegate as? AppDelegate)?.launchPreset(
-                SSHDestination.preset(for: target), inNewWindow: true)
+            let preset = SSHDestination.preset(for: target)
+            if let destination { destination(preset) } else {
+                (NSApp.delegate as? AppDelegate)?.launchPreset(preset, inNewWindow: true)
+            }
         case .sftp:
             // Recorded once connected, by the browser.
             SFTPBrowserController.open(target)

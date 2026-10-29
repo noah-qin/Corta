@@ -139,7 +139,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func applyCanvasAppearance() {
-        guard let window else { return }
+        guard let window, !applySpaceCanvasAppearance() else { return }
         let color = TerminalColorPalette.defaultBackground
         window.isOpaque = true
         window.backgroundColor = NSColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y),
@@ -348,9 +348,11 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// Read at quit and on every window close.
     var restorableState: WindowState? {
         guard let window, let splitController, !isQuickTerminal else { return nil }
-        var state = splitController.windowState(frame: window.frame)
+        // Space's full-screen frame is not the window's own.
+        var state = splitController.windowState(frame: splitController.space.terminalFrame ?? window.frame)
         state?.id = windowID
         state?.customTabTitle = customTabTitle
+        state?.isSpace = splitController.space.isActive
         return state
     }
 }
@@ -504,5 +506,18 @@ private final class TabTitleField: NSTextField, NSTextFieldDelegate {
             return true
         }
         return false
+    }
+}
+
+private extension TerminalWindowController {
+    /// Space is an ordinary sidebar window: the system's background, and a
+    /// titlebar the sidebar's glass and the toolbar draw through. Its grid
+    /// starts below the toolbar, so no terminal text is under it (D24).
+    func applySpaceCanvasAppearance() -> Bool {
+        guard let window, splitController?.space.isActive == true else { return false }
+        window.isOpaque = true
+        window.backgroundColor = .underPageBackgroundColor
+        window.titlebarAppearsTransparent = true
+        return true
     }
 }

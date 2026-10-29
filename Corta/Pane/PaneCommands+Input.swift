@@ -33,6 +33,10 @@ extension PaneCommands {
         view.onDropPaths = { [weak self] paths in
             self?.insertDroppedPaths(paths)
         }
+        view.remotePathsForDrop = { [weak self] urls in
+            guard let remote = self?.host?.remote else { return [] }
+            return urls.compactMap { remote.remotePath(forDropped: $0) }
+        }
         view.onLookUp = { [weak self] point in
             self?.wordForLookUp(at: point)
         }

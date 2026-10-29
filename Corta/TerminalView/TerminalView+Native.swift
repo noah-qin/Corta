@@ -22,7 +22,9 @@ extension TerminalView {
     // MARK: - Dragging a file or folder in
 
     func registerForFileDrags() {
-        registerForDraggedTypes([.fileURL])
+        // File promises: the SFTP browser's rows, taken as a remote path on
+        // their own host (`SFTPRemoteDrag`), never read off the pasteboard.
+        registerForDraggedTypes([.fileURL] + NSFilePromiseReceiver.readableDraggedTypes.map { .init($0) })
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
@@ -38,12 +40,23 @@ extension TerminalView {
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         let paths = droppedPaths(from: sender)
         guard !paths.isEmpty else { return false }
+        if !(sender.draggingPasteboard.types ?? []).contains(.fileURL) { SFTPRemoteDrag.end() }
         onDropPaths?(paths)
         return true
     }
 
+    /// Local files, or else the SFTP browser's file on this pane's own host.
+    /// Only the pasteboard's types are looked at during the drag: reading a
+    /// promise's data here would wait on the drag that is still running.
     private func droppedPaths(from sender: any NSDraggingInfo) -> [String] {
-        Self.droppedPaths(from: sender.draggingPasteboard)
+        let pasteboard = sender.draggingPasteboard
+        let types = pasteboard.types ?? []
+        if types.contains(.fileURL) {
+            let local = Self.droppedPaths(from: pasteboard)
+            if !local.isEmpty { return local }
+        }
+        guard let url = SFTPRemoteDrag.url(forPasteboardTypes: types) else { return [] }
+        return remotePathsForDrop?([url]) ?? []
     }
 
     /// Apart from `NSDraggingInfo`, so tests need no synthetic Finder drag.

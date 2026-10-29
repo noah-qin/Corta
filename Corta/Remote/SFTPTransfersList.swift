@@ -220,3 +220,31 @@ struct SFTPDragItem: Transferable {
         .suggestedFileName { $0.name }
     }
 }
+
+/// The remote file a drag from the SFTP browser carries, for a terminal on
+/// the same host to take as its path (`PaneRemote.remotePath(forDropped:)`).
+///
+/// Kept in the process, not on the pasteboard: a second representation there
+/// is produced on the main actor while a drag holds it, and a terminal
+/// reading it on every drag update hung the app. Nothing is downloaded for
+/// it, and the URL names no password and no key.
+@MainActor
+enum SFTPRemoteDrag {
+    private(set) static var current: (url: URL, began: Date)?
+    /// A drag older than this is not the one over the terminal.
+    static let lifetime: TimeInterval = 120
+
+    static func begin(_ url: URL?) {
+        current = url.map { ($0, Date()) }
+    }
+
+    /// The URL of the drag in progress, if it is one of the browser's.
+    static func url(forPasteboardTypes types: [NSPasteboard.PasteboardType]) -> URL? {
+        guard let current, Date().timeIntervalSince(current.began) < lifetime,
+              types.contains(where: { NSFilePromiseReceiver.readableDraggedTypes.contains($0.rawValue) })
+        else { return nil }
+        return current.url
+    }
+
+    static func end() { current = nil }
+}

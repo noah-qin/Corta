@@ -521,6 +521,34 @@ edits before saving. Input-source badges use OS metadata, not keystroke contents
 private IME modes are deliberately left unknown. Neither feature changes the
 execution or clipboard trust boundaries described above.
 
+### 4.10 Space: project folders, restored sessions and remote files
+
+Space (D30) adds project folders, sessions that start again after a
+restart, and ways into a session's remote files. Each is listed here with
+what it trusts and what it refuses, so an audit can check them one by one.
+
+| Where | What crosses | Trusted because | Refused or bounded |
+| --- | --- | --- | --- |
+| Opening a project | A folder chosen in an open panel | The user picked it | Nothing in the folder is read, run or written; it is only new sessions' working directory |
+| `space.json` | Projects, sessions (number, directory, preset name, SSH destination, the user's name for it), the grid's layout | App-owned, owner-only (`0600`), written only by Corta | Read back validated field by field: absolute paths only, at most 64 projects × 32 sessions × 6 panels, divider fractions clamped, SSH destinations re-parsed (`SSHTarget.parse`, so an option-shaped host such as `-oProxyCommand=…` is dropped), names stripped of controls and cut to 64 characters; a newer format is neither read nor written over |
+| A session starting again | A login shell in the saved directory, the configured preset of that name, or `ssh` to the saved destination | The user created that session; the destination is one they typed into the connect dialog | Never a command line from the file; only when its project is first opened in a launch, not at launch; SSH asks for its password or passphrase through `SSH_ASKPASS` every time (D27), nothing stored; an agent CLI is not resumed — its own `--resume` is the user's to run |
+| Session titles in the sidebar and headers | The agent's reported name, the foreground process name, the SSH destination, the kernel's working directory | Displayed only | `PaneWindowTitle.sanitizedTitleComponent` (§2.9), as the window title; a name the user gives wins and is never replaced by program output |
+| **Browse Files on This Host…** (a remote session) | The host and directory the remote shell reported over OSC 7 (§2.8), or the destination the user connected to | The SFTP browser's own rules | The first connection to a *reported* host in a run is confirmed in the browser (`RemoteHostConsent`), as from the Shell menu; one window per destination |
+| **Remote Files ▸** (a project) | SSH destinations of the project's sessions, from `space.json` | Each was typed or picked by the user in the connect dialog | Listed only from those records — an `ssh` typed at a prompt leaves none and is not offered; connects only on the user's choice |
+| A remote file dragged onto a terminal | The dragged row's `sftp://user@host:port/path`, noted in the process when the drag begins (`SFTPRemoteDrag`) — never read off the pasteboard, and never taken from another app | A drag is the user's own action, and the path is text they can see before pressing Return | Accepted only by a pane whose session is on that host — same host, and same user and port where both name one; a path with any control character is refused outright, not cleaned (a server can name a folder with a newline, and a cleaned path would be a different one); inserted single-quoted for every shell (`PaneCommands.shellQuoted`) and as a paste, so bracketed paste and the paste warning apply (§2.3) and nothing runs until Return. The URL names no password and no key file |
+
+Two residual risks, accepted:
+
+- A pane's host is, for a session reached by typing `ssh` at a prompt, the
+  host the *remote shell* reports (§2.8). A hostile remote shell can claim
+  another host's name, and a path dragged from that host's browser would be
+  accepted there. What reaches it is the path the user dragged, quoted and
+  unexecuted — the same text they could have typed.
+- `space.json` names hosts that are connected to again, without a click,
+  when the project is opened. Anything able to write that file already runs
+  as the user; the file's validation keeps a forged entry to a destination
+  the connect dialog would also have accepted.
+
 ## 5. Data at Rest
 
 **Terminal contents are not automatically persisted.** Scrollback routinely
@@ -536,6 +564,14 @@ split layout, focused pane, working directories, preset identifiers and
 launch metadata. Setting `restore-windows = false` disables restoration. The file is
 owner-only (`0600`), as are `directory-history.json` and `recent-hosts.json`.
 Saved directories and host/preset metadata may themselves be sensitive.
+Space's `space.json` holds the same kinds of metadata; §4.10 lists what it
+contains and how it is read back.
+Space keeps its project folders and their sessions in `space.json`, owner-only
+too, with the same kinds of metadata and no terminal text; it is written
+whatever `restore-windows` says, because the project list is what Space is.
+Nothing is written into a project folder, and nothing is read from one: a
+folder may come from anyone's repository, and a file there naming sessions
+would be a way to make Corta start them.
 
 This is separate from AppKit restoration. Terminal windows set
 `isRestorable = false` to prevent macOS restoring stale frames or retaining

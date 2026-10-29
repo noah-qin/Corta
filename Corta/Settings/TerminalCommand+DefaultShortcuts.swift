@@ -29,6 +29,10 @@ nonisolated extension TerminalCommand {
         case .nextTab: return Shortcut("]", [.command, .shift])
         case .renameTab: return nil
         case .close: return Shortcut("w", .command)
+        // ⌘O, "open" on the Mac; a terminal has no document to open otherwise.
+        case .openProject: return Shortcut("o", .command)
+        // ⌥⌘S for Space. ⌃⌘S stays the system's Show Sidebar.
+        case .toggleSpace: return Shortcut("s", [.command, .option])
         case .splitRight: return Shortcut("d", .command)
         case .splitDown: return Shortcut("d", [.command, .shift])
         case .focusLeft: return Shortcut(Shortcut.parse("left")!.key, [.command, .option])

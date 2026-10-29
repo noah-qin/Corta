@@ -420,3 +420,36 @@ enum RemotePath {
         return "/" + segments.joined(separator: "/")
     }
 }
+
+// MARK: - Remote files dropped on the pane
+
+extension PaneRemote {
+    /// The path of a dropped `sftp://` URL, if it names a file on the host
+    /// this pane's session is on — the same host, and the same user and
+    /// port where both name one. Nil for a local pane, an unknown host, or a
+    /// path with a control character in it: a server can name a directory
+    /// with a newline, and a path cleaned of it would be another path.
+    func remotePath(forDropped url: URL) -> String? {
+        let ours: SSHTarget?
+        switch state {
+        case .connected(let key, _): ours = SSHTarget(key: key)
+        case .remote(let reported, _, _): ours = SSHTarget.named(reported)
+        case .remoteUnknown, .local, .unknown: ours = nil
+        }
+        guard let ours, let host = url.host(percentEncoded: false) else { return nil }
+        return Self.remotePath(of: url, host: host, matching: ours)
+    }
+
+    /// The matching rule alone, for tests.
+    nonisolated static func remotePath(of url: URL, host: String, matching ours: SSHTarget) -> String? {
+        let bare = host.hasPrefix("[") && host.hasSuffix("]") ? String(host.dropFirst().dropLast()) : host
+        guard url.scheme?.lowercased() == "sftp", bare.lowercased() == ours.host.lowercased() else { return nil }
+        if let user = url.user(percentEncoded: false), let ourUser = ours.user, user != ourUser { return nil }
+        if let port = url.port, let ourPort = ours.port, port != ourPort { return nil }
+        let path = url.path(percentEncoded: false)
+        guard path.hasPrefix("/"),
+              !path.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+        else { return nil }
+        return path
+    }
+}

@@ -129,6 +129,71 @@ Terminal hotkey, remote badges — is collected in
   ([Presets](CONFIGURATION.md#4a-presets)).
 - New windows open at `columns` × `rows` cells (120 × 30 by default).
 
+### Space: projects side by side
+
+Space keeps a project's terminals together — a shell for Git and builds, an
+SSH session on the server, an agent CLI or two — with up to six on screen at
+once. Switch with the grid button beside Connect and **+** in the toolbar (in
+Space it shows a terminal, and takes you back), **View ▸ Show Space** (⌥⌘S)
+or **File ▸ Open Project…** (⌘O). Space fills the screen; the terminal mode
+gets its own window size back, and its tabs and splits are exactly as they
+were, still running.
+
+- **A project is a folder.** Add one with **+** beside *Projects* or ⌘O. Its
+  first session starts there. Nothing is read from or written into the folder.
+- **New sessions.** The toolbar's **+** (or ⌘D) starts a shell in the project
+  folder; the globe connects over SSH into the same project. Run `claude`,
+  `codex` or anything else in them as in any terminal.
+- **The grid is yours to split.** A new session splits the roomiest panel
+  along its longer side. Drag a session — a sidebar row or a panel's header —
+  onto a panel: near an edge it splits that panel on that side (the half it
+  will take is shown as you drag), in the middle it takes the panel's place
+  (two panels on screen swap). Drag the gaps to resize. No split leaves a
+  panel smaller than 64 × 18 cells; with no room, or at the limit, a session
+  takes the place of the panel you used least recently, never the one you are
+  typing in.
+- **Columns or rows.** A tiled grid shares one axis: in rows each row has its
+  own widths, in columns each column its own heights. **View ▸ Arrange in
+  Columns / Arrange in Rows** (also in each panel's **…**) switches; ⌘Z undoes.
+- **Choosing is not showing.** Clicking a session on screen focuses its panel.
+  Clicking a hidden one only selects it; the grid changes when you ask: the
+  add button at the end of its row (it appears on hover, and says what it will
+  replace or join), ⌘Return, **Show in Grid** or **Show in Panel ▸** in its
+  context menu, or a drag. Each placement outlines the panel once, shows a
+  note with **Undo**, and can be undone with ⌘Z — the layout comes back, every
+  process keeps running.
+- **Names and kinds.** A session is named by its program — an agent's own
+  name, the SSH host, the command running — or *Terminal N* at a prompt.
+  Double-click its row, press Return on it, or choose **Rename…** to give it
+  your own name; programs never change that one. Its icon is a terminal, a
+  server for SSH, or sparkles for an agent CLI.
+- **Panel actions** are in the **…** at each panel's corner (faint until you
+  point at the panel) and on the header's context menu: **Fill Grid**, **Hide
+  Panel**, **Rename…**, **Browse Files on This Host…** for a remote session,
+  **End Session…**. Double-click a header to fill the grid, and again to
+  return (also ⇧⌘⏎). A hidden session keeps running, at the size of the grid.
+- **The sidebar** lists every project and every session. A coloured dot is a
+  session's state — green running, orange waiting for you, red error, blue
+  done — whether its panel is on screen or not, and a project's count says how
+  many of its sessions wait on you. Hide it with the toolbar button or
+  **View ▸ Hide Sidebar** (⌃⌘S).
+- **Remote files.** *Browse Files on This Host…* opens the SFTP browser at the
+  directory the remote shell is in. A project's **Remote Files ▸** lists the
+  hosts its sessions connected to through the connect dialog (an `ssh` typed at
+  a prompt is not listed). Drag a file from that browser onto a terminal on the
+  same host to type its path there, quoted; nothing runs until you press
+  Return, and other terminals do not take it.
+- **After a restart** Space lists the same projects and, for each, starts the
+  same sessions again — a shell in the directory it was in, the same preset,
+  the same SSH host, which asks for its password again — the first time you
+  open the project, in the same grid. Scrollback is not kept; an agent CLI picks
+  its conversation up with its own resume (`claude --continue`,
+  `codex resume --last`).
+
+`space-panel-limit` (1–6) caps the panels on screen.
+
+![Space with one project open and three sessions in the grid](brand/space.png)
+
 ## Text, fonts and themes
 
 - **Font.** Settings ▸ Appearance ▸ Font lists System Monospaced (the

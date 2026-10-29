@@ -87,6 +87,29 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   root, open a pane there), shell/directory/environment presets, and local
   `path:line:column` references that can open in an editor.
 
+### Space
+
+- Project folders in a sidebar, each with its own local, SSH and agent CLI
+  sessions; the toolbar's mode button, ⌥⌘S and ⌘O switch to it. Space fills
+  the screen and the terminal mode gets its own frame back; its tabs and
+  splits keep running and keep their layout.
+- A free split grid of up to six panels (`space-panel-limit`): drop a session
+  on a panel's edge to split it there, on its middle to replace it; drag the
+  gaps; arrange in columns or rows; every placement can be undone. No split
+  makes a panel smaller than 64 × 18 cells. Hidden sessions keep running at
+  the grid's size.
+- A sidebar of every session with its state, an add button that says what it
+  will replace, rename (kept over program titles), and an icon per kind:
+  local, SSH, agent CLI.
+- Remote sessions open the SFTP browser at their directory; a project lists
+  its connect-dialog hosts; a file dragged from the browser onto a terminal on
+  the same host types its quoted path.
+- Projects, sessions and grids are restored after a restart; sessions start
+  again (shell, preset or SSH host) when their project is first opened.
+  Scrollback is not restored (D30).
+- Limits: one Space per app — another window's mode button brings it forward;
+  a session cannot move between windows; the SFTP browser is its own window.
+
 ## Claude Code state and generic program notifications
 
 - Claude Code is currently the only CLI with a dedicated task-state
