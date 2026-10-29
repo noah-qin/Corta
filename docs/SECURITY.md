@@ -567,7 +567,9 @@ retained one keeps the name it stopped using. UUID
 values are canonically rendered and shell-quoted; display names are never
 command parameters. No rc is explicitly sourced and no configuration is changed.
 
-One SSH runs a fixed `/bin/sh` wrapper: `new-session -dP` atomically attempts
+One SSH runs a fixed `/bin/sh` wrapper, as one line with no single quotes
+inside its outer single-quoted argument so the remote login shell (including
+csh/tcsh) can parse it intact. `new-session -dP` atomically attempts
 creation; on failure, exact `has-session` can establish that the same name
 already exists; `attach-session` targets that exact name. A disappearance
 between preparation and attachment fails rather than silently recreating a

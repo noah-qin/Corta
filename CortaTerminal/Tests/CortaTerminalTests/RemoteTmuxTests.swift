@@ -98,10 +98,16 @@ struct RemoteTmuxTests {
         #expect(!tmux.command.contains("kill-server"))
         #expect(!tmux.command.contains("source "))
         #expect(!tmux.command.contains("-CC"))
+        #expect(!tmux.command.contains("\n"))
+        #expect(tmux.command.hasPrefix("/bin/sh -c '"))
+        #expect(tmux.command.hasSuffix("'"))
+        let script = tmux.command.dropFirst("/bin/sh -c '".count).dropLast()
+        #expect(!script.contains("'"), "the login shell must see one single-quoted argument")
     }
 
-    @Test(arguments: ["missing", "new", "attached", "prepare-failed", "attach-failed"])
-    func wrapperBranchesAndZeroExitNeverStartsFallback(_ branch: String) throws {
+    @Test(arguments: ["missing", "new", "attached", "prepare-failed", "attach-failed"],
+          ["/bin/sh", "/bin/zsh", "/bin/bash", "/bin/tcsh"])
+    func wrapperBranchesAndZeroExitNeverStartsFallback(_ branch: String, _ loginShell: String) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("corta-tmux-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -132,7 +138,7 @@ struct RemoteTmuxTests {
         var environment = ChildEnvironment.default()
         environment["PATH"] = root.path + ":/usr/bin:/bin"
         environment["SHELL"] = shell.path
-        let pty = try PTY.spawn(executable: "/bin/sh", arguments: ["-c", tmux.command], environment: environment)
+        let pty = try PTY.spawn(executable: loginShell, arguments: ["-c", tmux.command], environment: environment)
         defer { pty.close() }
         let output = pty.readOutput(timeout: testTimeout(5))
         var terminal = Terminal()

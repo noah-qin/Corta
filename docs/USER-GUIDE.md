@@ -213,6 +213,10 @@ sessions, including hidden ones, only when first opened. Before that it makes
 no connection. Turn retention off for ordinary SSH. The traditional terminal
 mode, typed/nested SSH, custom presets and SFTP never get this wrapper.
 
+Supported remote login shells are POSIX-family shells, zsh, fish and csh/tcsh.
+The fixed wrapper is a single quoted line passed to `/bin/sh`, so csh/tcsh
+can parse it before `/bin/sh` runs it. Nushell and other shells are untested.
+
 The panel's glass connection button keeps its result visible even after tmux
 clears the screen; click it for details and the exact tmux name:
 

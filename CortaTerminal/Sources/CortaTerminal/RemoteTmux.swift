@@ -37,37 +37,31 @@ public struct RemoteTmux: Equatable, Sendable {
     /// an already-existing identity from a creation failure.
     /// Attaching by exact name then fails safely if it disappeared in between.
     public var command: String {
-        let script = """
-        trap 'exit 129' HUP
-        trap 'exit 143' TERM
-        report_failure() {
-            printf '\\033]6973;\(token.uuidString);fail;%s;' "$1"
-            printf '%s' "$2" | LC_ALL=C head -c 1024 | od -An -v -tx1 | tr -d ' \\n'
-            printf '\\007'
-        }
-        if ! command -v tmux >/dev/null 2>&1; then
-            printf '\\033]6973;\(token.uuidString);start;missing\\007'
-            exec "${SHELL:-/bin/sh}" -l
-        fi
-        prepared=$(tmux new-session -dP -F corta-created -s '\(sessionName)' 2>&1)
-        result=$?
-        if [ "$result" -eq 0 ]; then
-            outcome=new
-        elif tmux has-session -t '=\(sessionName)' 2>/dev/null; then
-            outcome=attached
-        else
-            report_failure "$result" "$prepared"
-            printf '%s\\n' "$prepared" >&2
-            exec "${SHELL:-/bin/sh}" -l
-        fi
-        printf '\\033]6973;\(token.uuidString);start;%s\\007' "$outcome"
-        reason=$(tmux attach-session -t '=\(sessionName)' 2>&1 >/dev/tty)
-        result=$?
-        if [ "$result" -eq 0 ]; then exit 0; fi
-        report_failure "$result" "$reason"
-        printf '%s\\n' "$reason" >&2
-        exec "${SHELL:-/bin/sh}" -l
-        """
+        // ssh first passes this through the user's login shell. csh/tcsh cannot
+        // parse a newline inside single quotes; keep the entire sh program in
+        // one quoted argument, with no inner single quotes to split that run.
+        let script = [
+            "trap \"exit 129\" HUP;",
+            "trap \"exit 143\" TERM;",
+            "report_failure() {",
+            "printf \"\\033]6973;\(token.uuidString);fail;%s;\" \"$1\";",
+            "printf \"%s\" \"$2\" | LC_ALL=C head -c 1024 | od -An -v -tx1 | tr -d \" \\n\";",
+            "printf \"\\007\"; };",
+            "if ! command -v tmux >/dev/null 2>&1; then",
+            "printf \"\\033]6973;\(token.uuidString);start;missing\\007\";",
+            "exec \"${SHELL:-/bin/sh}\" -l; fi;",
+            "prepared=$(tmux new-session -dP -F corta-created -s \"\(sessionName)\" 2>&1);",
+            "result=$?;",
+            "if [ \"$result\" -eq 0 ]; then outcome=new;",
+            "elif tmux has-session -t \"=\(sessionName)\" 2>/dev/null; then outcome=attached;",
+            "else report_failure \"$result\" \"$prepared\";",
+            "printf \"%s\\n\" \"$prepared\" >&2; exec \"${SHELL:-/bin/sh}\" -l; fi;",
+            "printf \"\\033]6973;\(token.uuidString);start;%s\\007\" \"$outcome\";",
+            "reason=$(tmux attach-session -t \"=\(sessionName)\" 2>&1 >/dev/tty);",
+            "result=$?; if [ \"$result\" -eq 0 ]; then exit 0; fi;",
+            "report_failure \"$result\" \"$reason\";",
+            "printf \"%s\\n\" \"$reason\" >&2; exec \"${SHELL:-/bin/sh}\" -l"
+        ].joined(separator: " ")
         return "/bin/sh -c " + Self.quoted(script)
     }
 

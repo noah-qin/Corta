@@ -301,6 +301,11 @@ provides an ordinary login shell. A successful manual detach ends SSH without
 starting another shell. Authentication cancellation or a network failure does
 not establish or destroy a tmux session automatically.
 
+The retention wrapper supports POSIX-family remote login shells, zsh, fish
+and csh/tcsh. It is passed as one line to `/bin/sh`; csh/tcsh cannot parse
+literal newlines inside its quoted argument. Nushell and other shells have
+not been tested.
+
 **Original session ended · New terminal** means an earlier established UUID
 no longer existed. Server restarts, ending the session and `destroy-unattached
 on` lose the original programs; Corta cannot recover them and does not change

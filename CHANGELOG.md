@@ -43,6 +43,10 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Retained Space SSH connections work when the remote login shell is csh or
+  tcsh. The fixed tmux wrapper uses one quoted line, preserving tmux startup,
+  failure reporting, login-shell fallback and normal detach behavior.
+
 - Dragging an SFTP file no longer waits on the main thread to provide its
   drag data. Finder receives a promised download with transfer progress;
   URL and text destinations receive its `sftp://user@host:port/path` link

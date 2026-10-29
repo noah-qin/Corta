@@ -38293,6 +38293,7 @@
       }
     },
     "space.ssh.missing.detail" : {
+      "comment" : "Space SSH retention fallback, including remote csh/tcsh login shells. Not detected means absent from sshd's PATH, not necessarily uninstalled; preserve this distinction.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {

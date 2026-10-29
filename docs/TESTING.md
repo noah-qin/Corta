@@ -830,7 +830,11 @@ in the launched app; record which in the pull request.
 
 `RemoteTmuxTests` checks token/phase boundaries, malformed and repeated reports,
 RIS, command quoting, missing/broken tmux, attach failure and zero-exit detach
-without a fallback shell. A `fail` after screen output, or after the
+without a fallback shell. Every wrapper branch runs with `/bin/sh`, `/bin/zsh`,
+`/bin/bash` and `/bin/tcsh` as the login shell parsing the generated command.
+The command must contain no literal newline or single quote inside the outer
+single-quoted script, so csh/tcsh can hand it intact to `/bin/sh`.
+A `fail` after screen output, or after the
 attach-failure window, is ignored; a `fail` before any drawing, including a
 prepare failure with no `start`, is kept. A title report does not close that
 window. `RemoteTmuxSSHIntegrationTests` runs through the
