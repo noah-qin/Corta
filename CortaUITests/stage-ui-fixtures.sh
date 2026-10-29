@@ -274,4 +274,20 @@ SH
 {"version":1,"projects":[{"path":"$conversation_stage/project","sessions":[$sessions],"layout":$layout,"nextNumber":4}]}
 JSON
 done
+
+# Space SSH dialog: local sessions only; no real destination or credentials.
+mkdir -p "$root/space-ssh/ApplicationSupport" "$root/space-ssh/project"
+cat > "$root/space-ssh/config" <<'CONFIG'
+appearance = light
+restore-windows = false
+columns = 100
+rows = 30
+CONFIG
+cat > "$root/space-ssh/.zshrc" <<'ZSH'
+PROMPT='demo ❯ '
+RPROMPT=''
+ZSH
+cat > "$root/space-ssh/ApplicationSupport/space.json" <<JSON
+{"version":1,"selectedProject":"$root/space-ssh/project","projects":[{"path":"$root/space-ssh/project","sessions":[{"number":1}],"layout":{"panel":{"_0":0}},"nextNumber":2}]}
+JSON
 printf '%s\n' "$root"

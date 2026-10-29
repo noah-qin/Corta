@@ -108,6 +108,13 @@ its PTY at the grid's size (`resizeSessionOffScreen`). `SpaceStore` writes
 the project list to Application Support; nothing is read from or written to
 a project folder. Layout changes register on the window's undo manager.
 
+Opted-in Space SSH uses `RemoteTmux`'s fixed remote wrapper, rebuilt from each
+record's validated UUID/target. The remote server owns tmux's lifetime; Corta
+owns only ssh and starts nothing before the project opens. `PaneRemote` drains
+the token-bound startup/failure report independently of rendering, and Space
+persists only whether tmux was established. Glass connection details remain
+available after a clear. There is no local daemon or tmux control mode (D09).
+
 The two thread boundaries are the interesting part of this diagram:
 
 - **PTY/parse → render** is a snapshot taken at vsync, not a push. The

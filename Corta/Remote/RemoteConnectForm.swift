@@ -27,6 +27,7 @@ struct RemoteConnectForm: View {
     var modeSelection: Binding<RemoteConnectMode>?
     @Binding var fields: SSHTargetFields
     var paneFiles: RemoteConnectPaneFiles?
+    var retainSSH: Binding<Bool>?
     /// A line above the fields — where a prefilled name came from.
     var notice: String?
     var error: String?
@@ -108,6 +109,13 @@ struct RemoteConnectForm: View {
                 }
                 hostField
                 advanced
+                if let retainSSH {
+                    Toggle(L10n.text("space.ssh.retain"), isOn: retainSSH)
+                        .toggleStyle(.switch)
+                        .padding(12)
+                        .glassEffect(.regular, in: .rect(cornerRadius: Self.cardRadius))
+                        .accessibilityIdentifier("connect-retain-ssh")
+                }
                 if let error {
                     // Said in words with a symbol, never by colour alone.
                     Label(error, systemImage: "exclamationmark.triangle.fill")

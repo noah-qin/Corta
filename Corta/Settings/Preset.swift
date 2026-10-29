@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Foundation
+import CortaTerminal
 
 /// A named way to open a terminal: a shell, a directory, arguments and
 /// environment variables, as `preset.<name>.…` keys. Applied at spawn only,
@@ -43,6 +44,10 @@ nonisolated struct Preset: Equatable, Sendable {
     /// the user typed, which a title may name where a pane's own report is
     /// missing (`PaneRemoteState`). Never read from or written to the file.
     var connectTarget: SSHTarget?
+    /// Only the Space connect dialog may request remote retention. Never serialized.
+    var retainSSH = false
+    var remoteTmux: RemoteTmux?
+    var tmuxPreviouslyEstablished = false
 
     init(name: String) {
         self.name = name

@@ -232,6 +232,8 @@ root; `ci.yml`'s core job runs it after `swift test`:
 
 ```sh
 python3 scripts/verify-ssh-integration.py
+# Also the app-hosted window close/reopen check. See Space below.
+python3 scripts/verify-ssh-integration.py --app
 ```
 
 Without the fixture the suite skips itself; a failed fixture set-up is
@@ -825,6 +827,35 @@ check (D14): a scratch stage's `space.json`, then clicks, renames, hovers, the
 sidebar toggle and full screen, with screenshots attached. The sidebar's
 choose-then-show interaction, undo, and remote-file drags are checked by hand
 in the launched app; record which in the pull request.
+
+`RemoteTmuxTests` checks token/phase boundaries, malformed and repeated reports,
+RIS, command quoting, missing/broken tmux, attach failure and zero-exit detach
+without a fallback shell. `RemoteTmuxSSHIntegrationTests` runs through the
+isolated sshd fixture in `scripts/verify-ssh-integration.py`, using an installed
+tmux on a private socket with a fixture-only config/shell. It checks two UUIDs,
+distinct remote PIDs surviving the app's actual `TerminalSession.stop` SIGHUP
+path, reconnect, resize, targeted kill, recreation, detach, ordinary SSH and
+authentication refusal. It installs nothing and never uses an existing tmux
+server. Missing tmux is reported as unavailable, not a passing lifecycle check.
+`CortaSpaceSSHIntegrationTests` is the same fixture through a real Space
+window: constructing the window does not connect; activating Space starts the
+saved sessions, including the one off the grid; `SplitViewController.teardown`
+(the window-close path) leaves the remote pane PIDs alive; opening Space again
+attaches and those PIDs are unchanged. Run it with
+`python3 scripts/verify-ssh-integration.py --app` after the core SSH suites.
+A skipped suite is not a passing lifecycle check.
+`SpaceGridTests` cover UUID migration/persistence and invalid/duplicate repair.
+The UI case `CortaSpaceUITests/testSSHRetentionIsOnlyOfferedInSpaceAndDefaultsOn`
+uses the externally prepared `space-ssh` stage (same `stage-ui-fixtures.sh`
+recipe), opens no real host and verifies the glass toggle's mode/default/reset.
+
+For Xcode package resolution problems, use absolute paths with
+`-clonedSourcePackagesDirPath` and `-packageCachePath`, plus `-scmProvider system`.
+A separately downloaded binary artifact must match its package manifest's
+SHA-256 before seeding a repository-local artifact cache. A resolver reporting
+an empty package list is not success: verify it lists CortaTerminal and Sparkle
+and the build finds their products. Never change package pins or machine-wide
+settings merely to get a test to run.
 
 `LocalConversationTests` checks exact UUID extraction (including Codex rollout
 filenames), ambiguous open files, unsupported tools and two same-directory

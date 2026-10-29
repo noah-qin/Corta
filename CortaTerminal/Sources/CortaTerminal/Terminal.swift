@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Foundation
+
 /// A terminal: bytes in, grid out — the unit a golden test feeds and a
 /// viewport renders (`DECISIONS.md` D07). Not isolated: `TerminalSession`
 /// owns the child process and synchronizes access.
@@ -31,6 +33,13 @@ public struct Terminal: Sendable {
         get { performer.directoryCompletionToken.map { String(decoding: $0, as: UTF8.self) } }
         set { performer.directoryCompletionToken = newValue.map { Array($0.utf8) } }
     }
+
+    /// Armed by an opted-in launcher before the reader starts; ordinary panes ignore OSC 6973.
+    public mutating func expectRemoteTmux(token: UUID) {
+        performer.remoteTmuxHandshake = RemoteTmux.Handshake(token: token.uuidString)
+    }
+
+    public var remoteTmuxReport: RemoteTmux.Report? { performer.remoteTmuxHandshake?.report }
 
     public init(
         rows: Int = 24,

@@ -46,10 +46,17 @@ nonisolated struct SpaceState: Codable, Equatable, Sendable {
     /// index and divider in range. A hand-edited or truncated file degrades
     /// field by field rather than as a whole.
     func validated() -> SpaceState {
+        let counts = projects.prefix(Self.maximumProjects).flatMap { $0.sessions.prefix(Self.maximumSessions) }
+            .reduce(into: [UUID: Int]()) { $0[$1.id, default: 0] += 1 }
         var seen = Set<String>()
         let projects = projects.compactMap { project -> SpaceProjectRecord? in
             guard project.path.hasPrefix("/"), seen.insert(project.path).inserted else { return nil }
-            return project.validated()
+            var valid = project.validated()
+            for index in valid.sessions.indices where counts[valid.sessions[index].id, default: 0] > 1 {
+                valid.sessions[index].id = UUID()
+                valid.sessions[index].tmuxEstablished = false
+            }
+            return valid
         }
         let kept = Array(projects.prefix(Self.maximumProjects))
         return SpaceState(
@@ -162,6 +169,10 @@ nonisolated indirect enum SpaceLayoutRecord: Codable, Equatable, Sendable {
 }
 
 nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
+    var id: UUID
+    /// Per-connection state, never a config-file setting.
+    var retainSSH: Bool?
+    var tmuxEstablished: Bool?
     var conversation: LocalConversation?
     var number: Int
     /// The local working directory at the last save; nil for a remote one.
@@ -174,6 +185,7 @@ nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
     var name: String?
 
     init(number: Int, directory: String? = nil, presetName: String? = nil, ssh: SSHTarget? = nil) {
+        self.id = UUID()
         self.number = number
         self.directory = directory
         self.presetName = presetName
@@ -181,12 +193,19 @@ nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case conversation, number, directory, presetName, ssh, name
+        case id, retainSSH, tmuxEstablished, conversation, number, directory, presetName, ssh, name
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
-        conversation = nil
+        let rawID = try? values.decode(String.self, forKey: .id)
+        let parsed = rawID.flatMap(UUID.init(uuidString:))
+        let validID = parsed.flatMap { uuid in
+            rawID?.lowercased() == uuid.uuidString.lowercased() ? uuid : nil
+        }
+        id = validID ?? UUID()
+        retainSSH = try values.decodeIfPresent(Bool.self, forKey: .retainSSH)
+        tmuxEstablished = validID == nil ? false : try values.decodeIfPresent(Bool.self, forKey: .tmuxEstablished)
         if let saved = try? values.nestedContainer(keyedBy: ConversationKeys.self, forKey: .conversation),
            let kind = try? saved.decode(LocalConversation.Kind.self, forKey: .kind),
            let raw = try? saved.decode(String.self, forKey: .id),
@@ -323,6 +342,9 @@ struct SpaceStore {
                 }
             }
         }
+        // Decoding supplies identities for legacy/invalid records; persist
+        // them before any project is opened, including off-grid sessions.
+        save(valid)
         // Bounded, off the main thread: a project on a mount that stopped
         // answering must not hold the window.
         let existing = PathProbe.directories(

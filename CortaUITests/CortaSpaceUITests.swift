@@ -25,6 +25,7 @@ final class CortaSpaceUITests: XCTestCase {
 
     /// A stage with two project folders, and a Space file that shows three of
     /// the first project's five sessions.
+    @MainActor
     private func makeStage(appearance: String) throws -> XCUIApplication {
         stage = FileManager.default.temporaryDirectory.appendingPathComponent("CortaSpaceUI-" + UUID().uuidString)
         let projects = stage.appendingPathComponent("projects")
@@ -58,6 +59,7 @@ final class CortaSpaceUITests: XCTestCase {
         super.tearDown()
     }
 
+    @MainActor
     private func attach(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         attachment.name = name
@@ -65,6 +67,7 @@ final class CortaSpaceUITests: XCTestCase {
         add(attachment)
     }
 
+    @MainActor
     private func panels(_ app: XCUIApplication) -> XCUIElementQuery {
         app.groups.matching(identifier: "Corta.Space.Panel")
     }
@@ -152,6 +155,31 @@ final class CortaSpaceUITests: XCTestCase {
         attach(app, "Space-full-screen")
         app.typeKey("f", modifierFlags: [.command, .control])
         sleep(2)
+    }
+
+    @MainActor
+    func testSSHRetentionIsOnlyOfferedInSpaceAndDefaultsOn() throws {
+        let fixture = try UIFixtures.stage("space-ssh")
+        let app = UIFixtures.app(stage: fixture, runner: Self.self, usingTestTarget: true)
+        defer { app.terminate() }
+        app.launch()
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 8))
+        app.toolbars.buttons["Connect…"].click()
+        let retention = app.switches["connect-retain-ssh"]
+        XCTAssertFalse(retention.exists)
+        app.typeKey(.escape, modifierFlags: [])
+        app.typeKey("s", modifierFlags: [.command, .option])
+        XCTAssertTrue(panels(app).firstMatch.waitForExistence(timeout: 5))
+        app.toolbars.buttons["Connect…"].click()
+        XCTAssertTrue(retention.waitForExistence(timeout: 3))
+        XCTAssertEqual((retention.value as? NSNumber)?.intValue, 1)
+        retention.click()
+        XCTAssertEqual((retention.value as? NSNumber)?.intValue, 0)
+        attach(app, "Space-SSH-retention-off")
+        app.typeKey(.escape, modifierFlags: [])
+        app.toolbars.buttons["Connect…"].click()
+        XCTAssertEqual((retention.value as? NSNumber)?.intValue, 1)
+        app.typeKey(.escape, modifierFlags: [])
     }
 
     @MainActor

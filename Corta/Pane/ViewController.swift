@@ -443,6 +443,16 @@ extension ViewController {
     /// A rebuild keeps the pane's grid and font size: the new child is born
     /// at the size it is shown at, and the window does not move.
     private func setUpPane(strictRespawn: Bool = false, keeping grid: TerminalSize? = nil) {
+        if grid != nil, var retained = preset, let tmux = retained.remoteTmux,
+           let command = retained.arguments.last {
+            let fresh = RemoteTmux(id: tmux.id)
+            retained.tmuxPreviouslyEstablished = retained.tmuxPreviouslyEstablished
+                || remote.tmuxReport?.established == true
+            retained.arguments[retained.arguments.count - 1] = command.replacingOccurrences(
+                of: tmux.command, with: fresh.command)
+            retained.remoteTmux = fresh
+            preset = retained
+        }
         let configuration = ConfigurationStore.shared.configuration
         if grid == nil || !isFontSizeZoomed {
             fontSize = Configuration.fontSizeRange.clamped(configuration.fontSize)
@@ -460,6 +470,7 @@ extension ViewController {
         installSessionCallbacks()
         installTerminalCallbacks(on: terminalView)
         // The PTY reader must not run until all callbacks and views are ready.
+        if let tmux = preset?.remoteTmux { session.expectRemoteTmux(token: tmux.token) }
         session.start()
         remote.watchForEstablishedConnection()
     }
@@ -579,6 +590,7 @@ extension ViewController {
         let wake = frameLoop.outputWake
         frameLoop.onOutputSignal = { [weak self] in
             guard let self else { return }
+            self.remote.readTmuxReport()
             self.agents.readOutput()
             if !self.agents.visible, self.session?.takeBell() == true { self.handleBell() }
         }
@@ -1072,7 +1084,7 @@ extension ViewController {
         view.window?.makeFirstResponder(terminalView)
         resizeSessionToFitView(coalesce: false)
         invalidateDisplay()
-        if strictRespawn {
+        if strictRespawn, preset?.remoteTmux == nil {
             // Every time: a new connection; the old scrollback is gone.
             terminalView.showToast(remote.reconnectNotice)
         }

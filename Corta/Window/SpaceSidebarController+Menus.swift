@@ -110,6 +110,9 @@ extension SpaceSidebarController {
             add("space.session.browseFiles", to: menu) { space.browseFiles(of: session) }
         }
         menu.addItem(.separator())
+        if session.record.retainSSH == true {
+            add("space.ssh.kill.title", to: menu) { space.endRemoteSession(session) }
+        }
         add("space.session.end", to: menu) { space.endSession(session) }
     }
 

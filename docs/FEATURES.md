@@ -109,6 +109,13 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   Local Claude/Codex conversations are remembered per pane by kind and UUID;
   their exact resume commands fill empty integrated prompts, awaiting Return.
   Missing/invalid IDs leave ordinary shells. Scrollback is not restored (D30).
+- Space connect-dialog SSH defaults to optional remote tmux retention, with a
+  persistent UUID per terminal, independent sessions on one host, reconnect and
+  separately confirmed targeted end. Status/details use Liquid Glass and survive
+  terminal clears. Only sshd's PATH is searched, no rc sourced; missing/broken
+  tmux falls back to ordinary SSH. `destroy-unattached` can defeat retention;
+  shared UUID clients compete for size and `allow-passthrough` affects metadata.
+  No global tmux configuration is changed. See the user guide for limits.
 - Limits: one Space per app — another window's mode button brings it forward;
   a session cannot move between windows; the SFTP browser is its own window.
 

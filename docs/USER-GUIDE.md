@@ -197,6 +197,45 @@ were, still running.
   **Fill Conversation Again** in the pane's menu fills the same command again
   at an empty prompt, without executing it.
 
+### Keep Space SSH programs running after disconnecting
+
+In Space's connect dialog, **Keep running after disconnect** defaults to on.
+Each terminal gets its own `corta-<UUID>` session in the remote host's existing
+tmux. Closing a panel, window or Corta disconnects only local SSH; reconnecting
+that same terminal attaches to its still-running programs. No CLI conversation
+resume command is sent. After restarting Corta, the project connects its saved
+sessions, including hidden ones, only when first opened. Before that it makes
+no connection. Turn retention off for ordinary SSH. The traditional terminal
+mode, typed/nested SSH, custom presets and SFTP never get this wrapper.
+
+The panel's glass connection button keeps its result visible even after tmux
+clears the screen; click it for details and the exact tmux name:
+
+- **tmux · Reconnectable**: the named remote session exists.
+- **Ordinary SSH · Limited recovery**: remote tmux was not detected. Corta
+  checks only the PATH supplied by sshd; it does not source remote shell
+  startup scripts. An installation added only in `.zshrc` is not detected.
+  Put tmux on that PATH and reconnect. This does not mean it is uninstalled.
+- **tmux failed · Ordinary SSH**: creation or attachment failed; details show
+  its exit status and up to 1,024 bytes of sanitised remote error text. A login
+  shell is provided. Normal tmux detach (exit status 0) ends SSH instead.
+- **Original session ended · New terminal**: a previously established tmux
+  session is gone. The new terminal does not restore its former programs.
+
+**End Remote Session…**, separately confirmed in the panel or sidebar menu,
+terminates only that UUID with `tmux kill-session -t '=corta-<UUID>'`. Its new
+terminal shows authentication and the result. Cancel runs nothing. Ordinary
+close and removing a local session/project never kill tmux; removal warns that
+it may keep consuming remote resources and gives the manual cleanup command.
+
+A server restart or an ended tmux session loses those processes permanently.
+`destroy-unattached on` can destroy the session when SSH disconnects; Corta
+does not change it. Screen/history are maintained remotely and subject to the
+server's history limit. Two clients using the same UUID share a session and
+compete over its size. Without `allow-passthrough`, directory and program-state
+reports may not reach Corta; tmux status integration is not promised. Corta
+changes no global tmux settings, installs nothing and starts no local daemon.
+
 A brief Liquid Glass note at the grid's foot explains a successful fill,
 without showing the UUID or offering Undo. Only successful fills count:
 

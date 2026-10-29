@@ -50,6 +50,14 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
     /// Shared by both readers of the state — the title's cached copy and
     /// one-off questions — so they supersede the same report.
     private var reportTracker = PaneRemoteState.ReportTracker()
+    private(set) var tmuxReport: RemoteTmux.Report?
+    var onTmuxReport: ((RemoteTmux.Report) -> Void)?
+
+    func readTmuxReport() {
+        guard let report = host?.session?.remoteTmuxReport, report != tmuxReport else { return }
+        tmuxReport = report
+        onTmuxReport?(report)
+    }
 
     init(host: PaneRemoteHost? = nil) {
         self.host = host
@@ -57,6 +65,7 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
 
     /// A new session: no report has been seen from it.
     func reset() {
+        tmuxReport = nil
         reportTracker = PaneRemoteState.ReportTracker()
     }
 
@@ -98,6 +107,9 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
 
     /// What actually spawned, or the preset's command if the spawn failed.
     var reconnectCommand: (executable: String, arguments: [String])? {
+        if let preset = host?.preset, preset.remoteTmux != nil, let shell = preset.shell {
+            return (shell, preset.arguments)
+        }
         if let launchedCommand = host?.launchedCommand { return launchedCommand }
         guard let shell = host?.preset?.shell else { return nil }
         return (shell, host?.preset?.arguments ?? [])

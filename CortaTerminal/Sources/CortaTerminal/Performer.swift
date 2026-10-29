@@ -36,6 +36,7 @@ struct Performer: ParserPerformer, Sendable {
     /// The secret the pane's own zsh widget puts before each OSC 134
     /// report; nil believes none. Outside `state`, so a reset keeps it.
     var directoryCompletionToken: [UInt8]?
+    var remoteTmuxHandshake: RemoteTmux.Handshake?
 
     /// Large image transmissions stop the parse instead of decoding in it
     /// (`DeferredImageTransmission`); set only for the session's feed.

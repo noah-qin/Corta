@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 
 /// One grid panel: a rounded card holding a slim header and the terminal.
 ///
@@ -45,6 +46,7 @@ final class SpacePaneView: NSView {
     private let detailLabel = NSTextField(labelWithString: "")
     private let status = SpaceStatusPill()
     private let menuButton = NSButton()
+    private let sshButton = NSButton()
     private var isFocused = false
     private var isPointerInside = false
     private var isDropTarget = false
@@ -103,7 +105,12 @@ final class SpacePaneView: NSView {
     }
 
     private func layOut() {
-        let row = NSStackView(views: [icon, titleLabel, status, detailLabel, NSView(), menuButton])
+        sshButton.bezelStyle = .glass
+        sshButton.controlSize = .small
+        sshButton.target = self
+        sshButton.action = #selector(showSSHStatus)
+        sshButton.setAccessibilityIdentifier("Corta.Space.SSHStatus")
+        let row = NSStackView(views: [icon, titleLabel, status, sshButton, detailLabel, NSView(), menuButton])
         row.spacing = 8
         row.setCustomSpacing(10, after: status)
         for child in [card, header, terminalHost, row] as [NSView] {
@@ -166,6 +173,11 @@ final class SpacePaneView: NSView {
         titleLabel.textColor = isFocused ? .labelColor : .secondaryLabelColor
         detailLabel.stringValue = presentation.detail
         status.configure(text: presentation.state, tint: presentation.tint)
+        sshButton.isHidden = session.record.ssh == nil || session.record.retainSSH != true
+        let sshStatus = SpaceSSHStatus(session: session)
+        sshButton.title = sshStatus.title
+        sshButton.toolTip = sshStatus.detail
+        sshButton.setAccessibilityLabel(sshStatus.title + ". " + sshStatus.detail)
         applyOutline()
         setAccessibilityLabel([presentation.title, presentation.state].compactMap { $0 }.joined(separator: ", "))
     }
@@ -436,6 +448,10 @@ extension SpacePaneView {
             refill.target = self
             refill.isEnabled = space?.canFillConversation(session) == true
         }
+        if session.record.retainSSH == true {
+            menu.addItem(withTitle: L10n.text("space.ssh.kill.title"), action: #selector(endRemoteSession),
+                         keyEquivalent: "").target = self
+        }
         menu.addItem(.separator())
         // nil targets: the window's own commands, enabled as the menu bar's.
         menu.addItem(withTitle: L10n.text("space.arrange.columns"),
@@ -454,6 +470,17 @@ extension SpacePaneView {
 
     @objc private func toggleMaximize() { space?.toggleMaximize(session) }
     @objc private func hidePanel() { space?.hide(session) }
+    @objc private func endRemoteSession() { space?.endRemoteSession(session) }
+    @objc private func showSSHStatus() {
+        guard let window else { return }
+        let status = SpaceSSHStatus(session: session)
+        let alert = NSAlert()
+        alert.messageText = status.title
+        alert.informativeText = status.detail + "\n\n" + RemoteTmux(id: session.id).sessionName
+        alert.addButton(withTitle: L10n.text("common.close"))
+        alert.buttons.forEach { $0.bezelStyle = .glass }
+        alert.beginSheetModal(for: window)
+    }
     @objc private func endSession() { space?.endSession(session) }
     @objc private func rename() { space?.sidebar.beginRename(session) }
     @objc private func refillConversation() { space?.refillConversation(session) }

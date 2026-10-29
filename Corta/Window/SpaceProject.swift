@@ -21,7 +21,7 @@ import CortaTerminal
 /// opened this launch; before that the record says what to start.
 @MainActor
 final class SpaceSession {
-    let id = UUID()
+    var id: UUID { record.id }
     var record: SpaceSessionRecord
     var pane: ViewController?
     /// `CortaSpaceController.touch` order: the grid replaces the lowest.

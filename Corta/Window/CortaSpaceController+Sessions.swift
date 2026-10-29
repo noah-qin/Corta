@@ -52,15 +52,17 @@ extension CortaSpaceController {
         let configured = preset.flatMap { preset in
             ConfigurationStore.shared.configuration.presets.contains { $0.name == preset.name } ? preset.name : nil
         }
-        let record = SpaceSessionRecord(
+        var record = SpaceSessionRecord(
             number: project.nextNumber,
             directory: preset?.connectTarget == nil ? (directory ?? project.path) : nil,
             presetName: preset?.connectTarget == nil ? configured : nil,
             ssh: preset?.connectTarget)
+        record.retainSSH = preset?.connectTarget != nil && preset?.retainSSH == true
         project.nextNumber += 1
         let session = SpaceSession(record: record)
         touch(session)
         project.sessions.append(session)
+        if record.retainSSH == true { saveNow() }
         if project.maximized != nil { setMaximized(nil, in: project) }
         let placement = automaticPlacement(in: project)
         spawn(session, in: project, panelSize: plannedSize(of: placement, in: project), preset: preset)
@@ -187,6 +189,13 @@ extension CortaSpaceController {
     /// Ends the session, asking first if a program is running in it.
     func endSession(_ session: SpaceSession) {
         guard let host else { return }
+        if session.record.retainSSH == true {
+            confirmRetainedRemoval([session]) { [weak self, weak session] in
+                guard let session else { return }
+                self?.remove(session)
+            }
+            return
+        }
         guard let pane = session.pane else {
             remove(session)
             return
@@ -203,7 +212,12 @@ extension CortaSpaceController {
     /// The pane's session is over (its shell exited and was closed).
     func removeSession(_ pane: ViewController) {
         guard let (_, session) = session(for: pane) else { return }
-        remove(session)
+        if session.record.retainSSH == true {
+            confirmRetainedRemoval([session]) { [weak self, weak session] in
+                guard let session else { return }
+                self?.remove(session)
+            }
+        } else { remove(session) }
     }
 
     private func remove(_ session: SpaceSession) {
@@ -236,11 +250,14 @@ extension CortaSpaceController {
     func spawn(_ session: SpaceSession, in project: SpaceProject, panelSize: CGSize, preset: Preset? = nil) {
         guard let host, session.pane == nil else { return }
         let record = session.record
-        let resolved = preset
-            ?? record.ssh.map(SSHDestination.preset(for:))
+        var resolved = record.ssh.map { target in
+            makeSSHPreset(target, record.retainSSH == true ? RemoteTmux(id: record.id) : nil)
+        }
+            ?? preset
             ?? record.presetName.flatMap { name in
                 ConfigurationStore.shared.configuration.presets.first { $0.name == name }
             }
+        resolved?.tmuxPreviouslyEstablished = record.tmuxEstablished == true
         let template = host.focusedPane ?? host.panes.first
         let terminalSize = CGSize(width: panelSize.width, height: panelSize.height - SpacePaneView.headerHeight)
         let grid = terminalSize.width > 0 && terminalSize.height > 0
@@ -254,5 +271,11 @@ extension CortaSpaceController {
             pane.isFontSizeZoomed = template.isFontSizeZoomed
         }
         session.pane = pane
+        pane.remote.onTmuxReport = { [weak self, weak session] report in
+            guard let self, let session else { return }
+            if report.established { session.record.tmuxEstablished = true }
+            self.refreshNow()
+            self.scheduleSave()
+        }
     }
 }

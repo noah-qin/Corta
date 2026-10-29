@@ -46,6 +46,7 @@ extension Performer {
         case 2: state.windowTitle = text()
         case 7: setWorkingDirectory(payload)
         case 7501: programStatus(payload)
+        case 6973: remoteTmuxHandshake?.receive(payload)
         case 9: conEmu(payload)
         case 633: vscodeIntegration(payload)
         case 1337: itermExtension(payload)

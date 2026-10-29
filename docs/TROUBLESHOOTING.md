@@ -290,6 +290,32 @@ the badge reads. A `tmux` or `screen` in the foreground reads *Remote?*
 because the session it is attached to may itself be on another machine
 and nothing here can tell — it is uncertainty, not an accusation.
 
+### Space SSH says recovery is limited, or starts a new terminal
+
+Click the panel's glass connection button for details. **Remote tmux was not
+detected** means it was absent from sshd's PATH, not necessarily uninstalled.
+The connection does not source remote shell startup scripts; putting tmux only
+in `.zshrc` is insufficient. Put it on that PATH and reconnect. A different
+**tmux failed** result includes a bounded remote error and exit status, then
+provides an ordinary login shell. A successful manual detach ends SSH without
+starting another shell. Authentication cancellation or a network failure does
+not establish or destroy a tmux session automatically.
+
+**Original session ended · New terminal** means an earlier established UUID
+no longer existed. Server restarts, ending the session and `destroy-unattached
+on` lose the original programs; Corta cannot recover them and does not change
+your tmux settings. History is limited by the server's tmux configuration.
+Two clients using the same UUID share the terminal and compete over its size.
+Without `allow-passthrough`, program-state and directory reports may be blocked;
+Corta does not promise unverified tmux status integration or enable it globally.
+
+Retention applies only to Space SSH created with **Keep running after
+disconnect** enabled. Disable it for ordinary SSH. Closing/removing local
+panels or projects never kills remote tmux. If an abandoned session consumes
+resources, connect to the same host and run the exact `tmux kill-session -t
+'=corta-<UUID>'` shown by its connection details/removal warning. **End Remote
+Session…** confirms this separately and never runs `kill-server`.
+
 ### Browse Remote Files… says authentication failed, but `ssh` works in the pane
 
 The SFTP connection asks for a password or a key passphrase in a dialog

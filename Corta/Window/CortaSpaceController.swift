@@ -36,6 +36,8 @@ final class CortaSpaceController: NSObject {
     private(set) static weak var owner: CortaSpaceController?
 
     weak var host: SplitViewController?
+    /// Transport construction is injectable for isolated SSH tests, never configuration.
+    var makeSSHPreset: (SSHTarget, RemoteTmux?) -> Preset = { SSHDestination.preset(for: $0, retaining: $1) }
     private(set) var isActive = false
     private(set) var projects: [SpaceProject] = []
     private(set) var selectedProject: SpaceProject?
@@ -247,8 +249,21 @@ final class CortaSpaceController: NSObject {
     /// Ends the project's sessions — asking first if any is busy — and
     /// forgets it.
     func removeProject(_ project: SpaceProject) {
+        guard host != nil else { return }
+        if project.sessions.contains(where: { $0.record.retainSSH == true }) {
+            confirmRetainedRemoval(project.sessions) { [weak self, weak project] in
+                guard let project else { return }
+                self?.removeProjectAfterRetentionWarning(project)
+            }
+        } else {
+            removeProjectAfterRetentionWarning(project)
+        }
+    }
+
+    private func removeProjectAfterRetentionWarning(_ project: SpaceProject) {
         guard let host else { return }
-        let running = project.sessions.compactMap(\.pane).filter { $0.session?.hasForegroundJob == true }
+        let running = project.sessions.filter { $0.record.retainSSH != true }.compactMap(\.pane)
+            .filter { $0.session?.hasForegroundJob == true }
         let scope = L10n.text("close.scope.project")
         host.confirmClose(of: running, scope: scope, in: host.toolbarWindow) { [weak self, weak project] confirmed in
             guard confirmed, let self, let project else { return }

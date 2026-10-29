@@ -12,6 +12,14 @@ Versioning for compatibility changes.
 
 ### Added
 
+- Space SSH can keep remote programs running through an existing remote tmux,
+  enabled by default per connection and independently identified by persistent
+  UUIDs. Reconnect reattaches, ordinary close/removal preserves remote sessions,
+  and a separate confirmed action ends only the selected remote session.
+  Glass connection details distinguish missing/broken tmux, limited ordinary
+  SSH and a lost session replaced by a new terminal. Traditional/preset/typed
+  SSH and SFTP are unchanged; no remote rc or global tmux config is changed.
+
 - Space remembers each local Claude/Codex pane's conversation kind and UUID.
   Reopening a project fills that pane's exact resume command into an empty
   integrated shell prompt; Return remains yours to press. A brief glass note

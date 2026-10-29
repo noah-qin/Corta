@@ -546,6 +546,43 @@ the host/control-character checks above. A promised file captures its source
 folder and connection generation at drag start; replacing the connection
 invalidates a delayed request.
 
+**Space SSH retention (#434).** Only the Space connect dialog's enabled
+retention choice authorizes the fixed remote wrapper. System OpenSSH still
+owns aliases, users, ports, identity files, ProxyJump, host verification and
+authentication. It allocates a tty (`-t`). Typed/nested SSH, presets, SFTP and
+traditional mode are unchanged. No command is read from a project or saved to
+disk. `space.json` stores standard UUIDs, target and booleans only. Malformed,
+missing or duplicate identities are replaced and persisted with the old
+established flag cleared, never connected under their invalid names. UUID
+values are canonically rendered and shell-quoted; display names are never
+command parameters. No rc is explicitly sourced and no configuration is changed.
+
+One SSH runs a fixed `/bin/sh` wrapper: `new-session -dP` atomically attempts
+creation; on failure, exact `has-session` can establish that the same name
+already exists; `attach-session` targets that exact name. A disappearance
+between preparation and attachment fails rather than silently recreating a
+supposedly recovered session. The parent waits for tmux: zero exits SSH;
+nonzero records failure then execs the ordinary login shell. HUP/TERM exit the
+wrapper without fallback. This deliberate supervision replaces #434's original
+`exec tmux new-session -A` shape so failures can be handled truthfully.
+
+OSC 6973 is display-only and armed only before this connection's reader starts,
+with a fresh random UUID token each time. It accepts one `start` enum
+(`missing`, `new`, `attached`), plus at most one `fail` with exit status 1–255
+and at most 1,024 hex-encoded error bytes. Missing/failure closes the handshake;
+RIS cannot rearm it. Startup and later failure are separate, as approved for
+#434. Errors drop controls/concealing scalars; the parser's 4,096-byte OSC cap
+also applies. One report is retained per pane, no text is echoed to input or
+used to launch commands. A hostile remote host can forge its own displayed
+result if it reads the token; it gains no new execution capability.
+
+Ordinary close/removal only tears down local SSH. Removal warns about remote
+resource use and gives exact manual cleanup names. **End Remote Session…**
+is separately confirmed with host and UUID in view; its entire remote command
+is `tmux kill-session -t '=corta-<UUID>'`, never `kill-server`. A separate terminal
+shows authentication and success/failure. This grants no authority over another
+session or a remote agent's exit protocol.
+
 **Local conversation identity (#436).** A Space record may also hold only
 `conversation.kind` (`claude` or `codex`) and `conversation.id` (a standard
 UUID). No transcript, session-file path, executable path or whole command is

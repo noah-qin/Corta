@@ -20,6 +20,13 @@ import Synchronization
 
 /// What the terminal reports about itself: modes, colours, titles, directories and command records. Any thread.
 extension TerminalSession {
+    /// Install before `start()`, so no startup bytes can beat the expectation.
+    public func expectRemoteTmux(token: UUID) {
+        state.withLock { $0.terminal.expectRemoteTmux(token: token) }
+    }
+
+    public var remoteTmuxReport: RemoteTmux.Report? { state.withLock { $0.terminal.remoteTmuxReport } }
+
     /// Without a full `snapshot()`; read on every scroll and output batch.
     public var scrollbackTotalPushed: Int {
         registerStateWaiter { state.withLock { $0.terminal.grid.scrollback.totalPushed } }

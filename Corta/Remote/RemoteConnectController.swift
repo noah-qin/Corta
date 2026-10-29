@@ -15,15 +15,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 import SwiftUI
 
 /// A user-entered destination becomes argv for system OpenSSH, never shell text.
 nonisolated enum SSHDestination {
-    static func preset(for target: SSHTarget) -> Preset {
+    static func preset(for target: SSHTarget, retaining tmux: RemoteTmux? = nil) -> Preset {
         var preset = Preset(name: target.displayName)
         preset.shell = "/usr/bin/ssh"
         preset.arguments = target.sshArguments
         preset.connectTarget = target
+        preset.remoteTmux = tmux
+        if let tmux { preset.arguments = target.sshOptions + ["-t", "--", target.host, tmux.command] }
         return preset
     }
 }
@@ -95,6 +98,7 @@ final class RemoteConnectController: NSWindowController {
     ///   - mode: the initially selected connection destination.
     ///   - sender: the control or menu item opening the dialog.
     ///   - paneFiles: the focused pane's host, when it is remote.
+    ///   - sessionDestination: receives the preset when opening a session in Space.
     func show(
         _ mode: RemoteConnectMode, sender: Any?, paneFiles: RemoteConnectPaneFiles? = nil,
         sessionDestination: ((Preset) -> Void)? = nil
@@ -108,6 +112,7 @@ final class RemoteConnectController: NSWindowController {
         // connection nobody asked for.
         self.sessionDestination = sessionDestination
         draft.reset(mode: mode, paneFiles: paneFiles)
+        draft.isSpace = sessionDestination != nil
         window.title = L10n.text("ui.connect.title")
         if let parent = NSApp.keyWindow ?? NSApp.mainWindow, parent.isVisible,
             parent.attachedSheet == nil, !(parent is NSPanel)
@@ -147,13 +152,15 @@ final class RemoteConnectController: NSWindowController {
         case .success(let value): target = value
         case .failure(let problem): return problem
         }
+        let retainSSH = draft.isSpace && draft.retainSSH
         let destination = sessionDestination
         close()
         switch mode {
         case .ssh:
             // Recorded once the connection is established, by the pane
             // (`PaneRemote.watchForEstablishedConnection`).
-            let preset = SSHDestination.preset(for: target)
+            var preset = SSHDestination.preset(for: target)
+            preset.retainSSH = retainSSH
             if let destination { destination(preset) } else {
                 (NSApp.delegate as? AppDelegate)?.launchPreset(preset, inNewWindow: true)
             }
@@ -169,6 +176,8 @@ final class RemoteConnectController: NSWindowController {
 /// showing starts empty.
 @MainActor @Observable
 final class RemoteConnectDraft {
+    var isSpace = false
+    var retainSSH = true
     var mode: RemoteConnectMode = .ssh
     var fields = SSHTargetFields()
     var problem: SSHTarget.Problem?
@@ -180,6 +189,7 @@ final class RemoteConnectDraft {
     var generation = 0
 
     func reset(mode: RemoteConnectMode, paneFiles: RemoteConnectPaneFiles? = nil) {
+        retainSSH = true
         self.mode = mode
         self.paneFiles = paneFiles
         fields = SSHTargetFields()
@@ -199,6 +209,7 @@ private struct RemoteConnectSheet: View {
             RemoteConnectForm(
                 mode: draft.mode, modeSelection: $draft.mode, fields: $draft.fields,
                 paneFiles: draft.paneFiles,
+                retainSSH: draft.isSpace && draft.mode == .ssh ? $draft.retainSSH : nil,
                 error: draft.problem.map(RemoteConnectForm.message),
                 focusGeneration: draft.generation,
                 onCancel: { RemoteConnectController.shared.close() },

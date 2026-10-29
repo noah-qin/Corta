@@ -37820,6 +37820,1068 @@
         }
       }
     },
+    "space.ssh.starting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux wird gestartet…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starting tmux…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Iniciando tmux…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Démarrage de tmux…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux を開始中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux 시작 중…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Iniciando tmux…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "正在新建 tmux…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "正在新建 tmux…"
+          }
+        }
+      }
+    },
+    "space.ssh.attaching" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Wird wieder verbunden…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Will reattach…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Se volverá a conectar…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Rattachement prévu…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "再接続予定…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "다시 연결할 예정…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Reconexão prevista…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "将要接入…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "將要接入…"
+          }
+        }
+      }
+    },
+    "space.ssh.pending.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dieses Projekt verbindet sich erst beim ersten Öffnen. Corta prüft, ob die entfernte tmux-Sitzung noch besteht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This project connects only when first opened. Corta will check whether its remote tmux session still exists."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Este proyecto se conecta solo al abrirlo por primera vez. Corta comprobará si su sesión tmux remota sigue existiendo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ce projet se connecte uniquement à sa première ouverture. Corta vérifiera si sa session tmux distante existe encore."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "このプロジェクトは初めて開いたときだけ接続します。Corta はリモートの tmux セッションが残っているか確認します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "이 프로젝트를 처음 열 때만 연결합니다. Corta가 원격 tmux 세션이 남아 있는지 확인합니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Este projeto só se conecta ao ser aberto pela primeira vez. O Corta verificará se a sessão tmux remota ainda existe."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "本项目只在首次打开时连接。Corta 将检查原远端 tmux 会话是否仍存在。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "本專案只在首次開啟時連線。Corta 將檢查原遠端 tmux 工作階段是否仍存在。"
+          }
+        }
+      }
+    },
+    "space.ssh.ready" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux · Wiederverbindbar"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tmux · Reconnectable"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux · Se puede reconectar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux · Reconnexion possible"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux · 再接続可能"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux · 재연결 가능"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux · Reconexão disponível"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux · 可重连"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux · 可重新連線"
+          }
+        }
+      }
+    },
+    "space.ssh.ready.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Die Programme dieser entfernten tmux-Sitzung laufen nach einer SSH-Trennung, dem Schließen des Bereichs oder Fensters und dem Beenden von Corta weiter. Bildschirm und Verlauf bleiben auf dem Server und unterliegen dessen tmux-Einstellungen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This remote tmux session keeps its programs running after SSH disconnects, the panel or window closes, or Corta quits. Its screen and history live on the server, subject to remote tmux settings."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Los programas de esta sesión tmux remota siguen activos tras desconectar SSH, cerrar el panel o la ventana, o salir de Corta. La pantalla y el historial permanecen en el servidor según sus ajustes de tmux."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les programmes de cette session tmux distante continuent après une déconnexion SSH, la fermeture du panneau ou de la fenêtre, ou l’arrêt de Corta. L’écran et l’historique restent sur le serveur selon ses réglages tmux."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "このリモート tmux セッション内のプログラムは、SSH の切断、パネルやウインドウの閉鎖、Corta の終了後も動作します。画面と履歴はサーバーに保持され、リモートの tmux 設定に従います。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "이 원격 tmux 세션의 프로그램은 SSH 연결 해제, 패널이나 윈도우 닫기, Corta 종료 후에도 실행됩니다. 화면과 기록은 서버에 남으며 원격 tmux 설정의 제한을 받습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Os programas desta sessão tmux remota continuam após desconectar o SSH, fechar o painel ou a janela, ou sair do Corta. A tela e o histórico ficam no servidor, sujeitos às configurações remotas do tmux."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "此远端 tmux 会话在 SSH 断线、关闭面板或窗口、退出 Corta 后保留其中的程序。屏幕与历史由远端维护，历史长度受远端 tmux 配置约束。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "此遠端 tmux 工作階段在 SSH 中斷、關閉面板或視窗、結束 Corta 後保留其中的程式。畫面與歷史由遠端維護，歷史長度受遠端 tmux 設定約束。"
+          }
+        }
+      }
+    },
+    "space.ssh.replaced" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ursprüngliche Sitzung beendet · Neues Terminal"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original session ended · New terminal"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Sesión original finalizada · Terminal nuevo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Session initiale terminée · Nouveau terminal"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "元のセッションは終了 · 新規ターミナル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "원래 세션 종료 · 새 터미널"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Sessão original encerrada · Novo terminal"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "原会话已结束，已新建终端"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "原工作階段已結束，已新建終端"
+          }
+        }
+      }
+    },
+    "space.ssh.replaced.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Die bisherige entfernte tmux-Sitzung besteht nicht mehr. Ein neues Terminal wurde erstellt; die ursprünglichen Programme wurden nicht wiederhergestellt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The previous remote tmux session no longer exists. A new terminal was created; the original programs were not restored."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "La sesión tmux remota anterior ya no existe. Se ha creado un terminal nuevo; los programas originales no se han restaurado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "La session tmux distante précédente n’existe plus. Un nouveau terminal a été créé ; les programmes initiaux n’ont pas été restaurés."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "以前のリモート tmux セッションは存在しません。新しいターミナルを作成しました。元のプログラムは復元されていません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "이전 원격 tmux 세션이 더 이상 존재하지 않습니다. 새 터미널을 만들었으며 원래 프로그램은 복원되지 않았습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "A sessão tmux remota anterior não existe mais. Um novo terminal foi criado; os programas originais não foram restaurados."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "原远端 tmux 会话已不存在，已新建终端；原来运行的程序未恢复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "原遠端 tmux 工作階段已不存在，已新建終端；原來執行的程式未復原。"
+          }
+        }
+      }
+    },
+    "space.ssh.missing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Normales SSH · Eingeschränkte Wiederherstellung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordinary SSH · Limited recovery"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "SSH normal · Recuperación limitada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "SSH ordinaire · Restauration limitée"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "通常の SSH · 復元に制限"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "일반 SSH · 복원 제한"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "SSH comum · Recuperação limitada"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "普通 SSH · 恢复受限"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "一般 SSH · 復原受限"
+          }
+        }
+      }
+    },
+    "space.ssh.missing.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Auf dem entfernten Rechner wurde tmux nicht erkannt. Normales SSH wird verwendet; laufende Programme lassen sich nach einer Trennung möglicherweise nicht wiederherstellen. Die Verbindung lädt keine Shell-Startskripte. Falls tmux außerhalb des von sshd bereitgestellten PATH installiert ist, fügen Sie es diesem PATH hinzu und verbinden Sie erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remote tmux was not detected. This is ordinary SSH; running programs may not be recoverable after disconnecting. The connection does not source remote shell startup scripts. If tmux is installed outside the PATH supplied by sshd, add it to that PATH and reconnect."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "No se ha detectado tmux en el equipo remoto. Se usa SSH normal; quizá no se puedan recuperar los programas tras desconectar. La conexión no carga scripts de inicio del shell. Si tmux está instalado fuera del PATH proporcionado por sshd, añádalo a ese PATH y vuelva a conectar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux n’a pas été détecté sur l’hôte distant. SSH ordinaire est utilisé ; les programmes actifs peuvent être irrécupérables après une déconnexion. La connexion ne charge pas les scripts de démarrage du shell. Si tmux est installé hors du PATH fourni par sshd, ajoutez-le à ce PATH puis reconnectez-vous."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "リモートで tmux が検出されませんでした。通常の SSH を使用します。切断後、実行中のプログラムを復元できない場合があります。接続時にシェルの起動スクリプトは読み込みません。tmux が sshd の PATH 外にある場合、その PATH に追加して再接続してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "원격에서 tmux를 감지하지 못했습니다. 일반 SSH를 사용하며 연결 해제 후 실행 중인 프로그램을 복원하지 못할 수 있습니다. 연결은 셸 시작 스크립트를 읽지 않습니다. tmux가 sshd에서 제공하는 PATH 밖에 설치되어 있다면 해당 PATH에 추가한 후 다시 연결하십시오."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "O tmux não foi detectado no host remoto. O SSH comum está em uso; programas ativos podem não ser recuperados após a desconexão. A conexão não carrega scripts de inicialização do shell. Se o tmux estiver instalado fora do PATH fornecido pelo sshd, adicione-o a esse PATH e reconecte."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "远端未检测到 tmux，当前使用普通 SSH。断线后可能无法恢复正在运行的程序。连接不会读取远端的 shell 启动脚本；若 tmux 已安装但不在 sshd 提供的 PATH 上，请把它放到该 PATH 之后重新连接。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "遠端未偵測到 tmux，目前使用一般 SSH。中斷後可能無法復原正在執行的程式。連線不會讀取遠端 Shell 啟動指令碼；若 tmux 已安裝但不在 sshd 提供的 PATH 上，請將它放到該 PATH 後重新連線。"
+          }
+        }
+      }
+    },
+    "space.ssh.failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux fehlgeschlagen · Normales SSH"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tmux failed · Ordinary SSH"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Error de tmux · SSH normal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Échec de tmux · SSH ordinaire"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux の失敗 · 通常の SSH"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux 실패 · 일반 SSH"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Falha no tmux · SSH comum"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux 失败 · 普通 SSH"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux 失敗 · 一般 SSH"
+          }
+        }
+      }
+    },
+    "space.ssh.failed.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Erstellen oder Verbinden der tmux-Sitzung fehlgeschlagen (Exit-Status %lld). Eine normale Login-Shell wird verwendet; die Wiederherstellung ist eingeschränkt. Entfernter Fehler:"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tmux creation or attachment failed (exit status %lld). Using an ordinary login shell; recovery is limited. Remote error:"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ha fallado la creación o conexión de tmux (código de salida %lld). Se usa un shell de inicio de sesión normal; la recuperación es limitada. Error remoto:"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "La création ou le rattachement tmux a échoué (code de sortie %lld). Un shell de connexion ordinaire est utilisé ; la restauration est limitée. Erreur distante :"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux の作成または接続に失敗しました（終了コード %lld）。通常のログインシェルを使用し、復元には制限があります。リモートエラー："
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux 생성 또는 연결에 실패했습니다(종료 코드 %lld). 일반 로그인 셸을 사용하며 복원이 제한됩니다. 원격 오류:"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Falha ao criar ou conectar o tmux (código de saída %lld). Um shell de login comum está em uso; a recuperação é limitada. Erro remoto:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux 创建或接入失败（退出码 %lld），已降级到普通登录 Shell，恢复受限。远端错误："
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux 建立或接入失敗（結束代碼 %lld），已降級至一般登入 Shell，復原受限。遠端錯誤："
+          }
+        }
+      }
+    },
+    "space.ssh.remove.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Entfernte Sitzung weiterlaufen lassen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep the remote session running?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "¿Mantener activa la sesión remota?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Garder la session distante active ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "リモートセッションを維持しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "원격 세션을 계속 실행할까요?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Manter a sessão remota ativa?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "保留远端会话并移除本地记录？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "保留遠端工作階段並移除本機記錄？"
+          }
+        }
+      }
+    },
+    "space.ssh.remove.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Das Entfernen des lokalen Eintrags oder Projekts trennt nur SSH. Die entfernte tmux-Sitzung kann weiterhin Ressourcen verbrauchen. Verbinden Sie sich später mit demselben Rechner und führen Sie den passenden Befehl unten aus, um sie zu beenden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removing the local session or project only disconnects SSH. Its remote tmux session may continue consuming resources. To stop it later, connect to the same host and run the matching command below."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Eliminar el registro local o el proyecto solo desconecta SSH. La sesión tmux remota puede seguir consumiendo recursos. Para detenerla después, conéctese al mismo equipo y ejecute el comando correspondiente de abajo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Supprimer l’entrée locale ou le projet déconnecte seulement SSH. La session tmux distante peut continuer à consommer des ressources. Pour l’arrêter ensuite, connectez-vous au même hôte et exécutez la commande correspondante ci-dessous."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "ローカルの記録やプロジェクトを削除しても SSH を切断するだけです。リモートの tmux はリソースを消費し続ける場合があります。後で終了するには、同じホストに接続して下の対応するコマンドを実行してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "로컬 기록이나 프로젝트를 제거하면 SSH만 연결 해제됩니다. 원격 tmux 세션은 계속 리소스를 사용할 수 있습니다. 나중에 종료하려면 같은 호스트에 연결하여 아래의 해당 명령을 실행하십시오."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Remover o registro local ou o projeto apenas desconecta o SSH. A sessão tmux remota pode continuar consumindo recursos. Para encerrá-la depois, conecte-se ao mesmo host e execute o comando correspondente abaixo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "移除本地会话或项目只断开 SSH，远端 tmux 可能继续占用资源。之后如需清理，请连接相同主机并执行对应的以下命令。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "移除本機工作階段或專案只會中斷 SSH，遠端 tmux 可能繼續佔用資源。之後如需清理，請連線至相同主機並執行下方對應的指令。"
+          }
+        }
+      }
+    },
+    "space.ssh.remove.button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Lokalen Eintrag entfernen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Local Record"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Eliminar registro local"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Supprimer l’entrée locale"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "ローカル記録を削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "로컬 기록 제거"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Remover registro local"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "移除本地记录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "移除本機記錄"
+          }
+        }
+      }
+    },
+    "space.ssh.kill.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Entfernte Sitzung beenden…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End Remote Session…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Finalizar sesión remota…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Terminer la session distante…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "リモートセッションを終了…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "원격 세션 종료…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Encerrar sessão remota…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "结束远端会话…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "結束遠端工作階段…"
+          }
+        }
+      }
+    },
+    "space.ssh.kill.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dies beendet alle Programme in dieser einen entfernten tmux-Sitzung. Corta führt nur kill-session für den obigen Namen aus, niemals kill-server. Ein neues Terminal zeigt SSH-Anmeldung und Ergebnis."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This terminates every program in this one remote tmux session. Corta will run only kill-session for the name above, never kill-server. A new terminal shows SSH authentication and the result."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Esto termina todos los programas de esta única sesión tmux remota. Corta solo ejecuta kill-session para el nombre indicado, nunca kill-server. Un terminal nuevo muestra la autenticación SSH y el resultado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ceci termine tous les programmes de cette seule session tmux distante. Corta exécute uniquement kill-session pour le nom ci-dessus, jamais kill-server. Un nouveau terminal affiche l’authentification SSH et le résultat."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "この一つのリモート tmux セッション内の全プログラムを終了します。Corta は上記の名前に対して kill-session のみを実行し、kill-server は実行しません。新しいターミナルに SSH 認証と結果を表示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "이 원격 tmux 세션 하나에 있는 모든 프로그램을 종료합니다. Corta는 위 이름에 대해 kill-session만 실행하며 kill-server는 실행하지 않습니다. 새 터미널에서 SSH 인증 및 결과를 표시합니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Isso encerra todos os programas desta única sessão tmux remota. O Corta executa apenas kill-session para o nome acima, nunca kill-server. Um novo terminal mostra a autenticação SSH e o resultado."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "这会终止上述这一条远端 tmux 会话中的所有程序。Corta 只对该名字执行 kill-session，绝不执行 kill-server。新终端会显示 SSH 认证过程和结果。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "這會終止上述這一條遠端 tmux 工作階段中的所有程式。Corta 只對該名稱執行 kill-session，絕不執行 kill-server。新終端會顯示 SSH 認證過程和結果。"
+          }
+        }
+      }
+    },
+    "space.ssh.kill.button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Entfernte Sitzung beenden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End Remote Session"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Finalizar sesión remota"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Terminer la session distante"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "リモートセッションを終了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "원격 세션 종료"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Encerrar sessão remota"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "结束远端会话"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "結束遠端工作階段"
+          }
+        }
+      }
+    },
+    "space.ssh.retain" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nach Trennung weiterlaufen lassen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep running after disconnect"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Conservar tras desconectar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Conserver après déconnexion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "切断後も保持"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "연결 해제 후 유지"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Manter após desconectar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "断线后保留"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "斷線後保留"
+          }
+        }
+      }
+    },
     "space.state.ended" : {
       "extractionState" : "manual",
       "localizations" : {

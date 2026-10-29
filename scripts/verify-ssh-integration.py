@@ -15,6 +15,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import argparse
 import os
 import pathlib
 import pwd
@@ -38,7 +39,7 @@ def wait_for_listener(port, proc, timeout):
     return False
 
 
-def run_fixture(root):
+def run_fixture(root, app_tests=False, xcodebuild_args=()):
     proc = None
     log = None
     try:
@@ -75,7 +76,21 @@ def run_fixture(root):
         (root/'bare.conf').write_text(f'Host *\n IdentityAgent none\n ForwardAgent no\n BatchMode yes\n StrictHostKeyChecking yes\n UserKnownHostsFile {root}/known_hosts\n GlobalKnownHostsFile /dev/null\n ConnectTimeout 3\n')
         env = dict(os.environ, CORTA_SSH_TEST_ROOT=str(root), CORTA_SSH_TEST_PORT=str(port),
                    SSH_AUTH_SOCK='', CORTA_TEST_TIMEOUT_SCALE='3')
-        result = subprocess.run(['swift', 'test', '--package-path', 'CortaTerminal', '--filter', 'SFTPSSHIntegrationTests'], env=env)
+        tmux = shutil.which('tmux')
+        if tmux:
+            env['CORTA_TMUX_TEST_EXECUTABLE'] = tmux
+        else:
+            print('tmux lifecycle checks unavailable: no installed tmux (not installed by this fixture)')
+        result = subprocess.run(['swift', 'test', '--package-path', 'CortaTerminal', '--filter', 'SSHIntegrationTests'], env=env)
+        if result.returncode == 0 and app_tests:
+            app_env = dict(env)
+            for key in ('CORTA_SSH_TEST_ROOT', 'CORTA_SSH_TEST_PORT',
+                        'CORTA_TMUX_TEST_EXECUTABLE', 'CORTA_TEST_TIMEOUT_SCALE'):
+                if key in env:
+                    app_env['TEST_RUNNER_' + key] = env[key]
+            result = subprocess.run(['xcodebuild', 'test', '-project', 'Corta.xcodeproj',
+                '-scheme', 'Corta', '-testPlan', 'Unit', '-destination', 'platform=macOS',
+                '-only-testing:CortaTests/CortaSpaceSSHIntegrationTests', *xcodebuild_args], env=app_env)
         if result.returncode:
             log.flush()
             print((root / 'sshd.log').read_text())
@@ -94,5 +109,12 @@ def run_fixture(root):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--app', action='store_true', help='also verify Space windows through the app test host')
+    parser.add_argument('xcodebuild_args', nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+    build_args = args.xcodebuild_args
+    if build_args[:1] == ['--']:
+        build_args = build_args[1:]
     fixture_root = pathlib.Path(tempfile.mkdtemp(prefix='corta-ssh-fixture-', dir='/private/tmp'))
-    raise SystemExit(run_fixture(fixture_root))
+    raise SystemExit(run_fixture(fixture_root, args.app, build_args))

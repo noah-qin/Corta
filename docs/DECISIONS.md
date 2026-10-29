@@ -182,6 +182,16 @@ not a feature. Automation that *runs commands* — a "run this" intent or
 URL — is likewise out: open/focus intents ship, execution does not
 (`SECURITY.md` §4.6).
 
+**Space SSH exception (#434).** When the user connects with retention on,
+Corta may run its fixed remote tmux wrapper, rebuilt from a validated UUID
+and the SSH destination. It never reads a command from a restore file, uses
+no tmux control mode and provides no local multiplexer or daemon. A separate
+confirmed action may kill only that named remote session. The wrapper waits
+for the tmux client so exit status 0 (normal detach) ends SSH while nonzero
+can report failure and fall back to a login shell. Atomic detached creation,
+exact existence checks on collisions and exact attachment provide truthful
+new/attached results; it does not use tmux control mode or a local daemon.
+
 ## D10 — One config file is the only settings store
 
 **Decision.** `~/.config/corta/config` holds every setting;
@@ -822,7 +832,7 @@ sets `auto_updates true` so `brew upgrade` leaves updates to Sparkle, and
 **Decision.** Space shows project folders and their sessions in a sidebar
 and up to six of them in a free split grid. It is a mode of an ordinary terminal
 window: every session is a pane of that window, as a split's is, and it
-ends when the window closes. The terminal mode's split tree is kept whole
+ends locally when the window closes. The terminal mode's split tree is kept whole
 while Space shows and the reverse; switching changes what is on screen and
 the window's frame — Space takes the screen's visible frame, and the
 terminal mode gets its own back, so its shells return at the size they
@@ -833,16 +843,21 @@ the folders and, for each, its sessions' directories, preset names or SSH
 destinations, the user's names for them, and the grid's split tree, in
 `Application Support/space.json` (`CONFIGURATION.md` §8). A restored
 session is a fresh shell, the configured preset, or the same SSH
-connection. For local Claude and Codex, Corta remembers only the kind and the standard
+connection. A Space SSH created through the connect dialog with retention
+on may reattach to its own `corta-<UUID>` session on an existing remote tmux.
+Closing the window or quitting ends only the local ssh; tmux owns the remote
+processes, screen and history. The saved record holds its UUID and whether
+tmux was established, never a command. Nothing connects before the project
+is first opened, including its off-grid sessions. For local Claude and Codex, Corta remembers only the kind and the standard
 UUID in a session file opened by that pane's foreground process. On the
 project's first opening next launch it fills `claude --resume <UUID>` or
 `codex resume <UUID>` into an empty integrated shell prompt; only the user's
 Return executes it. Missing or invalid identities leave an ordinary shell.
 Local agents never use tmux.
 
-**Why.** Keeping the processes alive past their window, to attach to again,
-is the multiplexer D09 rules out; a list of what to start again is the
-part of it a project view needs. One Space, not one per window, so a
+**Why.** Keeping local processes alive past their window remains the
+multiplexer D09 rules out. Remote tmux retention delegates that lifetime
+to the remote host under the connection choice; Corta owns no daemon. One Space, not one per window, so a
 folder cannot be open twice with two sets of sessions. Nothing is read from
 or written to the project folder: a folder may come from anyone's
 repository, and a file there naming sessions would be a way to make Corta
@@ -858,8 +873,8 @@ minimum and a larger one would hold more than a person reads at once. A tiled
 grid shares one axis, so columns (own heights) and rows (own widths) are a
 choice the user makes, not one the grid makes for them.
 
-**What it costs.** Quitting ends Space's sessions like any other pane's;
-their scrollback is not restored. A session cannot move to another window.
+**What it costs.** Quitting ends Space's local children; remote retained
+processes may continue consuming resources. Local scrollback is not restored. A session cannot move to another window.
 
 **Consequence.** Reopen with a design for sessions that outlive a window
 that does not reopen D09, or with a measured case where 64 × 18 breaks a

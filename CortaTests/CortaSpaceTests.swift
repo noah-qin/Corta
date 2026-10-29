@@ -95,6 +95,43 @@ struct SpaceGridTests {
         #expect(valid.nextNumber == 33)
     }
 
+    @Test func savedIdentitiesMigrateAndRejectShellTextAndDuplicates() throws {
+        let legacy = #"{"number":1,"ssh":{"host":"fixture"},"retainSSH":true}"#
+        let migrated = try JSONDecoder().decode(SpaceSessionRecord.self, from: Data(legacy.utf8))
+        let saved = try JSONEncoder().encode(migrated)
+        let again = try JSONDecoder().decode(SpaceSessionRecord.self, from: saved)
+        #expect(again.id == migrated.id)
+        for invalid in ["x; touch /tmp/evil", "a b", "", "{00000000-0000-0000-0000-000000000000}"] {
+            var object = try #require(JSONSerialization.jsonObject(with: saved) as? [String: Any])
+            object["id"] = invalid
+            object["tmuxEstablished"] = true
+            let record = try JSONDecoder().decode(
+                SpaceSessionRecord.self, from: JSONSerialization.data(withJSONObject: object))
+            #expect(record.id != migrated.id)
+            #expect(record.tmuxEstablished == false)
+        }
+        let state = SpaceState(projects: [
+            SpaceProjectRecord(path: "/one", sessions: [again, again]),
+            SpaceProjectRecord(path: "/two", sessions: [again]),
+        ]).validated()
+        let records = state.projects.flatMap(\.sessions)
+        #expect(Set(records.map(\.id)).count == 3)
+        #expect(records[0].id != again.id, "every occurrence of an ambiguous identity is replaced")
+        #expect(records[1].tmuxEstablished == false)
+    }
+
+    @Test @MainActor func legacyIdentityIsPersistedWithoutOpeningTheProject() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let store = SpaceStore(directory: directory)
+        let legacy = #"{"version":1,"projects":[{"path":"/fixture","sessions":[{"number":1}],"nextNumber":2}]}"#
+        try Data(legacy.utf8).write(to: store.fileURL)
+        let first = store.load(isDirectory: { _ in true })
+        let second = store.load(isDirectory: { _ in true })
+        #expect(first.projects[0].sessions[0].id == second.projects[0].sessions[0].id)
+    }
+
     @Test func aRemoteDropIsTakenOnlyOnItsOwnHost() throws {
         let ours = SSHTarget(host: "Build.Example.com", user: "deploy", port: 2222)
         func path(_ text: String) -> String? {
