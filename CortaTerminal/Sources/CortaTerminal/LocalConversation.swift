@@ -31,11 +31,25 @@ public struct LocalConversation: Codable, Equatable, Sendable {
     }
 
     public let kind: Kind
-    public let id: UUID
+    public let id: UUID?
+    public let source: Source
 
-    public init(kind: Kind, id: UUID) {
+    public enum Source: String, Codable, Sendable { case sessionRecord, openFile, picker }
+
+    public init(kind: Kind, id: UUID? = nil, source: Source = .openFile) {
         self.kind = kind
         self.id = id
+        self.source = id == nil ? .picker : source
+    }
+
+    private enum CodingKeys: String, CodingKey { case kind, id, source }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try values.decode(Kind.self, forKey: .kind)
+        let raw = try? values.decode(String.self, forKey: .id)
+        let source = values.contains(.source) ? try? values.decode(Source.self, forKey: .source) : .openFile
+        self.init(kind: kind, id: source == nil ? nil : raw.flatMap(Self.standardUUID), source: source ?? .picker)
     }
 
     /// UUID's permissive parser alone also accepts nonstandard spellings.
@@ -46,8 +60,8 @@ public struct LocalConversation: Codable, Equatable, Sendable {
     }
 
     public var command: String {
-        let prefix = kind == .claude ? "claude --resume " : "codex resume "
-        return prefix + id.uuidString.lowercased()
+        let prefix = kind == .claude ? "claude --resume" : "codex resume"
+        return prefix + (id.map { " " + $0.uuidString.lowercased() } ?? "")
     }
 
     /// Kernel vnode time: seconds and nanoseconds, never a file read.
@@ -112,7 +126,7 @@ public struct LocalConversation: Codable, Equatable, Sendable {
         let file = URL(fileURLWithPath: path)
         guard file.pathExtension == "jsonl" else { return nil }
         let stem = file.deletingPathExtension().lastPathComponent
-        if let uuid = standardUUID(stem) { return uuid }
+        if kind == .claude, let uuid = standardUUID(stem) { return uuid }
         // Codex's rollout file has a timestamp before the standard UUID.
         if kind == .codex, stem.hasPrefix("rollout-"), stem.count > 44,
            stem.dropLast(36).hasSuffix("-") {

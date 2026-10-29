@@ -20,9 +20,9 @@ Versioning for compatibility changes.
   SSH and a lost session replaced by a new terminal. Traditional/preset/typed
   SSH and SFTP are unchanged; no remote rc or global tmux config is changed.
 
-- Space remembers each local Claude/Codex pane's conversation kind and UUID.
-  Reopening a project fills that pane's exact resume command into an empty
-  integrated shell prompt; Return remains yours to press. A brief glass note
+- Space remembers each local Claude/Codex pane's kind, optional conversation
+  UUID and source. Reopening a project fills its picker or exact resume command
+  into an empty integrated shell prompt; Return remains yours to press. A brief glass note
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
@@ -38,6 +38,12 @@ Versioning for compatibility changes.
   `space-panel-limit` caps the panels on screen.
 
 ### Changed
+
+- Space remembers local Claude/Codex kinds even without a conversation UUID,
+  filling their official pickers on reopen. It recognizes npm-wrapped Codex,
+  verifies Claude process session records, and shows each pane's resume source
+  with privacy-safe fallback diagnostics. Exact UUID resume remains an optional
+  accelerator; commands still wait for Return.
 
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
 

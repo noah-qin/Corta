@@ -21,7 +21,7 @@ import Testing
 
 extension CortaSpaceTests {
     private func withConversationFixture(
-        skipping: Set<Int> = [], rightPrompt: String = "",
+        skipping: Set<Int> = [], rightPrompt: String = "", picker: Bool = false, typedInput: Bool = false,
         _ body: (CortaSpaceController, SpaceProject) async throws -> Void
     ) async throws {
         let (controller, host) = try makeWindow(limit: 2)
@@ -30,6 +30,12 @@ extension CortaSpaceTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         try "PROMPT='demo> '\nRPROMPT='\(rightPrompt)'\nHISTFILE=/dev/null\n".write(
             to: folder.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+        if typedInput {
+            let shellRC = folder.appendingPathComponent(".zshrc")
+            let script = try String(contentsOf: shellRC, encoding: .utf8)
+                + "zle-line-init() { BUFFER='user input'; CURSOR=0; }; zle -N zle-line-init\n"
+            try script.write(to: shellRC, atomically: true, encoding: .utf8)
+        }
         var preset = Preset(name: "conversation-fixture")
         preset.shell = "/bin/zsh"
         preset.environment = ["ZDOTDIR": folder.path, "HOME": folder.path]
@@ -38,11 +44,11 @@ extension CortaSpaceTests {
         defer { _ = ConfigurationStore.shared.update { $0.presets = oldPresets } }
         let ids = ["3f2a9c1e-7b14-4d2e-9a6f-1c8e0b44d912", "019eee77-052d-7530-af09-17a140e08123",
                    "2b20121e-9a9b-43cb-b12e-fde980cb41e0"]
-        let records = try ids.enumerated().map { index, raw in
+        let records = ids.enumerated().map { index, raw in
             var record = SpaceSessionRecord(number: index + 1, directory: folder.path, presetName: preset.name)
             if !skipping.contains(index) {
                 record.conversation = LocalConversation(kind: index == 2 ? .codex : .claude,
-                                                        id: try #require(UUID(uuidString: raw)))
+                                                        id: picker ? nil : UUID(uuidString: raw))
             }
             return record
         }
@@ -111,6 +117,46 @@ extension CortaSpaceTests {
         }
     }
 
+    @Test func missingRecordFillsPickersAndUsesTheSinglePickerNotice() async throws {
+        try await withConversationFixture(skipping: [1, 2], picker: true) { space, project in
+            let item = project.sessions[0]
+            try await waitForConversation {
+                conversationNoteText(in: space) == L10n.text("space.conversation.pickerFilled")
+            }
+            let text = conversationText(item.pane?.session)
+            #expect(text.contains("claude --resume"))
+            #expect(!text.contains("--continue"))
+            #expect(!text.contains("--last"))
+            #expect(item.pane?.session?.isCommandRunning == false)
+        }
+        try await withConversationFixture(picker: true) { space, project in
+            try await waitForConversation {
+                conversationNoteText(in: space) == L10n.text("space.conversation.filledMany")
+            }
+            for item in project.sessions {
+                #expect(conversationText(item.pane?.session).contains(try #require(item.record.conversation).command))
+                #expect(item.pane?.session?.isCommandRunning == false)
+            }
+        }
+    }
+
+    @Test func typedPromptsAreFailedFillsAndNeverCountAsFilled() async throws {
+        try await withConversationFixture(typedInput: true) { space, project in
+            try await waitForConversation { project.sessions.allSatisfy {
+                conversationText($0.pane?.session).contains("user input")
+            } }
+            try await Task.sleep(for: .seconds(1))
+            for item in project.sessions {
+                #expect(!space.canFillConversation(item))
+                #expect(!space.fillConversation(item))
+                let text = conversationText(item.pane?.session)
+                #expect(!text.contains("--resume"))
+                #expect(!item.conversationNeedsNotice)
+            }
+            #expect(conversationNoteText(in: space) == nil)
+        }
+    }
+
     @Test func aRightPromptStillReceivesTheResumeCommand() async throws {
         try await withConversationFixture(rightPrompt: "RIGHT") { _, project in
             let item = project.sessions[0]
@@ -162,7 +208,8 @@ extension CortaSpaceTests {
                 try await waitForConversation("empty prompt before launching fixture") {
                     space.canFillConversation(item)
                 }
-                let file = project.url.appendingPathComponent(uuid.uuidString + ".jsonl")
+                let name = "rollout-2026-10-29T09-00-00-" + uuid.uuidString + ".jsonl"
+                let file = project.url.appendingPathComponent(name)
                 let command = PaneCommands.shellQuoted(executable.path) + " 30 3>" + PaneCommands.shellQuoted(file.path)
                 terminal.write(Array((command + "\r").utf8)) // Explicit fixture Return, not a restoration action.
                 try await waitForConversation("foreground codex", diagnostic: {

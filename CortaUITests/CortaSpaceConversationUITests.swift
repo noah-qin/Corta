@@ -32,6 +32,13 @@ final class CortaSpaceConversationUITests: XCTestCase {
         app.launchEnvironment["CORTA_STAGE_DIR"] = stage.path
         app.launchEnvironment["ZDOTDIR"] = stage.path
         app.launchEnvironment["SHELL"] = "/bin/zsh"
+        if scenario == "real", let home = ProcessInfo.processInfo.environment["CORTA_CONVERSATION_REAL_HOME"] {
+            app.launchEnvironment["HOME"] = home
+            for key in ["CORTA_CONVERSATION_REAL_CLAUDE", "CORTA_CONVERSATION_REAL_CODEX"] {
+                let childKey = key == "CORTA_CONVERSATION_REAL_CLAUDE" ? "TEST_REAL_CLAUDE" : "TEST_REAL_CODEX"
+                app.launchEnvironment[childKey] = ProcessInfo.processInfo.environment[key]
+            }
+        }
         app.launchArguments = ["-AppleLanguages", "(en)"]
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 8))
@@ -77,7 +84,7 @@ final class CortaSpaceConversationUITests: XCTestCase {
         defer { app.terminate() }
         waitForText(first, in: app)
         waitForText(second, in: app)
-        let note = "Each pane has its own conversation filled in. Press Return to continue. "
+        let note = "Each pane has its resume command filled in. Press Return to continue. "
             + "Delete that line to skip it."
         expectNote(note, in: app)
         XCTAssertFalse(app.textViews.allElementsBoundByIndex.contains {
@@ -89,13 +96,87 @@ final class CortaSpaceConversationUITests: XCTestCase {
         expectNote("Press Return to continue this conversation.", in: app)
     }
 
-    func testInvalidUUIDLeavesPromptBlankAndShowsNoFillNote() throws {
+    func testRealCLIsFillTheirRecordedCommandsAfterAppRelaunch() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["CORTA_CONVERSATION_REAL_CLAUDE"] != nil,
+              environment["CORTA_CONVERSATION_REAL_CODEX"] != nil else {
+            throw XCTSkip("Opt in with authenticated installed Claude/Codex and a trusted real fixture cwd")
+        }
+        let app = try launch("real")
+        defer { app.terminate() }
+        let panels = app.groups.matching(identifier: "Corta.Space.Panel")
+        XCTAssertEqual(panels.count, 2)
+        let root = try XCTUnwrap(environment["CORTA_UI_FIXTURES"])
+        let file = URL(fileURLWithPath: root)
+            .appendingPathComponent("space-conversation-real/ApplicationSupport/space.json")
+        let predicate = NSPredicate { _, _ in
+            guard let entries = try? self.realConversations(in: file) else { return false }
+            return entries.count == 2 && entries[0].source == "sessionRecord" && entries[1].kind == "codex"
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: nil)],
+                                    timeout: 20), .completed)
+        let entries = try realConversations(in: file)
+        XCTAssertEqual(entries.first?.source, "sessionRecord")
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 8))
+        app.toolbars.buttons["Show Space"].click()
+        for entry in entries {
+            let prefix = entry.kind == "claude" ? "claude --resume" : "codex resume"
+            waitForText(prefix + (entry.id.map { " " + $0.lowercased() } ?? ""), in: app)
+        }
+        expectNote("Each pane has its resume command filled in. Press Return to continue. "
+                   + "Delete that line to skip it.", in: app)
+    }
+
+    private struct RealConversation: Decodable {
+        let kind: String
+        let id: String?
+        let source: String
+    }
+
+    private func realConversations(in file: URL) throws -> [RealConversation] {
+        let object = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]
+        let projects = try XCTUnwrap(object?["projects"] as? [[String: Any]])
+        let sessions = try XCTUnwrap(projects.first?["sessions"] as? [[String: Any]])
+        return try sessions.compactMap { session in
+            guard let identity = session["conversation"] else { return nil }
+            return try JSONDecoder().decode(RealConversation.self,
+                                           from: JSONSerialization.data(withJSONObject: identity))
+        }
+    }
+
+    func testInvalidUUIDFallsBackToPickerWithoutExecuting() throws {
         let app = try launch("invalid")
         defer { app.terminate() }
-        waitForText("demo ❯", in: app)
+        waitForText("claude --resume", in: app)
+        expectNote("The resume command is filled in. Press Return, then choose the conversation to continue. "
+                   + "Delete the line to skip it.", in: app)
         XCTAssertFalse(app.textViews.allElementsBoundByIndex.contains {
-            ($0.value as? String)?.contains("--resume") == true
+            let text = $0.value as? String ?? ""
+            return text.contains("; echo bad") || text.contains("--continue") || text.contains("--last")
+                || text.contains("USER-EXECUTED")
         })
-        XCTAssertFalse(app.otherElements["Corta.Space.Note"].exists)
+        let panel = app.groups.matching(identifier: "Corta.Space.Panel").firstMatch
+        panel.buttons["Panel Actions"].click()
+        XCTAssertTrue(app.menuItems["Resume Source: picker"].exists)
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
+    func testMissingRecordsFillTwoIndependentPickers() throws {
+        let app = try launch("pickers")
+        defer { app.terminate() }
+        let predicate = NSPredicate(format: "value CONTAINS %@", "claude --resume")
+        let deadline = SuspendingClock.now + .seconds(12)
+        while app.textViews.matching(predicate).count < 2, SuspendingClock.now < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        XCTAssertEqual(app.textViews.matching(predicate).count, 2)
+        expectNote("Each pane has its resume command filled in. Press Return to continue. "
+                   + "Delete that line to skip it.", in: app)
+        XCTAssertFalse(app.textViews.allElementsBoundByIndex.contains {
+            let text = $0.value as? String ?? ""
+            return text.contains("USER-EXECUTED") || text.contains("--continue") || text.contains("--last")
+        })
     }
 }

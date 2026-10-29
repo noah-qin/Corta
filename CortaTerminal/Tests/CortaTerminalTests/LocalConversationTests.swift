@@ -25,7 +25,8 @@ struct LocalConversationTests {
 
     @Test func filenamesSelectOnlyOneStandardIdentity() {
         for name in ["claude", "claude-code", "codex"] {
-            let result = LocalConversation.openedFiles(processName: name, paths: ["/one/" + first + ".jsonl"])
+            let stem = name == "codex" ? "rollout-2026-10-29T09-00-00-" + first : first
+            let result = LocalConversation.openedFiles(processName: name, paths: ["/one/" + stem + ".jsonl"])
             #expect(result?.id == UUID(uuidString: first))
             #expect(result?.command == (name == "codex" ? "codex resume " : "claude --resume ") + first)
         }
@@ -66,7 +67,7 @@ struct LocalConversationTests {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let executable = directory.appendingPathComponent("claude")
+        let executable = directory.appendingPathComponent("0.165.0")
         try FileManager.default.copyItem(atPath: "/bin/sleep", toPath: executable.path)
         // A copied Apple platform binary may be killed at exec. Sign only
         // this disposable copy so the fixture has an ordinary local identity.
@@ -76,10 +77,13 @@ struct LocalConversationTests {
         try signer.run()
         signer.waitUntilExit()
         try #require(signer.terminationStatus == 0)
+        let invocation = directory.appendingPathComponent("codex")
+        try FileManager.default.createSymbolicLink(at: invocation, withDestinationURL: executable)
         // A newer, unrelated conversation is never inspected.
         try Data("private contents".utf8).write(to: directory.appendingPathComponent(UUID().uuidString + ".jsonl"))
         func start(_ id: String) throws -> PTY {
-            try PTYFixture.shell("exec 3>'" + directory.path + "/" + id + ".jsonl'; exec '" + executable.path + "' 30")
+            let path = directory.path + "/rollout-2026-10-29T09-00-00-" + id + ".jsonl"
+            return try PTYFixture.shell("exec 3>'" + path + "'; exec '" + invocation.path + "' 30")
         }
         let one = try start(first), two = try start(second)
         defer { one.close(); two.close() }
@@ -98,7 +102,7 @@ struct LocalConversationTests {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let executable = directory.appendingPathComponent("claude")
+        let executable = directory.appendingPathComponent("codex")
         try FileManager.default.copyItem(atPath: "/bin/sleep", toPath: executable.path)
         let signer = Process()
         signer.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
@@ -106,8 +110,8 @@ struct LocalConversationTests {
         try signer.run()
         signer.waitUntilExit()
         try #require(signer.terminationStatus == 0)
-        let older = directory.appendingPathComponent(first + ".jsonl")
-        let newer = directory.appendingPathComponent(second + ".jsonl")
+        let older = directory.appendingPathComponent("rollout-2026-10-29T09-00-00-" + first + ".jsonl")
+        let newer = directory.appendingPathComponent("rollout-2026-10-29T09-00-00-" + second + ".jsonl")
         let pty = try PTYFixture.shell(
             "exec 3>'" + older.path + "'; exec 4>'" + newer.path + "'; exec '" + executable.path + "' 30")
         defer { pty.close() }

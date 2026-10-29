@@ -48,6 +48,7 @@ public final class PTY: @unchecked Sendable {
     }
 
     private let state = Mutex(State())
+    let conversationCache = Mutex(ClaudeConversationCache())
     private let exited = DispatchGroup()
     private let exitQueue: DispatchQueue
     private let exitSource: DispatchSourceProcess

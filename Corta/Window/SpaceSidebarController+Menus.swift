@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 
 /// The sidebar's menus: a row's context menu, and the add button's.
 extension SpaceSidebarController {
@@ -101,6 +102,10 @@ extension SpaceSidebarController {
                 menu.addItem(withTitle: L10n.text("space.panel.showIn"), action: nil, keyEquivalent: "")
                     .submenu = submenu
             }
+        }
+        if let conversation = session.record.conversation, session.record.ssh == nil {
+            menu.addItem(NSMenuItem.sectionHeader(title: L10n.format(
+                "space.conversation.source", conversation.source.rawValue)))
         }
         if space.canFillConversation(session) {
             add("space.conversation.fillAgain", to: menu) { space.refillConversation(session) }

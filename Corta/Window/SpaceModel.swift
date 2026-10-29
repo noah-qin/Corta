@@ -213,12 +213,7 @@ nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
         id = validID ?? UUID()
         retainSSH = try values.decodeIfPresent(Bool.self, forKey: .retainSSH)
         tmuxEstablished = validID == nil ? false : try values.decodeIfPresent(Bool.self, forKey: .tmuxEstablished)
-        if let saved = try? values.nestedContainer(keyedBy: ConversationKeys.self, forKey: .conversation),
-           let kind = try? saved.decode(LocalConversation.Kind.self, forKey: .kind),
-           let raw = try? saved.decode(String.self, forKey: .id),
-           let uuid = LocalConversation.standardUUID(raw) {
-            conversation = LocalConversation(kind: kind, id: uuid)
-        }
+        conversation = try? values.decode(LocalConversation.self, forKey: .conversation)
         number = try values.decode(Int.self, forKey: .number)
         directory = try values.decodeIfPresent(String.self, forKey: .directory)
         presetName = try values.decodeIfPresent(String.self, forKey: .presetName)
@@ -228,8 +223,6 @@ nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
         supersededTmuxNames = Self.canonicalTmuxNames(storedNames)
         if ssh != nil { conversation = nil }
     }
-
-    private enum ConversationKeys: String, CodingKey { case kind, id }
 
     static let maximumNameLength = 64
 

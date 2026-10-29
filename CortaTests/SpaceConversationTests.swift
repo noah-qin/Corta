@@ -29,17 +29,41 @@ struct SpaceConversationTests {
         #expect(try decode("").conversation == nil)
         for invalid in ["", uuid + ";echo", uuid + " ", "{" + uuid + "}", "task-123"] {
             let metadata = #", "conversation":{"kind":"claude","id":"\#(invalid)"}"#
-            #expect(try decode(metadata).conversation == nil)
+            #expect(try decode(metadata).conversation == LocalConversation(kind: .claude))
         }
         for fields in [#", "conversation":{"kind":"gemini","id":"\#(uuid)"}"#,
                        #", "conversation":{"id":"\#(uuid)"}"#,
-                       #", "conversation":{"kind":"claude"}"#,
                        #", "conversation":42"#] {
             #expect(try decode(fields).conversation == nil)
         }
         let valid = #", "conversation":{"kind":"claude","id":"\#(uuid)"}"#
         #expect(try decode(valid).conversation?.command == "claude --resume " + uuid)
         #expect(try decode(valid + #", "ssh":{"host":"fixture"}"#).conversation == nil)
+    }
+
+    @Test func pickerLegacySourcesAndAllFourNotes() throws {
+        let decoder = JSONDecoder()
+        let legacy = try decoder.decode(LocalConversation.self, from: Data(
+            #"{"kind":"codex","id":"\#(uuid)"}"#.utf8))
+        #expect(legacy.source == .openFile)
+        #expect(legacy.command == "codex resume " + uuid)
+        let unknown = try decoder.decode(LocalConversation.self, from: Data(
+            #"{"kind":"claude","id":"\#(uuid)","source":"future"}"#.utf8))
+        #expect(unknown.source == .picker)
+        #expect(unknown.id == nil)
+        let picker = try decoder.decode(LocalConversation.self, from: Data(#"{"kind":"claude"}"#.utf8))
+        #expect(picker.source == .picker)
+        #expect(picker.command == "claude --resume")
+        #expect(CortaSpaceController.conversationNoticeKey(for: [legacy]) == "space.conversation.filled")
+        #expect(CortaSpaceController.conversationNoticeKey(for: [picker]) == "space.conversation.pickerFilled")
+        #expect(CortaSpaceController.conversationNoticeKey(for: [legacy, picker]) == "space.conversation.filledMany")
+        #expect(L10n.text("space.conversation.continue") == "Press Return to continue this conversation.")
+        for conversation in [legacy, picker] {
+            let key = CortaSpaceController.conversationNoticeKey(for: [conversation])
+            #expect(!L10n.text(key).contains(uuid))
+            #expect(!conversation.command.contains("--continue"))
+            #expect(!conversation.command.contains("--last"))
+        }
     }
 
     @Test func aCursorAtHomeWithTypedTextIsNotAnEmptyPrompt() {
@@ -107,7 +131,7 @@ struct SpaceConversationTests {
         let projects = try #require(object["projects"] as? [[String: Any]])
         let sessions = try #require(projects[0]["sessions"] as? [[String: Any]])
         let conversation = try #require(sessions[0]["conversation"] as? [String: Any])
-        #expect(Set(conversation.keys) == ["kind", "id"])
+        #expect(Set(conversation.keys) == ["kind", "id", "source"])
         let text = String(decoding: data, as: UTF8.self)
         #expect(!text.contains("resume"))
         #expect(!text.contains("jsonl"))

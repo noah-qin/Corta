@@ -864,29 +864,55 @@ an empty package list is not success: verify it lists CortaTerminal and Sparkle
 and the build finds their products. Never change package pins or machine-wide
 settings merely to get a test to run.
 
-`LocalConversationTests` checks exact UUID extraction (including Codex rollout
-filenames), ambiguous open files, the strictly newest open file by vnode
-modification time and then creation time, a tie that does not choose,
-unsupported tools and two same-directory processes holding different session
-files. One process holding two session files records the newer modification
-time. A full 1,024-descriptor buffer still does not guess. `SpaceConversationTests` checks
-legacy/invalid metadata, duplicate JSON keys, metadata-only persistence and
-remote exclusion. The conversation cases in `CortaSpaceTests` also open real windows and shells,
-check that two same-directory Claude prompts and an off-grid Codex prompt hold
-their own commands without execution, count successful fills, dismiss the note,
-and delete/refill without repeating on mode switches. One case sets `RPROMPT`
-so a right-hand prompt is not mistaken for typed text; the prompt line must
-be stable before the fill. The grid case covers a flush-right run, a wide
-glyph, wrapped input and an unstable line that is sampled again.
-`CortaSpaceConversationUITests` verifies prompt fills without
-execution, single/multiple notes, later-shown sessions and explicit refill.
-The fixtures use disposable stages and a process-local shell environment;
-no model account or billable request is needed. The native process fixtures
-use disposable, ad-hoc-signed copies of the system sleep executable, so the
-kernel sees a recognized name and an inherited open session descriptor; no
-installed binary or system signing policy is changed. Real installed CLI file-handle
-lifetimes still need independent acceptance; a synthetic fixture is not proof
-that a CLI keeps its session file open long enough to be observed.
+`LocalConversationTests` checks exact UUID extraction, ambiguous/strictly
+newest open files, and two same-directory processes holding different files.
+`ClaudeSessionRecordTests` checks `sessionRecord` success; missing, unreadable,
+overlarge, invalid JSON, missing field, nonstandard UUID, mismatched PID/start,
+symlink, kernel identity changing during read, and cache invalidation on PID
+reuse, and a record published after the agent process appears (no contents
+are read until the file exists, then only once). Every failure asserts `picker` and the exact reason through returned
+observations, without parsing system logs. Whole-group recognition covers a
+node leader with a Codex member and rejects mixed tools. Native version-named
+Claude uses only the kernel invocation basename; later arguments are ignored. A new agent clears
+the previous UUID; a failed probe of the same agent retains a verified UUID.
+
+`SpaceConversationTests` checks legacy/invalid metadata, source migration,
+duplicate keys, metadata-only persistence, remote exclusion and notice choice.
+The conversation cases in `CortaSpaceTests` open real windows/shells to check
+exact/picker fills, successful-fill counts, hidden panes, notes, delete/refill,
+mode switches, right prompts and process replacement/exit. The grid cases
+cover typed text, wide glyphs, wraps and unstable prompts.
+`CortaSpaceConversationUITests` checks exact and picker fills without execution,
+all four messages, per-pane source menus and explicit refill. Prepare stages
+with `CortaUITests/stage-ui-fixtures.sh` and select that class in the UI plan.
+These synthetic stages and disposable signed sleep executables verify Corta's
+behavior, not real CLI compatibility. No installed binary or machine-wide
+setting is changed.
+
+The opt-in `CortaSpaceTests/realClaudeAndNpmCodexSourcesSurviveClosingAndReopeningSpace()`
+uses installed authenticated CLIs. Set `TEST_RUNNER_CORTA_CONVERSATION_REAL_CLAUDE`,
+`TEST_RUNNER_CORTA_CONVERSATION_REAL_CODEX`, `TEST_RUNNER_CORTA_CONVERSATION_REAL_HOME`
+and `TEST_RUNNER_CORTA_CONVERSATION_REAL_CWD` (an already trusted checkout), then
+select `CortaSpaceTests` under Unit. It requests one tiny reply per CLI, asks
+for no tool calls, checks sources and persisted identities, measures one warm
+utility-task round over both panes, and verifies unsubmitted fills after
+closing/reopening Space. It never changes installed CLI configuration.
+For a full app-process relaunch, also prepare the UI stages with
+`CORTA_CONVERSATION_REAL_CWD=/path/to/trusted/checkout CortaUITests/stage-ui-fixtures.sh`,
+pass its root as `TEST_RUNNER_CORTA_UI_FIXTURES` and the same real CLI/home
+variables, and select
+`CortaSpaceConversationUITests/testRealCLIsFillTheirRecordedCommandsAfterAppRelaunch`
+in the UI plan. The test verifies both recorded commands after terminate/launch.
+
+Real Claude acceptance must record its version, `sessionRecord` in
+`space.json`, the privacy-safe source/result log, and a restart filling that
+same UUID. A `picker` result is not a passing Claude enhancement check: report
+the fallback reason. Real npm Codex acceptance records its version, recognized
+kind, source/log, and either the UUID or `codex resume` baseline. Only files
+open in its foreground group are eligible; shared app-server files are not
+attributed. Measure one round over all agent panes off main, reporting the
+method and time with the verification results. Synthetic tests cannot replace
+these real-CLI checks.
 
 `./scripts/build-and-run.sh --space-preview` opens the Debug build in Space.
 

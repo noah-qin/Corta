@@ -16,6 +16,7 @@
 
 import AppKit
 import CortaTerminal
+import OSLog
 
 /// Three identical prompt-line samples, 100 ms apart, before a fill or a skip.
 /// A right prompt or a transient redraw must not discard the pane on the first look.
@@ -39,8 +40,10 @@ nonisolated struct ConversationPromptReadiness: Equatable, Sendable {
 }
 
 extension CortaSpaceController {
+    private static let conversationLog = Logger(subsystem: "dev.noahqin.Corta", category: "space")
+
     /// One bounded batch at a time, also while Space is hidden. The only
-    /// retained result is kind + UUID; an exited process leaves the last one.
+    /// retained result is kind + optional UUID + source; an exited process leaves the last one.
     func startConversationMonitor() {
         guard conversationMonitor == nil else { return }
         conversationMonitor = Task { [weak self] in
@@ -59,18 +62,36 @@ extension CortaSpaceController {
             return (item.id, terminal)
         }
         let updates = await Task.detached(priority: .utility) {
-            candidates.map { ($0.0, $0.1.localConversation) }
+            candidates.map { ($0.0, $0.1.conversationObservation) }
         }.value
         guard !Task.isCancelled else { return }
-        for (id, conversation) in updates {
-            guard let conversation, let (_, item) = session(withID: id),
+        for (id, observation) in updates {
+            guard let observation, let (_, item) = session(withID: id),
                   let original = candidates.first(where: { $0.0 == id })?.1,
                   item.pane?.session === original, item.record.ssh == nil,
-                  case .local = item.pane?.remote.state,
-                  item.record.conversation != conversation else { continue }
+                  case .local = item.pane?.remote.state else { continue }
+            if item.conversationObservation != observation {
+                let conversation = observation.conversation
+                let result = observation.reason?.rawValue ?? "success"
+                let kind = conversation.kind.rawValue
+                let source = conversation.source.rawValue
+                Self.conversationLog.info("""
+                    conversation kind=\(kind, privacy: .public) \
+                    source=\(source, privacy: .public) result=\(result, privacy: .public)
+                    """)
+            }
+            let conversation = observation.retainingIdentity(
+                item.record.conversation, previousProcesses: item.conversationObservation?.processes)
+            item.conversationObservation = observation
+            guard item.record.conversation != conversation else { continue }
             item.record.conversation = conversation
             scheduleSave()
         }
+    }
+
+    nonisolated static func conversationNoticeKey(for conversations: [LocalConversation]) -> String {
+        if conversations.count > 1 { return "space.conversation.filledMany" }
+        return conversations.first?.id == nil ? "space.conversation.pickerFilled" : "space.conversation.filled"
     }
 
     private struct PendingConversation {
@@ -107,7 +128,7 @@ extension CortaSpaceController {
             }
             guard !Task.isCancelled, let self, let project, self.isActive, self.selectedProject === project,
                   !filled.isEmpty else { return }
-            let key = filled.count == 1 ? "space.conversation.filled" : "space.conversation.filledMany"
+            let key = Self.conversationNoticeKey(for: filled.compactMap { $0.record.conversation })
             self.content.showNote(L10n.text(key))
         }
     }
@@ -204,7 +225,7 @@ extension CortaSpaceController {
 
     func refillConversation(_ item: SpaceSession) {
         guard fillConversation(item) else { return }
-        content.showNote(L10n.text("space.conversation.filled"))
+        content.showNote(L10n.text(Self.conversationNoticeKey(for: [item.record.conversation].compactMap { $0 })))
     }
 
     func showConversationNoticeIfNeeded() {

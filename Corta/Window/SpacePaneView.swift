@@ -442,7 +442,9 @@ extension SpacePaneView {
             menu.addItem(withTitle: L10n.text("space.session.browseFiles"), action: #selector(browseFiles),
                          keyEquivalent: "").target = self
         }
-        if session.record.conversation != nil, session.record.ssh == nil {
+        if let conversation = session.record.conversation, session.record.ssh == nil {
+            menu.addItem(NSMenuItem.sectionHeader(title: L10n.format(
+                "space.conversation.source", conversation.source.rawValue)))
             let refill = menu.addItem(withTitle: L10n.text("space.conversation.fillAgain"),
                                       action: #selector(refillConversation), keyEquivalent: "")
             refill.target = self

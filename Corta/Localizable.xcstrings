@@ -35407,55 +35407,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Jeder Bereich hat sein eigenes Gespräch eingetragen. Zum Fortsetzen Return drücken. Zum Überspringen die jeweilige Zeile löschen."
+            "value" : "Jeder Bereich hat seinen Fortsetzungsbefehl. Zum Fortsetzen Return drücken. Zum Überspringen die Zeile löschen."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Each pane has its own conversation filled in. Press Return to continue. Delete that line to skip it."
+            "value" : "Each pane has its resume command filled in. Press Return to continue. Delete that line to skip it."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Cada panel tiene escrita su conversación. Pulsa Retorno para continuar. Borra esa línea para omitirla."
+            "value" : "Cada panel tiene su comando de reanudación escrito. Pulsa Retorno para continuar. Borra esa línea para omitirlo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Chaque volet contient sa conversation. Appuyez sur Retour pour continuer. Supprimez la ligne correspondante pour passer."
+            "value" : "Chaque volet a sa commande de reprise. Appuyez sur Retour pour continuer. Supprimez cette ligne pour passer."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "各ペインにそれぞれの会話を入力しました。Returnで続行します。続行しない場合はその行を削除してください。"
+            "value" : "各ペインに再開コマンドを入力しました。Returnで続行します。続行しない場合はその行を削除してください。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "각 패널에 해당 대화를 입력했습니다. Return을 눌러 계속하세요. 건너뛰려면 해당 줄을 삭제하세요."
+            "value" : "각 패널에 재개 명령이 입력되었습니다. Return을 눌러 계속하세요. 건너뛰려면 해당 줄을 삭제하세요."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Cada painel tem sua conversa preenchida. Pressione Return para continuar. Apague a linha correspondente para ignorá-la."
+            "value" : "Cada painel tem seu comando de retomada preenchido. Pressione Return para continuar. Apague essa linha para ignorar."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "已按各格填好对话，按回车继续。不想继续就删掉那一行。"
+            "value" : "已按各格填好恢复命令，按回车继续。不想继续就删掉那一行。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "已按各格填好對話，按 Return 繼續。不想繼續就刪掉那一行。"
+            "value" : "已按各格填好恢復命令，按 Return 繼續。不想繼續就刪掉那一行。"
           }
         }
       }
@@ -48497,6 +48497,124 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "視窗"
+          }
+        }
+      }
+    },
+    "space.conversation.pickerFilled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Der Fortsetzungsbefehl ist eingetragen. Return drücken, dann das Gespräch wählen. Zum Überspringen die Zeile löschen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The resume command is filled in. Press Return, then choose the conversation to continue. Delete the line to skip it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "El comando de reanudación está escrito. Pulsa Retorno y elige la conversación. Borra la línea para omitirla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "La commande de reprise est saisie. Appuyez sur Retour, puis choisissez la conversation. Supprimez la ligne pour passer."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "再開コマンドを入力しました。Returnを押して、続ける会話を選んでください。再開しない場合は行を削除してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "재개 명령이 입력되었습니다. Return을 누른 다음 계속할 대화를 선택하세요. 건너뛰려면 줄을 삭제하세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "O comando de retomada está preenchido. Pressione Return e escolha a conversa. Apague a linha para ignorar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "已填好恢复命令，按回车后选择要继续的对话。不想继续就删掉这行。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "已填好恢復命令，按 Return 後選擇要繼續的對話。不想繼續就刪掉這行。"
+          }
+        }
+      }
+    },
+    "space.conversation.source" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Quelle der Fortsetzung: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resume Source: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Origen de reanudación: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Source de reprise : %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "再開元：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "재개 출처: %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Origem da retomada: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "恢复来源：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "恢復來源：%@"
           }
         }
       }

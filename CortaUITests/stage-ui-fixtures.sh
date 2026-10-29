@@ -249,7 +249,7 @@ SH
 chmod 700 "$root/real-claude/claude-shell"
 
 # Local conversation restoration: fixed public UUIDs, no actual agent account.
-for scenario in one many invalid; do
+for scenario in one many invalid pickers real; do
   stage "space-conversation-$scenario" 'columns = 180\nrows = 50\nrestore-windows = false\nspace-panel-limit = 2\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
   conversation_stage="$root/space-conversation-$scenario"
   mkdir -p "$conversation_stage/ApplicationSupport" "$conversation_stage/project"
@@ -270,8 +270,48 @@ SH
   if [[ "$scenario" == invalid ]]; then
     sessions='{"number":1,"name":"Invalid Conversation","conversation":{"kind":"claude","id":"3f2a9c1e-7b14-4d2e-9a6f-1c8e0b44d912; echo bad"}}'
   fi
+  if [[ "$scenario" == pickers ]]; then
+    sessions='{"number":1,"conversation":{"kind":"claude","source":"picker"}},{"number":2,"conversation":{"kind":"claude","source":"picker"}}'
+    layout='{"split":{"vertical":true,"fraction":0.5,"first":{"panel":{"_0":0}},"second":{"panel":{"_0":1}}}}'
+  fi
+  conversation_project="$conversation_stage/project"
+  if [[ "$scenario" == real ]]; then
+    conversation_project="${CORTA_CONVERSATION_REAL_CWD:-$conversation_project}"
+    cat >> "$conversation_stage/config" <<'CONFIG'
+preset.real-claude.shell = /bin/zsh
+preset.real-claude.env.TEST_REAL_KIND = claude
+preset.real-codex.shell = /bin/zsh
+preset.real-codex.env.TEST_REAL_KIND = codex
+CONFIG
+    cat > "$conversation_stage/.zshrc" <<'SH'
+PROMPT='acceptance> '
+RPROMPT=''
+HISTFILE=/dev/null
+# A one-shot launch in the fixture's own prompt, never a machine-wide shell hook.
+# After the app relaunches these markers suppress the CLI launch so restore can fill.
+if [[ -n "$TEST_REAL_KIND" && ! -e "$ZDOTDIR/started-$TEST_REAL_KIND" ]]; then
+  : > "$ZDOTDIR/started-$TEST_REAL_KIND"
+  if [[ "$TEST_REAL_KIND" == claude ]]; then
+    CORTA_REAL_COMMAND="${(q)TEST_REAL_CLAUDE}"
+  else
+    CORTA_REAL_COMMAND="${(q)TEST_REAL_CODEX} --no-alt-screen"
+  fi
+  zle-line-init() {
+    if [[ -n "$CORTA_REAL_COMMAND" ]]; then
+      BUFFER="$CORTA_REAL_COMMAND"
+      CURSOR=${#BUFFER}
+      unset CORTA_REAL_COMMAND
+      zle accept-line
+    fi
+  }
+  zle -N zle-line-init
+fi
+SH
+    sessions='{"number":1,"name":"Real Claude","presetName":"real-claude"},{"number":2,"name":"Real Codex","presetName":"real-codex"}'
+    layout='{"split":{"vertical":true,"fraction":0.5,"first":{"panel":{"_0":0}},"second":{"panel":{"_0":1}}}}'
+  fi
   cat > "$conversation_stage/ApplicationSupport/space.json" <<JSON
-{"version":1,"projects":[{"path":"$conversation_stage/project","sessions":[$sessions],"layout":$layout,"nextNumber":4}]}
+{"version":1,"projects":[{"path":"$conversation_project","sessions":[$sessions],"layout":$layout,"nextNumber":4}]}
 JSON
 done
 

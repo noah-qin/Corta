@@ -15,24 +15,55 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Darwin
+import Foundation
+import Synchronization
 
 extension PTY {
-    /// Bounded kernel metadata only. Call off main; no files are opened or read.
-    public var localConversation: LocalConversation? {
-        guard exitStatus == nil, let group = foregroundProcessGroup,
-              let name = Self.processName(of: group),
-              LocalConversation.Kind(processName: name) != nil else { return nil }
+    /// Bounded background sampling of the whole foreground group, including npm wrappers.
+    public var conversationObservation: ConversationObservation? {
+        guard exitStatus == nil, let group = foregroundProcessGroup else { return nil }
+        var members = [pid_t](repeating: 0, count: 256)
+        let count = proc_listpgrppids(group, &members, Int32(members.count * MemoryLayout<pid_t>.size))
+        guard count > 0, count < members.count,
+              let (kind, agents) = ConversationObservation.recognized(
+                members.prefix(Int(count)).compactMap(ConversationProcess.read)) else { return nil }
+        let result: ConversationObservation
+        if kind == .claude {
+            // Multiple Claude members cannot be attributed to one conversation safely.
+            guard agents.count == 1, let agent = agents.first else {
+                return ConversationObservation(kind: kind, processes: agents, reason: .processMismatch)
+            }
+            result = conversationCache.withLock { cache in
+                let directory = FileManager.default.homeDirectoryForCurrentUser
+                    .appendingPathComponent(".claude/sessions", isDirectory: true)
+                return cache.read(process: agent, directory: directory) {
+                    ConversationProcess.read(agent.pid) == agent
+                }
+            }
+        } else {
+            let lists = members.prefix(Int(count)).map { Self.conversationFiles(of: $0) }
+            let files = lists.allSatisfy({ $0 != nil }) ? lists.compactMap { $0 }.flatMap { $0 } : nil
+            result = ConversationObservation.codex(processes: agents, files: files)
+        }
+        guard exitStatus == nil, foregroundProcessGroup == group,
+              agents.allSatisfy({ ConversationProcess.read($0.pid) == $0 }) else { return nil }
+        return result
+    }
+
+    public var localConversation: LocalConversation? { conversationObservation?.conversation }
+
+    private static func conversationFiles(of pid: pid_t) -> [LocalConversation.OpenedFile]? {
         let stride = MemoryLayout<proc_fdinfo>.stride
         var descriptors = [proc_fdinfo](repeating: proc_fdinfo(), count: 1024)
         let capacity = Int32(descriptors.count * stride)
-        let bytes = proc_pidinfo(group, PROC_PIDLISTFDS, 0, &descriptors, capacity)
+        let bytes = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &descriptors, capacity)
         // A full buffer may have omitted another candidate: don't guess.
         guard bytes > 0, bytes < capacity else { return nil }
         var files: [LocalConversation.OpenedFile] = []
         for descriptor in descriptors.prefix(Int(bytes) / stride) where descriptor.proc_fdtype == PROX_FDTYPE_VNODE {
             var info = vnode_fdinfowithpath()
             let size = Int32(MemoryLayout<vnode_fdinfowithpath>.size)
-            guard proc_pidfdinfo(group, descriptor.proc_fd, PROC_PIDFDVNODEPATHINFO, &info, size) == size else {
+            guard proc_pidfdinfo(pid, descriptor.proc_fd, PROC_PIDFDVNODEPATHINFO, &info, size) == size else {
                 continue
             }
             let path = withUnsafeBytes(of: &info.pvip.vip_path) { raw in
@@ -44,9 +75,7 @@ extension PTY {
                 modified: Self.fileTime(seconds: stat.vst_mtime, nanoseconds: stat.vst_mtimensec),
                 created: Self.fileTime(seconds: stat.vst_birthtime, nanoseconds: stat.vst_birthtimensec)))
         }
-        guard exitStatus == nil, foregroundProcessGroup == group,
-              Self.processName(of: group) == name else { return nil }
-        return LocalConversation.openedFiles(processName: name, files: files)
+        return files
     }
 
     /// Epoch is not a time the kernel measured for this descriptor.

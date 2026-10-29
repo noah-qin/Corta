@@ -848,20 +848,30 @@ on may reattach to its own `corta-<UUID>` session on an existing remote tmux.
 Closing the window or quitting ends only the local ssh; tmux owns the remote
 processes, screen and history. The saved record holds its UUID and whether
 tmux was established, never a command. Nothing connects before the project
-is first opened, including its off-grid sessions. For local Claude and Codex, Corta remembers only the kind and the standard
-UUID in a session file opened by that pane's foreground process. On the
-project's first opening next launch it fills `claude --resume <UUID>` or
-`codex resume <UUID>` into an empty integrated shell prompt; only the user's
-Return executes it. A right-hand prompt is not typed text: the input is the
-gap between the cursor and a trailing run flush with the row. The line is
-filled only after it has been unchanged for a few samples, and a write that
-does not land is tried again within the same ten seconds. Typing abandons
-the fill at once. When that process holds more than one standard session
-file, the newest modification time on those open descriptors wins, then the
-creation time. Those times are the kernel's vnode times; the file is not
-opened and the directory is not scanned. Equal or missing times, or a
-descriptor list that filled the 1,024-entry query, leave the previously
-recorded UUID in place. Missing or invalid identities leave an ordinary shell.
+is first opened, including its off-grid sessions. For local Claude and Codex, Corta remembers the kind, an optional standard
+conversation UUID and its source. The official picker (`claude --resume` or
+`codex resume`, without an ID) is the baseline. An exact UUID accelerates it
+only when reliably attributed to this pane: Claude's bounded, no-follow
+`~/.claude/sessions/<pid>.json` record with kernel PID/start verification
+(`sessionRecord`), or Codex's strictly selected open rollout file (`openFile`).
+Both are undocumented and may stop working after a CLI update; failure uses
+`picker`, never the directory's newest conversation, `--continue` or `--last`.
+The whole foreground group is inspected, so npm's node wrapper does not hide
+Codex; a group containing both kinds is not attributed. Each Claude process
+is read once, cached by PID and subsecond kernel start. An absent record has
+no contents to read and is probed until it appears; contents are never reread
+every second. A new agent process
+replaces the old identity, even when it yields only a kind; an exited process
+leaves the last observation. A failed probe of the same process retains a
+previously verified UUID. Source/result changes are logged without identity
+or paths and each pane's menu shows its source.
+
+On the project's first opening next launch, the fixed resume command fills
+an empty integrated shell prompt; only the user's Return executes it.
+A right-hand prompt is not typed text: the input is the gap between the
+cursor and a trailing run. The line must be stable for a few samples;
+a failed write is retried within ten seconds. Typing abandons the fill.
+Missing or invalid UUIDs use the picker; a missing kind leaves a plain shell.
 Local agents never use tmux.
 
 **Why.** Keeping local processes alive past their window remains the

@@ -106,9 +106,11 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   the same host types its quoted path.
 - Projects, sessions and grids are restored after a restart; sessions start
   again (shell, preset or SSH host) when their project is first opened.
-  Local Claude/Codex conversations are remembered per pane by kind and UUID;
-  their exact resume commands fill empty integrated prompts, awaiting Return.
-  Missing/invalid IDs leave ordinary shells. Scrollback is not restored (D30).
+  Local Claude/Codex kinds, optional UUIDs and sources are remembered per pane.
+  Official picker commands (or exact resume commands when verified) fill empty
+  integrated prompts, awaiting Return. Missing/invalid UUIDs use the picker;
+  a missing kind leaves an ordinary shell. Each pane's menu shows the source.
+  Undocumented accelerators may stop working after CLI updates. Scrollback is not restored (D30).
 - Space connect-dialog SSH defaults to optional remote tmux retention, with a
   persistent UUID per terminal, independent sessions on one host, reconnect and
   separately confirmed targeted end. Status/details use Liquid Glass and survive

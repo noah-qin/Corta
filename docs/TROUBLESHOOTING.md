@@ -290,6 +290,26 @@ the badge reads. A `tmux` or `screen` in the foreground reads *Remote?*
 because the session it is attached to may itself be on another machine
 and nothing here can tell — it is uncertainty, not an accusation.
 
+### Space always fills a picker instead of a specific conversation
+
+This is the reliable baseline: Return opens Claude's or Codex's official
+conversation picker. In the pane's menu, **Resume Source** shows `picker`,
+`sessionRecord` (Claude's verified process record), or `openFile` (Codex's
+foreground group). A CLI update can change these undocumented accelerators;
+Corta never substitutes the directory's newest conversation.
+
+Inspect Console for subsystem `dev.noahqin.Corta`, category `space`, or run
+`log show --last 10m --info --predicate 'subsystem == "dev.noahqin.Corta" AND category == "space"'`.
+Each source/result change reports the kind and a fixed reason, with no UUID,
+path or conversation content: `recordMissing`, `recordUnreadable` (also a
+symlink or invalid JSON), `recordTooLarge`, `fieldMissing`, `notStandardUUID`,
+`processMismatch`, `noOpenFile`, or `ambiguousOpenFiles`. Claude records are
+read once per PID/start time. An absent file is probed again until it appears;
+its contents are not reread every second. Codex's npm
+node wrapper is recognized, but a shared background app-server's files are
+not reliably attributable; it then uses the picker. A missing kind leaves a
+plain shell. A busy prompt or a failed fill produces no success note.
+
 ### Space SSH says recovery is limited, or starts a new terminal
 
 Click the panel's glass connection button for details. **Remote tmux was not

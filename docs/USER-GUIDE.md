@@ -187,15 +187,22 @@ were, still running.
   same sessions again — a shell in the directory it was in, the same preset,
   the same SSH host, which asks for its password again — the first time you
   open the project, in the same grid. Scrollback is not kept. For local Claude
-  (`claude` or `claude-code`) and Codex, each pane remembers the conversation
-  UUID from its own process's open session file, even after the process exits.
-  It fills `claude --resume <UUID>` or `codex resume <UUID>` at an empty,
-  integrated prompt; press Return to execute, or delete the line to skip it.
-  Two panes in the same directory keep their own conversations. If one process
-  has several session files open, the newest one — by the file's modification
-  time, then its creation time — is the one recorded; a tie keeps the previous
-  UUID. With no valid ID, nothing is filled; SSH, remote agents and SFTP are
-  excluded. Preset commands are unchanged. A busy prompt, or one with text at
+  (`claude` or `claude-code`) and Codex, each pane remembers which tool was
+  running, even after it exits. The baseline fills `claude --resume` or
+  `codex resume`: press Return, then choose the conversation in that tool's
+  official picker. npm Codex 0.165.0 has verified picker recovery; its TUI did
+  not expose an attributable open rollout file. Shared app-server ownership
+  remains unverified. When a UUID can be reliably attributed to that pane, it
+  instead fills `claude --resume <UUID>` or `codex resume <UUID>` for that exact
+  conversation. Two panes in the same directory keep their own identities;
+  neither uses the directory's newest conversation, `--continue` or `--last`.
+  The accelerators are undocumented and may stop working after a CLI update;
+  the picker remains available. Claude uses its verified process session record;
+  Codex uses its foreground group's open files. If Codex's shared background
+  app-server owns the file, it cannot be attributed reliably and uses the picker.
+  **Resume Source** in each pane's menu shows `sessionRecord`, `openFile` or
+  `picker`. With no recorded kind, nothing is filled. SSH, remote agents and
+  SFTP are excluded. Preset commands are unchanged. A busy prompt, or one with text at
   the cursor, is left alone. A prompt's right-hand side (RPROMPT, Starship,
   Powerlevel10k) is not text you typed: Corta waits until that line has stopped
   changing, then fills, and tries a few more times if the write does not land.
@@ -252,11 +259,14 @@ changes no global tmux settings, installs nothing and starts no local daemon.
 A brief Liquid Glass note at the grid's foot explains a successful fill,
 without showing the UUID or offering Undo. Only successful fills count:
 
-- One: “This conversation is filled in. Press Return to continue. Delete the line to skip it.”
-- More than one: “Each pane has its own conversation filled in. Press Return to continue. Delete that line to skip it.”
+- One, exact conversation: “This conversation is filled in. Press Return to continue. Delete the line to skip it.”
+- One, picker: “The resume command is filled in. Press Return, then choose the conversation to continue. Delete the line to skip it.”
+- More than one: “Each pane has its resume command filled in. Press Return to continue. Delete that line to skip it.”
 - A session filled while hidden, when shown: “Press Return to continue this conversation.”
 
 The note disappears after a few seconds; the command stays in the prompt.
+
+![Two Space panes with unsubmitted Claude picker commands and a Liquid Glass note](brand/space-conversation.png)
 
 `space-panel-limit` (1–6) caps the panels on screen.
 

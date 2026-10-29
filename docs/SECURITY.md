@@ -600,24 +600,48 @@ is `tmux kill-session -t '=corta-<UUID>'`, never `kill-server`. A separate termi
 shows authentication and success/failure. This grants no authority over another
 session or a remote agent's exit protocol.
 
-**Local conversation identity (#436).** A Space record may also hold only
-`conversation.kind` (`claude` or `codex`) and `conversation.id` (a standard
-UUID). No transcript, session-file path, executable path or whole command is
-saved. A bounded kernel query inspects at most 1,024 open descriptors of the
-recognized foreground process, off main, without reading file contents or
-searching directories by modification time. The vnode's own modification
-time, then its creation time, may select the strictly newest of several
-standard names that process has open. Equal or missing times do not update
-the record, and neither does a descriptor list that filled the 1,024-entry
-buffer. OSC 7501 task IDs are never conversation IDs. SSH, manually typed
-remote agents and SFTP do not participate.
+**Local conversation identity (#436).** `space.json` holds only kind
+(`claude`/`codex`), optional standard UUID, and source (`sessionRecord`,
+`openFile`, `picker`). No transcript, session-file path, executable path or
+whole command is saved. A bounded query (256 foreground-group members,
+1,024 descriptors per member) runs off main; it recognizes npm-wrapped Codex,
+rejects mixed Claude/Codex groups, and never searches directories for the
+newest conversation. For native version-named symlink targets, a bounded 64 KiB kernel argument
+query decodes only the invocation basename (`argv[0]`), never later arguments
+or environment values; neither executable paths nor arguments are persisted
+or logged. OSC 7501 task IDs are never conversation UUIDs. SSH,
+manually typed remote agents and SFTP do not participate.
 
-On read, missing/invalid kinds or UUIDs discard the identity; duplicate JSON
-keys discard conversation identities conservatively. A command is reconstructed
-from fixed words and the validated UUID only, and passed to `fillPrompt(with:)`
-only at the first integrated, empty shell prompt after that project's first
-opening in a launch. No Return is sent. A failed fill produces no success note;
-a user may delete the line or explicitly fill it again from the session menu.
+For Claude, only identity fields `sessionId`, `pid` and `procStart` are decoded
+from `~/.claude/sessions/<pid>.json`; no other field is retained or logged.
+The reader refuses symlinks and non-regular files, reads at most 64 KiB,
+compares PID and UTC start second with the kernel, and rechecks the subsecond
+kernel identity before/after reading. After the first file read, results
+(including malformed/unreadable failures) are cached per PID/start identity
+per pane. A missing file has no contents to read: existence is probed again
+until Claude publishes it; once present, its contents are read only once. The undocumented record can disappear
+or change: that degrades to the official picker. Codex only inspects open
+file names and kernel vnode times across the foreground group: exactly one
+UUID, or a strictly newest modification/creation time with all candidates
+timed. Missing/tied times or a full descriptor buffer do not guess. A shared
+background app-server is not searched; if it owns the files, only the picker
+is available. These accelerators do not establish CLI-version compatibility.
+
+On read, invalid UUIDs discard the UUID and use `picker`; kind-only records
+also use the picker. Legacy kind/UUID records without source read as
+`openFile`; absent/invalid kinds leave ordinary shells. Duplicate JSON keys
+discard conversation identities conservatively. Each source/result change
+logs only kind, source and success or a fixed fallback reason under subsystem
+`dev.noahqin.Corta`, category `space`; no UUID, path or file content is logged.
+A failed probe cannot erase a verified UUID from the same agent; a different
+PID/start identity replaces it. Exiting preserves the last record.
+
+Only four commands are reconstructed from fixed words and an optional
+validated UUID: `claude --resume`, `codex resume`, and those same commands
+with one UUID. They go through `fillPrompt(with:)` at the first integrated,
+empty prompt after that project's first opening in a launch. No Return is
+sent; preset commands are unchanged. Failed fills produce no success note;
+a user may delete the line or explicitly fill it again from the pane menu.
 
 Two residual risks, accepted:
 
