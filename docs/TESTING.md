@@ -864,6 +864,9 @@ an empty package list is not success: verify it lists CortaTerminal and Sparkle
 and the build finds their products. Never change package pins or machine-wide
 settings merely to get a test to run.
 
+`RemoteTmuxTests` runs the shell branch matrix with tcsh `-f -c` so local
+startup files do not affect the wrapper results.
+
 `LocalConversationTests` checks exact UUID extraction, ambiguous/strictly
 newest open files, and two same-directory processes holding different files.
 `ClaudeSessionRecordTests` checks `sessionRecord` success; missing, unreadable,

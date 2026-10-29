@@ -138,7 +138,9 @@ struct RemoteTmuxTests {
         var environment = ChildEnvironment.default()
         environment["PATH"] = root.path + ":/usr/bin:/bin"
         environment["SHELL"] = shell.path
-        let pty = try PTY.spawn(executable: loginShell, arguments: ["-c", tmux.command], environment: environment)
+        // tcsh otherwise reads the test machine’s startup files even for -c.
+        let arguments = (loginShell == "/bin/tcsh" ? ["-f", "-c"] : ["-c"]) + [tmux.command]
+        let pty = try PTY.spawn(executable: loginShell, arguments: arguments, environment: environment)
         defer { pty.close() }
         let output = pty.readOutput(timeout: testTimeout(5))
         var terminal = Terminal()
