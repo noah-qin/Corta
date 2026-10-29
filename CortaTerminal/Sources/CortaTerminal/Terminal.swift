@@ -41,6 +41,11 @@ public struct Terminal: Sendable {
 
     public var remoteTmuxReport: RemoteTmux.Report? { performer.remoteTmuxHandshake?.report }
 
+    /// Test-only: the attach-failure window has already closed, with no screen output.
+    mutating func testingExpireRemoteTmuxAttachWindow() {
+        performer.remoteTmuxHandshake?.testingExpireAttachFailureWindow()
+    }
+
     public init(
         rows: Int = 24,
         columns: Int = 80,

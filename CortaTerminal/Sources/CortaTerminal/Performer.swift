@@ -55,24 +55,33 @@ struct Performer: ParserPerformer, Sendable {
     // MARK: - Text and C0 controls
 
     mutating func print(_ scalar: UInt32) {
+        remoteTmuxHandshake?.noteScreenOutput()
         grid.write(scalar)
     }
 
     mutating func printASCII(_ bytes: ArraySlice<UInt8>) {
+        remoteTmuxHandshake?.noteScreenOutput()
         grid.writeASCII(bytes)
     }
 
     mutating func execute(_ control: UInt8) {
         switch control {
-        case 0x08: grid.backspace()
-        case 0x09: grid.tab()
+        case 0x08:
+            remoteTmuxHandshake?.noteScreenOutput()
+            grid.backspace()
+        case 0x09:
+            remoteTmuxHandshake?.noteScreenOutput()
+            grid.tab()
         // LF, VT and FF all move down one row without changing the column —
         // unless LNM is set, which makes each of them a new *line* rather
         // than a new row (ECMA-48 §8.3.106).
         case 0x0A, 0x0B, 0x0C:
+            remoteTmuxHandshake?.noteScreenOutput()
             grid.lineFeed()
             if state.newLineModeEnabled { grid.carriageReturn() }
-        case 0x0D: grid.carriageReturn()
+        case 0x0D:
+            remoteTmuxHandshake?.noteScreenOutput()
+            grid.carriageReturn()
         case 0x07: state.bellRequested = true  // BEL
         default: break  // The rest have no effect on the grid.
         }
@@ -81,6 +90,7 @@ struct Performer: ParserPerformer, Sendable {
     // MARK: - CSI dispatch
 
     mutating func csiDispatch(_ sequence: CSISequence) {
+        remoteTmuxHandshake?.noteScreenOutput()
         if state.itermImage != nil { state.itermImage = nil }
         // A private marker or an intermediate makes it a different sequence
         // with the same final byte — `CSI ? 25 h` is not `CSI 25 h`, and

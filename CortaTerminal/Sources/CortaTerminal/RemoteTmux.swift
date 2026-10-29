@@ -86,9 +86,23 @@ public struct RemoteTmux: Equatable, Sendable {
     }
 
     struct Handshake: Sendable {
+        /// How long an attach failure may still arrive after `start`, before any screen output.
+        static let attachFailureWindow: Duration = .seconds(1)
         let token: String
         var report = Report()
         var finished = false
+        var failDeadline: SuspendingClock.Instant?
+
+        /// tmux has drawn. A later `fail` for this token is no longer an attach failure.
+        mutating func noteScreenOutput() {
+            guard report.established, !finished else { return }
+            finished = true
+        }
+
+        mutating func testingExpireAttachFailureWindow() {
+            guard failDeadline != nil else { return }
+            failDeadline = SuspendingClock.now.advanced(by: .milliseconds(-1))
+        }
 
         mutating func receive(_ payload: ArraySlice<UInt8>) {
             guard !finished, payload.count <= 2200 else { return }
@@ -98,23 +112,41 @@ public struct RemoteTmux: Equatable, Sendable {
             if fields[1] == "start", fields.count == 3, report.outcome == nil,
                let outcome = Outcome(rawValue: String(fields[2])) {
                 report.outcome = outcome
-                if outcome == .missing { finished = true }
-            } else if fields[1] == "fail", fields.count == 4,
-                      let status = Int(fields[2]), (1...255).contains(status), fields[3].count <= 2048 {
-                let hex = Array(fields[3].utf8)
-                guard hex.count.isMultiple(of: 2) else { return }
-                var bytes: [UInt8] = []
-                for offset in stride(from: 0, to: hex.count, by: 2) {
-                    guard let byte = UInt8(String(decoding: hex[offset...offset + 1], as: UTF8.self), radix: 16)
-                    else { return }
-                    bytes.append(byte)
+                if outcome == .missing {
+                    finished = true
+                } else {
+                    failDeadline = SuspendingClock.now.advanced(by: Self.attachFailureWindow)
                 }
-                report.failureStatus = status
-                report.reason = String(String(decoding: bytes, as: UTF8.self).unicodeScalars.filter {
-                    !CharacterSet.controlCharacters.contains($0) && !ConcealingScalars.contains($0.value)
-                })
+            } else if let failure = Self.failure(from: fields) {
+                // A failure before `start` is the prepare path. After `start`, only
+                // the short window — and no screen output, which already finished — accepts it.
+                if report.established {
+                    guard let deadline = failDeadline, SuspendingClock.now < deadline else {
+                        finished = true
+                        return
+                    }
+                }
+                report.failureStatus = failure.status
+                report.reason = failure.reason
                 finished = true
             }
+        }
+
+        private static func failure(from fields: [Substring]) -> (status: Int, reason: String)? {
+            guard fields.count == 4, fields[1] == "fail",
+                  let status = Int(fields[2]), (1...255).contains(status), fields[3].count <= 2048 else { return nil }
+            let hex = Array(fields[3].utf8)
+            guard hex.count.isMultiple(of: 2) else { return nil }
+            var bytes: [UInt8] = []
+            for offset in stride(from: 0, to: hex.count, by: 2) {
+                guard let byte = UInt8(String(decoding: hex[offset...offset + 1], as: UTF8.self), radix: 16)
+                else { return nil }
+                bytes.append(byte)
+            }
+            let reason = String(String(decoding: bytes, as: UTF8.self).unicodeScalars.filter {
+                !CharacterSet.controlCharacters.contains($0) && !ConcealingScalars.contains($0.value)
+            })
+            return (status, reason)
         }
     }
 }
