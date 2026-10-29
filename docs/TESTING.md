@@ -830,7 +830,10 @@ in the launched app; record which in the pull request.
 
 `RemoteTmuxTests` checks token/phase boundaries, malformed and repeated reports,
 RIS, command quoting, missing/broken tmux, attach failure and zero-exit detach
-without a fallback shell. `RemoteTmuxSSHIntegrationTests` runs through the
+without a fallback shell. A `fail` after screen output, or after the
+attach-failure window, is ignored; a `fail` before any drawing, including a
+prepare failure with no `start`, is kept. A title report does not close that
+window. `RemoteTmuxSSHIntegrationTests` runs through the
 isolated sshd fixture in `scripts/verify-ssh-integration.py`, using an installed
 tmux on a private socket with a fixture-only config/shell. It checks two UUIDs,
 distinct remote PIDs surviving the app's actual `TerminalSession.stop` SIGHUP
@@ -858,13 +861,19 @@ and the build finds their products. Never change package pins or machine-wide
 settings merely to get a test to run.
 
 `LocalConversationTests` checks exact UUID extraction (including Codex rollout
-filenames), ambiguous open files, unsupported tools and two same-directory
-processes holding different session files. `SpaceConversationTests` checks
+filenames), ambiguous open files, the strictly newest open file by vnode
+modification time and then creation time, a tie that does not choose,
+unsupported tools and two same-directory processes holding different session
+files. One process holding two session files records the newer modification
+time. A full 1,024-descriptor buffer still does not guess. `SpaceConversationTests` checks
 legacy/invalid metadata, duplicate JSON keys, metadata-only persistence and
 remote exclusion. The conversation cases in `CortaSpaceTests` also open real windows and shells,
 check that two same-directory Claude prompts and an off-grid Codex prompt hold
 their own commands without execution, count successful fills, dismiss the note,
-and delete/refill without repeating on mode switches.
+and delete/refill without repeating on mode switches. One case sets `RPROMPT`
+so a right-hand prompt is not mistaken for typed text; the prompt line must
+be stable before the fill. The grid case covers a flush-right run, a wide
+glyph, wrapped input and an unstable line that is sampled again.
 `CortaSpaceConversationUITests` verifies prompt fills without
 execution, single/multiple notes, later-shown sessions and explicit refill.
 The fixtures use disposable stages and a process-local shell environment;
@@ -881,9 +890,13 @@ that a CLI keeps its session file open long enough to be observed.
 
 `SFTPDragProviderTests` reproduces the deadlock trigger with a lazy
 `public.file-url` alongside file-promise types. A probe counts attempted
-materialization instead of hanging the test; terminal negotiation (accepted,
-wrong-host and external) and upload targeting must never request it. An
-ordinary Finder file URL must still work. It also exercises the actual
+materialization instead of hanging the test. The browser's own drag — local
+or carrying that drag's `sftp://` link — must not request it during tracking.
+An external promise is read only after the tracking call returns, and not on
+the main thread; a resident file URL beside a promise is the local path even
+while a remote drag is current. Ending the drag session clears the record
+before the two-minute lifetime. An ordinary Finder file URL must still work.
+It also exercises the actual
 table's pasteboard writer and `NSItemProvider`: URL and UTF-8 text must load
 while the main thread is occupied, without starting a download. A gated file transfer checks that
 requesting file bytes returns asynchronously, leaves the main actor available,

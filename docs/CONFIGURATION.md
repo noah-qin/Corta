@@ -692,10 +692,13 @@ the reattach is the remote program's doing, not Corta's.
 Space SSH retention is a **per-connection choice**, not a config-file key.
 Its connect dialog defaults **Keep running after disconnect** to on; legacy
 SSH records without that choice retain ordinary SSH behavior. `space.json`
-saves a standard session UUID, SSH target, retention choice and whether tmux
-was established. Invalid/missing/duplicate identities are replaced and saved
+saves a standard session UUID, SSH target, retention choice, whether tmux
+was established, and — only after a duplicate UUID is replaced — the previous
+canonical `corta-<UUID>` names, which the removal warning lists and nothing
+else reads. Invalid/missing/duplicate identities are replaced and saved
 before any project opens, never used to attach. No command, credential or
-terminal text is saved. The fixed command is rebuilt from the target/UUID;
+terminal text is saved. Reconnect rebuilds the fixed command from the target
+and a new token; it does not edit the previous command string. The fixed command is rebuilt from the target/UUID;
 only first opening a project starts its sessions, including off-grid ones.
 See [Space SSH retention](USER-GUIDE.md#keep-space-ssh-programs-running-after-disconnecting)
 for sshd PATH limits, `destroy-unattached`, shared-client sizing and the
@@ -819,7 +822,7 @@ managed remote-edit copies. Their contents are not configuration keys.
 | `Configuration.presets` | same file | Named shell/directory/environment combinations | **Pane-launch configuration** — read once, at the moment a pane spawns from that preset; never re-applied afterwards (`docs/CONFIGURATION.md` §4a) |
 | `SessionRestore` | `state.json` | Window frames and split arrangement, restored on the next launch | **Window/session state** — describes *this run's* windows, not a preference about future ones |
 | `DirectoryHistoryStore` | `directory-history.json` | Ranked recent directories | **Temporary interaction history** — gated by `directory-history`; clear it in Privacy & Security ▸ History |
-| `SpaceStore` | `space.json` | Space's project folders and, for each, its sessions (persistent UUID, number, directory, preset name or SSH destination, per-connection retention and whether tmux was established, optional local conversation kind and UUID), which were in the grid and the grid's divider positions | **Window/session state** — never contents or a command line; nothing is written into a project folder |
+| `SpaceStore` | `space.json` | Space's project folders and, for each, its sessions (persistent UUID, number, directory, preset name or SSH destination, per-connection retention, whether tmux was established, any replaced `corta-<UUID>` names, optional local conversation kind and UUID), which were in the grid and the grid's divider positions | **Window/session state** — never contents or a command line; nothing is written into a project folder |
 | `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent Hosts |
 | `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — preserve undecided edits before deleting app data; used copies are pruned after 30 days unless edits are pending |
 

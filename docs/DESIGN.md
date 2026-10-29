@@ -617,12 +617,14 @@ after close. Remote editing keeps a SHA-256 baseline of what it downloaded,
 validates the content before uploading, and sends the approved private
 snapshot rather than the live editor file (`SECURITY.md` §5).
 
-A file promise can also advertise `public.file-url`. Reading that local URL
+A file promise can also advertise `public.file-url`. Reading a promised URL
 while tracking a drag synchronously materializes its download, whose queue
-needs the same main actor: a circular wait. Terminal and upload destinations
-classify promises before considering ordinary file URLs, and never read a
-promise's file data during drag negotiation. Same-host terminal drops use
-the in-process remote path; mismatched or external promises are refused.
+needs the same main actor: a circular wait. The browser's own drag is known
+from the in-process record and is never read as a file URL; a same-host
+terminal drop uses that remote path. A resident file URL from any other drag
+is used immediately, promise types or not. A promised file URL from any other
+drag is read only after the tracking call has returned, on another thread,
+and the path is taken on the next pass. The tracking call never waits.
 
 SFTP table rows publish an explicit `NSItemProvider`. Drag metadata and the
 URL/text representations use immutable, nonisolated values: synchronous

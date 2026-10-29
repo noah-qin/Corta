@@ -541,19 +541,29 @@ The same browser drag offers a public URL/text representation to other
 applications. It contains the connection's specified user, host and port and
 the percent-encoded remote path, never a password or identity-file path.
 Exporting that link performs no file I/O and starts no connection or download.
-Internal terminal drops continue to use only the process-local record and
-the host/control-character checks above. A promised file captures its source
-folder and connection generation at drag start; replacing the connection
-invalidates a delayed request.
+Internal terminal drops use the process-local record only when the drag is
+that browser row (the record is live and, for a drag from another app, the
+pasteboard's link is that same `sftp://` URL). A resident `file-url` from
+anywhere else is the local path. A promised `file-url` from anywhere else is
+read only after the tracking call has returned, on another thread; the
+tracking call never waits, so a download whose queue needs the main actor
+cannot deadlock it. The record is cleared when the drag session ends, and
+the two-minute lifetime remains only as a backstop. A promised file captures
+its source folder and connection generation at drag start; replacing the
+connection invalidates a delayed request.
 
 **Space SSH retention (#434).** Only the Space connect dialog's enabled
 retention choice authorizes the fixed remote wrapper. System OpenSSH still
 owns aliases, users, ports, identity files, ProxyJump, host verification and
 authentication. It allocates a tty (`-t`). Typed/nested SSH, presets, SFTP and
 traditional mode are unchanged. No command is read from a project or saved to
-disk. `space.json` stores standard UUIDs, target and booleans only. Malformed,
-missing or duplicate identities are replaced and persisted with the old
-established flag cleared, never connected under their invalid names. UUID
+disk. `space.json` stores standard UUIDs, target, booleans, and — only when a
+duplicate UUID was replaced — the previous `corta-<standard UUID>` names.
+Those names are checked again on read and appear only in the removal
+warning. Malformed, missing or duplicate identities are replaced and
+persisted with the old established flag cleared, never connected under
+their invalid names. Every duplicate occurrence is replaced, and each
+retained one keeps the name it stopped using. UUID
 values are canonically rendered and shell-quoted; display names are never
 command parameters. No rc is explicitly sourced and no configuration is changed.
 
@@ -569,9 +579,14 @@ wrapper without fallback. This deliberate supervision replaces #434's original
 OSC 6973 is display-only and armed only before this connection's reader starts,
 with a fresh random UUID token each time. It accepts one `start` enum
 (`missing`, `new`, `attached`), plus at most one `fail` with exit status 1–255
-and at most 1,024 hex-encoded error bytes. Missing/failure closes the handshake;
-RIS cannot rearm it. Startup and later failure are separate, as approved for
-#434. Errors drop controls/concealing scalars; the parser's 4,096-byte OSC cap
+and at most 1,024 hex-encoded error bytes. `missing`, and a `fail` that
+arrives before `start` (the prepare path), close the handshake. After
+`new` or `attached`, `fail` is accepted only until the pane draws or for one
+second, whichever comes first; a later `fail` is ignored and the handshake
+closes. A title report is not drawing. RIS cannot rearm it. Reconnect builds
+the ssh arguments again from the saved destination and a new token; it does
+not search the previous command string. Startup and later failure are separate,
+as approved for #434. Errors drop controls/concealing scalars; the parser's 4,096-byte OSC cap
 also applies. One report is retained per pane, no text is echoed to input or
 used to launch commands. A hostile remote host can forge its own displayed
 result if it reads the token; it gains no new execution capability.
@@ -588,8 +603,11 @@ session or a remote agent's exit protocol.
 UUID). No transcript, session-file path, executable path or whole command is
 saved. A bounded kernel query inspects at most 1,024 open descriptors of the
 recognized foreground process, off main, without reading file contents or
-searching directories by modification time. Ambiguous candidates do not update
-the record. OSC 7501 task IDs are never conversation IDs. SSH, manually typed
+searching directories by modification time. The vnode's own modification
+time, then its creation time, may select the strictly newest of several
+standard names that process has open. Equal or missing times do not update
+the record, and neither does a descriptor list that filled the 1,024-entry
+buffer. OSC 7501 task IDs are never conversation IDs. SSH, manually typed
 remote agents and SFTP do not participate.
 
 On read, missing/invalid kinds or UUIDs discard the identity; duplicate JSON

@@ -47,7 +47,38 @@ Versioning for compatibility changes.
   drag data. Finder receives a promised download with transfer progress;
   URL and text destinations receive its `sftp://user@host:port/path` link
   without downloading. Delayed downloads keep the drag's original folder
-  and refuse a connection that has since been replaced.
+  and refuse a connection that has since been replaced. Cancelling the drag
+  drops that in-process path when the drag ends.
+
+- Filling a Space conversation no longer treats a right-hand prompt
+  (RPROMPT, Starship, Powerlevel10k) as text you typed. The line is filled
+  once it has stopped changing, and a write that does not land is tried again.
+
+- A file dragged in from Finder is inserted as its local path even when the
+  drag also advertises a file promise, such as an iCloud placeholder. Only
+  the SFTP browser's own drag is taken as a remote path. A promised local
+  file is read after tracking returns, so the download cannot wait on the
+  main thread.
+
+- After a retained Space SSH session has attached, a late `fail` signal no
+  longer marks the pane as failed. An attach failure that arrives before
+  any screen output, within a short window, is still recorded.
+
+- Reconnecting a retained Space SSH session rebuilds the ssh command from
+  the destination and a new token. It does not search the previous command
+  text for the old wrapper.
+
+- When one local Claude or Codex process has more than one session file
+  open, Space records the newest by the kernel's modification time, then
+  its creation time. A tie, or a descriptor list that filled the query,
+  keeps the UUID already recorded.
+
+- Removing or ending a retained SSH session still asks, in the same glass
+  alert, when that window cannot show a sheet. Removal continues only
+  after you confirm.
+
+- Replacing a duplicated session UUID keeps the old `corta-<UUID>` in the
+  removal warning, so that remote tmux session can still be ended by hand.
 
 ## [1.5.1] - 2026-10-27
 

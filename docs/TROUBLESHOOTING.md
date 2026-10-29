@@ -313,7 +313,9 @@ Retention applies only to Space SSH created with **Keep running after
 disconnect** enabled. Disable it for ordinary SSH. Closing/removing local
 panels or projects never kills remote tmux. If an abandoned session consumes
 resources, connect to the same host and run the exact `tmux kill-session -t
-'=corta-<UUID>'` shown by its connection details/removal warning. **End Remote
+'=corta-<UUID>'` shown by its connection details or removal warning, including
+a previous name kept when a duplicated UUID was replaced. The warning is shown
+even when the Space window cannot present a sheet. **End Remote
 Session…** confirms this separately and never runs `kill-server`.
 
 ### Browse Remote Files… says authentication failed, but `ssh` works in the pane

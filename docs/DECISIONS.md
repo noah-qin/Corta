@@ -852,7 +852,16 @@ is first opened, including its off-grid sessions. For local Claude and Codex, Co
 UUID in a session file opened by that pane's foreground process. On the
 project's first opening next launch it fills `claude --resume <UUID>` or
 `codex resume <UUID>` into an empty integrated shell prompt; only the user's
-Return executes it. Missing or invalid identities leave an ordinary shell.
+Return executes it. A right-hand prompt is not typed text: the input is the
+gap between the cursor and a trailing run flush with the row. The line is
+filled only after it has been unchanged for a few samples, and a write that
+does not land is tried again within the same ten seconds. Typing abandons
+the fill at once. When that process holds more than one standard session
+file, the newest modification time on those open descriptors wins, then the
+creation time. Those times are the kernel's vnode times; the file is not
+opened and the directory is not scanned. Equal or missing times, or a
+descriptor list that filled the 1,024-entry query, leave the previously
+recorded UUID in place. Missing or invalid identities leave an ordinary shell.
 Local agents never use tmux.
 
 **Why.** Keeping local processes alive past their window remains the

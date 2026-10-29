@@ -127,6 +127,7 @@ refer to [SECURITY.md](SECURITY.md).
 | `OSC 5113` | all | refused | File transfer writes stream-named files | §2.10; #411 |
 | `OSC 5522` | text/plain write/wdata | implemented | Bounded sanitised text transaction, gated like OSC 52; partial protocol. Replies a fixed `status=DONE`, `EPERM` (writes not allowed) or `EIO` (pasteboard failed) | #411 |
 | `OSC 5522` | read, MIME aliases, non-text, primary selection | refused | No clipboard disclosure or extra clipboard surfaces | §2.6; §2.10 |
+| `OSC 6973` | token-bound start / fail | implemented | Armed before the reader starts. One `start`; a `fail` only before drawing or within one second. Later reports are ignored. RIS cannot rearm it | §4.10; #434 |
 | `OSC 7501` | status / probe | implemented | Bounded task state; constant probe reply | #409 |
 | `OSC 21337` | tab metadata | implemented | Bounded self-reported metadata | #409 |
 

@@ -191,9 +191,14 @@ were, still running.
   UUID from its own process's open session file, even after the process exits.
   It fills `claude --resume <UUID>` or `codex resume <UUID>` at an empty,
   integrated prompt; press Return to execute, or delete the line to skip it.
-  Two panes in the same directory keep their own conversations. With no valid
-  ID, nothing is filled; SSH, remote agents and SFTP are excluded. Preset
-  commands are unchanged, and a busy prompt or one with text is left alone.
+  Two panes in the same directory keep their own conversations. If one process
+  has several session files open, the newest one — by the file's modification
+  time, then its creation time — is the one recorded; a tie keeps the previous
+  UUID. With no valid ID, nothing is filled; SSH, remote agents and SFTP are
+  excluded. Preset commands are unchanged. A busy prompt, or one with text at
+  the cursor, is left alone. A prompt's right-hand side (RPROMPT, Starship,
+  Powerlevel10k) is not text you typed: Corta waits until that line has stopped
+  changing, then fills, and tries a few more times if the write does not land.
   **Fill Conversation Again** in the pane's menu fills the same command again
   at an empty prompt, without executing it.
 
@@ -227,6 +232,10 @@ terminates only that UUID with `tmux kill-session -t '=corta-<UUID>'`. Its new
 terminal shows authentication and the result. Cancel runs nothing. Ordinary
 close and removing a local session/project never kill tmux; removal warns that
 it may keep consuming remote resources and gives the manual cleanup command.
+The warning is a sheet on the Space window, or a dialog when that window
+cannot show a sheet; Cancel leaves the session in place. If a saved UUID was
+replaced because the file listed it twice, the warning also lists the previous
+`corta-<UUID>`.
 
 A server restart or an ended tmux session loses those processes permanently.
 `destroy-unattached on` can destroy the session when SSH disconnects; Corta
