@@ -190,9 +190,11 @@ were, still running.
   (`claude` or `claude-code`) and Codex, each pane remembers which tool was
   running, even after it exits. The baseline fills `claude --resume` or
   `codex resume`: press Return, then choose the conversation in that tool's
-  official picker. npm Codex 0.165.0 has verified picker recovery; its TUI did
-  not expose an attributable open rollout file. Shared app-server ownership
-  remains unverified. When a UUID can be reliably attributed to that pane, it
+  official picker. In the [recorded real-CLI check](test-results/2026-10-30-conversation-review3.md),
+  Claude Code 2.1.312 used `sessionRecord`; npm Codex 0.165.0 used
+  `picker` / `noOpenFile` and filled `codex resume` after restart.
+  Codex's `openFile` enhancement and shared app-server ownership remain unverified.
+  When a UUID can be reliably attributed to that pane, it
   instead fills `claude --resume <UUID>` or `codex resume <UUID>` for that exact
   conversation. Two panes in the same directory keep their own identities;
   neither uses the directory's newest conversation, `--continue` or `--last`.

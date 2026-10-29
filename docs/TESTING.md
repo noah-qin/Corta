@@ -1179,7 +1179,9 @@ any skipped checks. Separate build failures, assertion failures, crashes,
 timing failures and fixture/setup problems. Attach an `.xcresult` for app
 failures or the smallest byte stream for parser failures, after removing
 private data. A manual pass is recorded in the pull request or issue it
-verifies, not as a file in the tree.
+verifies, not as a file in the tree. For the maintainer-requested review3
+exception (no PR), the [conversation acceptance record](test-results/2026-10-30-conversation-review3.md)
+is retained in the historical `docs/test-results/` location.
 
 The historical esctest2 number that includes “known bugs” is a compatibility
 classification, not an automated-test pass rate. Always report all three
