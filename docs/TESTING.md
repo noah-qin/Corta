@@ -888,6 +888,8 @@ that a confirmed mixed group clears persisted metadata.
 duplicate keys, metadata-only persistence, remote exclusion and notice choice.
 The conversation cases in `CortaSpaceTests` open real windows/shells to check
 exact/picker fills, successful-fill counts, hidden panes, notes, delete/refill,
+and suppress delayed notices after deletion, edits, trailing spaces or moving
+the cursor to Home. They also cover
 mode switches, right prompts and process replacement/exit. The grid cases
 cover typed text, wide glyphs, wraps and unstable prompts.
 `CortaSpaceConversationUITests` checks exact and picker fills without execution,

@@ -76,10 +76,12 @@ extension CortaSpaceTests {
             head: SelectionPoint(row: grid.rows - 1, column: grid.columns - 1)), in: grid)
     }
 
-    private func conversationNoteText(in space: CortaSpaceController) -> String? {
+    private func conversationNoteText(in space: CortaSpaceController, checkUndo: Bool = true) -> String? {
         let glass = space.content.view.subviews.compactMap { $0 as? NSGlassEffectView }.last
         let row = glass?.contentView as? NSStackView
-        #expect(row?.arrangedSubviews.contains { $0 is NSButton } != true, "no Undo for a conversation fill")
+        if checkUndo {
+            #expect(row?.arrangedSubviews.contains { $0 is NSButton } != true, "no Undo for a conversation fill")
+        }
         return (row?.arrangedSubviews.first as? NSTextField)?.stringValue
     }
 
@@ -226,6 +228,27 @@ extension CortaSpaceTests {
                 #expect(item.record.conversation == expected, "the last observed conversation survives exit")
                 space.saveNow()
                 #expect(SpaceStore.standard.load().projects[0].sessions[0].conversation == expected)
+            }
+        }
+    }
+
+    @Test func hiddenDeletedOrEditedCommandsDoNotGetTheContinueNotice() async throws {
+        for edit in [[UInt8(0x15)], Array(" extra".utf8), Array(" ".utf8), [UInt8(0x01)]] {
+            try await withConversationFixture { space, project in
+                let hidden = project.sessions[2]
+                try await waitForConversation { hidden.conversationNeedsNotice }
+                let terminal = try #require(hidden.pane?.session)
+                let before = terminal.snapshot().cursor
+                let text = conversationText(terminal)
+                terminal.write(edit)
+                try await waitForConversation {
+                    terminal.snapshot().cursor != before || conversationText(terminal) != text
+                }
+                space.show(hidden)
+                space.refreshNow()
+                #expect(!hidden.conversationNeedsNotice)
+                #expect(conversationNoteText(in: space, checkUndo: false) != L10n.text("space.conversation.continue"))
+                #expect(!terminal.isCommandRunning)
             }
         }
     }

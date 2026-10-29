@@ -262,7 +262,7 @@ without showing the UUID or offering Undo. Only successful fills count:
 - One, exact conversation: “This conversation is filled in. Press Return to continue. Delete the line to skip it.”
 - One, picker: “The resume command is filled in. Press Return, then choose the conversation to continue. Delete the line to skip it.”
 - More than one: “Each pane has its resume command filled in. Press Return to continue. Delete that line to skip it.”
-- A session filled while hidden, when shown: “Press Return to continue this conversation.”
+- A session filled while hidden, when shown with that exact input still at the same prompt: “Press Return to continue this conversation.”
 
 The note disappears after a few seconds; the command stays in the prompt.
 

@@ -49,6 +49,9 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Space only shows a delayed conversation continuation note while the exact
+  unsubmitted resume line is still at the original prompt.
+
 - Space conversation sampling preserves a verified UUID's original source after
   transient failures, clears identities for mixed Claude/Codex groups, and
   distinguishes unreadable fd tables from ambiguous rollout candidates.

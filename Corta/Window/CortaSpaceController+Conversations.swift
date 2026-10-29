@@ -78,6 +78,7 @@ extension CortaSpaceController {
         guard case .observed(let observation) = sample else {
             item.conversationObservation = nil
             item.conversationNeedsNotice = false
+            item.conversationFilledCommand = nil
             if item.record.conversation != nil {
                 item.record.conversation = nil
                 scheduleSave()
@@ -232,7 +233,10 @@ extension CortaSpaceController {
     @discardableResult
     func fillConversation(_ item: SpaceSession) -> Bool {
         guard canFillConversation(item), let conversation = item.record.conversation else { return false }
-        return item.pane?.shell.fillPrompt(with: conversation.command) == true
+        guard item.pane?.shell.fillPrompt(with: conversation.command) == true else { return false }
+        item.conversationFilledCommand = conversation.command
+        item.conversationFilledPrompt = item.pane?.session?.promptEndPosition
+        return true
     }
 
     func refillConversation(_ item: SpaceSession) {
@@ -240,10 +244,38 @@ extension CortaSpaceController {
         content.showNote(L10n.text(Self.conversationNoticeKey(for: [item.record.conversation].compactMap { $0 })))
     }
 
+    /// Compare exact ASCII input cells, including spaces, rather than copied
+    /// selection text (which trims trailing blanks). Right prompts are excluded.
+    private nonisolated static func hasFilledConversationPrompt(
+        in grid: Grid, row: Int, column: Int, command: String
+    ) -> Bool {
+        guard !grid.isAlternateScreenActive, !grid.pendingWrap,
+              let row = grid.screenRow(ofAbsoluteRow: row) else { return false }
+        let start = row * grid.columns + column
+        let end = grid.cursor.row * grid.columns + grid.cursor.column
+        let expected = Array(command.unicodeScalars.map(\.value))
+        guard end - start == expected.count else { return false }
+        for (offset, scalar) in expected.enumerated() {
+            let index = start + offset
+            let line = index / grid.columns
+            guard line == row || grid.line(line).wrapped, grid[line, index % grid.columns].scalar == scalar
+            else { return false }
+        }
+        return Self.isEmptyConversationPrompt(in: grid, row: grid.absoluteRow(ofScreenRow: grid.cursor.row),
+                                             column: grid.cursor.column)
+    }
+
     func showConversationNoticeIfNeeded() {
         guard let project = selectedProject else { return }
         for item in project.shown where item.conversationNeedsNotice {
             item.conversationNeedsNotice = false
+            guard let command = item.conversationFilledCommand, let pane = item.pane,
+                  let terminal = pane.session, !terminal.isCommandRunning,
+                  let end = terminal.promptEndPosition,
+                  end.row == item.conversationFilledPrompt?.row,
+                  end.column == item.conversationFilledPrompt?.column else { continue }
+            guard Self.hasFilledConversationPrompt(in: terminal.snapshot(), row: end.row,
+                                                   column: end.column, command: command) else { continue }
             content.showNote(L10n.text("space.conversation.continue"))
         }
     }

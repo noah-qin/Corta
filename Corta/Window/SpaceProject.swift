@@ -28,6 +28,9 @@ final class SpaceSession {
     var lastUsed: UInt64 = 0
     /// A successful off-grid fill is explained when its panel first shows.
     var conversationNeedsNotice = false
+    /// Transient expected input for the delayed notice; never persisted.
+    var conversationFilledCommand: String?
+    var conversationFilledPrompt: (row: Int, column: Int)?
     var conversationObservation: ConversationObservation?
 
     init(record: SpaceSessionRecord) {
