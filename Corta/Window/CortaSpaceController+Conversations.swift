@@ -17,6 +17,27 @@
 import AppKit
 import CortaTerminal
 
+/// Three identical prompt-line samples, 100 ms apart, before a fill or a skip.
+/// A right prompt or a transient redraw must not discard the pane on the first look.
+nonisolated struct ConversationPromptReadiness: Equatable, Sendable {
+    static let stableSamples = 3
+    private(set) var samples = 0
+    private var signature: [UInt32] = []
+
+    enum Decision: Equatable, Sendable { case wait, fill, skip }
+
+    mutating func observe(signature: [UInt32], isEmpty: Bool) -> Decision {
+        if signature == self.signature {
+            samples += 1
+        } else {
+            self.signature = signature
+            samples = 1
+        }
+        guard samples >= Self.stableSamples else { return .wait }
+        return isEmpty ? .fill : .skip
+    }
+}
+
 extension CortaSpaceController {
     /// One bounded batch at a time, also while Space is hidden. The only
     /// retained result is kind + UUID; an exited process leaves the last one.
@@ -56,10 +77,13 @@ extension CortaSpaceController {
         let item: SpaceSession
         let terminal: TerminalSession
         let inputRevision: UInt64
+        var readiness = ConversationPromptReadiness()
+        var fillAttempts = 0
     }
 
     /// Wait for each new shell's first integrated prompt, not a fixed startup
-    /// delay. Each pane gets one attempt; failed writes never count as filled.
+    /// delay. The prompt line must sit still for a few samples — a right prompt
+    /// redraws after the cursor — and a failed write is tried again, not counted.
     func prepareConversations(in project: SpaceProject) {
         let candidates = project.sessions.compactMap { item -> PendingConversation? in
             guard item.record.ssh == nil, item.record.conversation != nil,
@@ -74,21 +98,11 @@ extension CortaSpaceController {
             var filled: [SpaceSession] = []
             while !pending.isEmpty, SuspendingClock.now < deadline {
                 guard !Task.isCancelled, let self, let project, self.projects.contains(project) else { return }
-                pending.removeAll { pending in
-                    let item = pending.item
-                    guard project.sessions.contains(item), let pane = item.pane, let terminal = pane.session,
-                          terminal === pending.terminal,
-                          pane.terminalView?.userInputRevision == pending.inputRevision else {
-                        return true
-                    }
-                    guard terminal.promptEndPosition != nil else { return terminal.pty.exitStatus != nil }
-                    if self.fillConversation(item) {
-                        filled.append(item)
-                        item.conversationNeedsNotice = !(self.isActive && self.selectedProject === project
-                            && project.shown.contains(item))
-                    }
-                    return true
+                var remaining: [PendingConversation] = []
+                for var candidate in pending where self.keepWaiting(&candidate, in: project, filled: &filled) {
+                    remaining.append(candidate)
                 }
+                pending = remaining
                 if !pending.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
             }
             guard !Task.isCancelled, let self, let project, self.isActive, self.selectedProject === project,
@@ -106,18 +120,79 @@ extension CortaSpaceController {
         return Self.isEmptyConversationPrompt(in: terminal.snapshot(), row: end.row, column: end.column)
     }
 
+    /// Keeps a pane until its prompt line has been stable, then fills or skips.
+    /// Typing or a shell that exits abandons immediately. Returns whether to keep waiting.
+    private func keepWaiting(
+        _ candidate: inout PendingConversation, in project: SpaceProject, filled: inout [SpaceSession]
+    ) -> Bool {
+        let item = candidate.item
+        guard project.sessions.contains(item), let pane = item.pane, let terminal = pane.session,
+              terminal === candidate.terminal,
+              pane.terminalView?.userInputRevision == candidate.inputRevision else { return false }
+        guard let end = terminal.promptEndPosition else { return terminal.pty.exitStatus == nil }
+        let grid = terminal.snapshot()
+        guard let signature = Self.conversationPromptSignature(in: grid, row: end.row, column: end.column)
+        else { return true }
+        let empty = Self.isEmptyConversationPrompt(in: grid, row: end.row, column: end.column)
+        switch candidate.readiness.observe(signature: signature, isEmpty: empty) {
+        case .wait:
+            return true
+        case .skip:
+            return false
+        case .fill:
+            guard fillConversation(item) else {
+                candidate.fillAttempts += 1
+                return candidate.fillAttempts < ConversationPromptReadiness.stableSamples
+            }
+            filled.append(item)
+            item.conversationNeedsNotice = !(isActive && selectedProject === project && project.shown.contains(item))
+            return false
+        }
+    }
+
+    /// Cells from the cursor through the logical prompt line. A redraw changes this.
+    nonisolated static func conversationPromptSignature(in grid: Grid, row: Int, column: Int) -> [UInt32]? {
+        guard let screenRow = grid.screenRow(ofAbsoluteRow: row),
+              (0..<grid.columns).contains(column) else { return nil }
+        var scalars: [UInt32] = []
+        for index in screenRow..<grid.rows {
+            if index > screenRow, !grid.line(index).wrapped { break }
+            if index > screenRow { scalars.append(0x0A) }
+            let start = index == screenRow ? column : 0
+            for cell in start..<grid.columns { scalars.append(grid[index, cell].scalar) }
+        }
+        return scalars
+    }
+
     /// A cursor at the start alone is insufficient: Home can leave typed
-    /// text after it. If right-prompt text makes emptiness uncertain, skip.
+    /// text after it. A right prompt is the trailing run, flush to the line
+    /// and separated from the cursor by a space; that run is not user text.
+    /// A wrapped continuation that holds anything is user text.
     nonisolated static func isEmptyConversationPrompt(in grid: Grid, row: Int, column: Int) -> Bool {
         guard !grid.isAlternateScreenActive, let screenRow = grid.screenRow(ofAbsoluteRow: row),
               (0..<grid.columns).contains(column) else { return false }
-        for index in screenRow..<grid.rows {
-            if index > screenRow, !grid.line(index).wrapped { break }
-            let start = index == screenRow ? column : 0
-            for cell in start..<grid.columns where grid[index, cell].scalar != 0 && grid[index, cell].scalar != 32 {
-                return false
-            }
+        for index in (screenRow + 1)..<grid.rows {
+            guard grid.line(index).wrapped else { break }
+            for cell in 0..<grid.columns where !isConversationPadding(grid[index, cell]) { return false }
         }
+        return inputBeforeRightPromptIsEmpty(in: grid, row: screenRow, column: column)
+    }
+
+    /// Blank, or the spacer half of a wide glyph. A wide spacer is part of the glyph before it.
+    private nonisolated static func isConversationPadding(_ cell: Cell) -> Bool {
+        if cell.attributes.contains(.wideSpacer) { return false }
+        return cell.scalar == 0 || cell.scalar == 32
+    }
+
+    private nonisolated static func inputBeforeRightPromptIsEmpty(in grid: Grid, row: Int, column: Int) -> Bool {
+        var end = grid.columns - 1
+        while end >= column, isConversationPadding(grid[row, end]) { end -= 1 }
+        if end < column { return true }
+        var start = end
+        while start > column, !isConversationPadding(grid[row, start - 1]) { start -= 1 }
+        // Text that begins at the cursor has no gap, so it is the input, not a right prompt.
+        if start == column { return false }
+        for cell in column..<start where !isConversationPadding(grid[row, cell]) { return false }
         return true
     }
 

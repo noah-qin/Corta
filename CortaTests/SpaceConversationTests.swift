@@ -54,6 +54,44 @@ struct SpaceConversationTests {
         #expect(!CortaSpaceController.isEmptyConversationPrompt(in: terminal.grid, row: 0, column: 2))
     }
 
+    @Test func aRightPromptIsNotUserTextAndAnUnstableLineWaits() {
+        var terminal = Terminal(rows: 4, columns: 40)
+        terminal.feed(Array("$ ".utf8))
+        terminal.feed(Array(String(repeating: " ", count: 33).utf8))
+        terminal.feed(Array("right".utf8))
+        terminal.feed(Array("\u{1b}[3G".utf8))
+        #expect(CortaSpaceController.isEmptyConversationPrompt(in: terminal.grid, row: 0, column: 2))
+        terminal.feed(Array("hi".utf8))
+        terminal.feed(Array("\u{1b}[3G".utf8))
+        #expect(!CortaSpaceController.isEmptyConversationPrompt(in: terminal.grid, row: 0, column: 2),
+                "text at the cursor is the input, even with a right prompt")
+
+        var wide = Terminal(rows: 2, columns: 10)
+        wide.feed(Array("$ ".utf8))
+        wide.feed(Array(String(repeating: " ", count: 6).utf8))
+        wide.feed(Array("右".utf8))
+        wide.feed(Array("\u{1b}[3G".utf8))
+        #expect(CortaSpaceController.isEmptyConversationPrompt(in: wide.grid, row: 0, column: 2))
+
+        var wrapped = Terminal(rows: 3, columns: 10)
+        wrapped.feed(Array("$ ".utf8))
+        wrapped.feed(Array("abcdefghij".utf8))
+        wrapped.feed(Array("\u{1b}[3G".utf8))
+        #expect(!CortaSpaceController.isEmptyConversationPrompt(in: wrapped.grid, row: 0, column: 2))
+
+        var readiness = ConversationPromptReadiness()
+        let right: [UInt32] = [32, 82, 73, 71, 72, 84]
+        #expect(readiness.observe(signature: right, isEmpty: true) == .wait)
+        #expect(readiness.observe(signature: [82], isEmpty: false) == .wait, "a redraw starts the count again")
+        #expect(readiness.observe(signature: right, isEmpty: true) == .wait)
+        #expect(readiness.observe(signature: right, isEmpty: true) == .wait)
+        #expect(readiness.observe(signature: right, isEmpty: true) == .fill)
+        var typed = ConversationPromptReadiness()
+        #expect(typed.observe(signature: [104, 105], isEmpty: false) == .wait)
+        _ = typed.observe(signature: [104, 105], isEmpty: false)
+        #expect(typed.observe(signature: [104, 105], isEmpty: false) == .skip)
+    }
+
     @Test @MainActor func persistenceContainsOnlyKindAndUUIDAndRejectsDuplicateKeys() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

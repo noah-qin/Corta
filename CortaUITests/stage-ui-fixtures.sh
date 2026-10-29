@@ -255,7 +255,7 @@ for scenario in one many invalid; do
   mkdir -p "$conversation_stage/ApplicationSupport" "$conversation_stage/project"
   cat > "$conversation_stage/.zshrc" <<'SH'
 PROMPT='demo ❯ '
-RPROMPT=''
+RPROMPT='RIGHT'
 claude() { print -r -- "USER-EXECUTED-CLAUDE $*"; }
 codex() { print -r -- "USER-EXECUTED-CODEX $*"; }
 SH

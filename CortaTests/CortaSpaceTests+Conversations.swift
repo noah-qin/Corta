@@ -21,13 +21,14 @@ import Testing
 
 extension CortaSpaceTests {
     private func withConversationFixture(
-        skipping: Set<Int> = [], _ body: (CortaSpaceController, SpaceProject) async throws -> Void
+        skipping: Set<Int> = [], rightPrompt: String = "",
+        _ body: (CortaSpaceController, SpaceProject) async throws -> Void
     ) async throws {
         let (controller, host) = try makeWindow(limit: 2)
         defer { close(controller, host) }
         let folder = try makeProject()
         defer { try? FileManager.default.removeItem(at: folder) }
-        try "PROMPT='demo> '\nRPROMPT=''\nHISTFILE=/dev/null\n".write(
+        try "PROMPT='demo> '\nRPROMPT='\(rightPrompt)'\nHISTFILE=/dev/null\n".write(
             to: folder.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
         var preset = Preset(name: "conversation-fixture")
         preset.shell = "/bin/zsh"
@@ -107,6 +108,18 @@ extension CortaSpaceTests {
             #expect(space.fillConversation(hidden), "explicit refill is still a fill, never a run")
             try await waitForConversation { conversationText(terminal).contains(command) }
             #expect(!terminal.isCommandRunning)
+        }
+    }
+
+    @Test func aRightPromptStillReceivesTheResumeCommand() async throws {
+        try await withConversationFixture(rightPrompt: "RIGHT") { _, project in
+            let item = project.sessions[0]
+            let command = try #require(item.record.conversation).command
+            try await waitForConversation("RPROMPT must not look like typed text") {
+                conversationText(item.pane?.session).contains(command)
+                    && conversationText(item.pane?.session).contains("RIGHT")
+            }
+            #expect(item.pane?.session?.isCommandRunning == false)
         }
     }
 
