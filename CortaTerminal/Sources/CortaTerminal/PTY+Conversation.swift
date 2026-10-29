@@ -28,7 +28,7 @@ extension PTY {
         let bytes = proc_pidinfo(group, PROC_PIDLISTFDS, 0, &descriptors, capacity)
         // A full buffer may have omitted another candidate: don't guess.
         guard bytes > 0, bytes < capacity else { return nil }
-        var paths: [String] = []
+        var files: [LocalConversation.OpenedFile] = []
         for descriptor in descriptors.prefix(Int(bytes) / stride) where descriptor.proc_fdtype == PROX_FDTYPE_VNODE {
             var info = vnode_fdinfowithpath()
             let size = Int32(MemoryLayout<vnode_fdinfowithpath>.size)
@@ -38,10 +38,20 @@ extension PTY {
             let path = withUnsafeBytes(of: &info.pvip.vip_path) { raw in
                 String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
             }
-            paths.append(path)
+            let stat = info.pvip.vip_vi.vi_stat
+            files.append(LocalConversation.OpenedFile(
+                path: path,
+                modified: Self.fileTime(seconds: stat.vst_mtime, nanoseconds: stat.vst_mtimensec),
+                created: Self.fileTime(seconds: stat.vst_birthtime, nanoseconds: stat.vst_birthtimensec)))
         }
         guard exitStatus == nil, foregroundProcessGroup == group,
               Self.processName(of: group) == name else { return nil }
-        return LocalConversation.openedFiles(processName: name, paths: paths)
+        return LocalConversation.openedFiles(processName: name, files: files)
+    }
+
+    /// Epoch is not a time the kernel measured for this descriptor.
+    private static func fileTime(seconds: Int64, nanoseconds: Int64) -> LocalConversation.FileTime? {
+        guard seconds != 0 || nanoseconds != 0 else { return nil }
+        return LocalConversation.FileTime(seconds: seconds, nanoseconds: nanoseconds)
     }
 }

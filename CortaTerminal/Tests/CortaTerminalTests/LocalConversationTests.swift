@@ -38,6 +38,25 @@ struct LocalConversationTests {
         #expect(LocalConversation.openedFiles(processName: "claude", paths: ambiguous) == nil)
         let repeated = [first + ".jsonl", first + ".jsonl"]
         #expect(LocalConversation.openedFiles(processName: "claude", paths: repeated) != nil)
+        let older = LocalConversation.FileTime(seconds: 10, nanoseconds: 0)
+        let newer = LocalConversation.FileTime(seconds: 10, nanoseconds: 1)
+        let files = [
+            LocalConversation.OpenedFile(path: "/one/" + first + ".jsonl", modified: older, created: newer),
+            LocalConversation.OpenedFile(path: "/two/" + second + ".jsonl", modified: newer, created: older),
+        ]
+        #expect(LocalConversation.openedFiles(processName: "claude", files: files)?.id == UUID(uuidString: second))
+        let tied = [
+            LocalConversation.OpenedFile(path: first + ".jsonl", modified: older, created: older),
+            LocalConversation.OpenedFile(path: second + ".jsonl", modified: older, created: older),
+        ]
+        #expect(
+            LocalConversation.openedFiles(processName: "claude", files: tied) == nil,
+            "a tie keeps the previous UUID")
+        let byBirth = [
+            LocalConversation.OpenedFile(path: first + ".jsonl", modified: older, created: older),
+            LocalConversation.OpenedFile(path: second + ".jsonl", modified: older, created: newer),
+        ]
+        #expect(LocalConversation.openedFiles(processName: "claude", files: byBirth)?.id == UUID(uuidString: second))
         for invalid in ["", "{" + first + "}", first + ";echo", first + " ", "task-1", first + ".jsonl.bak"] {
             #expect(LocalConversation.openedFiles(processName: "claude", paths: [invalid + ".jsonl"]) == nil)
         }
@@ -73,5 +92,40 @@ struct LocalConversationTests {
         #expect(one.localConversation != two.localConversation)
         one.close()
         #expect(one.localConversation == nil)
+    }
+
+    @Test func oneProcessKeepsTheNewestOpenConversationFile() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("claude")
+        try FileManager.default.copyItem(atPath: "/bin/sleep", toPath: executable.path)
+        let signer = Process()
+        signer.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        signer.arguments = ["--force", "--sign", "-", executable.path]
+        try signer.run()
+        signer.waitUntilExit()
+        try #require(signer.terminationStatus == 0)
+        let older = directory.appendingPathComponent(first + ".jsonl")
+        let newer = directory.appendingPathComponent(second + ".jsonl")
+        let pty = try PTYFixture.shell(
+            "exec 3>'" + older.path + "'; exec 4>'" + newer.path + "'; exec '" + executable.path + "' 30")
+        defer { pty.close() }
+        // The redirections create the files. Opening truncates them, so the
+        // modification times are set only after both descriptors exist.
+        let deadline = SuspendingClock.now + testTimeout(5)
+        while !FileManager.default.fileExists(atPath: older.path)
+            || !FileManager.default.fileExists(atPath: newer.path), SuspendingClock.now < deadline {
+            usleep(10_000)
+        }
+        try #require(FileManager.default.fileExists(atPath: older.path))
+        try #require(FileManager.default.fileExists(atPath: newer.path))
+        let past = Date().addingTimeInterval(-3600)
+        try FileManager.default.setAttributes([.modificationDate: past], ofItemAtPath: older.path)
+        try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: newer.path)
+        while pty.localConversation?.id != UUID(uuidString: second), SuspendingClock.now < deadline {
+            usleep(10_000)
+        }
+        #expect(pty.localConversation?.id == UUID(uuidString: second))
     }
 }
