@@ -38,6 +38,12 @@ final class CortaSpaceController: NSObject {
     weak var host: SplitViewController?
     /// Transport construction is injectable for isolated SSH tests, never configuration.
     var makeSSHPreset: (SSHTarget, RemoteTmux?) -> Preset = { SSHDestination.preset(for: $0, retaining: $1) }
+    /// Alert presentation is injectable so a test never runs an app-modal dialog.
+    var presentAlert: (
+        NSAlert, NSWindow?, @escaping @MainActor (NSApplication.ModalResponse) -> Void
+    ) -> Void = { alert, window, done in
+        alert.present(for: window, completion: done)
+    }
     private(set) var isActive = false
     private(set) var projects: [SpaceProject] = []
     private(set) var selectedProject: SpaceProject?
