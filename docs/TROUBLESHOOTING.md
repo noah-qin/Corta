@@ -303,9 +303,13 @@ Inspect Console for subsystem `dev.noahqin.Corta`, category `space`, or run
 Each source/result change reports the kind and a fixed reason, with no UUID,
 path or conversation content: `recordMissing`, `recordUnreadable` (also a
 symlink or invalid JSON), `recordTooLarge`, `fieldMissing`, `notStandardUUID`,
-`processMismatch`, `noOpenFile`, or `ambiguousOpenFiles`. Claude records are
-read once per PID/start time. An absent file is probed again until it appears;
-its contents are not reread every second. Codex's npm
+`processMismatch`, `noOpenFile`, `ambiguousOpenFiles` (multiple candidates), or
+`openFilesUnreadable` (an unreadable/full fd table). Claude reads from the
+agent process's HOME, including a preset's override. Successful records are
+cached per PID/start time; failures get at most three non-ENOENT attempts.
+An absent file is probed until publication within that budget. A transient
+failure preserves an already verified UUID and its original source; its reason
+appears only in the log. A confirmed mixed Claude/Codex group clears the record. Codex's npm
 node wrapper is recognized, but a shared background app-server's files are
 not reliably attributable; it then uses the picker. A missing kind leaves a
 plain shell. A busy prompt or a failed fill produces no success note.

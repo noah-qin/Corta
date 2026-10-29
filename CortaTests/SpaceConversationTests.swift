@@ -51,6 +51,10 @@ struct SpaceConversationTests {
             #"{"kind":"claude","id":"\#(uuid)","source":"future"}"#.utf8))
         #expect(unknown.source == .picker)
         #expect(unknown.id == nil)
+        let contradictory = try decoder.decode(LocalConversation.self, from: Data(
+            #"{"kind":"claude","id":"\#(uuid)","source":"picker"}"#.utf8))
+        #expect(contradictory.id == nil)
+        #expect(contradictory.command == "claude --resume")
         let picker = try decoder.decode(LocalConversation.self, from: Data(#"{"kind":"claude"}"#.utf8))
         #expect(picker.source == .picker)
         #expect(picker.command == "claude --resume")

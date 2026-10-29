@@ -852,18 +852,30 @@ is first opened, including its off-grid sessions. For local Claude and Codex, Co
 conversation UUID and its source. The official picker (`claude --resume` or
 `codex resume`, without an ID) is the baseline. An exact UUID accelerates it
 only when reliably attributed to this pane: Claude's bounded, no-follow
-`~/.claude/sessions/<pid>.json` record with kernel PID/start verification
+`$HOME/.claude/sessions/<pid>.json` record with kernel PID/start verification
 (`sessionRecord`), or Codex's strictly selected open rollout file (`openFile`).
 Both are undocumented and may stop working after a CLI update; failure uses
 `picker`, never the directory's newest conversation, `--continue` or `--last`.
 The whole foreground group is inspected, so npm's node wrapper does not hide
-Codex; a group containing both kinds is not attributed. Each Claude process
-is read once, cached by PID and subsecond kernel start. An absent record has
-no contents to read and is probed until it appears; contents are never reread
-every second. A new agent process
+Codex; a confirmed group containing both kinds clears the pane's saved identity.
+Claude's own process HOME is the only environment value decoded from a bounded
+64 KiB kernel query; other values are neither decoded, retained nor logged.
+Missing/unreadable HOME never falls back to the account directory.
+
+**Bounded retry amendment (review3).** The successful record is read once and
+cached by PID and subsecond kernel start. To recover from partial publication
+or a transient `recordUnreadable`/`processMismatch`, failures share a maximum
+of three non-ENOENT attempts per identity (initial attempt plus two retries,
+at the existing one-second monitor cadence). This deliberately relaxes #436's
+one-read rule only on failure; it is not an unlimited once-per-second reread.
+After exhaustion, only the last fixed reason is retained; no failed record or
+observation is cached. ENOENT reads no contents and can be probed until a late
+record appears, within the remaining attempt budget. Replacing the kernel
+identity resets that budget. A new agent process
 replaces the old identity, even when it yields only a kind; an exited process
 leaves the last observation. A failed probe of the same process retains a
-previously verified UUID. Source/result changes are logged without identity
+previously verified UUID and the source that obtained it; only the log reason
+reflects the failed probe. `picker` never accompanies a UUID. Source/result changes are logged without identity
 or paths and each pane's menu shows its source.
 
 On the project's first opening next launch, the fixed resume command fills

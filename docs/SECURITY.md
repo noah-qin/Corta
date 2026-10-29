@@ -608,22 +608,28 @@ whole command is saved. A bounded query (256 foreground-group members,
 rejects mixed Claude/Codex groups, and never searches directories for the
 newest conversation. For native version-named symlink targets, a bounded 64 KiB kernel argument
 query decodes only the invocation basename (`argv[0]`), never later arguments
-or environment values; neither executable paths nor arguments are persisted
+or environment values for recognition; neither executable paths nor arguments are persisted
 or logged. OSC 7501 task IDs are never conversation UUIDs. SSH,
 manually typed remote agents and SFTP do not participate.
 
 For Claude, only identity fields `sessionId`, `pid` and `procStart` are decoded
-from `~/.claude/sessions/<pid>.json`; no other field is retained or logged.
+from `$HOME/.claude/sessions/<pid>.json`, using this agent process's HOME.
+A bounded 64 KiB kernel query decodes only that exact environment entry, skips
+all other values as bytes, and never persists/logs HOME. Missing, invalid or
+unreadable HOME fails closed; the account home is not substituted.
+No other record field is retained or logged.
 The reader refuses symlinks and non-regular files, reads at most 64 KiB,
 compares PID and UTC start second with the kernel, and rechecks the subsecond
-kernel identity before/after reading. After the first file read, results
-(including malformed/unreadable failures) are cached per PID/start identity
-per pane. A missing file has no contents to read: existence is probed again
-until Claude publishes it; once present, its contents are read only once. The undocumented record can disappear
+kernel identity before/after reading. Only successful results
+are cached per PID/start identity per pane. Failed reads share three attempts
+per identity, at the one-second monitor cadence; exhaustion retains only the
+fixed reason. ENOENT reads no contents and can be probed until publication
+within the remaining budget (D30's bounded retry amendment). The undocumented record can disappear
 or change: that degrades to the official picker. Codex only inspects open
 file names and kernel vnode times across the foreground group: exactly one
 UUID, or a strictly newest modification/creation time with all candidates
-timed. Missing/tied times or a full descriptor buffer do not guess. A shared
+timed. Missing/tied times do not guess (`ambiguousOpenFiles`); unreadable or
+full descriptor tables report `openFilesUnreadable`. A shared
 background app-server is not searched; if it owns the files, only the picker
 is available. These accelerators do not establish CLI-version compatibility.
 
@@ -633,7 +639,9 @@ also use the picker. Legacy kind/UUID records without source read as
 discard conversation identities conservatively. Each source/result change
 logs only kind, source and success or a fixed fallback reason under subsystem
 `dev.noahqin.Corta`, category `space`; no UUID, path or file content is logged.
-A failed probe cannot erase a verified UUID from the same agent; a different
+A confirmed mixed Claude/Codex group clears the pane's saved conversation.
+A failed probe preserves both a verified UUID and its original source from
+the same agent; a different
 PID/start identity replaces it. Exiting preserves the last record.
 
 Only four commands are reconstructed from fixed words and an optional

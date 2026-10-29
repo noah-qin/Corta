@@ -873,11 +873,16 @@ newest open files, and two same-directory processes holding different files.
 overlarge, invalid JSON, missing field, nonstandard UUID, mismatched PID/start,
 symlink, kernel identity changing during read, and cache invalidation on PID
 reuse, and a record published after the agent process appears (no contents
-are read until the file exists, then only once). Every failure asserts `picker` and the exact reason through returned
+are read until the file exists), the literal Claude 2.1.312 `procStart`,
+bounded failure retries, and success-only caching. `ConversationProcessHomeTests`
+checks exact HOME extraction and a disposable signed process whose record lives
+under its own HOME. Every failure asserts `picker` and the exact reason through returned
 observations, without parsing system logs. Whole-group recognition covers a
 node leader with a Codex member and rejects mixed tools. Native version-named
 Claude uses only the kernel invocation basename; later arguments are ignored. A new agent clears
-the previous UUID; a failed probe of the same agent retains a verified UUID.
+the previous UUID; a failed probe of the same agent retains a verified UUID
+and its source. Unreadable fd tables have a distinct reason. App tests verify
+that a confirmed mixed group clears persisted metadata.
 
 `SpaceConversationTests` checks legacy/invalid metadata, source migration,
 duplicate keys, metadata-only persistence, remote exclusion and notice choice.

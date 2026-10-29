@@ -62,31 +62,43 @@ extension CortaSpaceController {
             return (item.id, terminal)
         }
         let updates = await Task.detached(priority: .utility) {
-            candidates.map { ($0.0, $0.1.conversationObservation) }
+            candidates.map { ($0.0, $0.1.pty.conversationSample) }
         }.value
         guard !Task.isCancelled else { return }
-        for (id, observation) in updates {
-            guard let observation, let (_, item) = session(withID: id),
+        for (id, sample) in updates {
+            guard let sample, let (_, item) = session(withID: id),
                   let original = candidates.first(where: { $0.0 == id })?.1,
                   item.pane?.session === original, item.record.ssh == nil,
                   case .local = item.pane?.remote.state else { continue }
-            if item.conversationObservation != observation {
-                let conversation = observation.conversation
-                let result = observation.reason?.rawValue ?? "success"
-                let kind = conversation.kind.rawValue
-                let source = conversation.source.rawValue
-                Self.conversationLog.info("""
-                    conversation kind=\(kind, privacy: .public) \
-                    source=\(source, privacy: .public) result=\(result, privacy: .public)
-                    """)
-            }
-            let conversation = observation.retainingIdentity(
-                item.record.conversation, previousProcesses: item.conversationObservation?.processes)
-            item.conversationObservation = observation
-            guard item.record.conversation != conversation else { continue }
-            item.record.conversation = conversation
-            scheduleSave()
+            applyConversationSample(sample, to: item)
         }
+    }
+
+    func applyConversationSample(_ sample: ConversationSample, to item: SpaceSession) {
+        guard case .observed(let observation) = sample else {
+            item.conversationObservation = nil
+            item.conversationNeedsNotice = false
+            if item.record.conversation != nil {
+                item.record.conversation = nil
+                scheduleSave()
+            }
+            return
+        }
+        let conversation = observation.retainingIdentity(
+            item.record.conversation, previousProcesses: item.conversationObservation?.processes)
+        if item.conversationObservation != observation {
+            let result = observation.reason?.rawValue ?? "success"
+            let kind = conversation.kind.rawValue
+            let source = conversation.source.rawValue
+            Self.conversationLog.info("""
+                conversation kind=\(kind, privacy: .public) \
+                source=\(source, privacy: .public) result=\(result, privacy: .public)
+                """)
+        }
+        item.conversationObservation = observation
+        guard item.record.conversation != conversation else { return }
+        item.record.conversation = conversation
+        scheduleSave()
     }
 
     nonisolated static func conversationNoticeKey(for conversations: [LocalConversation]) -> String {

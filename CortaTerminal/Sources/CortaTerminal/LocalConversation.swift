@@ -38,7 +38,7 @@ public struct LocalConversation: Codable, Equatable, Sendable {
 
     public init(kind: Kind, id: UUID? = nil, source: Source = .openFile) {
         self.kind = kind
-        self.id = id
+        self.id = source == .picker ? nil : id
         self.source = id == nil ? .picker : source
     }
 

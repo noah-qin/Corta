@@ -49,6 +49,12 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Space conversation sampling preserves a verified UUID's original source after
+  transient failures, clears identities for mixed Claude/Codex groups, and
+  distinguishes unreadable fd tables from ambiguous rollout candidates.
+  Claude records use the agent process's HOME and retry failed reads within a
+  bounded per-process budget while caching only success.
+
 - Retained Space SSH connections work when the remote login shell is csh or
   tcsh. The fixed tmux wrapper uses one quoted line, preserving tmux startup,
   failure reporting, login-shell fallback and normal detach behavior.

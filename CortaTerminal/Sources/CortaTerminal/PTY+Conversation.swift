@@ -20,22 +20,29 @@ import Synchronization
 
 extension PTY {
     /// Bounded background sampling of the whole foreground group, including npm wrappers.
-    public var conversationObservation: ConversationObservation? {
+    public var conversationSample: ConversationSample? {
         guard exitStatus == nil, let group = foregroundProcessGroup else { return nil }
         var members = [pid_t](repeating: 0, count: 256)
         let count = proc_listpgrppids(group, &members, Int32(members.count * MemoryLayout<pid_t>.size))
-        guard count > 0, count < members.count,
-              let (kind, agents) = ConversationObservation.recognized(
-                members.prefix(Int(count)).compactMap(ConversationProcess.read)) else { return nil }
+        guard count > 0, count < members.count else { return nil }
+        let identities = members.prefix(Int(count)).compactMap(ConversationProcess.read)
+        if ConversationSample.isMixed(identities) {
+            guard exitStatus == nil, foregroundProcessGroup == group,
+                  identities.allSatisfy({ ConversationProcess.read($0.pid) == $0 }) else { return nil }
+            return .mixedProcesses
+        }
+        guard let (kind, agents) = ConversationObservation.recognized(identities) else { return nil }
         let result: ConversationObservation
         if kind == .claude {
             // Multiple Claude members cannot be attributed to one conversation safely.
             guard agents.count == 1, let agent = agents.first else {
-                return ConversationObservation(kind: kind, processes: agents, reason: .processMismatch)
+                return .observed(ConversationObservation(kind: kind, processes: agents, reason: .processMismatch))
             }
             result = conversationCache.withLock { cache in
-                let directory = FileManager.default.homeDirectoryForCurrentUser
-                    .appendingPathComponent(".claude/sessions", isDirectory: true)
+                guard let home = ConversationProcess.homeDirectory(agent.pid) else {
+                    return ConversationObservation(kind: .claude, processes: agents, reason: .recordUnreadable)
+                }
+                let directory = home.appendingPathComponent(".claude/sessions", isDirectory: true)
                 return cache.read(process: agent, directory: directory) {
                     ConversationProcess.read(agent.pid) == agent
                 }
@@ -47,7 +54,12 @@ extension PTY {
         }
         guard exitStatus == nil, foregroundProcessGroup == group,
               agents.allSatisfy({ ConversationProcess.read($0.pid) == $0 }) else { return nil }
-        return result
+        return .observed(result)
+    }
+
+    public var conversationObservation: ConversationObservation? {
+        guard case .observed(let observation) = conversationSample else { return nil }
+        return observation
     }
 
     public var localConversation: LocalConversation? { conversationObservation?.conversation }

@@ -123,6 +123,8 @@ struct ClaudeSessionRecordTests {
         #expect(result?.1 == [codex])
         #expect(ConversationObservation.recognized([node]) == nil)
         #expect(ConversationObservation.recognized([node, codex, process]) == nil)
+        #expect(ConversationSample.isMixed([node, codex, process]))
+        #expect(!ConversationSample.isMixed([node, codex]))
     }
 
     @Test func codexFallbacksExposeReasonsAndNeverGuessANonRolloutFile() {
@@ -138,7 +140,7 @@ struct ClaudeSessionRecordTests {
             #expect(result.conversation.command == "codex resume")
             #expect(result.reason == reason)
         }
-        #expect(ConversationObservation.codex(processes: [], files: nil).reason == .ambiguousOpenFiles)
+        #expect(ConversationObservation.codex(processes: [], files: nil).reason == .openFilesUnreadable)
     }
 
     @Test func failedProbeRetainsVerifiedUUIDOnlyForSameAgentProcess() {
@@ -146,8 +148,66 @@ struct ClaudeSessionRecordTests {
         let fallback = ConversationObservation(kind: .claude, processes: [process], reason: .recordMissing)
         let retained = fallback.retainingIdentity(previous, previousProcesses: [process])
         #expect(retained.id == previous.id)
-        #expect(retained.source == .picker)
+        #expect(retained.source == .sessionRecord)
+        #expect(fallback.reason == .recordMissing)
         #expect(fallback.retainingIdentity(previous, previousProcesses: []).id == nil)
         #expect(fallback.retainingIdentity(previous, previousProcesses: nil).command == "claude --resume")
     }
+    @Test func failuresRetryWithinAFiniteBudgetAndOnlySuccessIsCached() throws {
+        for invalid in [Data("partial JSON".utf8), try record(pid: 124)] {
+            try withRecord { directory, file in
+                var cache = ClaudeConversationCache()
+                try invalid.write(to: file)
+                #expect(cache.read(process: process, directory: directory, verify: { true }).reason != nil)
+                try record().write(to: file)
+                #expect(cache.read(process: process, directory: directory, verify: { true }).conversation.source
+                        == .sessionRecord)
+            }
+        }
+        try withRecord { directory, file in
+            var cache = ClaudeConversationCache()
+            try Data("partial JSON".utf8).write(to: file)
+            var checks = 0
+            for _ in 0..<10 {
+                #expect(cache.read(process: process, directory: directory, verify: {
+                    checks += 1
+                    return true
+                }).reason == .recordUnreadable)
+            }
+            #expect(checks == ClaudeConversationCache.maximumAttempts)
+            try record().write(to: file)
+            #expect(cache.read(process: process, directory: directory, verify: { true }).conversation.id == nil)
+            let replacement = ConversationProcess(pid: 123, seconds: process.seconds,
+                                                  microseconds: 13, name: "claude")
+            #expect(cache.read(process: replacement, directory: directory, verify: { true }).conversation.source
+                    == .sessionRecord)
+        }
+    }
+
+    @Test func realClaude21312ProcStartLiteralMatchesKernelEpoch() throws {
+        // Copied verbatim from the 2.1.312 process record during the #436
+        // acceptance run, 2026-10-30 local time. No conversation content.
+        try withRecord { directory, file in
+            try record(start: "Thu Oct 29 17:27:02 2026").write(to: file)
+            let result = ClaudeSessionRecord.read(process: process, directory: directory, verify: { true })
+            #expect(result.conversation.source == .sessionRecord)
+            #expect(result.reason == nil)
+        }
+    }
+
+    @Test func codexClosedRolloutRetainsItsOriginalSource() {
+        let agent = ConversationProcess(pid: 456, seconds: 1, microseconds: 2, name: "codex")
+        let success = ConversationObservation.codex(processes: [agent], files: [
+            LocalConversation.OpenedFile(path: "rollout-date-" + uuid + ".jsonl"),
+        ])
+        for files: [LocalConversation.OpenedFile]? in [[], nil] {
+            let failure = ConversationObservation.codex(processes: [agent], files: files)
+            let retained = failure.retainingIdentity(success.conversation, previousProcesses: [agent])
+            #expect(retained == success.conversation)
+            #expect(retained.source == .openFile)
+            #expect(retained.command.contains(uuid))
+            #expect(failure.reason != nil)
+        }
+    }
+
 }

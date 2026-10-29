@@ -230,4 +230,18 @@ extension CortaSpaceTests {
         }
     }
 
+    @Test func confirmedMixedGroupClearsThePersistedIdentity() async throws {
+        try await withConversationFixture { space, project in
+            let item = project.sessions[0]
+            try await waitForConversation { !space.canFillConversation(item) }
+            #expect(item.record.conversation != nil)
+            space.applyConversationSample(.mixedProcesses, to: item)
+            #expect(item.record.conversation == nil)
+            #expect(item.conversationObservation == nil)
+            #expect(!space.canFillConversation(item))
+            space.saveNow()
+            #expect(SpaceStore.standard.load().projects[0].sessions[0].conversation == nil)
+        }
+    }
+
 }

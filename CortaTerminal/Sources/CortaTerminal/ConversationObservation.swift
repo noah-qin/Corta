@@ -73,7 +73,7 @@ public struct ConversationProcess: Hashable, Sendable {
 public struct ConversationObservation: Equatable, Sendable {
     public enum Reason: String, Error, Sendable {
         case recordMissing, recordUnreadable, recordTooLarge, fieldMissing, notStandardUUID
-        case processMismatch, noOpenFile, ambiguousOpenFiles
+        case processMismatch, noOpenFile, ambiguousOpenFiles, openFilesUnreadable
     }
 
     public let conversation: LocalConversation
@@ -91,13 +91,13 @@ public struct ConversationObservation: Equatable, Sendable {
     /// A different PID/start time replaces it, even if only the kind is available.
     public func retainingIdentity(_ previous: LocalConversation?,
                                   previousProcesses: [ConversationProcess]?) -> LocalConversation {
-        guard conversation.id == nil, previousProcesses == processes,
-              previous?.kind == conversation.kind, let id = previous?.id else { return conversation }
-        return LocalConversation(kind: conversation.kind, id: id, source: conversation.source)
+        guard conversation.id == nil, previousProcesses == processes, let previous,
+              previous.kind == conversation.kind, previous.id != nil else { return conversation }
+        return previous
     }
 
     static func codex(processes: [ConversationProcess], files: [LocalConversation.OpenedFile]?) -> Self {
-        guard let files else { return Self(kind: .codex, processes: processes, reason: .ambiguousOpenFiles) }
+        guard let files else { return Self(kind: .codex, processes: processes, reason: .openFilesUnreadable) }
         let conversation = LocalConversation.openedFiles(processName: "codex", files: files)
         let hasCandidate = files.contains {
             LocalConversation.openedFiles(processName: "codex", files: [$0]) != nil
@@ -112,6 +112,16 @@ public struct ConversationObservation: Equatable, Sendable {
         guard kinds.count == 1, let first = agents.first,
               let kind = LocalConversation.Kind(processName: first.name) else { return nil }
         return (kind, agents.sorted { $0.pid < $1.pid })
+    }
+}
+
+/// An absent sample preserves exit history; confirmed mixed tools erase it.
+public enum ConversationSample: Equatable, Sendable {
+    case observed(ConversationObservation)
+    case mixedProcesses
+
+    static func isMixed(_ members: [ConversationProcess]) -> Bool {
+        Set(members.compactMap { LocalConversation.Kind(processName: $0.name) }).count > 1
     }
 }
 
@@ -197,18 +207,32 @@ enum ClaudeSessionRecord {
 
 /// One agent per pane; replacing its kernel identity releases the old cached record.
 struct ClaudeConversationCache: Sendable {
+    static let maximumAttempts = 3
     private var process: ConversationProcess?
     private var observation: ConversationObservation?
+    private var attempts = 0
+    private var lastReason: ConversationObservation.Reason = .recordMissing
 
     mutating func read(process: ConversationProcess, directory: URL,
                        verify: () -> Bool) -> ConversationObservation {
-        if self.process == process, let observation { return observation }
+        if self.process != process {
+            self.process = process
+            observation = nil
+            attempts = 0
+        }
+        if let observation { return observation }
+        guard attempts < Self.maximumAttempts else {
+            return ConversationObservation(kind: .claude, processes: [process], reason: lastReason)
+        }
         let result = ClaudeSessionRecord.read(process: process, directory: directory, verify: verify)
-        self.process = process
-        // ENOENT means no file was read. Claude can publish its record after
-        // its process appears; wait for that first file, then cache the one read,
-        // including malformed/unreadable results, for this kernel identity.
-        observation = result.reason == .recordMissing ? nil : result
+        if let reason = result.reason {
+            lastReason = reason
+            // ENOENT reads no contents; allow a late publication. All other
+            // failures share a finite per-kernel-identity attempt budget.
+            if reason != .recordMissing { attempts += 1 }
+        } else {
+            observation = result
+        }
         return result
     }
 }
