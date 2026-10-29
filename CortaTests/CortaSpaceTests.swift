@@ -118,6 +118,20 @@ struct SpaceGridTests {
         #expect(Set(records.map(\.id)).count == 3)
         #expect(records[0].id != again.id, "every occurrence of an ambiguous identity is replaced")
         #expect(records[1].tmuxEstablished == false)
+        let oldName = RemoteTmux(id: again.id).sessionName
+        #expect(records.allSatisfy { $0.supersededTmuxNames == [oldName] })
+        let encoded = try JSONEncoder().encode(records[0])
+        var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object["supersededTmuxNames"] = ["tmux kill-server", oldName, "corta-not-a-uuid", oldName]
+        let decoded = try JSONDecoder().decode(
+            SpaceSessionRecord.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(decoded.supersededTmuxNames == [oldName])
+        var plain = SpaceSessionRecord(number: 1)
+        plain.retainSSH = false
+        let local = SpaceState(projects: [
+            SpaceProjectRecord(path: "/local", sessions: [plain, plain]),
+        ]).validated()
+        #expect(local.projects[0].sessions.allSatisfy { $0.supersededTmuxNames == nil })
     }
 
     @Test @MainActor func legacyIdentityIsPersistedWithoutOpeningTheProject() throws {

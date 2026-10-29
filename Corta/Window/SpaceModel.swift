@@ -53,6 +53,9 @@ nonisolated struct SpaceState: Codable, Equatable, Sendable {
             guard project.path.hasPrefix("/"), seen.insert(project.path).inserted else { return nil }
             var valid = project.validated()
             for index in valid.sessions.indices where counts[valid.sessions[index].id, default: 0] > 1 {
+                if valid.sessions[index].retainSSH == true {
+                    valid.sessions[index].rememberSupersededTmuxName()
+                }
                 valid.sessions[index].id = UUID()
                 valid.sessions[index].tmuxEstablished = false
             }
@@ -183,6 +186,9 @@ nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
     var ssh: SSHTarget?
     /// The user's name for it, which programs' titles never replace.
     var name: String?
+    /// `corta-<UUID>` names replaced because the UUID was duplicated.
+    /// Shown in the removal warning so the old remote session can still be ended.
+    var supersededTmuxNames: [String]?
 
     init(number: Int, directory: String? = nil, presetName: String? = nil, ssh: SSHTarget? = nil) {
         self.id = UUID()
@@ -194,6 +200,7 @@ nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, retainSSH, tmuxEstablished, conversation, number, directory, presetName, ssh, name
+        case supersededTmuxNames
     }
 
     init(from decoder: Decoder) throws {
@@ -217,12 +224,36 @@ nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
         presetName = try values.decodeIfPresent(String.self, forKey: .presetName)
         ssh = try values.decodeIfPresent(SSHTarget.self, forKey: .ssh)
         name = try values.decodeIfPresent(String.self, forKey: .name)
+        let storedNames = try values.decodeIfPresent([String].self, forKey: .supersededTmuxNames) ?? []
+        supersededTmuxNames = Self.canonicalTmuxNames(storedNames)
         if ssh != nil { conversation = nil }
     }
 
     private enum ConversationKeys: String, CodingKey { case kind, id }
 
     static let maximumNameLength = 64
+
+    /// Only a `corta-` name we generate: a standard UUID, nothing a file could smuggle into a command.
+    static func canonicalTmuxSessionName(_ text: String) -> String? {
+        let prefix = "corta-"
+        guard text.hasPrefix(prefix) else { return nil }
+        guard let uuid = LocalConversation.standardUUID(String(text.dropFirst(prefix.count))) else { return nil }
+        return prefix + uuid.uuidString.lowercased()
+    }
+
+    static func canonicalTmuxNames(_ names: [String]) -> [String]? {
+        var seen = Set<String>()
+        let clean = names.prefix(SpaceState.maximumSessions).compactMap(canonicalTmuxSessionName)
+            .filter { seen.insert($0).inserted }
+        return clean.isEmpty ? nil : clean
+    }
+
+    /// The remote name this record is about to stop using.
+    mutating func rememberSupersededTmuxName() {
+        var names = supersededTmuxNames ?? []
+        names.append(RemoteTmux(id: id).sessionName)
+        supersededTmuxNames = Self.canonicalTmuxNames(names)
+    }
 
     /// A typed or stored name as a row can show it: one line, no controls,
     /// bounded; nil when nothing is left.
@@ -237,6 +268,7 @@ nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
         var record = self
         record.number = min(max(number, 1), 1_000_000)
         record.name = Self.cleanName(name)
+        record.supersededTmuxNames = Self.canonicalTmuxNames(supersededTmuxNames ?? [])
         if let directory, !directory.hasPrefix("/") { record.directory = nil }
         if let ssh {
             record.conversation = nil
