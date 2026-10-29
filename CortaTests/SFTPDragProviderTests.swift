@@ -125,7 +125,8 @@ struct SFTPDragProviderTests {
         #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: true) == ["/srv/notes.txt"])
         terminal.remotePathsForDrop = { _ in [] }
         #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: true).isEmpty, "another host is refused")
-        #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: false).isEmpty, "external promises are refused")
+        #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: false).isEmpty,
+                "the browser's own promise is not taken as a local file")
         #expect(SFTPDropTargetView.fileURLs(pasteboard).isEmpty, "not an upload, even with fileURL advertised")
         #expect(pasteboard.string(forType: .URL) == "sftp://user@example.com:2222/srv/notes.txt")
         #expect(pasteboard.string(forType: .string) == "sftp://user@example.com:2222/srv/notes.txt")
@@ -151,12 +152,57 @@ struct SFTPDragProviderTests {
         terminal.remotePathsForDrop = { _ in [] }
         #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: true).isEmpty)
         #expect(SFTPDropTargetView.fileURLs(pasteboard).isEmpty)
-        #expect(probe.requests == 0, "reading fileURL would wait for a download that needs this main thread")
+        #expect(probe.requests == 0, "the tracking call must not read a promised file URL")
+        let deadline = SuspendingClock.now + .seconds(2)
+        var materialized: [String] = []
+        while materialized != ["/tmp/materialized-promise.txt"], SuspendingClock.now < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            materialized = terminal.droppedPaths(from: pasteboard, isLocalDrag: false)
+        }
+        #expect(probe.requests >= 1)
+        #expect(probe.mainThreadRequests == 0, "materializing waits on a background thread, not this one")
+        #expect(materialized == ["/tmp/materialized-promise.txt"])
+        #expect(SFTPDropTargetView.fileURLs(pasteboard).map(\.path) == ["/tmp/materialized-promise.txt"])
 
         SFTPRemoteDrag.end()
         pasteboard.clearContents()
         pasteboard.setString("file:///tmp/ordinary-file.txt", forType: .fileURL)
         #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: false) == ["/tmp/ordinary-file.txt"])
+    }
+
+    @Test("a resident file URL beside a promise is the local path, not the remote drag")
+    func residentFileURLBesideAPromiseIsLocal() throws {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally(); SFTPRemoteDrag.end() }
+        let promise = try #require(NSFilePromiseReceiver.readableDraggedTypes.first)
+        let item = NSPasteboardItem()
+        item.setData(Data(), forType: .init(promise))
+        item.setString("file:///tmp/icloud-placeholder.txt", forType: .fileURL)
+        #expect(pasteboard.writeObjects([item]))
+        let remote = try #require(URL(string: "sftp://user@example.com:2222/srv/notes.txt"))
+        SFTPRemoteDrag.begin(remote)
+        let terminal = TerminalView(frame: .zero)
+        terminal.remotePathsForDrop = { urls in urls.map(\.path) }
+        #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: true) == ["/srv/notes.txt"])
+        #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: false) == ["/tmp/icloud-placeholder.txt"])
+        #expect(SFTPDropTargetView.fileURLs(pasteboard).map(\.path) == ["/tmp/icloud-placeholder.txt"])
+    }
+
+    @Test("ending the drag session drops the remote path before the lifetime does")
+    func dragSessionEndClearsTheRecord() throws {
+        let url = try #require(URL(string: "sftp://user@example.com/srv/notes.txt"))
+        let promise = NSPasteboard.PasteboardType(try #require(NSFilePromiseReceiver.readableDraggedTypes.first))
+        let first = SFTPRemoteDrag.begin(url)
+        SFTPRemoteDrag.attach("older")
+        let second = SFTPRemoteDrag.begin(url)
+        SFTPRemoteDrag.attach("newer")
+        #expect(SFTPRemoteDrag.detach("older") == first)
+        SFTPRemoteDrag.end(token: first)
+        #expect(SFTPRemoteDrag.url(forPasteboardTypes: [promise]) == url, "a newer drag is still the current one")
+        let ended = SFTPRemoteDrag.detach("newer")
+        #expect(ended == second)
+        SFTPRemoteDrag.end(token: second)
+        #expect(SFTPRemoteDrag.url(forPasteboardTypes: [promise]) == nil)
     }
 
     @Test("file promise errors and cancellation complete the provider", arguments: [false, true])
@@ -201,12 +247,15 @@ struct SFTPDragProviderTests {
 /// a real SwiftUI promise would instead wait for an asynchronous download.
 nonisolated private final class PromisedURLProbe: NSObject, NSPasteboardItemDataProvider {
     private let requestCount = Mutex(0)
+    private let mainCount = Mutex(0)
     var requests: Int { requestCount.withLock { $0 } }
+    var mainThreadRequests: Int { mainCount.withLock { $0 } }
 
     func pasteboard(
         _ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType
     ) {
         requestCount.withLock { $0 += 1 }
+        if Thread.isMainThread { mainCount.withLock { $0 += 1 } }
         item.setString("file:///tmp/materialized-promise.txt", forType: type)
     }
 }
