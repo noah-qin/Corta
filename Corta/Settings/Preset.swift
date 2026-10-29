@@ -48,6 +48,12 @@ nonisolated struct Preset: Equatable, Sendable {
     var retainSSH = false
     var remoteTmux: RemoteTmux?
     var tmuxPreviouslyEstablished = false
+    /// Extra ssh arguments placed before the destination's own options.
+    /// The integration fixture's `-F` lives here. Never serialized.
+    var retainedSSHPreamble: [String] = []
+    /// Text placed in front of the remote tmux command, in the same argument.
+    /// The integration fixture's `PATH=…` lives here. Never serialized.
+    var retainedCommandLeadIn = ""
 
     init(name: String) {
         self.name = name
@@ -91,11 +97,38 @@ nonisolated struct Preset: Equatable, Sendable {
         return true
     }
 
+    /// A reconnect builds the ssh command again from the destination and a new
+    /// token. Searching the previous command text would miss a wrapper that is
+    /// no longer verbatim, and the OSC would stay on the old token.
+    mutating func refreshRetainedTmuxToken(reportEstablished: Bool) {
+        guard let tmux = remoteTmux, let target = connectTarget else { return }
+        let fresh = RemoteTmux(id: tmux.id)
+        tmuxPreviouslyEstablished = tmuxPreviouslyEstablished || reportEstablished
+        arguments = SSHDestination.retainedArguments(
+            for: target, tmux: fresh, preamble: retainedSSHPreamble, commandLeadIn: retainedCommandLeadIn)
+        remoteTmux = fresh
+    }
+
+    /// Arguments as the config file may store them. The integration fixture's
+    /// ssh preamble and command lead-in are process state, not settings.
+    private var persistedArguments: [String] {
+        var args = arguments
+        if !retainedSSHPreamble.isEmpty, args.starts(with: retainedSSHPreamble) {
+            args.removeFirst(retainedSSHPreamble.count)
+        }
+        if !retainedCommandLeadIn.isEmpty, let last = args.indices.last,
+           args[last].hasPrefix(retainedCommandLeadIn) {
+            args[last].removeFirst(retainedCommandLeadIn.count)
+        }
+        return args
+    }
+
     var serializedLines: [String] {
         var lines: [String] = []
         if let shell { lines.append("preset.\(name).shell = \(shell)") }
-        if !arguments.isEmpty {
-            lines.append("preset.\(name).arguments = \(arguments.joined(separator: " "))")
+        let persisted = persistedArguments
+        if !persisted.isEmpty {
+            lines.append("preset.\(name).arguments = \(persisted.joined(separator: " "))")
         }
         if let directory { lines.append("preset.\(name).directory = \(directory)") }
         for key in environment.keys.sorted() {

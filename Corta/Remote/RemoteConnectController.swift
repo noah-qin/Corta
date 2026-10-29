@@ -26,8 +26,16 @@ nonisolated enum SSHDestination {
         preset.arguments = target.sshArguments
         preset.connectTarget = target
         preset.remoteTmux = tmux
-        if let tmux { preset.arguments = target.sshOptions + ["-t", "--", target.host, tmux.command] }
+        if let tmux { preset.arguments = retainedArguments(for: target, tmux: tmux) }
         return preset
+    }
+
+    /// `ssh <preamble> <options> -t -- <host> <lead-in><wrapper>`. The lead-in
+    /// and preamble are fixture-only; a saved connection leaves both empty.
+    static func retainedArguments(
+        for target: SSHTarget, tmux: RemoteTmux, preamble: [String] = [], commandLeadIn: String = ""
+    ) -> [String] {
+        preamble + target.sshOptions + ["-t", "--", target.host, commandLeadIn + tmux.command]
     }
 }
 

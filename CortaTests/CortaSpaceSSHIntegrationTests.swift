@@ -87,10 +87,17 @@ struct CortaSpaceSSHIntegrationTests {
             host.space.makeSSHPreset = { [self] target, tmux in
                 launches += 1
                 var preset = SSHDestination.preset(for: target, retaining: tmux)
-                preset.arguments.insert(contentsOf: ["-F", fixture.appendingPathComponent("ssh.conf").path], at: 0)
-                let last = preset.arguments.count - 1
-                preset.arguments[last] = "PATH='\(bin.path):/usr/bin:/bin' TMUX_TMPDIR='\(root.path)' "
-                    + "HOME='\(root.path)' ZDOTDIR='\(root.path)' SHELL=/bin/sh " + preset.arguments[last]
+                let preamble = ["-F", fixture.appendingPathComponent("ssh.conf").path]
+                let leadIn = "PATH='\(bin.path):/usr/bin:/bin' TMUX_TMPDIR='\(root.path)' "
+                    + "HOME='\(root.path)' ZDOTDIR='\(root.path)' SHELL=/bin/sh "
+                if let tmux {
+                    preset.retainedSSHPreamble = preamble
+                    preset.retainedCommandLeadIn = leadIn
+                    preset.arguments = SSHDestination.retainedArguments(
+                        for: target, tmux: tmux, preamble: preamble, commandLeadIn: leadIn)
+                } else {
+                    preset.arguments.insert(contentsOf: preamble, at: 0)
+                }
                 return preset
             }
             controller.showWindow(nil)

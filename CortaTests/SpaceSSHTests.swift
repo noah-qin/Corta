@@ -32,6 +32,37 @@ struct SpaceSSHTests {
         #expect(!preset.serializedLines.joined().contains("tmuxPreviouslyEstablished"))
     }
 
+    @Test func reconnectRebuildsTheCommandFromTheTargetAndANewToken() throws {
+        let target = SSHTarget(host: "alias", user: "deploy", port: 2222, identityFile: "/tmp/key")
+        let tmux = RemoteTmux(id: UUID())
+        var preset = SSHDestination.preset(for: target, retaining: tmux)
+        preset.retainedSSHPreamble = ["-F", "/tmp/ssh.conf"]
+        preset.retainedCommandLeadIn = "PATH=/fixture/bin "
+        preset.arguments = SSHDestination.retainedArguments(
+            for: target, tmux: tmux, preamble: preset.retainedSSHPreamble,
+            commandLeadIn: preset.retainedCommandLeadIn)
+        preset.arguments[preset.arguments.count - 1] = "echo hijacked"
+        preset.refreshRetainedTmuxToken(reportEstablished: true)
+        let fresh = try #require(preset.remoteTmux)
+        #expect(fresh.id == tmux.id)
+        #expect(fresh.token != tmux.token)
+        #expect(preset.tmuxPreviouslyEstablished)
+        let rebuilt = SSHDestination.retainedArguments(
+            for: target, tmux: fresh, preamble: ["-F", "/tmp/ssh.conf"], commandLeadIn: "PATH=/fixture/bin ")
+        #expect(preset.arguments == rebuilt)
+        #expect(!preset.arguments.contains { $0.contains("hijacked") || $0.contains(tmux.token.uuidString) })
+        #expect(preset.arguments.contains { $0.contains(fresh.token.uuidString) })
+        #expect(!preset.serializedLines.joined().contains("ssh.conf"))
+        #expect(!preset.serializedLines.joined().contains("PATH="))
+
+        var untouched = SSHDestination.preset(for: target, retaining: tmux)
+        untouched.connectTarget = nil
+        untouched.arguments = ["echo hijacked"]
+        untouched.refreshRetainedTmuxToken(reportEstablished: true)
+        #expect(untouched.arguments == ["echo hijacked"])
+        #expect(untouched.remoteTmux?.token == tmux.token)
+    }
+
     @Test @MainActor func statusDoesNotClaimMissingOrFailedConnectionsWereRestored() {
         let token = UUID()
         func report(_ signal: String) -> RemoteTmux.Report? {
