@@ -174,7 +174,9 @@ and [verification limits](CONFORMANCE.md#cli-signal-compatibility).
   and directories, with managed local copies for editing: Back and Forward, a
   breadcrumb path, sortable columns, hidden files on request, a row menu, drag
   and drop to upload (the listing or folder row outlined, naming the
-  destination) and to Finder, and transfers in a toolbar popover with
+  destination) and to Finder, plus an `sftp://` link for URL/text destinations
+  without a download. Drag data is supplied without waiting on the main
+  thread; Finder downloads have transfers in a toolbar popover with
   speed and time left. The first connection to a host in a run requires
   confirmation; a remote report alone cannot open it. Passwords, key
   passphrases, one-time codes and new host keys are asked in a dialog

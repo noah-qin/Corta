@@ -28,7 +28,7 @@ nonce="$2"
 [ -n "$s" ] && [ -n "$nonce" ] || exit 2
 remote_app="$s/remote/srv/app"
 rm -rf "$s"
-mkdir -p "$s/bin" "$remote_app/src" "$s/ApplicationSupport"
+mkdir -p "$s/bin" "$remote_app/src" "$s/ApplicationSupport" "$s/downloads"
 printf 'hello\n' > "$remote_app/README.md"
 head -c 300000 /dev/zero > "$remote_app/big.bin"
 printf 'fn main() {}\n' > "$remote_app/src/main.rs"

@@ -206,28 +206,48 @@ private struct TransferRow: View {
 
 // MARK: - Drag to Finder
 
-/// One remote file as a drag: Finder asks for the file when it is dropped,
-/// and the export downloads it (through the transfer queue, with a progress
-/// row) into a private staging folder the system then copies from.
-struct SFTPDragItem: Transferable {
+/// Immutable drag payload. Provider metadata and URL loads never hop to the
+/// main actor: AppKit can request them synchronously while tracking a drag.
+/// Only an actual file request starts the asynchronous queued download.
+nonisolated struct SFTPDragItem: Sendable {
     let name: String
+    let remoteURL: URL?
     let export: @Sendable () async throws -> URL
 
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .data) { item in
-            SentTransferredFile(try await item.export(), allowAccessingOriginalFile: false)
+    func itemProvider() -> NSItemProvider {
+        let provider = NSItemProvider()
+        provider.suggestedName = name
+        provider.registerFileRepresentation(
+            forTypeIdentifier: UTType.data.identifier, fileOptions: [], visibility: .all
+        ) { completion in
+            // Never wait here: the consumer may be on the main thread.
+            Task.detached {
+                do { completion(try await export(), false, nil) } catch { completion(nil, false, error) }
+            }
+            return nil
         }
-        .suggestedFileName { $0.name }
+        if let remoteURL {
+            let data = Data(remoteURL.absoluteString.utf8)
+            for type in [UTType.url, .utf8PlainText] {
+                provider.registerDataRepresentation(
+                    forTypeIdentifier: type.identifier, visibility: .all
+                ) { completion in
+                    completion(data, nil)
+                    return nil
+                }
+            }
+        }
+        return provider
     }
 }
 
 /// The remote file a drag from the SFTP browser carries, for a terminal on
 /// the same host to take as its path (`PaneRemote.remotePath(forDropped:)`).
 ///
-/// Kept in the process, not on the pasteboard: a second representation there
-/// is produced on the main actor while a drag holds it, and a terminal
-/// reading it on every drag update hung the app. Nothing is downloaded for
-/// it, and the URL names no password and no key.
+/// Internal drops use this process-local record instead of reading promised
+/// pasteboard data during drag updates. External consumers also receive the
+/// URL through a nonisolated provider. Neither path downloads a file, and
+/// the URL names no password and no key.
 @MainActor
 enum SFTPRemoteDrag {
     private(set) static var current: (url: URL, began: Date)?
@@ -241,9 +261,13 @@ enum SFTPRemoteDrag {
     /// The URL of the drag in progress, if it is one of the browser's.
     static func url(forPasteboardTypes types: [NSPasteboard.PasteboardType]) -> URL? {
         guard let current, Date().timeIntervalSince(current.began) < lifetime,
-              types.contains(where: { NSFilePromiseReceiver.readableDraggedTypes.contains($0.rawValue) })
+              isFilePromise(types)
         else { return nil }
         return current.url
+    }
+
+    static func isFilePromise(_ types: [NSPasteboard.PasteboardType]) -> Bool {
+        types.contains { NSFilePromiseReceiver.readableDraggedTypes.contains($0.rawValue) }
     }
 
     static func end() { current = nil }

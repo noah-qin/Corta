@@ -537,6 +537,15 @@ what it trusts and what it refuses, so an audit can check them one by one.
 | **Remote Files ▸** (a project) | SSH destinations of the project's sessions, from `space.json` | Each was typed or picked by the user in the connect dialog | Listed only from those records — an `ssh` typed at a prompt leaves none and is not offered; connects only on the user's choice |
 | A remote file dragged onto a terminal | The dragged row's `sftp://user@host:port/path`, noted in the process when the drag begins (`SFTPRemoteDrag`) — never read off the pasteboard, and never taken from another app | A drag is the user's own action, and the path is text they can see before pressing Return | Accepted only by a pane whose session is on that host — same host, and same user and port where both name one; a path with any control character is refused outright, not cleaned (a server can name a folder with a newline, and a cleaned path would be a different one); inserted single-quoted for every shell (`PaneCommands.shellQuoted`) and as a paste, so bracketed paste and the paste warning apply (§2.3) and nothing runs until Return. The URL names no password and no key file |
 
+The same browser drag offers a public URL/text representation to other
+applications. It contains the connection's specified user, host and port and
+the percent-encoded remote path, never a password or identity-file path.
+Exporting that link performs no file I/O and starts no connection or download.
+Internal terminal drops continue to use only the process-local record and
+the host/control-character checks above. A promised file captures its source
+folder and connection generation at drag start; replacing the connection
+invalidates a delayed request.
+
 **Local conversation identity (#436).** A Space record may also hold only
 `conversation.kind` (`claude` or `codex`) and `conversation.id` (a standard
 UUID). No transcript, session-file path, executable path or whole command is

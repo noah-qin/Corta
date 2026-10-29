@@ -33,6 +33,14 @@ Versioning for compatibility changes.
 
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
 
+### Fixed
+
+- Dragging an SFTP file no longer waits on the main thread to provide its
+  drag data. Finder receives a promised download with transfer progress;
+  URL and text destinations receive its `sftp://user@host:port/path` link
+  without downloading. Delayed downloads keep the drag's original folder
+  and refuse a connection that has since been replaced.
+
 ## [1.5.1] - 2026-10-27
 
 ### Changed

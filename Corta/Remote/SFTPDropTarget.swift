@@ -155,7 +155,10 @@ final class SFTPDropTargetView: NSView {
     }
 
     static func fileURLs(_ pasteboard: NSPasteboard) -> [URL] {
-        (pasteboard.readObjects(
+        // A promise may also advertise fileURL; never materialize it while
+        // tracking an upload target, especially one of our own downloads.
+        guard !SFTPRemoteDrag.isFilePromise(pasteboard.types ?? []) else { return [] }
+        return (pasteboard.readObjects(
             forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
     }
 

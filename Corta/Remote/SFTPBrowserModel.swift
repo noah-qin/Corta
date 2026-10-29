@@ -315,19 +315,28 @@ final class SFTPBrowserModel {
     /// remote URL noted for a terminal on this host (`SFTPRemoteDrag`).
     func dragItem(for entry: Entry) -> SFTPDragItem {
         SFTPRemoteDrag.begin(remoteURL(for: entry))
-        return SFTPDragItem(name: Self.localFileName(entry.name)) { [weak self] in
+        let directory = currentPath
+        let connection = connectionGeneration
+        return SFTPDragItem(name: Self.localFileName(entry.name), remoteURL: remoteURL(for: entry)) { [weak self] in
             guard let self else { throw SFTPTransferQueue.TransferFailure(message: L10n.text("sftp.drag.unavailable")) }
-            return try await self.exportForDrag(entry)
+            return try await self.exportForDrag(entry, directory: directory, connection: connection)
         }
     }
 
-    func exportForDrag(_ entry: Entry) async throws -> URL {
-        guard connectionState == .connected, entry.kind == .file,
+    func exportForDrag(_ entry: Entry, directory: String? = nil, connection: Int? = nil) async throws -> URL {
+        guard connectionState == .connected, connection == nil || connection == connectionGeneration,
+            entry.kind == .file,
             Self.isPlainEntryName(entry.name)
         else { throw SFTPTransferQueue.TransferFailure(message: L10n.text("sftp.drag.unavailable")) }
-        let staging = try Self.makeDragStagingDirectory()
+        let generation = connectionGeneration
+        let sourceDirectory = directory ?? currentPath
+        let staging = try await Task.detached { try Self.makeDragStagingDirectory() }.value
+        guard connectionState == .connected, generation == connectionGeneration else {
+            try? await Task.detached { try FileManager.default.removeItem(at: staging) }.value
+            throw SFTPTransferQueue.TransferFailure(message: L10n.text("sftp.drag.unavailable"))
+        }
         dragStagingDirectories.append(staging)
-        let remotePath = Self.joinPath(currentPath, entry.name)
+        let remotePath = Self.joinPath(sourceDirectory, entry.name)
         let local = staging.appendingPathComponent(Self.localFileName(entry.name))
         return try await withCheckedThrowingContinuation { continuation in
             transferQueue.enqueue(

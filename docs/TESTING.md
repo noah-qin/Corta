@@ -846,6 +846,37 @@ that a CLI keeps its session file open long enough to be observed.
 
 `./scripts/build-and-run.sh --space-preview` opens the Debug build in Space.
 
+### SFTP drag data and Finder downloads
+
+`SFTPDragProviderTests` reproduces the deadlock trigger with a lazy
+`public.file-url` alongside file-promise types. A probe counts attempted
+materialization instead of hanging the test; terminal negotiation (accepted,
+wrong-host and external) and upload targeting must never request it. An
+ordinary Finder file URL must still work. It also exercises the actual
+table's pasteboard writer and `NSItemProvider`: URL and UTF-8 text must load
+while the main thread is occupied, without starting a download. A gated file transfer checks that
+requesting file bytes returns asynchronously, leaves the main actor available,
+keeps the directory captured at drag start, and completes with the downloaded
+bytes. An abandoned connection must fail rather than download from a new one.
+`SFTPDragExportTests` checks private staging permissions and cleanup.
+
+The UI-plan case
+`RemoteWorkflowUITests/testFileDragExportsLinkAndDownloadsToFinder` uses
+`stage-remote-ui.sh` and the real local `sftp-server`. It drags a file row
+onto a same-host terminal and verifies the quoted remote path, then
+into a text field and checks its `sftp://` link, then into a disposable Finder
+folder and checks the downloaded bytes. It requires an interactive, unlocked
+desktop and closes only the Finder window it opens. Run it with:
+
+```sh
+xcodebuild test -project Corta.xcodeproj -scheme Corta -testPlan UI \
+  -only-testing:CortaUITests/RemoteWorkflowUITests/testFileDragExportsLinkAndDownloadsToFinder
+```
+
+Record a UI-runner initialization failure separately from an assertion
+failure; it does not verify the drag. Never change system authentication,
+permissions or global settings to get the runner started.
+
 ### The SFTP browser without a server
 
 Debug builds offer **Help ▸ SFTP Development Preview**, or launch with

@@ -610,6 +610,21 @@ after close. Remote editing keeps a SHA-256 baseline of what it downloaded,
 validates the content before uploading, and sends the approved private
 snapshot rather than the live editor file (`SECURITY.md` §5).
 
+A file promise can also advertise `public.file-url`. Reading that local URL
+while tracking a drag synchronously materializes its download, whose queue
+needs the same main actor: a circular wait. Terminal and upload destinations
+classify promises before considering ordinary file URLs, and never read a
+promise's file data during drag negotiation. Same-host terminal drops use
+the in-process remote path; mismatched or external promises are refused.
+
+SFTP table rows publish an explicit `NSItemProvider`. Drag metadata and the
+URL/text representations use immutable, nonisolated values: synchronous
+pasteboard negotiation must never need a main-actor task. A file load handler
+returns immediately and completes asynchronously after the transfer queue
+finishes its download. The queue still owns progress, cancellation and errors;
+requesting a link alone never starts that work. The source directory and
+connection generation are captured before the drag leaves the browser.
+
 ### 7.10 The status bar and the theme editor
 
 `SystemMetrics` reads public Mach, `getloadavg`, `getifaddrs`, volume and

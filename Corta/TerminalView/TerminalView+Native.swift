@@ -40,23 +40,28 @@ extension TerminalView {
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         let paths = droppedPaths(from: sender)
         guard !paths.isEmpty else { return false }
-        if !(sender.draggingPasteboard.types ?? []).contains(.fileURL) { SFTPRemoteDrag.end() }
+        if SFTPRemoteDrag.isFilePromise(sender.draggingPasteboard.types ?? []) { SFTPRemoteDrag.end() }
         onDropPaths?(paths)
         return true
     }
 
-    /// Local files, or else the SFTP browser's file on this pane's own host.
-    /// Only the pasteboard's types are looked at during the drag: reading a
-    /// promise's data here would wait on the drag that is still running.
+    /// A promise can advertise `.fileURL` too. Reading that URL during
+    /// tracking materializes the file, synchronously waiting for a download
+    /// whose queue needs this same main actor. Classify promises first.
     private func droppedPaths(from sender: any NSDraggingInfo) -> [String] {
-        let pasteboard = sender.draggingPasteboard
+        droppedPaths(from: sender.draggingPasteboard, isLocalDrag: sender.draggingSource != nil)
+    }
+
+    /// Kept separate so a real table writer can exercise drag negotiation
+    /// without synthesizing a window-server drag session.
+    func droppedPaths(from pasteboard: NSPasteboard, isLocalDrag: Bool) -> [String] {
         let types = pasteboard.types ?? []
-        if types.contains(.fileURL) {
-            let local = Self.droppedPaths(from: pasteboard)
-            if !local.isEmpty { return local }
+        if SFTPRemoteDrag.isFilePromise(types) {
+            guard isLocalDrag, let url = SFTPRemoteDrag.url(forPasteboardTypes: types) else { return [] }
+            return remotePathsForDrop?([url]) ?? []
         }
-        guard let url = SFTPRemoteDrag.url(forPasteboardTypes: types) else { return [] }
-        return remotePathsForDrop?([url]) ?? []
+        guard types.contains(.fileURL) else { return [] }
+        return Self.droppedPaths(from: pasteboard)
     }
 
     /// Apart from `NSDraggingInfo`, so tests need no synthetic Finder drag.

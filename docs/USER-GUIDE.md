@@ -670,7 +670,11 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   to sort. Right-click a row for its actions; double-click a folder to open
   it. Drop files from Finder on the listing — or on a folder row — to upload
   them; while you drag, the listing (or the row) is outlined and says where
-  the files will go. Drag a file out to Finder to download it. Transfers are under
+  the files will go. Drag a file out to Finder to download it. The same drag offers an
+  `sftp://user@host:port/path` link to URL or text destinations, without
+  downloading; user and port appear when specified for the connection.
+  The link contains no password or private-key path. Dragging and waiting
+  for a download leave the browser responsive. Transfers are under
   the toolbar's arrows button, with speed, time left and Show in Finder.
 - **Editing a remote file.** **Edit** in the browser — or ⌘-clicking a
   `path:line` in a remote pane — downloads a copy and opens it in your

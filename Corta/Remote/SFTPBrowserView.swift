@@ -359,7 +359,7 @@ extension SFTPBrowserView {
                 if entry.kind == .file {
                     // Dragged to Finder, a file is downloaded where it lands.
                     TableRow(entry)
-                        .draggable(model.dragItem(for: entry))
+                        .itemProvider { model.dragItem(for: entry).itemProvider() }
                 } else {
                     TableRow(entry)
                 }
