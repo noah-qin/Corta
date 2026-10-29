@@ -30,6 +30,9 @@ final class TerminalView: NSView, CALayerDelegate {
     /// tracking focus after a tab moves windows. Not `private` because
     /// `TerminalView+Scroll.swift` reports gesture phases to it.
     var renderPolicy: RenderPolicy?
+    /// Pane-local input revision, so delayed prompt fills never overtake typing.
+    private(set) var userInputRevision: UInt64 = 0
+
     /// Pauses rendering while the window is occluded; replaced when changing windows.
     private var inputGeometryObservers: [NSObjectProtocol] = []
     private var occlusionObserver: NSObjectProtocol?
@@ -421,6 +424,7 @@ extension TerminalView {
 
     /// Shared input hook, independent of diagnostic sampling.
     func noteUserInput() {
+        userInputRevision &+= 1
         paneController?.updateReaderPriority(input: true)
         frameScheduler.noteInput()
         renderPolicy?.noteInput()

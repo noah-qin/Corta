@@ -81,6 +81,7 @@ extension CortaSpaceController {
         sidebar.reload()
         for panel in panels.values where panel.window != nil { panel.update() }
         content.update()
+        showConversationNoticeIfNeeded()
     }
 
     /// The project names the window, with its folder as the proxy icon.

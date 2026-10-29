@@ -833,7 +833,12 @@ the folders and, for each, its sessions' directories, preset names or SSH
 destinations, the user's names for them, and the grid's split tree, in
 `Application Support/space.json` (`CONFIGURATION.md` §8). A restored
 session is a fresh shell, the configured preset, or the same SSH
-connection; an agent CLI resumes its own conversation (`claude --continue`).
+connection. For local Claude and Codex, Corta remembers only the kind and the standard
+UUID in a session file opened by that pane's foreground process. On the
+project's first opening next launch it fills `claude --resume <UUID>` or
+`codex resume <UUID>` into an empty integrated shell prompt; only the user's
+Return executes it. Missing or invalid identities leave an ordinary shell.
+Local agents never use tmux.
 
 **Why.** Keeping the processes alive past their window, to attach to again,
 is the multiplexer D09 rules out; a list of what to start again is the

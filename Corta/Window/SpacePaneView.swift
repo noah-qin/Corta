@@ -206,49 +206,9 @@ final class SpacePaneView: NSView {
             NSAnimationContext.runAnimationGroup({ context in
                 context.duration = 0.9
                 ring.animator().alphaValue = 0
-            }, completionHandler: { ring.removeFromSuperview() })
+            }, completionHandler: { MainActor.assumeIsolated { ring.removeFromSuperview() } })
         }
     }
-
-    // MARK: - The panel's menu
-
-    /// Hide, fill the grid, end: everything a panel can do, in one place.
-    func makeMenu() -> NSMenu {
-        let menu = NSMenu()
-        let maximized = space?.selectedProject?.maximized === session
-        for (key, action) in [
-            (maximized ? "space.panel.restore" : "space.panel.maximize", #selector(toggleMaximize)),
-            ("space.panel.hide", #selector(hidePanel)),
-        ] {
-            menu.addItem(withTitle: L10n.text(key), action: action, keyEquivalent: "").target = self
-        }
-        menu.addItem(withTitle: L10n.text("space.session.rename"), action: #selector(rename), keyEquivalent: "")
-            .target = self
-        if space?.canBrowseFiles(of: session) == true {
-            menu.addItem(withTitle: L10n.text("space.session.browseFiles"), action: #selector(browseFiles),
-                         keyEquivalent: "").target = self
-        }
-        menu.addItem(.separator())
-        // nil targets: the window's own commands, enabled as the menu bar's.
-        menu.addItem(withTitle: L10n.text("space.arrange.columns"),
-                     action: #selector(SplitViewController.arrangeSpaceInColumns(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: L10n.text("space.arrange.rows"),
-                     action: #selector(SplitViewController.arrangeSpaceInRows(_:)), keyEquivalent: "")
-        menu.addItem(.separator())
-        menu.addItem(withTitle: L10n.text("space.session.end"), action: #selector(endSession), keyEquivalent: "")
-            .target = self
-        return menu
-    }
-
-    @objc private func showMenu(_ sender: NSButton) {
-        makeMenu().popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
-    }
-
-    @objc private func toggleMaximize() { space?.toggleMaximize(session) }
-    @objc private func hidePanel() { space?.hide(session) }
-    @objc private func endSession() { space?.endSession(session) }
-    @objc private func rename() { space?.sidebar.beginRename(session) }
-    @objc private func browseFiles() { space?.browseFiles(of: session) }
 
     // MARK: - Pointer
 
@@ -448,4 +408,55 @@ private extension NSColor {
         appearance.performAsCurrentDrawingAppearance { result = self.usingColorSpace(.sRGB) ?? self }
         return result
     }
+}
+
+// Panel actions share the card's private controls.
+extension SpacePaneView {
+    // MARK: - The panel's menu
+
+    /// Hide, fill the grid, end: everything a panel can do, in one place.
+    func makeMenu() -> NSMenu {
+        let menu = NSMenu()
+        let maximized = space?.selectedProject?.maximized === session
+        for (key, action) in [
+            (maximized ? "space.panel.restore" : "space.panel.maximize", #selector(toggleMaximize)),
+            ("space.panel.hide", #selector(hidePanel)),
+        ] {
+            menu.addItem(withTitle: L10n.text(key), action: action, keyEquivalent: "").target = self
+        }
+        menu.addItem(withTitle: L10n.text("space.session.rename"), action: #selector(rename), keyEquivalent: "")
+            .target = self
+        if space?.canBrowseFiles(of: session) == true {
+            menu.addItem(withTitle: L10n.text("space.session.browseFiles"), action: #selector(browseFiles),
+                         keyEquivalent: "").target = self
+        }
+        if session.record.conversation != nil, session.record.ssh == nil {
+            let refill = menu.addItem(withTitle: L10n.text("space.conversation.fillAgain"),
+                                      action: #selector(refillConversation), keyEquivalent: "")
+            refill.target = self
+            refill.isEnabled = space?.canFillConversation(session) == true
+        }
+        menu.addItem(.separator())
+        // nil targets: the window's own commands, enabled as the menu bar's.
+        menu.addItem(withTitle: L10n.text("space.arrange.columns"),
+                     action: #selector(SplitViewController.arrangeSpaceInColumns(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L10n.text("space.arrange.rows"),
+                     action: #selector(SplitViewController.arrangeSpaceInRows(_:)), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: L10n.text("space.session.end"), action: #selector(endSession), keyEquivalent: "")
+            .target = self
+        return menu
+    }
+
+    @objc private func showMenu(_ sender: NSButton) {
+        makeMenu().popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
+    }
+
+    @objc private func toggleMaximize() { space?.toggleMaximize(session) }
+    @objc private func hidePanel() { space?.hide(session) }
+    @objc private func endSession() { space?.endSession(session) }
+    @objc private func rename() { space?.sidebar.beginRename(session) }
+    @objc private func refillConversation() { space?.refillConversation(session) }
+    @objc private func browseFiles() { space?.browseFiles(of: session) }
+
 }

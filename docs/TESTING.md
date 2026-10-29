@@ -826,6 +826,24 @@ sidebar toggle and full screen, with screenshots attached. The sidebar's
 choose-then-show interaction, undo, and remote-file drags are checked by hand
 in the launched app; record which in the pull request.
 
+`LocalConversationTests` checks exact UUID extraction (including Codex rollout
+filenames), ambiguous open files, unsupported tools and two same-directory
+processes holding different session files. `SpaceConversationTests` checks
+legacy/invalid metadata, duplicate JSON keys, metadata-only persistence and
+remote exclusion. The conversation cases in `CortaSpaceTests` also open real windows and shells,
+check that two same-directory Claude prompts and an off-grid Codex prompt hold
+their own commands without execution, count successful fills, dismiss the note,
+and delete/refill without repeating on mode switches.
+`CortaSpaceConversationUITests` verifies prompt fills without
+execution, single/multiple notes, later-shown sessions and explicit refill.
+The fixtures use disposable stages and a process-local shell environment;
+no model account or billable request is needed. The native process fixtures
+use disposable, ad-hoc-signed copies of the system sleep executable, so the
+kernel sees a recognized name and an inherited open session descriptor; no
+installed binary or system signing policy is changed. Real installed CLI file-handle
+lifetimes still need independent acceptance; a synthetic fixture is not proof
+that a CLI keeps its session file open long enough to be observed.
+
 `./scripts/build-and-run.sh --space-preview` opens the Debug build in Space.
 
 ### The SFTP browser without a server

@@ -102,6 +102,9 @@ extension SpaceSidebarController {
                     .submenu = submenu
             }
         }
+        if space.canFillConversation(session) {
+            add("space.conversation.fillAgain", to: menu) { space.refillConversation(session) }
+        }
         add("space.session.rename", to: menu) { [weak self] in self?.beginRename(session) }
         if space.canBrowseFiles(of: session) {
             add("space.session.browseFiles", to: menu) { space.browseFiles(of: session) }

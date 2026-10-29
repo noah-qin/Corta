@@ -26,6 +26,8 @@ final class SpaceSession {
     var pane: ViewController?
     /// `CortaSpaceController.touch` order: the grid replaces the lowest.
     var lastUsed: UInt64 = 0
+    /// A successful off-grid fill is explained when its panel first shows.
+    var conversationNeedsNotice = false
 
     init(record: SpaceSessionRecord) {
         self.record = record
@@ -79,6 +81,7 @@ final class SpaceProject {
     /// Its sessions run: they start the first time the project is shown in a
     /// launch, not at launch, so a list of old projects costs nothing.
     var isStarted = false
+    var conversationPreparation: Task<Void, Never>?
 
     init(record: SpaceProjectRecord) {
         url = URL(fileURLWithPath: record.path, isDirectory: true)

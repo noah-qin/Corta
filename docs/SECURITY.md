@@ -531,11 +531,27 @@ what it trusts and what it refuses, so an audit can check them one by one.
 | --- | --- | --- | --- |
 | Opening a project | A folder chosen in an open panel | The user picked it | Nothing in the folder is read, run or written; it is only new sessions' working directory |
 | `space.json` | Projects, sessions (number, directory, preset name, SSH destination, the user's name for it), the grid's layout | App-owned, owner-only (`0600`), written only by Corta | Read back validated field by field: absolute paths only, at most 64 projects × 32 sessions × 6 panels, divider fractions clamped, SSH destinations re-parsed (`SSHTarget.parse`, so an option-shaped host such as `-oProxyCommand=…` is dropped), names stripped of controls and cut to 64 characters; a newer format is neither read nor written over |
-| A session starting again | A login shell in the saved directory, the configured preset of that name, or `ssh` to the saved destination | The user created that session; the destination is one they typed into the connect dialog | Never a command line from the file; only when its project is first opened in a launch, not at launch; SSH asks for its password or passphrase through `SSH_ASKPASS` every time (D27), nothing stored; an agent CLI is not resumed — its own `--resume` is the user's to run |
+| A session starting again | A login shell in the saved directory, the configured preset of that name, or `ssh` to the saved destination | The user created that session; the destination is one they typed into the connect dialog | Never a command line from the file; only when its project is first opened in a launch, not at launch; SSH asks for its password or passphrase through `SSH_ASKPASS` every time (D27), nothing stored; local Claude/Codex resume text is filled only under the rules below, never executed |
 | Session titles in the sidebar and headers | The agent's reported name, the foreground process name, the SSH destination, the kernel's working directory | Displayed only | `PaneWindowTitle.sanitizedTitleComponent` (§2.9), as the window title; a name the user gives wins and is never replaced by program output |
 | **Browse Files on This Host…** (a remote session) | The host and directory the remote shell reported over OSC 7 (§2.8), or the destination the user connected to | The SFTP browser's own rules | The first connection to a *reported* host in a run is confirmed in the browser (`RemoteHostConsent`), as from the Shell menu; one window per destination |
 | **Remote Files ▸** (a project) | SSH destinations of the project's sessions, from `space.json` | Each was typed or picked by the user in the connect dialog | Listed only from those records — an `ssh` typed at a prompt leaves none and is not offered; connects only on the user's choice |
 | A remote file dragged onto a terminal | The dragged row's `sftp://user@host:port/path`, noted in the process when the drag begins (`SFTPRemoteDrag`) — never read off the pasteboard, and never taken from another app | A drag is the user's own action, and the path is text they can see before pressing Return | Accepted only by a pane whose session is on that host — same host, and same user and port where both name one; a path with any control character is refused outright, not cleaned (a server can name a folder with a newline, and a cleaned path would be a different one); inserted single-quoted for every shell (`PaneCommands.shellQuoted`) and as a paste, so bracketed paste and the paste warning apply (§2.3) and nothing runs until Return. The URL names no password and no key file |
+
+**Local conversation identity (#436).** A Space record may also hold only
+`conversation.kind` (`claude` or `codex`) and `conversation.id` (a standard
+UUID). No transcript, session-file path, executable path or whole command is
+saved. A bounded kernel query inspects at most 1,024 open descriptors of the
+recognized foreground process, off main, without reading file contents or
+searching directories by modification time. Ambiguous candidates do not update
+the record. OSC 7501 task IDs are never conversation IDs. SSH, manually typed
+remote agents and SFTP do not participate.
+
+On read, missing/invalid kinds or UUIDs discard the identity; duplicate JSON
+keys discard conversation identities conservatively. A command is reconstructed
+from fixed words and the validated UUID only, and passed to `fillPrompt(with:)`
+only at the first integrated, empty shell prompt after that project's first
+opening in a launch. No Return is sent. A failed fill produces no success note;
+a user may delete the line or explicitly fill it again from the session menu.
 
 Two residual risks, accepted:
 

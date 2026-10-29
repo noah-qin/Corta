@@ -152,6 +152,8 @@ extension TerminalSession {
     /// asks (`PTY.hasForegroundJob`).
     public var hasForegroundJob: Bool { pty.hasForegroundJob }
 
+    public var localConversation: LocalConversation? { pty.localConversation }
+
     public var foregroundProcessName: String? { pty.foregroundProcessName }
 
     /// Shell included, for a title bar.

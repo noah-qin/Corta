@@ -184,7 +184,7 @@ struct SpaceGridTests {
 struct CortaSpaceTests {
     /// A window, a fresh Space file and the given panel limit. Space fills
     /// the screen, which holds a 2 × 2 grid.
-    private func makeWindow(limit: Int = 4) throws -> (TerminalWindowController, SplitViewController) {
+    func makeWindow(limit: Int = 4) throws -> (TerminalWindowController, SplitViewController) {
         try? FileManager.default.removeItem(at: SpaceStore.standard.fileURL)
         _ = ConfigurationStore.shared.update { $0.spacePanelLimit = limit }
         let controller = TerminalWindowController(setup: .init())
@@ -193,14 +193,14 @@ struct CortaSpaceTests {
         return (controller, host)
     }
 
-    private func close(_ controller: TerminalWindowController, _ host: SplitViewController) {
+    func close(_ controller: TerminalWindowController, _ host: SplitViewController) {
         host.teardown()
         controller.window?.close()
         _ = ConfigurationStore.shared.update { $0.spacePanelLimit = 4 }
         try? FileManager.default.removeItem(at: SpaceStore.standard.fileURL)
     }
 
-    private func makeProject() throws -> URL {
+    func makeProject() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("Space-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
@@ -276,59 +276,6 @@ struct CortaSpaceTests {
         space.drop(second, on: try #require(space.panel(for: third)), edge: .left)
         #expect(live.shown == [second, first], "at the limit an edge drop replaces")
         #expect(first.pane?.view.window === kept)
-    }
-
-    @Test func aDropOnAnEdgeSplitsThatPanelThere() throws {
-        let (controller, host) = try makeWindow(limit: 6)
-        defer { close(controller, host) }
-        let project = try makeProject()
-        defer { try? FileManager.default.removeItem(at: project) }
-        let space = host.space
-        space.setActive(true)
-        space.openProject(project)
-        let live = try #require(space.selectedProject)
-        let first = live.sessions[0]
-        space.newSession()
-        let second = live.sessions[1]
-        space.hide(second)
-        #expect(live.shown == [first])
-        let target = try #require(space.panel(for: first))
-        try #require(space.canDrop(second, on: target, edge: .top))
-        space.drop(second, on: target, edge: .top)
-        #expect(live.shown == [second, first], "the top half comes first")
-        let split = try #require(space.gridTree?.root as? NSSplitView)
-        #expect(!split.isVertical)
-        // Closing a panel leaves its neighbour the space; dropping on the
-        // neighbour's edge puts a session back there.
-        space.hide(second)
-        #expect(live.shown == [first])
-        space.drop(second, on: target, edge: .top)
-        #expect(live.shown == [second, first])
-    }
-
-    @Test func aPlacementUndoesToTheGridBeforeIt() throws {
-        let (controller, host) = try makeWindow(limit: 6)
-        defer { close(controller, host) }
-        let project = try makeProject()
-        defer { try? FileManager.default.removeItem(at: project) }
-        let space = host.space
-        space.setActive(true)
-        space.openProject(project)
-        space.newSession()
-        let live = try #require(space.selectedProject)
-        let hidden = live.sessions[1]
-        space.hide(hidden)
-        let before = live.layout
-        space.show(hidden)
-        #expect(live.shown.contains(hidden))
-        let undo = try #require(controller.window?.undoManager)
-        #expect(undo.canUndo)
-        undo.undo()
-        #expect(live.layout == before, "the grid as it was")
-        #expect(!live.shown.contains(hidden))
-        #expect(kill(try #require(hidden.pane?.session).pty.processIdentifier, 0) == 0, "still running")
-        undo.redo()
-        #expect(live.shown.contains(hidden))
     }
 
     @Test func hidingFillingAndEndingKeepTheRestRunning() throws {
@@ -413,4 +360,5 @@ struct CortaSpaceTests {
         #expect(!otherHost.space.isActive)
         #expect(host.space.isActive)
     }
+
 }

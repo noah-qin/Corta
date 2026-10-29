@@ -102,17 +102,19 @@ final class SpaceContentController: NSViewController {
 
     /// A short note over the grid's foot — what just happened, and Undo.
     /// Navigation layer, so Liquid Glass; it goes by itself.
-    func showNote(_ text: String, undoTitle: String, undo: @escaping () -> Void) {
+    func showNote(_ text: String, undoTitle: String? = nil, undo: (() -> Void)? = nil) {
         note?.removeFromSuperview()
         noteDismissal?.cancel()
         noteAction = undo
-        let label = NSTextField(labelWithString: text)
+        let label = undoTitle == nil
+            ? NSTextField(wrappingLabelWithString: text) : NSTextField(labelWithString: text)
         label.font = .systemFont(ofSize: NSFont.systemFontSize)
-        label.lineBreakMode = .byTruncatingMiddle
-        let button = NSButton(title: undoTitle, target: self, action: #selector(undoFromNote))
+        label.lineBreakMode = undoTitle == nil ? .byWordWrapping : .byTruncatingMiddle
+        if undoTitle == nil { label.preferredMaxLayoutWidth = max(240, min(800, view.bounds.width - 96)) }
+        let button = NSButton(title: undoTitle ?? "", target: self, action: #selector(undoFromNote))
         button.bezelStyle = .glass
         button.controlSize = .small
-        let row = NSStackView(views: [label, button])
+        let row = NSStackView(views: undoTitle == nil ? [label] : [label, button])
         row.spacing = 12
         row.edgeInsets = NSEdgeInsets(top: 6, left: 16, bottom: 6, right: 8)
         let glass = NSGlassEffectView()
@@ -130,7 +132,9 @@ final class SpaceContentController: NSViewController {
         let dismissal = DispatchWorkItem { [weak self, weak glass] in
             guard let glass else { return }
             NSAnimationContext.runAnimationGroup({ $0.duration = 0.2; glass.animator().alphaValue = 0 },
-                                                 completionHandler: { glass.removeFromSuperview() })
+                                                 completionHandler: {
+                MainActor.assumeIsolated { glass.removeFromSuperview() }
+            })
             if self?.note === glass { self?.note = nil }
         }
         noteDismissal = dismissal

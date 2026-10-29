@@ -12,6 +12,12 @@ Versioning for compatibility changes.
 
 ### Added
 
+- Space remembers each local Claude/Codex pane's conversation kind and UUID.
+  Reopening a project fills that pane's exact resume command into an empty
+  integrated shell prompt; Return remains yours to press. A brief glass note
+  explains the fill, and the session menu can fill it again. No transcript,
+  session-file path or command line is saved; remote sessions are excluded.
+
 - Space: project folders with their own local, SSH and agent CLI sessions,
   up to six at once in a free split grid of rounded panels beside a sidebar
   that shows every session's state. Switch with the toolbar's mode button,

@@ -106,7 +106,9 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   the same host types its quoted path.
 - Projects, sessions and grids are restored after a restart; sessions start
   again (shell, preset or SSH host) when their project is first opened.
-  Scrollback is not restored (D30).
+  Local Claude/Codex conversations are remembered per pane by kind and UUID;
+  their exact resume commands fill empty integrated prompts, awaiting Return.
+  Missing/invalid IDs leave ordinary shells. Scrollback is not restored (D30).
 - Limits: one Space per app — another window's mode button brings it forward;
   a session cannot move between windows; the SFTP browser is its own window.
 

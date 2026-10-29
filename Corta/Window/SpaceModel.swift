@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 
 /// What Space remembers between launches: the project folders and, for each,
 /// the sessions to start again and which of them were on screen. Never
@@ -161,6 +162,7 @@ nonisolated indirect enum SpaceLayoutRecord: Codable, Equatable, Sendable {
 }
 
 nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
+    var conversation: LocalConversation?
     var number: Int
     /// The local working directory at the last save; nil for a remote one.
     var directory: String?
@@ -177,6 +179,29 @@ nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
         self.presetName = presetName
         self.ssh = ssh
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case conversation, number, directory, presetName, ssh, name
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        conversation = nil
+        if let saved = try? values.nestedContainer(keyedBy: ConversationKeys.self, forKey: .conversation),
+           let kind = try? saved.decode(LocalConversation.Kind.self, forKey: .kind),
+           let raw = try? saved.decode(String.self, forKey: .id),
+           let uuid = LocalConversation.standardUUID(raw) {
+            conversation = LocalConversation(kind: kind, id: uuid)
+        }
+        number = try values.decode(Int.self, forKey: .number)
+        directory = try values.decodeIfPresent(String.self, forKey: .directory)
+        presetName = try values.decodeIfPresent(String.self, forKey: .presetName)
+        ssh = try values.decodeIfPresent(SSHTarget.self, forKey: .ssh)
+        name = try values.decodeIfPresent(String.self, forKey: .name)
+        if ssh != nil { conversation = nil }
+    }
+
+    private enum ConversationKeys: String, CodingKey { case kind, id }
 
     static let maximumNameLength = 64
 
@@ -195,6 +220,7 @@ nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
         record.name = Self.cleanName(name)
         if let directory, !directory.hasPrefix("/") { record.directory = nil }
         if let ssh {
+            record.conversation = nil
             // The key file is checked when connecting, as for a recent host.
             let parsed = SSHTarget.parse(
                 host: ssh.host, user: ssh.user ?? "", port: ssh.port.map(String.init) ?? "",
@@ -290,6 +316,13 @@ struct SpaceStore {
               state.version <= SpaceState.currentVersion
         else { return SpaceState() }
         var valid = state.validated()
+        if SpaceConversationJSON.hasDuplicateKeys(data) {
+            for project in valid.projects.indices {
+                for session in valid.projects[project].sessions.indices {
+                    valid.projects[project].sessions[session].conversation = nil
+                }
+            }
+        }
         // Bounded, off the main thread: a project on a mount that stopped
         // answering must not hold the window.
         let existing = PathProbe.directories(

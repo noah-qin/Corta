@@ -248,4 +248,30 @@ exec /bin/zsh -f
 SH
 chmod 700 "$root/real-claude/claude-shell"
 
+# Local conversation restoration: fixed public UUIDs, no actual agent account.
+for scenario in one many invalid; do
+  stage "space-conversation-$scenario" 'columns = 180\nrows = 50\nrestore-windows = false\nspace-panel-limit = 2\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+  conversation_stage="$root/space-conversation-$scenario"
+  mkdir -p "$conversation_stage/ApplicationSupport" "$conversation_stage/project"
+  cat > "$conversation_stage/.zshrc" <<'SH'
+PROMPT='demo ❯ '
+RPROMPT=''
+claude() { print -r -- "USER-EXECUTED-CLAUDE $*"; }
+codex() { print -r -- "USER-EXECUTED-CODEX $*"; }
+SH
+  first='{"number":1,"name":"Conversation A","conversation":{"kind":"claude","id":"3f2a9c1e-7b14-4d2e-9a6f-1c8e0b44d912"}}'
+  if [[ "$scenario" == many ]]; then
+    sessions="$first,"'{"number":2,"name":"Conversation B","conversation":{"kind":"claude","id":"019eee77-052d-7530-af09-17a140e08123"}},{"number":3,"name":"Conversation C","conversation":{"kind":"codex","id":"2b20121e-9a9b-43cb-b12e-fde980cb41e0"}}'
+    layout='{"split":{"vertical":true,"fraction":0.5,"first":{"panel":{"_0":0}},"second":{"panel":{"_0":1}}}}'
+  else
+    sessions="$first"
+    layout='{"panel":{"_0":0}}'
+  fi
+  if [[ "$scenario" == invalid ]]; then
+    sessions='{"number":1,"name":"Invalid Conversation","conversation":{"kind":"claude","id":"3f2a9c1e-7b14-4d2e-9a6f-1c8e0b44d912; echo bad"}}'
+  fi
+  cat > "$conversation_stage/ApplicationSupport/space.json" <<JSON
+{"version":1,"projects":[{"path":"$conversation_stage/project","sessions":[$sessions],"layout":$layout,"nextNumber":4}]}
+JSON
+done
 printf '%s\n' "$root"

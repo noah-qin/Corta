@@ -186,9 +186,25 @@ were, still running.
 - **After a restart** Space lists the same projects and, for each, starts the
   same sessions again — a shell in the directory it was in, the same preset,
   the same SSH host, which asks for its password again — the first time you
-  open the project, in the same grid. Scrollback is not kept; an agent CLI picks
-  its conversation up with its own resume (`claude --continue`,
-  `codex resume --last`).
+  open the project, in the same grid. Scrollback is not kept. For local Claude
+  (`claude` or `claude-code`) and Codex, each pane remembers the conversation
+  UUID from its own process's open session file, even after the process exits.
+  It fills `claude --resume <UUID>` or `codex resume <UUID>` at an empty,
+  integrated prompt; press Return to execute, or delete the line to skip it.
+  Two panes in the same directory keep their own conversations. With no valid
+  ID, nothing is filled; SSH, remote agents and SFTP are excluded. Preset
+  commands are unchanged, and a busy prompt or one with text is left alone.
+  **Fill Conversation Again** in the pane's menu fills the same command again
+  at an empty prompt, without executing it.
+
+A brief Liquid Glass note at the grid's foot explains a successful fill,
+without showing the UUID or offering Undo. Only successful fills count:
+
+- One: “This conversation is filled in. Press Return to continue. Delete the line to skip it.”
+- More than one: “Each pane has its own conversation filled in. Press Return to continue. Delete that line to skip it.”
+- A session filled while hidden, when shown: “Press Return to continue this conversation.”
+
+The note disappears after a few seconds; the command stays in the prompt.
 
 `space-panel-limit` (1–6) caps the panels on screen.
 

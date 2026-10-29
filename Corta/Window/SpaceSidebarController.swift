@@ -227,7 +227,7 @@ final class SpaceSidebarController: NSViewController, NSOutlineViewDataSource, N
             cell.configure(project, isSelected: project === space?.selectedProject)
             return cell
         }
-        guard let session = item as? SpaceSession, let space else { return nil }
+        guard let session = item as? SpaceSession, space != nil else { return nil }
         let cell = outlineView.makeView(withIdentifier: SpaceSessionCell.identifier, owner: nil)
             as? SpaceSessionCell ?? SpaceSessionCell()
         cell.configure(content(of: session))

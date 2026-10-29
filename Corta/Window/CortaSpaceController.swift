@@ -42,6 +42,7 @@ final class CortaSpaceController: NSObject {
     private var isLoaded = false
     var usageClock: UInt64 = 0
     private weak var terminalFocus: ViewController?
+    var conversationMonitor: Task<Void, Never>?
     private var pendingSave: DispatchWorkItem?
     var isRefreshScheduled = false
     var isOutputRefreshScheduled = false
@@ -251,6 +252,7 @@ final class CortaSpaceController: NSObject {
         let scope = L10n.text("close.scope.project")
         host.confirmClose(of: running, scope: scope, in: host.toolbarWindow) { [weak self, weak project] confirmed in
             guard confirmed, let self, let project else { return }
+            project.conversationPreparation?.cancel()
             for session in project.sessions { self.discard(session) }
             self.projects.removeAll { $0 === project }
             if self.selectedProject === project {
@@ -273,16 +275,21 @@ final class CortaSpaceController: NSObject {
     func start(_ project: SpaceProject) {
         guard !project.isStarted else { return }
         project.isStarted = true
+        startConversationMonitor()
         let area = gridArea
         let sizes = project.pendingLayout?.panelSizes(in: area) ?? [:]
         for (index, session) in project.sessions.enumerated() where session.pane == nil {
             spawn(session, in: project, panelSize: sizes[index] ?? area)
         }
+        prepareConversations(in: project)
     }
 
     /// The window is closing: written while the shells can still say where
     /// they are.
     func stop() {
+        conversationMonitor?.cancel()
+        conversationMonitor = nil
+        for project in projects { project.conversationPreparation?.cancel() }
         saveNow()
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
         observers = []
