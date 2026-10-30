@@ -26,6 +26,9 @@ Versioning for compatibility changes.
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
+- Space recognizes a linked worktree and can type `git worktree add` into
+  a new shell. Return runs it. Corta does not run git itself.
+
 - A selection in a Space pane can be sent to another member. The message
   can include that pane's directory, branch and commit.
 

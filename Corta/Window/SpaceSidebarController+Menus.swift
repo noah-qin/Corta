@@ -122,6 +122,12 @@ extension SpaceSidebarController {
             add("space.conversation.fillAgain", to: menu) { space.refillConversation(session) }
         }
         add("space.session.rename", to: menu) { [weak self] in self?.beginRename(session) }
+        if session.record.ssh == nil {
+            add("space.worktree.new", to: menu) { space.promptWorktree(from: session) }
+            if space.gitFacts[session.id]?.worktree == true {
+                add("space.worktree.reveal", to: menu) { space.revealWorktreeMain(session) }
+            }
+        }
         if space.canBrowseFiles(of: session) {
             add("space.session.browseFiles", to: menu) { space.browseFiles(of: session) }
         }

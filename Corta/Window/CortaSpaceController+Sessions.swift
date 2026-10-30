@@ -166,6 +166,57 @@ extension CortaSpaceController {
         refreshNow()
     }
 
+    func promptWorktree(from session: SpaceSession) {
+        guard let project = self.session(withID: session.id)?.project else { return }
+        let alert = NSAlert()
+        alert.messageText = L10n.text("space.worktree.prompt")
+        alert.informativeText = L10n.text("space.worktree.detail")
+        let name = NSTextField(frame: NSRect(x: 0, y: 28, width: 280, height: 24))
+        name.stringValue = gitFacts[session.id]?.detached == false ? (gitFacts[session.id]?.name ?? "topic") : "topic"
+        let branch = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+        branch.placeholderString = L10n.text("space.worktree.branchOptional")
+        let stack = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 52))
+        name.frame = NSRect(x: 0, y: 28, width: 280, height: 24)
+        branch.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
+        stack.addSubview(name)
+        stack.addSubview(branch)
+        alert.accessoryView = stack
+        alert.addButton(withTitle: L10n.text("space.worktree.new"))
+        alert.addButton(withTitle: L10n.text("space.member.cancel"))
+        presentAlert(alert, host?.toolbarWindow) { [weak self] response in
+            guard response == .alertFirstButtonReturn, let self else { return }
+            let newBranch = !branch.stringValue.trimmingCharacters(in: .whitespaces).isEmpty
+            let branchName = newBranch ? branch.stringValue : name.stringValue
+            guard let location = WorktreeCommand.location(projectPath: project.path, name: name.stringValue),
+                  let command = WorktreeCommand.line(location: location, branch: branchName, newBranch: newBranch)
+            else {
+                self.content.showNote(L10n.text("space.worktree.rejected"))
+                return
+            }
+            self.newSession(directory: project.path)
+            self.fillWhenReady(command: command, note: "space.worktree.filled")
+        }
+    }
+
+    func revealWorktreeMain(_ session: SpaceSession) {
+        guard let path = gitFacts[session.id]?.mainRepository else { return }
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
+    }
+
+    func fillWhenReady(command: String, note: String) {
+        guard let session = focusedSession else { return }
+        Task { @MainActor [weak self, weak session] in
+            let deadline = SuspendingClock.now.advanced(by: .seconds(10))
+            while SuspendingClock.now < deadline {
+                if session?.pane?.shell.fillPrompt(with: command) == true {
+                    self?.content.showNote(L10n.text(note))
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+        }
+    }
+
     func connectSession() {
         RemoteConnectController.shared.show(.ssh, sender: self, sessionDestination: { [weak self] preset in
             self?.newSession(preset: preset)

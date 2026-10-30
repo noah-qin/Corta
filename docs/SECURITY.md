@@ -605,6 +605,10 @@ is `tmux kill-session -t '=corta-<UUID>'`, never `kill-server`. A separate termi
 shows authentication and success/failure. This grants no authority over another
 session or a remote agent's exit protocol.
 
+**Worktree commands (#443).** The session menu can type one
+`git worktree add … && cd …` line into an empty prompt. The name and
+path may contain only `[A-Za-z0-9._/-]`. Corta does not run it.
+
 **Agent messages (#437, off by default).** `agent-messages` starts a
 per-user socket and puts `corta` on the `PATH` of shells Corta spawns.
 Membership is the permission to send. A nudge writes only the constant
