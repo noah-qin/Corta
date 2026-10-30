@@ -16,6 +16,7 @@
 
 import AppKit
 import CortaTerminal
+import Darwin
 
 /// Which session is in use, and keeping the chrome that shows it current.
 extension CortaSpaceController {
@@ -88,6 +89,7 @@ extension CortaSpaceController {
         let ordered = waitingSessionIDs()
         sidebar.setWaitingCount(ordered.count)
         noteGitDirectories()
+        syncAgentBus()
         sidebar.reload()
         for panel in panels.values where panel.window != nil { panel.update() }
         content.update()
@@ -106,6 +108,7 @@ extension CortaSpaceController {
         let idle = status?.state == .idle
         let typing = pane.terminalView?.lastUserInput.map { SuspendingClock.now - $0 < .seconds(3) } ?? false
         let member = member(of: session)
+        let agent = observation?.processes.first
         let gate = AgentNudgeGate(
             enabled: member?.nudgeEnabled == true,
             foregroundIsAgent: foreground, idle: idle, userIdle: !typing,
@@ -113,8 +116,25 @@ extension CortaSpaceController {
             bracketedPaste: terminal.isBracketedPasteEnabled,
             nudgesThisMinute: AgentHub.shared.bus.nudges(for: member?.id ?? UUID(), now: Date().timeIntervalSinceReferenceDate))
         return AgentWakeSnapshot(
-            kind: kind, claudeSocket: nil, codexExecutable: nil, codexThread: observation?.conversation.id?.uuidString,
+            kind: kind,
+            claudeSocket: agent.flatMap { Self.claudeSocket(of: $0.pid) },
+            codexExecutable: kind == "codex" ? agent.flatMap { Self.executablePath(of: $0.pid) } : nil,
+            codexThread: observation?.conversation.id?.uuidString,
             gate: gate)
+    }
+
+    private static func executablePath(of pid: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        let count = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+        guard count > 0 else { return nil }
+        return String(cString: buffer)
+    }
+
+    /// Claude publishes the inbox socket in the process environment. Only an absolute path is accepted.
+    private static func claudeSocket(of pid: pid_t) -> String? {
+        guard let value = ConversationProcess.environmentValue(pid, key: "CLAUDE_CODE_MESSAGING_SOCKET"),
+              value.hasPrefix("/"), !value.contains(".."), value.utf8.count < 104 else { return nil }
+        return value
     }
 
     func writeNudge(to sessionID: UUID) -> Bool {
