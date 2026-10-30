@@ -26,8 +26,11 @@ Versioning for compatibility changes.
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
-- An SSH session can be marked as a remote member. Delivery reports that
-  the forward is unavailable. Corta does not install a remote client.
+- `agent-messages` starts a per-user socket and a `corta` command on the
+  `PATH` of shells Corta launches. Members can send, read, wait and ask
+  who they are. A fixed wake-up line is written only when every gate passes.
+  A retained SSH member gets a `/tmp` client and an `ssh -R` forward on its
+  next connection.
 
 - A Space project can be saved as a template and applied to another
   project. Templates live in Application Support and omit identities,

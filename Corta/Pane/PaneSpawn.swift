@@ -50,7 +50,8 @@ enum PaneSpawn {
         size: TerminalSize, directory: String?, scrollbackLimit: Int,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity, preset: Preset? = nil,
         configuredShell: String? = nil, directoryCompletion: Bool = true, historySuggestions: Bool = true,
-        directoryCheckTimeout: DispatchTimeInterval = .milliseconds(500)
+        directoryCheckTimeout: DispatchTimeInterval = .milliseconds(500),
+        extraEnvironment: [String: String] = [:]
     ) throws(PTYError) -> Started {
         // An uninstalled preset shell degrades to a working terminal.
         let configured =
@@ -97,7 +98,7 @@ enum PaneSpawn {
             do {
                 let session = try TerminalSession(
                     executable: attempt.shell, arguments: attemptArguments,
-                    environment: prepared.environment, size: size,
+                    environment: Self.withAgent(prepared.environment, extraEnvironment), size: size,
                     workingDirectory: attempt.directory,
                     // Applies to new sessions: shrinking a live one would drop lines.
                     scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit,
@@ -113,12 +114,25 @@ enum PaneSpawn {
         throw lastError
     }
 
+    /// Added after sanitizing, so `CORTA_PANE_ID` is not stripped with the other
+    /// internal names. `CORTA_AGENT_BIN` is a directory prepended to `PATH`, not
+    /// passed through.
+    static func withAgent(_ environment: [String: String], _ extra: [String: String]) -> [String: String] {
+        var result = environment
+        var extra = extra
+        if let bin = extra.removeValue(forKey: "CORTA_AGENT_BIN") {
+            result["PATH"] = bin + ":" + (result["PATH"] ?? "/usr/bin:/bin")
+        }
+        for (key, value) in extra { result[key] = value }
+        return result
+    }
+
     /// The recorded command, exactly — a fallback would silently turn a remote
     /// pane into a local shell.
     static func respawn(
         _ command: (executable: String, arguments: [String]),
         size: TerminalSize, configuration: Configuration, preset: Preset?,
-        workingDirectory: String?
+        workingDirectory: String?, extraEnvironment: [String: String] = [:]
     ) throws(PTYError) -> Started {
         var environment = ChildEnvironment.default()
         for (key, value) in preset?.environment ?? [:] { environment[key] = value }
@@ -137,7 +151,7 @@ enum PaneSpawn {
             // A local cwd for the launcher; the remote side lands where it lands.
             let session = try TerminalSession(
                 executable: command.executable, arguments: command.arguments,
-                environment: environment, size: size,
+                environment: Self.withAgent(environment, extraEnvironment), size: size,
                 workingDirectory: usableDirectory(preset?.directory ?? workingDirectory),
                 scrollbackLimit: configuration.scrollbackLines,
                 commandHistoryLimit: configuration.commandHistoryLimit,

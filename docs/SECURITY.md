@@ -606,9 +606,13 @@ shows authentication and success/failure. This grants no authority over another
 session or a remote agent's exit protocol.
 
 **Remote members (#444).** A marked SSH member carries its host name.
-Messages to it return `forwardUnavailable`. Corta does not copy a client
-onto the remote machine and does not add `ssh -R` unless a later change
-passes the checked extras from #434.
+The next retained connection passes one token and one `ssh -R` of the
+message socket, and the wrapper writes a `corta` script under
+`/tmp/corta-<token>` for that session. Nothing is written under the
+remote home, and global tmux configuration is unchanged. Until that
+connection is up, delivery returns `forwardUnavailable`. The remote
+client talks with `nc -U` and the token; `LOCAL_PEERPID` is not used
+for it.
 
 **Worktree commands (#443).** The session menu can type one
 `git worktree add … && cd …` line into an empty prompt. The name and

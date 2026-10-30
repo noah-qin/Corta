@@ -282,17 +282,22 @@ project. Agent start commands are typed and wait for Return. Templates
 do not keep conversation ids, tmux names or credentials.
 
 `agent-messages` (default off) lets you mark a local session as a project
-member from its menu. Members then use `corta send`, `corta read`,
-`corta wait`, `corta members`, `corta whoami` and `corta status`. A member
-that has no push channel gets one fixed line, “Corta: you have new
-messages; run corta read.”, only while it is idle and you are not typing.
+member from its menu. Corta then listens on a per-user socket and puts
+`corta` on the `PATH` of shells it starts. Members use `corta send`,
+`corta read`, `corta wait`, `corta members`, `corta whoami` and
+`corta status`. The same tools are available as optional MCP tools from
+`corta mcp`. A member that has no push channel gets one fixed line,
+“Corta: you have new messages; run corta read.”, only while it is idle
+and you are not typing.
 Turn the member's wake-up off, or turn `agent-messages` off, and nothing
 is typed. Message text stays in the inbox. It is not saved across launches.
 Select text in a pane and choose Send to Member to deliver that selection.
 The message includes the pane's directory, branch and commit when git
-information is already known. An SSH session can be marked as a remote
-member. Sending to it reports that the forward is unavailable: this
-version does not install a client on the remote machine.
+information is already known. An SSH session kept by tmux can be marked as a remote member. The next
+connection forwards Corta's socket and leaves a `corta` script in
+`/tmp/corta-<token>` for that session. Until that connection is up,
+sending reports that the forward is unavailable. The remote needs
+`nc -U`. Nothing is written under the remote home directory.
 
 A session already in a linked worktree is marked, and its menu can show
 the main repository in Finder. New Session in a Worktree… types

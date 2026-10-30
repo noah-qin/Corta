@@ -95,6 +95,34 @@ extension CortaSpaceController {
         updateAttentionBadge(ordered: ordered)
     }
 
+    func wakeSnapshot(for sessionID: UUID) -> AgentWakeSnapshot? {
+        guard let session = session(withID: sessionID)?.session, let pane = session.pane,
+              let terminal = pane.session else { return nil }
+        let observation = session.conversationObservation
+        let kind = observation?.conversation.kind.rawValue
+        let group = terminal.pty.foregroundProcessGroup
+        let foreground = observation?.processes.contains { $0.pid == group } == true
+        let status = pane.agents.status
+        let idle = status?.state == .idle
+        let typing = pane.terminalView?.lastUserInput.map { SuspendingClock.now - $0 < .seconds(3) } ?? false
+        let member = member(of: session)
+        let gate = AgentNudgeGate(
+            enabled: member?.nudgeEnabled == true,
+            foregroundIsAgent: foreground, idle: idle, userIdle: !typing,
+            composing: pane.terminalView?.hasMarkedText() == true,
+            bracketedPaste: terminal.isBracketedPasteEnabled,
+            nudgesThisMinute: AgentHub.shared.bus.nudges(for: member?.id ?? UUID(), now: Date().timeIntervalSinceReferenceDate))
+        return AgentWakeSnapshot(
+            kind: kind, claudeSocket: nil, codexExecutable: nil, codexThread: observation?.conversation.id?.uuidString,
+            gate: gate)
+    }
+
+    func writeNudge(to sessionID: UUID) -> Bool {
+        guard let session = session(withID: sessionID)?.session,
+              let terminal = session.pane?.session else { return false }
+        return terminal.write(AgentEnvelope.nudgeBytes()) == .accepted
+    }
+
     func noteGitDirectories() {
         var directories: [UUID: String] = [:]
         for session in projects.flatMap(\.sessions) where session.record.ssh == nil {

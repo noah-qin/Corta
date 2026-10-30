@@ -40,6 +40,8 @@ public struct RemoteTmux: Equatable, Sendable {
         public var environmentValue = ""
         public var reverseRemote = ""
         public var reverseLocal = ""
+        /// Install a `/tmp` `corta` for this session and pass its environment into tmux.
+        public var installRemoteClient = false
 
         public init() {}
 
@@ -90,6 +92,26 @@ public struct RemoteTmux: Equatable, Sendable {
     /// -dP atomically creates the session; an exact has-session distinguishes
     /// an already-existing identity from a creation failure.
     /// Attaching by exact name then fails safely if it disappeared in between.
+    /// Writes the remote `corta` with `printf %b`, so `$` survives into the file.
+    private static func remoteClientInstaller() -> String {
+        let script = [
+            "#!/bin/sh",
+            "op=$1; to=$2; shift 2",
+            "printf %s\\n \"{\\\"op\\\":\\\"$op\\\",\\\"token\\\":\\\"$CORTA_MEMBER_TOKEN\\\",\\\"to\\\":\\\"$to\\\",\\\"body\\\":\\\"$*\\\"}\" | nc -U \"$CORTA_FORWARD\"",
+        ].joined(separator: "\n")
+        var escaped = ""
+        for character in script {
+            switch character {
+            case "\\": escaped += "\\\\"
+            case "\"": escaped += "\\\""
+            case "$": escaped += "\\$"
+            case "\n": escaped += "\\n"
+            default: escaped.append(character)
+            }
+        }
+        return "printf \"%b\" \"" + escaped + "\""
+    }
+
     public var command: String { command(extras: Extras()) }
 
     public func command(extras: Extras) -> String {
@@ -97,9 +119,19 @@ public struct RemoteTmux: Equatable, Sendable {
         // parse a newline inside single quotes; keep the entire sh program in
         // one quoted argument, with no inner single quotes to split that run.
         let safe = extras.accepted() ?? Extras()
+        let install = extras.installRemoteClient && safe.hasEnvironment && safe.hasForward
         let assignment = safe.hasEnvironment
             ? ["export \(safe.environmentName)=\(safe.environmentValue);"] : []
-        let script = (assignment + [
+        let client: [String] = install ? [
+            "d=/tmp/corta-\(safe.environmentValue);",
+            "mkdir -p \"$d\";",
+            Self.remoteClientInstaller() + " > \"$d/corta\";",
+            "chmod 700 \"$d\" \"$d/corta\";",
+        ] : []
+        let flags = install
+            ? "-e \(safe.environmentName)=\(safe.environmentValue) -e CORTA_FORWARD=\(safe.reverseRemote) -e PATH=/tmp/corta-\(safe.environmentValue):\\$PATH "
+            : ""
+        let script = (assignment + client + [
             "trap \"exit 129\" HUP;",
             "trap \"exit 143\" TERM;",
             "report_failure() {",
@@ -109,7 +141,7 @@ public struct RemoteTmux: Equatable, Sendable {
             "if ! command -v tmux >/dev/null 2>&1; then",
             "printf \"\\033]6973;\(token.uuidString);start;missing\\007\";",
             "exec \"${SHELL:-/bin/sh}\" -l; fi;",
-            "prepared=$(tmux new-session -dP -F corta-created -s \"\(sessionName)\" 2>&1);",
+            "prepared=$(tmux new-session -dP \(flags)-F corta-created -s \"\(sessionName)\" 2>&1);",
             "result=$?;",
             "if [ \"$result\" -eq 0 ]; then outcome=new;",
             "elif tmux has-session -t \"=\(sessionName)\" 2>/dev/null; then outcome=attached;",

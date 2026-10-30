@@ -96,11 +96,16 @@ extension CortaSpaceController {
     }
 
     func syncAgentBus() {
-        agentBus.replaceMembers(projects.flatMap(\.members))
-        agentBus.boundSessions = Set(projects.flatMap(\.sessions).compactMap { session in
+        let members = projects.flatMap(\.members)
+        let bound = Set(projects.flatMap(\.sessions).compactMap { session in
             session.conversationObservation?.processes.isEmpty == false ? session.id : nil
         })
-        agentBus.forwardsDown = Set(projects.flatMap(\.members).filter { $0.host != nil }.map(\.id))
+        var shells: [pid_t: UUID] = [:]
+        for session in projects.flatMap(\.sessions) {
+            if let pid = session.pane?.session?.pty.processIdentifier { shells[pid] = session.id }
+        }
+        AgentHub.shared.sync(members: members, bound: bound, shells: shells)
+        agentBus = AgentHub.shared.bus
     }
 
     @discardableResult
@@ -115,17 +120,9 @@ extension CortaSpaceController {
             body = String(decoding: body.utf8.prefix(limit), as: UTF8.self)
             lines.append("truncated: \(original)")
         }
-        let sent = agentBus.send(from: AgentEnvelope.userID, to: member.id.uuidString, body: body,
-                                 replyTo: nil, context: lines, now: Date().timeIntervalSinceReferenceDate)
-        if let number = sent.0, let item = sent.2 {
-            let envelope = AgentEnvelope.text(
-                fromRole: "user", fromID: AgentEnvelope.userID, number: number, replyTo: nil,
-                body: item.body, context: item.context, fromUserPane: SpaceSessionPresentation(session: session).title)
-            _ = envelope
-            agentBus.mark(number, sent.1, now: item.at)
-        }
-        content.showNote(L10n.format("space.member.sent", String(describing: sent.1)))
-        return sent.1
+        let delivery = AgentHub.shared.deliverUser(to: member.id.uuidString, body: body, context: lines)
+        content.showNote(L10n.format("space.member.sent", AgentHub.shared.deliveryName(delivery)))
+        return delivery
     }
 
     func member(of session: SpaceSession) -> AgentMemberRecord? {
@@ -250,10 +247,29 @@ extension CortaSpaceController {
 
     func applyTemplate(to project: SpaceProject) {
         let file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
-        guard let template = file.templates.first else {
+        guard !file.templates.isEmpty else {
             content.showNote(L10n.text("space.template.empty"))
             return
         }
+        let alert = NSAlert()
+        alert.messageText = L10n.text("space.template.apply")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        field.stringValue = file.templates.count == 1 ? file.templates[0].name : ""
+        alert.informativeText = file.templates.map(\.name).joined(separator: ", ")
+        alert.accessoryView = field
+        alert.addButton(withTitle: L10n.text("space.template.apply"))
+        alert.addButton(withTitle: L10n.text("space.member.cancel"))
+        presentAlert(alert, host?.toolbarWindow) { [weak self, weak project] response in
+            guard response == .alertFirstButtonReturn, let self, let project,
+                  let template = file.templates.first(where: { $0.name == field.stringValue }) else {
+                self?.content.showNote(L10n.text("space.template.empty"))
+                return
+            }
+            self.apply(template, to: project)
+        }
+    }
+
+    func apply(_ template: SpaceTemplate, to project: SpaceProject) {
         selectProject(project)
         start(project)
         for (index, built) in template.sessions(in: project.path).enumerated() {
@@ -453,6 +469,26 @@ extension CortaSpaceController {
         AgentDirectory.refresh()
     }
 
+    /// A remote member's connection forwards the message socket and installs a `/tmp` client.
+    func remotePreset(_ preset: Preset?, session: SpaceSession) -> Preset? {
+        guard var preset, let tmux = preset.remoteTmux, let target = preset.connectTarget,
+              ConfigurationStore.shared.configuration.agentMessages,
+              let member = member(of: session), member.host != nil,
+              let socket = AgentHub.shared.socketPath else { return preset }
+        let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        AgentHub.shared.rememberRemote(token: token, member: member.id)
+        var extras = RemoteTmux.Extras()
+        extras.environmentName = "CORTA_MEMBER_TOKEN"
+        extras.environmentValue = token
+        extras.reverseRemote = "/tmp/corta-" + token + ".sock"
+        extras.reverseLocal = socket
+        extras.installRemoteClient = true
+        preset.arguments = SSHDestination.retainedArguments(
+            for: target, tmux: tmux, preamble: preset.retainedSSHPreamble,
+            commandLeadIn: preset.retainedCommandLeadIn, extras: extras)
+        return preset
+    }
+
     func spawn(_ session: SpaceSession, in project: SpaceProject, panelSize: CGSize, preset: Preset? = nil) {
         guard let host, session.pane == nil else { return }
         let record = session.record
@@ -470,7 +506,8 @@ extension CortaSpaceController {
             ? template?.gridSize(fittingBelowChrome: terminalSize) : nil
         let pane = host.makePane(
             workingDirectory: record.ssh == nil ? (record.directory ?? project.path) : nil,
-            initialGridSize: grid, preset: resolved)
+            initialGridSize: grid, preset: remotePreset(resolved, session: session),
+            agentPaneID: session.id)
         // The window's temporary font zoom applies to new sessions too.
         if let template {
             pane.setFontSize(template.fontSize)
@@ -479,7 +516,12 @@ extension CortaSpaceController {
         session.pane = pane
         pane.remote.onTmuxReport = { [weak self, weak session] report in
             guard let self, let session else { return }
-            if report.established { session.record.tmuxEstablished = true }
+            if report.established {
+                session.record.tmuxEstablished = true
+                if let member = self.member(of: session), member.host != nil {
+                    AgentHub.shared.markRemoteReady(member.id)
+                }
+            }
             self.refreshNow()
             self.scheduleSave()
         }

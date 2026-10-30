@@ -87,6 +87,12 @@ final class CortaSpaceController: NSObject {
             self.gitFacts = facts
             self.sidebar.reload()
         }
+        AgentHub.shared.snapshot = { [weak self] id in self?.wakeSnapshot(for: id) }
+        AgentHub.shared.writeNudge = { [weak self] id in self?.writeNudge(to: id) ?? false }
+        AgentHub.shared.contextLines = { [weak self] id in
+            guard let self, let session = self.session(withID: id)?.session else { return [] }
+            return self.gitContext(for: session)
+        }
         observers.append(NotificationCenter.default.addObserver(
             forName: AgentDirectory.didChange, object: nil, queue: .main
         ) { [weak self] _ in

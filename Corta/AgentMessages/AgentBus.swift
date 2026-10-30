@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Darwin
 import Foundation
 
 /// A project member. The binding to a live process is not stored.
@@ -313,5 +314,37 @@ nonisolated enum AgentPush {
         guard !executable.isEmpty, !thread.isEmpty, !thread.contains(" "), !message.contains("\0"),
               thread.utf8.allSatisfy({ $0 >= 0x20 && $0 < 0x7F }) else { return nil }
         return [executable, "queue", "--thread", thread, "--message", message]
+    }
+
+    static func writeClaude(socket path: String, envelope: String) -> Bool {
+        guard path.hasPrefix("/"), !path.contains(".."), path.utf8.count < 104 else { return false }
+        guard var address = SSHAskpass.socketAddress(path) else { return false }
+        let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard descriptor >= 0 else { return false }
+        defer { close(descriptor) }
+        let connected = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
+        }
+        guard connected == 0 else { return false }
+        let line = claudeLine(envelope: envelope, messageID: "cc-msg-corta")
+        return SSHAskpass.writeLine(Data(line.utf8), to: descriptor)
+    }
+
+    static func run(_ arguments: [String], timeout: TimeInterval) -> Bool {
+        guard let executable = arguments.first else { return false }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = Array(arguments.dropFirst())
+        process.standardInput = FileHandle.nullDevice
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        do { try process.run() } catch { return false }
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning, Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        if process.isRunning { process.terminate(); return false }
+        return process.terminationStatus == 0
     }
 }

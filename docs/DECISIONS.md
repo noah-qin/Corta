@@ -970,11 +970,13 @@ CLI. Until then the line stays constant and off by default.
 
 ## D33 — Remote members are marked, and not given a client yet
 
-**Decision.** An SSH session can be marked as a member with its host
-name. Delivery to it returns `forwardUnavailable`. The retention wrapper
-can already accept one environment variable and one `ssh -R` pair (D09,
-#434) but this version passes neither, and it does not write a client
-under the remote home or anywhere else.
+**Decision.** An SSH session marked as a member gets one token and one
+`ssh -R` forward of Corta's message socket. The wrapper installs a
+`corta` script under `/tmp/corta-<token>` for that session only and puts
+it on the tmux session's `PATH`. It does not write `$HOME` or change
+global tmux configuration. Until that ssh session is up, delivery returns
+`forwardUnavailable`. A missing `nc -U` on the remote leaves the script
+unable to connect.
 
 **Why.** A remote `corta` has to be a Linux program or a script placed on
 the remote machine. Placing one is a new write to a machine the user did
