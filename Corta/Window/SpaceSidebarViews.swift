@@ -133,6 +133,12 @@ final class SpaceSessionCell: NSTableCellView {
         var hint: String?
         /// Off screen: the add button shows while the pointer is over it.
         var canShow = false
+        var git: GitRow?
+
+        struct GitRow: Equatable {
+            var text: String
+            var toolTip: String
+        }
     }
 
     static let identifier = NSUserInterfaceItemIdentifier("Corta.Space.SessionCell")
@@ -198,15 +204,27 @@ final class SpaceSessionCell: NSTableCellView {
             dot.layer?.backgroundColor = color.cgColor
         }
         self.content = content
-        hint.stringValue = content.hint ?? ""
-        hint.isHidden = content.hint == nil
+        if let hintText = content.hint {
+            hint.stringValue = hintText
+            hint.textColor = .secondaryLabelColor
+            hint.isHidden = false
+        } else if let git = content.git {
+            hint.stringValue = git.text
+            hint.textColor = .secondaryLabelColor
+            hint.isHidden = false
+        } else {
+            hint.stringValue = ""
+            hint.isHidden = true
+        }
         updateButton()
         let place = presentation.isRunning
             ? L10n.text(content.isOnScreen ? "space.session.onScreen" : "space.session.offScreen") : nil
         let details = [presentation.state, presentation.detail.isEmpty ? nil : presentation.detail, place]
             .compactMap { $0 }
-        toolTip = ([presentation.title] + details).joined(separator: "\n")
-        setAccessibilityLabel(([presentation.title] + details).joined(separator: ", "))
+        var lines = [presentation.title] + details
+        if let git = content.git { lines.append(git.toolTip) }
+        toolTip = lines.joined(separator: "\n")
+        setAccessibilityLabel(lines.joined(separator: ", "))
     }
 }
 

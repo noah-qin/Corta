@@ -101,6 +101,9 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   gaps; arrange in columns or rows; every placement can be undone. No split
   makes a panel smaller than 64 × 18 cells. Hidden sessions keep running at
   the grid's size.
+- Each local session row shows its Git branch and whether tracked files
+  differ, read from `.git` only. Untracked files and ahead/behind are not
+  shown. More than 20,000 index entries skips the change check.
 - A sidebar of every session with its state, an add button that says what it
   will replace, rename (kept over program titles), and an icon per kind:
   local, SSH, agent CLI.

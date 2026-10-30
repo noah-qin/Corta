@@ -897,10 +897,12 @@ Local agents never use tmux.
 **Why.** Keeping local processes alive past their window remains the
 multiplexer D09 rules out. Remote tmux retention delegates that lifetime
 to the remote host under the connection choice; Corta owns no daemon. One Space, not one per window, so a
-folder cannot be open twice with two sets of sessions. Nothing is read from
-or written to the project folder: a folder may come from anyone's
+folder cannot be open twice with two sets of sessions. Nothing in the project folder is executed or used to name a session, and
+nothing is written there: a folder may come from anyone's
 repository, and a file there naming sessions would be a way to make Corta
-run them (`SECURITY.md` §4.6).
+run them (`SECURITY.md` §4.6). The sidebar's Git row is the one read: `.git/HEAD`,
+a worktree `gitdir:` file and `.git/index`, plus `stat` of the tracked paths
+the index names. It never runs `git`.
 
 The grid is a free split tree, the terminal mode's own: a session dropped on
 a panel's edge splits it there. No split leaves a panel smaller than 64 × 18

@@ -52,6 +52,8 @@ final class CortaSpaceController: NSObject {
     private weak var terminalFocus: ViewController?
     var conversationMonitor: Task<Void, Never>?
     var attentionQueue = AttentionQueue()
+    var gitFacts: [UUID: GitFacts] = [:]
+    let gitMonitor = GitStatusMonitor()
     private var pendingSave: DispatchWorkItem?
     var isRefreshScheduled = false
     var isOutputRefreshScheduled = false
@@ -79,6 +81,11 @@ final class CortaSpaceController: NSObject {
         super.init()
         sidebar.space = self
         content.space = self
+        gitMonitor.onUpdate = { [weak self] facts in
+            guard let self, self.gitFacts != facts else { return }
+            self.gitFacts = facts
+            self.sidebar.reload()
+        }
         observers.append(NotificationCenter.default.addObserver(
             forName: AgentDirectory.didChange, object: nil, queue: .main
         ) { [weak self] _ in

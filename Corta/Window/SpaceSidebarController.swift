@@ -186,7 +186,8 @@ final class SpaceSidebarController: NSViewController, NSOutlineViewDataSource, N
             presentation: SpaceSessionPresentation(session: session), isOnScreen: onScreen,
             hint: session === chosen && !onScreen ? space?.placementHint(for: session) : nil,
             // Only the project on screen has a grid to add to.
-            canShow: !onScreen && space?.session(withID: session.id)?.project === space?.selectedProject)
+            canShow: !onScreen && space?.session(withID: session.id)?.project === space?.selectedProject,
+            git: space?.gitRow(for: session.id))
     }
 
     /// What a project row shows; it reloads only when this changes.

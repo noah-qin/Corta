@@ -81,16 +81,45 @@ extension CortaSpaceController {
     func refreshNow() {
         guard isActive else {
             sidebar.setWaitingCount(0)
+            gitMonitor.update([:])
             updateAttentionBadge(ordered: [])
             return
         }
         let ordered = waitingSessionIDs()
         sidebar.setWaitingCount(ordered.count)
+        noteGitDirectories()
         sidebar.reload()
         for panel in panels.values where panel.window != nil { panel.update() }
         content.update()
         showConversationNoticeIfNeeded()
         updateAttentionBadge(ordered: ordered)
+    }
+
+    func noteGitDirectories() {
+        var directories: [UUID: String] = [:]
+        for session in projects.flatMap(\.sessions) where session.record.ssh == nil {
+            if let directory = session.pane?.session?.currentDirectory ?? session.record.directory {
+                directories[session.id] = directory
+            }
+        }
+        gitMonitor.update(directories)
+    }
+
+    func gitRow(for id: UUID) -> SpaceSessionCell.Content.GitRow? {
+        guard let facts = gitFacts[id] else { return nil }
+        var text = facts.detached ? L10n.format("space.git.detached", facts.name) : facts.name
+        if facts.worktree { text += " · " + L10n.text("space.git.worktree") }
+        var tip = text
+        if facts.unchecked {
+            tip += "\n" + L10n.text("space.git.large")
+        } else if let count = facts.changedFiles, count > 0 {
+            text += " · \(count)"
+            tip += "\n" + L10n.format("space.git.dirty", count)
+        }
+        if let main = facts.mainRepository {
+            tip += "\n" + L10n.format("space.git.main", (main as NSString).abbreviatingWithTildeInPath)
+        }
+        return SpaceSessionCell.Content.GitRow(text: text, toolTip: tip)
     }
 
     func hasWaitingSession() -> Bool {

@@ -275,6 +275,13 @@ The note disappears after a few seconds; the command stays in the prompt.
 
 `space-panel-limit` (1–6) caps the panels on screen.
 
+Each local session's row shows the Git branch of its directory, read from
+`.git` without running `git`. A linked worktree is marked and its tooltip
+names the main repository. A number is how many tracked files differ in
+size or modification time; untracked files and ahead/behind are not
+counted. A repository with more than 20,000 index entries says changes
+were not checked. A directory that is not a repository shows nothing.
+
 The sidebar's top counts sessions that are waiting on you: a permission
 prompt, a question, a finished turn, or an attention request. View ▸
 Jump to Next Waiting Session (⌥⌘J) puts the oldest one on the grid — in

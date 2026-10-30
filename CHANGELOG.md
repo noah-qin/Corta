@@ -26,6 +26,9 @@ Versioning for compatibility changes.
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
+- Space shows each local session's Git branch, worktree mark and a count of
+  tracked files that differ, read from `.git` without running git.
+
 - Space lists sessions that are waiting on you and jumps to the oldest with
   View ▸ Jump to Next Waiting Session (⌥⌘J). The Dock badge shows the count
   while the Space window is not key (`space-attention-badge`).
