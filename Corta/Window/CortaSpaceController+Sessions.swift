@@ -217,6 +217,57 @@ extension CortaSpaceController {
         }
     }
 
+    func saveTemplate(of project: SpaceProject) {
+        let alert = NSAlert()
+        alert.messageText = L10n.text("space.template.save")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        field.stringValue = project.name
+        alert.accessoryView = field
+        alert.addButton(withTitle: L10n.text("space.template.save"))
+        alert.addButton(withTitle: L10n.text("space.member.cancel"))
+        presentAlert(alert, host?.toolbarWindow) { response in
+            guard response == .alertFirstButtonReturn,
+                  let name = AgentMemberRecord.cleanRole(field.stringValue) else { return }
+            var file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
+            let template = SpaceTemplate.capture(
+                name: name, projectPath: project.path, sessions: project.sessions.map(\.currentRecord),
+                members: project.members, layout: project.layout)
+            file.templates.removeAll { $0.name == name }
+            file.templates.append(template)
+            try? file.save(to: SpaceTemplateFile.url)
+        }
+    }
+
+    func applyTemplate(to project: SpaceProject) {
+        let file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
+        guard let template = file.templates.first else {
+            content.showNote(L10n.text("space.template.empty"))
+            return
+        }
+        selectProject(project)
+        start(project)
+        for (index, built) in template.sessions(in: project.path).enumerated() {
+            var record = built.0
+            record.number = project.nextNumber
+            project.nextNumber += 1
+            let session = SpaceSession(record: record)
+            project.sessions.append(session)
+            if project.maximized != nil { setMaximized(nil, in: project) }
+            let placement = automaticPlacement(in: project)
+            spawn(session, in: project, panelSize: plannedSize(of: placement, in: project))
+            place(session, placement, in: project)
+            focus(session)
+            if let agent = built.1 { fillWhenReady(command: agent, note: "space.template.filled") }
+            if let role = template.sessions[index].memberRole, let clean = AgentMemberRecord.cleanRole(role) {
+                project.members.append(AgentMemberRecord(
+                    role: clean, sessionID: session.id,
+                    nudgeEnabled: template.sessions[index].nudgeEnabled ?? true))
+            }
+        }
+        scheduleSave()
+        content.showNote(L10n.format("space.template.applied", template.name))
+    }
+
     func connectSession() {
         RemoteConnectController.shared.show(.ssh, sender: self, sessionDestination: { [weak self] preset in
             self?.newSession(preset: preset)

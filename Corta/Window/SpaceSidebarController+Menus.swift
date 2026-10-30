@@ -140,6 +140,8 @@ extension SpaceSidebarController {
 
     private func addProjectItems(to menu: NSMenu, project: SpaceProject, space: CortaSpaceController) {
         add("space.newSession", to: menu) { space.selectProject(project); space.newSession() }
+        add("space.template.save", to: menu) { space.saveTemplate(of: project) }
+        add("space.template.apply", to: menu) { space.applyTemplate(to: project) }
         add("space.connectSSH", to: menu) { space.selectProject(project); space.connectSession() }
         let hosts = space.remoteHosts(of: project)
         if !hosts.isEmpty {

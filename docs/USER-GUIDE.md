@@ -275,6 +275,12 @@ The note disappears after a few seconds; the command stays in the prompt.
 
 `space-panel-limit` (1–6) caps the panels on screen.
 
+A project's menu can save the layout as a template in
+`space-templates.json` (Application Support, never the project folder).
+New Sessions from Template starts the same kinds of sessions in another
+project. Agent start commands are typed and wait for Return. Templates
+do not keep conversation ids, tmux names or credentials.
+
 `agent-messages` (default off) lets you mark a local session as a project
 member from its menu. Members then use `corta send`, `corta read`,
 `corta wait`, `corta members`, `corta whoami` and `corta status`. A member

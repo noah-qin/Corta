@@ -26,6 +26,10 @@ Versioning for compatibility changes.
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
+- A Space project can be saved as a template and applied to another
+  project. Templates live in Application Support and omit identities,
+  tmux names and credentials.
+
 - Space recognizes a linked worktree and can type `git worktree add` into
   a new shell. Return runs it. Corta does not run git itself.
 
