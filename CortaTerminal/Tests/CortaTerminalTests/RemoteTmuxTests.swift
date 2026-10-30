@@ -103,6 +103,20 @@ struct RemoteTmuxTests {
         #expect(tmux.command.hasSuffix("'"))
         let script = tmux.command.dropFirst("/bin/sh -c '".count).dropLast()
         #expect(!script.contains("'"), "the login shell must see one single-quoted argument")
+        var extras = RemoteTmux.Extras()
+        extras.environmentName = "CORTA_MEMBER_TOKEN"
+        extras.environmentValue = "abcDEF-12"
+        extras.reverseRemote = "/tmp/corta.sock"
+        extras.reverseLocal = "/tmp/local.sock"
+        let extended = tmux.command(extras: extras)
+        #expect(extended.contains("export CORTA_MEMBER_TOKEN=abcDEF-12;"))
+        #expect(!extended.contains("\n"))
+        #expect(!extended.dropFirst("/bin/sh -c '".count).dropLast().contains("'"))
+        #expect(RemoteTmux.forwardArguments(extras) == ["-R", "/tmp/corta.sock:/tmp/local.sock"])
+        extras.environmentValue = "no;pe"
+        #expect(!tmux.command(extras: extras).contains("no"))
+        #expect(RemoteTmux.forwardArguments(extras).isEmpty)
+        #expect(tmux.command(extras: extras) == tmux.command)
     }
 
     @Test(arguments: ["missing", "new", "attached", "prepare-failed", "attach-failed"],

@@ -32,15 +32,74 @@ public struct RemoteTmux: Equatable, Sendable {
     /// Exact targeting avoids tmux's prefix/pattern matching.
     public var killCommand: String { "tmux kill-session -t '=\(sessionName)'" }
 
+    /// One environment assignment and one `ssh -R` pair, both optional.
+    /// #434 does not set either. A later remote-member path may. Anything
+    /// outside the token alphabet is dropped, never quoted into the command.
+    public struct Extras: Equatable, Sendable {
+        public var environmentName = ""
+        public var environmentValue = ""
+        public var reverseRemote = ""
+        public var reverseLocal = ""
+
+        public init() {}
+
+        var hasEnvironment: Bool { !environmentName.isEmpty || !environmentValue.isEmpty }
+        var hasForward: Bool { !reverseRemote.isEmpty || !reverseLocal.isEmpty }
+
+        func accepted() -> Extras? {
+            var copy = Extras()
+            if hasEnvironment {
+                guard Self.environmentName(environmentName), Self.token(environmentValue, max: 128) else { return nil }
+                copy.environmentName = environmentName
+                copy.environmentValue = environmentValue
+            }
+            if hasForward {
+                guard Self.socket(reverseRemote), Self.socket(reverseLocal) else { return nil }
+                copy.reverseRemote = reverseRemote
+                copy.reverseLocal = reverseLocal
+            }
+            return copy
+        }
+
+        private static func environmentName(_ text: String) -> Bool {
+            guard let first = text.utf8.first, (65...90).contains(first), text.utf8.count <= 32 else { return false }
+            return text.utf8.dropFirst().allSatisfy { (65...90).contains($0) || (48...57).contains($0) || $0 == 95 }
+        }
+
+        private static func token(_ text: String, max: Int) -> Bool {
+            (1...max).contains(text.utf8.count) && text.utf8.allSatisfy(Self.isTokenByte)
+        }
+
+        private static func socket(_ text: String) -> Bool {
+            text.hasPrefix("/") && token(text, max: 100)
+        }
+
+        private static func isTokenByte(_ byte: UInt8) -> Bool {
+            (65...90).contains(byte) || (97...122).contains(byte) || (48...57).contains(byte)
+                || byte == 46 || byte == 95 || byte == 45 || byte == 47
+        }
+    }
+
+    /// `-R remote:local` when both paths are safe tokens. Otherwise nothing.
+    public static func forwardArguments(_ extras: Extras) -> [String] {
+        guard let safe = extras.accepted(), safe.hasForward else { return [] }
+        return ["-R", safe.reverseRemote + ":" + safe.reverseLocal]
+    }
+
     /// One SSH, no rc sourcing, no control mode and no remote files/config changes.
     /// -dP atomically creates the session; an exact has-session distinguishes
     /// an already-existing identity from a creation failure.
     /// Attaching by exact name then fails safely if it disappeared in between.
-    public var command: String {
+    public var command: String { command(extras: Extras()) }
+
+    public func command(extras: Extras) -> String {
         // ssh first passes this through the user's login shell. csh/tcsh cannot
         // parse a newline inside single quotes; keep the entire sh program in
         // one quoted argument, with no inner single quotes to split that run.
-        let script = [
+        let safe = extras.accepted() ?? Extras()
+        let assignment = safe.hasEnvironment
+            ? ["export \(safe.environmentName)=\(safe.environmentValue);"] : []
+        let script = (assignment + [
             "trap \"exit 129\" HUP;",
             "trap \"exit 143\" TERM;",
             "report_failure() {",
@@ -61,7 +120,7 @@ public struct RemoteTmux: Equatable, Sendable {
             "result=$?; if [ \"$result\" -eq 0 ]; then exit 0; fi;",
             "report_failure \"$result\" \"$reason\";",
             "printf \"%s\\n\" \"$reason\" >&2; exec \"${SHELL:-/bin/sh}\" -l"
-        ].joined(separator: " ")
+        ]).joined(separator: " ")
         return "/bin/sh -c " + Self.quoted(script)
     }
 

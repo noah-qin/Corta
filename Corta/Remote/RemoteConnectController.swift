@@ -33,9 +33,11 @@ nonisolated enum SSHDestination {
     /// `ssh <preamble> <options> -t -- <host> <lead-in><wrapper>`. The lead-in
     /// and preamble are fixture-only; a saved connection leaves both empty.
     static func retainedArguments(
-        for target: SSHTarget, tmux: RemoteTmux, preamble: [String] = [], commandLeadIn: String = ""
+        for target: SSHTarget, tmux: RemoteTmux, preamble: [String] = [], commandLeadIn: String = "",
+        extras: RemoteTmux.Extras = .init()
     ) -> [String] {
-        preamble + target.sshOptions + ["-t", "--", target.host, commandLeadIn + tmux.command]
+        preamble + target.sshOptions + RemoteTmux.forwardArguments(extras)
+            + ["-t", "--", target.host, commandLeadIn + tmux.command(extras: extras)]
     }
 }
 

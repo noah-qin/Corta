@@ -567,6 +567,11 @@ retained one keeps the name it stopped using. UUID
 values are canonically rendered and shell-quoted; display names are never
 command parameters. No rc is explicitly sourced and no configuration is changed.
 
+The wrapper builder can also take one environment assignment and one
+`ssh -R` socket pair. #434 passes neither. A name, value or path outside
+`[A-Za-z0-9._/-]` (and an uppercase environment name) is dropped whole, not
+quoted in. Nothing in this path reads a command from a file.
+
 One SSH runs a fixed `/bin/sh` wrapper, as one line with no single quotes
 inside its outer single-quoted argument so the remote login shell (including
 csh/tcsh) can parse it intact. `new-session -dP` atomically attempts
