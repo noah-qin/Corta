@@ -862,21 +862,29 @@ Claude's own process HOME is the only environment value decoded from a bounded
 64 KiB kernel query; other values are neither decoded, retained nor logged.
 Missing/unreadable HOME never falls back to the account directory.
 
-**Bounded retry amendment (review3).** The successful record is read once and
-cached by PID and subsecond kernel start. To recover from partial publication
+**Bounded retry amendment (review3), restated for same-process switches.** A
+successful record is cached by PID, subsecond kernel start and the record
+file's stat four-tuple `(dev, inode, size, mtime)`. Each sample `lstat`s
+that file and reads it only when the tuple changes, once per change. A
+same-process change that yields a new standard UUID replaces the saved one
+and is logged as `sessionChanged`. A change that cannot be confirmed drops
+the old UUID back to `picker`; it is not kept as the current conversation.
+An unchanged tuple is not read again, so a touch of only `mtime` rereads
+once and, when the UUID is the same, logs no source change. To recover from partial publication
 or a transient `recordUnreadable`/`processMismatch`, failures share a maximum
 of three non-ENOENT attempts per identity (initial attempt plus two retries,
-at the existing one-second monitor cadence). This deliberately relaxes #436's
-one-read rule only on failure; it is not an unlimited once-per-second reread.
+at the existing one-second monitor cadence). This deliberately relaxes a strict one-read rule only for a changed stamp
+or a failed read; it is not an unlimited once-per-second reread.
 After exhaustion, only the last fixed reason is retained; no failed record or
 observation is cached. ENOENT reads no contents and can be probed until a late
 record appears, within the remaining attempt budget. Replacing the kernel
 identity resets that budget. A new agent process
 replaces the old identity, even when it yields only a kind; an exited process
-leaves the last observation. A failed probe of the same process retains a
+leaves the last observation. A failed probe of an unchanged record retains a
 previously verified UUID and the source that obtained it; only the log reason
-reflects the failed probe. `picker` never accompanies a UUID. Source/result changes are logged without identity
-or paths and each pane's menu shows its source.
+reflects that probe. `picker` never accompanies a UUID. Source/result changes are logged without identity
+or paths and each pane's menu shows its source. Kind, UUID, source or process
+identity changes notify listeners with the session id alone.
 
 On the project's first opening next launch, the fixed resume command fills
 an empty integrated shell prompt; only the user's Return executes it.

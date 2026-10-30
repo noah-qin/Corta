@@ -56,7 +56,10 @@ Versioning for compatibility changes.
   transient failures, clears identities for mixed Claude/Codex groups, and
   distinguishes unreadable fd tables from ambiguous rollout candidates.
   Claude records use the agent process's HOME and retry failed reads within a
-  bounded per-process budget while caching only success.
+  bounded per-process budget while caching only success. A change to that
+  record's stat four-tuple is reread once: a new UUID replaces the saved one,
+  and an unconfirmed change falls back to the picker. Kind, UUID, source or
+  process-identity changes are posted for the pane.
 
 - Retained Space SSH connections work when the remote login shell is csh or
   tcsh. The fixed tmux wrapper uses one quoted line, preserving tmux startup,

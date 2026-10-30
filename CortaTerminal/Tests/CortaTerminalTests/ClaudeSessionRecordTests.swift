@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Darwin
 import Foundation
 import Testing
 @testable import CortaTerminal
@@ -40,13 +41,20 @@ struct ClaudeSessionRecordTests {
         try withRecord { directory, file in
             try record().write(to: file)
             var cache = ClaudeConversationCache()
-            let first = cache.read(process: process, directory: directory, verify: { true })
+            var reads = 0
+            let first = cache.read(process: process, directory: directory, verify: { reads += 1; return true })
             #expect(first.conversation.source == .sessionRecord)
             #expect(first.conversation.id == UUID(uuidString: uuid))
             #expect(first.reason == nil)
+            let afterFirst = reads
+            #expect(cache.read(process: process, directory: directory, verify: { reads += 1; return true }) == first)
+            #expect(reads == afterFirst, "an unchanged stat four-tuple is not read again")
             try Data("not json".utf8).write(to: file)
-            #expect(cache.read(process: process, directory: directory, verify: { true }) == first,
-                    "the same PID and subsecond kernel start are read only once")
+            let rewritten = cache.read(process: process, directory: directory, verify: { reads += 1; return true })
+            #expect(rewritten.conversation.source == .picker)
+            #expect(rewritten.sessionChanged)
+            #expect(rewritten.reason == .recordUnreadable)
+            #expect(reads > afterFirst)
             let reused = ConversationProcess(pid: 123, seconds: process.seconds,
                                              microseconds: 13, name: "claude")
             #expect(cache.read(process: reused, directory: directory, verify: { true }).reason == .recordUnreadable)
@@ -64,7 +72,11 @@ struct ClaudeSessionRecordTests {
             #expect(created.conversation.source == .sessionRecord)
             #expect(created.reason == nil)
             try FileManager.default.removeItem(at: file)
-            #expect(cache.read(process: process, directory: directory, verify: { true }) == created)
+            let removed = cache.read(process: process, directory: directory, verify: { true })
+            #expect(removed.conversation.source == .picker)
+            #expect(removed.reason == .recordMissing)
+            #expect(removed.sessionChanged)
+            #expect(removed.retainingIdentity(created.conversation, previousProcesses: [process]).id == nil)
         }
     }
 
@@ -174,13 +186,57 @@ struct ClaudeSessionRecordTests {
                     return true
                 }).reason == .recordUnreadable)
             }
-            #expect(checks == ClaudeConversationCache.maximumAttempts)
+            #expect(checks == 1, "an unchanged failing stamp is not read again")
+            for index in 0..<ClaudeConversationCache.maximumAttempts {
+                try Data("partial JSON \(index)".utf8).write(to: file)
+                _ = cache.read(process: process, directory: directory, verify: { checks += 1; return true })
+            }
+            let exhausted = checks
             try record().write(to: file)
-            #expect(cache.read(process: process, directory: directory, verify: { true }).conversation.id == nil)
+            #expect(cache.read(process: process, directory: directory, verify: { checks += 1; return true })
+                .conversation.id == nil)
+            #expect(checks == exhausted, "a spent per-identity budget ignores a later stamp")
             let replacement = ConversationProcess(pid: 123, seconds: process.seconds,
                                                   microseconds: 13, name: "claude")
             #expect(cache.read(process: replacement, directory: directory, verify: { true }).conversation.source
                     == .sessionRecord)
+        }
+    }
+
+    @Test func aChangedRecordIsRereadOnceAndAnUnconfirmedSwitchDropsTheUUID() throws {
+        try withRecord { directory, file in
+            try record().write(to: file)
+            var cache = ClaudeConversationCache()
+            var reads = 0
+            let first = cache.read(process: process, directory: directory, verify: { reads += 1; return true })
+            let replacement = "019eee77-052d-7530-af09-17a140e08123"
+            try record(id: replacement).write(to: file)
+            let switched = cache.read(process: process, directory: directory, verify: { reads += 1; return true })
+            #expect(switched.conversation.id == UUID(uuidString: replacement))
+            #expect(switched.sessionChanged)
+            #expect(switched.conversation.command == "claude --resume " + replacement)
+            try record(id: uuid + ";echo").write(to: file)
+            let invalid = cache.read(process: process, directory: directory, verify: { reads += 1; return true })
+            #expect(invalid.conversation.source == .picker)
+            #expect(invalid.sessionChanged)
+            #expect(invalid.reason == .notStandardUUID)
+            #expect(invalid.retainingIdentity(switched.conversation, previousProcesses: [process]).command
+                    == "claude --resume")
+            var times = [timeval](repeating: timeval(tv_sec: 1_800_000_000, tv_usec: 0), count: 2)
+            try record().write(to: file)
+            let restored = cache.read(process: process, directory: directory, verify: { reads += 1; return true })
+            #expect(restored.conversation.id == first.conversation.id)
+            let beforeTouch = reads
+            file.path.withCString { path in
+                _ = times.withUnsafeMutableBufferPointer { utimes(path, $0.baseAddress) }
+            }
+            let touched = cache.read(process: process, directory: directory, verify: { reads += 1; return true })
+            #expect(reads > beforeTouch, "mtime alone is a new stamp and is read once")
+            #expect(touched.conversation == restored.conversation)
+            #expect(!touched.sessionChanged)
+            let afterTouch = reads
+            #expect(cache.read(process: process, directory: directory, verify: { reads += 1; return true }) == touched)
+            #expect(reads == afterTouch)
         }
     }
 

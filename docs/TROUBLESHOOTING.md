@@ -303,16 +303,26 @@ Inspect Console for subsystem `dev.noahqin.Corta`, category `space`, or run
 Each source/result change reports the kind and a fixed reason, with no UUID,
 path or conversation content: `recordMissing`, `recordUnreadable` (also a
 symlink or invalid JSON), `recordTooLarge`, `fieldMissing`, `notStandardUUID`,
-`processMismatch`, `noOpenFile`, `ambiguousOpenFiles` (multiple candidates), or
-`openFilesUnreadable` (an unreadable/full fd table). Claude reads from the
-agent process's HOME, including a preset's override. Successful records are
-cached per PID/start time; failures get at most three non-ENOENT attempts.
-An absent file is probed until publication within that budget. A transient
-failure preserves an already verified UUID and its original source; its reason
-appears only in the log. A confirmed mixed Claude/Codex group clears the record. Codex's npm
+`processMismatch`, `noOpenFile`, `ambiguousOpenFiles` (multiple candidates),
+`openFilesUnreadable` (an unreadable/full fd table), or `sessionChanged`
+(the same process's record file changed and was rechecked). Claude reads from the
+agent process's HOME, including a preset's override. A successful record is
+cached by PID, kernel start and the file's stat four-tuple; the file is
+reread only when that tuple changes. Failures get at most three non-ENOENT
+attempts per process. An absent file is probed until publication within that
+budget. A transient failure of an unchanged file preserves an already verified
+UUID and its original source; its reason appears only in the log. A changed
+file that cannot be confirmed drops that UUID. A confirmed mixed Claude/Codex group clears the record. Codex's npm
 node wrapper is recognized, but a shared background app-server's files are
 not reliably attributable; it then uses the picker. A missing kind leaves a
 plain shell. A busy prompt or a failed fill produces no success note.
+
+### Space fills the previous conversation after /clear or /resume
+
+The same Claude process kept its pid. Look for `sessionChanged` in the
+`space` log. A new standard UUID replaces the saved one on the next sample;
+an unreadable new record falls back to the picker. Report the CLI version
+if the log never shows `sessionChanged` after you switched conversations.
 
 ### Space SSH says recovery is limited, or starts a new terminal
 

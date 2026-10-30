@@ -203,7 +203,10 @@ were, still running.
   Codex uses its foreground group's open files. If Codex's shared background
   app-server owns the file, it cannot be attributed reliably and uses the picker.
   **Resume Source** in each pane's menu shows `sessionRecord`, `openFile` or
-  `picker`. With no recorded kind, nothing is filled. SSH, remote agents and
+  `picker`. Claude's record is checked again when that file changes, so
+  `/clear`, `/resume` or a new conversation in the same process is picked up
+  on the next sample; if the new record cannot be confirmed, the pane falls
+  back to the picker instead of keeping the previous UUID. With no recorded kind, nothing is filled. SSH, remote agents and
   SFTP are excluded. Preset commands are unchanged. A busy prompt, or one with text at
   the cursor, is left alone. A prompt's right-hand side (RPROMPT, Starship,
   Powerlevel10k) is not text you typed: Corta waits until that line has stopped

@@ -73,24 +73,38 @@ public struct ConversationProcess: Hashable, Sendable {
 public struct ConversationObservation: Equatable, Sendable {
     public enum Reason: String, Error, Sendable {
         case recordMissing, recordUnreadable, recordTooLarge, fieldMissing, notStandardUUID
-        case processMismatch, noOpenFile, ambiguousOpenFiles, openFilesUnreadable
+        case processMismatch, noOpenFile, ambiguousOpenFiles, openFilesUnreadable, sessionChanged
     }
 
     public let conversation: LocalConversation
     public let processes: [ConversationProcess]
     public let reason: Reason?
+    /// The record file's stat changed and this sample is not the previous conversation.
+    public let sessionChanged: Bool
 
-    init(kind: LocalConversation.Kind, processes: [ConversationProcess],
-         id: UUID? = nil, source: LocalConversation.Source = .picker, reason: Reason? = nil) {
+    public init(kind: LocalConversation.Kind, processes: [ConversationProcess],
+         id: UUID? = nil, source: LocalConversation.Source = .picker, reason: Reason? = nil,
+         sessionChanged: Bool = false) {
         conversation = LocalConversation(kind: kind, id: id, source: source)
         self.processes = processes
         self.reason = reason
+        self.sessionChanged = sessionChanged
+    }
+
+    /// Logged once. Later samples of the same stamp do not repeat it.
+    public func settled() -> ConversationObservation {
+        guard sessionChanged else { return self }
+        return ConversationObservation(
+            kind: conversation.kind, processes: processes, id: conversation.id,
+            source: conversation.source, reason: reason)
     }
 
     /// A transient failed probe of the same agent must not erase a verified UUID.
+    /// A same-process record change that cannot be confirmed drops it.
     /// A different PID/start time replaces it, even if only the kind is available.
     public func retainingIdentity(_ previous: LocalConversation?,
                                   previousProcesses: [ConversationProcess]?) -> LocalConversation {
+        if sessionChanged { return conversation }
         guard conversation.id == nil, previousProcesses == processes, let previous,
               previous.kind == conversation.kind, previous.id != nil else { return conversation }
         return previous
@@ -129,6 +143,25 @@ public enum ConversationSample: Equatable, Sendable {
 /// Only identity fields are decoded; no transcript or other fields leave this reader.
 enum ClaudeSessionRecord {
     static let maximumBytes = 64 * 1024
+
+    /// `(dev, inode, size, mtime)`. Compared before any read of the file.
+    struct FileStamp: Equatable, Sendable {
+        var device: UInt64
+        var inode: UInt64
+        var size: Int64
+        var seconds: Int64
+        var nanoseconds: Int64
+    }
+
+    /// `lstat`: a symlink is visible and is not followed. Missing is nil.
+    static func stamp(process: ConversationProcess, directory: URL) -> FileStamp? {
+        var metadata = stat()
+        let path = directory.appendingPathComponent(String(process.pid) + ".json").path
+        guard lstat(path, &metadata) == 0 else { return nil }
+        return FileStamp(
+            device: UInt64(metadata.st_dev), inode: UInt64(metadata.st_ino), size: metadata.st_size,
+            seconds: Int64(metadata.st_mtimespec.tv_sec), nanoseconds: Int64(metadata.st_mtimespec.tv_nsec))
+    }
 
     private struct Identity: Decodable {
         let sessionId: String?
@@ -205,34 +238,68 @@ enum ClaudeSessionRecord {
     }
 }
 
-/// One agent per pane; replacing its kernel identity releases the old cached record.
+/// One agent per pane. A success is cached by PID, kernel start and the
+/// record file's stat four-tuple; a changed stamp is read once.
 struct ClaudeConversationCache: Sendable {
     static let maximumAttempts = 3
     private var process: ConversationProcess?
+    private var stamp: ClaudeSessionRecord.FileStamp?
     private var observation: ConversationObservation?
     private var attempts = 0
     private var lastReason: ConversationObservation.Reason = .recordMissing
+    /// The stamp already charged against the failure budget. An unchanged file is not read again.
+    private var failedStamp: ClaudeSessionRecord.FileStamp?
 
     mutating func read(process: ConversationProcess, directory: URL,
                        verify: () -> Bool) -> ConversationObservation {
         if self.process != process {
             self.process = process
             observation = nil
+            stamp = nil
+            failedStamp = nil
             attempts = 0
+            lastReason = .recordMissing
         }
-        if let observation { return observation }
-        guard attempts < Self.maximumAttempts else {
+        let current = ClaudeSessionRecord.stamp(process: process, directory: directory)
+        if let observation, current == stamp { return observation }
+        if let failedStamp, current == failedStamp {
             return ConversationObservation(kind: .claude, processes: [process], reason: lastReason)
         }
+        let hadIdentity = observation?.conversation.id != nil
+        if current == nil {
+            observation = nil
+            stamp = nil
+            failedStamp = nil
+            return ConversationObservation(
+                kind: .claude, processes: [process], reason: .recordMissing, sessionChanged: hadIdentity)
+        }
+        guard attempts < Self.maximumAttempts else {
+            observation = nil
+            stamp = current
+            failedStamp = current
+            return ConversationObservation(
+                kind: .claude, processes: [process], reason: lastReason, sessionChanged: hadIdentity)
+        }
         let result = ClaudeSessionRecord.read(process: process, directory: directory, verify: verify)
+        let previous = observation?.conversation.id
+        stamp = current
         if let reason = result.reason {
             lastReason = reason
-            // ENOENT reads no contents; allow a late publication. All other
-            // failures share a finite per-kernel-identity attempt budget.
             if reason != .recordMissing { attempts += 1 }
-        } else {
-            observation = result
+            observation = nil
+            failedStamp = current
+            let switched = hadIdentity
+            return ConversationObservation(
+                kind: .claude, processes: [process], reason: reason, sessionChanged: switched)
         }
-        return result
+        failedStamp = nil
+        attempts = 0
+        let switched = previous != nil && previous != result.conversation.id
+        let stored = ConversationObservation(
+            kind: .claude, processes: [process], id: result.conversation.id, source: .sessionRecord)
+        observation = stored
+        return switched ? ConversationObservation(
+            kind: .claude, processes: [process], id: result.conversation.id, source: .sessionRecord,
+            sessionChanged: true) : stored
     }
 }

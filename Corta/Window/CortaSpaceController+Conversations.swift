@@ -39,6 +39,24 @@ nonisolated struct ConversationPromptReadiness: Equatable, Sendable {
     }
 }
 
+extension Notification.Name {
+    /// Kind, UUID, source or process identity of one Space session changed.
+    /// `object` is the session's `UUID`. Nothing in the note is a transcript.
+    static let spaceConversationIdentityDidChange = Notification.Name(
+        "dev.noahqin.Corta.spaceConversationIdentityDidChange")
+}
+
+/// What #437 binds on. Equal samples do not notify.
+nonisolated struct ConversationIdentity: Equatable, Sendable {
+    var conversation: LocalConversation?
+    var processes: [ConversationProcess]
+
+    init(conversation: LocalConversation?, processes: [ConversationProcess]) {
+        self.conversation = conversation
+        self.processes = processes
+    }
+}
+
 extension CortaSpaceController {
     private static let conversationLog = Logger(subsystem: "dev.noahqin.Corta", category: "space")
 
@@ -75,6 +93,8 @@ extension CortaSpaceController {
     }
 
     func applyConversationSample(_ sample: ConversationSample, to item: SpaceSession) {
+        let before = ConversationIdentity(
+            conversation: item.record.conversation, processes: item.conversationObservation?.processes ?? [])
         guard case .observed(let observation) = sample else {
             item.conversationObservation = nil
             item.conversationNeedsNotice = false
@@ -83,12 +103,16 @@ extension CortaSpaceController {
                 item.record.conversation = nil
                 scheduleSave()
             }
+            noteIdentityChange(from: before, on: item)
             return
         }
         let conversation = observation.retainingIdentity(
             item.record.conversation, previousProcesses: item.conversationObservation?.processes)
-        if item.conversationObservation != observation {
-            let result = observation.reason?.rawValue ?? "success"
+        let settled = observation.settled()
+        if observation.sessionChanged || item.conversationObservation != settled {
+            let result = observation.sessionChanged
+                ? ConversationObservation.Reason.sessionChanged.rawValue
+                : (observation.reason?.rawValue ?? "success")
             let kind = conversation.kind.rawValue
             let source = conversation.source.rawValue
             Self.conversationLog.info("""
@@ -96,10 +120,19 @@ extension CortaSpaceController {
                 source=\(source, privacy: .public) result=\(result, privacy: .public)
                 """)
         }
-        item.conversationObservation = observation
-        guard item.record.conversation != conversation else { return }
-        item.record.conversation = conversation
-        scheduleSave()
+        item.conversationObservation = settled
+        if item.record.conversation != conversation {
+            item.record.conversation = conversation
+            scheduleSave()
+        }
+        noteIdentityChange(from: before, on: item)
+    }
+
+    private func noteIdentityChange(from before: ConversationIdentity, on item: SpaceSession) {
+        let after = ConversationIdentity(
+            conversation: item.record.conversation, processes: item.conversationObservation?.processes ?? [])
+        guard before != after else { return }
+        NotificationCenter.default.post(name: .spaceConversationIdentityDidChange, object: item.id)
     }
 
     nonisolated static func conversationNoticeKey(for conversations: [LocalConversation]) -> String {

@@ -70,6 +70,48 @@ struct SpaceConversationTests {
         }
     }
 
+    @Test @MainActor func identityChangesOnKindUUIDSourceOrProcessAndNowhereElse() {
+        let id = try? UUID(uuidString: uuid)
+        let process = ConversationProcess(pid: 4, seconds: 5, microseconds: 6, name: "claude")
+        let exact = LocalConversation(kind: .claude, id: id, source: .sessionRecord)
+        let base = ConversationIdentity(conversation: exact, processes: [process])
+        #expect(base == ConversationIdentity(conversation: exact, processes: [process]))
+        #expect(base != ConversationIdentity(
+            conversation: LocalConversation(kind: .codex, id: id, source: .openFile), processes: [process]))
+        #expect(base != ConversationIdentity(
+            conversation: LocalConversation(kind: .claude, source: .picker), processes: [process]))
+        let moved = ConversationProcess(pid: 4, seconds: 5, microseconds: 7, name: "claude")
+        #expect(base != ConversationIdentity(conversation: exact, processes: [moved]))
+    }
+
+    @Test @MainActor func anIdentityChangeNotifiesOnceAndARepeatDoesNot() {
+        let split = SplitViewController()
+        let space = CortaSpaceController(host: split)
+        let item = SpaceSession(record: SpaceSessionRecord(number: 1))
+        let process = ConversationProcess(pid: 4, seconds: 5, microseconds: 6, name: "claude")
+        let id = UUID(uuidString: uuid)
+        var notes: [UUID] = []
+        let token = NotificationCenter.default.addObserver(
+            forName: .spaceConversationIdentityDidChange, object: nil, queue: nil
+        ) { note in
+            if let id = note.object as? UUID { notes.append(id) }
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+        let observed = ConversationObservation(
+            kind: .claude, processes: [process], id: id, source: .sessionRecord)
+        space.applyConversationSample(.observed(observed), to: item)
+        space.applyConversationSample(.observed(observed), to: item)
+        let picker = ConversationObservation(kind: .claude, processes: [process], reason: .recordMissing,
+                                             sessionChanged: true)
+        space.applyConversationSample(.observed(picker), to: item)
+        let settled = ConversationObservation(
+            kind: .claude, processes: [process], reason: .recordMissing)
+        space.applyConversationSample(.observed(settled), to: item)
+        #expect(notes == [item.id, item.id])
+        #expect(item.record.conversation?.id == nil)
+        #expect(item.record.conversation?.source == .picker)
+    }
+
     @Test func aCursorAtHomeWithTypedTextIsNotAnEmptyPrompt() {
         var terminal = Terminal(rows: 5, columns: 40)
         terminal.feed(Array("$ ".utf8))

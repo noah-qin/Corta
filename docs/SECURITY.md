@@ -621,7 +621,12 @@ No other record field is retained or logged.
 The reader refuses symlinks and non-regular files, reads at most 64 KiB,
 compares PID and UTC start second with the kernel, and rechecks the subsecond
 kernel identity before/after reading. Only successful results
-are cached per PID/start identity per pane. Failed reads share three attempts
+are cached per PID, kernel start and the record file's stat four-tuple
+`(dev, inode, size, mtime)`. Each sample compares that tuple with `lstat`
+and reads the file only when it changes. A same-process change replaces the
+UUID or, if the new record cannot be confirmed, drops it to `picker`
+(`sessionChanged`); the previous UUID is not treated as the current
+conversation. Failed reads share three attempts
 per identity, at the one-second monitor cadence; exhaustion retains only the
 fixed reason. ENOENT reads no contents and can be probed until publication
 within the remaining budget (D30's bounded retry amendment). The undocumented record can disappear
@@ -640,9 +645,12 @@ discard conversation identities conservatively. Each source/result change
 logs only kind, source and success or a fixed fallback reason under subsystem
 `dev.noahqin.Corta`, category `space`; no UUID, path or file content is logged.
 A confirmed mixed Claude/Codex group clears the pane's saved conversation.
-A failed probe preserves both a verified UUID and its original source from
-the same agent; a different
-PID/start identity replaces it. Exiting preserves the last record.
+A failed probe of an unchanged record preserves both a verified UUID and its
+original source from the same agent. A same-process record change
+(`sessionChanged`) replaces that UUID, or drops it when the new record cannot
+be confirmed. A different PID/start identity replaces it. Kind, UUID, source
+or process-identity changes post `spaceConversationIdentityDidChange` with
+the session id and nothing else. Exiting preserves the last record.
 
 Only four commands are reconstructed from fixed words and an optional
 validated UUID: `claude --resume`, `codex resume`, and those same commands
