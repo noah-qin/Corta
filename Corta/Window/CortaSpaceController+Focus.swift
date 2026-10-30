@@ -90,6 +90,7 @@ extension CortaSpaceController {
         sidebar.setWaitingCount(ordered.count)
         noteGitDirectories()
         syncAgentBus()
+        AgentHub.shared.nudgePending()
         sidebar.reload()
         for panel in panels.values where panel.window != nil { panel.update() }
         content.update()

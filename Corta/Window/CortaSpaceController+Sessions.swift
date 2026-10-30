@@ -133,26 +133,99 @@ extension CortaSpaceController {
         guard let (project, _) = self.session(withID: session.id), session.record.ssh == nil else { return }
         let alert = NSAlert()
         alert.messageText = L10n.text("space.member.prompt")
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        let field = NSTextField(frame: NSRect(x: 0, y: 28, width: 280, height: 24))
         field.stringValue = session.record.conversation?.kind.rawValue ?? "member"
-        alert.accessoryView = field
+        let nudge = NSButton(checkboxWithTitle: L10n.text("space.member.nudge"), target: nil, action: nil)
+        nudge.state = .on
+        nudge.frame = NSRect(x: 0, y: 0, width: 280, height: 22)
+        let stack = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 56))
+        stack.addSubview(field)
+        stack.addSubview(nudge)
+        alert.accessoryView = stack
+        alert.informativeText = L10n.text("space.member.nudgeDetail")
         alert.addButton(withTitle: L10n.text("space.member.add"))
         alert.addButton(withTitle: L10n.text("space.member.cancel"))
         presentAlert(alert, host?.toolbarWindow) { [weak self, weak project] response in
             guard response == .alertFirstButtonReturn, let self, let project,
                   let role = AgentMemberRecord.cleanRole(field.stringValue) else { return }
             project.members.removeAll { $0.sessionID == session.id }
-            project.members.append(AgentMemberRecord(role: role, sessionID: session.id))
+            project.members.append(AgentMemberRecord(
+                role: role, sessionID: session.id, nudgeEnabled: nudge.state == .on))
             self.scheduleSave()
             self.refreshNow()
+            self.copyIntroduction(session)
         }
+    }
+
+    func sendSelectionFromPalette() {
+        guard isActive, let session = focusedSession, let text = session.pane?.commands.selectedText() else {
+            content.showNote(L10n.text("space.member.none"))
+            return
+        }
+        let others = (project(containing: session)?.members ?? []).filter { $0.sessionID != session.id }
+        if others.count == 1 {
+            sendUserText(text, to: others[0], from: session, context: gitContext(for: session))
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = L10n.text("command.sendSelectionToMember")
+        alert.informativeText = others.map { $0.role + " " + AgentEnvelope.shortID($0.id) }.joined(separator: "\n")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        alert.accessoryView = field
+        alert.addButton(withTitle: L10n.text("space.member.send"))
+        alert.addButton(withTitle: L10n.text("space.member.cancel"))
+        presentAlert(alert, host?.toolbarWindow) { [weak self] response in
+            guard response == .alertFirstButtonReturn, let self,
+                  let member = others.first(where: {
+                      AgentEnvelope.shortID($0.id) == field.stringValue || $0.role == field.stringValue
+                  }) else { return }
+            self.sendUserText(text, to: member, from: session, context: self.gitContext(for: session))
+        }
+    }
+
+    func copyIntroduction(_ session: SpaceSession) {
+        syncAgentBus()
+        guard let text = AgentHub.shared.introduction(sessionID: session.id) else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        content.showNote(L10n.text("space.member.copied"))
+    }
+
+    func showHistory(_ session: SpaceSession) {
+        syncAgentBus()
+        let text = AgentHub.shared.historyText(sessionID: session.id)
+        let alert = NSAlert()
+        alert.messageText = L10n.text("space.member.history")
+        alert.informativeText = text.isEmpty ? L10n.text("space.member.historyEmpty") : text
+        alert.addButton(withTitle: L10n.text("space.member.copy"))
+        alert.addButton(withTitle: L10n.text("space.member.cancel"))
+        presentAlert(alert, host?.toolbarWindow) { response in
+            guard response == .alertFirstButtonReturn, !text.isEmpty else { return }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
+    }
+
+    func copyUnread(_ session: SpaceSession) {
+        syncAgentBus()
+        let text = AgentHub.shared.unreadText(sessionID: session.id)
+        guard !text.isEmpty else {
+            content.showNote(L10n.text("space.member.historyEmpty"))
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        content.showNote(L10n.text("space.member.copied"))
     }
 
     func setMemberPaused(_ session: SpaceSession, paused: Bool) {
         guard let project = self.session(withID: session.id)?.project,
               let index = project.members.firstIndex(where: { $0.sessionID == session.id }) else { return }
         project.members[index].paused = paused
-        if paused { /* inbox drop is the bus's job when it is attached */ }
+        if paused {
+            syncAgentBus()
+            AgentHub.shared.dropInbox(sessionID: session.id)
+        }
         scheduleSave()
     }
 
@@ -168,6 +241,8 @@ extension CortaSpaceController {
 
     func removeMember(_ session: SpaceSession) {
         guard let project = self.session(withID: session.id)?.project else { return }
+        syncAgentBus()
+        AgentHub.shared.dropInbox(sessionID: session.id)
         project.members.removeAll { $0.sessionID == session.id }
         scheduleSave()
         refreshNow()
@@ -292,6 +367,29 @@ extension CortaSpaceController {
         }
         scheduleSave()
         content.showNote(L10n.format("space.template.applied", template.name))
+    }
+
+    func deleteTemplate() {
+        let file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
+        guard !file.templates.isEmpty else {
+            content.showNote(L10n.text("space.template.empty"))
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = L10n.text("space.template.delete")
+        alert.informativeText = file.templates.map(\.name).joined(separator: ", ")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        alert.accessoryView = field
+        alert.addButton(withTitle: L10n.text("space.template.delete"))
+        alert.addButton(withTitle: L10n.text("space.member.cancel"))
+        presentAlert(alert, host?.toolbarWindow) { response in
+            guard response == .alertFirstButtonReturn else { return }
+            var file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
+            let before = file.templates.count
+            file.templates.removeAll { $0.name == field.stringValue }
+            guard file.templates.count < before else { return }
+            try? file.save(to: SpaceTemplateFile.url)
+        }
     }
 
     func connectSession() {

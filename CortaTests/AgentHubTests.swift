@@ -71,6 +71,25 @@ struct AgentHubTests {
         #expect(!String(decoding: written, as: UTF8.self).contains("secret"))
     }
 
+    @Test func pausingDropsTheInboxAndTheIntroductionHasNoBody() {
+        let hub = AgentHub()
+        let front = UUID()
+        let back = UUID()
+        let session = UUID()
+        hub.sync(members: [
+            AgentMemberRecord(id: front, role: "frontend", sessionID: UUID()),
+            AgentMemberRecord(id: back, role: "backend", sessionID: session),
+        ], bound: [session], shells: [:])
+        hub.snapshot = { _ in nil }
+        _ = hub.exchange(AgentRequest(op: "send", to: back.uuidString, body: "secret"), caller: front)
+        #expect(hub.unreadText(sessionID: session).contains("secret"))
+        hub.dropInbox(sessionID: session)
+        #expect(hub.unreadText(sessionID: session).isEmpty)
+        let intro = AgentEnvelope.introduction(role: "backend", id: back)
+        #expect(intro.contains(AgentEnvelope.shortID(back)))
+        #expect(!intro.contains("secret"))
+    }
+
     @Test func theCommandLinkPointsAtTheExecutable() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

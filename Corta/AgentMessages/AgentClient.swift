@@ -35,10 +35,18 @@ enum AgentClient {
             FileHandle.standardError.write(Data("agent messages are off\n".utf8))
             return 1
         }
+        var body = invocation.body
+        if body == "-" {
+            body = String(data: FileHandle.standardInput.readDataToEndOfFile(), encoding: .utf8)
+        }
         let request = AgentRequest(
-            op: invocation.operation, to: invocation.token, body: invocation.body,
+            op: invocation.operation == "wait" ? "read" : invocation.operation,
+            to: invocation.token, body: body,
             replyTo: invocation.replyTo, timeout: invocation.timeout, number: invocation.number,
             context: invocation.context ? true : nil, pane: environment["CORTA_PANE_ID"], token: nil)
+        if invocation.operation == "wait" {
+            return wait(request, socketPath: path, seconds: invocation.timeout ?? 110, json: invocation.json)
+        }
         guard let reply = exchange(request, socketPath: path) else {
             FileHandle.standardError.write(Data("refused(unavailable)\n".utf8))
             return 1
@@ -46,6 +54,27 @@ enum AgentClient {
         let output = invocation.json ? (try? JSONEncoder().encode(reply)).map { String(decoding: $0, as: UTF8.self) } ?? reply.text : reply.text
         FileHandle.standardOutput.write(Data((output + "\n").utf8))
         return reply.ok ? 0 : 1
+    }
+
+    /// Poll `read` until a message arrives or the timeout elapses, then count one empty wait.
+    static func wait(_ request: AgentRequest, socketPath: String, seconds: Int, json: Bool) -> Int32 {
+        let deadline = Date().addingTimeInterval(TimeInterval(min(max(seconds, 1), 110)))
+        while Date() < deadline {
+            if let reply = exchange(request, socketPath: socketPath), reply.ok, !reply.text.isEmpty {
+                FileHandle.standardOutput.write(Data((reply.text + "\n").utf8))
+                return 0
+            }
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        var empty = request
+        empty.op = "wait"
+        guard let reply = exchange(empty, socketPath: socketPath) else {
+            FileHandle.standardError.write(Data("refused(unavailable)\n".utf8))
+            return 1
+        }
+        let output = json ? (try? JSONEncoder().encode(reply)).map { String(decoding: $0, as: UTF8.self) } ?? reply.text : reply.text
+        FileHandle.standardOutput.write(Data((output + "\n").utf8))
+        return reply.ok && reply.delivery != "giveUp" ? 0 : 1
     }
 
     static func exchange(_ request: AgentRequest, socketPath: String) -> AgentReply? {

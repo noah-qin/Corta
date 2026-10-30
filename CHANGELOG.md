@@ -26,6 +26,10 @@ Versioning for compatibility changes.
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
+- Member menus copy an introduction, the delivery history and unread text.
+  `corta wait` blocks until a message or its timeout. Send Selection to Member
+  is in the View menu and the command palette. Templates can be deleted by name.
+
 - `agent-messages` starts a per-user socket and a `corta` command on the
   `PATH` of shells Corta launches. Members can send, read, wait and ask
   who they are. A fixed wake-up line is written only when every gate passes.

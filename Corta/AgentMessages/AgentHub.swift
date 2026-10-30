@@ -238,6 +238,48 @@ final class AgentHub {
     func caller(token: String) -> UUID? { remoteTokens[token] }
 
     /// A person sending a selection. Wakes the receiver the same way `corta send` does.
+    private var nudgedThrough: [UUID: Int] = [:]
+
+    /// One nudge for unread mail when the gate newly allows it. Not a poll of the PTY.
+    func nudgePending() {
+        let now = Date().timeIntervalSinceReferenceDate
+        for member in bus.members where !member.paused && member.host == nil {
+            let unread = bus.peek(member: member.id)
+            guard let newest = unread.map(\.number).max(), (nudgedThrough[member.id] ?? 0) < newest else { continue }
+            guard let shot = snapshot?(member.sessionID),
+                  AgentNudgeGate.bytes(gate: shot.gate, body: "", role: member.role) != nil,
+                  writeNudge?(member.sessionID) == true else { continue }
+            nudgedThrough[member.id] = newest
+            bus.mark(newest, .nudged, now: now)
+        }
+    }
+
+    func dropInbox(sessionID: UUID) {
+        if let member = bus.members.first(where: { $0.sessionID == sessionID }) {
+            bus.dropInbox(member: member.id)
+        }
+    }
+
+    func introduction(sessionID: UUID) -> String? {
+        guard let member = bus.members.first(where: { $0.sessionID == sessionID }) else { return nil }
+        return AgentEnvelope.introduction(role: member.role, id: member.id)
+    }
+
+    func historyText(sessionID: UUID) -> String {
+        guard let member = bus.members.first(where: { $0.sessionID == sessionID }) else { return "" }
+        return bus.items.filter { $0.to == member.id || $0.from == member.id }.suffix(20).map { item in
+            "#\(item.number) \(deliveryName(item.delivery))" + (item.read ? " read" : "")
+        }.joined(separator: "\n")
+    }
+
+    func unreadText(sessionID: UUID) -> String {
+        guard let member = bus.members.first(where: { $0.sessionID == sessionID }) else { return "" }
+        return bus.peek(member: member.id).map { item in
+            AgentEnvelope.text(fromRole: role(of: item.from), fromID: item.from, number: item.number,
+                               replyTo: item.replyTo, body: item.body, context: item.context)
+        }.joined(separator: "\n\n")
+    }
+
     func deliverUser(to token: String, body: String, context: [String]) -> AgentDelivery {
         let now = Date().timeIntervalSinceReferenceDate
         let sent = bus.send(from: AgentEnvelope.userID, to: token, body: body, replyTo: nil, context: context, now: now)

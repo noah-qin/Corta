@@ -290,6 +290,15 @@ the badge reads. A `tmux` or `screen` in the foreground reads *Remote?*
 because the session it is attached to may itself be on another machine
 and nothing here can tell — it is uncertainty, not an accusation.
 
+### A Space member was not woken
+
+Open that session's menu and choose Delivery History. `queued` means the
+wake-up line was not typed: the member is busy, you were typing, the
+foreground process is not the agent, or wake-up is off. `pushed` means the
+Claude socket or `codex queue` accepted it. `forwardUnavailable` means a
+remote member's SSH forward is not up. The history does not include the
+message text. Messages are forgotten when Corta quits.
+
 ### Space always fills a picker instead of a specific conversation
 
 This is the reliable baseline: Return opens Claude's or Codex's official

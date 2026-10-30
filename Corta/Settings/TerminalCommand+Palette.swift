@@ -27,7 +27,7 @@ nonisolated extension TerminalCommand {
     var category: CommandCategory {
         switch self {
         case .newWindow, .newTab, .previousTab, .nextTab, .renameTab, .close, .quickTerminal, .openProject,
-            .toggleSpace, .nextWaitingSession:
+            .toggleSpace, .nextWaitingSession, .sendSelectionToMember:
             return .window
         case .splitRight, .splitDown, .focusLeft, .focusRight, .focusUp, .focusDown,
             .growPaneHorizontally, .shrinkPaneHorizontally, .growPaneVertically,
@@ -64,7 +64,8 @@ nonisolated extension TerminalCommand {
         case .renameTab: return 6
         case .toggleSpace: return 7
         case .nextWaitingSession: return 8
-        case .openProject: return 9
+        case .sendSelectionToMember: return 9
+        case .openProject: return 10
         case .splitRight: return 0
         case .splitDown: return 1
         case .focusLeft: return 2

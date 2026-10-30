@@ -291,7 +291,12 @@ member from its menu. Corta then listens on a per-user socket and puts
 and you are not typing.
 Turn the member's wake-up off, or turn `agent-messages` off, and nothing
 is typed. Message text stays in the inbox. It is not saved across launches.
-Select text in a pane and choose Send to Member to deliver that selection.
+Select text in a pane and choose Send to Member, or View ▸ Send Selection to Member,
+to deliver that selection. A member's menu copies an introduction you can paste
+once, the delivery history (results only, not the text), and any unread
+messages. `corta wait` blocks until a message arrives or the timeout (at most
+110 seconds). Messages disappear when you quit. Templates are saved, applied
+and deleted from the project menu.
 The message includes the pane's directory, branch and commit when git
 information is already known. An SSH session kept by tmux can be marked as a remote member. The next
 connection forwards Corta's socket and leaves a `corta` script in

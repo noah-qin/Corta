@@ -574,6 +574,7 @@ the key against both rows, which is how you spot it.
 | `open-project` | Open Project… | `cmd+o` |
 | `toggle-space` | Show Space | `alt+cmd+s` |
 | `next-waiting-session` | Jump to Next Waiting Session | `alt+cmd+j` |
+| `send-selection-to-member` | Send Selection to Member | *(none)* |
 | `split-right` | Split Pane Right | `cmd+d` |
 | `split-down` | Split Pane Down | `shift+cmd+d` |
 | `focus-left` | Move Focus Left | `alt+cmd+left` |

@@ -177,6 +177,7 @@ extension AppDelegate {
         // Space and its sidebar first, as the toolbar's leading items are.
         view.addItem(item(for: .toggleSpace))
         view.addItem(item(for: .nextWaitingSession))
+        view.addItem(item(for: .sendSelectionToMember))
         // Show or Hide Sidebar by state; enabled only while Space shows.
         view.addItem(
             withTitle: L10n.text("menu.toggleSidebar"),

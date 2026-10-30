@@ -171,6 +171,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case openProject = "open-project"
     case toggleSpace = "toggle-space"
     case nextWaitingSession = "next-waiting-session"
+    case sendSelectionToMember = "send-selection-to-member"
     case splitRight = "split-right"
     case splitDown = "split-down"
     case focusLeft = "focus-left"
@@ -233,6 +234,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .openProject: return L10n.text("command.openProject")
         case .toggleSpace: return L10n.text("command.toggleSpace")
         case .nextWaitingSession: return L10n.text("command.nextWaitingSession")
+        case .sendSelectionToMember: return L10n.text("command.sendSelectionToMember")
         case .splitRight: return L10n.text("command.splitRight")
         case .splitDown: return L10n.text("command.splitDown")
         case .focusLeft: return L10n.text("command.focusLeft")
@@ -305,6 +307,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .openProject: return #selector(SplitViewController.openSpaceProject(_:))
         case .toggleSpace: return #selector(SplitViewController.toggleSpaceMode(_:))
         case .nextWaitingSession: return #selector(SplitViewController.jumpToNextWaitingSession(_:))
+        case .sendSelectionToMember: return #selector(SplitViewController.sendSelectionToMember(_:))
         case .splitRight: return #selector(SplitViewController.splitRight(_:))
         case .splitDown: return #selector(SplitViewController.splitDown(_:))
         case .focusLeft: return #selector(SplitViewController.moveFocusLeft(_:))

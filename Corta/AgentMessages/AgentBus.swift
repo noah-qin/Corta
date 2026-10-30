@@ -73,6 +73,14 @@ nonisolated struct AgentEnvelope: Equatable, Sendable {
         return key + ": " + trimmed
     }
 
+    static func introduction(role: String, id: UUID) -> String {
+        let short = shortID(id)
+        return "You are Corta project member \"\(role)\" (\(short)). "
+            + "`corta members` lists members; `corta send <ID> \"…\"` sends; "
+            + "`corta read` reads; `corta wait` waits. "
+            + "Reply with `corta send <ID> --reply-to <number>`."
+    }
+
     static func shortID(_ id: UUID) -> String {
         "m-" + id.uuidString.lowercased().prefix(8)
     }
@@ -218,6 +226,14 @@ nonisolated struct AgentBus: Equatable, Sendable {
 
     func nudges(for member: UUID, now: TimeInterval) -> Int {
         (nudgedAt[member] ?? []).filter { now - $0 < 60 }.count
+    }
+
+    func peek(member: UUID) -> [Item] {
+        items.filter { $0.to == member && !$0.read }
+    }
+
+    mutating func dropInbox(member: UUID) {
+        items.removeAll { $0.to == member }
     }
 
     mutating func read(member: UUID) -> [Item] {

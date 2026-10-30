@@ -116,6 +116,9 @@ extension SpaceSidebarController {
                     space.setMemberPaused(session, paused: member?.paused != true)
                 }
                 add("space.member.remove", to: menu) { space.removeMember(session) }
+                add("space.member.intro", to: menu) { space.copyIntroduction(session) }
+                add("space.member.history", to: menu) { space.showHistory(session) }
+                add("space.member.unread", to: menu) { space.copyUnread(session) }
             }
         }
         if space.canFillConversation(session) {
@@ -146,6 +149,7 @@ extension SpaceSidebarController {
         add("space.newSession", to: menu) { space.selectProject(project); space.newSession() }
         add("space.template.save", to: menu) { space.saveTemplate(of: project) }
         add("space.template.apply", to: menu) { space.applyTemplate(to: project) }
+        add("space.template.delete", to: menu) { space.deleteTemplate() }
         add("space.connectSSH", to: menu) { space.selectProject(project); space.connectSession() }
         let hosts = space.remoteHosts(of: project)
         if !hosts.isEmpty {
