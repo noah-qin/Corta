@@ -17,6 +17,18 @@
 import Darwin
 import Foundation
 
+/// Names that can be members. Claude and Codex also keep conversation recovery.
+enum AgentProcessNames {
+    static let builtIn: Set<String> = [
+        "claude", "claude-code", "codex", "gemini", "kimi", "grok", "aider", "opencode",
+    ]
+
+    static func matches(_ name: String, configured: String) -> Bool {
+        if builtIn.contains(name) { return true }
+        return configured.split(separator: ",").contains { $0.trimmingCharacters(in: .whitespaces) == name }
+    }
+}
+
 /// A project member. The binding to a live process is not stored.
 nonisolated struct AgentMemberRecord: Codable, Equatable, Sendable {
     var id: UUID

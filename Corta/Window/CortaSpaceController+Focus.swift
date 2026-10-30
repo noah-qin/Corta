@@ -104,9 +104,13 @@ extension CortaSpaceController {
         let observation = session.conversationObservation
         let kind = observation?.conversation.kind.rawValue
         let group = terminal.pty.foregroundProcessGroup
-        let foreground = observation?.processes.contains { $0.pid == group } == true
+        let configured = ConfigurationStore.shared.configuration.agentProcesses
+        let foregroundName = terminal.pty.activeProcessName
+        let namedAgent = foregroundName.map { AgentProcessNames.matches($0, configured: configured) } == true
+            && group != terminal.pty.processIdentifier
+        let foreground = observation?.processes.contains { $0.pid == group } == true || namedAgent
         let status = pane.agents.status
-        let idle = status?.state == .idle
+        let idle = status?.state == .idle || (status == nil && namedAgent)
         let typing = pane.terminalView?.lastUserInput.map { SuspendingClock.now - $0 < .seconds(3) } ?? false
         let member = member(of: session)
         let agent = observation?.processes.first

@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaTerminal
 import Foundation
 import Testing
 @testable import Corta
@@ -88,6 +89,13 @@ struct AgentHubTests {
         let intro = AgentEnvelope.introduction(role: "backend", id: back)
         #expect(intro.contains(AgentEnvelope.shortID(back)))
         #expect(!intro.contains("secret"))
+    }
+
+    @Test func extraAgentNamesCountWithoutBecomingResumeCommands() {
+        #expect(AgentProcessNames.matches("kimi", configured: ""))
+        #expect(AgentProcessNames.matches("helper", configured: "helper, other"))
+        #expect(!AgentProcessNames.matches("zsh", configured: "helper"))
+        #expect(LocalConversation(kind: .claude).command == "claude --resume")
     }
 
     @Test func aClaudeSocketMustLiveInItsPrivateDirectory() {

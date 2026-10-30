@@ -97,8 +97,14 @@ extension CortaSpaceController {
 
     func syncAgentBus() {
         let members = projects.flatMap(\.members)
-        let bound = Set(projects.flatMap(\.sessions).compactMap { session in
-            session.conversationObservation?.processes.isEmpty == false ? session.id : nil
+        let configured = ConfigurationStore.shared.configuration.agentProcesses
+        let bound = Set(projects.flatMap(\.sessions).compactMap { session -> UUID? in
+            if session.conversationObservation?.processes.isEmpty == false { return session.id }
+            if let name = session.pane?.session?.pty.activeProcessName,
+               AgentProcessNames.matches(name, configured: configured) {
+                return session.id
+            }
+            return nil
         })
         var shells: [pid_t: UUID] = [:]
         for session in projects.flatMap(\.sessions) {
