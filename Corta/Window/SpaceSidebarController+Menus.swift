@@ -107,6 +107,17 @@ extension SpaceSidebarController {
             menu.addItem(NSMenuItem.sectionHeader(title: L10n.format(
                 "space.conversation.source", conversation.source.rawValue)))
         }
+        if ConfigurationStore.shared.configuration.agentMessages, session.record.ssh == nil {
+            let member = space.member(of: session)
+            if member == nil {
+                add("space.member.add", to: menu) { space.makeMember(session) }
+            } else {
+                add(member?.paused == true ? "space.member.resume" : "space.member.pause", to: menu) {
+                    space.setMemberPaused(session, paused: member?.paused != true)
+                }
+                add("space.member.remove", to: menu) { space.removeMember(session) }
+            }
+        }
         if space.canFillConversation(session) {
             add("space.conversation.fillAgain", to: menu) { space.refillConversation(session) }
         }

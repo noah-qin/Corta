@@ -93,6 +93,10 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   sessions; the toolbar's mode button, ⌥⌘S and ⌘O switch to it. Space fills
   the screen and the terminal mode gets its own frame back; its tabs and
   splits keep running and keep their layout.
+- Optional agent messages (`agent-messages`, off by default): members of a
+  project send with `corta`. A fixed wake-up line is typed only when the
+  member is idle and you are not. Message text is not written into the pane
+  and is not saved.
 - A waiting queue across projects: the sidebar counts sessions that need you,
   and Jump to Next Waiting Session (⌥⌘J) focuses the oldest. The Dock badge
   shows the count while the Space window is not key (`space-attention-badge`).

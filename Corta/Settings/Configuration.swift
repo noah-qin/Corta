@@ -164,6 +164,8 @@ nonisolated struct Configuration: Equatable, Sendable {
     var notifyFromPrograms = true
     var spacePanelLimit = 6
     var agentStatus = true
+    /// Member messaging. Off until the user turns it on.
+    var agentMessages = false
     /// Dock badge for Space's waiting queue while the Space window is not key.
     var spaceAttentionBadge = true
     /// Additional comma-separated foreground executable names.

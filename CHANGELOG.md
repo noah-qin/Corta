@@ -26,6 +26,10 @@ Versioning for compatibility changes.
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
+- Space members can message each other when `agent-messages` is on. `corta`
+  sends and reads; a fixed wake-up line is written only when every gate
+  passes. The feature is off by default.
+
 - Space shows each local session's Git branch, worktree mark and a count of
   tracked files that differ, read from `.git` without running git.
 

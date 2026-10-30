@@ -605,6 +605,15 @@ is `tmux kill-session -t '=corta-<UUID>'`, never `kill-server`. A separate termi
 shows authentication and success/failure. This grants no authority over another
 session or a remote agent's exit protocol.
 
+**Agent messages (#437, off by default).** `agent-messages` starts a
+per-user socket and puts `corta` on the `PATH` of shells Corta spawns.
+Membership is the permission to send. A nudge writes only the constant
+line in D32, and only when every gate passes. `codex queue` is the one
+program D31 allows, with structured arguments. Logs record member ids,
+message numbers and results, not bodies. `space.json` stores the role,
+session id and nudge switch, not bindings or text. The same local account
+is not an isolation boundary.
+
 **Local conversation identity (#436).** `space.json` holds only kind
 (`claude`/`codex`), optional standard UUID, and source (`sessionRecord`,
 `openFile`, `picker`). No transcript, session-file path, executable path or

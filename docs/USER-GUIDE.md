@@ -275,6 +275,14 @@ The note disappears after a few seconds; the command stays in the prompt.
 
 `space-panel-limit` (1–6) caps the panels on screen.
 
+`agent-messages` (default off) lets you mark a local session as a project
+member from its menu. Members then use `corta send`, `corta read`,
+`corta wait`, `corta members`, `corta whoami` and `corta status`. A member
+that has no push channel gets one fixed line, “Corta: you have new
+messages; run corta read.”, only while it is idle and you are not typing.
+Turn the member's wake-up off, or turn `agent-messages` off, and nothing
+is typed. Message text stays in the inbox. It is not saved across launches.
+
 Each local session's row shows the Git branch of its directory, read from
 `.git` without running `git`. A linked worktree is marked and its tooltip
 names the main repository. A number is how many tracked files differ in

@@ -72,6 +72,44 @@ extension CortaSpaceController {
     }
 
     /// The SSH connect dialog, whose connection opens in this project.
+    func member(of session: SpaceSession) -> AgentMemberRecord? {
+        self.session(withID: session.id)?.project.members.first { $0.sessionID == session.id }
+    }
+
+    func makeMember(_ session: SpaceSession) {
+        guard let (project, _) = self.session(withID: session.id), session.record.ssh == nil else { return }
+        let alert = NSAlert()
+        alert.messageText = L10n.text("space.member.prompt")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.stringValue = session.record.conversation?.kind.rawValue ?? "member"
+        alert.accessoryView = field
+        alert.addButton(withTitle: L10n.text("space.member.add"))
+        alert.addButton(withTitle: L10n.text("space.member.cancel"))
+        presentAlert(alert, host?.toolbarWindow) { [weak self, weak project] response in
+            guard response == .alertFirstButtonReturn, let self, let project,
+                  let role = AgentMemberRecord.cleanRole(field.stringValue) else { return }
+            project.members.removeAll { $0.sessionID == session.id }
+            project.members.append(AgentMemberRecord(role: role, sessionID: session.id))
+            self.scheduleSave()
+            self.refreshNow()
+        }
+    }
+
+    func setMemberPaused(_ session: SpaceSession, paused: Bool) {
+        guard let project = self.session(withID: session.id)?.project,
+              let index = project.members.firstIndex(where: { $0.sessionID == session.id }) else { return }
+        project.members[index].paused = paused
+        if paused { /* inbox drop is the bus's job when it is attached */ }
+        scheduleSave()
+    }
+
+    func removeMember(_ session: SpaceSession) {
+        guard let project = self.session(withID: session.id)?.project else { return }
+        project.members.removeAll { $0.sessionID == session.id }
+        scheduleSave()
+        refreshNow()
+    }
+
     func connectSession() {
         RemoteConnectController.shared.show(.ssh, sender: self, sessionDestination: { [weak self] preset in
             self?.newSession(preset: preset)

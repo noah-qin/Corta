@@ -76,13 +76,54 @@ nonisolated struct SpaceProjectRecord: Codable, Equatable, Sendable {
     /// The next session's number; numbers are never reused within a project,
     /// so a name stays with its session when another one closes.
     var nextNumber = 1
+    /// Roles the user assigned. No message text and no process binding.
+    var members: [AgentMemberRecord] = []
+
+    init(path: String, sessions: [SpaceSessionRecord] = [], layout: SpaceLayoutRecord? = nil,
+         nextNumber: Int = 1, members: [AgentMemberRecord] = []) {
+        self.path = path
+        self.sessions = sessions
+        self.layout = layout
+        self.nextNumber = nextNumber
+        self.members = members
+    }
+
+    private enum CodingKeys: String, CodingKey { case path, sessions, layout, nextNumber, members }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        path = try values.decode(String.self, forKey: .path)
+        sessions = try values.decodeIfPresent([SpaceSessionRecord].self, forKey: .sessions) ?? []
+        layout = try values.decodeIfPresent(SpaceLayoutRecord.self, forKey: .layout)
+        nextNumber = try values.decodeIfPresent(Int.self, forKey: .nextNumber) ?? 1
+        members = try values.decodeIfPresent([AgentMemberRecord].self, forKey: .members) ?? []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(path, forKey: .path)
+        try values.encode(sessions, forKey: .sessions)
+        try values.encodeIfPresent(layout, forKey: .layout)
+        try values.encode(nextNumber, forKey: .nextNumber)
+        if !members.isEmpty { try values.encode(members, forKey: .members) }
+    }
 
     func validated() -> SpaceProjectRecord {
         let sessions = Array(sessions.prefix(SpaceState.maximumSessions)).map { $0.validated() }
         let highest = sessions.map(\.number).max() ?? 0
+        let ids = Set(sessions.map(\.id))
+        var seen = Set<UUID>()
+        let members = members.filter { member in
+            ids.contains(member.sessionID) && seen.insert(member.id).inserted
+                && AgentMemberRecord.cleanRole(member.role) != nil
+        }.map { member in
+            var copy = member
+            copy.role = AgentMemberRecord.cleanRole(member.role) ?? member.role
+            return copy
+        }
         return SpaceProjectRecord(
             path: path, sessions: sessions, layout: layout?.validated(sessionCount: sessions.count),
-            nextNumber: min(max(nextNumber, highest + 1), 1_000_000))
+            nextNumber: min(max(nextNumber, highest + 1), 1_000_000), members: members)
     }
 }
 
