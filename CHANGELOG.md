@@ -26,6 +26,9 @@ Versioning for compatibility changes.
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
+- An SSH session can be marked as a remote member. Delivery reports that
+  the forward is unavailable. Corta does not install a remote client.
+
 - A Space project can be saved as a template and applied to another
   project. Templates live in Application Support and omit identities,
   tmux names and credentials.

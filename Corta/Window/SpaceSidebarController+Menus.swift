@@ -132,6 +132,10 @@ extension SpaceSidebarController {
             add("space.session.browseFiles", to: menu) { space.browseFiles(of: session) }
         }
         menu.addItem(.separator())
+        if ConfigurationStore.shared.configuration.agentMessages, session.record.ssh != nil,
+           space.member(of: session) == nil {
+            add("space.member.remote", to: menu) { space.makeRemoteMember(session) }
+        }
         if session.record.retainSSH == true {
             add("space.ssh.kill.title", to: menu) { space.endRemoteSession(session) }
         }

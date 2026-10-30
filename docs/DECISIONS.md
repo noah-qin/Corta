@@ -48,6 +48,7 @@ Status of every entry below is **accepted** unless it says otherwise.
 | [D30](#d30--space-is-a-second-view-of-one-windows-sessions-not-a-multiplexer) | Space is a second view of one window's sessions, not a multiplexer | Accepted |
 | [D31](#d31--one-codex-queue-invocation-for-a-member) | One `codex queue` invocation for a member | Accepted |
 | [D32](#d32--a-fixed-wake-up-line-and-only-that) | A fixed wake-up line, and only that | Accepted |
+| [D33](#d33--remote-members-are-marked-and-not-given-a-client-yet) | Remote members are marked, and not given a client yet | Accepted |
 
 ---
 
@@ -966,3 +967,26 @@ arriving in the same instant can land next to the line.
 
 **Consequence.** Reopen if a general, non-typing wake-up exists for every
 CLI. Until then the line stays constant and off by default.
+
+## D33 — Remote members are marked, and not given a client yet
+
+**Decision.** An SSH session can be marked as a member with its host
+name. Delivery to it returns `forwardUnavailable`. The retention wrapper
+can already accept one environment variable and one `ssh -R` pair (D09,
+#434) but this version passes neither, and it does not write a client
+under the remote home or anywhere else.
+
+**Why.** A remote `corta` has to be a Linux program or a script placed on
+the remote machine. Placing one is a new write to a machine the user did
+not ask Corta to modify. `LOCAL_PEERPID` cannot identify a process that
+arrives through sshd, so a token would be required before any client is
+trusted. Until that client exists, the honest result is that the forward
+is unavailable.
+
+**What it costs.** An agent on a retained SSH session cannot send or
+receive through Corta yet. The member row still shows, so the limit is
+visible.
+
+**Consequence.** Reopen when a remote client can be delivered without
+writing a file the user did not ask for, or when the user opts in to
+installing one. The host mark and `forwardUnavailable` stay.

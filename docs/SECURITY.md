@@ -605,6 +605,11 @@ is `tmux kill-session -t '=corta-<UUID>'`, never `kill-server`. A separate termi
 shows authentication and success/failure. This grants no authority over another
 session or a remote agent's exit protocol.
 
+**Remote members (#444).** A marked SSH member carries its host name.
+Messages to it return `forwardUnavailable`. Corta does not copy a client
+onto the remote machine and does not add `ssh -R` unless a later change
+passes the checked extras from #434.
+
 **Worktree commands (#443).** The session menu can type one
 `git worktree add … && cd …` line into an empty prompt. The name and
 path may contain only `[A-Za-z0-9._/-]`. Corta does not run it.

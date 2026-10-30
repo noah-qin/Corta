@@ -290,7 +290,9 @@ Turn the member's wake-up off, or turn `agent-messages` off, and nothing
 is typed. Message text stays in the inbox. It is not saved across launches.
 Select text in a pane and choose Send to Member to deliver that selection.
 The message includes the pane's directory, branch and commit when git
-information is already known.
+information is already known. An SSH session can be marked as a remote
+member. Sending to it reports that the forward is unavailable: this
+version does not install a client on the remote machine.
 
 A session already in a linked worktree is marked, and its menu can show
 the main repository in Finder. New Session in a Worktree… types

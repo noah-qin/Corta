@@ -159,6 +159,16 @@ extension CortaSpaceController {
         scheduleSave()
     }
 
+    func makeRemoteMember(_ session: SpaceSession) {
+        guard let project = self.session(withID: session.id)?.project,
+              let hostName = session.record.ssh?.displayName,
+              let role = AgentMemberRecord.cleanRole(hostName) else { return }
+        project.members.removeAll { $0.sessionID == session.id }
+        project.members.append(AgentMemberRecord(role: role, sessionID: session.id, host: hostName))
+        scheduleSave()
+        refreshNow()
+    }
+
     func removeMember(_ session: SpaceSession) {
         guard let project = self.session(withID: session.id)?.project else { return }
         project.members.removeAll { $0.sessionID == session.id }
