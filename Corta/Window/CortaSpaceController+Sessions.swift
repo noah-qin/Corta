@@ -72,6 +72,62 @@ extension CortaSpaceController {
     }
 
     /// The SSH connect dialog, whose connection opens in this project.
+    func project(containing session: SpaceSession) -> SpaceProject? {
+        self.session(withID: session.id)?.project
+    }
+
+    /// Directory, branch, commit and dirty flag this pane already knows.
+    func gitContext(for session: SpaceSession) -> [String] {
+        var lines: [String] = []
+        if let directory = session.pane?.session?.currentDirectory ?? session.record.directory,
+           let line = AgentEnvelope.contextLine("cwd", directory) { lines.append(line) }
+        if let line = AgentEnvelope.contextLine("pane", SpaceSessionPresentation(session: session).title) {
+            lines.append(line)
+        }
+        if let facts = gitFacts[session.id] {
+            if let line = AgentEnvelope.contextLine("branch", facts.name) { lines.append(line) }
+            let directory = session.pane?.session?.currentDirectory ?? session.record.directory ?? ""
+            if let head = GitStatusReader.commit(directory: directory),
+               let line = AgentEnvelope.contextLine("head", head) { lines.append(line) }
+            if let dirty = facts.changedFiles,
+               let line = AgentEnvelope.contextLine("dirty", dirty > 0 ? "true" : "false") { lines.append(line) }
+        }
+        return lines
+    }
+
+    func syncAgentBus() {
+        agentBus.replaceMembers(projects.flatMap(\.members))
+        agentBus.boundSessions = Set(projects.flatMap(\.sessions).compactMap { session in
+            session.conversationObservation?.processes.isEmpty == false ? session.id : nil
+        })
+        agentBus.forwardsDown = Set(projects.flatMap(\.members).filter { $0.host != nil }.map(\.id))
+    }
+
+    @discardableResult
+    func sendUserText(_ text: String, to member: AgentMemberRecord, from session: SpaceSession,
+                      context: [String] = []) -> AgentDelivery {
+        syncAgentBus()
+        let limit = AgentEnvelope.bodyLimit
+        var body = text
+        var lines = context
+        if body.utf8.count > limit {
+            let original = body.utf8.count
+            body = String(decoding: body.utf8.prefix(limit), as: UTF8.self)
+            lines.append("truncated: \(original)")
+        }
+        let sent = agentBus.send(from: AgentEnvelope.userID, to: member.id.uuidString, body: body,
+                                 replyTo: nil, context: lines, now: Date().timeIntervalSinceReferenceDate)
+        if let number = sent.0, let item = sent.2 {
+            let envelope = AgentEnvelope.text(
+                fromRole: "user", fromID: AgentEnvelope.userID, number: number, replyTo: nil,
+                body: item.body, context: item.context, fromUserPane: SpaceSessionPresentation(session: session).title)
+            _ = envelope
+            agentBus.mark(number, sent.1, now: item.at)
+        }
+        content.showNote(L10n.format("space.member.sent", String(describing: sent.1)))
+        return sent.1
+    }
+
     func member(of session: SpaceSession) -> AgentMemberRecord? {
         self.session(withID: session.id)?.project.members.first { $0.sessionID == session.id }
     }

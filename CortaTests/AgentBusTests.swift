@@ -104,6 +104,13 @@ struct AgentBusTests {
         #expect(AgentNudgeGate.bytes(gate: closed, body: "x", role: "y") == nil)
     }
 
+    @Test func contextLinesDropNewlinesAndUnknownKeys() {
+        #expect(AgentEnvelope.contextLine("cwd", "a\nb") == "cwd: a b")
+        #expect(AgentEnvelope.contextLine("nope", "x") == nil)
+        let long = String(repeating: "x", count: 300)
+        #expect(AgentEnvelope.contextLine("pane", long)?.utf8.count == "pane: ".utf8.count + 256)
+    }
+
     @Test func envelopeContextAndClaudeLineStayBounded() {
         let text = AgentEnvelope.text(fromRole: "frontend", fromID: front, number: 12, replyTo: 9,
                                       body: "look", context: ["cwd: /tmp", "branch: main"])

@@ -282,6 +282,9 @@ that has no push channel gets one fixed line, “Corta: you have new
 messages; run corta read.”, only while it is idle and you are not typing.
 Turn the member's wake-up off, or turn `agent-messages` off, and nothing
 is typed. Message text stays in the inbox. It is not saved across launches.
+Select text in a pane and choose Send to Member to deliver that selection.
+The message includes the pane's directory, branch and commit when git
+information is already known.
 
 Each local session's row shows the Git branch of its directory, read from
 `.git` without running `git`. A linked worktree is marked and its tooltip

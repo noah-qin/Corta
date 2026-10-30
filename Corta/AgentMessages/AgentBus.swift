@@ -64,6 +64,14 @@ nonisolated struct AgentEnvelope: Equatable, Sendable {
         Array((nudgeText + submit).utf8)
     }
 
+    static func contextLine(_ key: String, _ value: String) -> String? {
+        guard ["cwd", "branch", "head", "dirty", "pane"].contains(key) else { return nil }
+        let flat = value.replacingOccurrences(of: "\n", with: " ")
+        let trimmed = String(decoding: flat.utf8.prefix(256), as: UTF8.self)
+        guard !trimmed.isEmpty else { return nil }
+        return key + ": " + trimmed
+    }
+
     static func shortID(_ id: UUID) -> String {
         "m-" + id.uuidString.lowercased().prefix(8)
     }

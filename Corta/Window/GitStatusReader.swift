@@ -32,6 +32,18 @@ nonisolated struct GitFacts: Equatable, Sendable {
 
 /// Reads `.git` without running git. A missing repository is nil, never an error.
 nonisolated enum GitStatusReader {
+    /// The commit HEAD names, when the ref file is loose. Packed refs are left unread.
+    static func commit(directory: String) -> String? {
+        guard let located = locate(URL(fileURLWithPath: directory, isDirectory: true)),
+              let head = readHEAD(in: located.gitDir) else { return nil }
+        if head.detached { return head.full }
+        let ref = located.gitDir.appendingPathComponent("refs/heads/" + head.name)
+        guard let data = try? Data(contentsOf: ref), data.count <= 128,
+              let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              text.count >= 12, text.allSatisfy(\.isHexDigit) else { return nil }
+        return String(text.prefix(12))
+    }
+
     static func read(directory: String) -> GitFacts? {
         guard let located = locate(URL(fileURLWithPath: directory, isDirectory: true)) else { return nil }
         guard let head = readHEAD(in: located.gitDir) else { return nil }
@@ -97,6 +109,7 @@ nonisolated enum GitStatusReader {
     private struct Head {
         var name: String
         var detached: Bool
+        var full: String?
     }
 
     private static func readHEAD(in gitDir: URL) -> Head? {
@@ -108,10 +121,10 @@ nonisolated enum GitStatusReader {
         if text.hasPrefix(ref) {
             let name = String(text.dropFirst(ref.count))
             guard !name.isEmpty, !name.contains(".."), !name.hasPrefix("/") else { return nil }
-            return Head(name: name, detached: false)
+            return Head(name: name, detached: false, full: nil)
         }
         guard text.count >= 7, text.allSatisfy(\.isHexDigit) else { return nil }
-        return Head(name: String(text.prefix(7)), detached: true)
+        return Head(name: String(text.prefix(7)), detached: true, full: String(text.prefix(12)))
     }
 
     private enum Changes { case counted(Int), unchecked }

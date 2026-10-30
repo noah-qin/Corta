@@ -53,6 +53,7 @@ final class CortaSpaceController: NSObject {
     var conversationMonitor: Task<Void, Never>?
     var attentionQueue = AttentionQueue()
     var gitFacts: [UUID: GitFacts] = [:]
+    var agentBus = AgentBus()
     let gitMonitor = GitStatusMonitor()
     private var pendingSave: DispatchWorkItem?
     var isRefreshScheduled = false

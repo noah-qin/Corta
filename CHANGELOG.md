@@ -26,6 +26,9 @@ Versioning for compatibility changes.
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
+- A selection in a Space pane can be sent to another member. The message
+  can include that pane's directory, branch and commit.
+
 - Space members can message each other when `agent-messages` is on. `corta`
   sends and reads; a fixed wake-up line is written only when every gate
   passes. The feature is off by default.
