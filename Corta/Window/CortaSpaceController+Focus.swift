@@ -131,11 +131,32 @@ extension CortaSpaceController {
         return String(cString: buffer)
     }
 
-    /// Claude publishes the inbox socket in the process environment. Only an absolute path is accepted.
+    /// Claude's inbox is the environment path or a Unix socket in its private directory.
     private static func claudeSocket(of pid: pid_t) -> String? {
-        guard let value = ConversationProcess.environmentValue(pid, key: "CLAUDE_CODE_MESSAGING_SOCKET"),
-              value.hasPrefix("/"), !value.contains(".."), value.utf8.count < 104 else { return nil }
-        return value
+        if let value = ConversationProcess.environmentValue(pid, key: "CLAUDE_CODE_MESSAGING_SOCKET"),
+           AgentPush.acceptedSocket(value) {
+            return value
+        }
+        return Self.unixSockets(of: pid).first(where: AgentPush.acceptedSocket)
+    }
+
+    private static func unixSockets(of pid: pid_t) -> [String] {
+        let stride = MemoryLayout<proc_fdinfo>.stride
+        var descriptors = [proc_fdinfo](repeating: proc_fdinfo(), count: 256)
+        let bytes = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &descriptors, Int32(descriptors.count * stride))
+        guard bytes > 0 else { return [] }
+        var paths: [String] = []
+        for descriptor in descriptors.prefix(Int(bytes) / stride) where descriptor.proc_fdtype == PROX_FDTYPE_SOCKET {
+            var info = socket_fdinfo()
+            let size = Int32(MemoryLayout<socket_fdinfo>.size)
+            guard proc_pidfdinfo(pid, descriptor.proc_fd, PROC_PIDFDSOCKETINFO, &info, size) == size,
+                  info.psi.soi_kind == Int32(SOCKINFO_UN) else { continue }
+            let path = withUnsafeBytes(of: info.psi.soi_proto.pri_un.unsi_addr.ua_sun.sun_path) { raw in
+                String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
+            }
+            if path.hasPrefix("/") { paths.append(path) }
+        }
+        return paths
     }
 
     func writeNudge(to sessionID: UUID) -> Bool {

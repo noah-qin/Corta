@@ -423,6 +423,10 @@ extension SettingsView {
                 .help(L10n.text("settings.help.confirmClose"))
             }
             notificationsSection
+            Section(L10n.text("settings.section.space")) {
+                Toggle(L10n.text("settings.label.agentMessages"), isOn: bind(\.agentMessages))
+                    .help(L10n.text("settings.help.agentMessages"))
+            }
             if UpdateController.isAvailable {
                 Section(L10n.text("ui.section.updates")) {
                     Toggle(L10n.text("ui.update.auto"), isOn: bind(\.updateAutoCheck))

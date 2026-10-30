@@ -93,6 +93,9 @@ final class CortaSpaceController: NSObject {
             guard let self, let session = self.session(withID: id)?.session else { return [] }
             return self.gitContext(for: session)
         }
+        AgentHub.shared.inputRevision = { [weak self] id in
+            self?.session(withID: id)?.session.pane?.terminalView?.userInputRevision
+        }
         observers.append(NotificationCenter.default.addObserver(
             forName: AgentDirectory.didChange, object: nil, queue: .main
         ) { [weak self] _ in

@@ -332,8 +332,14 @@ nonisolated enum AgentPush {
         return [executable, "queue", "--thread", thread, "--message", message]
     }
 
+    /// Claude's inbox lives under its private socket directory, never an arbitrary path.
+    static func acceptedSocket(_ path: String) -> Bool {
+        path.hasPrefix("/") && !path.contains("..") && path.utf8.count < 104
+            && (path.contains("cc-socks") || path.contains("claude"))
+    }
+
     static func writeClaude(socket path: String, envelope: String) -> Bool {
-        guard path.hasPrefix("/"), !path.contains(".."), path.utf8.count < 104 else { return false }
+        guard acceptedSocket(path) else { return false }
         guard var address = SSHAskpass.socketAddress(path) else { return false }
         let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
         guard descriptor >= 0 else { return false }

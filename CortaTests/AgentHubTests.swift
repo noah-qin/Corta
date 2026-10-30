@@ -90,6 +90,13 @@ struct AgentHubTests {
         #expect(!intro.contains("secret"))
     }
 
+    @Test func aClaudeSocketMustLiveInItsPrivateDirectory() {
+        #expect(AgentPush.acceptedSocket("/tmp/cc-socks-501/1.sock"))
+        #expect(!AgentPush.acceptedSocket("/tmp/other.sock"))
+        #expect(!AgentPush.acceptedSocket("/tmp/cc-socks/../etc/passwd"))
+        #expect(!AgentPush.acceptedSocket("cc-socks"))
+    }
+
     @Test func theCommandLinkPointsAtTheExecutable() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

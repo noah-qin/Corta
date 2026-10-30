@@ -26,6 +26,11 @@ Versioning for compatibility changes.
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
+- Settings ▸ General turns agent messages on. A failed Claude or Codex push
+  is recorded, then the wake-up line is tried. A key during that line is
+  marked `nudgeInterrupted`. Templates can be renamed and shown. Claude's
+  inbox socket is also taken from the process's Unix sockets.
+
 - Member menus copy an introduction, the delivery history and unread text.
   `corta wait` blocks until a message or its timeout. Send Selection to Member
   is in the View menu and the command palette. Templates can be deleted by name.

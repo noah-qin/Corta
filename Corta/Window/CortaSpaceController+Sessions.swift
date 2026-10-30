@@ -369,6 +369,65 @@ extension CortaSpaceController {
         content.showNote(L10n.format("space.template.applied", template.name))
     }
 
+    func renameTemplate() {
+        let names = SpaceTemplateFile.load(from: SpaceTemplateFile.url).templates.map(\.name)
+        guard !names.isEmpty else {
+            content.showNote(L10n.text("space.template.empty"))
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = L10n.text("space.template.rename")
+        alert.informativeText = names.joined(separator: ", ")
+        let from = NSTextField(frame: NSRect(x: 0, y: 28, width: 240, height: 24))
+        let to = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        to.placeholderString = L10n.text("space.template.renameTo")
+        let stack = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 56))
+        stack.addSubview(from)
+        stack.addSubview(to)
+        alert.accessoryView = stack
+        alert.addButton(withTitle: L10n.text("space.template.rename"))
+        alert.addButton(withTitle: L10n.text("space.member.cancel"))
+        presentAlert(alert, host?.toolbarWindow) { response in
+            guard response == .alertFirstButtonReturn,
+                  let name = AgentMemberRecord.cleanRole(to.stringValue) else { return }
+            var file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
+            guard let index = file.templates.firstIndex(where: { $0.name == from.stringValue }) else { return }
+            file.templates[index].name = name
+            try? file.save(to: SpaceTemplateFile.url)
+        }
+    }
+
+    func showTemplate() {
+        let file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
+        guard !file.templates.isEmpty else {
+            content.showNote(L10n.text("space.template.empty"))
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = L10n.text("space.template.show")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        field.stringValue = file.templates[0].name
+        alert.accessoryView = field
+        alert.addButton(withTitle: L10n.text("space.template.show"))
+        alert.addButton(withTitle: L10n.text("space.member.cancel"))
+        presentAlert(alert, host?.toolbarWindow) { [weak self] response in
+            guard response == .alertFirstButtonReturn, let self,
+                  let template = file.templates.first(where: { $0.name == field.stringValue }),
+                  let data = try? JSONEncoder().encode(template) else { return }
+            let text = String(decoding: data, as: UTF8.self)
+            let shown = NSAlert()
+            shown.messageText = template.name
+            shown.informativeText = text
+            shown.addButton(withTitle: L10n.text("space.member.copy"))
+            shown.addButton(withTitle: L10n.text("space.member.cancel"))
+            self.presentAlert(shown, self.host?.toolbarWindow) { response in
+                guard response == .alertFirstButtonReturn else { return }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            }
+        }
+    }
+
     func deleteTemplate() {
         let file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
         guard !file.templates.isEmpty else {

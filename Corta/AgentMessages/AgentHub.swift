@@ -60,6 +60,9 @@ final class AgentHub {
     var snapshot: ((UUID) -> AgentWakeSnapshot?)?
     var writeNudge: ((UUID) -> Bool)?
     var contextLines: ((UUID) -> [String])?
+    /// The pane's input revision, so a key during a nudge can be recorded.
+    var inputRevision: ((UUID) -> UInt64?)?
+    private var interrupted: Set<Int> = []
 
     private var source: DispatchSourceRead?
     private var listener: Int32 = -1
@@ -192,16 +195,33 @@ final class AgentHub {
         guard let member = bus.members.first(where: { $0.id == item.to }) else { return .queued }
         if member.host != nil { return bus.forwardsDown.contains(member.id) ? .forwardUnavailable : .queued }
         guard let shot = snapshot?(member.sessionID) else { return .queued }
-        if let path = shot.claudeSocket, AgentPush.writeClaude(socket: path, envelope: envelope(item)) {
-            return .pushed
+        let text = envelope(item)
+        var pushFailed = false
+        if let path = shot.claudeSocket {
+            if AgentPush.writeClaude(socket: path, envelope: text) { return .pushed }
+            pushFailed = true
         }
         if let executable = shot.codexExecutable, let thread = shot.codexThread,
-           let argv = AgentPush.codexArguments(executable: executable, thread: thread, message: envelope(item)),
+           let argv = AgentPush.codexArguments(executable: executable, thread: thread, message: text),
            AgentPush.run(argv, timeout: 10) {
             return .pushed
+        } else if shot.codexExecutable != nil {
+            pushFailed = true
         }
-        guard AgentNudgeGate.bytes(gate: shot.gate, body: item.body, role: member.role) != nil else { return .queued }
-        return writeNudge?(member.sessionID) == true ? .nudged : .queued
+        guard AgentNudgeGate.bytes(gate: shot.gate, body: item.body, role: member.role) != nil else {
+            return pushFailed ? .pushFailed("connect") : .queued
+        }
+        guard writeNudge?(member.sessionID) == true else {
+            return pushFailed ? .pushFailed("connect") : .queued
+        }
+        let revision = inputRevision?(member.sessionID)
+        let number = item.number
+        let sessionID = member.sessionID
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(300)) { [weak self] in
+            guard let self, let revision, let now = self.inputRevision?(sessionID), now != revision else { return }
+            self.interrupted.insert(number)
+        }
+        return .nudged
     }
 
     private func envelope(_ item: AgentBus.Item) -> String {
@@ -269,6 +289,7 @@ final class AgentHub {
         guard let member = bus.members.first(where: { $0.sessionID == sessionID }) else { return "" }
         return bus.items.filter { $0.to == member.id || $0.from == member.id }.suffix(20).map { item in
             "#\(item.number) \(deliveryName(item.delivery))" + (item.read ? " read" : "")
+                + (interrupted.contains(item.number) ? " nudgeInterrupted" : "")
         }.joined(separator: "\n")
     }
 

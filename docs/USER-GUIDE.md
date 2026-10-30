@@ -281,7 +281,7 @@ New Sessions from Template starts the same kinds of sessions in another
 project. Agent start commands are typed and wait for Return. Templates
 do not keep conversation ids, tmux names or credentials.
 
-`agent-messages` (default off) lets you mark a local session as a project
+Settings ▸ General ▸ Agent messages (default off) lets you mark a local session as a project
 member from its menu. Corta then listens on a per-user socket and puts
 `corta` on the `PATH` of shells it starts. Members use `corta send`,
 `corta read`, `corta wait`, `corta members`, `corta whoami` and
