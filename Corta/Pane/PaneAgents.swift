@@ -25,6 +25,8 @@ import Darwin
 final class PaneAgents {
     weak var host: ViewController?
     private(set) var status: ProgramStatus?
+    /// OSC 9 / 777 / 99 asked for the user. Cleared when the pane is focused.
+    private(set) var notedAttention = false
     private(set) var progress: ProgramProgress?
     private var fallback: ProgramStatus?
     private var fallbackProcess: String?
@@ -48,6 +50,7 @@ final class PaneAgents {
         attentionRequest = nil
         processRefresh?.cancel(); processRefresh = nil
         status = nil; progress = nil; fallback = nil; fallbackProcess = nil
+        notedAttention = false
         lastProcessRead = 0; sawSignals = false; sessionHasExited = false
         AgentDirectory.refresh()
     }
@@ -85,6 +88,11 @@ final class PaneAgents {
         if oldStatus != status || oldProgress != progress { AgentDirectory.refresh() }
     }
 
+    func clearNotedAttention() {
+        guard notedAttention else { return }
+        notedAttention = false
+    }
+
     /// Bounces the Dock icon as the program asked, replacing any earlier
     /// request; only while Corta is in the background.
     private func requestAttention(_ attention: ProgramAttention) {
@@ -92,9 +100,14 @@ final class PaneAgents {
         attentionRequest = nil
         guard !NSApp.isActive else { return }
         switch attention {
-        case .once: attentionRequest = NSApp.requestUserAttention(.informationalRequest)
-        case .continuous: attentionRequest = NSApp.requestUserAttention(.criticalRequest)
-        case .cancel: break
+        case .once:
+            notedAttention = true
+            attentionRequest = NSApp.requestUserAttention(.informationalRequest)
+        case .continuous:
+            notedAttention = true
+            attentionRequest = NSApp.requestUserAttention(.criticalRequest)
+        case .cancel:
+            notedAttention = false
         }
     }
 

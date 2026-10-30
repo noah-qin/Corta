@@ -65,6 +65,17 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         window.makeFirstResponder(pane.terminalView)
     }
 
+    private static var spaceWaiting = (count: 0, active: false, windowIsKey: true, badge: true)
+
+    /// Space's queue count. Shown on the Dock only while its window is not key.
+    static func noteSpaceWaiting(count: Int, active: Bool, windowIsKey: Bool) {
+        let badge = ConfigurationStore.shared.configuration.spaceAttentionBadge
+        let next = (count: count, active: active, windowIsKey: windowIsKey, badge: badge)
+        guard next != spaceWaiting else { return }
+        spaceWaiting = next
+        refreshDock(enabled: ConfigurationStore.shared.configuration.agentStatus, directory: shared)
+    }
+
     static func refresh() {
         let directory = shared
         if directory.configurationObserver == nil {
@@ -121,7 +132,13 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
                 }
             }
         }
-        let badge = waiting > 0 ? String(waiting) : nil
+        let space = spaceWaiting
+        let badge: String?
+        if space.badge, space.active, !space.windowIsKey, space.count > 0 {
+            badge = String(space.count)
+        } else {
+            badge = waiting > 0 ? String(waiting) : nil
+        }
         let progress = values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
         let percent = progress.map { Int(($0 * 100).rounded()) }
         guard badge != directory.drawnBadge || percent != directory.drawnDockPercent else { return }

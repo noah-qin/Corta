@@ -51,6 +51,7 @@ final class CortaSpaceController: NSObject {
     var usageClock: UInt64 = 0
     private weak var terminalFocus: ViewController?
     var conversationMonitor: Task<Void, Never>?
+    var attentionQueue = AttentionQueue()
     private var pendingSave: DispatchWorkItem?
     var isRefreshScheduled = false
     var isOutputRefreshScheduled = false

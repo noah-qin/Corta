@@ -174,6 +174,11 @@ extension SplitViewController: NSToolbarDelegate {
         space.setActive(!space.isActive)
     }
 
+    /// View ▸ Jump to Next Waiting Session. Does nothing unless Space is showing.
+    @objc func jumpToNextWaitingSession(_: Any?) {
+        space.jumpToNextWaiting()
+    }
+
     /// View ▸ Show/Hide Sidebar and the toolbar's sidebar button. The window
     /// answers it, being always in the responder chain, and hands it to
     /// Space's split.

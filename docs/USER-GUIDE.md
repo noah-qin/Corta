@@ -275,6 +275,14 @@ The note disappears after a few seconds; the command stays in the prompt.
 
 `space-panel-limit` (1–6) caps the panels on screen.
 
+The sidebar's top counts sessions that are waiting on you: a permission
+prompt, a question, a finished turn, or an attention request. View ▸
+Jump to Next Waiting Session (⌥⌘J) puts the oldest one on the grid — in
+the least recently used panel's place when the grid is full, never by
+itself while you are typing — and moves it to the back of the queue.
+`space-attention-badge` (default on) shows that count on the Dock icon
+while the Space window is not key.
+
 ![Space with one project open and three sessions in the grid](brand/space.png)
 
 ## Text, fonts and themes

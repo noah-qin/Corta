@@ -93,6 +93,9 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   sessions; the toolbar's mode button, ⌥⌘S and ⌘O switch to it. Space fills
   the screen and the terminal mode gets its own frame back; its tabs and
   splits keep running and keep their layout.
+- A waiting queue across projects: the sidebar counts sessions that need you,
+  and Jump to Next Waiting Session (⌥⌘J) focuses the oldest. The Dock badge
+  shows the count while the Space window is not key (`space-attention-badge`).
 - A free split grid of up to six panels (`space-panel-limit`): drop a session
   on a panel's edge to split it there, on its middle to replace it; drag the
   gaps; arrange in columns or rows; every placement can be undone. No split

@@ -25,6 +25,7 @@ final class SpaceMenuAction: NSObject {
 /// "Projects", and the one way to add one.
 final class SpaceSidebarHeader: NSView {
     let addButton = NSButton()
+    private let waiting = NSTextField(labelWithString: "")
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -37,7 +38,11 @@ final class SpaceSidebarHeader: NSView {
         addButton.contentTintColor = .secondaryLabelColor
         addButton.toolTip = L10n.text("space.openProject")
         addButton.setAccessibilityIdentifier("Corta.Space.OpenProject")
-        let row = NSStackView(views: [label, NSView(), addButton])
+        waiting.font = .systemFont(ofSize: NSFont.smallSystemFontSize, weight: .medium)
+        waiting.textColor = .systemOrange
+        waiting.lineBreakMode = .byTruncatingTail
+        waiting.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let row = NSStackView(views: [label, waiting, NSView(), addButton])
         row.translatesAutoresizingMaskIntoConstraints = false
         addSubview(row)
         NSLayoutConstraint.activate([
@@ -47,6 +52,19 @@ final class SpaceSidebarHeader: NSView {
             row.bottomAnchor.constraint(equalTo: bottomAnchor),
             heightAnchor.constraint(equalToConstant: 26),
         ])
+    }
+
+    func setWaitingCount(_ count: Int) {
+        if count <= 0 {
+            waiting.stringValue = ""
+            waiting.toolTip = nil
+        } else if count == 1 {
+            waiting.stringValue = L10n.text("space.waiting.one")
+            waiting.toolTip = waiting.stringValue
+        } else {
+            waiting.stringValue = L10n.format("space.waiting.count", count)
+            waiting.toolTip = waiting.stringValue
+        }
     }
 
     @available(*, unavailable)

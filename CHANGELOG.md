@@ -26,6 +26,10 @@ Versioning for compatibility changes.
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
+- Space lists sessions that are waiting on you and jumps to the oldest with
+  View ▸ Jump to Next Waiting Session (⌥⌘J). The Dock badge shows the count
+  while the Space window is not key (`space-attention-badge`).
+
 - Space: project folders with their own local, SSH and agent CLI sessions,
   up to six at once in a free split grid of rounded panels beside a sidebar
   that shows every session's state. Switch with the toolbar's mode button,

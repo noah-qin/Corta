@@ -218,8 +218,13 @@ struct SpaceSessionPresentation: Equatable {
             case .done: tint = .systemBlue
             case .idle, .unknown: tint = .tertiaryLabelColor
             }
+            let waiting = AttentionQueue.isWaiting(
+                state: status.state, kind: status.kind, attention: pane.agents.notedAttention)
             return State(text: L10n.text("agent.state." + status.state.rawValue), tint: tint,
-                         needsAttention: status.state == .blocked || status.state == .error)
+                         needsAttention: waiting)
+        }
+        if pane.agents.notedAttention {
+            return State(text: L10n.text("space.waiting.attention"), tint: .systemOrange, needsAttention: true)
         }
         if program != nil { return State(text: L10n.text("space.state.running"), tint: .systemGreen) }
         return State()

@@ -76,6 +76,8 @@ extension SplitViewController {
         case #selector(toggleSpaceMode(_:)):
             menuItem.title = L10n.text(space.isActive ? "space.command.showTerminal" : "space.command.showSpace")
             return !(view.window is NSPanel)
+        case #selector(jumpToNextWaitingSession(_:)):
+            return space.isActive && space.hasWaitingSession()
         case #selector(openSpaceProject(_:)):
             return !(view.window is NSPanel)
         case #selector(arrangeSpaceInColumns(_:)), #selector(arrangeSpaceInRows(_:)):

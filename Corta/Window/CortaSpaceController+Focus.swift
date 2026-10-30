@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 
 /// Which session is in use, and keeping the chrome that shows it current.
 extension CortaSpaceController {
@@ -35,6 +36,7 @@ extension CortaSpaceController {
         }
         host.focusedPane = pane
         selectedProject?.focused = session
+        pane.agents.clearNotedAttention()
         touch(session)
         host.toolbarWindow?.makeFirstResponder(pane.terminalView)
         for other in host.panes { other.focus.applyAppearance() }
@@ -77,11 +79,52 @@ extension CortaSpaceController {
     }
 
     func refreshNow() {
-        guard isActive else { return }
+        guard isActive else {
+            sidebar.setWaitingCount(0)
+            updateAttentionBadge(ordered: [])
+            return
+        }
+        let ordered = waitingSessionIDs()
+        sidebar.setWaitingCount(ordered.count)
         sidebar.reload()
         for panel in panels.values where panel.window != nil { panel.update() }
         content.update()
         showConversationNoticeIfNeeded()
+        updateAttentionBadge(ordered: ordered)
+    }
+
+    func hasWaitingSession() -> Bool {
+        projects.flatMap(\.sessions).contains { session in
+            AttentionQueue.isWaiting(
+                state: session.pane?.agents.status?.state, kind: session.pane?.agents.status?.kind,
+                attention: session.pane?.agents.notedAttention == true)
+        }
+    }
+
+    /// Oldest waiting session first. A started session that is off the grid is included.
+    func waitingSessionIDs() -> [UUID] {
+        let waiting = projects.flatMap(\.sessions).filter { session in
+            AttentionQueue.isWaiting(
+                state: session.pane?.agents.status?.state, kind: session.pane?.agents.status?.kind,
+                attention: session.pane?.agents.notedAttention == true)
+        }.map(\.id)
+        return attentionQueue.sync(waiting: waiting)
+    }
+
+    func jumpToNextWaiting() {
+        guard isActive else { return }
+        let ordered = waitingSessionIDs()
+        guard attentionQueue.deferHead(of: ordered) != nil, let head = ordered.first,
+              let (_, session) = session(withID: head) else { return }
+        show(session)
+        refreshNow()
+    }
+
+    private func updateAttentionBadge(ordered: [UUID]) {
+        let window = host?.toolbarWindow
+        AgentDirectory.noteSpaceWaiting(
+            count: ordered.count, active: isActive,
+            windowIsKey: window?.isKeyWindow == true && NSApp.isActive)
     }
 
     /// The project names the window, with its folder as the proxy icon.

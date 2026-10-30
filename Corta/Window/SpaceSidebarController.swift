@@ -116,6 +116,8 @@ final class SpaceSidebarController: NSViewController, NSOutlineViewDataSource, N
 
     /// A full reload when the projects or their sessions changed; otherwise
     /// only the rows whose title or state did.
+    func setWaitingCount(_ count: Int) { header.setWaitingCount(count) }
+
     func reload() {
         guard isViewLoaded, let space, renaming == nil else { return }
         let structure = space.projects.map { project in

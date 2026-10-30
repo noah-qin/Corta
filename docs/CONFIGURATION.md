@@ -83,6 +83,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. The Quick Terminal is excluded. |
 | `confirm-close` | boolean | `true` | Ask before closing a pane, window or the app while a shell still has a foreground job. |
 | `space-panel-limit` | integer, 1–6 | `6` | The most panels Space's grid shows at once. No split makes a panel smaller than 64 × 18 cells, so a small screen holds fewer. Lowering it takes the least recently used panels off screen; their sessions keep running. |
+| `space-attention-badge` | boolean | `true` | While Space is showing and its window is not key, the Dock badge is how many sessions are waiting on you. `false` leaves the ordinary agent badge. |
 
 #### Quick Terminal
 
@@ -376,6 +377,7 @@ secure-keyboard-entry = false
 # Notifications
 notify-from-programs = true
 agent-status = true
+space-attention-badge = true
 agent-processes =
 notify-on-long-task = true         # default false
 notification-threshold = 60        # default 30
@@ -569,6 +571,7 @@ the key against both rows, which is how you spot it.
 | `close` | Close | `cmd+w` |
 | `open-project` | Open Project… | `cmd+o` |
 | `toggle-space` | Show Space | `alt+cmd+s` |
+| `next-waiting-session` | Jump to Next Waiting Session | `alt+cmd+j` |
 | `split-right` | Split Pane Right | `cmd+d` |
 | `split-down` | Split Pane Down | `shift+cmd+d` |
 | `focus-left` | Move Focus Left | `alt+cmd+left` |
