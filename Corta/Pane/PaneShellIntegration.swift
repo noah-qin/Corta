@@ -260,7 +260,6 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
             for: Paste.sanitized(text), bracketedPasteEnabled: bracketed, trailer: run ? [0x0D] : [])
         switch session.write(paste: chunks, closing: Paste.closing(bracketedPasteEnabled: bracketed)) {
         case .accepted:
-            host?.terminalView?.hasUnsubmittedInput = !run
             host?.terminalView?.noteUserInput()
             return true
         case .backpressured, .stopped, .failed: return false

@@ -295,18 +295,3 @@ struct TerminalViewIMETests {
 // them (the same reason HID injection with `keyboardSetUnicodeString`
 // bypasses the IME). Composition, candidate placement and commit are
 // verified in the launched app instead; see `docs/CONFORMANCE.md` §4.4.
-
-@MainActor
-@Suite struct AgentDraftInputTests {
-    @Test func committedTextProtectsTheDraftUntilAnActualSubmitKey() throws {
-        let view = TerminalView(frame: .zero)
-        view.onKeyBytes = { _ in }
-        view.insertText("draft", replacementRange: NSRange(location: NSNotFound, length: 0))
-        #expect(view.hasUnsubmittedInput)
-        let submit = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
-            timestamp: 0, windowNumber: 0, context: nil, characters: "\r", charactersIgnoringModifiers: "\r",
-            isARepeat: false, keyCode: 36))
-        view.deliverBytes(for: submit)
-        #expect(!view.hasUnsubmittedInput)
-    }
-}

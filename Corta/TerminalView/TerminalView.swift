@@ -32,9 +32,6 @@ final class TerminalView: NSView, CALayerDelegate {
     var renderPolicy: RenderPolicy?
     /// Pane-local input revision, so delayed prompt fills never overtake typing.
     private(set) var userInputRevision: UInt64 = 0
-    var hasUnsubmittedInput = false
-    /// When the user last typed here. A nudge waits until this is three seconds old.
-    private(set) var lastUserInput: SuspendingClock.Instant?
 
     /// Pauses rendering while the window is occluded; replaced when changing windows.
     private var inputGeometryObservers: [NSObjectProtocol] = []
@@ -428,7 +425,6 @@ extension TerminalView {
     /// Shared input hook, independent of diagnostic sampling.
     func noteUserInput() {
         userInputRevision &+= 1
-        lastUserInput = .now
         paneController?.updateReaderPriority(input: true)
         frameScheduler.noteInput()
         renderPolicy?.noteInput()

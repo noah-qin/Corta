@@ -44,7 +44,6 @@ extension TerminalView: NSTextInputClient {
         clearMarkedText()
         let text = (string as? NSAttributedString)?.string ?? (string as? String) ?? ""
         guard !text.isEmpty else { return }
-        hasUnsubmittedInput = true
         noteUserInput()
         if let event = NSApp.currentEvent { noteKeystrokeForMetrics(at: event.timestamp) }
         InputLatencySignposts.measure(.keyDown) { onKeyBytes?(Array(text.utf8)) }
@@ -198,7 +197,6 @@ extension TerminalView: NSTextInputClient {
         default: bytes = nil
         }
         guard let bytes else { return }
-        if bytes.first == 0x0D { hasUnsubmittedInput = false }
         noteUserInput()
         if let event = NSApp.currentEvent { noteKeystrokeForMetrics(at: event.timestamp) }
         InputLatencySignposts.measure(.keyDown) { onKeyBytes?(bytes) }
