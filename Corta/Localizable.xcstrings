@@ -7147,55 +7147,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Etwa %d erfasste Dateien geändert"
+            "value" : "Etwa %d erfasste Dateien geändert; neue Dateien nicht geprüft"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "About %d tracked files differ"
+            "value" : "About %d tracked files changed; new files not checked"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Unos %d archivos seguidos modificados"
+            "value" : "Unos %d archivos seguidos modificados; archivos nuevos sin comprobar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Environ %d fichiers suivis modifiés"
+            "value" : "Environ %d fichiers suivis modifiés ; nouveaux fichiers non vérifiés"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "追跡中の約 %d ファイルに変更"
+            "value" : "追跡中の約 %d ファイルに変更、新規ファイルは未確認"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "추적 파일 약 %d개 변경됨"
+            "value" : "추적 파일 약 %d개 변경됨, 새 파일은 확인하지 않음"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Cerca de %d arquivos rastreados alterados"
+            "value" : "Cerca de %d arquivos rastreados alterados; arquivos novos não verificados"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "约 %d 个已跟踪文件有改动"
+            "value" : "约 %d 个已跟踪文件有改动，未检查新文件"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "約 %d 個追蹤檔案有變更"
+            "value" : "約 %d 個已追蹤檔案有變更，未檢查新檔案"
           }
         }
       }

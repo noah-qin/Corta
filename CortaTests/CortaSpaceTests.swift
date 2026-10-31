@@ -434,6 +434,22 @@ struct CortaSpaceTests {
         #expect(!panel.makeMenu().items.contains { $0.title == L10n.text("space.session.diagnostics") })
     }
 
+    @Test func theGitRowNamesUncheckedNewFilesAndShowsNothingForNoChanges() throws {
+        let (controller, host) = try makeWindow()
+        defer { close(controller, host) }
+        let space = host.space
+        let id = UUID()
+        space.gitFacts[id] = GitFacts(name: "main", detached: false, worktree: false, changedFiles: 0,
+                                      unchecked: false)
+        let clean = try #require(space.gitRow(for: id))
+        #expect(clean.text == "main")
+        #expect(clean.toolTip == "main", "no changes: no mark and nothing about counts")
+        space.gitFacts[id]?.changedFiles = 3
+        let dirty = try #require(space.gitRow(for: id))
+        #expect(dirty.text == "main · 3")
+        #expect(dirty.toolTip.contains(L10n.format("space.git.dirty", 3)))
+    }
+
     @Test func projectsKeepTheirOwnSessionsAndAreSaved() throws {
         let (controller, host) = try makeWindow()
         defer { close(controller, host) }
