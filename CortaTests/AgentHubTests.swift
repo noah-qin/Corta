@@ -42,10 +42,10 @@ struct AgentHubTests {
             return true
         }
         let reply = hub.exchange(
-            AgentRequest(op: "send", to: back.uuidString, body: "hello"), caller: front)
+            AgentRequest(operation: "send", to: back.uuidString, body: "hello"), caller: front)
         #expect(reply.ok)
         #expect(reply.delivery == "queued")
-        let read = hub.exchange(AgentRequest(op: "read"), caller: back)
+        let read = hub.exchange(AgentRequest(operation: "read"), caller: back)
         #expect(read.text.contains("hello"))
     }
 
@@ -66,7 +66,8 @@ struct AgentHubTests {
                                                    nudgesThisMinute: 0))
         }
         hub.writeNudge = { _ in written = AgentEnvelope.nudgeBytes(); return true }
-        let reply = hub.exchange(AgentRequest(op: "send", to: AgentEnvelope.shortID(back), body: "secret"), caller: front)
+        let reply = hub.exchange(AgentRequest(operation: "send", to: AgentEnvelope.shortID(back),
+            body: "secret"), caller: front)
         #expect(reply.delivery == "nudged")
         #expect(written == AgentEnvelope.nudgeBytes())
         #expect(!String(decoding: written, as: UTF8.self).contains("secret"))
@@ -82,7 +83,7 @@ struct AgentHubTests {
             AgentMemberRecord(id: back, role: "backend", sessionID: session),
         ], bound: [session], shells: [:])
         hub.snapshot = { _ in nil }
-        _ = hub.exchange(AgentRequest(op: "send", to: back.uuidString, body: "secret"), caller: front)
+        _ = hub.exchange(AgentRequest(operation: "send", to: back.uuidString, body: "secret"), caller: front)
         #expect(hub.unreadText(sessionID: session).contains("secret"))
         hub.dropInbox(sessionID: session)
         #expect(hub.unreadText(sessionID: session).isEmpty)

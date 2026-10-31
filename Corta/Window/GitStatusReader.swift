@@ -25,6 +25,7 @@ nonisolated struct GitFacts: Equatable, Sendable {
     var mainRepository: String?
     /// Tracked files whose size or second-resolution mtime differs. Nil when unchecked.
     var changedFiles: Int?
+    var commit: String?
     var unchecked: Bool
 
     static let maximumEntries = 20_000
@@ -32,16 +33,45 @@ nonisolated struct GitFacts: Equatable, Sendable {
 
 /// Reads `.git` without running git. A missing repository is nil, never an error.
 nonisolated enum GitStatusReader {
-    /// The commit HEAD names, when the ref file is loose. Packed refs are left unread.
+    /// HEAD refs in linked worktrees belong to the common directory.
     static func commit(directory: String) -> String? {
         guard let located = locate(URL(fileURLWithPath: directory, isDirectory: true)),
               let head = readHEAD(in: located.gitDir) else { return nil }
         if head.detached { return head.full }
-        let ref = located.gitDir.appendingPathComponent("refs/heads/" + head.name)
-        guard let data = try? Data(contentsOf: ref), data.count <= 128,
-              let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-              text.count >= 12, text.allSatisfy(\.isHexDigit) else { return nil }
-        return String(text.prefix(12))
+        let common = commonDirectory(located.gitDir)
+        let name = "refs/heads/" + head.name
+        if let data = boundedData(common.appendingPathComponent(name), limit: 128),
+           let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           validCommit(text) { return String(text.prefix(12)) }
+        guard let data = boundedData(common.appendingPathComponent("packed-refs"), limit: 4 * 1024 * 1024),
+              let text = String(data: data, encoding: .utf8) else { return nil }
+        for line in text.split(separator: "\n") where !line.hasPrefix("#") && !line.hasPrefix("^") {
+            let parts = line.split(separator: " ", maxSplits: 1)
+            if parts.count == 2, parts[1] == name, validCommit(String(parts[0])) {
+                return String(parts[0].prefix(12))
+            }
+        }
+        return nil
+    }
+
+    static func commonDirectory(_ gitDir: URL) -> URL {
+        guard let data = boundedData(gitDir.appendingPathComponent("commondir"), limit: 4096),
+              let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !path.isEmpty, !path.contains("\0") else { return gitDir }
+        return URL(fileURLWithPath: path, relativeTo: gitDir).standardizedFileURL
+    }
+
+    private static func validCommit(_ text: String) -> Bool {
+        [40, 64].contains(text.utf8.count) && text.utf8.allSatisfy {
+            (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0)
+        }
+    }
+
+    private static func boundedData(_ url: URL, limit: Int) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: limit + 1), data.count <= limit else { return nil }
+        return data
     }
 
     static func read(directory: String) -> GitFacts? {
@@ -130,7 +160,7 @@ nonisolated enum GitStatusReader {
     private enum Changes { case counted(Int), unchecked }
 
     private static func changedFiles(index: URL, workTree: URL) -> Changes {
-        guard let data = try? Data(contentsOf: index), data.count >= 12 else { return .counted(0) }
+        guard let data = boundedData(index, limit: 32 * 1024 * 1024), data.count >= 12 else { return .counted(0) }
         guard data.prefix(4) == Data("DIRC".utf8) else { return .unchecked }
         let version = Int(integer(data, at: 4))
         let count = Int(integer(data, at: 8))
@@ -143,7 +173,7 @@ nonisolated enum GitStatusReader {
         for _ in 0..<count {
             guard let entry = entry(data, at: &offset, version: version, previous: &previous) else { return .unchecked }
             let file = (root as NSString).appendingPathComponent(entry.path)
-            guard file == root || file.hasPrefix(root + "/") else { continue }
+            guard file == root || file.hasPrefix(root + "/") else { return .unchecked }
             if differs(file, size: entry.size, mtime: entry.mtime) { changed += 1 }
         }
         return .counted(changed)
@@ -193,15 +223,17 @@ nonisolated enum GitStatusReader {
 
     /// v4: a variable-width strip count, then the suffix up to NUL.
     private static func compressedPath(_ data: Data, at cursor: inout Int, previous: String) -> String? {
-        var strip = 0
-        var shift = 0
-        while cursor < data.count {
-            let byte = data[cursor]
+        guard cursor < data.count else { return nil }
+        var byte = data[cursor]
+        cursor += 1
+        var strip = Int(byte & 0x7F)
+        var width = 1
+        while byte & 0x80 != 0 {
+            guard cursor < data.count, width < 5 else { return nil }
+            byte = data[cursor]
             cursor += 1
-            strip |= Int(byte & 0x7F) << shift
-            shift += 7
-            if byte & 0x80 == 0 { break }
-            if shift > 28 { return nil }
+            strip = ((strip + 1) << 7) | Int(byte & 0x7F)
+            width += 1
         }
         guard let end = data[cursor...].firstIndex(of: 0), strip <= previous.utf8.count else { return nil }
         let suffix = String(decoding: data[cursor..<end], as: UTF8.self)

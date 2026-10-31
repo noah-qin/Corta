@@ -26,6 +26,7 @@ final class SpaceContentController: NSViewController {
         case noProject
         case noSessions
         case allHidden
+        case unavailable
     }
 
     weak var space: CortaSpaceController?
@@ -69,6 +70,7 @@ final class SpaceContentController: NSViewController {
         case .noProject: empty.configure(.noProject); shown = empty
         case .noSessions: empty.configure(.noSessions); shown = empty
         case .allHidden: empty.configure(.allHidden); shown = empty
+        case .unavailable: empty.configure(.unavailable); shown = empty
         }
         guard shown.superview !== container || container.subviews.count != 1 else { return }
         // Another project's grid, or none: a short fade, never a cut through
@@ -177,7 +179,7 @@ private final class SpaceContentView: NSView {
 /// one action that changes it.
 @MainActor
 final class SpaceEmptyView: NSView {
-    enum Kind { case noProject, noSessions, allHidden }
+    enum Kind { case noProject, noSessions, allHidden, unavailable }
 
     var space: () -> CortaSpaceController? = { nil }
     private var kind = Kind.noProject
@@ -247,6 +249,12 @@ final class SpaceEmptyView: NSView {
             primary.title = L10n.text("space.newSession")
             secondary.title = L10n.text("space.connectSSH")
             secondary.isHidden = false
+        case .unavailable:
+            symbolName = "folder.badge.questionmark"
+            title.stringValue = L10n.text("space.project.unavailable")
+            message.stringValue = L10n.text("space.project.unavailableDetail")
+            primary.title = L10n.text("space.openProject")
+            secondary.isHidden = true
         case .allHidden:
             symbolName = "rectangle.on.rectangle"
             title.stringValue = L10n.text("space.empty.allHidden.title")
@@ -259,7 +267,7 @@ final class SpaceEmptyView: NSView {
 
     @objc private func primaryAction() {
         guard let space = space() else { return }
-        if kind == .noProject { space.chooseProject() } else { space.newSession() }
+        if kind == .noProject || kind == .unavailable { space.chooseProject() } else { space.newSession() }
     }
 
     @objc private func secondaryAction() { space()?.connectSession() }

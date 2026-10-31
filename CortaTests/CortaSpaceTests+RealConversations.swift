@@ -21,7 +21,8 @@ import Testing
 
 extension CortaSpaceTests {
     /// Opt-in: installed authenticated CLIs, one tiny model request each, no tool calls requested.
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["CORTA_CONVERSATION_REAL_CWD"] != nil))
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["CORTA_CONVERSATION_REAL_CWD"] != nil
+        && ProcessInfo.processInfo.environment["CORTA_MEMBERS_REAL"] != "1"))
     func realClaudeAndNpmCodexSourcesSurviveClosingAndReopeningSpace() async throws {
         let environment = ProcessInfo.processInfo.environment
         let cwd = try #require(environment["CORTA_CONVERSATION_REAL_CWD"])
@@ -50,22 +51,45 @@ extension CortaSpaceTests {
         let terminals = try project.sessions.map { try #require($0.pane?.session) }
         try await waitForRealConversation { terminals.allSatisfy { $0.promptEndPosition != nil } }
         terminals[0].write(Array((PaneCommands.shellQuoted(claude) + "\r").utf8))
-        terminals[1].write(Array((PaneCommands.shellQuoted(codex) + " --no-alt-screen\r").utf8))
+        terminals[1].write(Array((PaneCommands.shellQuoted(codex) + " --no-alt-screen --model gpt-6-luna\r").utf8))
         try await waitForRealConversation {
             project.sessions[0].record.conversation?.kind == .claude
                 && project.sessions[1].record.conversation?.kind == .codex
         }
         // Explicit test input, unrelated to Corta's unsubmitted restoration text.
         try await Task.sleep(for: .seconds(3))
-        for terminal in terminals {
-            terminal.write(Array("Reply with CORTA-436-READY only. Do not use tools.\r".utf8))
+        for item in project.sessions {
+            try await submitNativeAgentPrompt("Reply with CORTA-436-READY only. Do not use tools.", in: item)
         }
-        try await Task.sleep(for: .seconds(8))
+        try await waitForRealConversation {
+            project.sessions.allSatisfy { visibleText($0).components(separatedBy: "CORTA-436-READY").count >= 3 }
+        }
         await host.space.sampleConversations()
-        let saved = try await realConversationEvidence(in: host.space, project: project, terminals: terminals)
+        _ = try await realConversationEvidence(in: host.space, project: project, terminals: terminals)
+        let saved = try await verifyRealClear(host: host, project: project, terminals: terminals)
         host.teardown()
         controller.window?.close()
         try await verifyRealConversationRestore(saved)
+    }
+
+    private func verifyRealClear(host: SplitViewController, project: SpaceProject,
+                                 terminals: [TerminalSession]) async throws -> SpaceState {
+        let original = try #require(project.sessions[0].record.conversation?.id)
+        let identity = try #require(project.sessions[0].conversationObservation?.processes.first)
+        try await submitNativeAgentPrompt("/clear", in: project.sessions[0])
+        try await Task.sleep(for: .seconds(2))
+        try await submitNativeAgentPrompt("Reply with CORTA-436-CLEARED only. Do not use tools.",
+            in: project.sessions[0])
+        try await waitForRealConversation {
+            guard let current = project.sessions[0].record.conversation?.id else { return false }
+            return current != original
+        }
+        try await waitForRealConversation {
+            visibleText(project.sessions[0]).components(separatedBy: "CORTA-436-CLEARED").count >= 3
+        }
+        #expect(project.sessions[0].conversationObservation?.processes.first == identity,
+                "/clear changes the conversation within the same kernel process identity")
+        return try await realConversationEvidence(in: host.space, project: project, terminals: terminals)
     }
 
     private func verifyRealConversationRestore(_ saved: SpaceState) async throws {

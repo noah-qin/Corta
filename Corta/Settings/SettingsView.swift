@@ -45,7 +45,7 @@ struct SettingsView: View {
 
     enum Category: String, CaseIterable, Identifiable {
         case general, appearance, terminal, keyboardMouse, shortcuts, quickTerminal
-        case connections, privacy
+        case connections, space, privacy
         var id: String { rawValue }
 
         var title: String {
@@ -57,6 +57,7 @@ struct SettingsView: View {
             case .shortcuts: L10n.text("settings.tab.shortcuts")
             case .quickTerminal: L10n.text("settings.section.quickTerminal")
             case .connections: L10n.text("ui.category.connections")
+            case .space: L10n.text("settings.section.space")
             case .privacy: L10n.text("settings.tab.privacy")
             }
         }
@@ -71,6 +72,7 @@ struct SettingsView: View {
             case .shortcuts: .orange
             case .quickTerminal: .teal
             case .connections: .green
+            case .space: .indigo
             case .privacy: .blue
             }
         }
@@ -85,6 +87,7 @@ struct SettingsView: View {
             case .shortcuts: "command"
             case .quickTerminal: "rectangle.topthird.inset.filled"
             case .connections: "network"
+            case .space: "square.grid.2x2.fill"
             case .privacy: "hand.raised.fill"
             }
         }
@@ -123,6 +126,7 @@ struct SettingsView: View {
         case .shortcuts: shortcutsPage
         case .quickTerminal: Form { quickTerminalSection }
         case .connections: PresetSettingsView(model: model)
+        case .space: spacePage
         case .privacy: privacyPage
         }
     }
@@ -411,30 +415,6 @@ extension SettingsView {
     }
 
     // MARK: - General
-
-    private var generalPage: some View {
-        Form {
-            windowSection
-            Section(L10n.text("settings.section.closing")) {
-                Toggle(
-                    L10n.text("settings.label.confirmClose"),
-                    isOn: bind(\.confirmClose)
-                )
-                .help(L10n.text("settings.help.confirmClose"))
-            }
-            notificationsSection
-            Section(L10n.text("settings.section.space")) {
-                Toggle(L10n.text("settings.label.agentMessages"), isOn: bind(\.agentMessages))
-                    .help(L10n.text("settings.help.agentMessages"))
-            }
-            if UpdateController.isAvailable {
-                Section(L10n.text("ui.section.updates")) {
-                    Toggle(L10n.text("ui.update.auto"), isOn: bind(\.updateAutoCheck))
-                    Toggle(L10n.text("ui.update.applications"), isOn: bind(\.suggestApplicationsFolder))
-                }
-            }
-        }
-    }
 
     // MARK: - Helpers
 

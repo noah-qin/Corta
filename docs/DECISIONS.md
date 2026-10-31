@@ -48,7 +48,7 @@ Status of every entry below is **accepted** unless it says otherwise.
 | [D30](#d30--space-is-a-second-view-of-one-windows-sessions-not-a-multiplexer) | Space is a second view of one window's sessions, not a multiplexer | Accepted |
 | [D31](#d31--one-codex-queue-invocation-for-a-member) | One `codex queue` invocation for a member | Accepted |
 | [D32](#d32--a-fixed-wake-up-line-and-only-that) | A fixed wake-up line, and only that | Accepted |
-| [D33](#d33--remote-members-are-marked-and-not-given-a-client-yet) | Remote members are marked, and not given a client yet | Accepted |
+| [D33](#d33--an-opt-in-temporary-remote-member-client) | An opt-in temporary remote member client | Accepted |
 
 ---
 
@@ -790,6 +790,9 @@ payloads, routing a docs-only change, collecting CI evidence, checking
 links or a pull request title, driving the isolated sshd fixture — may be
 Python 3 from the runner's standard library, with no third-party packages,
 and carries tests in `scripts/tests/`. All of it lives in `scripts/`.
+D33 adds a remote-only exception: an explicitly chosen temporary Python client
+on a Linux member, with standard-library-only code and installer/state tests.
+It is not a macOS app or local-tool runtime dependency.
 
 **Why.** #133 moved the local tooling to Swift and Xcode so a contributor
 needs nothing beyond Xcode, and that still holds. The CI glue grew back in
@@ -935,7 +938,8 @@ program the grid is for.
 deliver a message into a Codex member's thread. The executable is that
 member pane's own `codex` (`proc_pidpath`), the arguments are structured
 and do not go through a shell, standard input is closed, output is bounded
-and the wait is 10 seconds.
+and the wait is 10 seconds. Delivery runs off the main actor; the pipe is
+drained with a 64 KiB cap, and a timed-out child is terminated and reaped.
 
 **Why.** Codex documents `codex queue` as the way to hand a thread a
 message. A shell string would be a command injection. This is the same
@@ -951,10 +955,13 @@ to 10 seconds. The message is still in the inbox.
 
 **Decision.** When agent messages are on and a member allows it, Corta may
 write one constant line, `Corta: you have new messages; run corta read.`
-plus a carriage return, into that member's pane. All six gates have to
+plus a Return encoded for the pane's negotiated keyboard protocol, into
+that member's pane. The constant text and Return are separated by 200 ms
+so a TUI does not classify the whole write as a multiline paste. A user key
+in that interval cancels submission. All six gates have to
 pass: the switch is on, the foreground process is that agent, it is idle,
-the user has not typed for three seconds and is not composing, the pane is
-not in bracketed paste, and this member has been nudged fewer than three
+the user has not typed for three seconds, has no tracked unsubmitted draft
+and is not composing, the pane has no pending or active paste, and this member has been nudged fewer than three
 times in the last minute. The bytes never include a name, a message number
 or any byte from a message.
 
@@ -968,27 +975,40 @@ arriving in the same instant can land next to the line.
 **Consequence.** Reopen if a general, non-typing wake-up exists for every
 CLI. Until then the line stays constant and off by default.
 
-## D33 — Remote members are marked, and not given a client yet
+## D33 — An opt-in temporary remote member client
 
-**Decision.** An SSH session marked as a member gets one token and one
-`ssh -R` forward of Corta's message socket. The wrapper installs a
-`corta` script under `/tmp/corta-<token>` for that session only and puts
-it on the tmux session's `PATH`. It does not write `$HOME` or change
-global tmux configuration. Until that ssh session is up, delivery returns
-`forwardUnavailable`. A missing `nc -U` on the remote leaves the script
-unable to connect.
+**Decision.** Making a retained SSH session a remote member explicitly offers
+installation of a temporary Python 3 standard-library client. This is a narrow
+remote-only exception to D28: macOS app/tools remain Swift. The next connection
+writes `/tmp/corta-<session UUID>/corta` (0700) and `connection.json` (0600) in a
+private directory, rejecting a symlink directory. Nothing is installed in the
+remote home. No AI tool is installed or configured.
 
-**Why.** A remote `corta` has to be a Linux program or a script placed on
-the remote machine. Placing one is a new write to a machine the user did
-not ask Corta to modify. `LOCAL_PEERPID` cannot identify a process that
-arrives through sshd, so a token would be required before any client is
-trusted. Until that client exists, the honest result is that the forward
-is unavailable.
+Each SSH connection forwards its own local 0600 socket under a 0700 directory.
+Its handler binds a fresh random token to exactly one active member and tmux
+name. A token presented to another connection's endpoint, or the shared local
+endpoint, is refused. Rotation, disconnect, pause, removal and disabling the
+feature revoke the old endpoint. SSH ControlMaster PIDs are not remote identity.
+The same local or remote Unix account is not an isolation boundary.
 
-**What it costs.** An agent on a retained SSH session cannot send or
-receive through Corta yet. The member row still shows, so the limit is
-visible.
+**Why.** JSON encoding safely transports arbitrary text without making it shell
+code. Every invocation rereads the atomic connection file: a long-running agent
+in the retained tmux session sees the new token and socket after reconnect,
+without having its process environment rewritten. New sessions get the client
+on PATH. `members`, `whoami`, `send`, `read`, `wait`, `status` and stdio MCP share
+the local protocol. Wait is bounded; messages remain in local volatile memory.
 
-**Consequence.** Reopen when a remote client can be delivered without
-writing a file the user did not ask for, or when the user opts in to
-installing one. The host mark and `forwardUnavailable` stay.
+The wrapper enables passthrough only for this tmux window, and runs a transient
+metadata monitor while attached. It reports foreground process names and Linux
+CPU/output counters, never terminal contents. A stale monitor makes delivery
+unavailable. Remote delivery uses the same fixed-line nudge gates as local
+generic agents; no remote Claude/Codex native push is claimed.
+
+**What it costs.** Python 3 and tmux must already exist on the remote host.
+The temporary client and retained tmux session survive disconnect; the monitor
+does not. Explicit cleanup commands are documented in the user guide. Remote
+AI/account acceptance is separate from the Linux protocol and reconnect tests.
+
+**Consequence.** Reopen if the protocol needs a remote daemon, writes outside
+this temporary directory, changes global tmux settings, or requires remote
+native push. None is authorized by membership today.

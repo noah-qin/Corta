@@ -28,7 +28,7 @@ final class CortaSpaceConversationUITests: XCTestCase {
                                  "Prepare stage-ui-fixtures.sh and pass TEST_RUNNER_CORTA_UI_FIXTURES")
         let stage = URL(fileURLWithPath: root).appendingPathComponent("space-conversation-" + scenario)
         XCTAssertTrue(FileManager.default.fileExists(atPath: stage.appendingPathComponent("config").path))
-        let app = XCUIApplication()
+        let app = UIFixtures.app(stage: stage, runner: Self.self)
         app.launchEnvironment["CORTA_STAGE_DIR"] = stage.path
         app.launchEnvironment["ZDOTDIR"] = stage.path
         app.launchEnvironment["SHELL"] = "/bin/zsh"

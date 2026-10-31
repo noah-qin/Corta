@@ -103,6 +103,47 @@ The repository also requires CodeQL scanning results separately from job
 status checks. Verify both the PR's checks and merge eligibility when changing
 language routing; successful placeholder jobs alone do not prove eligibility.
 
+## Space issue acceptance
+
+[Space acceptance](SPACE-ACCEPTANCE.md) maps #434–#445 to implementation,
+regression coverage and environment-dependent requirements. Issue-contract
+probes run in the ordinary Unit plan; they can also be selected explicitly:
+
+```sh
+xcodebuild test -project Corta.xcodeproj -scheme Corta -testPlan Unit \
+  -destination 'platform=macOS' \
+  -only-testing:CortaTests/SpaceIssueAcceptanceTests
+```
+
+Run Xcode test invocations sequentially: Unit/UI plans sharing derived data
+can replace each other's hosted test bundles. Prepare UI fixtures before
+running the Space conversation and SSH-dialog UI checks:
+
+```sh
+fixture_root=$(CortaUITests/stage-ui-fixtures.sh)
+TEST_RUNNER_CORTA_UI_FIXTURES="$fixture_root" \
+xcodebuild test -project Corta.xcodeproj -scheme Corta -testPlan UI \
+  -destination 'platform=macOS' \
+  -only-testing:CortaUITests/CortaSpaceUITests \
+  -only-testing:CortaUITests/CortaSpaceConversationUITests
+```
+
+`testProjectFilesCannotConfigureSpace` optionally accepts
+`TEST_RUNNER_CORTA_FILE_AUDIT_LIBRARY`, a temporary development-only dylib that
+interposes open/openat/fopen (including the non-cancelling open entry point).
+The test injects it only into the isolated app, filters to the scratch stage,
+requires a positive config-open control, and rejects opens of project-local
+`space.json`, `.corta` or `sessions`. The trace contains paths, never file bytes.
+Without an explicitly prepared tracing fixture this check is skipped; it is
+not a filesystem acceptance pass. OS tracing tools are an alternative where
+permissions permit them. Never weaken system tracing or signing policy to run it.
+
+Remove only that scratch fixture after the launched test app exits. For a
+localhost SSH/tmux lifecycle run, use `python3 -B scripts/verify-ssh-integration.py --app`.
+Its isolated sshd configuration disables per-source penalties so deliberate
+negative authentication cases cannot ban later lifecycle checks. No system
+sshd configuration is changed.
+
 ## Terminal core
 
 ```sh
@@ -432,6 +473,44 @@ through the default target passes.
 setup failure when the root or their config is missing, or the fixture
 prompt did not load. Their shared launcher also isolates `HOME` and
 `ZDOTDIR`; a missing fixture must never be counted as feature coverage.
+
+Real member acceptance requires explicit account/quota authorization. Set
+`TEST_RUNNER_CORTA_MEMBERS_REAL=1`, `TEST_RUNNER_CORTA_CONVERSATION_REAL_CWD`,
+`TEST_RUNNER_CORTA_CONVERSATION_REAL_HOME`, `TEST_RUNNER_CORTA_CONVERSATION_REAL_CLAUDE`,
+`TEST_RUNNER_CORTA_CONVERSATION_REAL_CODEX` and `TEST_RUNNER_CORTA_MEMBERS_REAL_GROK`,
+then select the whole `CortaTests/CortaSpaceTests` suite in the Unit plan.
+Add `TEST_RUNNER_CORTA_MEMBERS_EXTENDED=1` for native SendMessage, MCP-only and
+Grok frontend wait/idle loops. `TEST_RUNNER_CORTA_MEMBERS_BYPASS_ONLY=1` instead
+checks the real inbound hold with a per-process startup-warning overlay; it
+never approves the held message or changes persistent CLI settings.
+`TEST_RUNNER_CORTA_MEMBERS_GATES_ONLY=1` verifies a real Grok tool running,
+unsubmitted draft, disabled wake-up and return to the foreground shell.
+The fixture uses a temporary shell environment and per-invocation CLI flags;
+no persistent agent settings are changed. The same suite without
+`CORTA_MEMBERS_REAL` runs the separately opted-in conversation recovery case.
+
+For designated Linux protocol acceptance, prepare a private external directory
+with `target`, executable `askpass`, and task-local `known_hosts`; pass it as
+`TEST_RUNNER_CORTA_LINUX_TEST_ROOT` and select `CortaTests/RemoteMemberLinuxTests`.
+This runs no remote AI. It removes only its own UUID session and temporary files;
+remove the private credential directory after reviewing the run.
+
+`CortaSpaceTests/worktreeFormFillsWithoutRunningAndUserReturnUpdatesItsGitRow`
+is opt-in with `CORTA_WORKTREE_TEST_ROOT`. It requires integrated zsh. The
+ordinary Unit plan deliberately fixes `SHELL=/bin/sh`; `TEST_RUNNER_SHELL`
+does not override a plan entry. Copy its generated `.xctestrun` outside the
+tree, expand `__TESTROOT__` to the original products directory, and set that
+copy's target `EnvironmentVariables` and `TestingEnvironmentVariables` to
+`SHELL=/bin/zsh`, `ZDOTDIR=<scratch root>` and
+`CORTA_WORKTREE_TEST_ROOT=<scratch root>`. Give the scratch root a neutral
+`.zshrc`, then use `test-without-building -xctestrun <copy>` with the whole
+`CortaTests/CortaSpaceTests` suite. Never edit the user's shell rc to run it.
+
+For the Release one/six-panel comparison, prepare the same UI fixture root and
+select `CortaUITests/MeasurementUITests/testSpaceFloodOneAndSixPanels` under
+`-testPlan Release -configuration Benchmark`. The two stages use font size 10,
+independent live `yes` producers and the same display/toolchain. Record the
+printed frame CPU distributions and machine header; this is foreground work.
 
 ### Running app suites without a window
 

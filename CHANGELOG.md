@@ -26,7 +26,7 @@ Versioning for compatibility changes.
   explains the fill, and the session menu can fill it again. No transcript,
   session-file path or command line is saved; remote sessions are excluded.
 
-- Settings ▸ General turns agent messages on. A failed Claude or Codex push
+- Settings ▸ Space turns agent messages on. A failed Claude or Codex push
   is recorded, then the wake-up line is tried. A key during that line is
   marked `nudgeInterrupted`. Templates can be renamed and shown. Claude's
   inbox socket is also taken from the process's Unix sockets.
@@ -137,6 +137,34 @@ Versioning for compatibility changes.
 
 - Replacing a duplicated session UUID keeps the old `corta-<UUID>` in the
   removal warning, so that remote tmux session can still be ended by hand.
+
+### Tests and acceptance
+
+- Make the in-flight renderer fixture use independent targets and join all
+  completions; do not assume implicit Metal 4 ordering for shared texture writes.
+- Stage Space grid UI fixtures outside the sandboxed runner and use the
+  current split-tree format. Disable per-source penalties only in the isolated
+  localhost SSH fixture so deliberate failed authentication does not block
+  later tmux lifecycle checks.
+- Add default issue-contract regressions for message provenance/bounds,
+  remote token revocation, SSH template retention and Git context/index v4.
+  Native socket/MCP pipe tests exercise caller checks, streaming framing,
+  bounded background pushes and closed gates. Opt-in real local CLI and Linux
+  protocol tests keep account/environment requirements separate.
+- Rebalance a packed automatic grid before replacing panels when a six-panel
+  arrangement still meets the cell minimum.
+- Restore template split layouts and retained SSH choices, confirm external
+  paths, and sequence SSH dialogs. Add template management and member context
+  choices to Space settings. Missing project folders remain visible as unavailable.
+- Correct Git index-v4 strip decoding and linked-worktree refs; watch tracked
+  worktree edits off main. Prevent duplicate nudges, preserve unread messages
+  independently of history, and provide an absolute CLI path for tool shells
+  that reset PATH. Encode reminder Return for the negotiated keyboard protocol
+  and protect tracked user drafts.
+- Rotate and revoke per-connection remote credentials through private forwarding
+  endpoints. Install the explicitly chosen temporary Python client with JSON-safe
+  commands and fresh connection-file lookup; monitor only process metadata and
+  enable passthrough for the session's own tmux window.
 
 ## [1.5.1] - 2026-10-27
 

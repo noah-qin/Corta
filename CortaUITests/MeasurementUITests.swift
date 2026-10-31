@@ -45,11 +45,11 @@ final class MeasurementUITests: XCTestCase {
     /// Written by the app, read here. The runner is sandboxed: it may read
     /// anywhere but write only its own container, which the app cannot
     /// read — so the app creates the file and removes it on request.
-    private var metricsFile: URL!
+    var metricsFile: URL!
 
     private var previousInputSource: TISInputSource?
 
-    private var measurementStage: URL!
+    var measurementStage: URL!
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -385,7 +385,7 @@ extension MeasurementUITests {
     }
 
     @MainActor
-    private func makeApp(renderMetrics: Bool = true) -> XCUIApplication {
+    func makeApp(renderMetrics: Bool = true) -> XCUIApplication {
         let app = UIFixtures.app(stage: measurementStage, runner: Self.self, usingTestTarget: true)
         // Session restore would carry the previous test's windows in.
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
@@ -454,7 +454,7 @@ extension MeasurementUITests {
 
     /// The newest summary line for each metric, once every one has
     /// appeared; fails if a ring never filled.
-    private func waitForMetrics(_ metrics: [String], timeout: TimeInterval) throws -> [String] {
+    func waitForMetrics(_ metrics: [String], timeout: TimeInterval) throws -> [String] {
         var latest: [String: String] = [:]
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
@@ -512,7 +512,7 @@ extension MeasurementUITests {
         ]
     }
 
-    private func report(_ lines: [String]) {
+    func report(_ lines: [String]) {
         for line in lines { print("measurement: \(line)") }
     }
 }
@@ -527,6 +527,6 @@ private struct RingNeverFilled: Error, CustomStringConvertible {
 
 /// Lets the run loop turn — accessibility queries and the app's own
 /// events — rather than blocking the runner's main thread.
-private func pause(_ seconds: TimeInterval) {
+func pause(_ seconds: TimeInterval) {
     RunLoop.current.run(until: Date().addingTimeInterval(seconds))
 }

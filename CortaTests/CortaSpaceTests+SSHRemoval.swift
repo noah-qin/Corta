@@ -20,6 +20,39 @@ import Testing
 @testable import Corta
 
 extension CortaSpaceTests {
+    @Test func removalCopiesExactNamesAndEndsOnlyCurrentSelectedSessions() throws {
+        let (window, host) = try makeWindow()
+        defer { close(window, host) }
+        let clipboard = NSPasteboard.general
+        let saved = (clipboard.pasteboardItems ?? []).map { item in
+            let copy = NSPasteboardItem()
+            for type in item.types { if let data = item.data(forType: type) { copy.setData(data, forType: type) } }
+            return copy
+        }
+        defer { clipboard.clearContents(); clipboard.writeObjects(saved) }
+        var record = SpaceSessionRecord(number: 1, ssh: SSHTarget(host: "fixture"))
+        record.retainSSH = true
+        let previous = RemoteTmux(id: UUID()).sessionName
+        record.supersededTmuxNames = [previous]
+        let session = SpaceSession(record: record)
+        var launched: [String] = []
+        host.space.launchRemoteTermination = { _, command in launched.append(command) }
+        host.space.presentAlert = { alert, _, done in
+            (alert.accessoryView as? NSButton)?.performClick(nil)
+            done(.alertFirstButtonReturn)
+        }
+        host.space.confirmRetainedRemoval([session]) {}
+        let command = RemoteTmux(id: session.id).killCommand
+        #expect(clipboard.string(forType: .string) == command + "\ntmux kill-session -t '=" + previous + "'")
+        #expect(launched.isEmpty)
+        var completed = false
+        host.space.presentAlert = { _, _, done in done(.alertSecondButtonReturn) }
+        host.space.confirmRetainedRemoval([session]) { completed = true }
+        #expect(completed)
+        #expect(launched == [command])
+        #expect(!launched.contains { $0.contains(previous) })
+    }
+
     @Test func retainedRemovalWithoutAWindowStillAsksAndCompletes() throws {
         let (controller, host) = try makeWindow()
         defer { close(controller, host) }
@@ -27,7 +60,7 @@ extension CortaSpaceTests {
         var presented: NSAlert?
         host.space.presentAlert = { alert, _, done in
             presented = alert
-            done(.alertSecondButtonReturn)
+            done(.alertFirstButtonReturn)
         }
         var record = SpaceSessionRecord(number: 1, ssh: SSHTarget(host: "fixture"))
         record.retainSSH = true
@@ -48,7 +81,7 @@ extension CortaSpaceTests {
         presented = nil
         host.space.presentAlert = { alert, _, done in
             presented = alert
-            done(.alertFirstButtonReturn)
+            done(.alertThirdButtonReturn)
         }
         host.space.confirmRetainedRemoval([session]) { completed = true }
         #expect(presented != nil)

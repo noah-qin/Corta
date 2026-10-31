@@ -78,6 +78,7 @@ extension CortaSpaceController {
 
     /// Directory, branch, commit and dirty flag this pane already knows.
     func gitContext(for session: SpaceSession) -> [String] {
+        guard session.record.ssh == nil else { return [] }
         var lines: [String] = []
         if let directory = session.pane?.session?.currentDirectory ?? session.record.directory,
            let line = AgentEnvelope.contextLine("cwd", directory) { lines.append(line) }
@@ -86,8 +87,7 @@ extension CortaSpaceController {
         }
         if let facts = gitFacts[session.id] {
             if let line = AgentEnvelope.contextLine("branch", facts.name) { lines.append(line) }
-            let directory = session.pane?.session?.currentDirectory ?? session.record.directory ?? ""
-            if let head = GitStatusReader.commit(directory: directory),
+            if let head = facts.commit,
                let line = AgentEnvelope.contextLine("head", head) { lines.append(line) }
             if let dirty = facts.changedFiles,
                let line = AgentEnvelope.contextLine("dirty", dirty > 0 ? "true" : "false") { lines.append(line) }
@@ -96,10 +96,18 @@ extension CortaSpaceController {
     }
 
     func syncAgentBus() {
+        guard Self.owner == nil || Self.owner === self else { return }
+        configureAgentHubCallbacks()
+        for session in projects.flatMap(\.sessions) where session.record.ssh != nil {
+            if session.pane?.session?.pty.exitStatus != nil, let member = member(of: session) {
+                AgentHub.shared.disconnectRemote(member.id)
+            }
+        }
         let members = projects.flatMap(\.members)
         let configured = ConfigurationStore.shared.configuration.agentProcesses
         let bound = Set(projects.flatMap(\.sessions).compactMap { session -> UUID? in
             if session.conversationObservation?.processes.isEmpty == false { return session.id }
+            if agentActivities[session.id]?.kind != nil { return session.id }
             if let name = session.pane?.session?.pty.activeProcessName,
                AgentProcessNames.matches(name, configured: configured) {
                 return session.id
@@ -110,7 +118,11 @@ extension CortaSpaceController {
         for session in projects.flatMap(\.sessions) {
             if let pid = session.pane?.session?.pty.processIdentifier { shells[pid] = session.id }
         }
-        AgentHub.shared.sync(members: members, bound: bound, shells: shells)
+        var projectsByMember: [UUID: String] = [:]
+        for project in projects {
+            for member in project.members { projectsByMember[member.id] = project.path }
+        }
+        AgentHub.shared.sync(members: members, bound: bound, shells: shells, projects: projectsByMember)
         agentBus = AgentHub.shared.bus
     }
 
@@ -118,343 +130,20 @@ extension CortaSpaceController {
     func sendUserText(_ text: String, to member: AgentMemberRecord, from session: SpaceSession,
                       context: [String] = []) -> AgentDelivery {
         syncAgentBus()
-        let limit = AgentEnvelope.bodyLimit
+        guard ConfigurationStore.shared.configuration.agentMessages else { return .refused("disabled") }
+        let limit = AgentEnvelope.bodyLimit - 4096
         var body = text
         var lines = context
         if body.utf8.count > limit {
             let original = body.utf8.count
-            body = String(decoding: body.utf8.prefix(limit), as: UTF8.self)
+            body = AgentEnvelope.prefixUTF8(body, limit: limit)
             lines.append("truncated: \(original)")
         }
-        let delivery = AgentHub.shared.deliverUser(to: member.id.uuidString, body: body, context: lines)
+        let delivery = AgentHub.shared.deliverUser(to: member.id.uuidString, body: body, context: lines,
+                                                  pane: SpaceSessionPresentation(session: session).title,
+                                                      source: session.id)
         content.showNote(L10n.format("space.member.sent", AgentHub.shared.deliveryName(delivery)))
         return delivery
-    }
-
-    func member(of session: SpaceSession) -> AgentMemberRecord? {
-        self.session(withID: session.id)?.project.members.first { $0.sessionID == session.id }
-    }
-
-    func makeMember(_ session: SpaceSession) {
-        guard let (project, _) = self.session(withID: session.id), session.record.ssh == nil else { return }
-        let alert = NSAlert()
-        alert.messageText = L10n.text("space.member.prompt")
-        let field = NSTextField(frame: NSRect(x: 0, y: 28, width: 280, height: 24))
-        field.stringValue = session.record.conversation?.kind.rawValue ?? "member"
-        let nudge = NSButton(checkboxWithTitle: L10n.text("space.member.nudge"), target: nil, action: nil)
-        nudge.state = .on
-        nudge.frame = NSRect(x: 0, y: 0, width: 280, height: 22)
-        let stack = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 56))
-        stack.addSubview(field)
-        stack.addSubview(nudge)
-        alert.accessoryView = stack
-        alert.informativeText = L10n.text("space.member.nudgeDetail")
-        alert.addButton(withTitle: L10n.text("space.member.add"))
-        alert.addButton(withTitle: L10n.text("space.member.cancel"))
-        presentAlert(alert, host?.toolbarWindow) { [weak self, weak project] response in
-            guard response == .alertFirstButtonReturn, let self, let project,
-                  let role = AgentMemberRecord.cleanRole(field.stringValue) else { return }
-            project.members.removeAll { $0.sessionID == session.id }
-            project.members.append(AgentMemberRecord(
-                role: role, sessionID: session.id, nudgeEnabled: nudge.state == .on))
-            self.scheduleSave()
-            self.refreshNow()
-            self.copyIntroduction(session)
-        }
-    }
-
-    func sendSelectionFromPalette() {
-        guard isActive, let session = focusedSession, let text = session.pane?.commands.selectedText() else {
-            content.showNote(L10n.text("space.member.none"))
-            return
-        }
-        let others = (project(containing: session)?.members ?? []).filter { $0.sessionID != session.id }
-        if others.count == 1 {
-            sendUserText(text, to: others[0], from: session, context: gitContext(for: session))
-            return
-        }
-        let alert = NSAlert()
-        alert.messageText = L10n.text("command.sendSelectionToMember")
-        alert.informativeText = others.map { $0.role + " " + AgentEnvelope.shortID($0.id) }.joined(separator: "\n")
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-        alert.accessoryView = field
-        alert.addButton(withTitle: L10n.text("space.member.send"))
-        alert.addButton(withTitle: L10n.text("space.member.cancel"))
-        presentAlert(alert, host?.toolbarWindow) { [weak self] response in
-            guard response == .alertFirstButtonReturn, let self,
-                  let member = others.first(where: {
-                      AgentEnvelope.shortID($0.id) == field.stringValue || $0.role == field.stringValue
-                  }) else { return }
-            self.sendUserText(text, to: member, from: session, context: self.gitContext(for: session))
-        }
-    }
-
-    func copyIntroduction(_ session: SpaceSession) {
-        syncAgentBus()
-        guard let text = AgentHub.shared.introduction(sessionID: session.id) else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        content.showNote(L10n.text("space.member.copied"))
-    }
-
-    func showHistory(_ session: SpaceSession) {
-        syncAgentBus()
-        let text = AgentHub.shared.historyText(sessionID: session.id)
-        let alert = NSAlert()
-        alert.messageText = L10n.text("space.member.history")
-        alert.informativeText = text.isEmpty ? L10n.text("space.member.historyEmpty") : text
-        alert.addButton(withTitle: L10n.text("space.member.copy"))
-        alert.addButton(withTitle: L10n.text("space.member.cancel"))
-        presentAlert(alert, host?.toolbarWindow) { response in
-            guard response == .alertFirstButtonReturn, !text.isEmpty else { return }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-        }
-    }
-
-    func copyUnread(_ session: SpaceSession) {
-        syncAgentBus()
-        let text = AgentHub.shared.unreadText(sessionID: session.id)
-        guard !text.isEmpty else {
-            content.showNote(L10n.text("space.member.historyEmpty"))
-            return
-        }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        content.showNote(L10n.text("space.member.copied"))
-    }
-
-    func setMemberPaused(_ session: SpaceSession, paused: Bool) {
-        guard let project = self.session(withID: session.id)?.project,
-              let index = project.members.firstIndex(where: { $0.sessionID == session.id }) else { return }
-        project.members[index].paused = paused
-        if paused {
-            syncAgentBus()
-            AgentHub.shared.dropInbox(sessionID: session.id)
-        }
-        scheduleSave()
-    }
-
-    func makeRemoteMember(_ session: SpaceSession) {
-        guard let project = self.session(withID: session.id)?.project,
-              let hostName = session.record.ssh?.displayName,
-              let role = AgentMemberRecord.cleanRole(hostName) else { return }
-        project.members.removeAll { $0.sessionID == session.id }
-        project.members.append(AgentMemberRecord(role: role, sessionID: session.id, host: hostName))
-        scheduleSave()
-        refreshNow()
-    }
-
-    func removeMember(_ session: SpaceSession) {
-        guard let project = self.session(withID: session.id)?.project else { return }
-        syncAgentBus()
-        AgentHub.shared.dropInbox(sessionID: session.id)
-        project.members.removeAll { $0.sessionID == session.id }
-        scheduleSave()
-        refreshNow()
-    }
-
-    func promptWorktree(from session: SpaceSession) {
-        guard let project = self.session(withID: session.id)?.project else { return }
-        let alert = NSAlert()
-        alert.messageText = L10n.text("space.worktree.prompt")
-        alert.informativeText = L10n.text("space.worktree.detail")
-        let name = NSTextField(frame: NSRect(x: 0, y: 28, width: 280, height: 24))
-        name.stringValue = gitFacts[session.id]?.detached == false ? (gitFacts[session.id]?.name ?? "topic") : "topic"
-        let branch = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
-        branch.placeholderString = L10n.text("space.worktree.branchOptional")
-        let stack = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 52))
-        name.frame = NSRect(x: 0, y: 28, width: 280, height: 24)
-        branch.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
-        stack.addSubview(name)
-        stack.addSubview(branch)
-        alert.accessoryView = stack
-        alert.addButton(withTitle: L10n.text("space.worktree.new"))
-        alert.addButton(withTitle: L10n.text("space.member.cancel"))
-        presentAlert(alert, host?.toolbarWindow) { [weak self] response in
-            guard response == .alertFirstButtonReturn, let self else { return }
-            let newBranch = !branch.stringValue.trimmingCharacters(in: .whitespaces).isEmpty
-            let branchName = newBranch ? branch.stringValue : name.stringValue
-            guard let location = WorktreeCommand.location(projectPath: project.path, name: name.stringValue),
-                  let command = WorktreeCommand.line(location: location, branch: branchName, newBranch: newBranch)
-            else {
-                self.content.showNote(L10n.text("space.worktree.rejected"))
-                return
-            }
-            self.newSession(directory: project.path)
-            self.fillWhenReady(command: command, note: "space.worktree.filled")
-        }
-    }
-
-    func revealWorktreeMain(_ session: SpaceSession) {
-        guard let path = gitFacts[session.id]?.mainRepository else { return }
-        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
-    }
-
-    func fillWhenReady(command: String, note: String) {
-        guard let session = focusedSession else { return }
-        Task { @MainActor [weak self, weak session] in
-            let deadline = SuspendingClock.now.advanced(by: .seconds(10))
-            while SuspendingClock.now < deadline {
-                if session?.pane?.shell.fillPrompt(with: command) == true {
-                    self?.content.showNote(L10n.text(note))
-                    return
-                }
-                try? await Task.sleep(for: .milliseconds(200))
-            }
-        }
-    }
-
-    func saveTemplate(of project: SpaceProject) {
-        let alert = NSAlert()
-        alert.messageText = L10n.text("space.template.save")
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-        field.stringValue = project.name
-        alert.accessoryView = field
-        alert.addButton(withTitle: L10n.text("space.template.save"))
-        alert.addButton(withTitle: L10n.text("space.member.cancel"))
-        presentAlert(alert, host?.toolbarWindow) { response in
-            guard response == .alertFirstButtonReturn,
-                  let name = AgentMemberRecord.cleanRole(field.stringValue) else { return }
-            var file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
-            let template = SpaceTemplate.capture(
-                name: name, projectPath: project.path, sessions: project.sessions.map(\.currentRecord),
-                members: project.members, layout: project.layout)
-            file.templates.removeAll { $0.name == name }
-            file.templates.append(template)
-            try? file.save(to: SpaceTemplateFile.url)
-        }
-    }
-
-    func applyTemplate(to project: SpaceProject) {
-        let file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
-        guard !file.templates.isEmpty else {
-            content.showNote(L10n.text("space.template.empty"))
-            return
-        }
-        let alert = NSAlert()
-        alert.messageText = L10n.text("space.template.apply")
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-        field.stringValue = file.templates.count == 1 ? file.templates[0].name : ""
-        alert.informativeText = file.templates.map(\.name).joined(separator: ", ")
-        alert.accessoryView = field
-        alert.addButton(withTitle: L10n.text("space.template.apply"))
-        alert.addButton(withTitle: L10n.text("space.member.cancel"))
-        presentAlert(alert, host?.toolbarWindow) { [weak self, weak project] response in
-            guard response == .alertFirstButtonReturn, let self, let project,
-                  let template = file.templates.first(where: { $0.name == field.stringValue }) else {
-                self?.content.showNote(L10n.text("space.template.empty"))
-                return
-            }
-            self.apply(template, to: project)
-        }
-    }
-
-    func apply(_ template: SpaceTemplate, to project: SpaceProject) {
-        selectProject(project)
-        start(project)
-        for (index, built) in template.sessions(in: project.path).enumerated() {
-            var record = built.0
-            record.number = project.nextNumber
-            project.nextNumber += 1
-            let session = SpaceSession(record: record)
-            project.sessions.append(session)
-            if project.maximized != nil { setMaximized(nil, in: project) }
-            let placement = automaticPlacement(in: project)
-            spawn(session, in: project, panelSize: plannedSize(of: placement, in: project))
-            place(session, placement, in: project)
-            focus(session)
-            if let agent = built.1 { fillWhenReady(command: agent, note: "space.template.filled") }
-            if let role = template.sessions[index].memberRole, let clean = AgentMemberRecord.cleanRole(role) {
-                project.members.append(AgentMemberRecord(
-                    role: clean, sessionID: session.id,
-                    nudgeEnabled: template.sessions[index].nudgeEnabled ?? true))
-            }
-        }
-        scheduleSave()
-        content.showNote(L10n.format("space.template.applied", template.name))
-    }
-
-    func renameTemplate() {
-        let names = SpaceTemplateFile.load(from: SpaceTemplateFile.url).templates.map(\.name)
-        guard !names.isEmpty else {
-            content.showNote(L10n.text("space.template.empty"))
-            return
-        }
-        let alert = NSAlert()
-        alert.messageText = L10n.text("space.template.rename")
-        alert.informativeText = names.joined(separator: ", ")
-        let from = NSTextField(frame: NSRect(x: 0, y: 28, width: 240, height: 24))
-        let to = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-        to.placeholderString = L10n.text("space.template.renameTo")
-        let stack = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 56))
-        stack.addSubview(from)
-        stack.addSubview(to)
-        alert.accessoryView = stack
-        alert.addButton(withTitle: L10n.text("space.template.rename"))
-        alert.addButton(withTitle: L10n.text("space.member.cancel"))
-        presentAlert(alert, host?.toolbarWindow) { response in
-            guard response == .alertFirstButtonReturn,
-                  let name = AgentMemberRecord.cleanRole(to.stringValue) else { return }
-            var file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
-            guard let index = file.templates.firstIndex(where: { $0.name == from.stringValue }) else { return }
-            file.templates[index].name = name
-            try? file.save(to: SpaceTemplateFile.url)
-        }
-    }
-
-    func showTemplate() {
-        let file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
-        guard !file.templates.isEmpty else {
-            content.showNote(L10n.text("space.template.empty"))
-            return
-        }
-        let alert = NSAlert()
-        alert.messageText = L10n.text("space.template.show")
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-        field.stringValue = file.templates[0].name
-        alert.accessoryView = field
-        alert.addButton(withTitle: L10n.text("space.template.show"))
-        alert.addButton(withTitle: L10n.text("space.member.cancel"))
-        presentAlert(alert, host?.toolbarWindow) { [weak self] response in
-            guard response == .alertFirstButtonReturn, let self,
-                  let template = file.templates.first(where: { $0.name == field.stringValue }),
-                  let data = try? JSONEncoder().encode(template) else { return }
-            let text = String(decoding: data, as: UTF8.self)
-            let shown = NSAlert()
-            shown.messageText = template.name
-            shown.informativeText = text
-            shown.addButton(withTitle: L10n.text("space.member.copy"))
-            shown.addButton(withTitle: L10n.text("space.member.cancel"))
-            self.presentAlert(shown, self.host?.toolbarWindow) { response in
-                guard response == .alertFirstButtonReturn else { return }
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
-            }
-        }
-    }
-
-    func deleteTemplate() {
-        let file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
-        guard !file.templates.isEmpty else {
-            content.showNote(L10n.text("space.template.empty"))
-            return
-        }
-        let alert = NSAlert()
-        alert.messageText = L10n.text("space.template.delete")
-        alert.informativeText = file.templates.map(\.name).joined(separator: ", ")
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-        alert.accessoryView = field
-        alert.addButton(withTitle: L10n.text("space.template.delete"))
-        alert.addButton(withTitle: L10n.text("space.member.cancel"))
-        presentAlert(alert, host?.toolbarWindow) { response in
-            guard response == .alertFirstButtonReturn else { return }
-            var file = SpaceTemplateFile.load(from: SpaceTemplateFile.url)
-            let before = file.templates.count
-            file.templates.removeAll { $0.name == field.stringValue }
-            guard file.templates.count < before else { return }
-            try? file.save(to: SpaceTemplateFile.url)
-        }
     }
 
     func connectSession() {
@@ -622,6 +311,7 @@ extension CortaSpaceController {
     }
 
     func discard(_ session: SpaceSession) {
+        if let member = member(of: session), member.host != nil { AgentHub.shared.disconnectRemote(member.id) }
         guard let pane = session.pane else { return }
         session.pane = nil
         panels.removeValue(forKey: ObjectIdentifier(session))?.removeFromSuperview()
@@ -637,9 +327,11 @@ extension CortaSpaceController {
         guard var preset, let tmux = preset.remoteTmux, let target = preset.connectTarget,
               ConfigurationStore.shared.configuration.agentMessages,
               let member = member(of: session), member.host != nil,
-              let socket = AgentHub.shared.socketPath else { return preset }
+              AgentHub.shared.socketPath != nil else { return preset }
         let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
         AgentHub.shared.rememberRemote(token: token, member: member.id)
+        guard let socket = AgentHub.shared.remoteEndpoint(token: token, member: member.id,
+                                                         tmux: tmux.sessionName) else { return preset }
         var extras = RemoteTmux.Extras()
         extras.environmentName = "CORTA_MEMBER_TOKEN"
         extras.environmentValue = token
@@ -677,16 +369,9 @@ extension CortaSpaceController {
             pane.isFontSizeZoomed = template.isFontSizeZoomed
         }
         session.pane = pane
-        pane.remote.onTmuxReport = { [weak self, weak session] report in
-            guard let self, let session else { return }
-            if report.established {
-                session.record.tmuxEstablished = true
-                if let member = self.member(of: session), member.host != nil {
-                    AgentHub.shared.markRemoteReady(member.id)
-                }
-            }
-            self.refreshNow()
-            self.scheduleSave()
+        pane.remote.onTmuxReport = { [weak self, weak session, weak pane] report in
+            guard let self, let session, let pane else { return }
+            self.noteTmuxResult(report, session: session, pane: pane)
         }
     }
 }

@@ -79,7 +79,8 @@ struct SpaceSSHTests {
             == L10n.text("space.ssh.ready"))
         #expect(SpaceSSHStatus(report: report("start;missing"), previouslyEstablished: true).title
             == L10n.text("space.ssh.missing"))
-        #expect(SpaceSSHStatus(report: report("fail;7;626164"), previouslyEstablished: true).detail.contains("bad"))
+        #expect(SpaceSSHStatus(report: report("start;new\u{7}\u{1B}]6973;\(token.uuidString);fail;7;626164"),
+            previouslyEstablished: true).detail.contains("bad"))
         #expect(SpaceSSHStatus(report: nil, previouslyEstablished: true).title == L10n.text("space.ssh.attaching"))
         #expect(SpaceSSHStatus(report: nil, previouslyEstablished: false).title == L10n.text("space.ssh.starting"))
     }

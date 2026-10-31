@@ -50,11 +50,6 @@ extension Notification.Name {
 nonisolated struct ConversationIdentity: Equatable, Sendable {
     var conversation: LocalConversation?
     var processes: [ConversationProcess]
-
-    init(conversation: LocalConversation?, processes: [ConversationProcess]) {
-        self.conversation = conversation
-        self.processes = processes
-    }
 }
 
 extension CortaSpaceController {
@@ -79,17 +74,28 @@ extension CortaSpaceController {
                   case .local = pane.remote.state, let terminal = pane.session else { return nil }
             return (item.id, terminal)
         }
+        let configured = ConfigurationStore.shared.configuration.agentProcesses
         let updates = await Task.detached(priority: .utility) {
-            candidates.map { ($0.0, $0.1.pty.conversationSample) }
+            candidates.map { ($0.0, $0.1.pty.conversationSample, AgentActivity.read($0.1, configured: configured)) }
         }.value
         guard !Task.isCancelled else { return }
-        for (id, sample) in updates {
+        for (id, sample, activity) in updates {
+            if let activity {
+                if activity.idle(after: agentActivities[id]) { idleAgents.insert(id) } else { idleAgents.remove(id) }
+                agentActivities[id] = activity
+            } else {
+                agentActivities[id] = nil
+                idleAgents.remove(id)
+            }
             guard let sample, let (_, item) = session(withID: id),
                   let original = candidates.first(where: { $0.0 == id })?.1,
                   item.pane?.session === original, item.record.ssh == nil,
                   case .local = item.pane?.remote.state else { continue }
             applyConversationSample(sample, to: item)
         }
+        syncAgentBus()
+        AgentHub.shared.nudgePending()
+        if isActive { refreshNow() }
     }
 
     func applyConversationSample(_ sample: ConversationSample, to item: SpaceSession) {

@@ -84,6 +84,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `confirm-close` | boolean | `true` | Ask before closing a pane, window or the app while a shell still has a foreground job. |
 | `space-panel-limit` | integer, 1–6 | `6` | The most panels Space's grid shows at once. No split makes a panel smaller than 64 × 18 cells, so a small screen holds fewer. Lowering it takes the least recently used panels off screen; their sessions keep running. |
 | `space-attention-badge` | boolean | `true` | While Space is showing and its window is not key, the Dock badge is how many sessions are waiting on you. `false` leaves the ordinary agent badge. |
+| `waiting-queue-auto-advance` | boolean | `true` | After the focused waiting session leaves the queue, focus the next one. New arrivals never move focus, and recent typing prevents automatic movement. |
 
 #### Quick Terminal
 
@@ -380,6 +381,7 @@ notify-from-programs = true
 agent-status = true
 agent-messages = false
 space-attention-badge = true
+waiting-queue-auto-advance = true
 agent-processes =
 notify-on-long-task = true         # default false
 notification-threshold = 60        # default 30
@@ -832,6 +834,13 @@ managed remote-edit copies. Their contents are not configuration keys.
 | `SpaceTemplateFile` | `space-templates.json` | Named layouts: session kind, preset name or SSH host, relative directory, display name, agent kind, member role. No UUIDs, tmux names, credentials or command lines | **App state** — never written into a project folder |
 | `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent Hosts |
 | `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — preserve undecided edits before deleting app data; used copies are pruned after 30 days unless edits are pending |
+
+Template application restores the split tree and SSH retention with fresh
+identities; SSH uses explicit connection dialogs and external directories need
+confirmation. Manage templates in Settings ▸ Space or the project menu.
+Member records also keep optional context defaults, selection-context choice
+and an exact Codex thread name. These are per-member Space state, not global
+configuration keys. Bindings, tokens, inboxes and delivery history are runtime only.
 
 Why separate stores: `Configuration` is line-oriented text
 specifically so a person can open it in `$EDITOR`, diff it, and understand

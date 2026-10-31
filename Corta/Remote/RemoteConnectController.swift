@@ -83,6 +83,7 @@ final class RemoteConnectController: NSWindowController {
     static let shared = RemoteConnectController()
     private let draft = RemoteConnectDraft()
     private var sessionDestination: ((Preset) -> Void)?
+    private var cancellation: (() -> Void)?
 
     private init() {
         let window = NSPanel(
@@ -109,9 +110,13 @@ final class RemoteConnectController: NSWindowController {
     ///   - sender: the control or menu item opening the dialog.
     ///   - paneFiles: the focused pane's host, when it is remote.
     ///   - sessionDestination: receives the preset when opening a session in Space.
+    ///   - initialTarget: a template destination to show for explicit confirmation.
+    ///   - initialRetention: the saved template retention choice.
+    ///   - onCancel: skips a pending template session when its dialog is dismissed.
     func show(
         _ mode: RemoteConnectMode, sender: Any?, paneFiles: RemoteConnectPaneFiles? = nil,
-        sessionDestination: ((Preset) -> Void)? = nil
+        sessionDestination: ((Preset) -> Void)? = nil, initialTarget: SSHTarget? = nil,
+        initialRetention: Bool = true, onCancel: (() -> Void)? = nil
     ) {
         guard let window else { return }
         if window.isVisible {
@@ -121,8 +126,14 @@ final class RemoteConnectController: NSWindowController {
         // A fresh dialog each time: a host left over from the last one is a
         // connection nobody asked for.
         self.sessionDestination = sessionDestination
+        cancellation = onCancel
         draft.reset(mode: mode, paneFiles: paneFiles)
         draft.isSpace = sessionDestination != nil
+        if let initialTarget {
+            draft.fields = SSHTargetFields(host: initialTarget.host, user: initialTarget.user ?? "",
+                                           port: initialTarget.port.map(String.init) ?? "", identityFile: "")
+            draft.retainSSH = initialRetention
+        }
         window.title = L10n.text("ui.connect.title")
         if let parent = NSApp.keyWindow ?? NSApp.mainWindow, parent.isVisible,
             parent.attachedSheet == nil, !(parent is NSPanel)
@@ -142,11 +153,14 @@ final class RemoteConnectController: NSWindowController {
 
     override func close() {
         sessionDestination = nil
+        let cancelled = cancellation
+        cancellation = nil
         if let window, let parent = window.sheetParent {
             parent.endSheet(window)
         } else {
             super.close()
         }
+        cancelled?()
     }
 
     /// Validated here, at the boundary: a problem keeps the dialog open and
@@ -164,6 +178,7 @@ final class RemoteConnectController: NSWindowController {
         }
         let retainSSH = draft.isSpace && draft.retainSSH
         let destination = sessionDestination
+        cancellation = nil
         close()
         switch mode {
         case .ssh:

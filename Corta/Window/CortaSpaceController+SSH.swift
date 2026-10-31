@@ -27,11 +27,37 @@ extension CortaSpaceController {
         alert.informativeText = L10n.text("space.ssh.remove.detail") + "\n\n" + names.map {
             "tmux kill-session -t '=\($0)'"
         }.joined(separator: "\n")
+        alert.addButton(withTitle: L10n.text("space.ssh.remove.keep"))
+        alert.addButton(withTitle: L10n.text("space.ssh.kill.button"))
         alert.addButton(withTitle: L10n.text("common.cancel"))
-        alert.addButton(withTitle: L10n.text("space.ssh.remove.button"))
+        alert.buttons.last?.keyEquivalent = "\u{1b}"
+        let commands = names.map { "tmux kill-session -t '=\($0)'" }.joined(separator: "\n")
+        let copy = SpaceCopyCommandButton(commands: commands)
+        alert.accessoryView = copy
         alert.buttons.forEach { $0.bezelStyle = .glass }
-        presentAlert(alert, alertWindow()) { result in
-            if result == .alertSecondButtonReturn { completion() }
+        presentAlert(alert, alertWindow()) { [weak self] result in
+            if result == .alertFirstButtonReturn { completion() }
+            if result == .alertSecondButtonReturn {
+                for session in sessions where session.record.retainSSH == true {
+                    if let target = session.record.ssh {
+                        self?.launchTermination(target: target, command: RemoteTmux(id: session.id).killCommand)
+                    }
+                }
+                completion()
+            }
+        }
+    }
+
+    /// A fragmented start/failure pair must not persist a successful attachment.
+    func noteTmuxResult(_ report: RemoteTmux.Report, session: SpaceSession, pane: ViewController) {
+        refreshNow()
+        scheduleSave()
+        guard report.established, let terminal = pane.session else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { [weak self, weak session, weak pane] in
+            guard let self, let session, pane?.session === terminal,
+                  terminal.remoteTmuxReport?.established == true else { return }
+            session.record.tmuxEstablished = true
+            self.scheduleSave()
         }
     }
 
@@ -74,11 +100,16 @@ extension CortaSpaceController {
         alert.buttons.forEach { $0.bezelStyle = .glass }
         presentAlert(alert, alertWindow()) { result in
             guard result == .alertSecondButtonReturn else { return }
-            var preset = SSHDestination.preset(for: target)
-            preset.arguments = target.sshOptions + ["-t", "--", target.host, tmux.killCommand]
-            (NSApp.delegate as? AppDelegate)?.launchPreset(preset, inNewWindow: true)
+            self.launchTermination(target: target, command: tmux.killCommand)
         }
     }
+    private func launchTermination(target: SSHTarget, command: String) {
+        if let launchRemoteTermination { launchRemoteTermination(target, command); return }
+        var preset = SSHDestination.preset(for: target)
+        preset.arguments = target.sshOptions + ["-t", "--", target.host, command]
+        (NSApp.delegate as? AppDelegate)?.launchPreset(preset, inNewWindow: true)
+    }
+
 }
 
 /// Visible even when tmux clears the screen; also readable before the project starts.
@@ -113,5 +144,22 @@ struct SpaceSSHStatus {
             detail = L10n.text("space.ssh.pending.detail")
         }
         title = L10n.text("space.ssh." + key)
+    }
+}
+
+private final class SpaceCopyCommandButton: NSButton {
+    private let commands: String
+    init(commands: String) {
+        self.commands = commands
+        super.init(frame: NSRect(x: 0, y: 0, width: 260, height: 30))
+        title = L10n.text("space.ssh.copyKill")
+        bezelStyle = .rounded
+        target = self
+        action = #selector(copyCommands)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+    @objc private func copyCommands() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(commands, forType: .string)
     }
 }

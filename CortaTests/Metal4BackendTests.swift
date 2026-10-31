@@ -182,40 +182,43 @@ struct Metal4BackendTests {
         #expect(MetalRenderTarget.pixel(of: texture, x: 20, y: 15).b == 0)
     }
 
-    /// Eight frames through one backend, none waited for until the last: the
-    /// command buffers, allocators and every ring slot are each reused while
-    /// earlier frames are in flight. The last frame's opaque quad must win
-    /// intact — a premature slot rewrite shows up as the wrong colour.
+    /// Eight frames reuse every slot while earlier frames are in flight.
+    /// Independent targets model drawables: Metal 4 does not implicitly
+    /// synchronize overlapping writes to one texture across commits.
+    /// Join every completion, then verify every frame rather than assuming
+    /// the last commit finished all prior writes to a shared target.
     @Test func ringSlotsAreReusedAcrossFramesInFlight() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        // A generous slot wait, so a slow machine waits rather than drops.
         let backend = try Metal4Backend(device: device, slotWaitLimit: frameCompletionTimeout)
-        let target = MetalRenderTarget.make(device: device, width: 64, height: 48)
         let colors: [SIMD4<Float>] = [
             .init(1, 0, 0, 1), .init(0, 1, 0, 1), .init(0, 0, 1, 1), .init(1, 1, 0, 1),
             .init(1, 0, 1, 1), .init(0, 1, 1, 1), .init(0.5, 0.25, 1, 1), .init(0.25, 0.5, 1, 1),
         ]
         let size = CGSize(width: 64, height: 48)
-        for color in colors.dropLast() {
-            backend.beginFrame(target: target, clearColor: MTLClearColorMake(0, 0, 0, 1), label: "Corta.test")
+        let targets = colors.map { _ in MetalRenderTarget.make(device: device, width: 64, height: 48) }
+        let completed = DispatchGroup()
+        let errors = Mutex(0)
+        for (target, color) in zip(targets, colors) {
+            completed.enter()
+            #expect(backend.beginFrame(target: target, clearColor: MTLClearColorMake(0, 0, 0, 1), label: "Corta.test"))
             backend.drawSolidQuads(
                 [QuadInstance(origin: .zero, size: .init(64, 48), color: color)],
                 rect: CGRect(origin: .zero, size: size), drawableSize: size)
-            backend.endFrame(presenting: nil, onCompleted: nil)
+            backend.endFrame(presenting: nil) { error in
+                if error != nil { errors.withLock { $0 += 1 } }
+                completed.leave()
+            }
         }
-        let last = colors.last!
-        #expect(
-            backend.renderFrameAndWait(into: target) {
-                $0.drawSolidQuads(
-                    [QuadInstance(origin: .zero, size: .init(64, 48), color: last)],
-                    rect: CGRect(origin: .zero, size: size), drawableSize: size)
-            })
+        try #require(completed.wait(timeout: .now() + frameCompletionTimeout) == .success)
+        #expect(errors.withLock { $0 } == 0)
         #expect(backend.droppedFrameCount == 0)
-        let pixel = MetalRenderTarget.pixel(of: target, x: 8, y: 8)
-        #expect(abs(Int(pixel.b) - Int((last.z * 255).rounded())) <= 1)
-        #expect(abs(Int(pixel.g) - Int((last.y * 255).rounded())) <= 1)
-        #expect(abs(Int(pixel.r) - Int((last.x * 255).rounded())) <= 1)
-        #expect(pixel.a == 255)
+        for (target, color) in zip(targets, colors) {
+            let pixel = MetalRenderTarget.pixel(of: target, x: 8, y: 8)
+            #expect(abs(Int(pixel.b) - Int((color.z * 255).rounded())) <= 1)
+            #expect(abs(Int(pixel.g) - Int((color.y * 255).rounded())) <= 1)
+            #expect(abs(Int(pixel.r) - Int((color.x * 255).rounded())) <= 1)
+            #expect(pixel.a == 255)
+        }
     }
 
     /// A ring buffer that has to grow mid-frame retires the old one rather

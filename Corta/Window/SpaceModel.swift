@@ -46,19 +46,21 @@ nonisolated struct SpaceState: Codable, Equatable, Sendable {
     /// index and divider in range. A hand-edited or truncated file degrades
     /// field by field rather than as a whole.
     func validated() -> SpaceState {
-        let counts = projects.prefix(Self.maximumProjects).flatMap { $0.sessions.prefix(Self.maximumSessions) }
-            .reduce(into: [UUID: Int]()) { $0[$1.id, default: 0] += 1 }
+        var sessionIDs = Set<UUID>()
         var seen = Set<String>()
         let projects = projects.compactMap { project -> SpaceProjectRecord? in
             guard project.path.hasPrefix("/"), seen.insert(project.path).inserted else { return nil }
             var valid = project.validated()
-            for index in valid.sessions.indices where counts[valid.sessions[index].id, default: 0] > 1 {
+            for index in valid.sessions.indices where !sessionIDs.insert(valid.sessions[index].id).inserted {
                 if valid.sessions[index].retainSSH == true {
                     valid.sessions[index].rememberSupersededTmuxName()
                 }
                 valid.sessions[index].id = UUID()
+                sessionIDs.insert(valid.sessions[index].id)
                 valid.sessions[index].tmuxEstablished = false
             }
+            let ids = Set(valid.sessions.map(\.id))
+            valid.members.removeAll { !ids.contains($0.sessionID) }
             return valid
         }
         let kept = Array(projects.prefix(Self.maximumProjects))
@@ -70,6 +72,7 @@ nonisolated struct SpaceState: Codable, Equatable, Sendable {
 
 nonisolated struct SpaceProjectRecord: Codable, Equatable, Sendable {
     var path: String
+    var isAvailable = true
     var sessions: [SpaceSessionRecord] = []
     /// The grid: which sessions are on screen, and how they are split.
     var layout: SpaceLayoutRecord?
@@ -113,17 +116,21 @@ nonisolated struct SpaceProjectRecord: Codable, Equatable, Sendable {
         let highest = sessions.map(\.number).max() ?? 0
         let ids = Set(sessions.map(\.id))
         var seen = Set<UUID>()
+        var memberSessions = Set<UUID>()
         let members = members.filter { member in
             ids.contains(member.sessionID) && seen.insert(member.id).inserted
+                && memberSessions.insert(member.sessionID).inserted
                 && AgentMemberRecord.cleanRole(member.role) != nil
         }.map { member in
             var copy = member
             copy.role = AgentMemberRecord.cleanRole(member.role) ?? member.role
             return copy
         }
-        return SpaceProjectRecord(
+        var result = SpaceProjectRecord(
             path: path, sessions: sessions, layout: layout?.validated(sessionCount: sessions.count),
             nextNumber: min(max(nextNumber, highest + 1), 1_000_000), members: members)
+        result.isAvailable = isAvailable
+        return result
     }
 }
 
@@ -416,8 +423,9 @@ struct SpaceStore {
         let existing = PathProbe.directories(
             among: valid.projects.map(\.path) + valid.projects.flatMap { $0.sessions.compactMap(\.directory) },
             timeout: SessionRestore.directoryCheckTimeout, isDirectory: isDirectory)
-        valid.projects = valid.projects.filter { existing.contains($0.path) }.map { project in
+        valid.projects = valid.projects.map { project in
             var project = project
+            project.isAvailable = existing.contains(project.path)
             for index in project.sessions.indices {
                 if let directory = project.sessions[index].directory, !existing.contains(directory) {
                     project.sessions[index].directory = nil
@@ -438,4 +446,15 @@ struct SpaceStore {
     }
 
     private struct VersionProbe: Decodable { var version: Int? }
+}
+
+extension SpaceLayoutRecord {
+    func mapPanels(_ transform: (Int) -> Int) -> SpaceLayoutRecord {
+        switch self {
+        case .panel(let index): return .panel(transform(index))
+        case .split(let vertical, let fraction, let first, let second):
+            return .split(vertical: vertical, fraction: fraction,
+                          first: first.mapPanels(transform), second: second.mapPanels(transform))
+        }
+    }
 }

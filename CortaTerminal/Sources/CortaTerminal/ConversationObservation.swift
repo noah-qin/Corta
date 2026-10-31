@@ -48,7 +48,7 @@ public struct ConversationProcess: Hashable, Sendable {
     }
     /// Native Claude installs execute a version-named symlink target. `ps comm`
     /// still calls it claude: use only argv[0], never decode later arguments/environment.
-    private static func invocationName(_ pid: pid_t) -> String? {
+    public static func invocationName(_ pid: pid_t) -> String? {
         var query: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
         var length = 64 * 1024
         var bytes = [UInt8](repeating: 0, count: length)
@@ -83,8 +83,8 @@ public struct ConversationObservation: Equatable, Sendable {
     public let sessionChanged: Bool
 
     public init(kind: LocalConversation.Kind, processes: [ConversationProcess],
-         id: UUID? = nil, source: LocalConversation.Source = .picker, reason: Reason? = nil,
-         sessionChanged: Bool = false) {
+                id: UUID? = nil, source: LocalConversation.Source = .picker, reason: Reason? = nil,
+                sessionChanged: Bool = false) {
         conversation = LocalConversation(kind: kind, id: id, source: source)
         self.processes = processes
         self.reason = reason

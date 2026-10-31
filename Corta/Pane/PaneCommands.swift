@@ -151,8 +151,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
                 let title = member.role + " (" + AgentEnvelope.shortID(member.id) + ")"
                 let action = ContextAction { [weak self, weak space, weak session] in
                     guard let self, let space, let session, let text = self.selectedText() else { return }
-                    let lines = space.gitContext(for: session)
-                    _ = space.sendUserText(text, to: member, from: session, context: lines)
+                    space.sendSelection(text, to: member, from: session)
                 }
                 let item = NSMenuItem(title: title, action: #selector(ContextAction.run(_:)), keyEquivalent: "")
                 item.target = action
@@ -162,6 +161,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         }
         let parent = NSMenuItem(title: L10n.text("space.member.send"), action: nil, keyEquivalent: "")
         parent.submenu = submenu
+        parent.isEnabled = !others.isEmpty
         menu.addItem(parent)
     }
 

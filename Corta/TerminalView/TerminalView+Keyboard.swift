@@ -85,6 +85,14 @@ extension TerminalView {
             super.keyDown(with: event)
             return
         }
+        if event.keyCode == 36 || event.keyCode == 76
+            || (event.modifierFlags.contains(.control) && ["c",
+                "u"].contains(event.charactersIgnoringModifiers ?? "")) {
+            hasUnsubmittedInput = false
+        } else if event.modifierFlags.isDisjoint(with: [.control, .command]),
+                  event.characters?.unicodeScalars.contains(where: { $0.value >= 0x20 && $0.value < 0xF700 }) == true {
+            hasUnsubmittedInput = true
+        }
         keyCodesDelivered.insert(event.keyCode)
         // Starts the keypress-to-pixel trace (`InputLatencySignposts`).
         noteUserInput()

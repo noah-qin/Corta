@@ -18,7 +18,7 @@ import Testing
 @testable import Corta
 
 struct WorktreeCommandTests {
-    @Test func theLineIsOneShapeAndRejectsUnsafeNames() {
+    @Test func theLineIsOneShapeAndRejectsUnsafeNames() throws {
         let created = WorktreeCommand.line(location: "/work/app-topic", branch: "topic", newBranch: true)
         #expect(created == "git worktree add '/work/app-topic' -b 'topic' && cd '/work/app-topic'")
         let existing = WorktreeCommand.line(location: "/work/app-main", branch: "main", newBranch: false)
@@ -27,6 +27,6 @@ struct WorktreeCommandTests {
         #expect(WorktreeCommand.line(location: "/work/app", branch: "ma;in", newBranch: true) == nil)
         #expect(WorktreeCommand.location(projectPath: "/work/app", name: "topic") == "/work/app-topic")
         let pattern = #"^git worktree add '[A-Za-z0-9._/-]+'( -b)? '[A-Za-z0-9._/-]+' && cd '[A-Za-z0-9._/-]+'$"#
-        #expect(created?.wholeMatch(of: try! Regex(pattern)) != nil)
+        #expect(created?.wholeMatch(of: try Regex(pattern)) != nil)
     }
 }

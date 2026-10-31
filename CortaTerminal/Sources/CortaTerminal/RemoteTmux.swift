@@ -88,28 +88,10 @@ public struct RemoteTmux: Equatable, Sendable {
         return ["-R", safe.reverseRemote + ":" + safe.reverseLocal]
     }
 
-    /// One SSH, no rc sourcing, no control mode and no remote files/config changes.
-    /// -dP atomically creates the session; an exact has-session distinguishes
-    /// an already-existing identity from a creation failure.
-    /// Attaching by exact name then fails safely if it disappeared in between.
-    /// Writes the remote `corta` with `printf %b`, so `$` survives into the file.
+    /// Fixed bytes encoded to survive every remote login shell; no user text is code.
     private static func remoteClientInstaller() -> String {
-        let script = [
-            "#!/bin/sh",
-            "op=$1; to=$2; shift 2",
-            "printf %s\\n \"{\\\"op\\\":\\\"$op\\\",\\\"token\\\":\\\"$CORTA_MEMBER_TOKEN\\\",\\\"to\\\":\\\"$to\\\",\\\"body\\\":\\\"$*\\\"}\" | nc -U \"$CORTA_FORWARD\"",
-        ].joined(separator: "\n")
-        var escaped = ""
-        for character in script {
-            switch character {
-            case "\\": escaped += "\\\\"
-            case "\"": escaped += "\\\""
-            case "$": escaped += "\\$"
-            case "\n": escaped += "\\n"
-            default: escaped.append(character)
-            }
-        }
-        return "printf \"%b\" \"" + escaped + "\""
+        let encoded = Data(RemoteMemberClient.script.utf8).base64EncodedString()
+        return "printf %s \"" + encoded + "\" | base64 -d"
     }
 
     public var command: String { command(extras: Extras()) }
@@ -122,19 +104,29 @@ public struct RemoteTmux: Equatable, Sendable {
         let install = extras.installRemoteClient && safe.hasEnvironment && safe.hasForward
         let assignment = safe.hasEnvironment
             ? ["export \(safe.environmentName)=\(safe.environmentValue);"] : []
+        let directory = "/tmp/" + sessionName
         let client: [String] = install ? [
-            "d=/tmp/corta-\(safe.environmentValue);",
-            "mkdir -p \"$d\";",
-            Self.remoteClientInstaller() + " > \"$d/corta\";",
-            "chmod 700 \"$d\" \"$d/corta\";",
+            "umask 077; d=\(directory);",
+            "if [ -L \"$d\" ]; then exit 1; fi; mkdir -p \"$d\"; chmod 700 \"$d\";",
+            Self.remoteClientInstaller() + " > \"$d/corta.new\";"
+                + " chmod 700 \"$d/corta.new\"; mv -f \"$d/corta.new\" \"$d/corta\";",
+            #"printf %s "{\"token\":\"\#(safe.environmentValue)\",\"socket\":\"\#(safe.reverseRemote)\","#
+                + #"\"tmux\":\"\#(sessionName)\"}" > "$d/connection.json.new";"#,
+            "chmod 600 \"$d/connection.json.new\"; mv -f \"$d/connection.json.new\" \"$d/connection.json\";",
         ] : []
-        let flags = install
-            ? "-e \(safe.environmentName)=\(safe.environmentValue) -e CORTA_FORWARD=\(safe.reverseRemote) -e PATH=/tmp/corta-\(safe.environmentValue):\\$PATH "
-            : ""
+        let flags = install ? clientFlags(safe, directory: directory) : ""
+        let integration: [String] = install ? [
+            "tmux set-option -w -t \"=\(sessionName):0\" allow-passthrough on >/dev/null 2>&1 || :;",
+            "python3 \"$d/corta\" monitor >/dev/null 2>&1 & monitor=$!;",
+            "trap \"kill $monitor 2>/dev/null; exit 129\" HUP;",
+            "trap \"kill $monitor 2>/dev/null; exit 143\" TERM;",
+        ] : []
         let script = (assignment + client + [
             "trap \"exit 129\" HUP;",
             "trap \"exit 143\" TERM;",
-            "report_failure() {",
+            "started=no; report_failure() {",
+            "if [ \"$started\" != yes ]; then printf \"\\033]6973;\(token.uuidString);start;new\\007\";"
+                + " started=yes; fi;",
             "printf \"\\033]6973;\(token.uuidString);fail;%s;\" \"$1\";",
             "printf \"%s\" \"$2\" | LC_ALL=C head -c 1024 | od -An -v -tx1 | tr -d \" \\n\";",
             "printf \"\\007\"; };",
@@ -147,13 +139,21 @@ public struct RemoteTmux: Equatable, Sendable {
             "elif tmux has-session -t \"=\(sessionName)\" 2>/dev/null; then outcome=attached;",
             "else report_failure \"$result\" \"$prepared\";",
             "printf \"%s\\n\" \"$prepared\" >&2; exec \"${SHELL:-/bin/sh}\" -l; fi;",
-            "printf \"\\033]6973;\(token.uuidString);start;%s\\007\" \"$outcome\";",
+            "started=yes; printf \"\\033]6973;\(token.uuidString);start;%s\\007\" \"$outcome\";",
+        ] + integration + [
             "reason=$(tmux attach-session -t \"=\(sessionName)\" 2>&1 >/dev/tty);",
-            "result=$?; if [ \"$result\" -eq 0 ]; then exit 0; fi;",
+            "result=$?;",
+        ] + (install ? ["kill \"$monitor\" 2>/dev/null || :;"] : []) + [
+            "if [ \"$result\" -eq 0 ]; then exit 0; fi;",
             "report_failure \"$result\" \"$reason\";",
             "printf \"%s\\n\" \"$reason\" >&2; exec \"${SHELL:-/bin/sh}\" -l"
         ]).joined(separator: " ")
         return "/bin/sh -c " + Self.quoted(script)
+    }
+
+    private func clientFlags(_ safe: Extras, directory: String) -> String {
+        "-e \(safe.environmentName)=\(safe.environmentValue) -e CORTA_FORWARD=\(safe.reverseRemote)"
+            + " -e \"PATH=\(directory):$PATH\" "
     }
 
     private static func quoted(_ text: String) -> String {
@@ -167,7 +167,7 @@ public struct RemoteTmux: Equatable, Sendable {
         public fileprivate(set) var outcome: Outcome?
         public fileprivate(set) var failureStatus: Int?
         public fileprivate(set) var reason: String?
-        public var established: Bool { outcome == .new || outcome == .attached }
+        public var established: Bool { failureStatus == nil && (outcome == .new || outcome == .attached) }
     }
 
     struct Handshake: Sendable {
@@ -202,9 +202,8 @@ public struct RemoteTmux: Equatable, Sendable {
                 } else {
                     failDeadline = SuspendingClock.now.advanced(by: Self.attachFailureWindow)
                 }
-            } else if let failure = Self.failure(from: fields) {
-                // A failure before `start` is the prepare path. After `start`, only
-                // the short window — and no screen output, which already finished — accepts it.
+            } else if report.outcome != nil, let failure = Self.failure(from: fields) {
+                // Only a started handshake can fail; a report alone never arms it.
                 if report.established {
                     guard let deadline = failDeadline, SuspendingClock.now < deadline else {
                         finished = true
@@ -228,9 +227,10 @@ public struct RemoteTmux: Equatable, Sendable {
                 else { return nil }
                 bytes.append(byte)
             }
-            let reason = String(String(decoding: bytes, as: UTF8.self).unicodeScalars.filter {
+            var reason = String(String(decoding: bytes, as: UTF8.self).unicodeScalars.filter {
                 !CharacterSet.controlCharacters.contains($0) && !ConcealingScalars.contains($0.value)
             })
+            while reason.utf8.count > 1024 { reason.removeLast() }
             return (status, reason)
         }
     }

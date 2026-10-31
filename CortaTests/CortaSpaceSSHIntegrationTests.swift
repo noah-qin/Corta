@@ -120,7 +120,11 @@ struct CortaSpaceSSHIntegrationTests {
         first.space.setActive(true)
         let project = try #require(first.space.selectedProject)
         #expect(fixture.launches == 2, "the off-grid session starts at first project opening too")
-        try await wait { project.sessions.allSatisfy { $0.pane?.remote.tmuxReport?.established == true } }
+        try await wait {
+            project.sessions.allSatisfy {
+                $0.pane?.remote.tmuxReport?.established == true && $0.record.tmuxEstablished == true
+            }
+        }
         #expect(project.shown.count == 1)
         var pids: [String] = []
         for session in project.sessions {

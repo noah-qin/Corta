@@ -57,7 +57,8 @@ extension CortaSpaceController {
 
     /// A batch of output: titles in the sidebar may have changed. At most two
     /// refreshes a second, whatever the output rate.
-    func noteOutput() {
+    func noteOutput(from pane: ViewController? = nil) {
+        if let pane, let session = session(for: pane)?.session { lastAgentOutput[session.id] = .now }
         guard isActive, !isOutputRefreshScheduled else { return }
         isOutputRefreshScheduled = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -87,6 +88,18 @@ extension CortaSpaceController {
             return
         }
         let ordered = waitingSessionIDs()
+        let typing = focusedSession?.pane?.terminalView?.lastUserInput
+            .map { SuspendingClock.now - $0 < .seconds(3) } ?? false
+        let previousHead = advancedWaitingSession
+        if previousHead != focusedSession?.id { advancedWaitingSession = nil }
+        if ConfigurationStore.shared.configuration.waitingQueueAutoAdvance,
+           let previousHead, !ordered.contains(previousHead), focusedSession?.id == previousHead,
+           let next = ordered.first, let session = session(withID: next)?.session,
+           !typing {
+            advancedWaitingSession = nil
+            DispatchQueue.main.async { [weak self] in self?.show(session) }
+        }
+        if let focused = focusedSession?.id, ordered.contains(focused) { advancedWaitingSession = focused }
         sidebar.setWaitingCount(ordered.count)
         noteGitDirectories()
         syncAgentBus()
@@ -101,6 +114,23 @@ extension CortaSpaceController {
     func wakeSnapshot(for sessionID: UUID) -> AgentWakeSnapshot? {
         guard let session = session(withID: sessionID)?.session, let pane = session.pane,
               let terminal = pane.session else { return nil }
+        if let member = member(of: session), member.host != nil {
+            let remote = AgentHub.shared.remoteStates[member.id]
+            let userIdle = pane.terminalView?.lastUserInput.map { SuspendingClock.now - $0 >= .seconds(3) } ?? true
+            return AgentWakeSnapshot(kind: remote?.kind, claudeSocket: nil, codexExecutable: nil, codexThread: nil,
+                gate: AgentNudgeGate(
+                    enabled: ConfigurationStore.shared.configuration.agentMessages && member.nudgeEnabled,
+                    foregroundIsAgent: remote?.foreground == true,
+                    idle: pane.agents.status?.state == .idle || pane.agents.status?.state == .done
+                        || (pane.agents.status?.state != .working && pane.agents.status?.state != .blocked
+                            && remote?.idle == true),
+                    userIdle: userIdle,
+                    composing: pane.terminalView?.hasMarkedText() == true
+                        || pane.terminalView?.hasUnsubmittedInput == true,
+                    bracketedPaste: terminal.hasPendingPaste || terminal.isPasteInFlight,
+                    nudgesThisMinute: AgentHub.shared.bus.nudges(for: member.id,
+                                                               now: Date().timeIntervalSinceReferenceDate)))
+        }
         let observation = session.conversationObservation
         let kind = observation?.conversation.kind.rawValue
         let group = terminal.pty.foregroundProcessGroup
@@ -108,23 +138,29 @@ extension CortaSpaceController {
         let foregroundName = terminal.pty.activeProcessName
         let namedAgent = foregroundName.map { AgentProcessNames.matches($0, configured: configured) } == true
             && group != terminal.pty.processIdentifier
-        let foreground = observation?.processes.contains { $0.pid == group } == true || namedAgent
+        let activity = agentActivities[sessionID]
+        let observedAgent = observation?.processes.contains { activity?.processes.contains($0.pid) == true } == true
+        let foreground = activity?.group == group && (observedAgent || activity?.kind != nil || namedAgent)
         let status = pane.agents.status
-        let idle = status?.state == .idle || (status == nil && namedAgent)
+        let signalledIdle = status?.state == .idle || status?.state == .done
+        let hasAuthoritativeState = status?.state == .working || status?.state == .blocked
+        let quiet = lastAgentOutput[sessionID].map { SuspendingClock.now - $0 >= .seconds(2) } ?? false
+        let idle = signalledIdle || (!hasAuthoritativeState && idleAgents.contains(sessionID) && quiet)
         let typing = pane.terminalView?.lastUserInput.map { SuspendingClock.now - $0 < .seconds(3) } ?? false
         let member = member(of: session)
         let agent = observation?.processes.first
         let gate = AgentNudgeGate(
-            enabled: member?.nudgeEnabled == true,
+            enabled: ConfigurationStore.shared.configuration.agentMessages && member?.nudgeEnabled == true,
             foregroundIsAgent: foreground, idle: idle, userIdle: !typing,
-            composing: pane.terminalView?.hasMarkedText() == true,
-            bracketedPaste: terminal.isBracketedPasteEnabled,
-            nudgesThisMinute: AgentHub.shared.bus.nudges(for: member?.id ?? UUID(), now: Date().timeIntervalSinceReferenceDate))
+            composing: pane.terminalView?.hasMarkedText() == true || pane.terminalView?.hasUnsubmittedInput == true,
+            bracketedPaste: terminal.hasPendingPaste || terminal.isPasteInFlight,
+            nudgesThisMinute: AgentHub.shared.bus.nudges(for: member?.id ?? UUID(),
+                now: Date().timeIntervalSinceReferenceDate))
         return AgentWakeSnapshot(
             kind: kind,
             claudeSocket: agent.flatMap { Self.claudeSocket(of: $0.pid) },
             codexExecutable: kind == "codex" ? agent.flatMap { Self.executablePath(of: $0.pid) } : nil,
-            codexThread: observation?.conversation.id?.uuidString,
+            codexThread: observation?.conversation.id?.uuidString ?? member?.codexThreadName,
             gate: gate)
     }
 
@@ -132,7 +168,7 @@ extension CortaSpaceController {
         var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
         let count = proc_pidpath(pid, &buffer, UInt32(buffer.count))
         guard count > 0 else { return nil }
-        return String(cString: buffer)
+        return String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
 
     /// Claude's inbox is the environment path or a Unix socket in its private directory.
@@ -166,7 +202,25 @@ extension CortaSpaceController {
     func writeNudge(to sessionID: UUID) -> Bool {
         guard let session = session(withID: sessionID)?.session,
               let terminal = session.pane?.session else { return false }
-        return terminal.write(AgentEnvelope.nudgeBytes()) == .accepted
+        guard let key = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                        windowNumber: 0, context: nil, characters: "\r",
+                                        charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36),
+              let submit = TerminalView.bytes(for: key, enhancements: terminal.keyboardEnhancements,
+                                              newLineMode: paneIsNewLineMode(session)) else { return false }
+        guard terminal.write(Array(AgentEnvelope.nudgeText.utf8)) == .accepted else { return false }
+        let revision = session.pane?.terminalView?.userInputRevision
+        let group = terminal.pty.foregroundProcessGroup
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(200)) { [weak session] in
+            guard let session, session.pane?.session === terminal,
+                  session.pane?.terminalView?.userInputRevision == revision,
+                  terminal.pty.foregroundProcessGroup == group else { return }
+            _ = terminal.write(submit)
+        }
+        return true
+    }
+
+    private func paneIsNewLineMode(_ session: SpaceSession) -> Bool {
+        session.pane?.terminalView?.isNewLineMode?() ?? false
     }
 
     func noteGitDirectories() {
@@ -211,7 +265,16 @@ extension CortaSpaceController {
                 state: session.pane?.agents.status?.state, kind: session.pane?.agents.status?.kind,
                 attention: session.pane?.agents.notedAttention == true)
         }.map(\.id)
-        return attentionQueue.sync(waiting: waiting)
+        var priorities: [UUID: Int] = [:]
+        for session in projects.flatMap(\.sessions) {
+            switch session.pane?.agents.status?.kind {
+            case .auth: priorities[session.id] = 0
+            case .permission: priorities[session.id] = 1
+            case .question: priorities[session.id] = 2
+            case nil: break
+            }
+        }
+        return attentionQueue.sync(waiting: waiting, priorities: priorities)
     }
 
     func jumpToNextWaiting() {

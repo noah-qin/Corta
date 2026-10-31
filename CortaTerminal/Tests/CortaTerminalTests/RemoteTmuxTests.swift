@@ -68,8 +68,15 @@ struct RemoteTmuxTests {
         var prepare = Terminal()
         prepare.expectRemoteTmux(token: token)
         prepare.feed(signal(token.uuidString + ";fail;4;626164"))
-        #expect(prepare.remoteTmuxReport?.failureStatus == 4, "prepare failure has no start")
+        #expect(prepare.remoteTmuxReport?.failureStatus == nil, "failure before start is ignored")
+        prepare.feed(new)
+        prepare.feed(signal(token.uuidString + ";fail;4;626164"))
+        #expect(prepare.remoteTmuxReport?.failureStatus == 4)
 
+    }
+
+    @Test func ordinaryTerminalIgnoresThePrivateHandshake() {
+        let new = Array("\u{1B}]6973;\(UUID());start;new\u{7}".utf8)
         var ordinary = Terminal()
         ordinary.feed(new)
         #expect(ordinary.remoteTmuxReport == nil)
@@ -114,7 +121,7 @@ struct RemoteTmuxTests {
         #expect(!extended.dropFirst("/bin/sh -c '".count).dropLast().contains("'"))
         #expect(RemoteTmux.forwardArguments(extras) == ["-R", "/tmp/corta.sock:/tmp/local.sock"])
         extras.environmentValue = "no;pe"
-        #expect(!tmux.command(extras: extras).contains("no"))
+        #expect(!tmux.command(extras: extras).contains("no;pe"))
         #expect(RemoteTmux.forwardArguments(extras).isEmpty)
         #expect(tmux.command(extras: extras) == tmux.command)
     }

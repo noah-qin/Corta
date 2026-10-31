@@ -32,6 +32,7 @@ final class TerminalView: NSView, CALayerDelegate {
     var renderPolicy: RenderPolicy?
     /// Pane-local input revision, so delayed prompt fills never overtake typing.
     private(set) var userInputRevision: UInt64 = 0
+    var hasUnsubmittedInput = false
     /// When the user last typed here. A nudge waits until this is three seconds old.
     private(set) var lastUserInput: SuspendingClock.Instant?
 

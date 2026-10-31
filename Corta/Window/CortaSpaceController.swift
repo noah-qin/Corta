@@ -52,8 +52,13 @@ final class CortaSpaceController: NSObject {
     private weak var terminalFocus: ViewController?
     var conversationMonitor: Task<Void, Never>?
     var attentionQueue = AttentionQueue()
+    var advancedWaitingSession: UUID?
     var gitFacts: [UUID: GitFacts] = [:]
+    var launchRemoteTermination: ((SSHTarget, String) -> Void)?
     var agentBus = AgentBus()
+    var agentActivities: [UUID: AgentActivity] = [:]
+    var idleAgents: Set<UUID> = []
+    var lastAgentOutput: [UUID: SuspendingClock.Instant] = [:]
     let gitMonitor = GitStatusMonitor()
     private var pendingSave: DispatchWorkItem?
     var isRefreshScheduled = false
@@ -86,15 +91,6 @@ final class CortaSpaceController: NSObject {
             guard let self, self.gitFacts != facts else { return }
             self.gitFacts = facts
             self.sidebar.reload()
-        }
-        AgentHub.shared.snapshot = { [weak self] id in self?.wakeSnapshot(for: id) }
-        AgentHub.shared.writeNudge = { [weak self] id in self?.writeNudge(to: id) ?? false }
-        AgentHub.shared.contextLines = { [weak self] id in
-            guard let self, let session = self.session(withID: id)?.session else { return [] }
-            return self.gitContext(for: session)
-        }
-        AgentHub.shared.inputRevision = { [weak self] id in
-            self?.session(withID: id)?.session.pane?.terminalView?.userInputRevision
         }
         observers.append(NotificationCenter.default.addObserver(
             forName: AgentDirectory.didChange, object: nil, queue: .main
@@ -173,6 +169,9 @@ final class CortaSpaceController: NSObject {
     private func leave(host: SplitViewController, window: NSWindow) {
         saveNow()
         isActive = false
+        attentionQueue = AttentionQueue()
+        sidebar.setWaitingCount(0)
+        AgentDirectory.noteSpaceWaiting(count: 0, active: false, windowIsKey: true)
         crossfade(host.view)
         splitController.view.removeFromSuperview()
         host.focusedPane = terminalFocus.flatMap { host.panes.contains($0) ? $0 : nil }
@@ -238,7 +237,13 @@ final class CortaSpaceController: NSObject {
         panel.message = L10n.text("space.openProject.message")
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
-            MainActor.assumeIsolated { self?.openProject(url) }
+            MainActor.assumeIsolated {
+                self?.openProject(url)
+                if let project = self?.selectedProject,
+                   !SpaceTemplateFile.load(from: SpaceTemplateFile.url).templates.isEmpty {
+                    DispatchQueue.main.async { self?.applyTemplate(to: project) }
+                }
+            }
         }
     }
 
@@ -247,6 +252,7 @@ final class CortaSpaceController: NSObject {
     func openProject(_ url: URL) {
         let path = url.standardizedFileURL.resolvingSymlinksInPath().path
         if let existing = projects.first(where: { $0.path == path }) {
+            existing.isAvailable = true
             selectProject(existing)
             return
         }
@@ -309,10 +315,13 @@ final class CortaSpaceController: NSObject {
         }
     }
 
+}
+
+extension CortaSpaceController {
     /// Starts every session the project remembers, each at the size it will
     /// show at: its panel's, or the whole grid's for one off screen.
     func start(_ project: SpaceProject) {
-        guard !project.isStarted else { return }
+        guard !project.isStarted, project.isAvailable else { return }
         project.isStarted = true
         startConversationMonitor()
         let area = gridArea

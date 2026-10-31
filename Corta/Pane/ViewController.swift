@@ -393,6 +393,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         return owner ?? super.forwardingTarget(for: aSelector)
     }
 
+}
+
+extension ViewController {
     /// `coalesce: false` delivers the size now: a font change is one step,
     /// and waiting out the drag debounce drew a frame of the new font over
     /// the old grid first.
@@ -447,7 +450,9 @@ extension ViewController {
     private func setUpPane(strictRespawn: Bool = false, keeping grid: TerminalSize? = nil) {
         if grid != nil, var retained = preset {
             retained.refreshRetainedTmuxToken(reportEstablished: remote.tmuxReport?.established == true)
-            preset = retained
+            if let space = splitController?.space, let record = space.session(for: self)?.session {
+                preset = space.remotePreset(retained, session: record)
+            } else { preset = retained }
         }
         let configuration = ConfigurationStore.shared.configuration
         if grid == nil || !isFontSizeZoomed {
@@ -813,7 +818,7 @@ extension ViewController {
             windowTitle.apply()
         }
         // Space names every session in its sidebar, focused or not.
-        splitController?.space.noteOutput()
+        splitController?.space.noteOutput(from: self)
         if scrollOffset > 0, !sawOutputWhileScrolled {
             // Nothing else says so: no scroll bar, and the live screen is off view.
             sawOutputWhileScrolled = true

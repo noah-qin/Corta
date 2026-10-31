@@ -89,6 +89,9 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 
 ### Space
 
+See [Space acceptance](SPACE-ACCEPTANCE.md) for regression coverage and the
+separate launched-app, real-account and Linux protocol checks.
+
 - Project folders in a sidebar, each with its own local, SSH and agent CLI
   sessions; the toolbar's mode button, ⌥⌘S and ⌘O switch to it. Space fills
   the screen and the terminal mode gets its own frame back; its tabs and
@@ -98,7 +101,9 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   member is idle and you are not. Message text is not written into the pane
   and is not saved.
 - A waiting queue across projects: the sidebar counts sessions that need you,
-  and Jump to Next Waiting Session (⌥⌘J) focuses the oldest. The Dock badge
+  and Jump to Next Waiting Session (⌥⌘J) focuses the oldest within auth,
+  permission and question priority. Optional auto-advance waits until handling
+  finishes and typing stops. The Dock badge
   shows the count while the Space window is not key (`space-attention-badge`).
 - A free split grid of up to six panels (`space-panel-limit`): drop a session
   on a panel's edge to split it there, on its middle to replace it; drag the
@@ -106,7 +111,7 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   makes a panel smaller than 64 × 18 cells. Hidden sessions keep running at
   the grid's size.
 - Each local session row shows its Git branch and whether tracked files
-  differ, read from `.git` only. Untracked files and ahead/behind are not
+  differ, using bounded Git metadata and tracked-file size/mtime. Untracked files and ahead/behind are not
   shown. More than 20,000 index entries skips the change check.
 - A sidebar of every session with its state, an add button that says what it
   will replace, rename (kept over program titles), and an icon per kind:

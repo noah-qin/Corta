@@ -23,40 +23,13 @@ import XCTest
 final class CortaSpaceUITests: XCTestCase {
     private var stage: URL!
 
-    /// A stage with two project folders, and a Space file that shows three of
-    /// the first project's five sessions.
+    /// The shell script prepares public fixtures outside the runner's sandbox.
+    /// Use current split-tree records, not the removed visible/dividers fields.
     @MainActor
-    private func makeStage(appearance: String) throws -> XCUIApplication {
-        stage = FileManager.default.temporaryDirectory.appendingPathComponent("CortaSpaceUI-" + UUID().uuidString)
-        let projects = stage.appendingPathComponent("projects")
-        let web = projects.appendingPathComponent("web-app"), api = projects.appendingPathComponent("api-server")
-        for folder in [web.appendingPathComponent("src"), api] {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        }
-        let support = stage.appendingPathComponent("ApplicationSupport")
-        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
-        let config = "appearance = \(appearance)\nrestore-windows = false\ncolumns = 180\nrows = 50\n"
-            + "space-panel-limit = 3\n"
-        try config.write(to: stage.appendingPathComponent("config"), atomically: true, encoding: .utf8)
-        try "PROMPT='%1~ ❯ '\nRPROMPT=''\n".write(
-            to: stage.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
-        let sessions = (1...5).map { #"{"number":\#($0),"directory":"\#(web.path)"}"# }.joined(separator: ",")
-        let json = """
-            {"version":1,"selectedProject":"\(web.path)","projects":[
-             {"path":"\(web.path)","sessions":[\(sessions)],"visible":[0,1,2],"dividers":[],"nextNumber":6},
-             {"path":"\(api.path)","sessions":[{"number":1,"directory":"\(api.path)"}],"visible":[0],"dividers":[],"nextNumber":2}
-            ]}
-            """
-        try json.write(to: support.appendingPathComponent("space.json"), atomically: true, encoding: .utf8)
-        let app = XCUIApplication()
-        app.launchEnvironment["CORTA_STAGE_DIR"] = stage.path
-        app.launchEnvironment["ZDOTDIR"] = stage.path
-        return app
-    }
-
-    override func tearDown() {
-        if let stage { try? FileManager.default.removeItem(at: stage) }
-        super.tearDown()
+    private func makeStage(name: String = #function) throws -> XCUIApplication {
+        let fixture = "space-grid-" + name.replacingOccurrences(of: "()", with: "")
+        stage = try UIFixtures.stage(fixture)
+        return UIFixtures.app(stage: stage, runner: Self.self)
     }
 
     @MainActor
@@ -68,6 +41,14 @@ final class CortaSpaceUITests: XCTestCase {
     }
 
     @MainActor
+    private func waitForFrame(_ frame: CGRect, of window: XCUIElement) {
+        let restored = NSPredicate { _, _ in window.frame == frame }
+        let restoration = XCTNSPredicateExpectation(predicate: restored, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [restoration], timeout: 3), .completed,
+                       "the terminal gets its own frame back after the mode animation")
+    }
+
+    @MainActor
     private func panels(_ app: XCUIApplication) -> XCUIElementQuery {
         app.groups.matching(identifier: "Corta.Space.Panel")
     }
@@ -75,15 +56,20 @@ final class CortaSpaceUITests: XCTestCase {
     @MainActor
     func testSpaceGridSidebarAndModes() throws {
         continueAfterFailure = false
-        let app = try makeStage(appearance: "light")
+        let app = try makeStage()
         let previous = LatinInputSource.select()
         defer { LatinInputSource.restore(previous); app.terminate() }
         app.launch()
         app.activate()
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 8))
-        let frame = window.frame
         app.typeText("printf 'terminal mode\\n'\n")
+        let echoed = NSPredicate { _, _ in
+            (app.textViews.firstMatch.value as? String)?.contains("terminal mode") == true
+        }
+        let echo = XCTNSPredicateExpectation(predicate: echoed, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [echo], timeout: 3), .completed)
+        let frame = window.frame
 
         // Into Space by the toolbar's one mode button: the saved grid, and
         // the window takes the screen.
@@ -104,7 +90,9 @@ final class CortaSpaceUITests: XCTestCase {
         XCTAssertEqual(panels(app).allElementsBoundByIndex.map(\.label), before, "choosing is not showing")
         app.typeKey(.return, modifierFlags: .command)
         XCTAssertEqual(panels(app).count, 3)
-        XCTAssertTrue(app.otherElements["Corta.Space.Note"].waitForExistence(timeout: 2))
+        // NSGlassEffectView does not expose its container as an AX Other.
+        // Its real Undo control must be visible, and the following action restores the grid.
+        XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 2))
         app.typeKey("z", modifierFlags: .command)
         XCTAssertEqual(panels(app).allElementsBoundByIndex.map(\.label), before, "undone")
 
@@ -129,14 +117,14 @@ final class CortaSpaceUITests: XCTestCase {
         XCTAssertEqual(panels(app).count, 1)
         app.toolbars.buttons["Show Terminal"].click()
         XCTAssertEqual(panels(app).count, 0)
-        XCTAssertEqual(window.frame, frame, "the terminal gets its own frame back")
+        waitForFrame(frame, of: window)
         let terminal = app.textViews.firstMatch
         XCTAssertTrue((terminal.value as? String)?.contains("terminal mode") == true)
     }
 
     @MainActor
     func testFullScreenAndSidebarToggle() throws {
-        let app = try makeStage(appearance: "light")
+        let app = try makeStage()
         defer { app.terminate() }
         app.launch()
         app.activate()
@@ -160,7 +148,7 @@ final class CortaSpaceUITests: XCTestCase {
     @MainActor
     func testSSHRetentionIsOnlyOfferedInSpaceAndDefaultsOn() throws {
         let fixture = try UIFixtures.stage("space-ssh")
-        let app = UIFixtures.app(stage: fixture, runner: Self.self, usingTestTarget: true)
+        let app = UIFixtures.app(stage: fixture, runner: Self.self)
         defer { app.terminate() }
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 8))
@@ -183,8 +171,72 @@ final class CortaSpaceUITests: XCTestCase {
     }
 
     @MainActor
+    func testSpaceSettingsManagesTemplates() throws {
+        let fixture = try UIFixtures.stage("space-settings")
+        let app = UIFixtures.app(stage: fixture, runner: Self.self)
+        let previous = LatinInputSource.select()
+        defer { LatinInputSource.restore(previous); app.terminate() }
+        app.launch()
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 8))
+        app.activate()
+        app.menuBars.menuBarItems.element(boundBy: 1).click()
+        app.menuBars.menuItems["Settings…"].click()
+        let settings = app.windows["Corta.Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 15))
+        settings.outlines.firstMatch.staticTexts["Space"].click()
+        let name = settings.textFields.firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 3))
+        XCTAssertEqual(name.value as? String, "Review workspace")
+        let shot = XCTAttachment(screenshot: settings.screenshot())
+        shot.name = "Space settings and templates"
+        shot.lifetime = .keepAlways
+        add(shot)
+        settings.buttons["Show Template…"].click()
+        XCTAssertTrue(settings.sheets.firstMatch.waitForExistence(timeout: 3))
+        settings.sheets.firstMatch.buttons["Close"].click()
+        name.click()
+        name.typeKey("a", modifierFlags: .command)
+        name.typeText("Renamed workspace")
+        settings.buttons["Rename Template…"].click()
+        settings.buttons["Delete Template…"].click()
+        XCTAssertFalse(name.exists)
+        let url = fixture.appendingPathComponent("ApplicationSupport/space-templates.json")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        XCTAssertEqual((json["templates"] as? [Any])?.count, 0)
+    }
+
+    @MainActor
+    func testProjectFilesCannotConfigureSpace() throws {
+        guard let library = ProcessInfo.processInfo.environment["CORTA_FILE_AUDIT_LIBRARY"] else {
+            throw XCTSkip("Provide a task-only open/openat/fopen interposer for the filesystem acceptance trace")
+        }
+        let fixture = try UIFixtures.stage("space-trust")
+        let app = UIFixtures.app(stage: fixture, runner: Self.self)
+        app.launchEnvironment["DYLD_INSERT_LIBRARIES"] = library
+        app.launchEnvironment["CORTA_FILE_AUDIT_ROOT"] = fixture.path
+        let trace = fixture.appendingPathComponent("opened-files.log")
+        app.launchEnvironment["CORTA_FILE_AUDIT_LOG"] = trace.path
+        defer { app.terminate() }
+        app.launch()
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 8))
+        app.toolbars.buttons["Show Space"].click()
+        XCTAssertTrue(panels(app).firstMatch.waitForExistence(timeout: 5))
+        let log = try String(contentsOf: trace, encoding: .utf8)
+        XCTAssertTrue(log.hasPrefix("ready\n"), "the tracing fixture must actually load")
+        XCTAssertTrue(log.contains(fixture.appendingPathComponent("config").path), "positive open control")
+        for name in ["space.json", ".corta", "sessions"] {
+            XCTAssertFalse(log.contains(fixture.appendingPathComponent("project/" + name).path))
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.appendingPathComponent("should-not-exist").path))
+        let attachment = XCTAttachment(string: log)
+        attachment.name = "Space app project-file open trace"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
     func testDarkSpaceScreenshot() throws {
-        let app = try makeStage(appearance: "dark")
+        let app = try makeStage()
         defer { app.terminate() }
         app.launch()
         app.activate()

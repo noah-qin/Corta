@@ -227,6 +227,7 @@ extension PaneCommands {
             closing: Paste.closing(bracketedPasteEnabled: bracketed))
         switch outcome {
         case .accepted:
+            if !sanitized.isEmpty { host?.terminalView?.hasUnsubmittedInput = true }
             host?.terminalView?.noteUserInput()
         case .backpressured:
             // The child stopped reading; nothing was sent. Say why.

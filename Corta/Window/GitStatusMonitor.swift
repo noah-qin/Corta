@@ -47,17 +47,21 @@ nonisolated final class GitStatusMonitor: @unchecked Sendable {
         lock.unlock()
         var paths = Set<String>()
         for directory in directories.values {
-            guard let located = GitStatusReader.locate(URL(fileURLWithPath: directory, isDirectory: true)) else { continue }
+            guard let located = GitStatusReader.locate(URL(fileURLWithPath: directory,
+                isDirectory: true)) else { continue }
             paths.insert(located.gitDir.path)
+            paths.insert(located.workTree.path)
+            paths.insert(GitStatusReader.commonDirectory(located.gitDir).path)
         }
         let sorted = paths.sorted()
         watched = sorted
         guard !sorted.isEmpty else { return }
         var context = FSEventStreamContext(
-            version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil)
+            version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil,
+                copyDescription: nil)
         guard let created = FSEventStreamCreate(
             nil, Self.callback, &context, sorted as CFArray,
-            FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.5,
+            FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.1,
             FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents)) else { return }
         stream = created
         FSEventStreamSetDispatchQueue(created, queue)
@@ -82,7 +86,10 @@ nonisolated final class GitStatusMonitor: @unchecked Sendable {
         lock.unlock()
         var facts: [UUID: GitFacts] = [:]
         for (id, directory) in directories {
-            if let read = GitStatusReader.read(directory: directory) { facts[id] = read }
+            if var read = GitStatusReader.read(directory: directory) {
+                read.commit = GitStatusReader.commit(directory: directory)
+                facts[id] = read
+            }
         }
         let deliver = onUpdate
         DispatchQueue.main.async { deliver?(facts) }

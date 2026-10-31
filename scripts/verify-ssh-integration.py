@@ -49,7 +49,9 @@ def run_fixture(root, app_tests=False, xcodebuild_args=()):
         subprocess.run(['/usr/bin/ssh-keygen','-q','-t','ed25519','-N','corta pass phrase','-f',str(root/'locked')],check=True)
         (root/'authorized_keys').write_text((root/'client.pub').read_text() + (root/'locked.pub').read_text()); (root/'remote').mkdir()
         sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close()
-        (root/'sshd.conf').write_text(f'''ListenAddress 127.0.0.1\nPort {port}\nHostKey {root}/host\nPidFile {root}/sshd.pid\nAuthorizedKeysFile {root}/authorized_keys\nStrictModes no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nAllowUsers {pwd.getpwuid(os.getuid()).pw_name}\nSubsystem sftp internal-sftp -d {root}/remote\n''')
+        # Negative-authentication probes must not penalise later lifecycle clients.
+        # This is an isolated localhost daemon, not the user's SSH service.
+        (root/'sshd.conf').write_text(f'''ListenAddress 127.0.0.1\nPort {port}\nHostKey {root}/host\nPidFile {root}/sshd.pid\nAuthorizedKeysFile {root}/authorized_keys\nStrictModes no\nPerSourcePenalties no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nAllowUsers {pwd.getpwuid(os.getuid()).pw_name}\nSubsystem sftp internal-sftp -d {root}/remote\n''')
         log = open(root / 'sshd.log', 'w')
         proc = subprocess.Popen(
             ['/usr/sbin/sshd', '-D', '-e', '-f', str(root / 'sshd.conf')], stdout=log, stderr=log)

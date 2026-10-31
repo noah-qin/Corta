@@ -46,6 +46,7 @@ enum PaneSpawn {
     /// - Parameter historySuggestions: whether zsh suggests history suffixes.
     /// - Parameter directoryCheckTimeout: how long the off-main existence
     ///   check of `directory` may take before the next rung.
+    /// - Parameter extraEnvironment: task-owned pane identity and message socket values.
     static func start(
         size: TerminalSize, directory: String?, scrollbackLimit: Int,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity, preset: Preset? = nil,

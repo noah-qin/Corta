@@ -24,7 +24,7 @@ nonisolated struct AttentionQueue: Equatable, Sendable {
     private(set) var clock = 0
 
     /// `waiting` is the set that is waiting now. Order is the time each one entered.
-    mutating func sync(waiting: [UUID]) -> [UUID] {
+    mutating func sync(waiting: [UUID], priorities: [UUID: Int] = [:]) -> [UUID] {
         var next: [UUID: Int] = [:]
         for id in waiting where next[id] == nil {
             if let existing = since[id] {
@@ -35,7 +35,10 @@ nonisolated struct AttentionQueue: Equatable, Sendable {
             }
         }
         since = next
-        return next.sorted { $0.value < $1.value }.map(\.key)
+        return next.sorted {
+            let left = priorities[$0.key] ?? 3, right = priorities[$1.key] ?? 3
+            return left == right ? $0.value < $1.value : left < right
+        }.map(\.key)
     }
 
     /// The head waits again after the others. Returns the id that was jumped.

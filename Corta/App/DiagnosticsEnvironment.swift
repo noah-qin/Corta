@@ -234,5 +234,9 @@ nonisolated enum DiagnosticsEnvironment {
         #endif
     }
 
+    /// Protocol credentials for the bundled command, not diagnostic switches.
+    static func agentSocket(in environment: Environment) -> String? { environment["CORTA_AGENT_SOCKET"] }
+    static func agentPane(in environment: Environment) -> String? { environment["CORTA_PANE_ID"] }
+
     private static let log = Logger(subsystem: "dev.noahqin.Corta", category: "diagnostics")
 }

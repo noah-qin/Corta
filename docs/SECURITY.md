@@ -586,8 +586,8 @@ wrapper without fallback. This deliberate supervision replaces #434's original
 OSC 6973 is display-only and armed only before this connection's reader starts,
 with a fresh random UUID token each time. It accepts one `start` enum
 (`missing`, `new`, `attached`), plus at most one `fail` with exit status 1–255
-and at most 1,024 hex-encoded error bytes. `missing`, and a `fail` that
-arrives before `start` (the prepare path), close the handshake. After
+and at most 1,024 hex-encoded error bytes. `missing` closes the handshake; a `fail` arriving before `start` is ignored.
+The wrapper reports a started attempt before a preparation failure. After
 `new` or `attached`, `fail` is accepted only until the pane draws or for one
 second, whichever comes first; a later `fail` is ignored and the handshake
 closes. A title report is not drawing. RIS cannot rearm it. Reconnect builds
@@ -605,14 +605,20 @@ is `tmux kill-session -t '=corta-<UUID>'`, never `kill-server`. A separate termi
 shows authentication and success/failure. This grants no authority over another
 session or a remote agent's exit protocol.
 
-**Remote members (#444).** A marked SSH member carries its host name.
-The next retained connection passes one token and one `ssh -R` of the
-message socket, and the wrapper writes a `corta` script under
-`/tmp/corta-<token>` for that session. Nothing is written under the
-remote home, and global tmux configuration is unchanged. Until that
-connection is up, delivery returns `forwardUnavailable`. The remote
-client talks with `nc -U` and the token; `LOCAL_PEERPID` is not used
-for it.
+**Remote members (#444).** See [D33](DECISIONS.md#d33--an-opt-in-temporary-remote-member-client).
+The explicit member dialog explains the temporary Python client, retention and
+per-window passthrough before the next connection. A private endpoint binds
+one connection's token, member and tmux name. The shared local socket refuses
+remote credentials; rotation, disconnect, pause, removal and stop revoke the
+endpoint. SSH process ancestry is not trusted as remote identity.
+
+The standard-library client encodes JSON and rereads a 0600, owned, regular
+connection file (no symlinks, at most 4 KiB) on every invocation. Its stable
+session directory lets existing tmux processes reconnect without stale token
+environment values. Its transient monitor uses process metadata, not screen or
+history text. A stale report clears readiness. Same-account processes can read
+these credentials: this is not protection against the account owner or remote
+root. No remote AI installation, configuration or native push is performed.
 
 **Worktree commands (#443).** The session menu can type one
 `git worktree add … && cd …` line into an empty prompt. The name and
@@ -626,6 +632,16 @@ program D31 allows, with structured arguments. Logs record member ids,
 message numbers and results, not bodies. `space.json` stores the role,
 session id and nudge switch, not bindings or text. The same local account
 is not an isolation boundary.
+
+The complete message envelope, body and context fit 64 KiB. Context values are
+flattened and capped at 256 UTF-8 bytes each; remote Git context is omitted.
+Directory access requires an active member and is project scoped; status is
+limited to sender and recipient. Local callers are checked against kernel
+ancestry and the registered shell's start identity, rejecting stale PID reuse
+and a conflicting claimed pane. Claude delivery also rechecks that the socket parent is an owned private
+directory. Native delivery runs off main with bounded
+output/time. Socket input is bounded, timed and limited to 16 concurrent clients.
+Unread inboxes and the 500-entry delivery history have separate lifetimes.
 
 **Local conversation identity (#436).** `space.json` holds only kind
 (`claude`/`codex`), optional standard UUID, and source (`sessionRecord`,

@@ -214,6 +214,61 @@ were, still running.
   **Fill Conversation Again** in the pane's menu fills the same command again
   at an empty prompt, without executing it.
 
+### Space members, templates and Git
+
+Enable **Settings ▸ Space ▸ Agent messages**, then use a session's **Make Member…**
+menu. Membership permits messaging with members of that project; pause or remove
+it to revoke access. **Member Settings…** edits the role, wake-up switch, Git
+context defaults and optional exact Codex `/rename` name. **Project Members**
+shows capability and host; copy the introduction to tell an agent its ID.
+
+Use `corta members`, `corta send <ID> "text"`, `corta read`,
+`corta read --since <number>`, `corta wait --timeout 55`, and `corta status <number>`.
+Reply with `--reply-to <number>`. Roles are labels; send to an ID. All commands
+accept `--json`. If a tool shell resets PATH, use the absolute `corta` path in
+the introduction or peer envelope. Optional stdio MCP is `corta mcp`, exposing
+`corta_members`, `corta_whoami`, `corta_send`, `corta_read`, `corta_wait`, and
+`corta_status`; MCP wait is at most 55 seconds. Corta does not register MCP or
+change an agent's permissions for you. Claude's per-invocation Bash allow rule
+can be `Bash(corta *)`; also allow the shown absolute executable when needed.
+A CLI's own sandbox or inbound approval can still hold or reject a delivery.
+
+Claude socket push and Codex queue run in the background. `pushed` means the
+native transport accepted the message, not that the model read it. Generic
+agents receive only a fixed reminder when idle, with no recent typing, tracked
+draft, composition or paste; they then call `corta read`. The reminder uses the
+negotiated Return protocol. **Delivery History** shows failed pushes and gate
+reasons; **Copy Unread** remains available while queued. Messages stay in memory.
+
+**Send Selection to Member** sends a user instruction with its source pane;
+the receiver should answer in its own conversation. Shift-click adds an optional
+preface. Text is truncated safely as UTF-8, within the complete 64 KiB envelope.
+Git context is optional per member and selection, and excluded for remote sessions.
+
+Templates save the split tree, proportions, names, relative directories, agent
+kind and member roles. Applying creates fresh identities and fills agent commands
+without Return. External directories require confirmation. SSH sessions open the
+connect dialog one at a time, preserving retention; cancellation skips that
+session. Manage templates in **Settings ▸ Space** or the project menu. Opening
+a project offers saved templates.
+
+Git rows read bounded metadata and tracked-file size/mtime, off main; edits to
+tracked files trigger refresh without an index write. Untracked files, content
+diffs and ahead/behind are excluded. Indexes v2–v4 and linked-worktree common
+refs are supported; more than 20,000 entries skips the change check.
+
+**Make Remote Member** explains the temporary client before registration.
+Reconnect to install it in `/tmp/corta-<session UUID>` and forward a private
+socket. Python 3 and tmux must already be installed. Existing retained processes
+use fresh connection credentials after reconnect. Remote wake-up uses the fixed
+nudge, with a live metadata monitor; no native remote AI push is provided.
+Disconnecting retains the tmux session and temporary client. To uninstall, first
+remove membership and disconnect, then remove only that session's displayed
+`/tmp/corta-<UUID>` directory and expired `/tmp/corta-<token>.sock`; ending its
+programs is the separate exact **End Remote Session…** action. No global tmux
+or shell configuration is changed. See [acceptance coverage](SPACE-ACCEPTANCE.md)
+for the real-account and foreground checks required when changing these paths.
+
 ### Keep Space SSH programs running after disconnecting
 
 In Space's connect dialog, **Keep running after disconnect** defaults to on.

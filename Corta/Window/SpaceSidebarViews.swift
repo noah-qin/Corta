@@ -54,7 +54,18 @@ final class SpaceSidebarHeader: NSView {
         ])
     }
 
+    private var announcedWaiting = 0
+
     func setWaitingCount(_ count: Int) {
+        defer {
+            if count != announcedWaiting {
+                announcedWaiting = count
+                NSAccessibility.post(element: self, notification: .announcementRequested, userInfo: [
+                    .announcement: L10n.format("space.waiting.count", count),
+                    .priority: NSAccessibilityPriorityLevel.medium.rawValue,
+                ])
+            }
+        }
         if count <= 0 {
             waiting.stringValue = ""
             waiting.toolTip = nil
@@ -112,7 +123,8 @@ final class SpaceProjectCell: NSTableCellView {
         // Its own colour, as the session icons have: left to the list, it
         // went monochrome whenever another app was in front.
         imageView?.contentTintColor = .controlAccentColor
-        textField?.stringValue = project.name
+        textField?.stringValue = project.isAvailable ? project.name
+            : project.name + " · " + L10n.text("space.project.unavailable")
         toolTip = (project.path as NSString).abbreviatingWithTildeInPath
         let waiting = project.attentionCount
         badge.stringValue = waiting > 0 ? "\(waiting)" : ""

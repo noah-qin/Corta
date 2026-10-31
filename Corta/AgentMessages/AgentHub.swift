@@ -17,71 +17,67 @@
 import Darwin
 import Foundation
 
-/// One JSON line from `corta` or from the remote `nc` client.
-nonisolated struct AgentRequest: Codable, Equatable, Sendable {
-    var op: String
-    var to: String?
-    var body: String?
-    var replyTo: Int?
-    var timeout: Int?
-    var number: Int?
-    var context: Bool?
-    var pane: String?
-    var token: String?
-}
-
-nonisolated struct AgentReply: Codable, Equatable, Sendable {
-    var ok: Bool
-    var text: String
-    var delivery: String?
-}
-
-/// What the pane can tell the waker without sharing the view.
-struct AgentWakeSnapshot: Sendable {
-    var kind: String?
-    var claudeSocket: String?
-    var codexExecutable: String?
-    var codexThread: String?
-    var gate: AgentNudgeGate
-}
-
 /// The in-app bus plus the socket `corta` connects to.
 @MainActor
 final class AgentHub {
     static let shared = AgentHub()
 
-    private(set) var bus = AgentBus()
+    var bus = AgentBus()
     /// Shell pid → Space session id.
     var shells: [pid_t: UUID] = [:]
+    var shellStarts: [pid_t: UInt64] = [:]
     /// Remote token → member id. Not written to disk.
     var remoteTokens: [String: UUID] = [:]
     var remoteReady: Set<UUID> = []
+    var remoteStates: [UUID: AgentRemoteState] = [:]
     /// Filled by Space. Nil answers mean the session cannot be nudged.
     var snapshot: ((UUID) -> AgentWakeSnapshot?)?
     var writeNudge: ((UUID) -> Bool)?
     var contextLines: ((UUID) -> [String])?
+    var userDeliveryChanged: ((UUID, AgentDelivery) -> Void)?
+    var userMessageSources: [Int: UUID] = [:]
     /// The pane's input revision, so a key during a nudge can be recorded.
     var inputRevision: ((UUID) -> UInt64?)?
-    private var interrupted: Set<Int> = []
+    var interrupted: Set<Int> = []
 
-    private var source: DispatchSourceRead?
-    private var listener: Int32 = -1
-    private let acceptQueue = DispatchQueue(label: "dev.noahqin.Corta.agent", qos: .utility)
+    private var server: AgentSocketServer?
+    var remoteEndpoints: [String: AgentSocketServer] = [:]
+    var pendingDeliveries: Set<Int> = []
+    var deliveryTasks: [Int: Task<AgentDelivery, Never>] = [:]
+    var deliveredThrough: [UUID: Int] = [:]
+    var remoteSessionNames: [String: String] = [:]
     private(set) var socketPath: String?
 
     static func socketDirectory(development: Bool, uid: uid_t = getuid()) -> String {
         "/tmp/" + (development ? "corta-agent-dev-\(uid)" : "corta-agent-\(uid)")
     }
 
-    func sync(members: [AgentMemberRecord], bound: Set<UUID>, shells: [pid_t: UUID]) {
+    func sync(members: [AgentMemberRecord], bound: Set<UUID>, shells: [pid_t: UUID],
+              projects: [UUID: String] = [:]) {
+        let active = Set(members.filter { !$0.paused }.map(\.id))
+        remoteTokens = remoteTokens.filter { active.contains($0.value) }
+        pruneRemoteEndpoints()
+        remoteReady.formIntersection(active)
+        let now = Date().timeIntervalSinceReferenceDate
+        for (id, state) in remoteStates where now - (state.seen ?? 0) > 4 { disconnectRemote(id) }
+        bus.memberProjects = projects
+        for member in bus.members where member.host == nil && bus.boundSessions.contains(member.sessionID)
+            && !bound.contains(member.sessionID) { bus.dropInbox(member: member.id) }
         bus.replaceMembers(members)
         bus.boundSessions = bound
         bus.forwardsDown = Set(members.filter { $0.host != nil && !remoteReady.contains($0.id) }.map(\.id))
+        shellStarts = shells.reduce(into: [:]) { result, entry in
+            result[entry.key] = self.shells[entry.key] == entry.value
+                ? shellStarts[entry.key] : Self.processStart(entry.key)
+        }
         self.shells = shells
     }
 
     func rememberRemote(token: String, member: UUID) {
+        remoteTokens = remoteTokens.filter { $0.value != member }
+        remoteReady.remove(member)
         remoteTokens[token] = member
+        pruneRemoteEndpoints()
     }
 
     func markRemoteReady(_ member: UUID) {
@@ -89,33 +85,60 @@ final class AgentHub {
     }
 
     /// Start or stop with `agent-messages`. A second call refreshes the link.
-    func apply(enabled: Bool, development: Bool, executable: String) {
+    func apply(enabled: Bool, development: Bool, executable: String, directoryOverride: String? = nil) {
         guard enabled else {
             stop()
             return
         }
-        let directory = Self.socketDirectory(development: development)
+        let testPID = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+            ? nil : ProcessInfo.processInfo.processIdentifier
+        let directory = directoryOverride ?? (testPID.map { "/tmp/corta-agent-test-\(getuid())-\($0)" }
+            ?? Self.socketDirectory(development: development))
+        mkdir(directory, 0o700)
         _ = AgentCommandLink.ensure(
             bin: URL(fileURLWithPath: directory).appendingPathComponent("bin"),
             executable: URL(fileURLWithPath: executable))
         if socketPath != nil { return }
+        bus.commandPath = directory + "/bin/corta"
         let path = directory + "/agent.sock"
-        guard let listener = Self.listen(directory: directory, path: path) else { return }
-        self.listener = listener
+        guard let server = AgentSocketServer(directory: directory, path: path, handler: { [weak self] request, pid in
+            guard let self else { return AgentReply(ok: false, text: "refused(unavailable)", delivery: "refused") }
+            return await self.receive(request, pid: pid)
+        }) else { return }
+        self.server = server
         socketPath = path
-        let source = DispatchSource.makeReadSource(fileDescriptor: listener, queue: acceptQueue)
-        source.setEventHandler { [weak self] in self?.accept() }
-        source.setCancelHandler { close(listener) }
-        source.resume()
-        self.source = source
     }
 
     func stop() {
-        source?.cancel()
-        source = nil
-        if listener >= 0 { close(listener); listener = -1 }
+        server?.stop()
+        server = nil
+        for endpoint in remoteEndpoints.values { endpoint.stop() }
+        remoteEndpoints = [:]
+        remoteTokens = [:]
+        remoteReady = []
+        remoteSessionNames = [:]
+        remoteStates = [:]
+        for task in deliveryTasks.values { task.cancel() }
+        deliveryTasks = [:]
+        pendingDeliveries = []
+        deliveredThrough = [:]
+        for member in bus.members { bus.dropInbox(member: member.id) }
         if let socketPath { unlink(socketPath) }
         socketPath = nil
+    }
+
+    func receive(_ request: AgentRequest, pid: pid_t) async -> AgentReply {
+        guard socketPath != nil else { return AgentReply(ok: false, text: "refused(disabled)", delivery: "refused") }
+        let identity: UUID?
+        guard request.token == nil else { return Self.identityRefusal }
+        identity = caller(pid: pid, claimedPane: request.pane)
+        var reply = handle(request, caller: identity)
+        if let number = reply.number, let task = deliveryTasks[number] {
+            let delivery = await task.value
+            reply.text = "#\(number) \(deliveryName(delivery))"
+            reply.delivery = deliveryName(delivery)
+        }
+        return reply
     }
 
     /// Called on the accept queue or from a test.
@@ -124,128 +147,12 @@ final class AgentHub {
         return reply
     }
 
-    private func handle(_ request: AgentRequest, caller: UUID?) -> AgentReply {
-        let now = Date().timeIntervalSinceReferenceDate
-        switch request.op {
-        case "members":
-            let lines = bus.members.map { member in
-                let level = member.host != nil ? "remote" : (bus.boundSessions.contains(member.sessionID) ? "nudge" : "unbound")
-                return "\(AgentEnvelope.shortID(member.id)) \(member.role) \(level)"
-                    + (member.paused ? " paused" : "")
-            }
-            return AgentReply(ok: true, text: lines.joined(separator: "\n"), delivery: nil)
-        case "whoami":
-            guard let caller, let member = bus.members.first(where: { $0.id == caller }) else {
-                return AgentReply(ok: false, text: "refused(notAMember)", delivery: "refused")
-            }
-            return AgentReply(ok: true, text: "\(AgentEnvelope.shortID(member.id)) \(member.role)", delivery: nil)
-        case "send":
-            guard let caller else { return AgentReply(ok: false, text: "refused(notAMember)", delivery: "refused") }
-            guard let to = request.to, let body = request.body else {
-                return AgentReply(ok: false, text: "refused(missing)", delivery: "refused")
-            }
-            var context: [String] = []
-            if request.context == true, let target = bus.member(caller.uuidString) {
-                context = contextLines?(target.sessionID) ?? []
-            }
-            let sent = bus.send(from: caller, to: to, body: body, replyTo: request.replyTo,
-                               context: context, now: now)
-            guard let number = sent.0, let item = sent.2 else {
-                return AgentReply(ok: false, text: String(describing: sent.1), delivery: deliveryName(sent.1))
-            }
-            let delivery = wake(item)
-            bus.mark(number, delivery, now: now)
-            return AgentReply(ok: true, text: "#\(number) \(deliveryName(delivery))", delivery: deliveryName(delivery))
-        case "read":
-            guard let caller else { return AgentReply(ok: false, text: "refused(notAMember)", delivery: "refused") }
-            let items = bus.read(member: caller)
-            let text = items.map { item in
-                AgentEnvelope.text(fromRole: role(of: item.from), fromID: item.from, number: item.number,
-                                   replyTo: item.replyTo, body: item.body, context: item.context)
-            }.joined(separator: "\n\n")
-            return AgentReply(ok: true, text: text, delivery: nil)
-        case "wait":
-            guard let caller else { return AgentReply(ok: false, text: "refused(notAMember)", delivery: "refused") }
-            let pending = bus.read(member: caller)
-            if pending.isEmpty, let giveUp = bus.noteEmptyWait(member: caller) {
-                return AgentReply(ok: false, text: "giveUp", delivery: deliveryName(giveUp))
-            }
-            let text = pending.map { item in
-                AgentEnvelope.text(fromRole: role(of: item.from), fromID: item.from, number: item.number,
-                                   replyTo: item.replyTo, body: item.body, context: item.context)
-            }.joined(separator: "\n\n")
-            return AgentReply(ok: true, text: text, delivery: nil)
-        case "status":
-            guard let number = request.number, let item = bus.status(number: number) else {
-                return AgentReply(ok: false, text: "refused(missing)", delivery: "refused")
-            }
-            let read = item.read ? " read" : ""
-            return AgentReply(ok: true, text: "\(deliveryName(item.delivery))\(read)", delivery: deliveryName(item.delivery))
-        default:
-            return AgentReply(ok: false, text: "refused(missing)", delivery: "refused")
-        }
-    }
-
-    private func role(of id: UUID) -> String {
-        if id == AgentEnvelope.userID { return "user" }
-        return bus.members.first { $0.id == id }?.role ?? "member"
-    }
-
-    private func wake(_ item: AgentBus.Item) -> AgentDelivery {
-        guard let member = bus.members.first(where: { $0.id == item.to }) else { return .queued }
-        if member.host != nil { return bus.forwardsDown.contains(member.id) ? .forwardUnavailable : .queued }
-        guard let shot = snapshot?(member.sessionID) else { return .queued }
-        let text = envelope(item)
-        var pushFailed = false
-        if let path = shot.claudeSocket {
-            if AgentPush.writeClaude(socket: path, envelope: text) { return .pushed }
-            pushFailed = true
-        }
-        if let executable = shot.codexExecutable, let thread = shot.codexThread,
-           let argv = AgentPush.codexArguments(executable: executable, thread: thread, message: text),
-           AgentPush.run(argv, timeout: 10) {
-            return .pushed
-        } else if shot.codexExecutable != nil {
-            pushFailed = true
-        }
-        guard AgentNudgeGate.bytes(gate: shot.gate, body: item.body, role: member.role) != nil else {
-            return pushFailed ? .pushFailed("connect") : .queued
-        }
-        guard writeNudge?(member.sessionID) == true else {
-            return pushFailed ? .pushFailed("connect") : .queued
-        }
-        let revision = inputRevision?(member.sessionID)
-        let number = item.number
-        let sessionID = member.sessionID
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(300)) { [weak self] in
-            guard let self, let revision, let now = self.inputRevision?(sessionID), now != revision else { return }
-            self.interrupted.insert(number)
-        }
-        return .nudged
-    }
-
-    private func envelope(_ item: AgentBus.Item) -> String {
-        AgentEnvelope.text(fromRole: role(of: item.from), fromID: item.from, number: item.number,
-                           replyTo: item.replyTo, body: item.body, context: item.context)
-    }
-
-    func deliveryName(_ delivery: AgentDelivery) -> String {
-        switch delivery {
-        case .queued: return "queued"
-        case .pushed: return "pushed"
-        case .nudged: return "nudged"
-        case .pushFailed(let reason): return "pushFailed(\(reason))"
-        case .refused(let reason): return "refused(\(reason))"
-        case .forwardUnavailable: return "forwardUnavailable"
-        case .giveUp: return "giveUp"
-        }
-    }
-
     /// Walk parents to a registered shell. A claimed pane that disagrees is refused.
     func caller(pid: pid_t, claimedPane: String?) -> UUID? {
         var current = pid
         for _ in 0..<24 {
             if let session = shells[current] {
+                guard let start = shellStarts[current], Self.processStart(current) == start else { return nil }
                 if let claimedPane, claimedPane.lowercased() != session.uuidString.lowercased() { return nil }
                 return bus.members.first { $0.sessionID == session }?.id
             }
@@ -255,22 +162,33 @@ final class AgentHub {
         return nil
     }
 
-    func caller(token: String) -> UUID? { remoteTokens[token] }
+    func caller(token: String) -> UUID? {
+        guard let member = remoteTokens[token], bus.members.contains(where: { $0.id == member && !$0.paused })
+        else { return nil }
+        return member
+    }
+
+    func disconnectRemote(_ member: UUID) {
+        remoteReady.remove(member)
+        remoteStates[member] = nil
+        remoteTokens = remoteTokens.filter { $0.value != member }
+        pruneRemoteEndpoints()
+        bus.forwardsDown.insert(member)
+    }
 
     /// A person sending a selection. Wakes the receiver the same way `corta send` does.
-    private var nudgedThrough: [UUID: Int] = [:]
 
     /// One nudge for unread mail when the gate newly allows it. Not a poll of the PTY.
     func nudgePending() {
         let now = Date().timeIntervalSinceReferenceDate
-        for member in bus.members where !member.paused && member.host == nil {
+        for member in bus.members where !member.paused {
             let unread = bus.peek(member: member.id)
-            guard let newest = unread.map(\.number).max(), (nudgedThrough[member.id] ?? 0) < newest else { continue }
-            guard let shot = snapshot?(member.sessionID),
-                  AgentNudgeGate.bytes(gate: shot.gate, body: "", role: member.role) != nil,
-                  writeNudge?(member.sessionID) == true else { continue }
-            nudgedThrough[member.id] = newest
-            bus.mark(newest, .nudged, now: now)
+            guard let latest = unread.max(by: { $0.number < $1.number }),
+                  (deliveredThrough[member.id] ?? 0) < latest.number,
+                  !unread.contains(where: { pendingDeliveries.contains($0.number) }) else { continue }
+            let outcome = tryNudge(latest, member: member)
+            if outcome == .nudged { bus.mark(latest.number, outcome, now: now) }
+
         }
     }
 
@@ -283,6 +201,7 @@ final class AgentHub {
     func introduction(sessionID: UUID) -> String? {
         guard let member = bus.members.first(where: { $0.sessionID == sessionID }) else { return nil }
         return AgentEnvelope.introduction(role: member.role, id: member.id)
+            + " If your tool resets PATH, use " + bus.commandPath + " instead of corta."
     }
 
     func historyText(sessionID: UUID) -> String {
@@ -290,24 +209,39 @@ final class AgentHub {
         return bus.items.filter { $0.to == member.id || $0.from == member.id }.suffix(20).map { item in
             "#\(item.number) \(deliveryName(item.delivery))" + (item.read ? " read" : "")
                 + (interrupted.contains(item.number) ? " nudgeInterrupted" : "")
+                + " " + item.events.joined(separator: " → ")
         }.joined(separator: "\n")
     }
 
     func unreadText(sessionID: UUID) -> String {
         guard let member = bus.members.first(where: { $0.sessionID == sessionID }) else { return "" }
-        return bus.peek(member: member.id).map { item in
-            AgentEnvelope.text(fromRole: role(of: item.from), fromID: item.from, number: item.number,
-                               replyTo: item.replyTo, body: item.body, context: item.context)
-        }.joined(separator: "\n\n")
+        return bus.peek(member: member.id).map(envelope).joined(separator: "\n\n")
     }
 
-    func deliverUser(to token: String, body: String, context: [String]) -> AgentDelivery {
+    func deliverUser(to token: String, body: String, context: [String], pane: String? = nil,
+                     source: UUID? = nil) -> AgentDelivery {
         let now = Date().timeIntervalSinceReferenceDate
-        let sent = bus.send(from: AgentEnvelope.userID, to: token, body: body, replyTo: nil, context: context, now: now)
-        guard let number = sent.0, let item = sent.2 else { return sent.1 }
-        let delivery = wake(item)
+        let sent = bus.send(from: AgentEnvelope.userID, to: token, body: AgentEnvelope.prefixUTF8(body,
+            limit: AgentEnvelope.bodyLimit),
+                            replyTo: nil, context: context, now: now)
+        guard let number = sent.number, let item = sent.item else { return sent.delivery }
+        if let source { userMessageSources[number] = source }
+        if let pane { bus.setUserPane(number, pane) }
+        let delivery = wake(bus.status(number: number) ?? item)
         bus.mark(number, delivery, now: now)
         return delivery
+    }
+
+    func capability(_ member: AgentMemberRecord) -> String {
+        if member.paused { return "paused" }
+        if member.host != nil {
+            return remoteReady.contains(member.id) ? "remote/nudge" : "forwardUnavailable"
+        }
+        guard bus.boundSessions.contains(member.sessionID) else { return "unbound" }
+        guard let shot = snapshot?(member.sessionID) else { return "unsupported:noProcess" }
+        if shot.claudeSocket != nil || (shot.codexExecutable != nil && shot.codexThread != nil) { return "push" }
+        if let reason = shot.gate.denial { return "nudge/" + reason }
+        return "nudge"
     }
 
     func wakeSnapshot(for sessionID: UUID) -> AgentWakeSnapshot? { snapshot?(sessionID) }
@@ -317,46 +251,11 @@ final class AgentHub {
         return DispatchQueue.main.sync(execute: body)
     }
 
-    private func accept() {
-        let client = Darwin.accept(listener, nil, nil)
-        guard client >= 0 else { return }
-        acceptQueue.async { [weak self] in
-            defer { close(client) }
-            guard let self, let line = SSHAskpass.readLine(from: client, limit: AgentEnvelope.bodyLimit + 4096),
-                  let request = try? JSONDecoder().decode(AgentRequest.self, from: line) else { return }
-            let caller: UUID? = self.onMain {
-                if let token = request.token { return self.caller(token: token) }
-                var pid: pid_t = 0
-                var size = socklen_t(MemoryLayout<pid_t>.size)
-                guard getsockopt(client, SOL_LOCAL, LOCAL_PEERPID, &pid, &size) == 0 else { return nil }
-                return self.caller(pid: pid, claimedPane: request.pane)
-            }
-            let reply = self.exchange(request, caller: caller)
-            if let data = try? JSONEncoder().encode(reply) { _ = SSHAskpass.writeLine(data, to: client) }
-        }
-    }
-
-    private static func listen(directory: String, path: String) -> Int32? {
-        mkdir(directory, 0o700)
-        chmod(directory, 0o700)
-        unlink(path)
-        let listener = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard listener >= 0, var address = SSHAskpass.socketAddress(path) else {
-            if listener >= 0 { close(listener) }
-            return nil
-        }
-        _ = fcntl(listener, F_SETFD, FD_CLOEXEC)
-        let bound = withUnsafePointer(to: &address) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                bind(listener, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
-            }
-        }
-        guard bound == 0, chmod(path, 0o600) == 0, Darwin.listen(listener, 16) == 0 else {
-            close(listener)
-            unlink(path)
-            return nil
-        }
-        return listener
+    private static func processStart(_ pid: pid_t) -> UInt64? {
+        var info = proc_bsdinfo()
+        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
+        return info.pbi_start_tvsec * 1_000_000 + info.pbi_start_tvusec
     }
 
     private static func parent(of pid: pid_t) -> pid_t? {
@@ -386,5 +285,3 @@ enum AgentCommandLink {
         return symlink(executable.path, link) == 0
     }
 }
-
-

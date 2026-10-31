@@ -267,6 +267,7 @@ nonisolated extension Configuration {
             .flag("agent-status", \.agentStatus),
             .flag("agent-messages", \.agentMessages),
             .flag("space-attention-badge", \.spaceAttentionBadge),
+            .flag("waiting-queue-auto-advance", \.waitingQueueAutoAdvance),
             ConfigurationKey(name: "agent-processes", read: { configuration, value in
                 let names = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
                 guard names.count <= 32, names.allSatisfy({ name in

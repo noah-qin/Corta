@@ -24,6 +24,7 @@ nonisolated struct SpaceTemplate: Codable, Equatable, Sendable {
         var sshHost: String?
         var sshUser: String?
         var sshPort: Int?
+        var retainSSH: Bool?
         /// Relative to the project, or absolute when `outsideProject` is set.
         var directory: String?
         var outsideProject: Bool?
@@ -47,6 +48,7 @@ nonisolated struct SpaceTemplate: Codable, Equatable, Sendable {
                 sshHost: record.ssh?.host,
                 sshUser: record.ssh?.user,
                 sshPort: record.ssh?.port,
+                retainSSH: record.retainSSH,
                 directory: directory.path,
                 outsideProject: directory.outside ? true : nil,
                 name: record.name,
@@ -59,19 +61,30 @@ nonisolated struct SpaceTemplate: Codable, Equatable, Sendable {
 
     /// Records to start in `projectPath`. Agent kinds are returned beside them for the prompt fill.
     func sessions(in projectPath: String) -> [(SpaceSessionRecord, String?)] {
-        sessions.map { session in
+        sessions.prefix(SpaceState.maximumSessions).map { session in
             var directory = session.directory
             if session.outsideProject != true, let relative = directory {
-                directory = relative.isEmpty ? projectPath : (projectPath as NSString).appendingPathComponent(relative)
+                directory = relative.isEmpty ? projectPath
+                    : URL(fileURLWithPath: (projectPath as NSString).appendingPathComponent(relative))
+                        .standardizedFileURL.path
             }
             let ssh = session.sshHost.flatMap { host in
                 SSHTarget(host: host, user: session.sshUser, port: session.sshPort, identityFile: nil)
             }
             var record = SpaceSessionRecord(
                 number: 1, directory: ssh == nil ? directory : nil, presetName: session.presetName, ssh: ssh)
+            record.retainSSH = ssh == nil ? nil : session.retainSSH
             record.name = session.name
             let agent = session.agent == "claude" || session.agent == "codex" ? session.agent : nil
             return (record, agent)
+        }
+    }
+
+    func externalDirectories(in project: String) -> [String] {
+        sessions(in: project).compactMap { record, _ in
+            guard let directory = record.directory else { return nil }
+            let resolved = URL(fileURLWithPath: directory).standardizedFileURL.path
+            return resolved == project || resolved.hasPrefix(project + "/") ? nil : resolved
         }
     }
 
@@ -88,8 +101,12 @@ nonisolated struct SpaceTemplateFile: Codable, Equatable, Sendable {
     var templates: [SpaceTemplate] = []
 
     static func load(from url: URL) -> SpaceTemplateFile {
-        guard let data = try? Data(contentsOf: url),
-              let file = try? JSONDecoder().decode(SpaceTemplateFile.self, from: data) else { return SpaceTemplateFile() }
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return SpaceTemplateFile() }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: 8 * 1024 * 1024 + 1), data.count <= 8 * 1024 * 1024,
+              var file = try? JSONDecoder().decode(SpaceTemplateFile.self,
+                  from: data) else { return SpaceTemplateFile() }
+        file.templates = Array(file.templates.prefix(64))
         return file
     }
 
@@ -97,6 +114,7 @@ nonisolated struct SpaceTemplateFile: Codable, Equatable, Sendable {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = try JSONEncoder().encode(self)
         try data.write(to: url, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
     static var url: URL {

@@ -18,7 +18,7 @@ import Darwin
 import Foundation
 
 /// `corta` subcommands. The executable is a symlink to Corta; this runs before any window.
-enum AgentClient {
+nonisolated enum AgentClient {
     static func runIfInvoked(
         arguments: [String] = CommandLine.arguments,
         environment: [String: String] = ProcessInfo.processInfo.environment
@@ -26,24 +26,29 @@ enum AgentClient {
         let name = URL(fileURLWithPath: arguments.first ?? "").lastPathComponent
         guard name == "corta" else { return nil }
         let rest = Array(arguments.dropFirst())
-        if rest.first == "mcp" { return runMCP(environment: environment) }
+        if rest.first == "mcp" { return AgentMCP.run(environment: environment) }
         guard let invocation = AgentCommand.parse(rest) else {
             FileHandle.standardError.write(Data("usage: corta members|send|read|wait|status|whoami|mcp\n".utf8))
             return 2
         }
-        guard let path = environment["CORTA_AGENT_SOCKET"] else {
+        guard let path = DiagnosticsEnvironment.agentSocket(in: environment) else {
             FileHandle.standardError.write(Data("agent messages are off\n".utf8))
             return 1
         }
         var body = invocation.body
         if body == "-" {
-            body = String(data: FileHandle.standardInput.readDataToEndOfFile(), encoding: .utf8)
+            guard let input = boundedInput() else {
+                FileHandle.standardError.write(Data("refused(tooLarge)\n".utf8))
+                return 1
+            }
+            body = String(decoding: input, as: UTF8.self)
         }
         let request = AgentRequest(
-            op: invocation.operation == "wait" ? "read" : invocation.operation,
+            operation: invocation.operation == "wait" ? "read" : invocation.operation,
             to: invocation.token, body: body,
             replyTo: invocation.replyTo, timeout: invocation.timeout, number: invocation.number,
-            context: invocation.context ? true : nil, pane: environment["CORTA_PANE_ID"], token: nil)
+            context: invocation.context ? true : nil, pane: DiagnosticsEnvironment.agentPane(in: environment),
+                token: nil)
         if invocation.operation == "wait" {
             return wait(request, socketPath: path, seconds: invocation.timeout ?? 110, json: invocation.json)
         }
@@ -51,30 +56,48 @@ enum AgentClient {
             FileHandle.standardError.write(Data("refused(unavailable)\n".utf8))
             return 1
         }
-        let output = invocation.json ? (try? JSONEncoder().encode(reply)).map { String(decoding: $0, as: UTF8.self) } ?? reply.text : reply.text
+        let output = format(reply, json: invocation.json)
         FileHandle.standardOutput.write(Data((output + "\n").utf8))
         return reply.ok ? 0 : 1
     }
 
-    /// Poll `read` until a message arrives or the timeout elapses, then count one empty wait.
-    static func wait(_ request: AgentRequest, socketPath: String, seconds: Int, json: Bool) -> Int32 {
-        let deadline = Date().addingTimeInterval(TimeInterval(min(max(seconds, 1), 110)))
-        while Date() < deadline {
-            if let reply = exchange(request, socketPath: socketPath), reply.ok, !reply.text.isEmpty {
-                FileHandle.standardOutput.write(Data((reply.text + "\n").utf8))
-                return 0
-            }
-            Thread.sleep(forTimeInterval: 0.2)
+    private static func boundedInput() -> Data? {
+        var data = Data()
+        while data.count <= AgentEnvelope.bodyLimit {
+            guard let next = try? FileHandle.standardInput.read(upToCount: AgentEnvelope.bodyLimit + 1 - data.count)
+            else { return nil }
+            if next.isEmpty { return data }
+            data.append(next)
+        }
+        return nil
+    }
+
+    static func format(_ reply: AgentReply, json: Bool) -> String {
+        guard json, let data = try? JSONEncoder().encode(reply) else { return reply.text }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    static func waitReply(_ request: AgentRequest, socketPath: String, seconds: Int) -> AgentReply? {
+        let deadline = SuspendingClock.now.advanced(by: .seconds(min(max(seconds, 1), 110)))
+        var read = request
+        read.operation = "read"
+        while SuspendingClock.now < deadline {
+            guard let reply = exchange(read, socketPath: socketPath) else { return nil }
+            if !reply.ok || !reply.text.isEmpty { return reply }
+            Thread.sleep(forTimeInterval: 0.1)
         }
         var empty = request
-        empty.op = "wait"
-        guard let reply = exchange(empty, socketPath: socketPath) else {
+        empty.operation = "wait"
+        return exchange(empty, socketPath: socketPath)
+    }
+
+    static func wait(_ request: AgentRequest, socketPath: String, seconds: Int, json: Bool) -> Int32 {
+        guard let reply = waitReply(request, socketPath: socketPath, seconds: seconds) else {
             FileHandle.standardError.write(Data("refused(unavailable)\n".utf8))
             return 1
         }
-        let output = json ? (try? JSONEncoder().encode(reply)).map { String(decoding: $0, as: UTF8.self) } ?? reply.text : reply.text
-        FileHandle.standardOutput.write(Data((output + "\n").utf8))
-        return reply.ok && reply.delivery != "giveUp" ? 0 : 1
+        FileHandle.standardOutput.write(Data((format(reply, json: json) + "\n").utf8))
+        return reply.ok ? 0 : 1
     }
 
     static func exchange(_ request: AgentRequest, socketPath: String) -> AgentReply? {
@@ -83,6 +106,9 @@ enum AgentClient {
         let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
         guard descriptor >= 0 else { return nil }
         defer { close(descriptor) }
+        var timeout = timeval(tv_sec: 15, tv_usec: 0)
+        setsockopt(descriptor, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+        setsockopt(descriptor, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
         var on: Int32 = 1
         setsockopt(descriptor, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
         let connected = withUnsafePointer(to: &address) {
@@ -91,49 +117,8 @@ enum AgentClient {
             }
         }
         guard connected == 0, SSHAskpass.writeLine(encoded, to: descriptor),
-              let line = SSHAskpass.readLine(from: descriptor, limit: AgentEnvelope.bodyLimit + 8192) else { return nil }
+              let line = SSHAskpass.readLine(from: descriptor, limit: AgentEnvelope.bodyLimit * 32) else { return nil }
         return try? JSONDecoder().decode(AgentReply.self, from: line)
     }
 
-    /// A small stdio MCP server. Tool calls use the same socket as the command.
-    private static func runMCP(environment: [String: String]) -> Int32 {
-        let input = FileHandle.standardInput
-        while let line = try? input.read(upToCount: 1_000_000), !line.isEmpty,
-              let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any] {
-            let id = object["id"]
-            let method = object["method"] as? String ?? ""
-            var result: Any = [:]
-            switch method {
-            case "initialize":
-                result = ["protocolVersion": "2024-11-05", "capabilities": ["tools": [:]],
-                          "serverInfo": ["name": "corta", "version": "1"]]
-            case "tools/list":
-                result = ["tools": ["corta_members", "corta_send", "corta_read", "corta_wait", "corta_status"].map {
-                    ["name": $0, "description": $0, "inputSchema": ["type": "object"]]
-                }]
-            case "tools/call":
-                let params = object["params"] as? [String: Any]
-                let name = params?["name"] as? String ?? ""
-                let args = params?["arguments"] as? [String: Any] ?? [:]
-                let op = name.replacingOccurrences(of: "corta_", with: "")
-                let request = AgentRequest(
-                    op: op, to: args["to"] as? String, body: args["body"] as? String,
-                    replyTo: args["replyTo"] as? Int, timeout: args["timeout"] as? Int,
-                    number: args["number"] as? Int, context: args["context"] as? Bool,
-                    pane: environment["CORTA_PANE_ID"], token: nil)
-                let reply = environment["CORTA_AGENT_SOCKET"].flatMap { exchange(request, socketPath: $0) }
-                result = ["content": [["type": "text", "text": reply?.text ?? "refused(unavailable)"]]]
-            case "notifications/initialized":
-                continue
-            default:
-                result = [:]
-            }
-            var response: [String: Any] = ["jsonrpc": "2.0", "result": result]
-            if let id { response["id"] = id }
-            if let data = try? JSONSerialization.data(withJSONObject: response) {
-                FileHandle.standardOutput.write(data + Data("\n".utf8))
-            }
-        }
-        return 0
-    }
 }

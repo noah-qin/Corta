@@ -134,8 +134,8 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         }
         let space = spaceWaiting
         let badge: String?
-        if space.badge, space.active, !space.windowIsKey, space.count > 0 {
-            badge = String(space.count)
+        if space.active {
+            badge = space.badge && !space.windowIsKey && space.count > 0 ? String(space.count) : nil
         } else {
             badge = waiting > 0 ? String(waiting) : nil
         }

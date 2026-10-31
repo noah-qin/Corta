@@ -60,6 +60,7 @@ extension CortaSpaceController: NSSplitViewDelegate {
             content.show(.noProject)
             return
         }
+        guard project.isAvailable else { content.show(.unavailable); return }
         // Moving the first responder's view lets AppKit hand focus to
         // another panel; the focus before is the focus after.
         let keep = host.focusedPane
@@ -96,7 +97,7 @@ extension CortaSpaceController: NSSplitViewDelegate {
 
     /// Panels whose session just arrived get their terminal, their size and
     /// a frame; everyone off screen follows the grid's size.
-    private func settle(_ sessions: [SpaceSession]) {
+    func settle(_ sessions: [SpaceSession]) {
         guard let host else { return }
         for session in sessions { panel(for: session)?.attachTerminal() }
         host.view.layoutSubtreeIfNeeded()
@@ -153,115 +154,6 @@ extension CortaSpaceController: NSSplitViewDelegate {
         split.layoutSubtreeIfNeeded()
         apply(first, to: split.subviews[0])
         apply(second, to: split.subviews[1])
-    }
-
-    // MARK: - Placing
-
-    /// Where a session goes.
-    enum Placement {
-        /// The grid's first panel.
-        case root
-        /// Beside `target`, on `edge`.
-        case split(SpacePaneView, SpaceGrid.Edge)
-        /// In `target`'s place; if the session is on screen, the two swap.
-        case replace(SpacePaneView)
-    }
-
-    /// For a session added without a destination: split the roomiest panel
-    /// along its longer side; with no room or at the limit, take the place
-    /// of the least recently used panel, never the focused one.
-    func automaticPlacement(in project: SpaceProject) -> Placement {
-        let leaves = project.tree?.leaves.compactMap { $0 as? SpacePaneView } ?? []
-        guard !leaves.isEmpty else { return .root }
-        if project.maximized == nil, leaves.count < panelLimit {
-            let minimum = minimumPanelSize
-            // The roomiest panel that can split at all.
-            let sized = leaves.map { (panel: $0, size: size(of: $0, in: project)) }
-                .sorted { $0.size.width * $0.size.height > $1.size.width * $1.size.height }
-            for candidate in sized {
-                if let vertical = SpaceGrid.automaticSplit(of: candidate.size, minimum: minimum) {
-                    return .split(candidate.panel, vertical ? .right : .bottom)
-                }
-            }
-        }
-        let focused = project.focused.flatMap { focused in leaves.first { $0.session === focused } }
-        let oldest = SpaceGrid.leastRecentlyUsed(leaves, recency: { $0.session.lastUsed }, protected: focused)
-        return .replace(oldest ?? leaves[leaves.count - 1])
-    }
-
-    /// A panel's size, or what it will be once the window reaches its frame.
-    private func size(of panel: SpacePaneView, in project: SpaceProject) -> CGSize {
-        if transitionArea != nil, let sizes = project.layout?.panelSizes(in: gridArea),
-           let index = project.sessions.firstIndex(where: { $0 === panel.session }), let size = sizes[index] {
-            return size
-        }
-        return panel.frame.size
-    }
-
-    /// The size the session will have once placed: what it starts at.
-    func plannedSize(of placement: Placement, in project: SpaceProject) -> CGSize {
-        switch placement {
-        case .root: return gridArea
-        case .replace(let target): return size(of: target, in: project)
-        case .split(let target, let edge):
-            let size = size(of: target, in: project)
-            let gap = SpaceGrid.dividerThickness
-            return edge.isVertical
-                ? CGSize(width: (size.width - gap) / 2, height: size.height)
-                : CGSize(width: size.width, height: (size.height - gap) / 2)
-        }
-    }
-
-    /// Whether `session` can be dropped on `target`'s `edge`: room for two
-    /// panels there, and room in the grid for another.
-    func canDrop(_ session: SpaceSession, on target: SpacePaneView, edge: SpaceGrid.Edge) -> Bool {
-        guard let project = selectedProject, project.maximized == nil, session !== target.session else { return false }
-        guard project.shown.contains(session) || project.shown.count < panelLimit else { return false }
-        return SpaceGrid.canSplit(target.frame.size, vertical: edge.isVertical, minimum: minimumPanelSize)
-    }
-
-    /// Puts the session where `placement` says, changing only the panels
-    /// involved.
-    func place(_ session: SpaceSession, _ placement: Placement, in project: SpaceProject) {
-        guard let new = panel(for: session) else { return }
-        var arrived = [session]
-        switch placement {
-        case .root:
-            remove(new, from: project)
-            project.tree = SplitTree(root: new, style: .space)
-        case .replace(let target) where target === new:
-            arrived = []
-        case .replace(let target):
-            guard let tree = project.tree else { return }
-            if project.shown.contains(session) {
-                // Two panels on screen trade places.
-                let marker = NSView()
-                tree.replace(leaf: new, with: marker)
-                tree.replace(leaf: target, with: new)
-                tree.replace(leaf: marker, with: target)
-                arrived.append(target.session)
-            } else {
-                tree.replace(leaf: target, with: new)
-                target.session.pane?.view.removeFromSuperview()
-            }
-        case .split(let target, let edge):
-            remove(new, from: project)
-            guard let tree = project.tree else {
-                project.tree = SplitTree(root: new, style: .space)
-                break
-            }
-            let node = tree.split(leaf: target, orientation: edge.isVertical ? .columns : .rows, newLeaf: new)
-            node.delegate = self
-            if edge.isLeading { node.addSubview(new, positioned: .below, relativeTo: target) }
-            installRoot(of: project)
-            host?.view.layoutSubtreeIfNeeded()
-            let axis = node.isVertical ? node.bounds.width : node.bounds.height
-            node.setPosition(((axis - SpaceGrid.dividerThickness) / 2).rounded(), ofDividerAt: 0)
-            arrived.append(target.session)
-        }
-        installRoot(of: project)
-        host?.view.layoutSubtreeIfNeeded()
-        settle(arrived)
     }
 
     /// Takes a panel out of the tree; its neighbour fills the space.
@@ -393,7 +285,7 @@ extension CortaSpaceController {
         guard let project = session.pane == nil ? nil : selectedProject,
               project.sessions.contains(session) else { return L10n.text("space.hint.add") }
         switch automaticPlacement(in: project) {
-        case .root: return L10n.text("space.hint.add")
+        case .root, .retile: return L10n.text("space.hint.add")
         case .split(let target, _):
             return L10n.format("space.hint.beside", SpaceSessionPresentation(session: target.session).title)
         case .replace(let target):

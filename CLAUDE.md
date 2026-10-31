@@ -85,7 +85,8 @@ line each:
   passphrases and host keys through OpenSSH's `SSH_ASKPASS`, answered by
   Corta's own executable and a dialog; nothing is stored.
 - **D28** Local tools are Swift; CI-only glue may be Python (standard
-  library, tested in `scripts/tests/`).
+  library, tested in `scripts/tests/`). D33 adds the explicit opt-in temporary
+  Python client on a remote Linux member; it is not a macOS runtime dependency.
   **D29** No Homebrew cask until `homebrew/cask` accepts one; no tap of
   our own.
 - **D30** Space is a second view of one window's sessions, not a

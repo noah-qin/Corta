@@ -116,10 +116,11 @@ struct SpaceGridTests {
         ]).validated()
         let records = state.projects.flatMap(\.sessions)
         #expect(Set(records.map(\.id)).count == 3)
-        #expect(records[0].id != again.id, "every occurrence of an ambiguous identity is replaced")
+        #expect(records[0].id == again.id, "the first saved identity remains stable")
         #expect(records[1].tmuxEstablished == false)
         let oldName = RemoteTmux(id: again.id).sessionName
-        #expect(records.allSatisfy { $0.supersededTmuxNames == [oldName] })
+        #expect(records[0].supersededTmuxNames == nil)
+        #expect(records.dropFirst().allSatisfy { $0.supersededTmuxNames == [oldName] })
         let encoded = try JSONEncoder().encode(records[0])
         var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         object["supersededTmuxNames"] = ["tmux kill-server", oldName, "corta-not-a-uuid", oldName]
@@ -204,7 +205,7 @@ struct SpaceGridTests {
             == SpaceSessionRecord.maximumNameLength)
     }
 
-    @Test @MainActor func theStoreRoundTripsAndForgetsMissingFolders() throws {
+    @Test @MainActor func theStoreRoundTripsAndKeepsMissingProjectsUnavailable() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("SpaceStore-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = SpaceStore(directory: directory)
@@ -218,9 +219,11 @@ struct SpaceGridTests {
         let attributes = try FileManager.default.attributesOfItem(atPath: store.fileURL.path)
         #expect((attributes[.posixPermissions] as? Int) == 0o600)
         let loaded = store.load(isDirectory: { $0 == "/present" })
-        #expect(loaded.projects.map(\.path) == ["/present"])
+        #expect(loaded.projects.map(\.path) == ["/present", "/absent"])
+        #expect(loaded.projects[0].isAvailable)
+        #expect(!loaded.projects[1].isAvailable)
         #expect(loaded.projects[0].sessions[0].directory == nil)
-        #expect(loaded.selectedProject == "/present")
+        #expect(loaded.selectedProject == "/absent")
         // A newer format is neither read nor written over.
         try Data(#"{"version":99,"projects":[]}"#.utf8).write(to: store.fileURL)
         store.save(state)

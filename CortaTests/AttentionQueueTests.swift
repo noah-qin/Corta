@@ -22,16 +22,16 @@ import Testing
 struct AttentionQueueTests {
     @Test func oldestWaitsFirstAndAJumpSendsItToTheTail() {
         var queue = AttentionQueue()
-        let a = UUID(), b = UUID(), c = UUID()
+        let a = UUID(), b = UUID(), third = UUID()
         #expect(queue.sync(waiting: [a]) == [a])
         #expect(queue.sync(waiting: [a, b]) == [a, b])
-        #expect(queue.sync(waiting: [b, c, a]) == [a, b, c])
-        #expect(queue.sync(waiting: [a, b, c]) == [a, b, c], "a repeated sample is not a new wait")
-        let ordered = queue.sync(waiting: [a, b, c])
+        #expect(queue.sync(waiting: [b, third, a]) == [a, b, third])
+        #expect(queue.sync(waiting: [a, b, third]) == [a, b, third], "a repeated sample is not a new wait")
+        let ordered = queue.sync(waiting: [a, b, third])
         #expect(queue.deferHead(of: ordered) == a)
-        #expect(queue.sync(waiting: [a, b, c]) == [b, c, a])
-        #expect(queue.sync(waiting: [b, c]) == [b, c], "leaving the wait drops it")
-        #expect(queue.sync(waiting: [b, c, a]) == [b, c, a], "coming back waits behind")
+        #expect(queue.sync(waiting: [a, b, third]) == [b, third, a])
+        #expect(queue.sync(waiting: [b, third]) == [b, third], "leaving the wait drops it")
+        #expect(queue.sync(waiting: [b, third, a]) == [b, third, a], "coming back waits behind")
         #expect(queue.deferHead(of: []) == nil)
     }
 

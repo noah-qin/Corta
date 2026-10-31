@@ -6911,7 +6911,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Remote Member"
+            "value" : "Als Remote-Mitglied festlegen"
           }
         },
         "en" : {
@@ -6923,43 +6923,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Remote Member"
+            "value" : "Convertir en miembro remoto"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Remote Member"
+            "value" : "Définir comme membre distant"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Remote Member"
+            "value" : "リモートメンバーにする"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Remote Member"
+            "value" : "원격 구성원으로 설정"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Remote Member"
+            "value" : "Definir como membro remoto"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Remote Member"
+            "value" : "设为远端成员"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Remote Member"
+            "value" : "設為遠端成員"
           }
         }
       }
@@ -6970,7 +6970,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Save as Template…"
+            "value" : "Als Vorlage sichern …"
           }
         },
         "en" : {
@@ -6982,43 +6982,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Save as Template…"
+            "value" : "Guardar como plantilla…"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Save as Template…"
+            "value" : "Enregistrer comme modèle…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Save as Template…"
+            "value" : "テンプレートとして保存…"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Save as Template…"
+            "value" : "템플릿으로 저장…"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Save as Template…"
+            "value" : "Salvar como modelo…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Save as Template…"
+            "value" : "存为模板…"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Save as Template…"
+            "value" : "存為範本…"
           }
         }
       }
@@ -7029,7 +7029,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Sessions from Template"
+            "value" : "Sitzungen aus Vorlage erstellen"
           }
         },
         "en" : {
@@ -7041,43 +7041,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Sessions from Template"
+            "value" : "Crear sesiones desde una plantilla"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Sessions from Template"
+            "value" : "Créer des sessions à partir d’un modèle"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Sessions from Template"
+            "value" : "テンプレートからセッションを作成"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Sessions from Template"
+            "value" : "템플릿에서 세션 만들기"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Sessions from Template"
+            "value" : "Criar sessões a partir de um modelo"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Sessions from Template"
+            "value" : "从模板新建会话"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Sessions from Template"
+            "value" : "從範本新增工作階段"
           }
         }
       }
@@ -7088,7 +7088,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "There is no template yet."
+            "value" : "Noch keine Vorlagen vorhanden."
           }
         },
         "en" : {
@@ -7100,43 +7100,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "There is no template yet."
+            "value" : "Todavía no hay plantillas."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "There is no template yet."
+            "value" : "Aucun modèle pour le moment."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "There is no template yet."
+            "value" : "テンプレートはまだありません。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "There is no template yet."
+            "value" : "아직 템플릿이 없습니다."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "There is no template yet."
+            "value" : "Ainda não há modelos."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "There is no template yet."
+            "value" : "尚无模板。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "There is no template yet."
+            "value" : "尚無範本。"
           }
         }
       }
@@ -7147,7 +7147,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The start command is filled in. Press Return to run it."
+            "value" : "Der Startbefehl ist eingefügt. Zum Ausführen Eingabetaste drücken."
           }
         },
         "en" : {
@@ -7159,43 +7159,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The start command is filled in. Press Return to run it."
+            "value" : "Se ha escrito el comando de inicio. Pulsa Intro para ejecutarlo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The start command is filled in. Press Return to run it."
+            "value" : "La commande de lancement est saisie. Appuyez sur Retour pour l’exécuter."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The start command is filled in. Press Return to run it."
+            "value" : "起動コマンドを入力しました。Return で実行します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The start command is filled in. Press Return to run it."
+            "value" : "시작 명령을 입력했습니다. Return 키로 실행하세요."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The start command is filled in. Press Return to run it."
+            "value" : "O comando de início foi preenchido. Pressione Return para executá-lo."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The start command is filled in. Press Return to run it."
+            "value" : "已填好启动命令，按回车执行。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The start command is filled in. Press Return to run it."
+            "value" : "已填入啟動指令，按 Return 執行。"
           }
         }
       }
@@ -7206,7 +7206,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Applied template %@."
+            "value" : "Vorlage %@ angewendet."
           }
         },
         "en" : {
@@ -7218,43 +7218,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Applied template %@."
+            "value" : "Plantilla %@ aplicada."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Applied template %@."
+            "value" : "Modèle %@ appliqué."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Applied template %@."
+            "value" : "テンプレート %@ を適用しました。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Applied template %@."
+            "value" : "템플릿 %@을(를) 적용했습니다."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Applied template %@."
+            "value" : "Modelo %@ aplicado."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Applied template %@."
+            "value" : "已应用模板 %@。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Applied template %@."
+            "value" : "已套用範本 %@。"
           }
         }
       }
@@ -7265,7 +7265,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Session in a Worktree…"
+            "value" : "Neue Sitzung in einem Worktree …"
           }
         },
         "en" : {
@@ -7277,43 +7277,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Session in a Worktree…"
+            "value" : "Nueva sesión en un worktree…"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Session in a Worktree…"
+            "value" : "Nouvelle session dans un worktree…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Session in a Worktree…"
+            "value" : "新しいワークツリーでセッションを作成…"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Session in a Worktree…"
+            "value" : "새 worktree에서 세션 만들기…"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Session in a Worktree…"
+            "value" : "Nova sessão em um worktree…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Session in a Worktree…"
+            "value" : "在新 worktree 中新建会话…"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New Session in a Worktree…"
+            "value" : "在新 worktree 中新增工作階段…"
           }
         }
       }
@@ -7324,7 +7324,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Main Repository in Finder"
+            "value" : "Haupt-Repository im Finder zeigen"
           }
         },
         "en" : {
@@ -7336,43 +7336,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Main Repository in Finder"
+            "value" : "Mostrar repositorio principal en Finder"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Main Repository in Finder"
+            "value" : "Afficher le dépôt principal dans le Finder"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Main Repository in Finder"
+            "value" : "メインリポジトリを Finder に表示"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Main Repository in Finder"
+            "value" : "Finder에서 기본 저장소 보기"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Main Repository in Finder"
+            "value" : "Mostrar repositório principal no Finder"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Main Repository in Finder"
+            "value" : "在 Finder 中显示主仓库"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Main Repository in Finder"
+            "value" : "在 Finder 中顯示主要儲存庫"
           }
         }
       }
@@ -7383,7 +7383,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name the worktree"
+            "value" : "Worktree benennen"
           }
         },
         "en" : {
@@ -7395,43 +7395,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name the worktree"
+            "value" : "Nombrar el worktree"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name the worktree"
+            "value" : "Nommer le worktree"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name the worktree"
+            "value" : "ワークツリーに名前を付ける"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name the worktree"
+            "value" : "worktree 이름 지정"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name the worktree"
+            "value" : "Nomear o worktree"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name the worktree"
+            "value" : "为 worktree 命名"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name the worktree"
+            "value" : "為 worktree 命名"
           }
         }
       }
@@ -7442,7 +7442,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The command is typed into a new shell. Press Return to run it."
+            "value" : "Der Befehl wird in eine neue Shell eingefügt. Erst die Eingabetaste führt ihn aus."
           }
         },
         "en" : {
@@ -7454,43 +7454,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The command is typed into a new shell. Press Return to run it."
+            "value" : "El comando se escribe en un shell nuevo. Pulsa Intro para ejecutarlo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The command is typed into a new shell. Press Return to run it."
+            "value" : "La commande est saisie dans un nouveau shell. Retour lance son exécution."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The command is typed into a new shell. Press Return to run it."
+            "value" : "新しいシェルにコマンドを入力します。実行には Return を押してください。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The command is typed into a new shell. Press Return to run it."
+            "value" : "새 셸에 명령을 입력합니다. Return 키를 눌러야 실행됩니다."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The command is typed into a new shell. Press Return to run it."
+            "value" : "O comando é preenchido em um novo shell. Return inicia a execução."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The command is typed into a new shell. Press Return to run it."
+            "value" : "命令将填入新 shell，按回车后才执行。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The command is typed into a new shell. Press Return to run it."
+            "value" : "指令會填入新的 shell，按 Return 後才執行。"
           }
         }
       }
@@ -7501,7 +7501,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New branch, or empty to use the name as an existing branch"
+            "value" : "Neuer Branch; leer lassen für den vorhandenen Branch gleichen Namens"
           }
         },
         "en" : {
@@ -7513,43 +7513,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New branch, or empty to use the name as an existing branch"
+            "value" : "Nueva rama; déjalo vacío para usar la rama existente del mismo nombre"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New branch, or empty to use the name as an existing branch"
+            "value" : "Nouvelle branche ; vide pour utiliser la branche existante du même nom"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New branch, or empty to use the name as an existing branch"
+            "value" : "新しいブランチ名。空欄の場合は同名の既存ブランチを使用"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New branch, or empty to use the name as an existing branch"
+            "value" : "새 브랜치 이름. 비워 두면 같은 이름의 기존 브랜치 사용"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New branch, or empty to use the name as an existing branch"
+            "value" : "Nova branch; deixe vazio para usar a branch existente de mesmo nome"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New branch, or empty to use the name as an existing branch"
+            "value" : "新分支名；留空则使用同名的现有分支"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New branch, or empty to use the name as an existing branch"
+            "value" : "新分支名稱；留空則使用同名的現有分支"
           }
         }
       }
@@ -7560,7 +7560,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "That name can only use letters, digits, and . _ - /"
+            "value" : "Der Name darf nur Buchstaben, Ziffern und . _ - / enthalten"
           }
         },
         "en" : {
@@ -7572,43 +7572,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "That name can only use letters, digits, and . _ - /"
+            "value" : "El nombre solo puede contener letras, números y . _ - /"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "That name can only use letters, digits, and . _ - /"
+            "value" : "Le nom ne peut contenir que des lettres, chiffres et . _ - /"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "That name can only use letters, digits, and . _ - /"
+            "value" : "名前には英数字と . _ - / のみ使用できます"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "That name can only use letters, digits, and . _ - /"
+            "value" : "이름에는 영문자, 숫자 및 . _ - /만 사용할 수 있습니다"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "That name can only use letters, digits, and . _ - /"
+            "value" : "O nome só pode conter letras, números e . _ - /"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "That name can only use letters, digits, and . _ - /"
+            "value" : "名称只能包含字母、数字及 . _ - /"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "That name can only use letters, digits, and . _ - /"
+            "value" : "名稱只能包含字母、數字及 . _ - /"
           }
         }
       }
@@ -7619,7 +7619,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The worktree command is filled in. Press Return to run it. Delete the line to skip it."
+            "value" : "Der Worktree-Befehl ist eingefügt. Eingabetaste zum Ausführen; zum Überspringen die Zeile löschen."
           }
         },
         "en" : {
@@ -7631,43 +7631,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The worktree command is filled in. Press Return to run it. Delete the line to skip it."
+            "value" : "Se ha escrito el comando del worktree. Intro para ejecutarlo; borra la línea para omitirlo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The worktree command is filled in. Press Return to run it. Delete the line to skip it."
+            "value" : "La commande du worktree est saisie. Retour pour l’exécuter ; supprimez la ligne pour l’ignorer."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The worktree command is filled in. Press Return to run it. Delete the line to skip it."
+            "value" : "ワークツリーのコマンドを入力しました。Return で実行、行の削除でスキップします。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The worktree command is filled in. Press Return to run it. Delete the line to skip it."
+            "value" : "worktree 명령을 입력했습니다. Return 키로 실행하거나 줄을 삭제해 건너뛰세요."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The worktree command is filled in. Press Return to run it. Delete the line to skip it."
+            "value" : "O comando do worktree foi preenchido. Return para executar; apague a linha para ignorar."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The worktree command is filled in. Press Return to run it. Delete the line to skip it."
+            "value" : "已填好 worktree 命令，按回车执行；删除此行可跳过。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "The worktree command is filled in. Press Return to run it. Delete the line to skip it."
+            "value" : "已填入 worktree 指令，按 Return 執行；刪除此行可略過。"
           }
         }
       }
@@ -7678,7 +7678,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send to Member"
+            "value" : "An Mitglied senden"
           }
         },
         "en" : {
@@ -7690,43 +7690,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send to Member"
+            "value" : "Enviar a un miembro"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send to Member"
+            "value" : "Envoyer au membre"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send to Member"
+            "value" : "メンバーに送信"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send to Member"
+            "value" : "구성원에게 보내기"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send to Member"
+            "value" : "Enviar ao membro"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send to Member"
+            "value" : "发送给成员"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send to Member"
+            "value" : "傳送給成員"
           }
         }
       }
@@ -7737,7 +7737,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make a member from the pane menu first"
+            "value" : "Zuerst im Bereichsmenü ein Mitglied festlegen"
           }
         },
         "en" : {
@@ -7749,43 +7749,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make a member from the pane menu first"
+            "value" : "Primero crea un miembro desde el menú del panel"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make a member from the pane menu first"
+            "value" : "Définissez d’abord un membre dans le menu du panneau"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make a member from the pane menu first"
+            "value" : "先にペインのメニューでメンバーを設定してください"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make a member from the pane menu first"
+            "value" : "먼저 패널 메뉴에서 구성원을 설정하세요"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make a member from the pane menu first"
+            "value" : "Primeiro defina um membro no menu do painel"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make a member from the pane menu first"
+            "value" : "请先在面板菜单中设为成员"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make a member from the pane menu first"
+            "value" : "請先在面板選單中設為成員"
           }
         }
       }
@@ -7796,7 +7796,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery: %@"
+            "value" : "Zustellung: %@"
           }
         },
         "en" : {
@@ -7808,43 +7808,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery: %@"
+            "value" : "Entrega: %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery: %@"
+            "value" : "Distribution : %@"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery: %@"
+            "value" : "配信結果：%@"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery: %@"
+            "value" : "전달 결과: %@"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery: %@"
+            "value" : "Entrega: %@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery: %@"
+            "value" : "送达结果：%@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery: %@"
+            "value" : "傳遞結果：%@"
           }
         }
       }
@@ -7855,7 +7855,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send Selection to Member"
+            "value" : "Auswahl an Mitglied senden"
           }
         },
         "en" : {
@@ -7867,43 +7867,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send Selection to Member"
+            "value" : "Enviar selección a un miembro"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send Selection to Member"
+            "value" : "Envoyer la sélection à un membre"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send Selection to Member"
+            "value" : "選択範囲をメンバーに送信"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send Selection to Member"
+            "value" : "선택 영역을 구성원에게 보내기"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send Selection to Member"
+            "value" : "Enviar seleção ao membro"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send Selection to Member"
+            "value" : "把选区发送给成员"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Send Selection to Member"
+            "value" : "將選取內容傳送給成員"
           }
         }
       }
@@ -7914,7 +7914,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Allow the wake-up line"
+            "value" : "Weckzeile erlauben"
           }
         },
         "en" : {
@@ -7926,43 +7926,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Allow the wake-up line"
+            "value" : "Permitir la frase de activación"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Allow the wake-up line"
+            "value" : "Autoriser la phrase de réveil"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Allow the wake-up line"
+            "value" : "起動を促す行の入力を許可"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Allow the wake-up line"
+            "value" : "깨우기 문구 입력 허용"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Allow the wake-up line"
+            "value" : "Permitir a frase de ativação"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Allow the wake-up line"
+            "value" : "允许输入唤醒语"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Allow the wake-up line"
+            "value" : "允許輸入喚醒語"
           }
         }
       }
@@ -7973,7 +7973,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "When this member is idle and you are not typing, Corta types: Corta: you have new messages; run corta read."
+            "value" : "Wenn das Mitglied untätig ist und Sie nicht tippen, gibt Corta diese feste Zeile ein: Corta: you have new messages; run corta read."
           }
         },
         "en" : {
@@ -7985,43 +7985,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "When this member is idle and you are not typing, Corta types: Corta: you have new messages; run corta read."
+            "value" : "Si el miembro está inactivo y no estás escribiendo, Corta introduce: Corta: you have new messages; run corta read."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "When this member is idle and you are not typing, Corta types: Corta: you have new messages; run corta read."
+            "value" : "Lorsque le membre est inactif et que vous ne tapez pas, Corta saisit : Corta: you have new messages; run corta read."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "When this member is idle and you are not typing, Corta types: Corta: you have new messages; run corta read."
+            "value" : "メンバーが待機中で入力操作がない場合、Corta は固定文を入力します：Corta: you have new messages; run corta read."
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "When this member is idle and you are not typing, Corta types: Corta: you have new messages; run corta read."
+            "value" : "구성원이 유휴 상태이고 사용자가 입력 중이 아닐 때 고정 문구를 입력합니다: Corta: you have new messages; run corta read."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "When this member is idle and you are not typing, Corta types: Corta: you have new messages; run corta read."
+            "value" : "Quando o membro está ocioso e você não está digitando, o Corta insere: Corta: you have new messages; run corta read."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "When this member is idle and you are not typing, Corta types: Corta: you have new messages; run corta read."
+            "value" : "成员空闲且你未输入时，Corta 会输入固定唤醒语：Corta: you have new messages; run corta read."
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "When this member is idle and you are not typing, Corta types: Corta: you have new messages; run corta read."
+            "value" : "成員閒置且你未輸入時，Corta 會輸入固定喚醒語：Corta: you have new messages; run corta read."
           }
         }
       }
@@ -8032,7 +8032,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Introduction"
+            "value" : "Einführung kopieren"
           }
         },
         "en" : {
@@ -8044,43 +8044,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Introduction"
+            "value" : "Copiar presentación"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Introduction"
+            "value" : "Copier la présentation"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Introduction"
+            "value" : "紹介文をコピー"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Introduction"
+            "value" : "소개 문구 복사"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Introduction"
+            "value" : "Copiar apresentação"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Introduction"
+            "value" : "复制介绍语"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Introduction"
+            "value" : "複製介紹語"
           }
         }
       }
@@ -8091,7 +8091,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery History"
+            "value" : "Zustellverlauf"
           }
         },
         "en" : {
@@ -8103,43 +8103,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery History"
+            "value" : "Historial de entrega"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery History"
+            "value" : "Historique de distribution"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery History"
+            "value" : "配信履歴"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery History"
+            "value" : "전달 기록"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery History"
+            "value" : "Histórico de entrega"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery History"
+            "value" : "送达历史"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delivery History"
+            "value" : "傳遞記錄"
           }
         }
       }
@@ -8150,7 +8150,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "No messages yet. Messages are kept only until Corta quits."
+            "value" : "Noch keine Nachrichten. Sie bleiben nur bis zum Beenden von Corta erhalten."
           }
         },
         "en" : {
@@ -8162,43 +8162,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "No messages yet. Messages are kept only until Corta quits."
+            "value" : "Aún no hay mensajes. Se conservan solo hasta cerrar Corta."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "No messages yet. Messages are kept only until Corta quits."
+            "value" : "Aucun message. Les messages disparaissent à la fermeture de Corta."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "No messages yet. Messages are kept only until Corta quits."
+            "value" : "メッセージはまだありません。Corta 終了時に消去されます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "No messages yet. Messages are kept only until Corta quits."
+            "value" : "아직 메시지가 없습니다. Corta를 종료하면 메시지가 사라집니다."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "No messages yet. Messages are kept only until Corta quits."
+            "value" : "Ainda não há mensagens. Elas são mantidas somente até o Corta encerrar."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "No messages yet. Messages are kept only until Corta quits."
+            "value" : "尚无消息。消息仅保留到 Corta 退出。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "No messages yet. Messages are kept only until Corta quits."
+            "value" : "尚無訊息。訊息僅保留至 Corta 結束。"
           }
         }
       }
@@ -8209,7 +8209,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Unread"
+            "value" : "Ungelesene kopieren"
           }
         },
         "en" : {
@@ -8221,43 +8221,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Unread"
+            "value" : "Copiar mensajes sin leer"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Unread"
+            "value" : "Copier les messages non lus"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Unread"
+            "value" : "未読メッセージをコピー"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Unread"
+            "value" : "읽지 않은 메시지 복사"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Unread"
+            "value" : "Copiar mensagens não lidas"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Unread"
+            "value" : "复制未读消息"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy Unread"
+            "value" : "複製未讀訊息"
           }
         }
       }
@@ -8268,7 +8268,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy"
+            "value" : "Kopieren"
           }
         },
         "en" : {
@@ -8280,43 +8280,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy"
+            "value" : "Copiar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy"
+            "value" : "Copier"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy"
+            "value" : "コピー"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy"
+            "value" : "복사"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy"
+            "value" : "Copiar"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy"
+            "value" : "复制"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy"
+            "value" : "複製"
           }
         }
       }
@@ -8327,7 +8327,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copied."
+            "value" : "Kopiert."
           }
         },
         "en" : {
@@ -8339,43 +8339,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copied."
+            "value" : "Copiado."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copied."
+            "value" : "Copié."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copied."
+            "value" : "コピーしました。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copied."
+            "value" : "복사했습니다."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copied."
+            "value" : "Copiado."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copied."
+            "value" : "已复制。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copied."
+            "value" : "已複製。"
           }
         }
       }
@@ -8445,7 +8445,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Agent messages"
+            "value" : "Agent-Nachrichten"
           }
         },
         "en" : {
@@ -8457,43 +8457,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Agent messages"
+            "value" : "Mensajes entre agentes"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Agent messages"
+            "value" : "Messages entre agents"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Agent messages"
+            "value" : "エージェント間メッセージ"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Agent messages"
+            "value" : "에이전트 메시지"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Agent messages"
+            "value" : "Mensagens entre agentes"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Agent messages"
+            "value" : "Agent 消息"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Agent messages"
+            "value" : "Agent 訊息"
           }
         }
       }
@@ -8504,7 +8504,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Members message with corta. Add Bash(corta *) to a CLI allow list if it asks before running commands. Optional MCP: corta mcp."
+            "value" : "Mitglieder kommunizieren über corta. Bei Rückfragen Bash(corta *) zur CLI-Freigabeliste hinzufügen. Optionales MCP: corta mcp."
           }
         },
         "en" : {
@@ -8516,43 +8516,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Members message with corta. Add Bash(corta *) to a CLI allow list if it asks before running commands. Optional MCP: corta mcp."
+            "value" : "Los miembros se comunican con corta. Si el CLI pide permiso, añade Bash(corta *) a su lista permitida. MCP opcional: corta mcp."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Members message with corta. Add Bash(corta *) to a CLI allow list if it asks before running commands. Optional MCP: corta mcp."
+            "value" : "Les membres communiquent via corta. Si le CLI demande une autorisation, ajoutez Bash(corta *) à sa liste autorisée. MCP facultatif : corta mcp."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Members message with corta. Add Bash(corta *) to a CLI allow list if it asks before running commands. Optional MCP: corta mcp."
+            "value" : "メンバーは corta で通信します。CLI が実行許可を求める場合は Bash(corta *) を許可リストに追加してください。任意の MCP：corta mcp。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Members message with corta. Add Bash(corta *) to a CLI allow list if it asks before running commands. Optional MCP: corta mcp."
+            "value" : "구성원은 corta로 통신합니다. CLI가 실행 승인을 요청하면 허용 목록에 Bash(corta *)를 추가하세요. 선택적 MCP: corta mcp."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Members message with corta. Add Bash(corta *) to a CLI allow list if it asks before running commands. Optional MCP: corta mcp."
+            "value" : "Os membros se comunicam com corta. Se a CLI pedir permissão, adicione Bash(corta *) à lista de permissões. MCP opcional: corta mcp."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Members message with corta. Add Bash(corta *) to a CLI allow list if it asks before running commands. Optional MCP: corta mcp."
+            "value" : "成员通过 corta 通信。如 CLI 运行命令前询问，可将 Bash(corta *) 加入允许名单。MCP 可选：corta mcp。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Members message with corta. Add Bash(corta *) to a CLI allow list if it asks before running commands. Optional MCP: corta mcp."
+            "value" : "成員透過 corta 通訊。若 CLI 執行指令前詢問，可將 Bash(corta *) 加入允許清單。MCP 為選用：corta mcp。"
           }
         }
       }
@@ -8563,7 +8563,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Rename Template…"
+            "value" : "Vorlage umbenennen …"
           }
         },
         "en" : {
@@ -8575,43 +8575,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Rename Template…"
+            "value" : "Renombrar plantilla…"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Rename Template…"
+            "value" : "Renommer le modèle…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Rename Template…"
+            "value" : "テンプレート名を変更…"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Rename Template…"
+            "value" : "템플릿 이름 변경…"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Rename Template…"
+            "value" : "Renomear modelo…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Rename Template…"
+            "value" : "重命名模板…"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Rename Template…"
+            "value" : "重新命名範本…"
           }
         }
       }
@@ -8622,7 +8622,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New name"
+            "value" : "Neuer Name"
           }
         },
         "en" : {
@@ -8634,43 +8634,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New name"
+            "value" : "Nuevo nombre"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New name"
+            "value" : "Nouveau nom"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New name"
+            "value" : "新しい名前"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New name"
+            "value" : "새 이름"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New name"
+            "value" : "Novo nome"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New name"
+            "value" : "新名称"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "New name"
+            "value" : "新名稱"
           }
         }
       }
@@ -8681,7 +8681,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Template…"
+            "value" : "Vorlage anzeigen …"
           }
         },
         "en" : {
@@ -8693,43 +8693,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Template…"
+            "value" : "Ver plantilla…"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Template…"
+            "value" : "Afficher le modèle…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Template…"
+            "value" : "テンプレートを表示…"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Template…"
+            "value" : "템플릿 보기…"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Template…"
+            "value" : "Ver modelo…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Template…"
+            "value" : "查看模板…"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show Template…"
+            "value" : "檢視範本…"
           }
         }
       }
@@ -8740,7 +8740,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delete Template…"
+            "value" : "Vorlage löschen …"
           }
         },
         "en" : {
@@ -8752,43 +8752,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delete Template…"
+            "value" : "Eliminar plantilla…"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delete Template…"
+            "value" : "Supprimer le modèle…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delete Template…"
+            "value" : "テンプレートを削除…"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delete Template…"
+            "value" : "템플릿 삭제…"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delete Template…"
+            "value" : "Excluir modelo…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delete Template…"
+            "value" : "删除模板…"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Delete Template…"
+            "value" : "刪除範本…"
           }
         }
       }
@@ -8799,7 +8799,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Member…"
+            "value" : "Als Mitglied festlegen …"
           }
         },
         "en" : {
@@ -8811,43 +8811,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Member…"
+            "value" : "Convertir en miembro…"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Member…"
+            "value" : "Définir comme membre…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Member…"
+            "value" : "メンバーにする…"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Member…"
+            "value" : "구성원으로 설정…"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Member…"
+            "value" : "Definir como membro…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Member…"
+            "value" : "设为成员…"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Make Member…"
+            "value" : "設為成員…"
           }
         }
       }
@@ -8858,7 +8858,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Pause Member"
+            "value" : "Mitglied pausieren"
           }
         },
         "en" : {
@@ -8870,43 +8870,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Pause Member"
+            "value" : "Pausar miembro"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Pause Member"
+            "value" : "Suspendre le membre"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Pause Member"
+            "value" : "メンバーを一時停止"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Pause Member"
+            "value" : "구성원 일시 정지"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Pause Member"
+            "value" : "Pausar membro"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Pause Member"
+            "value" : "暂停成员"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Pause Member"
+            "value" : "暫停成員"
           }
         }
       }
@@ -8917,7 +8917,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Resume Member"
+            "value" : "Mitglied fortsetzen"
           }
         },
         "en" : {
@@ -8929,43 +8929,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Resume Member"
+            "value" : "Reactivar miembro"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Resume Member"
+            "value" : "Réactiver le membre"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Resume Member"
+            "value" : "メンバーを再開"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Resume Member"
+            "value" : "구성원 다시 활성화"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Resume Member"
+            "value" : "Reativar membro"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Resume Member"
+            "value" : "恢复成员"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Resume Member"
+            "value" : "恢復成員"
           }
         }
       }
@@ -8976,7 +8976,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Remove Member"
+            "value" : "Mitglied entfernen"
           }
         },
         "en" : {
@@ -8988,43 +8988,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Remove Member"
+            "value" : "Quitar miembro"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Remove Member"
+            "value" : "Retirer le membre"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Remove Member"
+            "value" : "メンバーを削除"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Remove Member"
+            "value" : "구성원 제거"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Remove Member"
+            "value" : "Remover membro"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Remove Member"
+            "value" : "移除成员"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Remove Member"
+            "value" : "移除成員"
           }
         }
       }
@@ -9035,7 +9035,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name this member's role"
+            "value" : "Rolle des Mitglieds benennen"
           }
         },
         "en" : {
@@ -9047,43 +9047,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name this member's role"
+            "value" : "Nombra el rol de este miembro"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name this member's role"
+            "value" : "Nommer le rôle de ce membre"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name this member's role"
+            "value" : "メンバーの役割に名前を付ける"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name this member's role"
+            "value" : "구성원 역할 이름 지정"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name this member's role"
+            "value" : "Nomeie a função deste membro"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name this member's role"
+            "value" : "为此成员的角色命名"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Name this member's role"
+            "value" : "為此成員的角色命名"
           }
         }
       }
@@ -9094,7 +9094,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Cancel"
+            "value" : "Abbrechen"
           }
         },
         "en" : {
@@ -9106,43 +9106,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Cancel"
+            "value" : "Cancelar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Cancel"
+            "value" : "Annuler"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Cancel"
+            "value" : "キャンセル"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Cancel"
+            "value" : "취소"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Cancel"
+            "value" : "Cancelar"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Cancel"
+            "value" : "取消"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Cancel"
+            "value" : "取消"
           }
         }
       }
@@ -9153,7 +9153,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%@ · detached"
+            "value" : "%@ · losgelöster HEAD"
           }
         },
         "en" : {
@@ -9165,43 +9165,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%@ · detached"
+            "value" : "%@ · HEAD separado"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%@ · detached"
+            "value" : "%@ · HEAD détachée"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%@ · detached"
+            "value" : "%@ · 分離 HEAD"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%@ · detached"
+            "value" : "%@ · 분리된 HEAD"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%@ · detached"
+            "value" : "%@ · HEAD separado"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%@ · detached"
+            "value" : "%@ · 分离 HEAD"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%@ · detached"
+            "value" : "%@ · 分離 HEAD"
           }
         }
       }
@@ -9212,7 +9212,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "worktree"
+            "value" : "Worktree"
           }
         },
         "en" : {
@@ -9236,7 +9236,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "worktree"
+            "value" : "ワークツリー"
           }
         },
         "ko" : {
@@ -9271,7 +9271,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "About %d tracked files differ"
+            "value" : "Etwa %d erfasste Dateien geändert"
           }
         },
         "en" : {
@@ -9283,43 +9283,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "About %d tracked files differ"
+            "value" : "Unos %d archivos seguidos modificados"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "About %d tracked files differ"
+            "value" : "Environ %d fichiers suivis modifiés"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "About %d tracked files differ"
+            "value" : "追跡中の約 %d ファイルに変更"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "About %d tracked files differ"
+            "value" : "추적 파일 약 %d개 변경됨"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "About %d tracked files differ"
+            "value" : "Cerca de %d arquivos rastreados alterados"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "About %d tracked files differ"
+            "value" : "约 %d 个已跟踪文件有改动"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "About %d tracked files differ"
+            "value" : "約 %d 個追蹤檔案有變更"
           }
         }
       }
@@ -9330,7 +9330,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Large repository, changes not checked"
+            "value" : "Großes Repository; Änderungen nicht geprüft"
           }
         },
         "en" : {
@@ -9342,43 +9342,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Large repository, changes not checked"
+            "value" : "Repositorio grande; cambios sin comprobar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Large repository, changes not checked"
+            "value" : "Dépôt volumineux, modifications non vérifiées"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Large repository, changes not checked"
+            "value" : "大きなリポジトリのため変更は未確認"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Large repository, changes not checked"
+            "value" : "큰 저장소로 변경 사항을 확인하지 않음"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Large repository, changes not checked"
+            "value" : "Repositório grande; alterações não verificadas"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Large repository, changes not checked"
+            "value" : "仓库过大，未检查改动"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Large repository, changes not checked"
+            "value" : "儲存庫過大，未檢查變更"
           }
         }
       }
@@ -9389,7 +9389,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Main repository: %@"
+            "value" : "Haupt-Repository: %@"
           }
         },
         "en" : {
@@ -9401,43 +9401,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Main repository: %@"
+            "value" : "Repositorio principal: %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Main repository: %@"
+            "value" : "Dépôt principal : %@"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Main repository: %@"
+            "value" : "メインリポジトリ：%@"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Main repository: %@"
+            "value" : "기본 저장소: %@"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Main repository: %@"
+            "value" : "Repositório principal: %@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Main repository: %@"
+            "value" : "主仓库：%@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Main repository: %@"
+            "value" : "主要儲存庫：%@"
           }
         }
       }
@@ -9448,7 +9448,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Jump to Next Waiting Session"
+            "value" : "Zur nächsten wartenden Sitzung"
           }
         },
         "en" : {
@@ -9460,43 +9460,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Jump to Next Waiting Session"
+            "value" : "Ir a la siguiente sesión en espera"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Jump to Next Waiting Session"
+            "value" : "Aller à la prochaine session en attente"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Jump to Next Waiting Session"
+            "value" : "次の応答待ちセッションに移動"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Jump to Next Waiting Session"
+            "value" : "다음 대기 세션으로 이동"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Jump to Next Waiting Session"
+            "value" : "Ir para a próxima sessão em espera"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Jump to Next Waiting Session"
+            "value" : "跳到下一个待处理会话"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Jump to Next Waiting Session"
+            "value" : "跳到下一個待處理工作階段"
           }
         }
       }
@@ -9507,7 +9507,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%d sessions are waiting for you"
+            "value" : "%d Sitzungen warten auf Sie"
           }
         },
         "en" : {
@@ -9519,43 +9519,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%d sessions are waiting for you"
+            "value" : "%d sesiones te esperan"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%d sessions are waiting for you"
+            "value" : "%d sessions vous attendent"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%d sessions are waiting for you"
+            "value" : "%d 個のセッションが応答待ち"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%d sessions are waiting for you"
+            "value" : "세션 %d개가 응답을 기다리는 중"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%d sessions are waiting for you"
+            "value" : "%d sessões esperam por você"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%d sessions are waiting for you"
+            "value" : "%d 个会话在等你"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%d sessions are waiting for you"
+            "value" : "%d 個工作階段正在等你"
           }
         }
       }
@@ -9566,7 +9566,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "1 session is waiting for you"
+            "value" : "1 Sitzung wartet auf Sie"
           }
         },
         "en" : {
@@ -9578,43 +9578,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "1 session is waiting for you"
+            "value" : "1 sesión te espera"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "1 session is waiting for you"
+            "value" : "1 session vous attend"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "1 session is waiting for you"
+            "value" : "1 個のセッションが応答待ち"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "1 session is waiting for you"
+            "value" : "세션 1개가 응답을 기다리는 중"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "1 session is waiting for you"
+            "value" : "1 sessão espera por você"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "1 session is waiting for you"
+            "value" : "1 个会话在等你"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "1 session is waiting for you"
+            "value" : "1 個工作階段正在等你"
           }
         }
       }
@@ -9625,7 +9625,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Needs you"
+            "value" : "Benötigt Ihre Aufmerksamkeit"
           }
         },
         "en" : {
@@ -9637,43 +9637,43 @@
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Needs you"
+            "value" : "Requiere tu atención"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Needs you"
+            "value" : "Votre intervention est requise"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Needs you"
+            "value" : "応答が必要"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Needs you"
+            "value" : "응답 필요"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Needs you"
+            "value" : "Precisa da sua atenção"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Needs you"
+            "value" : "需要你处理"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Needs you"
+            "value" : "需要你處理"
           }
         }
       }
@@ -51388,6 +51388,992 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "恢復來源：%@"
+          }
+        }
+      }
+    },
+    "space.template.outside" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The template uses directories outside this project"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "模板使用项目外的目录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "範本使用專案外的目錄"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "テンプレートはプロジェクト外のディレクトリを使用します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "템플릿이 프로젝트 외부 디렉터리를 사용합니다"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Die Vorlage nutzt Verzeichnisse außerhalb des Projekts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Le modèle utilise des dossiers hors du projet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "La plantilla usa directorios fuera del proyecto"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "O modelo usa diretórios fora do projeto"
+          }
+        }
+      }
+    },
+    "space.template.manage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project templates"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "项目模板"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "專案範本"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "プロジェクトのテンプレート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "프로젝트 템플릿"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Projektvorlagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Modèles de projet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Plantillas de proyecto"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Modelos de projeto"
+          }
+        }
+      }
+    },
+    "space.template.invalidName" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a valid name that is not already in use."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "请输入一个尚未使用的有效名称。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "請輸入尚未使用的有效名稱。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "未使用の有効な名前を入力してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "아직 사용하지 않은 올바른 이름을 입력하세요."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Geben Sie einen gültigen, noch nicht verwendeten Namen ein."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Saisissez un nom valide qui n’est pas encore utilisé."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Introduce un nombre válido que no esté en uso."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Digite um nome válido que ainda não esteja em uso."
+          }
+        }
+      }
+    },
+    "space.member.edit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Member Settings…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "成员设置…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "成員設定…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "メンバー設定…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "구성원 설정…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mitgliedseinstellungen …"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Réglages du membre…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ajustes del miembro…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ajustes do membro…"
+          }
+        }
+      }
+    },
+    "space.member.context" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Include Git context by default when sending"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "发送时默认附加 Git 上下文"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "傳送時預設附加 Git 上下文"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "送信時に Git コンテキストを既定で添付"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "전송 시 Git 컨텍스트 기본 포함"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Git-Kontext beim Senden standardmäßig anhängen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Joindre le contexte Git par défaut à l’envoi"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Adjuntar contexto Git al enviar por defecto"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Anexar contexto Git por padrão ao enviar"
+          }
+        }
+      }
+    },
+    "space.member.selectionContext" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Include Git context with selection messages"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "选区消息附加 Git 上下文"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "選取內容訊息附加 Git 上下文"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "選択範囲の送信に Git コンテキストを添付"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "선택 영역 메시지에 Git 컨텍스트 포함"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Git-Kontext an ausgewählten Text anhängen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Joindre le contexte Git au texte sélectionné"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Adjuntar contexto Git al texto seleccionado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Anexar contexto Git ao texto selecionado"
+          }
+        }
+      }
+    },
+    "space.member.codexName" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exact /rename name in Codex (optional)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Codex 中精确的 /rename 名称（可选）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Codex 中精確的 /rename 名稱（選填）"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Codex の正確な /rename 名（任意）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Codex의 정확한 /rename 이름(선택)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Exakter Codex-Name aus /rename (optional)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nom exact défini par /rename dans Codex (facultatif)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nombre exacto de /rename en Codex (opcional)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nome exato de /rename no Codex (opcional)"
+          }
+        }
+      }
+    },
+    "space.member.save" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save Member Settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "保存成员设置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "儲存成員設定"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "メンバー設定を保存"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "구성원 설정 저장"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mitgliedseinstellungen sichern"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Enregistrer les réglages du membre"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Guardar ajustes del miembro"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Salvar ajustes do membro"
+          }
+        }
+      }
+    },
+    "space.member.preface" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What to say (optional)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "要对它说什么（可选）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "要對它說什麼（選填）"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "添えるメッセージ（任意）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "덧붙일 말(선택)"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Zusätzliche Nachricht (optional)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Message à ajouter (facultatif)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mensaje adicional (opcional)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mensagem adicional (opcional)"
+          }
+        }
+      }
+    },
+    "space.member.directory" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Members"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "项目成员"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "專案成員"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "プロジェクトメンバー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "프로젝트 구성원"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Projektmitglieder"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Membres du projet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Miembros del proyecto"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Membros do projeto"
+          }
+        }
+      }
+    },
+    "space.project.unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "项目不可用"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "專案無法使用"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "プロジェクトを利用できません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "프로젝트 사용 불가"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Projekt nicht verfügbar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Projet indisponible"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Proyecto no disponible"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Projeto indisponível"
+          }
+        }
+      }
+    },
+    "space.project.unavailableDetail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The project folder was not found. Open it again; Corta will not recreate it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "找不到项目文件夹。请重新打开文件夹；Corta 不会重建它。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "找不到專案檔案夾。請重新開啟檔案夾；Corta 不會重建它。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "プロジェクトフォルダが見つかりません。フォルダを開き直してください。Corta は再作成しません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "프로젝트 폴더를 찾을 수 없습니다. 폴더를 다시 여세요. Corta가 폴더를 다시 만들지 않습니다."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Der Projektordner wurde nicht gefunden. Öffnen Sie ihn erneut; Corta erstellt ihn nicht neu."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Le dossier du projet est introuvable. Ouvrez-le à nouveau ; Corta ne le recrée pas."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "No se encuentra la carpeta del proyecto. Ábrela de nuevo; Corta no la recreará."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "A pasta do projeto não foi encontrada. Abra-a novamente; o Corta não a recria."
+          }
+        }
+      }
+    },
+    "space.ssh.remove.keep" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove and Keep Remote Sessions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "保留远端会话并移除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "保留遠端工作階段並移除"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "リモートセッションを残して削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "원격 세션을 유지하고 제거"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Entfernen, Remote-Sitzung behalten"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Retirer en conservant la session distante"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Quitar y conservar sesión remota"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Remover e manter sessão remota"
+          }
+        }
+      }
+    },
+    "space.ssh.copyKill" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy End Session Command"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "复制结束会话命令"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "複製結束工作階段指令"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "セッション終了コマンドをコピー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "세션 종료 명령 복사"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Befehl zum Beenden kopieren"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Copier la commande de fin de session"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Copiar comando para finalizar sesión"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Copiar comando para encerrar sessão"
+          }
+        }
+      }
+    },
+    "settings.label.spaceAttentionBadge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Space waiting badge in background"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Space 后台待处理角标"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Space 背景待處理標記"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Space が背面のとき待機数を表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Space가 백그라운드일 때 대기 배지 표시"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Warteabzeichen für Space im Hintergrund"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Badge d’attente de Space en arrière-plan"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Insignia de espera de Space en segundo plano"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Indicador de espera do Space em segundo plano"
+          }
+        }
+      }
+    },
+    "settings.label.waitingAutoAdvance" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jump to the next waiting session after handling one"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "处理完成后跳到下一个待处理会话"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "處理完成後跳到下一個待處理工作階段"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "対応後に次の待機セッションへ移動"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "처리 후 다음 대기 세션으로 이동"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Nach Bearbeitung zur nächsten wartenden Sitzung"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Passer à la session en attente suivante après traitement"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pasar a la siguiente sesión en espera tras atenderla"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Avançar para a próxima sessão em espera após atender"
+          }
+        }
+      }
+    },
+    "space.member.remoteDetail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On reconnect, Corta creates a private temporary Python client and socket forward on this host, enables passthrough only for this tmux window, and retains the remote session. Python 3 is required. No AI tool is installed. Reconnect after adding the member."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "重新连接时，Corta 会在此主机创建私有临时 Python 客户端和 socket 转发，仅为此 tmux 窗口启用透传，并保留远端会话。需要 Python 3，不安装 AI 工具。添加后请重新连接。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "重新連線時，Corta 會在此主機建立私有暫存 Python 用戶端及 socket 轉送，僅為此 tmux 視窗啟用透傳，並保留遠端工作階段。需要 Python 3，不安裝 AI 工具。新增後請重新連線。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "再接続時に、このホストに専用の一時 Python クライアントとソケット転送を作成し、この tmux ウインドウのみ透過を有効にしてセッションを保持します。Python 3 が必要です。AI ツールはインストールしません。追加後に再接続してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "다시 연결하면 이 호스트에 비공개 임시 Python 클라이언트와 소켓 전달을 만들고 이 tmux 창에만 통과를 허용하며 세션을 유지합니다. Python 3가 필요합니다. AI 도구는 설치하지 않습니다. 추가 후 다시 연결하세요."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Beim erneuten Verbinden erstellt Corta einen privaten temporären Python-Client und eine Socket-Weiterleitung, aktiviert Passthrough nur für dieses tmux-Fenster und behält die Sitzung. Python 3 ist erforderlich. Keine KI-Installation. Danach erneut verbinden."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "À la reconnexion, Corta crée un client Python temporaire privé et un transfert de socket, active le passthrough uniquement pour cette fenêtre tmux et conserve la session. Python 3 requis. Aucun outil IA installé. Reconnectez-vous après l’ajout."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Al reconectar, Corta crea un cliente Python temporal privado y un reenvío de socket, activa el paso solo para esta ventana tmux y conserva la sesión. Requiere Python 3. No instala IA. Reconecta tras añadir el miembro."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ao reconectar, Corta cria um cliente Python temporário privado e encaminha o socket, ativa a passagem apenas nesta janela tmux e mantém a sessão. Requer Python 3. Não instala IA. Reconecte após adicionar o membro."
           }
         }
       }

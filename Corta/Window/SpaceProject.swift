@@ -84,6 +84,7 @@ final class SpaceProject {
     }
     /// Its sessions run: they start the first time the project is shown in a
     /// launch, not at launch, so a list of old projects costs nothing.
+    var isAvailable = true
     var isStarted = false
     var conversationPreparation: Task<Void, Never>?
     var members: [AgentMemberRecord]
@@ -95,6 +96,7 @@ final class SpaceProject {
         pendingLayout = record.layout
         nextNumber = record.nextNumber
         members = record.members
+        isAvailable = record.isAvailable
         focused = record.layout?.panels.first.map { sessions[$0] }
     }
 

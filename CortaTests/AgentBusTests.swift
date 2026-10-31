@@ -32,50 +32,71 @@ struct AgentBusTests {
         return bus
     }
 
+    @Test func unreadMailSurvivesHistoryEvictionAndItsNudgeStillCounts() throws {
+        let sender = AgentMemberRecord(role: "sender", sessionID: UUID())
+        let old = AgentMemberRecord(role: "old", sessionID: UUID())
+        let other = AgentMemberRecord(role: "other", sessionID: UUID())
+        var bus = AgentBus()
+        bus.replaceMembers([sender, old, other])
+        bus.boundSessions = [sender.sessionID, old.sessionID, other.sessionID]
+        let first = bus.send(from: sender.id, to: old.id.uuidString, body: "keep unread", now: 0)
+        for index in 1...AgentBus.historyLimit {
+            let sent = bus.send(from: sender.id, to: other.id.uuidString, body: "later", now: Double(index) * 61)
+            #expect(sent.delivery == .queued)
+            _ = bus.read(member: other.id)
+        }
+        let number = try #require(first.number)
+        #expect(bus.status(number: number) == nil)
+        #expect(bus.peek(member: old.id).first?.body == "keep unread")
+        bus.mark(number, .nudged, now: 90_000)
+        #expect(bus.nudges(for: old.id, now: 90_001) == 1)
+        #expect(bus.read(member: old.id).first?.delivery == .nudged)
+    }
+
     @Test func sendReadLimitsAndUserIsNotARecipient() {
         var bus = makeBus()
         let sent = bus.send(from: front, to: AgentEnvelope.shortID(back), body: "check the route",
                             replyTo: nil, context: [], now: 0)
-        #expect(sent.1 == .queued)
+        #expect(sent.delivery == .queued)
         #expect(bus.read(member: back).map(\.body) == ["check the route"])
         #expect(bus.read(member: back).isEmpty)
         let role = bus.send(from: front, to: "backend", body: "no", replyTo: nil, context: [], now: 1)
-        #expect(role.1 == .refused("useAnID"))
+        #expect(role.delivery == .refused("useAnID"))
         let user = bus.send(from: front, to: "user", body: "no", replyTo: nil, context: [], now: 1)
-        #expect(user.1 == .refused("userIsNotARecipient"))
+        #expect(user.delivery == .refused("userIsNotARecipient"))
         let outsider = bus.send(from: UUID(), to: AgentEnvelope.shortID(back), body: "no",
                                 replyTo: nil, context: [], now: 1)
-        #expect(outsider.1 == .refused("notAMember"))
+        #expect(outsider.delivery == .refused("notAMember"))
         bus.boundSessions = []
         #expect(bus.send(from: front, to: AgentEnvelope.shortID(back), body: "x", replyTo: nil,
-                         context: [], now: 2).1 == .refused("unbound"))
+                         context: [], now: 2).delivery == .refused("unbound"))
     }
 
     @Test func rateInboxDepthAndEmptyWaits() {
         var bus = makeBus()
         for index in 0..<AgentBus.sendsPerMinute {
             #expect(bus.send(from: front, to: AgentEnvelope.shortID(back), body: "\(index)",
-                             replyTo: nil, context: [], now: 10).1 == .queued)
+                             replyTo: nil, context: [], now: 10).delivery == .queued)
         }
         #expect(bus.send(from: front, to: AgentEnvelope.shortID(back), body: "more",
-                         replyTo: nil, context: [], now: 10).1 == .refused("rate"))
+                         replyTo: nil, context: [], now: 10).delivery == .refused("rate"))
         _ = bus.read(member: back)
         for index in 0..<AgentBus.inboxLimit {
             _ = bus.send(from: front, to: AgentEnvelope.shortID(back), body: "q", replyTo: nil,
                          context: [], now: 80 + Double(index) * 60)
         }
         #expect(bus.send(from: front, to: AgentEnvelope.shortID(back), body: "q", replyTo: nil,
-                         context: [], now: 80 + Double(AgentBus.inboxLimit) * 60).1 == .refused("inboxFull"))
+                         context: [], now: 80 + Double(AgentBus.inboxLimit) * 60).delivery == .refused("inboxFull"))
         var chain = makeBus()
         var previous: Int?
         for index in 0..<AgentBus.replyDepth {
             let sent = chain.send(from: front, to: AgentEnvelope.shortID(back), body: "r",
                                   replyTo: previous, context: [], now: 200 + Double(index) * 60)
-            previous = sent.0
-            #expect(sent.1 == .queued)
+            previous = sent.number
+            #expect(sent.delivery == .queued)
         }
         #expect(chain.send(from: front, to: AgentEnvelope.shortID(back), body: "r", replyTo: previous,
-                           context: [], now: 200 + Double(AgentBus.replyDepth) * 60).1 == .refused("tooDeep"))
+                           context: [], now: 200 + Double(AgentBus.replyDepth) * 60).delivery == .refused("tooDeep"))
         for _ in 0..<AgentBus.emptyWaitLimit - 1 { #expect(chain.noteEmptyWait(member: back) == nil) }
         #expect(chain.noteEmptyWait(member: back) == .giveUp)
     }
@@ -119,7 +140,8 @@ struct AgentBusTests {
         let line = AgentPush.claudeLine(envelope: text, messageID: "cc-msg-1")
         #expect(!line.dropLast().contains("\n"))
         #expect(line.hasSuffix("\n"))
-        #expect(AgentPush.codexArguments(executable: "/usr/bin/codex", thread: "abc", message: "hi")?.contains("queue") == true)
+        #expect(AgentPush.codexArguments(executable: "/usr/bin/codex", thread: "abc",
+            message: "hi")?.contains("queue") == true)
         #expect(AgentPush.codexArguments(executable: "/usr/bin/codex", thread: "a b", message: "hi") == nil)
     }
 
@@ -128,6 +150,10 @@ struct AgentBusTests {
         #expect(AgentCommand.parse(["send", "backend"]) == nil)
         #expect(AgentCommand.parse(["wait", "--timeout", "999"])?.timeout == 110)
         #expect(AgentCommand.parse(["members", "--json"])?.json == true)
+        #expect(AgentCommand.parse(["read", "--since", "42", "--json"])?.since == 42)
+        #expect(AgentCommand.parse(["read", "--since", "-1"]) == nil)
+        #expect(AgentCommand.parse(["send", "m-test", "body", "--reply-to", "invalid"]) == nil)
+        #expect(AgentCommand.parse(["wait", "--timeout", "invalid"]) == nil)
         let record = AgentMemberRecord(id: front, role: "frontend", sessionID: back, nudgeEnabled: false)
         let project = SpaceProjectRecord(path: "/tmp/app", sessions: [], members: [record])
         let data = try JSONEncoder().encode(SpaceState(projects: [project]))
@@ -145,7 +171,7 @@ struct AgentBusTests {
         bus.setHost(back, "remote")
         bus.forwardsDown.insert(back)
         #expect(bus.send(from: front, to: AgentEnvelope.shortID(back), body: "x", replyTo: nil,
-                         context: [], now: 0).1 == .forwardUnavailable)
+                         context: [], now: 0).delivery == .forwardUnavailable)
         #expect(bus.items.isEmpty)
     }
 }
