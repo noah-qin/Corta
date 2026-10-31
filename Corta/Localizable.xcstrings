@@ -36233,55 +36233,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Die Sitzungen laufen weiter. Wähle eine in der Seitenleiste oder ziehe sie hierher."
+            "value" : "Die Sitzungen laufen weiter. Klicke eine in der Seitenleiste an, um sie anzuzeigen, oder ziehe sie hierher."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The sessions are still running. Choose one in the sidebar, or drag it here."
+            "value" : "The sessions are still running. Click one in the sidebar to show it, or drag it here."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Las sesiones siguen en ejecución. Elige una en la barra lateral o arrástrala aquí."
+            "value" : "Las sesiones siguen en ejecución. Haz clic en una en la barra lateral para mostrarla, o arrástrala aquí."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Les sessions continuent de tourner. Choisissez-en une dans la barre latérale ou faites-la glisser ici."
+            "value" : "Les sessions sont toujours actives. Cliquez sur l’une d’elles dans la barre latérale pour l’afficher, ou faites-la glisser ici."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "セッションは実行中です。サイドバーで選ぶか、ここへドラッグしてください。"
+            "value" : "セッションは実行中です。サイドバーでクリックすると表示されます。ここへドラッグすることもできます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "세션은 계속 실행 중입니다. 사이드바에서 선택하거나 여기로 드래그하세요."
+            "value" : "세션은 계속 실행 중입니다. 사이드바에서 클릭하면 표시되며, 여기로 드래그할 수도 있습니다."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "As sessões continuam em execução. Escolha uma na barra lateral ou arraste-a para cá."
+            "value" : "As sessões continuam em execução. Clique em uma na barra lateral para mostrá-la ou arraste-a para cá."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "会话仍在运行。在边栏中选择一个，或把它拖到这里。"
+            "value" : "这些会话仍在运行。点击侧栏里的会话即可显示，或把它拖到这里。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "工作階段仍在執行。在側邊欄中選擇一個，或把它拖到這裡。"
+            "value" : "這些工作階段仍在執行。點按側邊欄裡的工作階段即可顯示，或把它拖到這裡。"
           }
         }
       }

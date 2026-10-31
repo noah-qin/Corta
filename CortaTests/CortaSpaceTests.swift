@@ -386,6 +386,34 @@ struct CortaSpaceTests {
         #expect(host.panes.count == 3, "the terminal mode's pane and two sessions remain")
     }
 
+    @Test func clickingAHiddenSessionShowsItAndUndoPutsTheGridBack() throws {
+        let (controller, host) = try makeWindow()
+        defer { close(controller, host) }
+        let project = try makeProject()
+        defer { try? FileManager.default.removeItem(at: project) }
+        let space = host.space
+        space.setActive(true)
+        space.openProject(project)
+        space.newSession()
+        let live = try #require(space.selectedProject)
+        try #require(live.shown.count == 2)
+        let hidden = live.shown[1]
+        space.hide(hidden)
+        let layout = live.layout
+        #expect(!live.shown.contains(hidden))
+        // One event's undo group would also take back the hide.
+        let undo = try #require(controller.window?.undoManager)
+        undo.removeAllActions()
+        space.sidebar.choose(hidden)
+        #expect(live.shown.contains(hidden), "a click shows it, not only selects it")
+        #expect(space.focusedSession === hidden)
+        #expect(undo.canUndo)
+        undo.undo()
+        #expect(!live.shown.contains(hidden))
+        #expect(live.layout == layout)
+        #expect(kill(try #require(hidden.pane?.session).pty.processIdentifier, 0) == 0)
+    }
+
     @Test func projectsKeepTheirOwnSessionsAndAreSaved() throws {
         let (controller, host) = try makeWindow()
         defer { close(controller, host) }

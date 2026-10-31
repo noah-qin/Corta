@@ -32,8 +32,8 @@ final class SpaceSidebarController: NSViewController, NSOutlineViewDataSource, N
     private var isReloading = false
     /// The session whose row is being renamed; reloads wait for it.
     private weak var renaming: SpaceSession?
-    /// A hidden session chosen in the list. Choosing is not showing: the
-    /// grid does not change until it is asked to.
+    /// A hidden session picked from its row's add button or with ⌘Return,
+    /// on its way into the grid.
     weak var chosen: SpaceSession?
     /// The row of the last click: a double-click is two on the same row,
     /// not two quick clicks on two sessions.
@@ -64,8 +64,7 @@ final class SpaceSidebarController: NSViewController, NSOutlineViewDataSource, N
         outline.style = .sourceList
         // A session on screen is focused straight from the click
         // (`SpaceOutlineView`), so the list never takes the keyboard on the
-        // way and the panel never blinks. Hidden ones are chosen here, and
-        // the list keeps the keyboard for Return and ⌘Return.
+        // way and the panel never blinks. A hidden one is shown from here.
         outline.sidebar = self
         // The island is the background; the list draws only its rows.
         outline.backgroundColor = .clear
@@ -255,7 +254,7 @@ extension SpaceSidebarController {
     // MARK: - Choosing
 
     /// A click that reached the list: a project, or a hidden session to
-    /// choose. Sessions on screen never get here (`focusOnScreen`).
+    /// show. Sessions on screen never get here (`focusOnScreen`).
     @objc private func rowClicked() {
         guard !isReloading, let space else { return }
         let item = outline.item(atRow: outline.clickedRow)
@@ -270,16 +269,15 @@ extension SpaceSidebarController {
         }
     }
 
-    /// Selects a hidden session and says what showing it would do.
+    /// Clicking a session shows it: one on screen is focused; a hidden one
+    /// goes into the grid where its row's add button says — beside the
+    /// roomiest panel, or in the least recently used one's place — with an
+    /// Undo note, and ⌘Z puts the grid back.
     func choose(_ session: SpaceSession) {
         guard let space, let (project, _) = space.session(withID: session.id) else { return }
         if project !== space.selectedProject { space.selectProject(project) }
-        if project.shown.contains(session) {
-            space.focus(session)
-            return
-        }
-        chosen = session
-        reload()
+        chosen = nil
+        space.show(session)
     }
 
     /// The row's button, a double-click, ⌘Return: the chosen session goes
