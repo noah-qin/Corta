@@ -185,7 +185,9 @@ final class RemoteConnectController: NSWindowController {
 @MainActor @Observable
 final class RemoteConnectDraft {
     var isSpace = false
-    var retainSSH = true
+    /// Off until chosen for this connection: keeping programs running in
+    /// the remote tmux is an opt-in, not what an SSH connection does (#434).
+    var retainSSH = false
     var mode: RemoteConnectMode = .ssh
     var fields = SSHTargetFields()
     var problem: SSHTarget.Problem?
@@ -197,7 +199,7 @@ final class RemoteConnectDraft {
     var generation = 0
 
     func reset(mode: RemoteConnectMode, paneFiles: RemoteConnectPaneFiles? = nil) {
-        retainSSH = true
+        retainSSH = false
         self.mode = mode
         self.paneFiles = paneFiles
         fields = SSHTargetFields()

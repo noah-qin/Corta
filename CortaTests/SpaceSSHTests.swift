@@ -87,9 +87,10 @@ struct SpaceSSHTests {
 
     @Test @MainActor func openingDialogResetsThePerConnectionChoice() {
         let draft = RemoteConnectDraft()
-        draft.retainSSH = false
+        #expect(!draft.retainSSH, "keeping programs running is off by default")
+        draft.retainSSH = true
         draft.reset(mode: .ssh)
-        #expect(draft.retainSSH)
+        #expect(!draft.retainSSH, "and every new dialog starts off again")
         draft.reset(mode: .sftp)
         #expect(draft.mode == .sftp)
     }
