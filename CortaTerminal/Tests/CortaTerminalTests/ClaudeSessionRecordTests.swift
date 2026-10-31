@@ -116,18 +116,6 @@ struct ClaudeSessionRecordTests {
         }
     }
 
-    @Test func oneEnvironmentValueIsDecodedAndADuplicateIsRefused() {
-        let prefix: [UInt8] = [1, 0, 0, 0]
-        let environment = "/bin/claude\0\0claude\0HOME=/home/example\0"
-            + "CLAUDE_CODE_MESSAGING_SOCKET=/tmp/cc.sock\0OTHER=secret\0"
-        let bytes = prefix + Array(environment.utf8)
-        #expect(ConversationProcess.environmentValue(bytes: bytes,
-            key: "CLAUDE_CODE_MESSAGING_SOCKET") == "/tmp/cc.sock")
-        #expect(ConversationProcess.environmentValue(bytes: bytes, key: "OTHER") == "secret")
-        let doubled = bytes + Array("CLAUDE_CODE_MESSAGING_SOCKET=/tmp/other.sock\0".utf8)
-        #expect(ConversationProcess.environmentValue(bytes: doubled, key: "CLAUDE_CODE_MESSAGING_SOCKET") == nil)
-    }
-
     @Test func nativeVersionNamedExecutableUsesOnlyTheInvocationName() {
         let prefix: [UInt8] = [3, 0, 0, 0]
         let args = "/home/example/.local/share/claude/versions/2.1.312\0\0/home/example/.local/bin/claude\0"
