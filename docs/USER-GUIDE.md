@@ -133,11 +133,13 @@ Terminal hotkey, remote badges — is collected in
 
 Space keeps a project's terminals together — a shell for Git and builds, an
 SSH session on the server, an agent CLI or two — with up to six on screen at
-once. Switch with the grid button beside Connect and **+** in the toolbar (in
-Space it shows a terminal, and takes you back), **View ▸ Show Space** (⌥⌘S)
-or **File ▸ Open Project…** (⌘O). Space fills the screen; the terminal mode
-gets its own window size back, and its tabs and splits are exactly as they
-were, still running.
+once, and tells you which of them is waiting for you. Switch with the grid
+button beside Connect and **+** in the toolbar (in Space it shows a terminal,
+and takes you back), **View ▸ Show Space** (⌥⌘S) or **File ▸ Open Project…**
+(⌘O). Space shows in the window as it is: it does not move or resize it, and
+the grid uses the room the window has — make the window larger for more
+panels. The terminal mode's tabs and splits are exactly as they were, still
+running. The first time Space shows, a note says what ends with the window.
 
 - **A project is a folder.** Add one with **+** beside *Projects* or ⌘O. Its
   first session starts there. Nothing is read from or written into the folder.
@@ -149,19 +151,19 @@ were, still running.
   onto a panel: near an edge it splits that panel on that side (the half it
   will take is shown as you drag), in the middle it takes the panel's place
   (two panels on screen swap). Drag the gaps to resize. No split leaves a
-  panel smaller than 64 × 18 cells; with no room, or at the limit, a session
-  takes the place of the panel you used least recently, never the one you are
-  typing in.
+  panel smaller than 64 × 18 cells; with no room, or at the limit
+  (`space-panel-limit`, 1–6), a session takes the place of the panel you used
+  least recently, never the one you are typing in.
 - **Columns or rows.** A tiled grid shares one axis: in rows each row has its
   own widths, in columns each column its own heights. **View ▸ Arrange in
   Columns / Arrange in Rows** (also in each panel's **…**) switches; ⌘Z undoes.
-- **Choosing is not showing.** Clicking a session on screen focuses its panel.
-  Clicking a hidden one only selects it; the grid changes when you ask: the
-  add button at the end of its row (it appears on hover, and says what it will
-  replace or join), ⌘Return, **Show in Grid** or **Show in Panel ▸** in its
-  context menu, or a drag. Each placement outlines the panel once, shows a
-  note with **Undo**, and can be undone with ⌘Z — the layout comes back, every
-  process keeps running.
+- **Click to show.** Clicking a session on screen focuses its panel. Clicking
+  a hidden one puts it on the grid — beside the roomiest panel, or in the
+  place of the one you used least recently — outlines it once and shows a
+  note with **Undo**; ⌘Z puts the grid back, and every process keeps running.
+  To choose where it goes, use the add button at the end of its row (it
+  appears on hover and says what it will join or replace), **Show in Panel ▸**
+  in its context menu, or a drag.
 - **Names and kinds.** A session is named by its program — an agent's own
   name, the SSH host, the command running — or *Terminal N* at a prompt.
   Double-click its row, press Return on it, or choose **Rename…** to give it
@@ -170,67 +172,130 @@ were, still running.
 - **Panel actions** are in the **…** at each panel's corner (faint until you
   point at the panel) and on the header's context menu: **Fill Grid**, **Hide
   Panel**, **Rename…**, **Browse Files on This Host…** for a remote session,
-  **End Session…**. Double-click a header to fill the grid, and again to
-  return (also ⇧⌘⏎). A hidden session keeps running, at the size of the grid.
+  **Diagnostics ▸** for a session with a recorded conversation, **End
+  Session…**. Double-click a header to fill the grid, and again to return
+  (also ⇧⌘⏎). A hidden session keeps running, at the size of the grid.
 - **The sidebar** lists every project and every session. A coloured dot is a
-  session's state — green running, orange waiting for you, red error, blue
-  done — whether its panel is on screen or not, and a project's count says how
-  many of its sessions wait on you. Hide it with the toolbar button or
-  **View ▸ Hide Sidebar** (⌃⌘S).
+  session's state — green working, orange blocked on you (or a program's
+  own notification), red error, blue done — whether its panel is on screen or not. Hide it with the toolbar
+  button or **View ▸ Hide Sidebar** (⌃⌘S).
 - **Remote files.** *Browse Files on This Host…* opens the SFTP browser at the
-  directory the remote shell is in. A project's **Remote Files ▸** lists the
+  directory the remote shell reports. A project's **Remote Files ▸** lists the
   hosts its sessions connected to through the connect dialog (an `ssh` typed at
   a prompt is not listed). Drag a file from that browser onto a terminal on the
   same host to type its path there, quoted; nothing runs until you press
   Return, and other terminals do not take it.
-- **After a restart** Space lists the same projects and, for each, starts the
-  same sessions again — a shell in the directory it was in, the same preset,
-  the same SSH host, which asks for its password again — the first time you
-  open the project, in the same grid. Scrollback is not kept. For local Claude
-  (`claude` or `claude-code`) and Codex, each pane remembers which tool was
-  running, even after it exits. The baseline fills `claude --resume` or
-  `codex resume`: press Return, then choose the conversation in that tool's
-  official picker. In the [recorded real-CLI check](test-results/2026-10-30-conversation-review3.md),
-  Claude Code 2.1.312 used `sessionRecord`; npm Codex 0.165.0 used
-  `picker` / `noOpenFile` and filled `codex resume` after restart.
-  Codex's `openFile` enhancement and shared app-server ownership remain unverified.
-  When a UUID can be reliably attributed to that pane, it
-  instead fills `claude --resume <UUID>` or `codex resume <UUID>` for that exact
-  conversation. Two panes in the same directory keep their own identities;
-  neither uses the directory's newest conversation, `--continue` or `--last`.
-  The accelerators are undocumented and may stop working after a CLI update;
-  the picker remains available. Claude uses its verified process session record;
-  Codex uses its foreground group's open files. If Codex's shared background
-  app-server owns the file, it cannot be attributed reliably and uses the picker.
-  **Resume Source** in each pane's menu shows `sessionRecord`, `openFile` or
-  `picker`. Claude's record is checked again when that file changes, so
-  `/clear`, `/resume` or a new conversation in the same process is picked up
-  on the next sample; if the new record cannot be confirmed, the pane falls
-  back to the picker instead of keeping the previous UUID. With no recorded kind, nothing is filled. SSH, remote agents and
-  SFTP are excluded. Preset commands are unchanged. A busy prompt, or one with text at
-  the cursor, is left alone. A prompt's right-hand side (RPROMPT, Starship,
-  Powerlevel10k) is not text you typed: Corta waits until that line has stopped
-  changing, then fills, and tries a few more times if the write does not land.
-  **Fill Conversation Again** in the pane's menu fills the same command again
-  at an empty prompt, without executing it.
 
-### Space Git rows
+#### What ends with the window, and what comes back
 
-Git rows read bounded metadata and tracked-file size/mtime, off main; edits to
-tracked files trigger refresh without an index write. Untracked files, content
-diffs and ahead/behind are excluded. Indexes v2–v4 and linked-worktree common
-refs are supported; more than 20,000 entries skips the change check.
+Every Space session — on the grid or hidden in the sidebar — is a process of
+its window, like a split. Closing the window or quitting Corta ends them;
+when something is still running, the usual confirmation says how many Space
+sessions will end, hidden ones included, and a confirmed close is carried
+out. What comes back on the next launch, the first time you open the project:
+
+- **The layout.** The same projects, sessions, names and grid.
+- **A new shell.** Each session starts again: a shell in the directory it was
+  in, the same preset, or the same SSH host (which asks for its password
+  again). Scrollback and the programs that were running are gone.
+- **The resume command, typed for you.** A local session that was running
+  Claude Code or Codex gets `claude --resume` / `codex resume` filled in at its
+  prompt. Nothing runs until you press Return; delete the line to skip it.
+- **Remote tmux, if you chose it.** An SSH session connected with **Keep
+  running after disconnect** reattaches to its programs, still running on the
+  server ([below](#keep-space-ssh-programs-running-after-disconnecting)).
+
+#### Picking up a Claude or Codex conversation
+
+For local Claude (`claude` or `claude-code`) and Codex, each pane remembers
+which tool was running, even after it exits. The baseline fills
+`claude --resume` or `codex resume`: press Return, then choose the
+conversation in that tool's official picker. When a conversation UUID can be
+reliably attributed to that pane, it instead fills `claude --resume <UUID>` or
+`codex resume <UUID>` for that exact conversation. Two panes in the same
+directory keep their own identities; neither uses the directory's newest
+conversation, `--continue` or `--last`. Claude uses its verified process
+session record; Codex uses its foreground group's open files. Both are
+undocumented and may stop working after a CLI update; the picker remains. If
+Codex's shared background app-server owns the file, it cannot be attributed
+and uses the picker. In the [recorded real-CLI check](test-results/2026-10-30-conversation-review3.md),
+Claude Code 2.1.312 used `sessionRecord`; npm Codex 0.165.0 used `picker` /
+`noOpenFile` and filled `codex resume` after restart. Claude's record is
+checked again when that file changes, so `/clear`, `/resume` or a new
+conversation in the same process is picked up on the next sample; if the new
+record cannot be confirmed, the pane falls back to the picker.
+
+Only an empty integrated shell prompt is filled; a busy prompt, or one with
+text at the cursor, is left alone. A prompt's right-hand side (RPROMPT,
+Starship, Powerlevel10k) is not text you typed: Corta waits until that line
+has stopped changing, then fills, and tries a few more times if the write
+does not land. With no recorded kind, nothing is filled. SSH, remote agents
+and SFTP are excluded; preset commands are unchanged.
+
+A brief Liquid Glass note at the grid's foot explains a successful fill,
+without showing the UUID or offering Undo:
+
+- One, exact conversation: “This conversation is filled in. Press Return to continue. Delete the line to skip it.”
+- One, picker: “The resume command is filled in. Press Return, then choose the conversation to continue. Delete the line to skip it.”
+- More than one: “Each pane has its resume command filled in. Press Return to continue. Delete that line to skip it.”
+- A session filled while hidden, when shown with that exact input still at the same prompt: “Press Return to continue this conversation.”
+
+The note disappears after a few seconds; the command stays in the prompt.
+When recovery went wrong, the session's **Diagnostics ▸** menu (panel **…**
+or sidebar row) shows its **Resume Source** — `sessionRecord`, `openFile` or
+`picker` — and **Fill Conversation Again** fills the same command again at an
+empty prompt, without executing it.
+
+![Two Space panes with unsubmitted Claude picker commands and a Liquid Glass note](brand/space-conversation.png)
+
+#### Sessions waiting for you
+
+The sidebar's top counts the sessions whose program says it is blocked on
+you — signing in first, then a permission prompt, then a question — and a
+project's count says how many of its own are. **View ▸ Jump to Next Waiting
+Session** (⌥⌘J) puts the one that has waited longest on the grid — in the
+least recently used panel's place when the grid is full — and moves it to
+the back of the queue. Focus moves only when you press it, never because a
+session stopped waiting. Done, error and a program's own notification keep
+their colour in the sidebar but are not counted.
+
+Only a program that reports its state (OSC 7501 — Claude Code does) can be
+counted. One that Corta recognises only by its process name says **State
+unknown · not queued**: Corta cannot tell when it waits, and does not guess.
+`space-attention-badge` (default on) shows the count on the Dock icon while
+the Space window is not key.
+
+#### Git rows and worktrees
+
+Each local session's row shows the Git branch of its directory, read from
+`.git` without running `git`. A number is about how many tracked files differ
+in size or modification time; new (untracked) files are not checked, and a
+clean directory shows no number. Content diffs and ahead/behind are not
+counted. A repository with more than 20,000 index entries says changes were
+not checked. Indexes v2–v4 and linked worktrees are supported; a session
+already in a linked worktree is marked, its tooltip names the main
+repository, and its menu can show the main repository in Finder. A directory
+that is not a repository shows nothing. The metadata is read off the main
+thread, and edits to tracked files refresh it without an index write.
 
 ### Keep Space SSH programs running after disconnecting
 
-In Space's connect dialog, **Keep running after disconnect** defaults to on.
-Each terminal gets its own `corta-<UUID>` session in the remote host's existing
-tmux. Closing a panel, window or Corta disconnects only local SSH; reconnecting
-that same terminal attaches to its still-running programs. No CLI conversation
-resume command is sent. After restarting Corta, the project connects its saved
-sessions, including hidden ones, only when first opened. Before that it makes
-no connection. Turn retention off for ordinary SSH. The traditional terminal
+In Space's connect dialog, **Keep running after disconnect** is off by
+default; turn it on for each connection whose programs should outlive the
+connection. Each such terminal gets its own `corta-<UUID>` session in the
+remote host's existing tmux. Closing a panel, window or Corta disconnects only
+local SSH; reconnecting that same terminal attaches to its still-running
+programs. No CLI conversation resume command is sent. After restarting Corta,
+the project connects its saved sessions, including hidden ones, only when
+first opened. Before that it makes no connection. The traditional terminal
 mode, typed/nested SSH, custom presets and SFTP never get this wrapper.
+
+Inside tmux, what a program tells the terminal stops at tmux. Corta does not
+set `allow-passthrough`, so a kept session's state dot stays **unknown** (and
+it is not counted as waiting), and the remote shell's directory reports (OSC 7)
+do not reach Corta: **Browse Files on This Host…** starts in your home
+directory. Corta changes no global tmux settings, installs nothing and starts
+no local daemon.
 
 Supported remote login shells are POSIX-family shells, zsh, fish and csh/tcsh.
 The fixed wrapper is a single quoted line passed to `/bin/sh`, so csh/tcsh
@@ -264,41 +329,7 @@ A server restart or an ended tmux session loses those processes permanently.
 `destroy-unattached on` can destroy the session when SSH disconnects; Corta
 does not change it. Screen/history are maintained remotely and subject to the
 server's history limit. Two clients using the same UUID share a session and
-compete over its size. Without `allow-passthrough`, directory and program-state
-reports may not reach Corta; tmux status integration is not promised. Corta
-changes no global tmux settings, installs nothing and starts no local daemon.
-
-A brief Liquid Glass note at the grid's foot explains a successful fill,
-without showing the UUID or offering Undo. Only successful fills count:
-
-- One, exact conversation: “This conversation is filled in. Press Return to continue. Delete the line to skip it.”
-- One, picker: “The resume command is filled in. Press Return, then choose the conversation to continue. Delete the line to skip it.”
-- More than one: “Each pane has its resume command filled in. Press Return to continue. Delete that line to skip it.”
-- A session filled while hidden, when shown with that exact input still at the same prompt: “Press Return to continue this conversation.”
-
-The note disappears after a few seconds; the command stays in the prompt.
-
-![Two Space panes with unsubmitted Claude picker commands and a Liquid Glass note](brand/space-conversation.png)
-
-`space-panel-limit` (1–6) caps the panels on screen.
-
-A session already in a linked worktree is marked, and its menu can show
-the main repository in Finder.
-
-Each local session's row shows the Git branch of its directory, read from
-`.git` without running `git`. A linked worktree is marked and its tooltip
-names the main repository. A number is how many tracked files differ in
-size or modification time; untracked files and ahead/behind are not
-counted. A repository with more than 20,000 index entries says changes
-were not checked. A directory that is not a repository shows nothing.
-
-The sidebar's top counts sessions that are waiting on you: a permission
-prompt, a question, a finished turn, or an attention request. View ▸
-Jump to Next Waiting Session (⌥⌘J) puts the oldest one on the grid — in
-the least recently used panel's place when the grid is full, never by
-itself while you are typing — and moves it to the back of the queue.
-`space-attention-badge` (default on) shows that count on the Dock icon
-while the Space window is not key.
+compete over its size.
 
 ![Space with one project open and three sessions in the grid](brand/space.png)
 

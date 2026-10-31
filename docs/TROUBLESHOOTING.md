@@ -290,10 +290,29 @@ the badge reads. A `tmux` or `screen` in the foreground reads *Remote?*
 because the session it is attached to may itself be on another machine
 and nothing here can tell — it is uncertainty, not an accusation.
 
+### Space shows fewer panels than it used to
+
+Space no longer resizes the window: the grid uses the room the window has,
+and a session that does not fit at 64 × 18 cells stays off screen, still
+running. Make the window larger (or full screen) for more panels; clicking a
+hidden session in the sidebar puts it on the grid in place of the panel used
+least recently.
+
+### An agent waits for me but Space does not count it
+
+Only sessions whose program reports it is blocked (OSC 7501 — Claude Code
+does) are counted. A CLI that Corta recognises only by its process name shows
+**State unknown · not queued**; Corta does not guess when it waits. Inside a
+remote tmux session kept with **Keep running after disconnect**, the report
+stops at tmux, so that session is not counted either. Done, error and a
+program's own notification keep their colour but are not counted, and the
+queue never moves focus by itself: press ⌥⌘J.
+
 ### Space always fills a picker instead of a specific conversation
 
 This is the reliable baseline: Return opens Claude's or Codex's official
-conversation picker. In the pane's menu, **Resume Source** shows `picker`,
+conversation picker. In the session's **Diagnostics ▸** menu (panel **…** or
+sidebar row), **Resume Source** shows `picker`,
 `sessionRecord` (Claude's verified process record), or `openFile` (Codex's
 foreground group). A CLI update can change these undocumented accelerators;
 Corta never substitutes the directory's newest conversation.
@@ -345,11 +364,12 @@ no longer existed. Server restarts, ending the session and `destroy-unattached
 on` lose the original programs; Corta cannot recover them and does not change
 your tmux settings. History is limited by the server's tmux configuration.
 Two clients using the same UUID share the terminal and compete over its size.
-Without `allow-passthrough`, program-state and directory reports may be blocked;
-Corta does not promise unverified tmux status integration or enable it globally.
+Corta does not set `allow-passthrough`, so inside a kept session the agent's
+state stays unknown (it is not counted as waiting) and directory reports do
+not arrive: **Browse Files on This Host…** starts in your home directory.
 
 Retention applies only to Space SSH created with **Keep running after
-disconnect** enabled. Disable it for ordinary SSH. Closing/removing local
+disconnect** turned on; it is off by default. Closing/removing local
 panels or projects never kills remote tmux. If an abandoned session consumes
 resources, connect to the same host and run the exact `tmux kill-session -t
 '=corta-<UUID>'` shown by its connection details or removal warning, including
