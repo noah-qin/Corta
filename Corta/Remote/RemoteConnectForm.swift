@@ -79,7 +79,9 @@ struct RemoteConnectForm: View {
     var body: some View {
         // Computed once per body: each keystroke narrows the lists.
         let shown = visibleSuggestions
-        return GlassEffectContainer(spacing: 16) {
+        // These controls stay separate, including while pressed. A merge
+        // distance larger than their gaps pulls capsule edges together.
+        return GlassEffectContainer(spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 if let modeSelection {
@@ -138,12 +140,14 @@ struct RemoteConnectForm: View {
                             Text(L10n.text("common.cancel")).frame(minWidth: 72)
                         }
                         .buttonStyle(.glass)
+                        .buttonBorderShape(.capsule)
                         .keyboardShortcut(.cancelAction)
                     }
                     Button(action: onConnect) {
                         Text(L10n.text("sftp.host.connect")).frame(minWidth: 72)
                     }
                     .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.capsule)
                     .keyboardShortcut(.defaultAction)
                     // Empty in Files, Return opens the focused pane's host's.
                     .disabled(fields.isEmpty && !(paneFiles != nil && mode == .sftp))
@@ -250,6 +254,7 @@ struct RemoteConnectForm: View {
                 paneFiles.open()
             }
             .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
             .accessibilityIdentifier("connect-pane-files")
         }
         .padding(.horizontal, 14)

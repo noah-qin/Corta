@@ -85,6 +85,9 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Keep glass buttons and filters rounded and separate at rest and while pressed
+  in the connection forms and command history window.
+
 - Space only shows a delayed conversation continuation note while the exact
   unsubmitted resume line is still at the original prompt.
 
