@@ -99,20 +99,21 @@ extension SplitViewController {
     /// whether to proceed — at once, true, when nothing needs asking.
     /// `window` nil asks app-modally.
     func confirmClose(
-        of running: [ViewController], scope: String, in window: NSWindow?,
+        of running: [ViewController], scope: String, in window: NSWindow?, spaceSessions: Int = 0,
         completion: @escaping @MainActor (Bool) -> Void
     ) {
         guard needsCloseConfirmation(for: running) else {
             completion(true)
             return
         }
-        closeAlert(for: running, scope: scope).present(for: window) { response in
+        closeAlert(for: running, scope: scope, spaceSessions: spaceSessions).present(for: window) { response in
             completion(response == .alertFirstButtonReturn)
         }
     }
 
-    /// The "still running" alert; Return is Cancel.
-    func closeAlert(for running: [ViewController], scope: String) -> NSAlert {
+    /// The "still running" alert; Return is Cancel. `spaceSessions` is how
+    /// many of Space's sessions — on the grid or hidden — end with it.
+    func closeAlert(for running: [ViewController], scope: String, spaceSessions: Int = 0) -> NSAlert {
         let names = running.compactMap { $0.session?.foregroundProcessName }
         let alert = NSAlert()
         alert.alertStyle = .warning
@@ -122,6 +123,10 @@ extension SplitViewController {
             ? L10n.text("close.running.single")
             : L10n.format(
                 "close.running.multiple", ListFormatter.localizedString(byJoining: Array(Set(names)).sorted()))
+        if spaceSessions > 0 {
+            alert.informativeText += "\n\n" + (spaceSessions == 1
+                ? L10n.text("close.running.spaceOne") : L10n.format("close.running.space", spaceSessions))
+        }
         alert.addButton(withTitle: L10n.text("close.running.closeAnyway"))
         alert.addButton(withTitle: L10n.text("common.cancel"))
         // Keep the destructive action explicit; Return defaults to Cancel.

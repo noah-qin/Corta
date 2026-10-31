@@ -96,6 +96,12 @@ final class CortaSpaceController: NSObject {
         })
     }
 
+    /// Sessions running in this window's Space, on the grid or hidden: what
+    /// closing the window ends.
+    var liveSessionCount: Int {
+        projects.reduce(0) { $0 + $1.sessions.filter { $0.pane != nil }.count }
+    }
+
     /// `space-panel-limit`, within the grid's four.
     var panelLimit: Int {
         min(SpaceGrid.maximumPanels, max(1, ConfigurationStore.shared.configuration.spacePanelLimit))

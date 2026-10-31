@@ -450,6 +450,26 @@ struct CortaSpaceTests {
         #expect(dirty.toolTip.contains(L10n.format("space.git.dirty", 3)))
     }
 
+    @Test func closingTheWindowSaysHowManySpaceSessionsEndHiddenOnesIncluded() throws {
+        let (controller, host) = try makeWindow()
+        defer { close(controller, host) }
+        let project = try makeProject()
+        defer { try? FileManager.default.removeItem(at: project) }
+        let space = host.space
+        space.setActive(true)
+        space.openProject(project)
+        space.newSession()
+        space.newSession()
+        let live = try #require(space.selectedProject)
+        space.hide(live.shown[0])
+        #expect(space.liveSessionCount == 3, "the hidden session counts")
+        let alert = host.closeAlert(for: [], scope: L10n.text("close.scope.window"),
+                                    spaceSessions: space.liveSessionCount)
+        #expect(alert.informativeText.contains(L10n.format("close.running.space", 3)))
+        let plain = host.closeAlert(for: [], scope: L10n.text("close.scope.window"))
+        #expect(!plain.informativeText.contains(L10n.format("close.running.space", 3)))
+    }
+
     @Test func projectsKeepTheirOwnSessionsAndAreSaved() throws {
         let (controller, host) = try makeWindow()
         defer { close(controller, host) }

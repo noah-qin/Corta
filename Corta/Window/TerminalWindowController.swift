@@ -335,12 +335,15 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         if sender.attachedSheet != nil, sender.isVisible { return false }
         // A background tab or a minimised window has nowhere to show a sheet:
         // ask now and answer now, rather than close it from inside this call.
+        // Space's sessions are this window's processes too, hidden ones included.
+        let spaceSessions = splitController.space.liveSessionCount
         guard NSAlert.canPresentSheet(on: sender) else {
-            let alert = splitController.closeAlert(for: running, scope: L10n.text("close.scope.window"))
+            let alert = splitController.closeAlert(
+                for: running, scope: L10n.text("close.scope.window"), spaceSessions: spaceSessions)
             return alert.runModal() == .alertFirstButtonReturn
         }
         splitController.confirmClose(
-            of: running, scope: L10n.text("close.scope.window"), in: sender
+            of: running, scope: L10n.text("close.scope.window"), in: sender, spaceSessions: spaceSessions
         ) { [weak sender] confirmed in if confirmed { sender?.close() } }
         return false
     }
