@@ -45,6 +45,7 @@ Status of every entry below is **accepted** unless it says otherwise.
 | [D27](#d27--sftp-asks-through-opensshs-own-askpass-answered-by-corta) | SFTP asks through OpenSSH's `SSH_ASKPASS`; nothing is stored | Accepted |
 | [D28](#d28--local-tools-are-swift-ci-only-glue-may-be-python) | Local tools are Swift; CI-only glue may be Python | Accepted |
 | [D29](#d29--no-homebrew-cask-until-homebrewcask-accepts-one) | No Homebrew cask until `homebrew/cask` accepts one | Accepted |
+| [D30](#d30--space-is-a-second-view-of-one-windows-sessions-not-a-multiplexer) | Space is a second view of one window's sessions, not a multiplexer | Accepted |
 
 ---
 
@@ -180,6 +181,18 @@ Compatibility with AI command-line tools is part of terminal correctness,
 not a feature. Automation that *runs commands* — a "run this" intent or
 URL — is likewise out: open/focus intents ship, execution does not
 (`SECURITY.md` §4.6).
+
+**Space SSH exception (#434).** When the user connects with retention on
+(off by default, chosen per connection), Corta may run its fixed remote tmux wrapper, rebuilt from a validated UUID
+and the SSH destination. It never reads a command from a restore file, uses
+no tmux control mode and provides no local multiplexer or daemon. A separate
+confirmed action may kill only that named remote session. The wrapper waits
+for the tmux client so exit status 0 (normal detach) ends SSH while nonzero
+can report failure and fall back to a login shell. Atomic detached creation,
+exact existence checks on collisions and exact attachment provide truthful
+new/attached results; it does not use tmux control mode or a local daemon,
+passes no environment or forwarded socket, and sets no tmux option — not
+`allow-passthrough`.
 
 ## D10 — One config file is the only settings store
 
@@ -652,6 +665,13 @@ chrome well; a line of text does not.
 **Consequence.** Reopen with a design for what the titlebar band should
 show (a solid theme colour, say) rather than with the API alone.
 
+**Space presentation exception.** Space (D30) starts its grid below the
+toolbar, in the content safe area, so no terminal text is under the
+titlebar; its titlebar is therefore transparent over the window's own
+background and the sidebar's glass card. The terminal mode keeps the
+opaque titlebar. Neither mode mirrors terminal text with a background
+extension.
+
 ## D25 — Metal frames present on their own, not with the transaction
 
 **Decision.** The terminal's `CAMetalLayer` keeps `presentsWithTransaction`
@@ -808,3 +828,104 @@ stars lets a user submit the cask, 225 lets the maintainer — or when
 Homebrew's maintainers accept it as a notability exception. The cask then
 sets `auto_updates true` so `brew upgrade` leaves updates to Sparkle, and
 `depends_on macos: ">= :tahoe"` with `depends_on arch: :arm64` (D21).
+
+## D30 — Space is a second view of one window's sessions, not a multiplexer
+
+**Decision.** Space shows project folders and their sessions in a sidebar
+and up to six of them in a free split grid. It is a mode of an ordinary terminal
+window: every session is a pane of that window, as a split's is, and it
+ends locally when the window closes. The terminal mode's split tree is kept whole
+while Space shows and the reverse; switching changes what is on screen,
+never the window's frame and never a process (amended 2026-11-01: Space
+no longer takes the screen's visible frame; the grid lays out in the room
+the window has, and a panel that does not fit stays off screen, running).
+Clicking a hidden session in the sidebar shows it — beside the roomiest
+panel, or in the least recently used one's place — with an Undo note and
+⌘Z; its row's add button still chooses a placement. The first time Space
+shows, one note says its sessions end with the window; closing a window
+whose Space has live sessions says how many end, hidden ones included, in
+the existing "still running" confirmation, and a confirmed close is
+respected — Space does not hide the window instead. There is one Space in the app — the
+window that first shows it holds its sessions, and asking for Space in
+another window brings that one forward. What survives a quit is a list:
+the folders and, for each, its sessions' directories, preset names or SSH
+destinations, the user's names for them, and the grid's split tree, in
+`Application Support/space.json` (`CONFIGURATION.md` §8). A restored
+session is a fresh shell, the configured preset, or the same SSH
+connection. A Space SSH created through the connect dialog with retention
+on may reattach to its own `corta-<UUID>` session on an existing remote tmux.
+Closing the window or quitting ends only the local ssh; tmux owns the remote
+processes, screen and history. The saved record holds its UUID and whether
+tmux was established, never a command. Nothing connects before the project
+is first opened, including its off-grid sessions. For local Claude and Codex, Corta remembers the kind, an optional standard
+conversation UUID and its source. The official picker (`claude --resume` or
+`codex resume`, without an ID) is the baseline. An exact UUID accelerates it
+only when reliably attributed to this pane: Claude's bounded, no-follow
+`$HOME/.claude/sessions/<pid>.json` record with kernel PID/start verification
+(`sessionRecord`), or Codex's strictly selected open rollout file (`openFile`).
+Both are undocumented and may stop working after a CLI update; failure uses
+`picker`, never the directory's newest conversation, `--continue` or `--last`.
+The whole foreground group is inspected, so npm's node wrapper does not hide
+Codex; a confirmed group containing both kinds clears the pane's saved identity.
+Claude's own process HOME is the only environment value decoded from a bounded
+64 KiB kernel query; other values are neither decoded, retained nor logged.
+Missing/unreadable HOME never falls back to the account directory.
+
+**Bounded retry amendment (review3), restated for same-process switches.** A
+successful record is cached by PID, subsecond kernel start and the record
+file's stat four-tuple `(dev, inode, size, mtime)`. Each sample `lstat`s
+that file and reads it only when the tuple changes, once per change. A
+same-process change that yields a new standard UUID replaces the saved one
+and is logged as `sessionChanged`. A change that cannot be confirmed drops
+the old UUID back to `picker`; it is not kept as the current conversation.
+An unchanged tuple is not read again, so a touch of only `mtime` rereads
+once and, when the UUID is the same, logs no source change. To recover from partial publication
+or a transient `recordUnreadable`/`processMismatch`, failures share a maximum
+of three non-ENOENT attempts per identity (initial attempt plus two retries,
+at the existing one-second monitor cadence). This deliberately relaxes a strict one-read rule only for a changed stamp
+or a failed read; it is not an unlimited once-per-second reread.
+After exhaustion, only the last fixed reason is retained; no failed record or
+observation is cached. ENOENT reads no contents and can be probed until a late
+record appears, within the remaining attempt budget. Replacing the kernel
+identity resets that budget. A new agent process
+replaces the old identity, even when it yields only a kind; an exited process
+leaves the last observation. A failed probe of an unchanged record retains a
+previously verified UUID and the source that obtained it; only the log reason
+reflects that probe. `picker` never accompanies a UUID. Source/result changes are logged without identity
+or paths and each pane's menu shows its source. Kind, UUID, source or process
+identity changes notify listeners with the session id alone.
+
+On the project's first opening next launch, the fixed resume command fills
+an empty integrated shell prompt; only the user's Return executes it.
+A right-hand prompt is not typed text: the input is the gap between the
+cursor and a trailing run. The line must be stable for a few samples;
+a failed write is retried within ten seconds. Typing abandons the fill.
+Missing or invalid UUIDs use the picker; a missing kind leaves a plain shell.
+Local agents never use tmux.
+
+**Why.** Keeping local processes alive past their window remains the
+multiplexer D09 rules out. Remote tmux retention delegates that lifetime
+to the remote host under the connection choice; Corta owns no daemon. One Space, not one per window, so a
+folder cannot be open twice with two sets of sessions. Nothing in the project folder is executed or used to name a session, and
+nothing is written there: a folder may come from anyone's
+repository, and a file there naming sessions would be a way to make Corta
+run them (`SECURITY.md` §4.6). The sidebar's Git row is the one read: `.git/HEAD`,
+a worktree `gitdir:` file and `.git/index`, plus `stat` of the tracked paths
+the index names. It never runs `git`.
+
+The grid is a free split tree, the terminal mode's own: a session dropped on
+a panel's edge splits it there. No split leaves a panel smaller than 64 × 18
+cells; with no room, or at `space-panel-limit` (at most six), a session takes
+the least recently used panel's place, never the focused one's. Not 80 × 24,
+which beside the sidebar on a 14-inch display leaves room for one panel, so
+the grid would never be one. Six, because a 14-inch display holds six at the
+minimum and a larger one would hold more than a person reads at once. A tiled
+grid shares one axis, so columns (own heights) and rows (own widths) are a
+choice the user makes, not one the grid makes for them.
+
+**What it costs.** Quitting ends Space's local children; remote retained
+processes may continue consuming resources. Local scrollback is not restored. A session cannot move to another window.
+
+**Consequence.** Reopen with a design for sessions that outlive a window
+that does not reopen D09, or with a measured case where 64 × 18 breaks a
+program the grid is for.

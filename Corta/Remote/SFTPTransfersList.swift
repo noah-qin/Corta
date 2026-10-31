@@ -206,17 +206,134 @@ private struct TransferRow: View {
 
 // MARK: - Drag to Finder
 
-/// One remote file as a drag: Finder asks for the file when it is dropped,
-/// and the export downloads it (through the transfer queue, with a progress
-/// row) into a private staging folder the system then copies from.
-struct SFTPDragItem: Transferable {
+/// Immutable drag payload. Provider metadata and URL loads never hop to the
+/// main actor: AppKit can request them synchronously while tracking a drag.
+/// Only an actual file request starts the asynchronous queued download.
+nonisolated struct SFTPDragItem: Sendable {
     let name: String
+    let remoteURL: URL?
     let export: @Sendable () async throws -> URL
 
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .data) { item in
-            SentTransferredFile(try await item.export(), allowAccessingOriginalFile: false)
+    func itemProvider() -> NSItemProvider {
+        let provider = NSItemProvider()
+        provider.suggestedName = name
+        provider.registerFileRepresentation(
+            forTypeIdentifier: UTType.data.identifier, fileOptions: [], visibility: .all
+        ) { completion in
+            // Never wait here: the consumer may be on the main thread.
+            Task.detached {
+                do { completion(try await export(), false, nil) } catch { completion(nil, false, error) }
+            }
+            return nil
         }
-        .suggestedFileName { $0.name }
+        if let remoteURL {
+            let data = Data(remoteURL.absoluteString.utf8)
+            for type in [UTType.url, .utf8PlainText] {
+                provider.registerDataRepresentation(
+                    forTypeIdentifier: type.identifier, visibility: .all
+                ) { completion in
+                    completion(data, nil)
+                    return nil
+                }
+            }
+        }
+        return provider
+    }
+}
+
+/// The remote file a drag from the SFTP browser carries, for a terminal on
+/// the same host to take as its path (`PaneRemote.remotePath(forDropped:)`).
+///
+/// Internal drops use this process-local record instead of reading promised
+/// pasteboard data during drag updates. External consumers also receive the
+/// URL through a nonisolated provider. Neither path downloads a file, and
+/// the URL names no password and no key.
+@MainActor
+enum SFTPRemoteDrag {
+    private struct OpenDrag {
+        var token: Int
+        var session: AnyHashable?
+    }
+
+    private struct Record {
+        var url: URL
+        var began: Date
+        var token: Int
+    }
+
+    private static var current: Record?
+
+    /// The token of the drag still in progress, when one is.
+    static var currentToken: Int? { current?.token }
+    /// A drag older than this is not the one over the terminal. Session end clears it first.
+    static let lifetime: TimeInterval = 120
+    private static var generation = 0
+    private static var open: [OpenDrag] = []
+
+    @discardableResult
+    static func begin(_ url: URL?) -> Int {
+        generation += 1
+        let token = generation
+        current = url.map { Record(url: $0, began: Date(), token: token) }
+        if let index = open.firstIndex(where: { $0.token == 0 }) {
+            open[index].token = token
+        } else {
+            open.append(OpenDrag(token: token, session: nil))
+        }
+        return token
+    }
+
+    /// The URL of the drag in progress, if it is one of the browser's.
+    static func url(forPasteboardTypes types: [NSPasteboard.PasteboardType]) -> URL? {
+        guard let current, Date().timeIntervalSince(current.began) < lifetime,
+              isFilePromise(types)
+        else { return nil }
+        return current.url
+    }
+
+    /// The pasteboard carries this drag's `sftp://` link, so its file promise is the download.
+    static func matchesRecordedLink(_ pasteboard: NSPasteboard) -> Bool {
+        guard let current, Date().timeIntervalSince(current.began) < lifetime,
+              isFilePromise(pasteboard.types ?? []) else { return false }
+        let link = pasteboard.string(forType: .URL) ?? pasteboard.string(forType: .string)
+        return link == current.url.absoluteString
+    }
+
+    static func isFilePromise(_ types: [NSPasteboard.PasteboardType]) -> Bool {
+        types.contains { NSFilePromiseReceiver.readableDraggedTypes.contains($0.rawValue) }
+    }
+
+    /// Binds a SwiftUI drag session to the row that started it.
+    static func attach(_ session: AnyHashable) {
+        if open.contains(where: { $0.session == session }) { return }
+        if let index = open.firstIndex(where: { $0.session == nil && $0.token != 0 }) {
+            open[index].session = session
+        } else {
+            open.append(OpenDrag(token: 0, session: session))
+        }
+    }
+
+    /// Removes the session's token without clearing the record. The drop may still be reading it.
+    static func detach(_ session: AnyHashable) -> Int? {
+        if let index = open.firstIndex(where: { $0.session == session }) {
+            let token = open.remove(at: index).token
+            return token == 0 ? nil : token
+        }
+        if let index = open.firstIndex(where: { $0.session == nil && $0.token != 0 }) {
+            return open.remove(at: index).token
+        }
+        return nil
+    }
+
+    static func end() {
+        current = nil
+        open.removeAll()
+    }
+
+    /// Clears the record only when `token` is still the drag in progress.
+    static func end(token: Int) {
+        open.removeAll { $0.token == token }
+        guard current?.token == token else { return }
+        current = nil
     }
 }

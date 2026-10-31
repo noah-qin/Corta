@@ -263,7 +263,9 @@ nonisolated extension Configuration {
         ]),
         ("# Notifications", [
             .flag("notify-from-programs", \.notifyFromPrograms),
+            .integer("space-panel-limit", \.spacePanelLimit, in: 1...6),
             .flag("agent-status", \.agentStatus),
+            .flag("space-attention-badge", \.spaceAttentionBadge),
             ConfigurationKey(name: "agent-processes", read: { configuration, value in
                 let names = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
                 guard names.count <= 32, names.allSatisfy({ name in

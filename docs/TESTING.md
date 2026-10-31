@@ -103,6 +103,47 @@ The repository also requires CodeQL scanning results separately from job
 status checks. Verify both the PR's checks and merge eligibility when changing
 language routing; successful placeholder jobs alone do not prove eligibility.
 
+## Space issue acceptance
+
+[Space acceptance](SPACE-ACCEPTANCE.md) maps the 1.6.0 Space issues to implementation,
+regression coverage and environment-dependent requirements. Issue-contract
+probes run in the ordinary Unit plan; they can also be selected explicitly:
+
+```sh
+xcodebuild test -project Corta.xcodeproj -scheme Corta -testPlan Unit \
+  -destination 'platform=macOS' \
+  -only-testing:CortaTests/SpaceIssueAcceptanceTests
+```
+
+Run Xcode test invocations sequentially: Unit/UI plans sharing derived data
+can replace each other's hosted test bundles. Prepare UI fixtures before
+running the Space conversation and SSH-dialog UI checks:
+
+```sh
+fixture_root=$(CortaUITests/stage-ui-fixtures.sh)
+TEST_RUNNER_CORTA_UI_FIXTURES="$fixture_root" \
+xcodebuild test -project Corta.xcodeproj -scheme Corta -testPlan UI \
+  -destination 'platform=macOS' \
+  -only-testing:CortaUITests/CortaSpaceUITests \
+  -only-testing:CortaUITests/CortaSpaceConversationUITests
+```
+
+`testProjectFilesCannotConfigureSpace` optionally accepts
+`TEST_RUNNER_CORTA_FILE_AUDIT_LIBRARY`, a temporary development-only dylib that
+interposes open/openat/fopen (including the non-cancelling open entry point).
+The test injects it only into the isolated app, filters to the scratch stage,
+requires a positive config-open control, and rejects opens of project-local
+`space.json`, `.corta` or `sessions`. The trace contains paths, never file bytes.
+Without an explicitly prepared tracing fixture this check is skipped; it is
+not a filesystem acceptance pass. OS tracing tools are an alternative where
+permissions permit them. Never weaken system tracing or signing policy to run it.
+
+Remove only that scratch fixture after the launched test app exits. For a
+localhost SSH/tmux lifecycle run, use `python3 -B scripts/verify-ssh-integration.py --app`.
+Its isolated sshd configuration disables per-source penalties so deliberate
+negative authentication cases cannot ban later lifecycle checks. No system
+sshd configuration is changed.
+
 ## Terminal core
 
 ```sh
@@ -232,6 +273,8 @@ root; `ci.yml`'s core job runs it after `swift test`:
 
 ```sh
 python3 scripts/verify-ssh-integration.py
+# Also the app-hosted window close/reopen check. See Space below.
+python3 scripts/verify-ssh-integration.py --app
 ```
 
 Without the fixture the suite skips itself; a failed fixture set-up is
@@ -430,6 +473,20 @@ through the default target passes.
 setup failure when the root or their config is missing, or the fixture
 prompt did not load. Their shared launcher also isolates `HOME` and
 `ZDOTDIR`; a missing fixture must never be counted as feature coverage.
+
+Real conversation-recovery acceptance (#436) requires explicit account/quota
+authorization. Set `TEST_RUNNER_CORTA_CONVERSATION_REAL_CWD`,
+`TEST_RUNNER_CORTA_CONVERSATION_REAL_HOME`, `TEST_RUNNER_CORTA_CONVERSATION_REAL_CLAUDE`
+and `TEST_RUNNER_CORTA_CONVERSATION_REAL_CODEX`, then select the whole
+`CortaTests/CortaSpaceTests` suite in the Unit plan. The fixture uses a
+temporary shell environment and per-invocation CLI flags; no persistent agent
+settings are changed.
+
+For the Release one/six-panel comparison, prepare the same UI fixture root and
+select `CortaUITests/MeasurementUITests/testSpaceFloodOneAndSixPanels` under
+`-testPlan Release -configuration Benchmark`. The two stages use font size 10,
+independent live `yes` producers and the same display/toolchain. Record the
+printed frame CPU distributions and machine header; this is foreground work.
 
 ### Running app suites without a window
 
@@ -810,6 +867,156 @@ Never change global hotkeys, secure-input state, shell startup files or
 dependencies and per-process environments. Use temporary directories for
 fixtures and clean up the resources you create.
 
+### Space
+
+`SpaceGridTests` cover the grid's rules — drop edges, the split minimum,
+automatic placement and least recently used, column and row arrangement,
+`space.json`'s validation, sizes and round trip, session names — and the
+remote-drop rule (same host, user and port; control characters refused),
+without a window. `CortaSpaceTests` drive Space in real windows with real
+shells: entering and leaving Space keeps the window's frame and gives the
+terminal mode its tree and every process back; the first-run note shows once;
+a click shows a hidden session and ⌘Z undoes it; the close confirmation
+counts hidden sessions; new sessions split until the limit and then replace the
+least recently used; edge drops; hiding, filling and ending; projects and
+what is saved; one Space per app. `CortaSpaceUITests` is the launched-app
+check (D14): a scratch stage's `space.json`, then clicks, renames, hovers, the
+sidebar toggle and full screen, with screenshots attached. Remote-file drags
+are checked by hand in the launched app; record which in the pull request.
+
+`RemoteTmuxTests` checks token/phase boundaries, malformed and repeated reports,
+RIS, command quoting, missing/broken tmux, attach failure and zero-exit detach
+without a fallback shell. Every wrapper branch runs with `/bin/sh`, `/bin/zsh`,
+`/bin/bash` and `/bin/tcsh` as the login shell parsing the generated command.
+The command must contain no literal newline or single quote inside the outer
+single-quoted script, so csh/tcsh can hand it intact to `/bin/sh`.
+A `fail` after screen output, or after the
+attach-failure window, is ignored; a `fail` before any drawing, including a
+prepare failure with no `start`, is kept. A title report does not close that
+window. `RemoteTmuxSSHIntegrationTests` runs through the
+isolated sshd fixture in `scripts/verify-ssh-integration.py`, using an installed
+tmux on a private socket with a fixture-only config/shell. It checks two UUIDs,
+distinct remote PIDs surviving the app's actual `TerminalSession.stop` SIGHUP
+path, reconnect, resize, targeted kill, recreation, detach, ordinary SSH and
+authentication refusal. It installs nothing and never uses an existing tmux
+server. Missing tmux is reported as unavailable, not a passing lifecycle check.
+`CortaSpaceSSHIntegrationTests` is the same fixture through a real Space
+window: constructing the window does not connect; activating Space starts the
+saved sessions, including the one off the grid; `SplitViewController.teardown`
+(the window-close path) leaves the remote pane PIDs alive; opening Space again
+attaches and those PIDs are unchanged. Run it with
+`python3 scripts/verify-ssh-integration.py --app` after the core SSH suites.
+A skipped suite is not a passing lifecycle check.
+`SpaceGridTests` cover UUID migration/persistence and invalid/duplicate repair.
+The UI case `CortaSpaceUITests/testSSHRetentionIsOnlyOfferedInSpaceAndDefaultsOn`
+uses the externally prepared `space-ssh` stage (same `stage-ui-fixtures.sh`
+recipe), opens no real host and verifies the glass toggle's mode/default/reset.
+
+For Xcode package resolution problems, use absolute paths with
+`-clonedSourcePackagesDirPath` and `-packageCachePath`, plus `-scmProvider system`.
+A separately downloaded binary artifact must match its package manifest's
+SHA-256 before seeding a repository-local artifact cache. A resolver reporting
+an empty package list is not success: verify it lists CortaTerminal and Sparkle
+and the build finds their products. Never change package pins or machine-wide
+settings merely to get a test to run.
+
+`RemoteTmuxTests` runs the shell branch matrix with tcsh `-f -c` so local
+startup files do not affect the wrapper results.
+
+`LocalConversationTests` checks exact UUID extraction, ambiguous/strictly
+newest open files, and two same-directory processes holding different files.
+`ClaudeSessionRecordTests` checks `sessionRecord` success; missing, unreadable,
+overlarge, invalid JSON, missing field, nonstandard UUID, mismatched PID/start,
+symlink, kernel identity changing during read, and cache invalidation on PID
+reuse, and a record published after the agent process appears (no contents
+are read until the file exists), the literal Claude 2.1.312 `procStart`,
+bounded failure retries, and success-only caching. `ConversationProcessHomeTests`
+checks exact HOME extraction and a disposable signed process whose record lives
+under its own HOME. Every failure asserts `picker` and the exact reason through returned
+observations, without parsing system logs. Whole-group recognition covers a
+node leader with a Codex member and rejects mixed tools. Native version-named
+Claude uses only the kernel invocation basename; later arguments are ignored. A new agent clears
+the previous UUID; a failed probe of the same agent retains a verified UUID
+and its source. Unreadable fd tables have a distinct reason. App tests verify
+that a confirmed mixed group clears persisted metadata.
+
+`SpaceConversationTests` checks legacy/invalid metadata, source migration,
+duplicate keys, metadata-only persistence, remote exclusion and notice choice.
+The conversation cases in `CortaSpaceTests` open real windows/shells to check
+exact/picker fills, successful-fill counts, hidden panes, notes, delete/refill,
+and suppress delayed notices after deletion, edits, trailing spaces or moving
+the cursor to Home. They also cover
+mode switches, right prompts and process replacement/exit. The grid cases
+cover typed text, wide glyphs, wraps and unstable prompts.
+`CortaSpaceConversationUITests` checks exact and picker fills without execution,
+all four messages, per-pane source menus and explicit refill. Prepare stages
+with `CortaUITests/stage-ui-fixtures.sh` and select that class in the UI plan.
+These synthetic stages and disposable signed sleep executables verify Corta's
+behavior, not real CLI compatibility. No installed binary or machine-wide
+setting is changed.
+
+The opt-in `CortaSpaceTests/realClaudeAndNpmCodexSourcesSurviveClosingAndReopeningSpace()`
+uses installed authenticated CLIs. Set `TEST_RUNNER_CORTA_CONVERSATION_REAL_CLAUDE`,
+`TEST_RUNNER_CORTA_CONVERSATION_REAL_CODEX`, `TEST_RUNNER_CORTA_CONVERSATION_REAL_HOME`
+and `TEST_RUNNER_CORTA_CONVERSATION_REAL_CWD` (an already trusted checkout), then
+select `CortaSpaceTests` under Unit. It requests one tiny reply per CLI, asks
+for no tool calls, checks sources and persisted identities, measures one warm
+utility-task round over both panes, and verifies unsubmitted fills after
+closing/reopening Space. It never changes installed CLI configuration.
+For a full app-process relaunch, also prepare the UI stages with
+`CORTA_CONVERSATION_REAL_CWD=/path/to/trusted/checkout CortaUITests/stage-ui-fixtures.sh`,
+pass its root as `TEST_RUNNER_CORTA_UI_FIXTURES` and the same real CLI/home
+variables, and select
+`CortaSpaceConversationUITests/testRealCLIsFillTheirRecordedCommandsAfterAppRelaunch`
+in the UI plan. The test verifies both recorded commands after terminate/launch.
+
+Real Claude acceptance must record its version, `sessionRecord` in
+`space.json`, the privacy-safe source/result log, and a restart filling that
+same UUID. A `picker` result is not a passing Claude enhancement check: report
+the fallback reason. Real npm Codex acceptance records its version, recognized
+kind, source/log, and either the UUID or `codex resume` baseline. Only files
+open in its foreground group are eligible; shared app-server files are not
+attributed. Measure one round over all agent panes off main, reporting the
+method and time with the verification results. Synthetic tests cannot replace
+these real-CLI checks.
+
+`./scripts/build-and-run.sh --space-preview` opens the Debug build in Space.
+
+### SFTP drag data and Finder downloads
+
+`SFTPDragProviderTests` reproduces the deadlock trigger with a lazy
+`public.file-url` alongside file-promise types. A probe counts attempted
+materialization instead of hanging the test. The browser's own drag — local
+or carrying that drag's `sftp://` link — must not request it during tracking.
+An external promise is read only after the tracking call returns, and not on
+the main thread; a resident file URL beside a promise is the local path even
+while a remote drag is current. Ending the drag session clears the record
+before the two-minute lifetime. An ordinary Finder file URL must still work.
+It also exercises the actual
+table's pasteboard writer and `NSItemProvider`: URL and UTF-8 text must load
+while the main thread is occupied, without starting a download. A gated file transfer checks that
+requesting file bytes returns asynchronously, leaves the main actor available,
+keeps the directory captured at drag start, and completes with the downloaded
+bytes. An abandoned connection must fail rather than download from a new one.
+`SFTPDragExportTests` checks private staging permissions and cleanup.
+
+The UI-plan case
+`RemoteWorkflowUITests/testFileDragExportsLinkAndDownloadsToFinder` uses
+`stage-remote-ui.sh` and the real local `sftp-server`. It drags a file row
+onto a same-host terminal and verifies the quoted remote path, then
+into a text field and checks its `sftp://` link, then into a disposable Finder
+folder and checks the downloaded bytes. It requires an interactive, unlocked
+desktop and closes only the Finder window it opens. Run it with:
+
+```sh
+xcodebuild test -project Corta.xcodeproj -scheme Corta -testPlan UI \
+  -only-testing:CortaUITests/RemoteWorkflowUITests/testFileDragExportsLinkAndDownloadsToFinder
+```
+
+Record a UI-runner initialization failure separately from an assertion
+failure; it does not verify the drag. Never change system authentication,
+permissions or global settings to get the runner started.
+
 ### The SFTP browser without a server
 
 Debug builds offer **Help ▸ SFTP Development Preview**, or launch with
@@ -1028,7 +1235,9 @@ any skipped checks. Separate build failures, assertion failures, crashes,
 timing failures and fixture/setup problems. Attach an `.xcresult` for app
 failures or the smallest byte stream for parser failures, after removing
 private data. A manual pass is recorded in the pull request or issue it
-verifies, not as a file in the tree.
+verifies, not as a file in the tree. For the maintainer-requested review3
+exception (no PR), the [conversation acceptance record](test-results/2026-10-30-conversation-review3.md)
+is retained in the historical `docs/test-results/` location.
 
 The historical esctest2 number that includes “known bugs” is a compatibility
 classification, not an automated-test pass rate. Always report all three

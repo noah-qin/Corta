@@ -69,12 +69,12 @@ extension TerminalSession {
     }
 
     /// A paste is still queued for the child.
-    var hasPendingPaste: Bool {
+    public var hasPendingPaste: Bool {
         pendingWrites.withLock { !$0.pastes.isEmpty }
     }
 
     /// A paste's chunk is being written and has not returned.
-    var isPasteInFlight: Bool {
+    public var isPasteInFlight: Bool {
         pendingWrites.withLock { $0.writing && $0.inFlightPaste != nil }
     }
 

@@ -359,9 +359,7 @@ extension SFTPBrowserView {
                 if entry.kind == .file {
                     // Dragged to Finder, a file is downloaded where it lands.
                     TableRow(entry)
-                        .draggable(SFTPDragItem(name: SFTPBrowserModel.localFileName(entry.name)) { [model] in
-                            try await model.exportForDrag(entry)
-                        })
+                        .itemProvider { model.dragItem(for: entry).itemProvider() }
                 } else {
                     TableRow(entry)
                 }
@@ -390,6 +388,22 @@ extension SFTPBrowserView {
             }
             model.sortAscending = first.order == .forward
         }
+        // The row's provider has no drag-ended callback. Clear the remote path
+        // when the session ends — including a cancel — but on the next turn, so
+        // a drop landing in this app can still read it.
+        .onDragSessionUpdated { session in
+            if Self.dragSessionEnded(session.phase) {
+                guard let token = SFTPRemoteDrag.detach(session.id) else { return }
+                DispatchQueue.main.async { SFTPRemoteDrag.end(token: token) }
+            } else {
+                SFTPRemoteDrag.attach(session.id)
+            }
+        }
+    }
+
+    private static func dragSessionEnded(_ phase: DragSession.Phase) -> Bool {
+        if case .ended = phase { return true }
+        return phase == .dataTransferCompleted
     }
 
     /// The row menu acts on the clicked rows: right-clicking outside the

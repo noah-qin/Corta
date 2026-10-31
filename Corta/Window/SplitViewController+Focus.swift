@@ -19,6 +19,10 @@ import Cocoa
 // MARK: - Focus
 
 extension SplitViewController {
+    func pane(forLeaf leaf: NSView) -> ViewController? {
+        panes.first { $0.view === leaf || $0.view.isDescendant(of: leaf) }
+    }
+
     func noteFocus(_ pane: ViewController) {
         guard focusedPane !== pane else { return }
         let previous = focusedPane
@@ -29,11 +33,16 @@ extension SplitViewController {
         previous?.focus.applyAppearance()
         pane.focus.applyAppearance()
         applyWindowTitle()
+        space.noteFocus(pane, previous: previous)
     }
 
     /// The focused pane's title; a title in an unfocused pane waits for focus.
     func applyWindowTitle() {
         guard let window = view.window else { return }
+        if space.isActive {
+            space.applyWindowTitle()
+            return
+        }
         guard let focusedPane else {
             window.title = "Corta"
             window.representedURL = nil
@@ -48,16 +57,44 @@ extension SplitViewController {
     @objc func moveFocusDown(_: Any?) { moveFocus(.down) }
 
     private func moveFocus(_ direction: SplitMoveDirection) {
-        guard let focusedPane,
-            let leaf = tree.leaf(from: focusedPane.view, direction: direction, inContainer: view),
+        guard let focusedPane, let tree, let current = leafView(of: focusedPane),
+            let leaf = tree.leaf(from: current, direction: direction, inContainer: view),
             let target = pane(forLeaf: leaf)
         else { return }
         view.window?.makeFirstResponder(target.terminalView)
     }
 
+    /// The leaf a pane fills on screen: its own view in a split, its panel
+    /// in Space's grid.
+    func leafView(of pane: ViewController) -> NSView? {
+        space.isActive ? space.leaf(for: pane) : pane.view
+    }
+
     /// Focus moves need more than one pane.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
+        case #selector(toggleSpaceMode(_:)):
+            menuItem.title = L10n.text(space.isActive ? "space.command.showTerminal" : "space.command.showSpace")
+            return !(view.window is NSPanel)
+        case #selector(jumpToNextWaitingSession(_:)):
+            return space.isActive && space.hasWaitingSession()
+        case #selector(openSpaceProject(_:)):
+            return !(view.window is NSPanel)
+        case #selector(arrangeSpaceInColumns(_:)), #selector(arrangeSpaceInRows(_:)):
+            return space.isActive && (space.selectedProject?.shown.count ?? 0) > 1
+        case #selector(toggleSpaceSidebar(_:)):
+            let collapsed = space.splitController.splitViewItems.first?.isCollapsed ?? false
+            menuItem.title = L10n.text(collapsed || !space.isActive ? "menu.toggleSidebar" : "menu.hideSidebar")
+            return space.isActive
+        case #selector(splitRight(_:)) where space.isActive:
+            // In Space a new pane is a new session of the project.
+            menuItem.title = L10n.text("space.newSession")
+            return true
+        case #selector(splitRight(_:)):
+            menuItem.title = TerminalCommand.splitRight.title
+            return true
+        case #selector(splitDown(_:)) where space.isActive, #selector(reopenClosedPane(_:)) where space.isActive:
+            return false
         case #selector(selectPreviousCortaTab(_:)), #selector(selectNextCortaTab(_:)):
             return (view.window?.tabbedWindows?.count ?? 0) > 1
         case #selector(renameCurrentTab(_:)):
@@ -67,6 +104,10 @@ extension SplitViewController {
             return tree != nil && tree.leafCount > 1
         case #selector(reopenClosedPane(_:)):
             return canReopenClosedPane
+        case #selector(toggleZoomPane(_:)) where space.isActive:
+            let maximized = space.selectedProject?.maximized != nil
+            menuItem.title = L10n.text(maximized ? "command.unzoomPane" : "command.zoomPane")
+            return maximized || (tree != nil && tree.leafCount > 1)
         case #selector(toggleZoomPane(_:)):
             // The title says what the item does now, which a checkmark wouldn't.
             menuItem.title =
@@ -103,8 +144,14 @@ extension SplitViewController {
     /// from crushing a pane first.
     func updateWindowMinSize() {
         guard let window = view.window, let pane = panes.first else { return }
-        let treeMinimum = tree.minimumSize(
-            of: tree.root, leafSize: leafMinimumSize, dividerThickness: 1)
+        if space.isActive {
+            let minimum = space.minimumContentSize
+            window.contentMinSize = NSSize(
+                width: minimum.width, height: minimum.height + pane.windowChrome + statusBarHeight)
+            return
+        }
+        let treeMinimum = terminalTree.minimumSize(
+            of: terminalTree.root, leafSize: leafMinimumSize, dividerThickness: 1)
         window.contentMinSize = NSSize(
             width: treeMinimum.width,
             height: treeMinimum.height + pane.windowChrome + statusBarHeight)
@@ -115,8 +162,7 @@ extension SplitViewController {
     }
 
     private func minimumAxis(of subtree: NSView, vertical: Bool) -> CGFloat {
-        let size = tree.minimumSize(
-            of: subtree, leafSize: leafMinimumSize, dividerThickness: 1)
+        let size = terminalTree.minimumSize(of: subtree, leafSize: leafMinimumSize, dividerThickness: 1)
         return vertical ? size.width : size.height
     }
 }

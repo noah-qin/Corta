@@ -30,6 +30,9 @@ final class TerminalView: NSView, CALayerDelegate {
     /// tracking focus after a tab moves windows. Not `private` because
     /// `TerminalView+Scroll.swift` reports gesture phases to it.
     var renderPolicy: RenderPolicy?
+    /// Pane-local input revision, so delayed prompt fills never overtake typing.
+    private(set) var userInputRevision: UInt64 = 0
+
     /// Pauses rendering while the window is occluded; replaced when changing windows.
     private var inputGeometryObservers: [NSObjectProtocol] = []
     private var occlusionObserver: NSObjectProtocol?
@@ -131,6 +134,9 @@ final class TerminalView: NSView, CALayerDelegate {
 
     /// Dropped file paths; the controller sanitises, quotes and sends them.
     var onDropPaths: (([String]) -> Void)?
+    /// The remote paths among dropped `sftp://` URLs that this pane's own
+    /// session can use — same host — or none (`PaneRemote.remotePaths`).
+    var remotePathsForDrop: (([URL]) -> [String])?
     /// The word under a force touch and the popover anchor.
     var onLookUp: ((CGPoint) -> (String, CGPoint)?)?
     /// The selection as text for the Services menu.
@@ -418,6 +424,7 @@ extension TerminalView {
 
     /// Shared input hook, independent of diagnostic sampling.
     func noteUserInput() {
+        userInputRevision &+= 1
         paneController?.updateReaderPriority(input: true)
         frameScheduler.noteInput()
         renderPolicy?.noteInput()

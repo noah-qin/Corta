@@ -88,6 +88,9 @@ line each:
   library, tested in `scripts/tests/`).
   **D29** No Homebrew cask until `homebrew/cask` accepts one; no tap of
   our own.
+- **D30** Space is a second view of one window's sessions, not a
+  multiplexer: one Space per app, sessions end with their window, and only
+  a list of what to start again is saved — never in the project folder.
 
 ## Working Rules
 

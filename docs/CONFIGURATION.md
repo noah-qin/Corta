@@ -82,6 +82,8 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `rows` | 5–300 | `30` | As above. The window's size in pixels is this grid times the font's cell metrics plus the pane insets — so two terminals showing the same `columns × rows` are still different sizes on screen if their fonts differ. |
 | `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. The Quick Terminal is excluded. |
 | `confirm-close` | boolean | `true` | Ask before closing a pane, window or the app while a shell still has a foreground job. |
+| `space-panel-limit` | integer, 1–6 | `6` | The most panels Space's grid shows at once. No split makes a panel smaller than 64 × 18 cells, so a small screen holds fewer. Lowering it takes the least recently used panels off screen; their sessions keep running. |
+| `space-attention-badge` | boolean | `true` | While Space is showing and its window is not key, the Dock badge is how many sessions are waiting on you. `false` leaves the ordinary agent badge. |
 
 #### Quick Terminal
 
@@ -344,6 +346,7 @@ columns = 120
 rows = 30
 restore-windows = true
 confirm-close = true
+space-panel-limit = 6
 
 # Quick Terminal
 quick-terminal = false
@@ -374,6 +377,7 @@ secure-keyboard-entry = false
 # Notifications
 notify-from-programs = true
 agent-status = true
+space-attention-badge = true
 agent-processes =
 notify-on-long-task = true         # default false
 notification-threshold = 60        # default 30
@@ -565,6 +569,9 @@ the key against both rows, which is how you spot it.
 | `next-tab` | Next Tab | `shift+cmd+]` |
 | `rename-tab` | Rename Tab… | *(none)* |
 | `close` | Close | `cmd+w` |
+| `open-project` | Open Project… | `cmd+o` |
+| `toggle-space` | Show Space | `alt+cmd+s` |
+| `next-waiting-session` | Jump to Next Waiting Session | `alt+cmd+j` |
 | `split-right` | Split Pane Right | `cmd+d` |
 | `split-down` | Split Pane Down | `shift+cmd+d` |
 | `focus-left` | Move Focus Left | `alt+cmd+left` |
@@ -685,6 +692,22 @@ itself attaches to a remote multiplexer (`tmux attach`, `screen -r`), the
 copy says the command reattaches to whatever session exists on the host —
 the reattach is the remote program's doing, not Corta's.
 
+Space SSH retention is a **per-connection choice**, not a config-file key.
+Its connect dialog starts every connection with **Keep running after
+disconnect** off; legacy SSH records without that choice retain ordinary SSH
+behavior. `space.json`
+saves a standard session UUID, SSH target, retention choice, whether tmux
+was established, and — only after a duplicate UUID is replaced — the previous
+canonical `corta-<UUID>` names, which the removal warning lists and nothing
+else reads. Invalid/missing/duplicate identities are replaced and saved
+before any project opens, never used to attach. No command, credential or
+terminal text is saved. Reconnect rebuilds the fixed command from the target
+and a new token; it does not edit the previous command string. The fixed command is rebuilt from the target/UUID;
+only first opening a project starts its sessions, including off-grid ones.
+See [Space SSH retention](USER-GUIDE.md#keep-space-ssh-programs-running-after-disconnecting)
+for sshd PATH limits, `destroy-unattached`, shared-client sizing, and why a
+kept session's state and directory do not reach Corta (no `allow-passthrough`). Traditional/preset/typed SSH is unchanged.
+
 `browse-remote-files` opens the SFTP browser for the focused pane's host —
 enabled only for a pane known to be remote. The host name comes from the
 remote shell's own report, which is program output, so the first
@@ -803,8 +826,10 @@ managed remote-edit copies. Their contents are not configuration keys.
 | `Configuration.presets` | same file | Named shell/directory/environment combinations | **Pane-launch configuration** — read once, at the moment a pane spawns from that preset; never re-applied afterwards (`docs/CONFIGURATION.md` §4a) |
 | `SessionRestore` | `state.json` | Window frames and split arrangement, restored on the next launch | **Window/session state** — describes *this run's* windows, not a preference about future ones |
 | `DirectoryHistoryStore` | `directory-history.json` | Ranked recent directories | **Temporary interaction history** — gated by `directory-history`; clear it in Privacy & Security ▸ History |
+| `SpaceStore` | `space.json` | Space's project folders and, for each, its sessions (persistent UUID, number, directory, preset name or SSH destination, per-connection retention, whether tmux was established, any replaced `corta-<UUID>` names, optional local conversation kind, optional UUID and source), which were in the grid and the grid's divider positions, and whether the first-run Space note was shown | **Window/session state** — never contents or a command line; nothing is written into a project folder |
 | `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent Hosts |
 | `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — preserve undecided edits before deleting app data; used copies are pruned after 30 days unless edits are pending |
+
 
 Why separate stores: `Configuration` is line-oriented text
 specifically so a person can open it in `$EDITOR`, diff it, and understand

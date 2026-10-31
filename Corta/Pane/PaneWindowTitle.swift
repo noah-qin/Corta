@@ -151,6 +151,11 @@ final class PaneWindowTitle {
     /// path here to offer a drag of.
     func apply() {
         guard let window = window() else { return }
+        // Space titles the window with its project, not a panel's program.
+        if let split = window.contentViewController as? SplitViewController, split.space.isActive {
+            split.space.applyWindowTitle()
+            return
+        }
         let title = (window.windowController as? TerminalWindowController)?.customTabTitle ?? composed
         if window.title != title { window.title = title }
         (window.windowController as? TerminalWindowController)?.refreshTabTitle()
@@ -277,7 +282,7 @@ final class PaneWindowTitle {
     private static let processFactsInterval: CFTimeInterval = 0.4
 
     /// No controls (a newline truncates a title) and a hard length cap.
-    private static func sanitizedTitleComponent(_ text: String?) -> String? {
+    static func sanitizedTitleComponent(_ text: String?) -> String? {
         guard let text else { return nil }
         let cleaned =
             text
@@ -292,7 +297,7 @@ final class PaneWindowTitle {
 
     /// `~/Developer`, or just the last name deeper down; the proxy icon has the
     /// full path.
-    private static func abbreviated(_ path: String) -> String {
+    static func abbreviated(_ path: String) -> String {
         let home = NSHomeDirectory()
         if path == home { return "~" }
         let name = (path as NSString).lastPathComponent

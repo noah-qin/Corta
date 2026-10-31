@@ -87,6 +87,60 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   root, open a pane there), shell/directory/environment presets, and local
   `path:line:column` references that can open in an editor.
 
+### Space
+
+See [Space acceptance](SPACE-ACCEPTANCE.md) for regression coverage and the
+separate launched-app, real-account and Linux protocol checks.
+
+- Project folders in a sidebar, each with its own local, SSH and agent CLI
+  sessions; the toolbar's mode button, ⌥⌘S and ⌘O switch to it. Space shows
+  in the window's own frame and never resizes it; the terminal mode's tabs
+  and splits keep running and keep their layout. The first visit explains
+  that Space's sessions end with the window, and closing a window says how
+  many will end, hidden ones included.
+- A waiting queue across projects: the sidebar counts sessions whose program
+  reports it is blocked on you (OSC 7501), and Jump to Next Waiting Session
+  (⌥⌘J) focuses the one that waited longest, auth before permission before
+  question. Focus moves only when you ask. Done and error keep their colour
+  but are not counted; a CLI recognised only by its process name shows
+  *State unknown · not queued*. The Dock badge shows the count while the
+  Space window is not key (`space-attention-badge`).
+- A free split grid of up to six panels (`space-panel-limit`): drop a session
+  on a panel's edge to split it there, on its middle to replace it; drag the
+  gaps; arrange in columns or rows; every placement can be undone. No split
+  makes a panel smaller than 64 × 18 cells. Hidden sessions keep running at
+  the grid's size.
+- Each local session row shows its Git branch and about how many tracked files
+  differ, using bounded Git metadata and tracked-file size/mtime; new files are
+  not checked, a clean directory shows no number, and ahead/behind is not
+  shown. More than 20,000 index entries skips the change check. A linked
+  worktree is marked, and its main repository can be shown in Finder.
+- A sidebar of every session with its state; clicking a hidden session shows
+  it (Undo, ⌘Z), and its add button says what it will join or replace; rename
+  (kept over program titles), and an icon per kind: local, SSH, agent CLI.
+- Remote sessions open the SFTP browser at their directory; a project lists
+  its connect-dialog hosts; a file dragged from the browser onto a terminal on
+  the same host types its quoted path.
+- Projects, sessions and grids are restored after a restart; sessions start
+  again (shell, preset or SSH host) when their project is first opened.
+  Local Claude/Codex kinds, optional UUIDs and sources are remembered per pane,
+  and the resume command is filled in at the prompt for you to run with
+  Return. An SSH session connected with *Keep running after disconnect* (off
+  by default) reattaches to its own remote tmux session.
+  Official picker commands (or exact resume commands when verified) fill empty
+  integrated prompts, awaiting Return. Missing/invalid UUIDs use the picker;
+  a missing kind leaves an ordinary shell. Each pane's menu shows the source.
+  Undocumented accelerators may stop working after CLI updates. Scrollback is not restored (D30).
+- Space connect-dialog SSH defaults to optional remote tmux retention, with a
+  persistent UUID per terminal, independent sessions on one host, reconnect and
+  separately confirmed targeted end. Status/details use Liquid Glass and survive
+  terminal clears. Only sshd's PATH is searched, no rc sourced; missing/broken
+  tmux falls back to ordinary SSH. `destroy-unattached` can defeat retention;
+  shared UUID clients compete for size and `allow-passthrough` affects metadata.
+  No global tmux configuration is changed. See the user guide for limits.
+- Limits: one Space per app — another window's mode button brings it forward;
+  a session cannot move between windows; the SFTP browser is its own window.
+
 ## Claude Code state and generic program notifications
 
 - Claude Code is currently the only CLI with a dedicated task-state
@@ -149,7 +203,9 @@ and [verification limits](CONFORMANCE.md#cli-signal-compatibility).
   and directories, with managed local copies for editing: Back and Forward, a
   breadcrumb path, sortable columns, hidden files on request, a row menu, drag
   and drop to upload (the listing or folder row outlined, naming the
-  destination) and to Finder, and transfers in a toolbar popover with
+  destination) and to Finder, plus an `sftp://` link for URL/text destinations
+  without a download. Drag data is supplied without waiting on the main
+  thread; Finder downloads have transfers in a toolbar popover with
   speed and time left. The first connection to a host in a run requires
   confirmation; a remote report alone cannot open it. Passwords, key
   passphrases, one-time codes and new host keys are asked in a dialog

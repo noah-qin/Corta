@@ -155,8 +155,10 @@ final class SFTPDropTargetView: NSView {
     }
 
     static func fileURLs(_ pasteboard: NSPasteboard) -> [URL] {
-        (pasteboard.readObjects(
-            forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        // The browser's own promise is a download, not an upload. Any other
+        // file URL — resident, or promised and already materialized off this
+        // call — is a file from outside Corta.
+        ExternalFileDrop.paths(on: pasteboard).map { URL(fileURLWithPath: $0) }
     }
 
     // MARK: - The table under the overlay

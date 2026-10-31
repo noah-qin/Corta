@@ -73,7 +73,7 @@ extension SplitViewController {
     }
 
     private func pane(forView view: NSView) -> ViewController? {
-        panes.first { $0.view === view }
+        panes.first { $0.view === view || $0.view.isDescendant(of: view) }
     }
 
     // MARK: - Restore

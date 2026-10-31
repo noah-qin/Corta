@@ -290,6 +290,93 @@ the badge reads. A `tmux` or `screen` in the foreground reads *Remote?*
 because the session it is attached to may itself be on another machine
 and nothing here can tell — it is uncertainty, not an accusation.
 
+### Space shows fewer panels than it used to
+
+Space no longer resizes the window: the grid uses the room the window has,
+and a session that does not fit at 64 × 18 cells stays off screen, still
+running. Make the window larger (or full screen) for more panels; clicking a
+hidden session in the sidebar puts it on the grid in place of the panel used
+least recently.
+
+### An agent waits for me but Space does not count it
+
+Only sessions whose program reports it is blocked (OSC 7501 — Claude Code
+does) are counted. A CLI that Corta recognises only by its process name shows
+**State unknown · not queued**; Corta does not guess when it waits. Inside a
+remote tmux session kept with **Keep running after disconnect**, the report
+stops at tmux, so that session is not counted either. Done, error and a
+program's own notification keep their colour but are not counted, and the
+queue never moves focus by itself: press ⌥⌘J.
+
+### Space always fills a picker instead of a specific conversation
+
+This is the reliable baseline: Return opens Claude's or Codex's official
+conversation picker. In the session's **Diagnostics ▸** menu (panel **…** or
+sidebar row), **Resume Source** shows `picker`,
+`sessionRecord` (Claude's verified process record), or `openFile` (Codex's
+foreground group). A CLI update can change these undocumented accelerators;
+Corta never substitutes the directory's newest conversation.
+
+Inspect Console for subsystem `dev.noahqin.Corta`, category `space`, or run
+`log show --last 10m --info --predicate 'subsystem == "dev.noahqin.Corta" AND category == "space"'`.
+Each source/result change reports the kind and a fixed reason, with no UUID,
+path or conversation content: `recordMissing`, `recordUnreadable` (also a
+symlink or invalid JSON), `recordTooLarge`, `fieldMissing`, `notStandardUUID`,
+`processMismatch`, `noOpenFile`, `ambiguousOpenFiles` (multiple candidates),
+`openFilesUnreadable` (an unreadable/full fd table), or `sessionChanged`
+(the same process's record file changed and was rechecked). Claude reads from the
+agent process's HOME, including a preset's override. A successful record is
+cached by PID, kernel start and the file's stat four-tuple; the file is
+reread only when that tuple changes. Failures get at most three non-ENOENT
+attempts per process. An absent file is probed until publication within that
+budget. A transient failure of an unchanged file preserves an already verified
+UUID and its original source; its reason appears only in the log. A changed
+file that cannot be confirmed drops that UUID. A confirmed mixed Claude/Codex group clears the record. Codex's npm
+node wrapper is recognized, but a shared background app-server's files are
+not reliably attributable; it then uses the picker. A missing kind leaves a
+plain shell. A busy prompt or a failed fill produces no success note.
+
+### Space fills the previous conversation after /clear or /resume
+
+The same Claude process kept its pid. Look for `sessionChanged` in the
+`space` log. A new standard UUID replaces the saved one on the next sample;
+an unreadable new record falls back to the picker. Report the CLI version
+if the log never shows `sessionChanged` after you switched conversations.
+
+### Space SSH says recovery is limited, or starts a new terminal
+
+Click the panel's glass connection button for details. **Remote tmux was not
+detected** means it was absent from sshd's PATH, not necessarily uninstalled.
+The connection does not source remote shell startup scripts; putting tmux only
+in `.zshrc` is insufficient. Put it on that PATH and reconnect. A different
+**tmux failed** result includes a bounded remote error and exit status, then
+provides an ordinary login shell. A successful manual detach ends SSH without
+starting another shell. Authentication cancellation or a network failure does
+not establish or destroy a tmux session automatically.
+
+The retention wrapper supports POSIX-family remote login shells, zsh, fish
+and csh/tcsh. It is passed as one line to `/bin/sh`; csh/tcsh cannot parse
+literal newlines inside its quoted argument. Nushell and other shells have
+not been tested.
+
+**Original session ended · New terminal** means an earlier established UUID
+no longer existed. Server restarts, ending the session and `destroy-unattached
+on` lose the original programs; Corta cannot recover them and does not change
+your tmux settings. History is limited by the server's tmux configuration.
+Two clients using the same UUID share the terminal and compete over its size.
+Corta does not set `allow-passthrough`, so inside a kept session the agent's
+state stays unknown (it is not counted as waiting) and directory reports do
+not arrive: **Browse Files on This Host…** starts in your home directory.
+
+Retention applies only to Space SSH created with **Keep running after
+disconnect** turned on; it is off by default. Closing/removing local
+panels or projects never kills remote tmux. If an abandoned session consumes
+resources, connect to the same host and run the exact `tmux kill-session -t
+'=corta-<UUID>'` shown by its connection details or removal warning, including
+a previous name kept when a duplicated UUID was replaced. The warning is shown
+even when the Space window cannot present a sheet. **End Remote
+Session…** confirms this separately and never runs `kill-server`.
+
 ### Browse Remote Files… says authentication failed, but `ssh` works in the pane
 
 The SFTP connection asks for a password or a key passphrase in a dialog

@@ -521,6 +521,161 @@ edits before saving. Input-source badges use OS metadata, not keystroke contents
 private IME modes are deliberately left unknown. Neither feature changes the
 execution or clipboard trust boundaries described above.
 
+### 4.10 Space: project folders, restored sessions and remote files
+
+Space (D30) adds project folders, sessions that start again after a
+restart, and ways into a session's remote files. Each is listed here with
+what it trusts and what it refuses, so an audit can check them one by one.
+
+| Where | What crosses | Trusted because | Refused or bounded |
+| --- | --- | --- | --- |
+| Opening a project | A folder chosen in an open panel | The user picked it | Nothing in the folder is run or written, and nothing there names a session. The sidebar may read `.git/HEAD`, a worktree `gitdir:` file and `.git/index` (at most 20,000 entries) and `stat` those tracked paths. It does not run `git` |
+| `space.json` | Projects, sessions (number, directory, preset name, SSH destination, the user's name for it), the grid's layout, whether the first-run note was shown | App-owned, owner-only (`0600`), written only by Corta | Read back validated field by field: absolute paths only, at most 64 projects × 32 sessions × 6 panels, divider fractions clamped, SSH destinations re-parsed (`SSHTarget.parse`, so an option-shaped host such as `-oProxyCommand=…` is dropped), names stripped of controls and cut to 64 characters; a newer format is neither read nor written over |
+| A session starting again | A login shell in the saved directory, the configured preset of that name, or `ssh` to the saved destination | The user created that session; the destination is one they typed into the connect dialog | Never a command line from the file; only when its project is first opened in a launch, not at launch; SSH asks for its password or passphrase through `SSH_ASKPASS` every time (D27), nothing stored; local Claude/Codex resume text is filled only under the rules below, never executed |
+| Session titles in the sidebar and headers | The agent's reported name, the foreground process name, the SSH destination, the kernel's working directory | Displayed only | `PaneWindowTitle.sanitizedTitleComponent` (§2.9), as the window title; a name the user gives wins and is never replaced by program output |
+| **Browse Files on This Host…** (a remote session) | The host and directory the remote shell reported over OSC 7 (§2.8), or the destination the user connected to | The SFTP browser's own rules | The first connection to a *reported* host in a run is confirmed in the browser (`RemoteHostConsent`), as from the Shell menu; one window per destination |
+| **Remote Files ▸** (a project) | SSH destinations of the project's sessions, from `space.json` | Each was typed or picked by the user in the connect dialog | Listed only from those records — an `ssh` typed at a prompt leaves none and is not offered; connects only on the user's choice |
+| A remote file dragged onto a terminal | The dragged row's `sftp://user@host:port/path`, noted in the process when the drag begins (`SFTPRemoteDrag`) — never read off the pasteboard, and never taken from another app | A drag is the user's own action, and the path is text they can see before pressing Return | Accepted only by a pane whose session is on that host — same host, and same user and port where both name one; a path with any control character is refused outright, not cleaned (a server can name a folder with a newline, and a cleaned path would be a different one); inserted single-quoted for every shell (`PaneCommands.shellQuoted`) and as a paste, so bracketed paste and the paste warning apply (§2.3) and nothing runs until Return. The URL names no password and no key file |
+
+The same browser drag offers a public URL/text representation to other
+applications. It contains the connection's specified user, host and port and
+the percent-encoded remote path, never a password or identity-file path.
+Exporting that link performs no file I/O and starts no connection or download.
+Internal terminal drops use the process-local record only when the drag is
+that browser row (the record is live and, for a drag from another app, the
+pasteboard's link is that same `sftp://` URL). A resident `file-url` from
+anywhere else is the local path. A promised `file-url` from anywhere else is
+read only after the tracking call has returned, on another thread; the
+tracking call never waits, so a download whose queue needs the main actor
+cannot deadlock it. The record is cleared when the drag session ends, and
+the two-minute lifetime remains only as a backstop. A promised file captures
+its source folder and connection generation at drag start; replacing the
+connection invalidates a delayed request.
+
+**Space SSH retention (#434).** Only the Space connect dialog's enabled
+retention choice authorizes the fixed remote wrapper; it starts off on every
+connection. System OpenSSH still
+owns aliases, users, ports, identity files, ProxyJump, host verification and
+authentication. It allocates a tty (`-t`). Typed/nested SSH, presets, SFTP and
+traditional mode are unchanged. No command is read from a project or saved to
+disk. `space.json` stores standard UUIDs, target, booleans, and — only when a
+duplicate UUID was replaced — the previous `corta-<standard UUID>` names.
+Those names are checked again on read and appear only in the removal
+warning. Malformed, missing or duplicate identities are replaced and
+persisted with the old established flag cleared, never connected under
+their invalid names. Every duplicate occurrence is replaced, and each
+retained one keeps the name it stopped using. UUID
+values are canonically rendered and shell-quoted; display names are never
+command parameters. No rc is explicitly sourced and no configuration is changed.
+
+The wrapper passes no environment assignment and no `ssh -R` forward, and
+sets no tmux option — not `allow-passthrough`. Nothing in this path reads a
+command from a file.
+
+One SSH runs a fixed `/bin/sh` wrapper, as one line with no single quotes
+inside its outer single-quoted argument so the remote login shell (including
+csh/tcsh) can parse it intact. `new-session -dP` atomically attempts
+creation; on failure, exact `has-session` can establish that the same name
+already exists; `attach-session` targets that exact name. A disappearance
+between preparation and attachment fails rather than silently recreating a
+supposedly recovered session. The parent waits for tmux: zero exits SSH;
+nonzero records failure then execs the ordinary login shell. HUP/TERM exit the
+wrapper without fallback. This deliberate supervision replaces #434's original
+`exec tmux new-session -A` shape so failures can be handled truthfully.
+
+OSC 6973 is display-only and armed only before this connection's reader starts,
+with a fresh random UUID token each time. It accepts one `start` enum
+(`missing`, `new`, `attached`), plus at most one `fail` with exit status 1–255
+and at most 1,024 hex-encoded error bytes. `missing` closes the handshake; a `fail` arriving before `start` is ignored.
+The wrapper reports a started attempt before a preparation failure. After
+`new` or `attached`, `fail` is accepted only until the pane draws or for one
+second, whichever comes first; a later `fail` is ignored and the handshake
+closes. A title report is not drawing. RIS cannot rearm it. Reconnect builds
+the ssh arguments again from the saved destination and a new token; it does
+not search the previous command string. Startup and later failure are separate,
+as approved for #434. Errors drop controls/concealing scalars; the parser's 4,096-byte OSC cap
+also applies. One report is retained per pane, no text is echoed to input or
+used to launch commands. A hostile remote host can forge its own displayed
+result if it reads the token; it gains no new execution capability.
+
+Ordinary close/removal only tears down local SSH. Removal warns about remote
+resource use and gives exact manual cleanup names. **End Remote Session…**
+is separately confirmed with host and UUID in view; its entire remote command
+is `tmux kill-session -t '=corta-<UUID>'`, never `kill-server`. A separate terminal
+shows authentication and success/failure. This grants no authority over another
+session or a remote agent's exit protocol.
+
+**Local conversation identity (#436).** `space.json` holds only kind
+(`claude`/`codex`), optional standard UUID, and source (`sessionRecord`,
+`openFile`, `picker`). No transcript, session-file path, executable path or
+whole command is saved. A bounded query (256 foreground-group members,
+1,024 descriptors per member) runs off main; it recognizes npm-wrapped Codex,
+rejects mixed Claude/Codex groups, and never searches directories for the
+newest conversation. For native version-named symlink targets, a bounded 64 KiB kernel argument
+query decodes only the invocation basename (`argv[0]`), never later arguments
+or environment values for recognition; neither executable paths nor arguments are persisted
+or logged. OSC 7501 task IDs are never conversation UUIDs. SSH,
+manually typed remote agents and SFTP do not participate.
+
+For Claude, only identity fields `sessionId`, `pid` and `procStart` are decoded
+from `$HOME/.claude/sessions/<pid>.json`, using this agent process's HOME.
+A bounded 64 KiB kernel query decodes only that exact environment entry, skips
+all other values as bytes, and never persists/logs HOME. Missing, invalid or
+unreadable HOME fails closed; the account home is not substituted.
+No other record field is retained or logged.
+The reader refuses symlinks and non-regular files, reads at most 64 KiB,
+compares PID and UTC start second with the kernel, and rechecks the subsecond
+kernel identity before/after reading. Only successful results
+are cached per PID, kernel start and the record file's stat four-tuple
+`(dev, inode, size, mtime)`. Each sample compares that tuple with `lstat`
+and reads the file only when it changes. A same-process change replaces the
+UUID or, if the new record cannot be confirmed, drops it to `picker`
+(`sessionChanged`); the previous UUID is not treated as the current
+conversation. Failed reads share three attempts
+per identity, at the one-second monitor cadence; exhaustion retains only the
+fixed reason. ENOENT reads no contents and can be probed until publication
+within the remaining budget (D30's bounded retry amendment). The undocumented record can disappear
+or change: that degrades to the official picker. Codex only inspects open
+file names and kernel vnode times across the foreground group: exactly one
+UUID, or a strictly newest modification/creation time with all candidates
+timed. Missing/tied times do not guess (`ambiguousOpenFiles`); unreadable or
+full descriptor tables report `openFilesUnreadable`. A shared
+background app-server is not searched; if it owns the files, only the picker
+is available. These accelerators do not establish CLI-version compatibility.
+
+On read, invalid UUIDs discard the UUID and use `picker`; kind-only records
+also use the picker. Legacy kind/UUID records without source read as
+`openFile`; absent/invalid kinds leave ordinary shells. Duplicate JSON keys
+discard conversation identities conservatively. Each source/result change
+logs only kind, source and success or a fixed fallback reason under subsystem
+`dev.noahqin.Corta`, category `space`; no UUID, path or file content is logged.
+A confirmed mixed Claude/Codex group clears the pane's saved conversation.
+A failed probe of an unchanged record preserves both a verified UUID and its
+original source from the same agent. A same-process record change
+(`sessionChanged`) replaces that UUID, or drops it when the new record cannot
+be confirmed. A different PID/start identity replaces it. Kind, UUID, source
+or process-identity changes post `spaceConversationIdentityDidChange` with
+the session id and nothing else. Exiting preserves the last record.
+
+Only four commands are reconstructed from fixed words and an optional
+validated UUID: `claude --resume`, `codex resume`, and those same commands
+with one UUID. They go through `fillPrompt(with:)` at the first integrated,
+empty prompt after that project's first opening in a launch. No Return is
+sent; preset commands are unchanged. Failed fills produce no success note;
+a user may delete the line or explicitly fill it again from the pane menu.
+
+Two residual risks, accepted:
+
+- A pane's host is, for a session reached by typing `ssh` at a prompt, the
+  host the *remote shell* reports (§2.8). A hostile remote shell can claim
+  another host's name, and a path dragged from that host's browser would be
+  accepted there. What reaches it is the path the user dragged, quoted and
+  unexecuted — the same text they could have typed.
+- `space.json` names hosts that are connected to again, without a click,
+  when the project is opened. Anything able to write that file already runs
+  as the user; the file's validation keeps a forged entry to a destination
+  the connect dialog would also have accepted.
+
 ## 5. Data at Rest
 
 **Terminal contents are not automatically persisted.** Scrollback routinely
@@ -536,6 +691,14 @@ split layout, focused pane, working directories, preset identifiers and
 launch metadata. Setting `restore-windows = false` disables restoration. The file is
 owner-only (`0600`), as are `directory-history.json` and `recent-hosts.json`.
 Saved directories and host/preset metadata may themselves be sensitive.
+Space's `space.json` holds the same kinds of metadata; §4.10 lists what it
+contains and how it is read back.
+Space keeps its project folders and their sessions in `space.json`, owner-only
+too, with the same kinds of metadata and no terminal text; it is written
+whatever `restore-windows` says, because the project list is what Space is.
+Nothing is written into a project folder, and nothing is read from one: a
+folder may come from anyone's repository, and a file there naming sessions
+would be a way to make Corta start them.
 
 This is separate from AppKit restoration. Terminal windows set
 `isRestorable = false` to prevent macOS restoring stale frames or retaining

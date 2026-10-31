@@ -339,3 +339,84 @@ final class RemoteWorkflowUITests: XCTestCase {
         return condition()
     }
 }
+
+extension RemoteWorkflowUITests {
+    /// A real Table-row drag, including synchronous pasteboard negotiation.
+    /// Model-only export tests cannot exercise SwiftUI/AppKit's provider bridge.
+    @MainActor
+    func testFileDragExportsLinkAndDownloadsToFinder() throws {
+        let stage = Self.stage
+        let app = try launchOnStage(stage)
+        defer { app.terminate() }
+        let terminal = app.windows.firstMatch
+        XCTAssertTrue(waitUntil(timeout: 10) { terminal.title.contains("Remote: fakebox") })
+        terminal.click()
+        app.typeText("printf '%s' ")
+        askHostThenConnect(app, stage: stage)
+        let readme = checkListing(app, stage: stage)
+        let browser = connectedBrowserWindow(app)
+
+        // Leave room for an external destination on the right.
+        let title = browser.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+            .withOffset(CGVector(dx: 0, dy: 12))
+        title.press(forDuration: 0.1, thenDragTo: title.withOffset(CGVector(dx: 20 - browser.frame.minX, dy: 0)))
+
+        dropRemotePath(readme, onto: terminal, in: app)
+        browser.click()
+
+        // A text consumer gets a URL without asking for file bytes.
+        app.typeKey("g", modifierFlags: [.command, .shift])
+        let path = browser.textFields.firstMatch
+        XCTAssertTrue(path.waitForExistence(timeout: 3))
+        path.click()
+        app.typeKey("a", modifierFlags: .command)
+        app.typeKey(.delete, modifierFlags: [])
+        readme.press(forDuration: 0.2, thenDragTo: path)
+        XCTAssertTrue(waitUntil(timeout: 5) { (path.value as? String)?.contains("sftp://fakebox/") == true })
+        app.typeKey(.escape, modifierFlags: [])
+
+        // Finder must negotiate the file promise, then receive actual bytes.
+        let downloads = stage.appendingPathComponent("downloads")
+        XCTAssertTrue(NSWorkspace.shared.open(downloads))
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        let destination = finder.windows["downloads"]
+        XCTAssertTrue(destination.waitForExistence(timeout: 5))
+        defer { if destination.exists { destination.buttons[XCUIIdentifierCloseWindow].click() } }
+        let finderTitle = destination.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+            .withOffset(CGVector(dx: 0, dy: 12))
+        let screenWidth = try XCTUnwrap(NSScreen.main).frame.width
+        finderTitle.press(
+            forDuration: 0.1,
+            thenDragTo: finderTitle.withOffset(CGVector(dx: screenWidth - 650 - destination.frame.minX, dy: 0)))
+        app.activate()
+        let dropPoint = destination.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.7))
+        readme.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.2, thenDragTo: dropPoint)
+        let downloaded = downloads.appendingPathComponent("README.md")
+        XCTAssertTrue(waitUntil(timeout: 15) {
+            (try? String(contentsOf: downloaded, encoding: .utf8)) == "hello\n"
+        }, "Finder receives the remote file and the app stays responsive")
+        XCTAssertTrue(browser.exists)
+        browser.buttons[XCUIIdentifierCloseWindow].click()
+        terminal.click()
+        app.typeText("rm -rf '\(stage.path)'\n")
+        XCTAssertTrue(waitUntil(timeout: 10) { !FileManager.default.fileExists(atPath: stage.path) })
+    }
+
+    @MainActor
+    private func dropRemotePath(_ readme: XCUIElement, onto terminal: XCUIElement, in app: XCUIApplication) {
+        let stage = Self.stage
+        // The original hang: crossing a terminal must use the remote path,
+        // never synchronously request the promise's local file URL.
+        let terminalDrop = terminal.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.85))
+        readme.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.2, thenDragTo: terminalDrop)
+        terminalDrop.click()
+        app.typeText(" > '\(stage.path)/dropped-path'\n")
+        XCTAssertTrue(waitUntil(timeout: 10) {
+            (try? String(contentsOf: stage.appendingPathComponent("dropped-path"), encoding: .utf8))
+                == stage.appendingPathComponent("remote/srv/app/README.md").path
+        }, "same-host drop inserts the remote path and the terminal remains responsive")
+    }
+
+}

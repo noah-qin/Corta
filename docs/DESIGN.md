@@ -92,6 +92,31 @@ owning a binary split tree whose leaves are `ViewController` +
 `AppDelegate` retains the window controllers until their windows close).
 Nothing is shared between windows — that is what D07 buys.
 
+Space (D30) is a second view of the same window. Its sessions are panes of
+this `SplitViewController` too, so focus, input, close and the agent
+directory need nothing new; the controller keeps the terminal mode's
+`terminalTree`, and `tree` is Space's grid while Space shows. Switching
+modes never changes the window's frame; the grid lays out in the room the
+window has.
+`CortaSpaceController` owns the projects (`SpaceProject`, `SpaceSession`);
+each project keeps its own free `SplitTree` of panel cards (`SpacePaneView`),
+changed in place — a split, a close, a replacement — so untouched panels keep
+their drawables, and saved as a `SpaceLayoutRecord`. `SpaceGrid` holds the
+rules: edges, the 64 × 18 minimum, automatic placement, least recently used.
+The window is islands on the background behind pages: the sidebar's
+(`SpaceIslandView`) and the opaque panel cards, in the content layer; glass
+is left to the toolbar and the undo note. A session off screen keeps reading
+its PTY at the grid's size (`resizeSessionOffScreen`). `SpaceStore` writes
+the project list to Application Support; nothing is read from or written to
+a project folder. Layout changes register on the window's undo manager.
+
+Opted-in Space SSH (off by default per connection) uses `RemoteTmux`'s fixed remote wrapper, rebuilt from each
+record's validated UUID/target. The remote server owns tmux's lifetime; Corta
+owns only ssh and starts nothing before the project opens. `PaneRemote` drains
+the token-bound startup/failure report independently of rendering, and Space
+persists only whether tmux was established. Glass connection details remain
+available after a clear. There is no local daemon or tmux control mode (D09).
+
 The two thread boundaries are the interesting part of this diagram:
 
 - **PTY/parse → render** is a snapshot taken at vsync, not a push. The
@@ -593,6 +618,23 @@ session so `close` can cancel a handshake, and refuses an engine installed
 after close. Remote editing keeps a SHA-256 baseline of what it downloaded,
 validates the content before uploading, and sends the approved private
 snapshot rather than the live editor file (`SECURITY.md` §5).
+
+A file promise can also advertise `public.file-url`. Reading a promised URL
+while tracking a drag synchronously materializes its download, whose queue
+needs the same main actor: a circular wait. The browser's own drag is known
+from the in-process record and is never read as a file URL; a same-host
+terminal drop uses that remote path. A resident file URL from any other drag
+is used immediately, promise types or not. A promised file URL from any other
+drag is read only after the tracking call has returned, on another thread,
+and the path is taken on the next pass. The tracking call never waits.
+
+SFTP table rows publish an explicit `NSItemProvider`. Drag metadata and the
+URL/text representations use immutable, nonisolated values: synchronous
+pasteboard negotiation must never need a main-actor task. A file load handler
+returns immediately and completes asynchronously after the transfer queue
+finishes its download. The queue still owns progress, cancellation and errors;
+requesting a link alone never starts that work. The source directory and
+connection generation are captured before the drag leaves the browser.
 
 ### 7.10 The status bar and the theme editor
 

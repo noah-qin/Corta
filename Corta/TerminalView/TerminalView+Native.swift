@@ -22,7 +22,9 @@ extension TerminalView {
     // MARK: - Dragging a file or folder in
 
     func registerForFileDrags() {
-        registerForDraggedTypes([.fileURL])
+        // File promises: the SFTP browser's rows, taken as a remote path on
+        // their own host (`SFTPRemoteDrag`), never read off the pasteboard.
+        registerForDraggedTypes([.fileURL] + NSFilePromiseReceiver.readableDraggedTypes.map { .init($0) })
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
@@ -38,12 +40,40 @@ extension TerminalView {
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         let paths = droppedPaths(from: sender)
         guard !paths.isEmpty else { return false }
+        if sender.draggingSource != nil, let token = SFTPRemoteDrag.currentToken,
+           SFTPRemoteDrag.isFilePromise(sender.draggingPasteboard.types ?? []) {
+            SFTPRemoteDrag.end(token: token)
+        }
         onDropPaths?(paths)
         return true
     }
 
+    /// A drag from this app's file browser ends here as well as at its source.
+    override func draggingEnded(_ sender: any NSDraggingInfo) {
+        guard sender.draggingSource != nil, SFTPRemoteDrag.matchesRecordedLink(sender.draggingPasteboard),
+              let token = SFTPRemoteDrag.currentToken else { return }
+        SFTPRemoteDrag.end(token: token)
+    }
+
+    /// A promise can advertise `.fileURL` too. Reading that URL during
+    /// tracking materializes the file, synchronously waiting for a download
+    /// whose queue needs this same main actor. Only the browser's own drag
+    /// is taken as a remote path; every other file URL is resident data or
+    /// a promise fulfilled after this call returns.
     private func droppedPaths(from sender: any NSDraggingInfo) -> [String] {
-        Self.droppedPaths(from: sender.draggingPasteboard)
+        droppedPaths(from: sender.draggingPasteboard, isLocalDrag: sender.draggingSource != nil)
+    }
+
+    /// Kept separate so a real table writer can exercise drag negotiation
+    /// without synthesizing a window-server drag session.
+    func droppedPaths(from pasteboard: NSPasteboard, isLocalDrag: Bool) -> [String] {
+        let types = pasteboard.types ?? []
+        if SFTPRemoteDrag.isFilePromise(types), isLocalDrag,
+           let url = SFTPRemoteDrag.url(forPasteboardTypes: types) {
+            return remotePathsForDrop?([url]) ?? []
+        }
+        guard types.contains(.fileURL) || SFTPRemoteDrag.isFilePromise(types) else { return [] }
+        return ExternalFileDrop.paths(on: pasteboard)
     }
 
     /// Apart from `NSDraggingInfo`, so tests need no synthetic Finder drag.

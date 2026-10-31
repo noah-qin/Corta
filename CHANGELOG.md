@@ -10,9 +10,86 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- Space: project folders with their own local, SSH and agent CLI sessions,
+  up to six at once in a free split grid of rounded panels beside a sidebar
+  that shows every session's state. Switch with the toolbar's mode button,
+  View ▸ Show Space (⌥⌘S) or File ▸ Open Project… (⌘O). Space shows in the
+  window's own frame and never resizes it; the terminal mode's tabs and
+  splits stay as they were, still running. Drop sessions on a panel's edge
+  or middle, arrange in columns or rows, undo any placement with ⌘Z, rename
+  sessions; click a hidden session to put it on the grid. Browse a remote
+  session's files and drag a file's path into a terminal on its host.
+  Projects, sessions and grids are restored after a restart as new shells,
+  presets or SSH connections. `space-panel-limit` caps the panels on screen.
+  The first visit says that Space's sessions end with the window, and closing
+  a window says how many of them will end, hidden ones included.
+
+- Space counts the sessions whose program reports it is blocked on you
+  (OSC 7501) — sign-in, then permission, then question — and View ▸ Jump to
+  Next Waiting Session (⌥⌘J) shows the one that waited longest. Focus moves
+  only when you ask. Done, error and program notifications keep their colour
+  but are not counted; a CLI recognised only by its process name shows
+  *State unknown · not queued*. The Dock badge shows the count while the
+  Space window is not key (`space-attention-badge`).
+
+- Space remembers each local Claude/Codex pane's kind, optional conversation
+  UUID and source. Reopening a project fills `claude --resume` / `codex resume`
+  (with the exact UUID when it can be attributed to that pane) into an empty
+  integrated shell prompt; Return remains yours to press. A brief glass note
+  explains the fill. A session's Diagnostics menu shows the resume source and
+  can fill the command again. No transcript, session-file path or command line
+  is saved; remote sessions are excluded.
+
+- Space shows each local session's Git branch and about how many tracked
+  files changed, read from `.git` without running git; new files are not
+  checked. A linked worktree is marked and its main repository can be shown
+  in Finder.
+
+- Space SSH can keep remote programs running in an existing remote tmux,
+  chosen per connection in the connect dialog (off by default) and identified
+  by a persistent UUID. Reconnect reattaches; ordinary close and removal keep
+  the remote session, and a separately confirmed action ends only that one.
+  Glass connection details distinguish missing or broken tmux, limited
+  ordinary SSH and a lost session replaced by a new terminal. Login shells
+  from POSIX sh to csh/tcsh work. Corta sets no tmux option, so a kept
+  session's state and directory reports do not reach it. Traditional, preset
+  and typed SSH and SFTP are unchanged; no remote rc or global tmux setting
+  is changed.
+
 ### Changed
 
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
+
+### Fixed
+
+- Keep glass buttons and filters rounded and separate at rest and while pressed
+  in the connection forms and command history window.
+
+- Dragging an SFTP file no longer waits on the main thread to provide its
+  drag data. Finder receives a promised download with transfer progress;
+  URL and text destinations receive its `sftp://user@host:port/path` link
+  without downloading. Delayed downloads keep the drag's original folder
+  and refuse a connection that has since been replaced. Cancelling the drag
+  drops that in-process path when the drag ends.
+
+- A file dragged in from Finder is inserted as its local path even when the
+  drag also advertises a file promise, such as an iCloud placeholder. Only
+  the SFTP browser's own drag is taken as a remote path. A promised local
+  file is read after tracking returns, so the download cannot wait on the
+  main thread.
+
+### Tests and acceptance
+
+- Make the in-flight renderer fixture use independent targets and join all
+  completions; do not assume implicit Metal 4 ordering for shared texture writes.
+- Stage Space grid UI fixtures outside the sandboxed runner and use the
+  current split-tree format. Disable per-source penalties only in the isolated
+  localhost SSH fixture so deliberate failed authentication does not block
+  later tmux lifecycle checks.
+- Rebalance a packed automatic grid before replacing panels when a six-panel
+  arrangement still meets the cell minimum.
 
 ## [1.5.1] - 2026-10-27
 

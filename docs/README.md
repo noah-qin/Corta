@@ -31,6 +31,7 @@ for cursor defaults, the optional system bar, host details and graphical themes.
 | Document | Covers |
 | :--- | :--- |
 | [Contributing](../CONTRIBUTING.md) | Commit convention, branches, pull requests, what a change must carry. Start here. |
+| [Space acceptance](SPACE-ACCEPTANCE.md) | The 1.6.0 Space issues (#434, #436, #438, #439, #445): implementation coverage and required real-world checks. |
 | [Testing](TESTING.md) | Local setup, focused suites, golden fixtures, fuzzing and reporting results. |
 | [Decisions](DECISIONS.md) | The settled decisions, one record each: what, why, and what reopening costs. Read before proposing an architecture change. |
 | [Design](DESIGN.md) | Goals, the architecture, every module and its boundaries, the non-goals. |

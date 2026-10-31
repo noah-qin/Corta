@@ -50,8 +50,13 @@ final class SplitTree {
     /// only subview whenever this changes.
     private(set) var root: NSView
 
-    init(root: NSView) {
+    /// How the dividers draw: against the terminal canvas, or between Space
+    /// panels, whose headers sit on the window's own background.
+    let style: PaneSplitView.Style
+
+    init(root: NSView, style: PaneSplitView.Style = .terminal) {
         self.root = root
+        self.style = style
     }
 
     /// Every leaf, in tree order.
@@ -78,6 +83,8 @@ final class SplitTree {
     @discardableResult
     func split(leaf: NSView, orientation: SplitOrientation, newLeaf: NSView) -> NSSplitView {
         let node = makeSplitView(orientation: orientation)
+        // Reparenting a live terminal must not briefly lay it out at zero size.
+        node.frame = leaf.frame
         // Arranged subviews of an NSSplitView are frame-managed by the
         // split view itself — Auto Layout masks fight it. The container
         // re-enables constraints on the root when it installs one.
@@ -95,6 +102,18 @@ final class SplitTree {
         node.addArrangedSubview(leaf)
         node.addArrangedSubview(newLeaf)
         return node
+    }
+
+    /// Puts `newLeaf` where `leaf` is, at its frame; the rest of the tree is
+    /// untouched. The caller reinstalls the root if `leaf` was it.
+    func replace(leaf: NSView, with newLeaf: NSView) {
+        newLeaf.frame = leaf.frame
+        newLeaf.translatesAutoresizingMaskIntoConstraints = true
+        if leaf === root {
+            root = newLeaf
+        } else if let parent = leaf.superview as? NSSplitView {
+            parent.replaceSubview(leaf, with: newLeaf)
+        }
     }
 
     /// Removes `leaf` and collapses its parent node into the surviving
@@ -180,6 +199,7 @@ final class SplitTree {
 
     private func makeSplitView(orientation: SplitOrientation) -> NSSplitView {
         let split = PaneSplitView()
+        split.style = style
         split.isVertical = orientation.isVertical
         // A hairline divider; the panes' own backgrounds butt against it.
         split.dividerStyle = .thin
@@ -194,8 +214,22 @@ final class SplitTree {
 /// background is `.clear`, so the 1pt strip between two opaque Metal
 /// surfaces is a see-through slit). The divider is therefore the pane
 /// background, painted opaque, with a barely-there light lift on top.
+///
+/// Space's panels are separate rounded cards: there the divider is the gap
+/// between them, drawn by nothing.
 final class PaneSplitView: NSSplitView {
+    enum Style { case terminal, space }
+
+    var style = Style.terminal
+
+    /// Space's dividers are the gaps between its panel cards.
+    override var dividerThickness: CGFloat {
+        style == .space ? SpaceGrid.dividerThickness : super.dividerThickness
+    }
+
     override func drawDivider(in rect: NSRect) {
+        // The window's background shows between Space's cards.
+        guard style == .terminal else { return }
         let canvasColor = TerminalColorPalette.defaultBackground
         NSColor(
             srgbRed: CGFloat(canvasColor.x), green: CGFloat(canvasColor.y), blue: CGFloat(canvasColor.z), alpha: 1

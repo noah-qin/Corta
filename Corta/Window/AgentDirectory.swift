@@ -51,11 +51,29 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     }
     static func focus(_ id: UUID) {
         guard let pane = panes.first(where: { $0.taskNotifier.paneID == id }),
-              let window = pane.view.window else { return }
+              let host = pane.splitController, let window = host.toolbarWindow else { return }
+        // The pane is in whichever mode it belongs to; show that mode.
+        if let (_, session) = host.space.session(for: pane) {
+            host.space.setActive(true)
+            host.space.show(session)
+        } else if host.space.isActive {
+            host.space.setActive(false)
+        }
         NSApp.activate()
         window.tabGroup?.selectedWindow = window
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(pane.terminalView)
+    }
+
+    private static var spaceWaiting = (count: 0, active: false, windowIsKey: true, badge: true)
+
+    /// Space's queue count. Shown on the Dock only while its window is not key.
+    static func noteSpaceWaiting(count: Int, active: Bool, windowIsKey: Bool) {
+        let badge = ConfigurationStore.shared.configuration.spaceAttentionBadge
+        let next = (count: count, active: active, windowIsKey: windowIsKey, badge: badge)
+        guard next != spaceWaiting else { return }
+        spaceWaiting = next
+        refreshDock(enabled: ConfigurationStore.shared.configuration.agentStatus, directory: shared)
     }
 
     static func refresh() {
@@ -114,7 +132,13 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
                 }
             }
         }
-        let badge = waiting > 0 ? String(waiting) : nil
+        let space = spaceWaiting
+        let badge: String?
+        if space.active {
+            badge = space.badge && !space.windowIsKey && space.count > 0 ? String(space.count) : nil
+        } else {
+            badge = waiting > 0 ? String(waiting) : nil
+        }
         let progress = values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
         let percent = progress.map { Int(($0 * 100).rounded()) }
         guard badge != directory.drawnBadge || percent != directory.drawnDockPercent else { return }

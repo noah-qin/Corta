@@ -391,6 +391,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         return owner ?? super.forwardingTarget(for: aSelector)
     }
 
+}
+
+extension ViewController {
     /// `coalesce: false` delivers the size now: a font change is one step,
     /// and waiting out the drag debounce drew a frame of the new font over
     /// the old grid first.
@@ -398,9 +401,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         // Nothing reaches the child before the window is sized: a layout of the
         // view at its placeholder size would strand blank rows under the
         // prompt. The session is born at the target size, so nothing is lost.
-        guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil
-        else { return }
-        let grid = gridSize(fitting: view.bounds.size)
+        guard didSizeWindow, session != nil, view.window != nil else { return }
+        requestSessionSize(gridSize(fitting: view.bounds.size), coalesce: coalesce)
+    }
+
+    fileprivate func requestSessionSize(_ grid: TerminalSize, coalesce: Bool) {
+        guard let terminalRenderer else { return }
         let pixels = pixelSize(
             columns: Int(grid.columns), rows: Int(grid.rows), metrics: terminalRenderer.metrics)
         let size = TerminalSize(
@@ -440,6 +446,10 @@ extension ViewController {
     /// A rebuild keeps the pane's grid and font size: the new child is born
     /// at the size it is shown at, and the window does not move.
     private func setUpPane(strictRespawn: Bool = false, keeping grid: TerminalSize? = nil) {
+        if grid != nil, var retained = preset {
+            retained.refreshRetainedTmuxToken(reportEstablished: remote.tmuxReport?.established == true)
+            preset = retained
+        }
         let configuration = ConfigurationStore.shared.configuration
         if grid == nil || !isFontSizeZoomed {
             fontSize = Configuration.fontSizeRange.clamped(configuration.fontSize)
@@ -457,6 +467,7 @@ extension ViewController {
         installSessionCallbacks()
         installTerminalCallbacks(on: terminalView)
         // The PTY reader must not run until all callbacks and views are ready.
+        if let tmux = preset?.remoteTmux { session.expectRemoteTmux(token: tmux.token) }
         session.start()
         remote.watchForEstablishedConnection()
     }
@@ -576,6 +587,7 @@ extension ViewController {
         let wake = frameLoop.outputWake
         frameLoop.onOutputSignal = { [weak self] in
             guard let self else { return }
+            self.remote.readTmuxReport()
             self.agents.readOutput()
             if !self.agents.visible, self.session?.takeBell() == true { self.handleBell() }
         }
@@ -790,6 +802,8 @@ extension ViewController {
         if isFocusedPane {
             windowTitle.apply()
         }
+        // Space names every session in its sidebar, focused or not.
+        splitController?.space.noteOutput()
         if scrollOffset > 0, !sawOutputWhileScrolled {
             // Nothing else says so: no scroll bar, and the live screen is off view.
             sawOutputWhileScrolled = true
@@ -937,8 +951,8 @@ extension ViewController {
     }
 
     func closeEndedPane() {
-        if let split = splitController, split.hasMultiplePanes {
-            split.closePane(self)
+        if let split = splitController {
+            split.closeEndedPane(self)
         } else {
             view.window?.performClose(nil)
         }
@@ -1067,9 +1081,40 @@ extension ViewController {
         view.window?.makeFirstResponder(terminalView)
         resizeSessionToFitView(coalesce: false)
         invalidateDisplay()
-        if strictRespawn {
+        if strictRespawn, preset?.remoteTmux == nil {
             // Every time: a new connection; the old scrollback is gone.
             terminalView.showToast(remote.reconnectNotice)
         }
+    }
+}
+
+// MARK: - Space's sizes
+
+extension ViewController {
+    /// The pane size that holds `columns` × `rows`, below any chrome: what a
+    /// Space panel's minimum is measured in.
+    func contentSize(columns: Int, rows: Int) -> CGSize {
+        let metrics = cellMetrics
+        return CGSize(
+            width: CGFloat(columns) * metrics.cellWidth + TerminalLayout.insetWidth,
+            height: CGFloat(rows) * metrics.cellHeight + TerminalLayout.insetHeight)
+    }
+
+    /// The grid a pane `size` large holds when it sits below the chrome — a
+    /// Space panel, or a session Space keeps off screen.
+    func gridSize(fittingBelowChrome size: CGSize) -> TerminalSize {
+        let metrics = cellMetrics
+        return TerminalSize(
+            rows: Self.cellCount((size.height - TerminalLayout.insetHeight + Self.fitSlack) / metrics.cellHeight),
+            columns: Self.cellCount((size.width - TerminalLayout.insetWidth + Self.fitSlack) / metrics.cellWidth))
+    }
+
+    /// A session Space keeps off screen runs at the size it would have
+    /// filling the grid, so its output is laid out for the largest panel it
+    /// can come back in rather than the last slot it left.
+    func resizeSessionOffScreen(toFit size: CGSize) {
+        guard didSizeWindow, session != nil, view.window == nil, size.width > 0, size.height > 0
+        else { return }
+        requestSessionSize(gridSize(fittingBelowChrome: size), coalesce: false)
     }
 }

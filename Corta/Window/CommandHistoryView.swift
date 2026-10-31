@@ -28,7 +28,9 @@ struct CommandHistoryView: View {
 
     var body: some View {
         let rows = model.rows
-        GlassEffectContainer(spacing: 12) {
+        // These controls stay separate, including while pressed. A merge
+        // distance larger than their gaps pulls capsule edges together.
+        GlassEffectContainer(spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
                 searchField
                 filterRow
@@ -42,6 +44,7 @@ struct CommandHistoryView: View {
                     Spacer()
                     Button(L10n.text("commandHistory.clear")) { model.clearHistory() }
                         .buttonStyle(.glass)
+                        .buttonBorderShape(.capsule)
                         .controlSize(.large)
                         .disabled(model.noPaneMessage != nil)
                 }
@@ -101,6 +104,7 @@ struct CommandHistoryView: View {
         }
         .toggleStyle(.button)
         .buttonStyle(.glass)
+        .buttonBorderShape(.capsule)
         .fixedSize(horizontal: true, vertical: false)
         .controlSize(.large)
     }
@@ -172,6 +176,7 @@ private struct CommandHistoryRowView: View {
                     .disabled(!row.canFillOrRun)
             }
             .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
             .controlSize(.small)
         }
         .padding(.horizontal, 8)
