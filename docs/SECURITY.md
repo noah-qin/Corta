@@ -530,7 +530,7 @@ what it trusts and what it refuses, so an audit can check them one by one.
 | Where | What crosses | Trusted because | Refused or bounded |
 | --- | --- | --- | --- |
 | Opening a project | A folder chosen in an open panel | The user picked it | Nothing in the folder is run or written, and nothing there names a session. The sidebar may read `.git/HEAD`, a worktree `gitdir:` file and `.git/index` (at most 20,000 entries) and `stat` those tracked paths. It does not run `git` |
-| `space.json` | Projects, sessions (number, directory, preset name, SSH destination, the user's name for it), the grid's layout | App-owned, owner-only (`0600`), written only by Corta | Read back validated field by field: absolute paths only, at most 64 projects × 32 sessions × 6 panels, divider fractions clamped, SSH destinations re-parsed (`SSHTarget.parse`, so an option-shaped host such as `-oProxyCommand=…` is dropped), names stripped of controls and cut to 64 characters; a newer format is neither read nor written over |
+| `space.json` | Projects, sessions (number, directory, preset name, SSH destination, the user's name for it), the grid's layout, whether the first-run note was shown | App-owned, owner-only (`0600`), written only by Corta | Read back validated field by field: absolute paths only, at most 64 projects × 32 sessions × 6 panels, divider fractions clamped, SSH destinations re-parsed (`SSHTarget.parse`, so an option-shaped host such as `-oProxyCommand=…` is dropped), names stripped of controls and cut to 64 characters; a newer format is neither read nor written over |
 | A session starting again | A login shell in the saved directory, the configured preset of that name, or `ssh` to the saved destination | The user created that session; the destination is one they typed into the connect dialog | Never a command line from the file; only when its project is first opened in a launch, not at launch; SSH asks for its password or passphrase through `SSH_ASKPASS` every time (D27), nothing stored; local Claude/Codex resume text is filled only under the rules below, never executed |
 | Session titles in the sidebar and headers | The agent's reported name, the foreground process name, the SSH destination, the kernel's working directory | Displayed only | `PaneWindowTitle.sanitizedTitleComponent` (§2.9), as the window title; a name the user gives wins and is never replaced by program output |
 | **Browse Files on This Host…** (a remote session) | The host and directory the remote shell reported over OSC 7 (§2.8), or the destination the user connected to | The SFTP browser's own rules | The first connection to a *reported* host in a run is confirmed in the browser (`RemoteHostConsent`), as from the Shell menu; one window per destination |
@@ -553,7 +553,8 @@ its source folder and connection generation at drag start; replacing the
 connection invalidates a delayed request.
 
 **Space SSH retention (#434).** Only the Space connect dialog's enabled
-retention choice authorizes the fixed remote wrapper. System OpenSSH still
+retention choice authorizes the fixed remote wrapper; it starts off on every
+connection. System OpenSSH still
 owns aliases, users, ports, identity files, ProxyJump, host verification and
 authentication. It allocates a tty (`-t`). Typed/nested SSH, presets, SFTP and
 traditional mode are unchanged. No command is read from a project or saved to

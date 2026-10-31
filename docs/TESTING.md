@@ -105,7 +105,7 @@ language routing; successful placeholder jobs alone do not prove eligibility.
 
 ## Space issue acceptance
 
-[Space acceptance](SPACE-ACCEPTANCE.md) maps #434–#445 to implementation,
+[Space acceptance](SPACE-ACCEPTANCE.md) maps the 1.6.0 Space issues to implementation,
 regression coverage and environment-dependent requirements. Issue-contract
 probes run in the ordinary Unit plan; they can also be selected explicitly:
 
@@ -874,14 +874,15 @@ automatic placement and least recently used, column and row arrangement,
 `space.json`'s validation, sizes and round trip, session names — and the
 remote-drop rule (same host, user and port; control characters refused),
 without a window. `CortaSpaceTests` drive Space in real windows with real
-shells: Space takes the screen and the terminal mode gets its frame, tree and
-every process back; new sessions split until the limit and then replace the
+shells: entering and leaving Space keeps the window's frame and gives the
+terminal mode its tree and every process back; the first-run note shows once;
+a click shows a hidden session and ⌘Z undoes it; the close confirmation
+counts hidden sessions; new sessions split until the limit and then replace the
 least recently used; edge drops; hiding, filling and ending; projects and
 what is saved; one Space per app. `CortaSpaceUITests` is the launched-app
 check (D14): a scratch stage's `space.json`, then clicks, renames, hovers, the
-sidebar toggle and full screen, with screenshots attached. The sidebar's
-choose-then-show interaction, undo, and remote-file drags are checked by hand
-in the launched app; record which in the pull request.
+sidebar toggle and full screen, with screenshots attached. Remote-file drags
+are checked by hand in the launched app; record which in the pull request.
 
 `RemoteTmuxTests` checks token/phase boundaries, malformed and repeated reports,
 RIS, command quoting, missing/broken tmux, attach failure and zero-exit detach
