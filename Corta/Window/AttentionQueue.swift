@@ -49,12 +49,11 @@ nonisolated struct AttentionQueue: Equatable, Sendable {
         return head
     }
 
-    static func isWaiting(state: ProgramStatus.State?, kind: ProgramStatus.Kind?, attention: Bool) -> Bool {
-        if attention { return true }
-        switch state {
-        case .blocked, .done, .error: return true
-        case .idle, .working, .unknown, nil: break
-        }
-        return kind == .question
+    /// Only a program that says it is blocked on the user waits: a
+    /// permission, a question, sign-in. Done, error and a program's own
+    /// notification keep their colour in the sidebar and are not queued; a
+    /// program that reports no state (no OSC 7501) is never guessed at.
+    static func isWaiting(state: ProgramStatus.State?) -> Bool {
+        state == .blocked
     }
 }

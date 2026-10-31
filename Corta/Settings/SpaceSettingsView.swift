@@ -22,7 +22,6 @@ extension SettingsView {
         Form {
             Section(L10n.text("settings.section.space")) {
                 Toggle(L10n.text("settings.label.spaceAttentionBadge"), isOn: bind(\.spaceAttentionBadge))
-                Toggle(L10n.text("settings.label.waitingAutoAdvance"), isOn: bind(\.waitingQueueAutoAdvance))
             }
         }
     }

@@ -46,9 +46,9 @@ extension CortaSpaceTests {
         #expect(project.shown.contains(focused))
     }
 
-    @Test func waitingQueuePrioritizesAcrossHiddenPanelsAndAdvancesAfterHandling() async throws {
+    @Test func waitingQueueCountsOnlyBlockedAndNeverMovesFocusByItself() async throws {
         let original = ConfigurationStore.shared.configuration
-        _ = ConfigurationStore.shared.update { $0.agentStatus = true; $0.waitingQueueAutoAdvance = false }
+        _ = ConfigurationStore.shared.update { $0.agentStatus = true }
         defer { _ = ConfigurationStore.shared.update { $0 = original } }
         let root = try makeProject()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -57,9 +57,9 @@ extension CortaSpaceTests {
         _ = ConfigurationStore.shared.update { $0.presets.append(preset) }
         let (window, host) = try makeWindow(limit: 2)
         defer { close(window, host) }
-        let records = (1...3).map { SpaceSessionRecord(number: $0, directory: root.path, presetName: preset.name) }
+        let records = (1...4).map { SpaceSessionRecord(number: $0, directory: root.path, presetName: preset.name) }
         SpaceStore.standard.save(SpaceState(projects: [SpaceProjectRecord(path: root.path, sessions: records,
-            layout: .split(vertical: true, fraction: 0.5, first: .panel(0), second: .panel(1)), nextNumber: 4)]))
+            layout: .split(vertical: true, fraction: 0.5, first: .panel(0), second: .panel(1)), nextNumber: 5)]))
         host.space.setActive(true)
         let project = try #require(host.space.selectedProject)
         for (index, kind) in ["question", "permission", "auth"].enumerated() {
@@ -67,18 +67,20 @@ extension CortaSpaceTests {
             session.pane?.session?.write(Array(("\u{1B}]7501;state=blocked:kind=" + kind + "\u{7}\n").utf8))
             try await waitForIssueFlow { session.pane?.agents.status?.state == .blocked }
         }
-        #expect(host.space.waitingSessionIDs() == [records[2].id, records[1].id, records[0].id])
+        let done = project.sessions[3]
+        done.pane?.session?.write(Array("\u{1B}]7501;state=done\u{7}\n".utf8))
+        try await waitForIssueFlow { done.pane?.agents.status?.state == .done }
+        #expect(host.space.waitingSessionIDs() == [records[2].id, records[1].id, records[0].id],
+                "auth, then permission, then question; done is not queued")
         host.space.jumpToNextWaiting()
         #expect(host.space.focusedSession?.id == records[2].id)
         #expect(project.shown.contains { $0.id == records[2].id })
         project.sessions[2].pane?.session?.write(Array("\u{1B}]7501;state=working\u{7}\n".utf8))
         try await waitForIssueFlow { project.sessions[2].pane?.agents.status?.state == .working }
-        _ = ConfigurationStore.shared.update { $0.waitingQueueAutoAdvance = true }
-        host.space.show(project.sessions[1])
         host.space.refreshNow()
-        project.sessions[1].pane?.session?.write(Array("\u{1B}]7501;state=working\u{7}\n".utf8))
-        try await waitForIssueFlow { host.space.focusedSession?.id == records[0].id }
-        #expect(host.space.waitingSessionIDs() == [records[0].id])
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(host.space.focusedSession?.id == records[2].id, "handling one does not move focus to the next")
+        #expect(host.space.waitingSessionIDs() == [records[1].id, records[0].id])
         host.space.setActive(false)
         #expect(!host.space.isActive)
     }

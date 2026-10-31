@@ -221,13 +221,15 @@ struct SpaceSessionPresentation: Equatable {
             case .done: tint = .systemBlue
             case .idle, .unknown: tint = .tertiaryLabelColor
             }
-            let waiting = AttentionQueue.isWaiting(
-                state: status.state, kind: status.kind, attention: pane.agents.notedAttention)
-            return State(text: L10n.text("agent.state." + status.state.rawValue), tint: tint,
-                         needsAttention: waiting)
+            // Detected by its process name alone: Corta cannot tell when it
+            // waits, so it says so rather than guess.
+            let text = status.state == .unknown
+                ? L10n.text("space.state.unknownNotQueued") : L10n.text("agent.state." + status.state.rawValue)
+            return State(text: text, tint: tint, needsAttention: AttentionQueue.isWaiting(state: status.state))
         }
         if pane.agents.notedAttention {
-            return State(text: L10n.text("space.waiting.attention"), tint: .systemOrange, needsAttention: true)
+            // A program's own notification: its colour, not a place in the queue.
+            return State(text: program == nil ? nil : L10n.text("space.state.running"), tint: .systemOrange)
         }
         if program != nil { return State(text: L10n.text("space.state.running"), tint: .systemGreen) }
         return State()

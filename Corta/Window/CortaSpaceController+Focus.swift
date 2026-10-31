@@ -85,19 +85,9 @@ extension CortaSpaceController {
             updateAttentionBadge(ordered: [])
             return
         }
+        // Counted and ordered only. Focus moves when the person asks
+        // (⌥⌘J), never because a session stopped waiting.
         let ordered = waitingSessionIDs()
-        let typing = focusedSession?.pane?.terminalView?.lastUserInput
-            .map { SuspendingClock.now - $0 < .seconds(3) } ?? false
-        let previousHead = advancedWaitingSession
-        if previousHead != focusedSession?.id { advancedWaitingSession = nil }
-        if ConfigurationStore.shared.configuration.waitingQueueAutoAdvance,
-           let previousHead, !ordered.contains(previousHead), focusedSession?.id == previousHead,
-           let next = ordered.first, let session = session(withID: next)?.session,
-           !typing {
-            advancedWaitingSession = nil
-            DispatchQueue.main.async { [weak self] in self?.show(session) }
-        }
-        if let focused = focusedSession?.id, ordered.contains(focused) { advancedWaitingSession = focused }
         sidebar.setWaitingCount(ordered.count)
         noteGitDirectories()
         sidebar.reload()
@@ -136,18 +126,14 @@ extension CortaSpaceController {
 
     func hasWaitingSession() -> Bool {
         projects.flatMap(\.sessions).contains { session in
-            AttentionQueue.isWaiting(
-                state: session.pane?.agents.status?.state, kind: session.pane?.agents.status?.kind,
-                attention: session.pane?.agents.notedAttention == true)
+            AttentionQueue.isWaiting(state: session.pane?.agents.status?.state)
         }
     }
 
     /// Oldest waiting session first. A started session that is off the grid is included.
     func waitingSessionIDs() -> [UUID] {
         let waiting = projects.flatMap(\.sessions).filter { session in
-            AttentionQueue.isWaiting(
-                state: session.pane?.agents.status?.state, kind: session.pane?.agents.status?.kind,
-                attention: session.pane?.agents.notedAttention == true)
+            AttentionQueue.isWaiting(state: session.pane?.agents.status?.state)
         }.map(\.id)
         var priorities: [UUID: Int] = [:]
         for session in projects.flatMap(\.sessions) {

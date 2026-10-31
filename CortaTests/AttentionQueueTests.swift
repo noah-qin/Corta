@@ -35,15 +35,10 @@ struct AttentionQueueTests {
         #expect(queue.deferHead(of: []) == nil)
     }
 
-    @Test func permissionQuestionDoneAndAttentionWaitIdleWorkDoesNot() {
-        #expect(AttentionQueue.isWaiting(state: .blocked, kind: .permission, attention: false))
-        #expect(AttentionQueue.isWaiting(state: .blocked, kind: .question, attention: false))
-        #expect(AttentionQueue.isWaiting(state: .idle, kind: .question, attention: false))
-        #expect(AttentionQueue.isWaiting(state: .done, kind: nil, attention: false))
-        #expect(AttentionQueue.isWaiting(state: .error, kind: nil, attention: false))
-        #expect(AttentionQueue.isWaiting(state: .working, kind: nil, attention: true))
-        #expect(!AttentionQueue.isWaiting(state: .working, kind: nil, attention: false))
-        #expect(!AttentionQueue.isWaiting(state: .idle, kind: nil, attention: false))
-        #expect(!AttentionQueue.isWaiting(state: nil, kind: nil, attention: false))
+    @Test func onlyBlockedWaitsDoneErrorAndUnknownDoNot() {
+        #expect(AttentionQueue.isWaiting(state: .blocked))
+        for state: ProgramStatus.State? in [.done, .error, .idle, .working, .unknown, nil] {
+            #expect(!AttentionQueue.isWaiting(state: state))
+        }
     }
 }

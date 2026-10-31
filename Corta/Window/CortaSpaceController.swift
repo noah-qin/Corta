@@ -52,7 +52,6 @@ final class CortaSpaceController: NSObject {
     private weak var terminalFocus: ViewController?
     var conversationMonitor: Task<Void, Never>?
     var attentionQueue = AttentionQueue()
-    var advancedWaitingSession: UUID?
     var gitFacts: [UUID: GitFacts] = [:]
     var launchRemoteTermination: ((SSHTarget, String) -> Void)?
     let gitMonitor = GitStatusMonitor()
