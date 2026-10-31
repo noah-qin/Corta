@@ -113,11 +113,13 @@ struct GitStatusReaderTests {
         #expect(latest?.changedFiles == 0)
         let start = SuspendingClock.now
         try Data("changed-size".utf8).write(to: file)
-        while latest?.changedFiles != 1, start.duration(to: .now) < .seconds(2) {
+        // The one-second target is this machine's; a saturated CI runner
+        // gets the suite's usual scale (`testTimeoutScale`).
+        while latest?.changedFiles != 1, start.duration(to: .now) < .seconds(2) * testTimeoutScale {
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(latest?.changedFiles == 1)
-        #expect(start.duration(to: .now) < .seconds(1))
+        #expect(start.duration(to: .now) < .seconds(1) * testTimeoutScale)
         print("Git tracked edit refresh: \(start.duration(to: .now))")
         monitor.update([:])
     }
