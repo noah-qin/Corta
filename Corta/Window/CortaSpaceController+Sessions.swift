@@ -65,7 +65,7 @@ extension CortaSpaceController {
         if record.retainSSH == true { saveNow() }
         if project.maximized != nil { setMaximized(nil, in: project) }
         let placement = automaticPlacement(in: project)
-        spawn(session, in: project, panelSize: plannedSize(of: placement, in: project), preset: preset)
+        spawn(session, in: project, panelSize: plannedSize(of: placement), preset: preset)
         place(session, placement, in: project)
         focus(session)
         scheduleSave()

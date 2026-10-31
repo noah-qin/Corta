@@ -55,7 +55,7 @@ extension CortaSpaceController {
     }
 
     /// The size the session will have once placed: what it starts at.
-    func plannedSize(of placement: Placement, in project: SpaceProject) -> CGSize {
+    func plannedSize(of placement: Placement) -> CGSize {
         switch placement {
         case .root: return gridArea
         case .retile(let layout): return layout.panelSizes(in: gridArea)[-1] ?? gridArea
