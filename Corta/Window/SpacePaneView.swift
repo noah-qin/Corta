@@ -442,14 +442,6 @@ extension SpacePaneView {
             menu.addItem(withTitle: L10n.text("space.session.browseFiles"), action: #selector(browseFiles),
                          keyEquivalent: "").target = self
         }
-        if let conversation = session.record.conversation, session.record.ssh == nil {
-            menu.addItem(NSMenuItem.sectionHeader(title: L10n.format(
-                "space.conversation.source", conversation.source.rawValue)))
-            let refill = menu.addItem(withTitle: L10n.text("space.conversation.fillAgain"),
-                                      action: #selector(refillConversation), keyEquivalent: "")
-            refill.target = self
-            refill.isEnabled = space?.canFillConversation(session) == true
-        }
         if session.record.retainSSH == true {
             menu.addItem(withTitle: L10n.text("space.ssh.kill.title"), action: #selector(endRemoteSession),
                          keyEquivalent: "").target = self
@@ -460,9 +452,30 @@ extension SpacePaneView {
                      action: #selector(SplitViewController.arrangeSpaceInColumns(_:)), keyEquivalent: "")
         menu.addItem(withTitle: L10n.text("space.arrange.rows"),
                      action: #selector(SplitViewController.arrangeSpaceInRows(_:)), keyEquivalent: "")
+        if let diagnostics = makeDiagnosticsMenu() {
+            menu.addItem(.separator())
+            menu.addItem(withTitle: L10n.text("space.session.diagnostics"), action: nil, keyEquivalent: "")
+                .submenu = diagnostics
+        }
         menu.addItem(.separator())
         menu.addItem(withTitle: L10n.text("space.session.end"), action: #selector(endSession), keyEquivalent: "")
             .target = self
+        return menu
+    }
+
+    /// Where the resume command came from, and filling it again: for when
+    /// recovery went wrong, not for every day — so off the first level.
+    private func makeDiagnosticsMenu() -> NSMenu? {
+        guard let conversation = session.record.conversation, session.record.ssh == nil else { return nil }
+        let menu = NSMenu()
+        // Filling again needs an empty prompt; say so with a disabled item.
+        menu.autoenablesItems = false
+        menu.addItem(NSMenuItem.sectionHeader(title: L10n.format(
+            "space.conversation.source", conversation.source.rawValue)))
+        let refill = menu.addItem(withTitle: L10n.text("space.conversation.fillAgain"),
+                                  action: #selector(refillConversation), keyEquivalent: "")
+        refill.target = self
+        refill.isEnabled = space?.canFillConversation(session) == true
         return menu
     }
 

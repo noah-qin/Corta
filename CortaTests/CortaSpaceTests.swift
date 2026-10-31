@@ -414,6 +414,26 @@ struct CortaSpaceTests {
         #expect(kill(try #require(hidden.pane?.session).pty.processIdentifier, 0) == 0)
     }
 
+    @Test func resumeDetailsLiveInTheDiagnosticsSubmenu() throws {
+        let (controller, host) = try makeWindow()
+        defer { close(controller, host) }
+        let project = try makeProject()
+        defer { try? FileManager.default.removeItem(at: project) }
+        let space = host.space
+        space.setActive(true)
+        space.openProject(project)
+        let session = try #require(space.focusedSession)
+        session.record.conversation = LocalConversation(kind: .claude)
+        let panel = try #require(space.panels[ObjectIdentifier(session)])
+        let fill = L10n.text("space.conversation.fillAgain")
+        let menu = panel.makeMenu()
+        #expect(!menu.items.contains { $0.title == fill }, "not on the panel menu's first level")
+        let diagnostics = try #require(menu.items.first { $0.title == L10n.text("space.session.diagnostics") })
+        #expect(diagnostics.submenu?.items.contains { $0.title == fill } == true)
+        session.record.conversation = nil
+        #expect(!panel.makeMenu().items.contains { $0.title == L10n.text("space.session.diagnostics") })
+    }
+
     @Test func projectsKeepTheirOwnSessionsAndAreSaved() throws {
         let (controller, host) = try makeWindow()
         defer { close(controller, host) }

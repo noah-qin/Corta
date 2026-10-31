@@ -70,10 +70,12 @@ extension SpaceSidebarController {
         }
     }
 
-    private func add(_ key: String, to menu: NSMenu, _ action: @escaping () -> Void) {
+    @discardableResult
+    private func add(_ key: String, to menu: NSMenu, _ action: @escaping () -> Void) -> NSMenuItem {
         let entry = menu.addItem(withTitle: L10n.text(key), action: #selector(runMenuAction(_:)), keyEquivalent: "")
         entry.target = self
         entry.representedObject = SpaceMenuAction(action)
+        return entry
     }
 
     private func addSessionItems(
@@ -103,13 +105,6 @@ extension SpaceSidebarController {
                     .submenu = submenu
             }
         }
-        if let conversation = session.record.conversation, session.record.ssh == nil {
-            menu.addItem(NSMenuItem.sectionHeader(title: L10n.format(
-                "space.conversation.source", conversation.source.rawValue)))
-        }
-        if space.canFillConversation(session) {
-            add("space.conversation.fillAgain", to: menu) { space.refillConversation(session) }
-        }
         add("space.session.rename", to: menu) { [weak self] in self?.beginRename(session) }
         if session.record.ssh == nil {
             if space.gitFacts[session.id]?.worktree == true {
@@ -118,6 +113,18 @@ extension SpaceSidebarController {
         }
         if space.canBrowseFiles(of: session) {
             add("space.session.browseFiles", to: menu) { space.browseFiles(of: session) }
+        }
+        // Recovery details, for when it went wrong: off the first level.
+        if let conversation = session.record.conversation, session.record.ssh == nil {
+            let diagnostics = NSMenu()
+            diagnostics.autoenablesItems = false
+            diagnostics.addItem(NSMenuItem.sectionHeader(title: L10n.format(
+                "space.conversation.source", conversation.source.rawValue)))
+            let refill = add("space.conversation.fillAgain", to: diagnostics) { space.refillConversation(session) }
+            refill.isEnabled = space.canFillConversation(session)
+            menu.addItem(.separator())
+            menu.addItem(withTitle: L10n.text("space.session.diagnostics"), action: nil, keyEquivalent: "")
+                .submenu = diagnostics
         }
         menu.addItem(.separator())
         if session.record.retainSSH == true {
