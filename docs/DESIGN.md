@@ -95,7 +95,9 @@ Nothing is shared between windows — that is what D07 buys.
 Space (D30) is a second view of the same window. Its sessions are panes of
 this `SplitViewController` too, so focus, input, close and the agent
 directory need nothing new; the controller keeps the terminal mode's
-`terminalTree`, and `tree` is Space's grid while Space shows.
+`terminalTree`, and `tree` is Space's grid while Space shows. Switching
+modes never changes the window's frame; the grid lays out in the room the
+window has.
 `CortaSpaceController` owns the projects (`SpaceProject`, `SpaceSession`);
 each project keeps its own free `SplitTree` of panel cards (`SpacePaneView`),
 changed in place — a split, a close, a replacement — so untouched panels keep
@@ -108,7 +110,7 @@ its PTY at the grid's size (`resizeSessionOffScreen`). `SpaceStore` writes
 the project list to Application Support; nothing is read from or written to
 a project folder. Layout changes register on the window's undo manager.
 
-Opted-in Space SSH uses `RemoteTmux`'s fixed remote wrapper, rebuilt from each
+Opted-in Space SSH (off by default per connection) uses `RemoteTmux`'s fixed remote wrapper, rebuilt from each
 record's validated UUID/target. The remote server owns tmux's lifetime; Corta
 owns only ssh and starts nothing before the project opens. `PaneRemote` drains
 the token-bound startup/failure report independently of rendering, and Space

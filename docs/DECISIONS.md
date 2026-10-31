@@ -182,15 +182,17 @@ not a feature. Automation that *runs commands* — a "run this" intent or
 URL — is likewise out: open/focus intents ship, execution does not
 (`SECURITY.md` §4.6).
 
-**Space SSH exception (#434).** When the user connects with retention on,
-Corta may run its fixed remote tmux wrapper, rebuilt from a validated UUID
+**Space SSH exception (#434).** When the user connects with retention on
+(off by default, chosen per connection), Corta may run its fixed remote tmux wrapper, rebuilt from a validated UUID
 and the SSH destination. It never reads a command from a restore file, uses
 no tmux control mode and provides no local multiplexer or daemon. A separate
 confirmed action may kill only that named remote session. The wrapper waits
 for the tmux client so exit status 0 (normal detach) ends SSH while nonzero
 can report failure and fall back to a login shell. Atomic detached creation,
 exact existence checks on collisions and exact attachment provide truthful
-new/attached results; it does not use tmux control mode or a local daemon.
+new/attached results; it does not use tmux control mode or a local daemon,
+passes no environment or forwarded socket, and sets no tmux option — not
+`allow-passthrough`.
 
 ## D10 — One config file is the only settings store
 
@@ -833,10 +835,17 @@ sets `auto_updates true` so `brew upgrade` leaves updates to Sparkle, and
 and up to six of them in a free split grid. It is a mode of an ordinary terminal
 window: every session is a pane of that window, as a split's is, and it
 ends locally when the window closes. The terminal mode's split tree is kept whole
-while Space shows and the reverse; switching changes what is on screen and
-the window's frame — Space takes the screen's visible frame, and the
-terminal mode gets its own back, so its shells return at the size they
-left at — never a process. There is one Space in the app — the
+while Space shows and the reverse; switching changes what is on screen,
+never the window's frame and never a process (amended 2026-11-01: Space
+no longer takes the screen's visible frame; the grid lays out in the room
+the window has, and a panel that does not fit stays off screen, running).
+Clicking a hidden session in the sidebar shows it — beside the roomiest
+panel, or in the least recently used one's place — with an Undo note and
+⌘Z; its row's add button still chooses a placement. The first time Space
+shows, one note says its sessions end with the window; closing a window
+whose Space has live sessions says how many end, hidden ones included, in
+the existing "still running" confirmation, and a confirmed close is
+respected — Space does not hide the window instead. There is one Space in the app — the
 window that first shows it holds its sessions, and asking for Space in
 another window brings that one forward. What survives a quit is a list:
 the folders and, for each, its sessions' directories, preset names or SSH
