@@ -12,74 +12,53 @@ Versioning for compatibility changes.
 
 ### Added
 
-- Space SSH can keep remote programs running through an existing remote tmux,
-  enabled by default per connection and independently identified by persistent
-  UUIDs. Reconnect reattaches, ordinary close/removal preserves remote sessions,
-  and a separate confirmed action ends only the selected remote session.
-  Glass connection details distinguish missing/broken tmux, limited ordinary
-  SSH and a lost session replaced by a new terminal. Traditional/preset/typed
-  SSH and SFTP are unchanged; no remote rc or global tmux config is changed.
-
-- Space remembers each local Claude/Codex pane's kind, optional conversation
-  UUID and source. Reopening a project fills its picker or exact resume command
-  into an empty integrated shell prompt; Return remains yours to press. A brief glass note
-  explains the fill, and the session menu can fill it again. No transcript,
-  session-file path or command line is saved; remote sessions are excluded.
-
-- Settings ▸ Space turns agent messages on. A failed Claude or Codex push
-  is recorded, then the wake-up line is tried. A key during that line is
-  marked `nudgeInterrupted`. Templates can be renamed and shown. Claude's
-  inbox socket is also taken from the process's Unix sockets.
-
-- Member menus copy an introduction, the delivery history and unread text.
-  `corta wait` blocks until a message or its timeout. Send Selection to Member
-  is in the View menu and the command palette. Templates can be deleted by name.
-
-- `agent-messages` starts a per-user socket and a `corta` command on the
-  `PATH` of shells Corta launches. Members can send, read, wait and ask
-  who they are. A fixed wake-up line is written only when every gate passes.
-  A retained SSH member gets a `/tmp` client and an `ssh -R` forward on its
-  next connection.
-
-- A Space project can be saved as a template and applied to another
-  project. Templates live in Application Support and omit identities,
-  tmux names and credentials.
-
-- Space recognizes a linked worktree and can type `git worktree add` into
-  a new shell. Return runs it. Corta does not run git itself.
-
-- A selection in a Space pane can be sent to another member. The message
-  can include that pane's directory, branch and commit.
-
-- Space members can message each other when `agent-messages` is on. `corta`
-  sends and reads; a fixed wake-up line is written only when every gate
-  passes. The feature is off by default.
-
-- Space shows each local session's Git branch, worktree mark and a count of
-  tracked files that differ, read from `.git` without running git.
-
-- Space lists sessions that are waiting on you and jumps to the oldest with
-  View ▸ Jump to Next Waiting Session (⌥⌘J). The Dock badge shows the count
-  while the Space window is not key (`space-attention-badge`).
-
 - Space: project folders with their own local, SSH and agent CLI sessions,
   up to six at once in a free split grid of rounded panels beside a sidebar
   that shows every session's state. Switch with the toolbar's mode button,
-  View ▸ Show Space (⌥⌘S) or File ▸ Open Project… (⌘O); Space fills the
-  screen, and the terminal mode's window, tabs and splits come back as they
-  were, still running. Drop sessions on a panel's edge or middle, arrange in
-  columns or rows, undo any placement; rename sessions; browse a remote
+  View ▸ Show Space (⌥⌘S) or File ▸ Open Project… (⌘O). Space shows in the
+  window's own frame and never resizes it; the terminal mode's tabs and
+  splits stay as they were, still running. Drop sessions on a panel's edge
+  or middle, arrange in columns or rows, undo any placement with ⌘Z, rename
+  sessions; click a hidden session to put it on the grid. Browse a remote
   session's files and drag a file's path into a terminal on its host.
-  Projects, sessions and grids are restored after a restart.
-  `space-panel-limit` caps the panels on screen.
+  Projects, sessions and grids are restored after a restart as new shells,
+  presets or SSH connections. `space-panel-limit` caps the panels on screen.
+  The first visit says that Space's sessions end with the window, and closing
+  a window says how many of them will end, hidden ones included.
+
+- Space counts the sessions whose program reports it is blocked on you
+  (OSC 7501) — sign-in, then permission, then question — and View ▸ Jump to
+  Next Waiting Session (⌥⌘J) shows the one that waited longest. Focus moves
+  only when you ask. Done, error and program notifications keep their colour
+  but are not counted; a CLI recognised only by its process name shows
+  *State unknown · not queued*. The Dock badge shows the count while the
+  Space window is not key (`space-attention-badge`).
+
+- Space remembers each local Claude/Codex pane's kind, optional conversation
+  UUID and source. Reopening a project fills `claude --resume` / `codex resume`
+  (with the exact UUID when it can be attributed to that pane) into an empty
+  integrated shell prompt; Return remains yours to press. A brief glass note
+  explains the fill. A session's Diagnostics menu shows the resume source and
+  can fill the command again. No transcript, session-file path or command line
+  is saved; remote sessions are excluded.
+
+- Space shows each local session's Git branch and about how many tracked
+  files changed, read from `.git` without running git; new files are not
+  checked. A linked worktree is marked and its main repository can be shown
+  in Finder.
+
+- Space SSH can keep remote programs running in an existing remote tmux,
+  chosen per connection in the connect dialog (off by default) and identified
+  by a persistent UUID. Reconnect reattaches; ordinary close and removal keep
+  the remote session, and a separately confirmed action ends only that one.
+  Glass connection details distinguish missing or broken tmux, limited
+  ordinary SSH and a lost session replaced by a new terminal. Login shells
+  from POSIX sh to csh/tcsh work. Corta sets no tmux option, so a kept
+  session's state and directory reports do not reach it. Traditional, preset
+  and typed SSH and SFTP are unchanged; no remote rc or global tmux setting
+  is changed.
 
 ### Changed
-
-- Space remembers local Claude/Codex kinds even without a conversation UUID,
-  filling their official pickers on reopen. It recognizes npm-wrapped Codex,
-  verifies Claude process session records, and shows each pane's resume source
-  with privacy-safe fallback diagnostics. Exact UUID resume remains an optional
-  accelerator; commands still wait for Return.
 
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
 
@@ -88,22 +67,6 @@ Versioning for compatibility changes.
 - Keep glass buttons and filters rounded and separate at rest and while pressed
   in the connection forms and command history window.
 
-- Space only shows a delayed conversation continuation note while the exact
-  unsubmitted resume line is still at the original prompt.
-
-- Space conversation sampling preserves a verified UUID's original source after
-  transient failures, clears identities for mixed Claude/Codex groups, and
-  distinguishes unreadable fd tables from ambiguous rollout candidates.
-  Claude records use the agent process's HOME and retry failed reads within a
-  bounded per-process budget while caching only success. A change to that
-  record's stat four-tuple is reread once: a new UUID replaces the saved one,
-  and an unconfirmed change falls back to the picker. Kind, UUID, source or
-  process-identity changes are posted for the pane.
-
-- Retained Space SSH connections work when the remote login shell is csh or
-  tcsh. The fixed tmux wrapper uses one quoted line, preserving tmux startup,
-  failure reporting, login-shell fallback and normal detach behavior.
-
 - Dragging an SFTP file no longer waits on the main thread to provide its
   drag data. Finder receives a promised download with transfer progress;
   URL and text destinations receive its `sftp://user@host:port/path` link
@@ -111,35 +74,11 @@ Versioning for compatibility changes.
   and refuse a connection that has since been replaced. Cancelling the drag
   drops that in-process path when the drag ends.
 
-- Filling a Space conversation no longer treats a right-hand prompt
-  (RPROMPT, Starship, Powerlevel10k) as text you typed. The line is filled
-  once it has stopped changing, and a write that does not land is tried again.
-
 - A file dragged in from Finder is inserted as its local path even when the
   drag also advertises a file promise, such as an iCloud placeholder. Only
   the SFTP browser's own drag is taken as a remote path. A promised local
   file is read after tracking returns, so the download cannot wait on the
   main thread.
-
-- After a retained Space SSH session has attached, a late `fail` signal no
-  longer marks the pane as failed. An attach failure that arrives before
-  any screen output, within a short window, is still recorded.
-
-- Reconnecting a retained Space SSH session rebuilds the ssh command from
-  the destination and a new token. It does not search the previous command
-  text for the old wrapper.
-
-- When one local Claude or Codex process has more than one session file
-  open, Space records the newest by the kernel's modification time, then
-  its creation time. A tie, or a descriptor list that filled the query,
-  keeps the UUID already recorded.
-
-- Removing or ending a retained SSH session still asks, in the same glass
-  alert, when that window cannot show a sheet. Removal continues only
-  after you confirm.
-
-- Replacing a duplicated session UUID keeps the old `corta-<UUID>` in the
-  removal warning, so that remote tmux session can still be ended by hand.
 
 ### Tests and acceptance
 
@@ -149,25 +88,8 @@ Versioning for compatibility changes.
   current split-tree format. Disable per-source penalties only in the isolated
   localhost SSH fixture so deliberate failed authentication does not block
   later tmux lifecycle checks.
-- Add default issue-contract regressions for message provenance/bounds,
-  remote token revocation, SSH template retention and Git context/index v4.
-  Native socket/MCP pipe tests exercise caller checks, streaming framing,
-  bounded background pushes and closed gates. Opt-in real local CLI and Linux
-  protocol tests keep account/environment requirements separate.
 - Rebalance a packed automatic grid before replacing panels when a six-panel
   arrangement still meets the cell minimum.
-- Restore template split layouts and retained SSH choices, confirm external
-  paths, and sequence SSH dialogs. Add template management and member context
-  choices to Space settings. Missing project folders remain visible as unavailable.
-- Correct Git index-v4 strip decoding and linked-worktree refs; watch tracked
-  worktree edits off main. Prevent duplicate nudges, preserve unread messages
-  independently of history, and provide an absolute CLI path for tool shells
-  that reset PATH. Encode reminder Return for the negotiated keyboard protocol
-  and protect tracked user drafts.
-- Rotate and revoke per-connection remote credentials through private forwarding
-  endpoints. Install the explicitly chosen temporary Python client with JSON-safe
-  commands and fresh connection-file lookup; monitor only process metadata and
-  enable passthrough for the session's own tmux window.
 
 ## [1.5.1] - 2026-10-27
 
