@@ -495,17 +495,6 @@ with `target`, executable `askpass`, and task-local `known_hosts`; pass it as
 This runs no remote AI. It removes only its own UUID session and temporary files;
 remove the private credential directory after reviewing the run.
 
-`CortaSpaceTests/worktreeFormFillsWithoutRunningAndUserReturnUpdatesItsGitRow`
-is opt-in with `CORTA_WORKTREE_TEST_ROOT`. It requires integrated zsh. The
-ordinary Unit plan deliberately fixes `SHELL=/bin/sh`; `TEST_RUNNER_SHELL`
-does not override a plan entry. Copy its generated `.xctestrun` outside the
-tree, expand `__TESTROOT__` to the original products directory, and set that
-copy's target `EnvironmentVariables` and `TestingEnvironmentVariables` to
-`SHELL=/bin/zsh`, `ZDOTDIR=<scratch root>` and
-`CORTA_WORKTREE_TEST_ROOT=<scratch root>`. Give the scratch root a neutral
-`.zshrc`, then use `test-without-building -xctestrun <copy>` with the whole
-`CortaTests/CortaSpaceTests` suite. Never edit the user's shell rc to run it.
-
 For the Release one/six-panel comparison, prepare the same UI fixture root and
 select `CortaUITests/MeasurementUITests/testSpaceFloodOneAndSixPanels` under
 `-testPlan Release -configuration Benchmark`. The two stages use font size 10,

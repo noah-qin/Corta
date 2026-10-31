@@ -113,7 +113,6 @@ extension SpaceSidebarController {
         }
         add("space.session.rename", to: menu) { [weak self] in self?.beginRename(session) }
         if session.record.ssh == nil {
-            add("space.worktree.new", to: menu) { space.promptWorktree(from: session) }
             if space.gitFacts[session.id]?.worktree == true {
                 add("space.worktree.reveal", to: menu) { space.revealWorktreeMain(session) }
             }

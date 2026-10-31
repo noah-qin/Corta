@@ -346,9 +346,7 @@ sending reports that the forward is unavailable. The remote needs
 `nc -U`. Nothing is written under the remote home directory.
 
 A session already in a linked worktree is marked, and its menu can show
-the main repository in Finder. New Session in a Worktree… types
-`git worktree add` into a new shell and waits for Return. Names that
-contain a space or a semicolon are refused.
+the main repository in Finder.
 
 Each local session's row shows the Git branch of its directory, read from
 `.git` without running `git`. A linked worktree is marked and its tooltip

@@ -620,10 +620,6 @@ history text. A stale report clears readiness. Same-account processes can read
 these credentials: this is not protection against the account owner or remote
 root. No remote AI installation, configuration or native push is performed.
 
-**Worktree commands (#443).** The session menu can type one
-`git worktree add … && cd …` line into an empty prompt. The name and
-path may contain only `[A-Za-z0-9._/-]`. Corta does not run it.
-
 **Agent messages (#437, off by default).** `agent-messages` starts a
 per-user socket and puts `corta` on the `PATH` of shells Corta spawns.
 Membership is the permission to send. A nudge writes only the constant
