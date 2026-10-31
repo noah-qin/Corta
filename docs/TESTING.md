@@ -474,20 +474,13 @@ setup failure when the root or their config is missing, or the fixture
 prompt did not load. Their shared launcher also isolates `HOME` and
 `ZDOTDIR`; a missing fixture must never be counted as feature coverage.
 
-Real member acceptance requires explicit account/quota authorization. Set
-`TEST_RUNNER_CORTA_MEMBERS_REAL=1`, `TEST_RUNNER_CORTA_CONVERSATION_REAL_CWD`,
-`TEST_RUNNER_CORTA_CONVERSATION_REAL_HOME`, `TEST_RUNNER_CORTA_CONVERSATION_REAL_CLAUDE`,
-`TEST_RUNNER_CORTA_CONVERSATION_REAL_CODEX` and `TEST_RUNNER_CORTA_MEMBERS_REAL_GROK`,
-then select the whole `CortaTests/CortaSpaceTests` suite in the Unit plan.
-Add `TEST_RUNNER_CORTA_MEMBERS_EXTENDED=1` for native SendMessage, MCP-only and
-Grok frontend wait/idle loops. `TEST_RUNNER_CORTA_MEMBERS_BYPASS_ONLY=1` instead
-checks the real inbound hold with a per-process startup-warning overlay; it
-never approves the held message or changes persistent CLI settings.
-`TEST_RUNNER_CORTA_MEMBERS_GATES_ONLY=1` verifies a real Grok tool running,
-unsubmitted draft, disabled wake-up and return to the foreground shell.
-The fixture uses a temporary shell environment and per-invocation CLI flags;
-no persistent agent settings are changed. The same suite without
-`CORTA_MEMBERS_REAL` runs the separately opted-in conversation recovery case.
+Real conversation-recovery acceptance (#436) requires explicit account/quota
+authorization. Set `TEST_RUNNER_CORTA_CONVERSATION_REAL_CWD`,
+`TEST_RUNNER_CORTA_CONVERSATION_REAL_HOME`, `TEST_RUNNER_CORTA_CONVERSATION_REAL_CLAUDE`
+and `TEST_RUNNER_CORTA_CONVERSATION_REAL_CODEX`, then select the whole
+`CortaTests/CortaSpaceTests` suite in the Unit plan. The fixture uses a
+temporary shell environment and per-invocation CLI flags; no persistent agent
+settings are changed.
 
 For the Release one/six-panel comparison, prepare the same UI fixture root and
 select `CortaUITests/MeasurementUITests/testSpaceFloodOneAndSixPanels` under

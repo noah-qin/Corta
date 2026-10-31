@@ -290,23 +290,6 @@ the badge reads. A `tmux` or `screen` in the foreground reads *Remote?*
 because the session it is attached to may itself be on another machine
 and nothing here can tell — it is uncertainty, not an accusation.
 
-### A Space member was not woken
-
-Open that session's menu and choose Delivery History. `queued` means the
-wake-up line was not typed: the member is busy, you were typing, the
-foreground process is not the agent, or wake-up is off. `pushed` means the
-Claude socket or `codex queue` accepted it. The history does not include the
-message text. Messages are forgotten when Corta quits.
-
-History retains push failures and fixed gate reasons. An unread message is not
-nudged repeatedly after a successful reminder. Check the member wake-up switch,
-foreground process, reported/observed idle state, recent input, tracked draft,
-composition and paste. Clear or submit a draft yourself before expecting a nudge.
-A native `pushed` result does not mark the bus message read or approve a CLI's
-own inbound hold. If a tool shell reports `corta: command not found`, use the
-absolute executable shown in the introduction or peer envelope; some tools
-replace inherited PATH.
-
 ### Space always fills a picker instead of a specific conversation
 
 This is the reliable baseline: Return opens Claude's or Codex's official

@@ -214,36 +214,7 @@ were, still running.
   **Fill Conversation Again** in the pane's menu fills the same command again
   at an empty prompt, without executing it.
 
-### Space members and Git
-
-Enable **Settings ▸ Space ▸ Agent messages**, then use a session's **Make Member…**
-menu. Membership permits messaging with members of that project; pause or remove
-it to revoke access. **Member Settings…** edits the role, wake-up switch, Git
-context defaults and optional exact Codex `/rename` name. **Project Members**
-shows capability and host; copy the introduction to tell an agent its ID.
-
-Use `corta members`, `corta send <ID> "text"`, `corta read`,
-`corta read --since <number>`, `corta wait --timeout 55`, and `corta status <number>`.
-Reply with `--reply-to <number>`. Roles are labels; send to an ID. All commands
-accept `--json`. If a tool shell resets PATH, use the absolute `corta` path in
-the introduction or peer envelope. Optional stdio MCP is `corta mcp`, exposing
-`corta_members`, `corta_whoami`, `corta_send`, `corta_read`, `corta_wait`, and
-`corta_status`; MCP wait is at most 55 seconds. Corta does not register MCP or
-change an agent's permissions for you. Claude's per-invocation Bash allow rule
-can be `Bash(corta *)`; also allow the shown absolute executable when needed.
-A CLI's own sandbox or inbound approval can still hold or reject a delivery.
-
-Claude socket push and Codex queue run in the background. `pushed` means the
-native transport accepted the message, not that the model read it. Generic
-agents receive only a fixed reminder when idle, with no recent typing, tracked
-draft, composition or paste; they then call `corta read`. The reminder uses the
-negotiated Return protocol. **Delivery History** shows failed pushes and gate
-reasons; **Copy Unread** remains available while queued. Messages stay in memory.
-
-**Send Selection to Member** sends a user instruction with its source pane;
-the receiver should answer in its own conversation. Shift-click adds an optional
-preface. Text is truncated safely as UTF-8, within the complete 64 KiB envelope.
-Git context is optional per member and selection, and excluded for remote sessions.
+### Space Git rows
 
 Git rows read bounded metadata and tracked-file size/mtime, off main; edits to
 tracked files trigger refresh without an index write. Untracked files, content
@@ -310,24 +281,6 @@ The note disappears after a few seconds; the command stays in the prompt.
 ![Two Space panes with unsubmitted Claude picker commands and a Liquid Glass note](brand/space-conversation.png)
 
 `space-panel-limit` (1–6) caps the panels on screen.
-
-Settings ▸ General ▸ Agent messages (default off) lets you mark a local session as a project
-member from its menu. Corta then listens on a per-user socket and puts
-`corta` on the `PATH` of shells it starts. Members use `corta send`,
-`corta read`, `corta wait`, `corta members`, `corta whoami` and
-`corta status`. The same tools are available as optional MCP tools from
-`corta mcp`. A member that has no push channel gets one fixed line,
-“Corta: you have new messages; run corta read.”, only while it is idle
-and you are not typing.
-Turn the member's wake-up off, or turn `agent-messages` off, and nothing
-is typed. Message text stays in the inbox. It is not saved across launches.
-Select text in a pane and choose Send to Member, or View ▸ Send Selection to Member,
-to deliver that selection. A member's menu copies an introduction you can paste
-once, the delivery history (results only, not the text), and any unread
-messages. `corta wait` blocks until a message arrives or the timeout (at most
-110 seconds). Messages disappear when you quit.
-The message includes the pane's directory, branch and commit when git
-information is already known.
 
 A session already in a linked worktree is marked, and its menu can show
 the main repository in Finder.

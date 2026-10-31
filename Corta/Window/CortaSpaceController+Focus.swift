@@ -16,7 +16,6 @@
 
 import AppKit
 import CortaTerminal
-import Darwin
 
 /// Which session is in use, and keeping the chrome that shows it current.
 extension CortaSpaceController {
@@ -57,8 +56,7 @@ extension CortaSpaceController {
 
     /// A batch of output: titles in the sidebar may have changed. At most two
     /// refreshes a second, whatever the output rate.
-    func noteOutput(from pane: ViewController? = nil) {
-        if let pane, let session = session(for: pane)?.session { lastAgentOutput[session.id] = .now }
+    func noteOutput() {
         guard isActive, !isOutputRefreshScheduled else { return }
         isOutputRefreshScheduled = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -102,108 +100,11 @@ extension CortaSpaceController {
         if let focused = focusedSession?.id, ordered.contains(focused) { advancedWaitingSession = focused }
         sidebar.setWaitingCount(ordered.count)
         noteGitDirectories()
-        syncAgentBus()
-        AgentHub.shared.nudgePending()
         sidebar.reload()
         for panel in panels.values where panel.window != nil { panel.update() }
         content.update()
         showConversationNoticeIfNeeded()
         updateAttentionBadge(ordered: ordered)
-    }
-
-    func wakeSnapshot(for sessionID: UUID) -> AgentWakeSnapshot? {
-        guard let session = session(withID: sessionID)?.session, let pane = session.pane,
-              let terminal = pane.session else { return nil }
-        let observation = session.conversationObservation
-        let kind = observation?.conversation.kind.rawValue
-        let group = terminal.pty.foregroundProcessGroup
-        let configured = ConfigurationStore.shared.configuration.agentProcesses
-        let foregroundName = terminal.pty.activeProcessName
-        let namedAgent = foregroundName.map { AgentProcessNames.matches($0, configured: configured) } == true
-            && group != terminal.pty.processIdentifier
-        let activity = agentActivities[sessionID]
-        let observedAgent = observation?.processes.contains { activity?.processes.contains($0.pid) == true } == true
-        let foreground = activity?.group == group && (observedAgent || activity?.kind != nil || namedAgent)
-        let status = pane.agents.status
-        let signalledIdle = status?.state == .idle || status?.state == .done
-        let hasAuthoritativeState = status?.state == .working || status?.state == .blocked
-        let quiet = lastAgentOutput[sessionID].map { SuspendingClock.now - $0 >= .seconds(2) } ?? false
-        let idle = signalledIdle || (!hasAuthoritativeState && idleAgents.contains(sessionID) && quiet)
-        let typing = pane.terminalView?.lastUserInput.map { SuspendingClock.now - $0 < .seconds(3) } ?? false
-        let member = member(of: session)
-        let agent = observation?.processes.first
-        let gate = AgentNudgeGate(
-            enabled: ConfigurationStore.shared.configuration.agentMessages && member?.nudgeEnabled == true,
-            foregroundIsAgent: foreground, idle: idle, userIdle: !typing,
-            composing: pane.terminalView?.hasMarkedText() == true || pane.terminalView?.hasUnsubmittedInput == true,
-            bracketedPaste: terminal.hasPendingPaste || terminal.isPasteInFlight,
-            nudgesThisMinute: AgentHub.shared.bus.nudges(for: member?.id ?? UUID(),
-                now: Date().timeIntervalSinceReferenceDate))
-        return AgentWakeSnapshot(
-            kind: kind,
-            claudeSocket: agent.flatMap { Self.claudeSocket(of: $0.pid) },
-            codexExecutable: kind == "codex" ? agent.flatMap { Self.executablePath(of: $0.pid) } : nil,
-            codexThread: observation?.conversation.id?.uuidString ?? member?.codexThreadName,
-            gate: gate)
-    }
-
-    private static func executablePath(of pid: pid_t) -> String? {
-        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
-        let count = proc_pidpath(pid, &buffer, UInt32(buffer.count))
-        guard count > 0 else { return nil }
-        return String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
-    }
-
-    /// Claude's inbox is the environment path or a Unix socket in its private directory.
-    private static func claudeSocket(of pid: pid_t) -> String? {
-        if let value = ConversationProcess.environmentValue(pid, key: "CLAUDE_CODE_MESSAGING_SOCKET"),
-           AgentPush.acceptedSocket(value) {
-            return value
-        }
-        return Self.unixSockets(of: pid).first(where: AgentPush.acceptedSocket)
-    }
-
-    private static func unixSockets(of pid: pid_t) -> [String] {
-        let stride = MemoryLayout<proc_fdinfo>.stride
-        var descriptors = [proc_fdinfo](repeating: proc_fdinfo(), count: 256)
-        let bytes = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &descriptors, Int32(descriptors.count * stride))
-        guard bytes > 0 else { return [] }
-        var paths: [String] = []
-        for descriptor in descriptors.prefix(Int(bytes) / stride) where descriptor.proc_fdtype == PROX_FDTYPE_SOCKET {
-            var info = socket_fdinfo()
-            let size = Int32(MemoryLayout<socket_fdinfo>.size)
-            guard proc_pidfdinfo(pid, descriptor.proc_fd, PROC_PIDFDSOCKETINFO, &info, size) == size,
-                  info.psi.soi_kind == Int32(SOCKINFO_UN) else { continue }
-            let path = withUnsafeBytes(of: info.psi.soi_proto.pri_un.unsi_addr.ua_sun.sun_path) { raw in
-                String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
-            }
-            if path.hasPrefix("/") { paths.append(path) }
-        }
-        return paths
-    }
-
-    func writeNudge(to sessionID: UUID) -> Bool {
-        guard let session = session(withID: sessionID)?.session,
-              let terminal = session.pane?.session else { return false }
-        guard let key = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
-                                        windowNumber: 0, context: nil, characters: "\r",
-                                        charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36),
-              let submit = TerminalView.bytes(for: key, enhancements: terminal.keyboardEnhancements,
-                                              newLineMode: paneIsNewLineMode(session)) else { return false }
-        guard terminal.write(Array(AgentEnvelope.nudgeText.utf8)) == .accepted else { return false }
-        let revision = session.pane?.terminalView?.userInputRevision
-        let group = terminal.pty.foregroundProcessGroup
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(200)) { [weak session] in
-            guard let session, session.pane?.session === terminal,
-                  session.pane?.terminalView?.userInputRevision == revision,
-                  terminal.pty.foregroundProcessGroup == group else { return }
-            _ = terminal.write(submit)
-        }
-        return true
-    }
-
-    private func paneIsNewLineMode(_ session: SpaceSession) -> Bool {
-        session.pane?.terminalView?.isNewLineMode?() ?? false
     }
 
     func noteGitDirectories() {

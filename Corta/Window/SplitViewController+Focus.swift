@@ -78,8 +78,6 @@ extension SplitViewController {
             return !(view.window is NSPanel)
         case #selector(jumpToNextWaitingSession(_:)):
             return space.isActive && space.hasWaitingSession()
-        case #selector(sendSelectionToMember(_:)):
-            return space.isActive && ConfigurationStore.shared.configuration.agentMessages
         case #selector(openSpaceProject(_:)):
             return !(view.window is NSPanel)
         case #selector(arrangeSpaceInColumns(_:)), #selector(arrangeSpaceInRows(_:)):

@@ -87,7 +87,6 @@ final class SpaceProject {
     var isAvailable = true
     var isStarted = false
     var conversationPreparation: Task<Void, Never>?
-    var members: [AgentMemberRecord]
 
     init(record: SpaceProjectRecord) {
         url = URL(fileURLWithPath: record.path, isDirectory: true)
@@ -95,7 +94,6 @@ final class SpaceProject {
         self.sessions = sessions
         pendingLayout = record.layout
         nextNumber = record.nextNumber
-        members = record.members
         isAvailable = record.isAvailable
         focused = record.layout?.panels.first.map { sessions[$0] }
     }
@@ -112,7 +110,7 @@ final class SpaceProject {
 
     var record: SpaceProjectRecord {
         SpaceProjectRecord(path: path, sessions: sessions.map(\.currentRecord), layout: layout,
-                           nextNumber: nextNumber, members: members)
+                           nextNumber: nextNumber)
     }
 
     /// The grid as it is on screen, or as it was saved if not built yet.

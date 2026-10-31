@@ -46,13 +46,11 @@ enum PaneSpawn {
     /// - Parameter historySuggestions: whether zsh suggests history suffixes.
     /// - Parameter directoryCheckTimeout: how long the off-main existence
     ///   check of `directory` may take before the next rung.
-    /// - Parameter extraEnvironment: task-owned pane identity and message socket values.
     static func start(
         size: TerminalSize, directory: String?, scrollbackLimit: Int,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity, preset: Preset? = nil,
         configuredShell: String? = nil, directoryCompletion: Bool = true, historySuggestions: Bool = true,
-        directoryCheckTimeout: DispatchTimeInterval = .milliseconds(500),
-        extraEnvironment: [String: String] = [:]
+        directoryCheckTimeout: DispatchTimeInterval = .milliseconds(500)
     ) throws(PTYError) -> Started {
         // An uninstalled preset shell degrades to a working terminal.
         let configured =
@@ -99,7 +97,7 @@ enum PaneSpawn {
             do {
                 let session = try TerminalSession(
                     executable: attempt.shell, arguments: attemptArguments,
-                    environment: Self.withAgent(prepared.environment, extraEnvironment), size: size,
+                    environment: prepared.environment, size: size,
                     workingDirectory: attempt.directory,
                     // Applies to new sessions: shrinking a live one would drop lines.
                     scrollbackLimit: scrollbackLimit, commandHistoryLimit: commandHistoryLimit,
@@ -115,25 +113,12 @@ enum PaneSpawn {
         throw lastError
     }
 
-    /// Added after sanitizing, so `CORTA_PANE_ID` is not stripped with the other
-    /// internal names. `CORTA_AGENT_BIN` is a directory prepended to `PATH`, not
-    /// passed through.
-    static func withAgent(_ environment: [String: String], _ extra: [String: String]) -> [String: String] {
-        var result = environment
-        var extra = extra
-        if let bin = extra.removeValue(forKey: "CORTA_AGENT_BIN") {
-            result["PATH"] = bin + ":" + (result["PATH"] ?? "/usr/bin:/bin")
-        }
-        for (key, value) in extra { result[key] = value }
-        return result
-    }
-
     /// The recorded command, exactly — a fallback would silently turn a remote
     /// pane into a local shell.
     static func respawn(
         _ command: (executable: String, arguments: [String]),
         size: TerminalSize, configuration: Configuration, preset: Preset?,
-        workingDirectory: String?, extraEnvironment: [String: String] = [:]
+        workingDirectory: String?
     ) throws(PTYError) -> Started {
         var environment = ChildEnvironment.default()
         for (key, value) in preset?.environment ?? [:] { environment[key] = value }
@@ -152,7 +137,7 @@ enum PaneSpawn {
             // A local cwd for the launcher; the remote side lands where it lands.
             let session = try TerminalSession(
                 executable: command.executable, arguments: command.arguments,
-                environment: Self.withAgent(environment, extraEnvironment), size: size,
+                environment: environment, size: size,
                 workingDirectory: usableDirectory(preset?.directory ?? workingDirectory),
                 scrollbackLimit: configuration.scrollbackLines,
                 commandHistoryLimit: configuration.commandHistoryLimit,

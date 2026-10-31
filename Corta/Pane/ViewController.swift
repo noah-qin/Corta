@@ -38,8 +38,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     var terminalView: TerminalView!
     var terminalRenderer: TerminalRenderer!
     var session: TerminalSession!
-    /// Set before the view loads when this pane is a Space session.
-    var agentPaneID: UUID?
     lazy var agents = PaneAgents(host: self)
     private var readerDemotion: DispatchWorkItem?
     private var readerHiddenSince: TimeInterval?
@@ -514,16 +512,6 @@ extension ViewController {
             rows: size.rows, columns: size.columns, pixelWidth: pixels.width, pixelHeight: pixels.height)
     }
 
-    private func agentEnvironment(_ configuration: Configuration) -> [String: String] {
-        guard configuration.agentMessages else { return [:] }
-        var extra = ["CORTA_PANE_ID": (agentPaneID ?? taskNotifier.paneID).uuidString.lowercased()]
-        if let socket = AgentHub.shared.socketPath {
-            extra["CORTA_AGENT_SOCKET"] = socket
-            extra["CORTA_AGENT_BIN"] = (socket as NSString).deletingLastPathComponent + "/bin"
-        }
-        return extra
-    }
-
     /// The pane's child: the remote command again on a strict respawn,
     /// otherwise the shell or preset. `nil` after presenting why it failed.
     private func startSession(
@@ -533,15 +521,14 @@ extension ViewController {
             if strictRespawn, let command = remote.reconnectCommand {
                 return try PaneSpawn.respawn(
                     command, size: size, configuration: configuration, preset: preset,
-                    workingDirectory: inheritedWorkingDirectory, extraEnvironment: agentEnvironment(configuration))
+                    workingDirectory: inheritedWorkingDirectory)
             }
             return try PaneSpawn.start(
                 size: size, directory: inheritedWorkingDirectory,
                 scrollbackLimit: configuration.scrollbackLines,
                 commandHistoryLimit: configuration.commandHistoryLimit, preset: preset,
                 directoryCompletion: configuration.directoryCompletion,
-                historySuggestions: configuration.historySuggestions,
-                extraEnvironment: agentEnvironment(configuration))
+                historySuggestions: configuration.historySuggestions)
         } catch {
             presentFailure(
                 title: L10n.text("failure.title.session"),
@@ -816,7 +803,7 @@ extension ViewController {
             windowTitle.apply()
         }
         // Space names every session in its sidebar, focused or not.
-        splitController?.space.noteOutput(from: self)
+        splitController?.space.noteOutput()
         if scrollOffset > 0, !sawOutputWhileScrolled {
             // Nothing else says so: no scroll bar, and the live screen is off view.
             sawOutputWhileScrolled = true

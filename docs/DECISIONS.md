@@ -46,8 +46,6 @@ Status of every entry below is **accepted** unless it says otherwise.
 | [D28](#d28--local-tools-are-swift-ci-only-glue-may-be-python) | Local tools are Swift; CI-only glue may be Python | Accepted |
 | [D29](#d29--no-homebrew-cask-until-homebrewcask-accepts-one) | No Homebrew cask until `homebrew/cask` accepts one | Accepted |
 | [D30](#d30--space-is-a-second-view-of-one-windows-sessions-not-a-multiplexer) | Space is a second view of one window's sessions, not a multiplexer | Accepted |
-| [D31](#d31--one-codex-queue-invocation-for-a-member) | One `codex queue` invocation for a member | Accepted |
-| [D32](#d32--a-fixed-wake-up-line-and-only-that) | A fixed wake-up line, and only that | Accepted |
 
 ---
 
@@ -193,11 +191,6 @@ for the tmux client so exit status 0 (normal detach) ends SSH while nonzero
 can report failure and fall back to a login shell. Atomic detached creation,
 exact existence checks on collisions and exact attachment provide truthful
 new/attached results; it does not use tmux control mode or a local daemon.
-
-**Agent message exceptions (#437).** Two narrow exceptions, recorded as D31
-and D32. Corta may run one `codex queue` for a member, and may write one
-fixed wake-up line into a member's pane when every gate passes. It still
-does not run models, read other panes, or write message text into a PTY.
 
 ## D10 — One config file is the only settings store
 
@@ -927,46 +920,3 @@ processes may continue consuming resources. Local scrollback is not restored. A 
 **Consequence.** Reopen with a design for sessions that outlive a window
 that does not reopen D09, or with a measured case where 64 × 18 breaks a
 program the grid is for.
-
-## D31 — One codex queue invocation for a member
-
-**Decision.** When agent messages are on, Corta may run `codex queue` to
-deliver a message into a Codex member's thread. The executable is that
-member pane's own `codex` (`proc_pidpath`), the arguments are structured
-and do not go through a shell, standard input is closed, output is bounded
-and the wait is 10 seconds. Delivery runs off the main actor; the pipe is
-drained with a 64 KiB cap, and a timed-out child is terminated and reaped.
-
-**Why.** Codex documents `codex queue` as the way to hand a thread a
-message. A shell string would be a command injection. This is the same
-kind of narrow exception as the remote tmux wrapper (D09, #434).
-
-**What it costs.** A failed or slow `codex` delays that one delivery by up
-to 10 seconds. The message is still in the inbox.
-
-**Consequence.** Reopen if Codex provides a socket of its own, or if
-`codex queue` starts requiring a daemon this process cannot see.
-
-## D32 — A fixed wake-up line, and only that
-
-**Decision.** When agent messages are on and a member allows it, Corta may
-write one constant line, `Corta: you have new messages; run corta read.`
-plus a Return encoded for the pane's negotiated keyboard protocol, into
-that member's pane. The constant text and Return are separated by 200 ms
-so a TUI does not classify the whole write as a multiline paste. A user key
-in that interval cancels submission. All six gates have to
-pass: the switch is on, the foreground process is that agent, it is idle,
-the user has not typed for three seconds, has no tracked unsubmitted draft
-and is not composing, the pane has no pending or active paste, and this member has been nudged fewer than three
-times in the last minute. The bytes never include a name, a message number
-or any byte from a message.
-
-**Why.** Most agents have no injection socket. A constant line is not
-attacker-controlled text (`SECURITY.md`). The gates exist so a busy agent
-or a user mid-sentence is left alone.
-
-**What it costs.** The agent spends a turn calling `corta read`. A key
-arriving in the same instant can land next to the line.
-
-**Consequence.** Reopen if a general, non-typing wake-up exists for every
-CLI. Until then the line stays constant and off by default.

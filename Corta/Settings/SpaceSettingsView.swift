@@ -21,8 +21,6 @@ extension SettingsView {
     var spacePage: some View {
         Form {
             Section(L10n.text("settings.section.space")) {
-                Toggle(L10n.text("settings.label.agentMessages"), isOn: bind(\.agentMessages))
-                    .help(L10n.text("settings.help.agentMessages"))
                 Toggle(L10n.text("settings.label.spaceAttentionBadge"), isOn: bind(\.spaceAttentionBadge))
                 Toggle(L10n.text("settings.label.waitingAutoAdvance"), isOn: bind(\.waitingQueueAutoAdvance))
             }

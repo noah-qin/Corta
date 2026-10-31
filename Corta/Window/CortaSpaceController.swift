@@ -55,10 +55,6 @@ final class CortaSpaceController: NSObject {
     var advancedWaitingSession: UUID?
     var gitFacts: [UUID: GitFacts] = [:]
     var launchRemoteTermination: ((SSHTarget, String) -> Void)?
-    var agentBus = AgentBus()
-    var agentActivities: [UUID: AgentActivity] = [:]
-    var idleAgents: Set<UUID> = []
-    var lastAgentOutput: [UUID: SuspendingClock.Instant] = [:]
     let gitMonitor = GitStatusMonitor()
     private var pendingSave: DispatchWorkItem?
     var isRefreshScheduled = false

@@ -304,13 +304,11 @@ final class SplitViewController: NSViewController {
     /// Creates a pane and its session, force-loading the view so the shell
     /// spawns at the target grid size and directory rather than reflowing.
     func makePane(
-        workingDirectory: String?, initialGridSize: TerminalSize?, preset: Preset? = nil,
-        agentPaneID: UUID? = nil
+        workingDirectory: String?, initialGridSize: TerminalSize?, preset: Preset? = nil
     ) -> ViewController {
         let pane = ViewController()
         // Before `pane.view` loads: the preset supplies spawn settings.
         pane.preset = preset
-        pane.agentPaneID = agentPaneID
         // Opens where the focused pane is (OSC 7), else home. The directory is
         // already host-filtered, so a remote path never reaches a local spawn.
         pane.inheritedWorkingDirectory = workingDirectory

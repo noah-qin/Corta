@@ -72,75 +72,6 @@ extension CortaSpaceController {
     }
 
     /// The SSH connect dialog, whose connection opens in this project.
-    func project(containing session: SpaceSession) -> SpaceProject? {
-        self.session(withID: session.id)?.project
-    }
-
-    /// Directory, branch, commit and dirty flag this pane already knows.
-    func gitContext(for session: SpaceSession) -> [String] {
-        guard session.record.ssh == nil else { return [] }
-        var lines: [String] = []
-        if let directory = session.pane?.session?.currentDirectory ?? session.record.directory,
-           let line = AgentEnvelope.contextLine("cwd", directory) { lines.append(line) }
-        if let line = AgentEnvelope.contextLine("pane", SpaceSessionPresentation(session: session).title) {
-            lines.append(line)
-        }
-        if let facts = gitFacts[session.id] {
-            if let line = AgentEnvelope.contextLine("branch", facts.name) { lines.append(line) }
-            if let head = facts.commit,
-               let line = AgentEnvelope.contextLine("head", head) { lines.append(line) }
-            if let dirty = facts.changedFiles,
-               let line = AgentEnvelope.contextLine("dirty", dirty > 0 ? "true" : "false") { lines.append(line) }
-        }
-        return lines
-    }
-
-    func syncAgentBus() {
-        guard Self.owner == nil || Self.owner === self else { return }
-        configureAgentHubCallbacks()
-        let members = projects.flatMap(\.members)
-        let configured = ConfigurationStore.shared.configuration.agentProcesses
-        let bound = Set(projects.flatMap(\.sessions).compactMap { session -> UUID? in
-            if session.conversationObservation?.processes.isEmpty == false { return session.id }
-            if agentActivities[session.id]?.kind != nil { return session.id }
-            if let name = session.pane?.session?.pty.activeProcessName,
-               AgentProcessNames.matches(name, configured: configured) {
-                return session.id
-            }
-            return nil
-        })
-        var shells: [pid_t: UUID] = [:]
-        for session in projects.flatMap(\.sessions) {
-            if let pid = session.pane?.session?.pty.processIdentifier { shells[pid] = session.id }
-        }
-        var projectsByMember: [UUID: String] = [:]
-        for project in projects {
-            for member in project.members { projectsByMember[member.id] = project.path }
-        }
-        AgentHub.shared.sync(members: members, bound: bound, shells: shells, projects: projectsByMember)
-        agentBus = AgentHub.shared.bus
-    }
-
-    @discardableResult
-    func sendUserText(_ text: String, to member: AgentMemberRecord, from session: SpaceSession,
-                      context: [String] = []) -> AgentDelivery {
-        syncAgentBus()
-        guard ConfigurationStore.shared.configuration.agentMessages else { return .refused("disabled") }
-        let limit = AgentEnvelope.bodyLimit - 4096
-        var body = text
-        var lines = context
-        if body.utf8.count > limit {
-            let original = body.utf8.count
-            body = AgentEnvelope.prefixUTF8(body, limit: limit)
-            lines.append("truncated: \(original)")
-        }
-        let delivery = AgentHub.shared.deliverUser(to: member.id.uuidString, body: body, context: lines,
-                                                  pane: SpaceSessionPresentation(session: session).title,
-                                                      source: session.id)
-        content.showNote(L10n.format("space.member.sent", AgentHub.shared.deliveryName(delivery)))
-        return delivery
-    }
-
     func connectSession() {
         RemoteConnectController.shared.show(.ssh, sender: self, sessionDestination: { [weak self] preset in
             self?.newSession(preset: preset)
@@ -333,8 +264,7 @@ extension CortaSpaceController {
             ? template?.gridSize(fittingBelowChrome: terminalSize) : nil
         let pane = host.makePane(
             workingDirectory: record.ssh == nil ? (record.directory ?? project.path) : nil,
-            initialGridSize: grid, preset: resolved,
-            agentPaneID: session.id)
+            initialGridSize: grid, preset: resolved)
         // The window's temporary font zoom applies to new sessions too.
         if let template {
             pane.setFontSize(template.fontSize)

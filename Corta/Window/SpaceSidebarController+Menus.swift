@@ -107,7 +107,6 @@ extension SpaceSidebarController {
             menu.addItem(NSMenuItem.sectionHeader(title: L10n.format(
                 "space.conversation.source", conversation.source.rawValue)))
         }
-        addMemberItems(to: menu, session: session, space: space)
         if space.canFillConversation(session) {
             add("space.conversation.fillAgain", to: menu) { space.refillConversation(session) }
         }
@@ -127,33 +126,11 @@ extension SpaceSidebarController {
         add("space.session.end", to: menu) { space.endSession(session) }
     }
 
-    private func addMemberItems(to menu: NSMenu, session: SpaceSession, space: CortaSpaceController) {
-        if ConfigurationStore.shared.configuration.agentMessages {
-            let member = space.member(of: session)
-            if member == nil, session.record.ssh == nil {
-                add("space.member.add", to: menu) { space.makeMember(session) }
-            } else if member != nil {
-                add(member?.paused == true ? "space.member.resume" : "space.member.pause", to: menu) {
-                    space.setMemberPaused(session, paused: member?.paused != true)
-                }
-                add("space.member.directory", to: menu) {
-                    if let project = space.project(containing: session) { space.showMemberDirectory(for: project) }
-                }
-                add("space.member.edit", to: menu) { space.editMember(session) }
-                add("space.member.remove", to: menu) { space.removeMember(session) }
-                add("space.member.intro", to: menu) { space.copyIntroduction(session) }
-                add("space.member.history", to: menu) { space.showHistory(session) }
-                add("space.member.unread", to: menu) { space.copyUnread(session) }
-            }
-        }
-    }
-
     private func addProjectItems(to menu: NSMenu, project: SpaceProject, space: CortaSpaceController) {
         add("space.newSession", to: menu) { space.selectProject(project); space.newSession() }
         if let session = project.sessions.first(where: { space.gitFacts[$0.id]?.mainRepository != nil }) {
             add("space.worktree.reveal", to: menu) { space.revealWorktreeMain(session) }
         }
-        add("space.member.directory", to: menu) { space.showMemberDirectory(for: project) }
         add("space.connectSSH", to: menu) { space.selectProject(project); space.connectSession() }
         let hosts = space.remoteHosts(of: project)
         if !hosts.isEmpty {

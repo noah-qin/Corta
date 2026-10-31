@@ -74,27 +74,17 @@ extension CortaSpaceController {
                   case .local = pane.remote.state, let terminal = pane.session else { return nil }
             return (item.id, terminal)
         }
-        let configured = ConfigurationStore.shared.configuration.agentProcesses
         let updates = await Task.detached(priority: .utility) {
-            candidates.map { ($0.0, $0.1.pty.conversationSample, AgentActivity.read($0.1, configured: configured)) }
+            candidates.map { ($0.0, $0.1.pty.conversationSample) }
         }.value
         guard !Task.isCancelled else { return }
-        for (id, sample, activity) in updates {
-            if let activity {
-                if activity.idle(after: agentActivities[id]) { idleAgents.insert(id) } else { idleAgents.remove(id) }
-                agentActivities[id] = activity
-            } else {
-                agentActivities[id] = nil
-                idleAgents.remove(id)
-            }
+        for (id, sample) in updates {
             guard let sample, let (_, item) = session(withID: id),
                   let original = candidates.first(where: { $0.0 == id })?.1,
                   item.pane?.session === original, item.record.ssh == nil,
                   case .local = item.pane?.remote.state else { continue }
             applyConversationSample(sample, to: item)
         }
-        syncAgentBus()
-        AgentHub.shared.nudgePending()
         if isActive { refreshNow() }
     }
 

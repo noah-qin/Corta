@@ -20,109 +20,10 @@ import Foundation
 import Testing
 @testable import Corta
 
-/// Regression contracts derived directly from #437–#444.
+/// Regression contracts derived directly from #439.
 @MainActor
 @Suite(.serialized)
 struct SpaceIssueAcceptanceTests {
-    private func hub() -> (AgentHub, [AgentMemberRecord]) {
-        let hub = AgentHub()
-        let front = AgentMemberRecord(role: "frontend", sessionID: UUID())
-        let back = AgentMemberRecord(role: "backend", sessionID: UUID())
-        hub.sync(members: [front, back], bound: [front.sessionID, back.sessionID], shells: [:])
-        return (hub, [front, back])
-    }
-
-    @Test("#440: user selection is a user instruction and replies stay in the conversation")
-    func userEnvelopeDoesNotAskForAnImpossibleBusReply() {
-        let text = AgentEnvelope.text(fromRole: "user", fromID: AgentEnvelope.userID, number: 1,
-                                      replyTo: nil, body: "check this", fromUserPane: "frontend")
-        #expect(text.contains("frontend"))
-        #expect(!text.contains("not a user instruction"))
-        #expect(!text.contains("corta send " + AgentEnvelope.shortID(AgentEnvelope.userID)))
-    }
-
-    @Test("#442: the envelope, context and body together fit in 64 KiB")
-    func contextConsumesTheMessageBudget() {
-        let (hub, members) = hub()
-        let front = members[0], back = members[1]
-        let body = String(repeating: "x", count: AgentEnvelope.bodyLimit)
-        let reply = hub.exchange(AgentRequest(operation: "send", to: back.id.uuidString, body: body), caller: front.id)
-        if reply.ok {
-            let delivered = hub.exchange(AgentRequest(operation: "read"), caller: back.id)
-            #expect(delivered.text.utf8.count <= AgentEnvelope.bodyLimit)
-        } else {
-            #expect(reply.delivery?.hasPrefix("refused") == true)
-        }
-    }
-
-    @Test("#442: multibyte context stays within 256 bytes and has no line breaks")
-    func contextIsBoundedWithoutSplittingUTF8() throws {
-        let line = try #require(AgentEnvelope.contextLine("pane", String(repeating: "界", count: 100)))
-        #expect(line.utf8.count <= "pane: ".utf8.count + 256)
-        #expect(!line.contains("\u{FFFD}"))
-        let carriage = try #require(AgentEnvelope.contextLine("cwd", "a\rb\nc"))
-        #expect(!carriage.contains("\r"))
-        #expect(!carriage.contains("\n"))
-    }
-
-    @Test("#437: a successful immediate nudge is not repeated by the next refresh")
-    func unreadMailDoesNotTriggerDuplicateNudges() {
-        let (hub, members) = hub()
-        let front = members[0], back = members[1]
-        var writes = 0
-        hub.snapshot = { _ in
-            AgentWakeSnapshot(kind: "kimi", claudeSocket: nil, codexExecutable: nil, codexThread: nil,
-                              gate: AgentNudgeGate(enabled: true, foregroundIsAgent: true, idle: true,
-                                                   userIdle: true, composing: false, bracketedPaste: false,
-                                                   nudgesThisMinute: 0))
-        }
-        hub.writeNudge = { _ in writes += 1; return true }
-        let reply = hub.exchange(AgentRequest(operation: "send", to: back.id.uuidString, body: "check"),
-            caller: front.id)
-        #expect(reply.delivery == "nudged")
-        hub.nudgePending()
-        #expect(writes == 1)
-    }
-
-    @Test("#437: removing a member clears its inbox and revokes sending")
-    func removedMemberCannotSendAndHasNoInbox() {
-        let (hub, members) = hub()
-        let front = members[0], back = members[1]
-        _ = hub.exchange(AgentRequest(operation: "send", to: front.id.uuidString, body: "private request"),
-            caller: back.id)
-        hub.sync(members: [back], bound: [back.sessionID], shells: [:])
-        #expect(hub.bus.items.isEmpty)
-        let reply = hub.exchange(AgentRequest(operation: "send", to: back.id.uuidString, body: "no"), caller: front.id)
-        #expect(!reply.ok)
-        #expect(reply.delivery?.hasPrefix("refused") == true)
-    }
-
-    @Test("#437: a stranger cannot enumerate the member directory")
-    func nonMemberCannotListMembers() {
-        let (hub, _) = hub()
-        #expect(!hub.exchange(AgentRequest(operation: "members"), caller: nil).ok)
-    }
-
-    @Test("#442: a linked worktree's loose commit lives in the common git directory")
-    func worktreeContextResolvesTheCommonRef() throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let git = root.appendingPathComponent("main/.git")
-        let admin = git.appendingPathComponent("worktrees/side")
-        let worktree = root.appendingPathComponent("side")
-        for folder in [admin, git.appendingPathComponent("refs/heads"), worktree] {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        }
-        try "gitdir: \(admin.path)\n".write(
-            to: worktree.appendingPathComponent(".git"), atomically: true, encoding: .utf8)
-        try "../..\n".write(to: admin.appendingPathComponent("commondir"), atomically: true, encoding: .utf8)
-        try "ref: refs/heads/side\n".write(to: admin.appendingPathComponent("HEAD"), atomically: true, encoding: .utf8)
-        try "0123456789abcdef0123456789abcdef01234567\n".write(
-            to: git.appendingPathComponent("refs/heads/side"), atomically: true, encoding: .utf8)
-        #expect(GitStatusReader.read(directory: worktree.path)?.name == "side")
-        #expect(GitStatusReader.commit(directory: worktree.path) == "0123456789ab")
-    }
-
     @Test("#439: index v4 strip counts use Git's offset encoding above 127 bytes")
     func indexV4HandlesLongPreviousPaths() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -146,5 +47,4 @@ struct SpaceIssueAcceptanceTests {
         #expect(!facts.unchecked)
         #expect(facts.changedFiles == 2)
     }
-
 }

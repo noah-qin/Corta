@@ -25,7 +25,6 @@ nonisolated struct GitFacts: Equatable, Sendable {
     var mainRepository: String?
     /// Tracked files whose size or second-resolution mtime differs. Nil when unchecked.
     var changedFiles: Int?
-    var commit: String?
     var unchecked: Bool
 
     static let maximumEntries = 20_000
@@ -33,38 +32,11 @@ nonisolated struct GitFacts: Equatable, Sendable {
 
 /// Reads `.git` without running git. A missing repository is nil, never an error.
 nonisolated enum GitStatusReader {
-    /// HEAD refs in linked worktrees belong to the common directory.
-    static func commit(directory: String) -> String? {
-        guard let located = locate(URL(fileURLWithPath: directory, isDirectory: true)),
-              let head = readHEAD(in: located.gitDir) else { return nil }
-        if head.detached { return head.full }
-        let common = commonDirectory(located.gitDir)
-        let name = "refs/heads/" + head.name
-        if let data = boundedData(common.appendingPathComponent(name), limit: 128),
-           let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           validCommit(text) { return String(text.prefix(12)) }
-        guard let data = boundedData(common.appendingPathComponent("packed-refs"), limit: 4 * 1024 * 1024),
-              let text = String(data: data, encoding: .utf8) else { return nil }
-        for line in text.split(separator: "\n") where !line.hasPrefix("#") && !line.hasPrefix("^") {
-            let parts = line.split(separator: " ", maxSplits: 1)
-            if parts.count == 2, parts[1] == name, validCommit(String(parts[0])) {
-                return String(parts[0].prefix(12))
-            }
-        }
-        return nil
-    }
-
     static func commonDirectory(_ gitDir: URL) -> URL {
         guard let data = boundedData(gitDir.appendingPathComponent("commondir"), limit: 4096),
               let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
               !path.isEmpty, !path.contains("\0") else { return gitDir }
         return URL(fileURLWithPath: path, relativeTo: gitDir).standardizedFileURL
-    }
-
-    private static func validCommit(_ text: String) -> Bool {
-        [40, 64].contains(text.utf8.count) && text.utf8.allSatisfy {
-            (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0)
-        }
     }
 
     private static func boundedData(_ url: URL, limit: Int) -> Data? {
@@ -139,7 +111,6 @@ nonisolated enum GitStatusReader {
     private struct Head {
         var name: String
         var detached: Bool
-        var full: String?
     }
 
     private static func readHEAD(in gitDir: URL) -> Head? {
@@ -151,10 +122,10 @@ nonisolated enum GitStatusReader {
         if text.hasPrefix(ref) {
             let name = String(text.dropFirst(ref.count))
             guard !name.isEmpty, !name.contains(".."), !name.hasPrefix("/") else { return nil }
-            return Head(name: name, detached: false, full: nil)
+            return Head(name: name, detached: false)
         }
         guard text.count >= 7, text.allSatisfy(\.isHexDigit) else { return nil }
-        return Head(name: String(text.prefix(7)), detached: true, full: String(text.prefix(12)))
+        return Head(name: String(text.prefix(7)), detached: true)
     }
 
     private enum Changes { case counted(Int), unchecked }

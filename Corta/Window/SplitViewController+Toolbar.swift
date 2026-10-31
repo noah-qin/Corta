@@ -179,11 +179,6 @@ extension SplitViewController: NSToolbarDelegate {
         space.jumpToNextWaiting()
     }
 
-    /// Command palette: send the focused pane's selection to the other member, or ask which.
-    @objc func sendSelectionToMember(_: Any?) {
-        space.sendSelectionFromPalette()
-    }
-
     /// View ▸ Show/Hide Sidebar and the toolbar's sidebar button. The window
     /// answers it, being always in the responder chain, and hands it to
     /// Space's split.

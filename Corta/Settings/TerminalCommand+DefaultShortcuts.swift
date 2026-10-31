@@ -34,7 +34,6 @@ nonisolated extension TerminalCommand {
         // ⌥⌘S for Space. ⌃⌘S stays the system's Show Sidebar.
         case .toggleSpace: return Shortcut("s", [.command, .option])
         case .nextWaitingSession: return Shortcut("j", [.command, .option])
-        case .sendSelectionToMember: return nil
         case .splitRight: return Shortcut("d", .command)
         case .splitDown: return Shortcut("d", [.command, .shift])
         case .focusLeft: return Shortcut(Shortcut.parse("left")!.key, [.command, .option])

@@ -21,8 +21,7 @@ import Testing
 
 extension CortaSpaceTests {
     /// Opt-in: installed authenticated CLIs, one tiny model request each, no tool calls requested.
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["CORTA_CONVERSATION_REAL_CWD"] != nil
-        && ProcessInfo.processInfo.environment["CORTA_MEMBERS_REAL"] != "1"))
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["CORTA_CONVERSATION_REAL_CWD"] != nil))
     func realClaudeAndNpmCodexSourcesSurviveClosingAndReopeningSpace() async throws {
         let environment = ProcessInfo.processInfo.environment
         let cwd = try #require(environment["CORTA_CONVERSATION_REAL_CWD"])

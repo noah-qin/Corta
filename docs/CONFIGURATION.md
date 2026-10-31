@@ -239,7 +239,6 @@ of integration uses `TaskNotifier`'s typing-and-idle heuristic.
 | --- | --- | --- | --- |
 | `notify-from-programs` | boolean | `true` | Allow bounded program notifications and agent attention notices. Notification Center may retain their message text. |
 | `agent-status` | boolean | `true` | Show state on tabs, the Dock and the Agents list. Dedicated task-state integration currently covers Claude Code only; process-only detections show State unknown. |
-| `agent-messages` | boolean | `false` | Let Space members message each other with `corta`. Off: no socket, no `corta` on `PATH`, and no wake-up line is written. |
 | `agent-processes` | comma-separated names | *(empty)* | Additional foreground executable names, up to 32 names of 80 bytes each; macOS reports at most the first 32 bytes of a process name, so a longer name never matches. Built-ins: claude, claude-code, codex, gemini, aider, opencode. Names enable process detection only, not task-state integration or hook installation. No polling timer. |
 | `notify-on-long-task` | boolean | `false` | Post a notification when a long command finishes. |
 | `notification-threshold` | ≥ 1 | `30` | Seconds a command must run to be worth one. |
@@ -379,7 +378,6 @@ secure-keyboard-entry = false
 # Notifications
 notify-from-programs = true
 agent-status = true
-agent-messages = false
 space-attention-badge = true
 waiting-queue-auto-advance = true
 agent-processes =
@@ -576,7 +574,6 @@ the key against both rows, which is how you spot it.
 | `open-project` | Open Project… | `cmd+o` |
 | `toggle-space` | Show Space | `alt+cmd+s` |
 | `next-waiting-session` | Jump to Next Waiting Session | `alt+cmd+j` |
-| `send-selection-to-member` | Send Selection to Member | *(none)* |
 | `split-right` | Split Pane Right | `cmd+d` |
 | `split-down` | Split Pane Down | `shift+cmd+d` |
 | `focus-left` | Move Focus Left | `alt+cmd+left` |
@@ -830,13 +827,10 @@ managed remote-edit copies. Their contents are not configuration keys.
 | `Configuration.presets` | same file | Named shell/directory/environment combinations | **Pane-launch configuration** — read once, at the moment a pane spawns from that preset; never re-applied afterwards (`docs/CONFIGURATION.md` §4a) |
 | `SessionRestore` | `state.json` | Window frames and split arrangement, restored on the next launch | **Window/session state** — describes *this run's* windows, not a preference about future ones |
 | `DirectoryHistoryStore` | `directory-history.json` | Ranked recent directories | **Temporary interaction history** — gated by `directory-history`; clear it in Privacy & Security ▸ History |
-| `SpaceStore` | `space.json` | Space's project folders and, for each, its sessions (persistent UUID, number, directory, preset name or SSH destination, per-connection retention, whether tmux was established, any replaced `corta-<UUID>` names, optional local conversation kind, optional UUID and source, member role and wake-up switch), which were in the grid and the grid's divider positions | **Window/session state** — never contents or a command line; nothing is written into a project folder |
+| `SpaceStore` | `space.json` | Space's project folders and, for each, its sessions (persistent UUID, number, directory, preset name or SSH destination, per-connection retention, whether tmux was established, any replaced `corta-<UUID>` names, optional local conversation kind, optional UUID and source), which were in the grid and the grid's divider positions | **Window/session state** — never contents or a command line; nothing is written into a project folder |
 | `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent Hosts |
 | `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — preserve undecided edits before deleting app data; used copies are pruned after 30 days unless edits are pending |
 
-Member records also keep optional context defaults, selection-context choice
-and an exact Codex thread name. These are per-member Space state, not global
-configuration keys. Bindings, tokens, inboxes and delivery history are runtime only.
 
 Why separate stores: `Configuration` is line-oriented text
 specifically so a person can open it in `$EDITOR`, diff it, and understand

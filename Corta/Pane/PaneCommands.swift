@@ -108,7 +108,6 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             menu.addItem(menuItem)
         }
         item(.copy, self, enabled: host?.selection != nil)
-        addSendToMemberItems(to: menu)
         item(.paste, host)
         item(.selectAll, host)
         menu.addItem(.separator())
@@ -133,36 +132,6 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
             item(.close, splitController, title: closeTitle)
         }
         return menu
-    }
-
-    /// Space members other than this pane, when a selection and messaging are on.
-    private func addSendToMemberItems(to menu: NSMenu) {
-        guard ConfigurationStore.shared.configuration.agentMessages,
-              let pane = host as? ViewController, let space = pane.splitController?.space, space.isActive,
-              selectedText() != nil, let session = space.session(for: pane)?.session else { return }
-        let others = space.project(containing: session)?.members.filter { $0.sessionID != session.id } ?? []
-        let submenu = NSMenu()
-        if others.isEmpty {
-            let item = NSMenuItem(title: L10n.text("space.member.none"), action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            submenu.addItem(item)
-        } else {
-            for member in others {
-                let title = member.role + " (" + AgentEnvelope.shortID(member.id) + ")"
-                let action = ContextAction { [weak self, weak space, weak session] in
-                    guard let self, let space, let session, let text = self.selectedText() else { return }
-                    space.sendSelection(text, to: member, from: session)
-                }
-                let item = NSMenuItem(title: title, action: #selector(ContextAction.run(_:)), keyEquivalent: "")
-                item.target = action
-                item.representedObject = action
-                submenu.addItem(item)
-            }
-        }
-        let parent = NSMenuItem(title: L10n.text("space.member.send"), action: nil, keyEquivalent: "")
-        parent.submenu = submenu
-        parent.isEnabled = !others.isEmpty
-        menu.addItem(parent)
     }
 
     /// The recorded command whose prompt or output was right-clicked. Records

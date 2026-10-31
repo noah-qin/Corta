@@ -86,8 +86,7 @@ nonisolated final class GitStatusMonitor: @unchecked Sendable {
         lock.unlock()
         var facts: [UUID: GitFacts] = [:]
         for (id, directory) in directories {
-            if var read = GitStatusReader.read(directory: directory) {
-                read.commit = GitStatusReader.commit(directory: directory)
+            if let read = GitStatusReader.read(directory: directory) {
                 facts[id] = read
             }
         }

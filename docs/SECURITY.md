@@ -567,10 +567,9 @@ retained one keeps the name it stopped using. UUID
 values are canonically rendered and shell-quoted; display names are never
 command parameters. No rc is explicitly sourced and no configuration is changed.
 
-The wrapper builder can also take one environment assignment and one
-`ssh -R` socket pair. #434 passes neither. A name, value or path outside
-`[A-Za-z0-9._/-]` (and an uppercase environment name) is dropped whole, not
-quoted in. Nothing in this path reads a command from a file.
+The wrapper passes no environment assignment and no `ssh -R` forward, and
+sets no tmux option — not `allow-passthrough`. Nothing in this path reads a
+command from a file.
 
 One SSH runs a fixed `/bin/sh` wrapper, as one line with no single quotes
 inside its outer single-quoted argument so the remote login shell (including
@@ -604,25 +603,6 @@ is separately confirmed with host and UUID in view; its entire remote command
 is `tmux kill-session -t '=corta-<UUID>'`, never `kill-server`. A separate terminal
 shows authentication and success/failure. This grants no authority over another
 session or a remote agent's exit protocol.
-
-**Agent messages (#437, off by default).** `agent-messages` starts a
-per-user socket and puts `corta` on the `PATH` of shells Corta spawns.
-Membership is the permission to send. A nudge writes only the constant
-line in D32, and only when every gate passes. `codex queue` is the one
-program D31 allows, with structured arguments. Logs record member ids,
-message numbers and results, not bodies. `space.json` stores the role,
-session id and nudge switch, not bindings or text. The same local account
-is not an isolation boundary.
-
-The complete message envelope, body and context fit 64 KiB. Context values are
-flattened and capped at 256 UTF-8 bytes each; remote Git context is omitted.
-Directory access requires an active member and is project scoped; status is
-limited to sender and recipient. Local callers are checked against kernel
-ancestry and the registered shell's start identity, rejecting stale PID reuse
-and a conflicting claimed pane. Claude delivery also rechecks that the socket parent is an owned private
-directory. Native delivery runs off main with bounded
-output/time. Socket input is bounded, timed and limited to 16 concurrent clients.
-Unread inboxes and the 500-entry delivery history have separate lifetimes.
 
 **Local conversation identity (#436).** `space.json` holds only kind
 (`claude`/`codex`), optional standard UUID, and source (`sessionRecord`,

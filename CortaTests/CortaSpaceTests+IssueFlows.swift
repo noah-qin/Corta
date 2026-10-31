@@ -83,38 +83,6 @@ extension CortaSpaceTests {
         #expect(!host.space.isActive)
     }
 
-    @Test func selectionMenuIsDisabledWithoutAPeerAndPausedDeliveryExplainsRefusal() async throws {
-        let original = ConfigurationStore.shared.configuration.agentMessages
-        _ = ConfigurationStore.shared.update { $0.agentMessages = true }
-        defer { _ = ConfigurationStore.shared.update { $0.agentMessages = original } }
-        let root = try makeProject()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let (window, host) = try makeWindow()
-        defer { close(window, host) }
-        host.space.setActive(true)
-        host.space.openProject(root)
-        let source = try #require(host.space.focusedSession)
-        let pane = try #require(source.pane)
-        try await waitForIssueFlow { !visibleText(source).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        pane.selection = TerminalSelection(start: GridPosition(row: 0, column: 0),
-                                           end: GridPosition(row: 0, column: 3))
-        let project = try #require(host.space.selectedProject)
-        let title = L10n.text("space.member.send")
-        #expect(pane.commands.contextMenu().items.first { $0.title == title }?.isEnabled == false)
-        project.members = [AgentMemberRecord(role: "self", sessionID: source.id)]
-        #expect(pane.commands.contextMenu().items.first { $0.title == title }?.isEnabled == false)
-        host.space.newSession()
-        let peer = try #require(host.space.focusedSession)
-        let paused = AgentMemberRecord(role: "paused", sessionID: peer.id, paused: true)
-        project.members.append(paused)
-        // Adding the peer resizes the source grid and correctly clears its old selection.
-        pane.selection = TerminalSelection(start: GridPosition(row: 0, column: 0),
-                                           end: GridPosition(row: 0, column: 3))
-        #expect(pane.commands.contextMenu().items.first { $0.title == title }?.isEnabled == true)
-        #expect(host.space.sendUserText("selected", to: paused, from: source) == .refused("paused"))
-        #expect(AgentHub.shared.bus.peek(member: paused.id).isEmpty)
-    }
-
     func visibleText(_ session: SpaceSession) -> String {
         guard let grid = session.pane?.session?.snapshot() else { return "" }
         return Selection.text(of: SelectionRange(anchor: SelectionPoint(row: 0, column: 0),

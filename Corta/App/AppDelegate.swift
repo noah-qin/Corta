@@ -28,7 +28,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // Started by an SFTP connection's ssh as its `SSH_ASKPASS`: carry the
         // question to the running app and exit, before any UI exists.
         if let status = SSHAskpassClient.runIfInvoked() { exit(status) }
-        if let status = AgentClient.runIfInvoked() { exit(status) }
         let delegate = AppDelegate()
         NSApplication.shared.delegate = delegate
         withExtendedLifetime(delegate) {
@@ -317,18 +316,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // A notification click jumps back to its command
         // (`AppDelegate+Notifications.swift`).
         UNUserNotificationCenter.current().delegate = self
-        AgentHub.shared.apply(
-            enabled: ConfigurationStore.shared.configuration.agentMessages,
-            development: AppPaths.isDevelopmentBuild,
-            executable: Bundle.main.executableURL?.path ?? CommandLine.arguments[0])
-        NotificationCenter.default.addObserver(forName: ConfigurationStore.didChange, object: nil, queue: .main) { _ in
-            MainActor.assumeIsolated {
-                AgentHub.shared.apply(
-                    enabled: ConfigurationStore.shared.configuration.agentMessages,
-                    development: AppPaths.isDevelopmentBuild,
-                    executable: Bundle.main.executableURL?.path ?? CommandLine.arguments[0])
-            }
-        }
     }
 
     // MARK: - Reopening
