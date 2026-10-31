@@ -36,6 +36,8 @@ nonisolated struct SpaceState: Codable, Equatable, Sendable {
     var projects: [SpaceProjectRecord] = []
     /// The project folder last shown.
     var selectedProject: String?
+    /// The one-time note on what ends with the window has been shown.
+    var introductionShown: Bool?
 
     init(projects: [SpaceProjectRecord] = [], selectedProject: String? = nil) {
         self.projects = projects
@@ -62,9 +64,11 @@ nonisolated struct SpaceState: Codable, Equatable, Sendable {
             return valid
         }
         let kept = Array(projects.prefix(Self.maximumProjects))
-        return SpaceState(
+        var state = SpaceState(
             projects: kept,
             selectedProject: kept.contains { $0.path == selectedProject } ? selectedProject : kept.first?.path)
+        state.introductionShown = introductionShown == true ? true : nil
+        return state
     }
 }
 

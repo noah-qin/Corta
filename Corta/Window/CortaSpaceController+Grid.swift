@@ -21,7 +21,7 @@ import AppKit
 /// does not touch keep their views and drawables, and nothing else redraws.
 extension CortaSpaceController: NSSplitViewDelegate {
     /// Where panels go: the content area below the toolbar.
-    var gridArea: CGSize { transitionArea ?? content.gridArea }
+    var gridArea: CGSize { content.gridArea }
 
     /// The grid on screen.
     var gridTree: SplitTree? { selectedProject?.tree }
@@ -207,14 +207,14 @@ extension CortaSpaceController: NSSplitViewDelegate {
 
     /// The content area changed size; the sessions off screen follow it.
     func gridAreaDidChange() {
-        guard isActive, !isRebuildingGrid, !isAnimatingFrame else { return }
+        guard isActive, !isRebuildingGrid else { return }
         resizeOffScreenSessions()
     }
 
     // MARK: - Dividers
 
     func splitViewDidResizeSubviews(_ notification: Notification) {
-        guard !isRebuildingGrid, !isAnimatingFrame else { return }
+        guard !isRebuildingGrid else { return }
         scheduleSave()
     }
 

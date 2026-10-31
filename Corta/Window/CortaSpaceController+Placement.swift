@@ -40,7 +40,7 @@ extension CortaSpaceController {
         if project.maximized == nil, leaves.count < panelLimit {
             let minimum = minimumPanelSize
             // The roomiest panel that can split at all.
-            let sized = leaves.map { (panel: $0, size: size(of: $0, in: project)) }
+            let sized = leaves.map { (panel: $0, size: $0.frame.size) }
                 .sorted { $0.size.width * $0.size.height > $1.size.width * $1.size.height }
             for candidate in sized {
                 if let vertical = SpaceGrid.automaticSplit(of: candidate.size, minimum: minimum) {
@@ -54,23 +54,14 @@ extension CortaSpaceController {
         return .replace(oldest ?? leaves[leaves.count - 1])
     }
 
-    /// A panel's size, or what it will be once the window reaches its frame.
-    private func size(of panel: SpacePaneView, in project: SpaceProject) -> CGSize {
-        if transitionArea != nil, let sizes = project.layout?.panelSizes(in: gridArea),
-           let index = project.sessions.firstIndex(where: { $0 === panel.session }), let size = sizes[index] {
-            return size
-        }
-        return panel.frame.size
-    }
-
     /// The size the session will have once placed: what it starts at.
     func plannedSize(of placement: Placement, in project: SpaceProject) -> CGSize {
         switch placement {
         case .root: return gridArea
         case .retile(let layout): return layout.panelSizes(in: gridArea)[-1] ?? gridArea
-        case .replace(let target): return size(of: target, in: project)
+        case .replace(let target): return target.frame.size
         case .split(let target, let edge):
-            let size = size(of: target, in: project)
+            let size = target.frame.size
             let gap = SpaceGrid.dividerThickness
             return edge.isVertical
                 ? CGSize(width: (size.width - gap) / 2, height: size.height)

@@ -348,8 +348,8 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// Read at quit and on every window close.
     var restorableState: WindowState? {
         guard let window, let splitController, !isQuickTerminal else { return nil }
-        // Space's full-screen frame is not the window's own.
-        var state = splitController.windowState(frame: splitController.space.terminalFrame ?? window.frame)
+        // Space shows in the window's own frame; there is no other to keep.
+        var state = splitController.windowState(frame: window.frame)
         state?.id = windowID
         state?.customTabTitle = customTabTitle
         state?.isSpace = splitController.space.isActive

@@ -311,7 +311,7 @@ SH
     layout='{"split":{"vertical":true,"fraction":0.5,"first":{"panel":{"_0":0}},"second":{"panel":{"_0":1}}}}'
   fi
   cat > "$conversation_stage/ApplicationSupport/space.json" <<JSON
-{"version":1,"projects":[{"path":"$conversation_project","sessions":[$sessions],"layout":$layout,"nextNumber":4}]}
+{"version":1,"introductionShown":true,"projects":[{"path":"$conversation_project","sessions":[$sessions],"layout":$layout,"nextNumber":4}]}
 JSON
 done
 
@@ -330,7 +330,7 @@ for scenario in testSpaceGridSidebarAndModes testFullScreenAndSidebarToggle test
     sessions+="{\"number\":$number,\"directory\":\"$web\"}"
   done
   cat > "$grid_stage/ApplicationSupport/space.json" <<JSON
-{"version":1,"selectedProject":"$web","projects":[
+{"version":1,"introductionShown":true,"selectedProject":"$web","projects":[
  {"path":"$web","sessions":[$sessions],"layout":{"split":{"vertical":true,"fraction":0.5,"first":{"panel":{"_0":0}},"second":{"split":{"vertical":false,"fraction":0.5,"first":{"panel":{"_0":1}},"second":{"panel":{"_0":2}}}}}},"nextNumber":6},
  {"path":"$api","sessions":[{"number":1,"directory":"$api"}],"layout":{"panel":{"_0":0}},"nextNumber":2}
 ]}
@@ -339,7 +339,7 @@ done
 
 # Release Space flood stages: each visible session owns an independent producer.
 for count in 1 6; do
-  stage "space-flood-$count" 'font-size = 10\nspace-panel-limit = 6\nrestore-windows = false\nconfirm-close = false\nsecure-keyboard-entry = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+  stage "space-flood-$count" 'font-size = 10\ncolumns = 240\nrows = 64\nspace-panel-limit = 6\nrestore-windows = false\nconfirm-close = false\nsecure-keyboard-entry = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
   flood="$root/space-flood-$count"
   mkdir -p "$flood/project" "$flood/ApplicationSupport"
   cat > "$flood/producer" <<'SH'
@@ -358,7 +358,7 @@ def split(v,a,b,f=0.5): return {'split': {'vertical':v,'fraction':f,'first':a,'s
 layout=panel(0) if count==1 else split(True,split(False,panel(0),panel(1)),
     split(True,split(False,panel(2),panel(3)),split(False,panel(4),panel(5))),1/3)
 sessions=[{'number':i+1,'directory':project,'presetName':'flood'} for i in range(count)]
-(root/'ApplicationSupport/space.json').write_text(json.dumps({'version':1,'selectedProject':project,
+(root/'ApplicationSupport/space.json').write_text(json.dumps({'version':1,'introductionShown':True,'selectedProject':project,
  'projects':[{'path':project,'sessions':sessions,'layout':layout,'nextNumber':count+1}]}))
 PYCODE
 done
@@ -376,7 +376,7 @@ PROMPT='demo ❯ '
 RPROMPT=''
 ZSH
 cat > "$root/space-ssh/ApplicationSupport/space.json" <<JSON
-{"version":1,"selectedProject":"$root/space-ssh/project","projects":[{"path":"$root/space-ssh/project","sessions":[{"number":1}],"layout":{"panel":{"_0":0}},"nextNumber":2}]}
+{"version":1,"introductionShown":true,"selectedProject":"$root/space-ssh/project","projects":[{"path":"$root/space-ssh/project","sessions":[{"number":1}],"layout":{"panel":{"_0":0}},"nextNumber":2}]}
 JSON
 stage space-trust 'restore-windows = false\nconfirm-close = false\nsecure-keyboard-entry = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 mkdir -p "$root/space-trust/ApplicationSupport" "$root/space-trust/project"
@@ -384,6 +384,6 @@ for name in space.json .corta sessions; do
   printf '{"shell":"/usr/bin/touch","arguments":["%s/should-not-exist"]}\n' "$root/space-trust" > "$root/space-trust/project/$name"
 done
 cat > "$root/space-trust/ApplicationSupport/space.json" <<JSON
-{"version":1,"selectedProject":"$root/space-trust/project","projects":[{"path":"$root/space-trust/project","sessions":[{"number":1}],"layout":{"panel":{"_0":0}},"nextNumber":2}]}
+{"version":1,"introductionShown":true,"selectedProject":"$root/space-trust/project","projects":[{"path":"$root/space-trust/project","sessions":[{"number":1}],"layout":{"panel":{"_0":0}},"nextNumber":2}]}
 JSON
 printf '%s\n' "$root"

@@ -244,6 +244,11 @@ struct CortaSpaceTests {
         let controller = TerminalWindowController(setup: .init())
         let host = try #require(controller.contentViewController as? SplitViewController)
         controller.showWindow(nil)
+        // Space lays out in the window's own frame. The grid tests want the
+        // room a person gives Space by making the window as large as the display.
+        if let window = controller.window, let screen = window.screen ?? NSScreen.main {
+            window.setFrame(screen.visibleFrame, display: true)
+        }
         return (controller, host)
     }
 
@@ -275,16 +280,15 @@ struct CortaSpaceTests {
         let spacePane = try #require(host.focusedPane)
         #expect(host.space.owns(spacePane))
         #expect(spacePane.inheritedWorkingDirectory == project.standardizedFileURL.resolvingSymlinksInPath().path)
-        let screen = try #require(window.screen?.visibleFrame)
-        #expect(window.frame == screen, "Space takes the screen")
+        #expect(window.frame == frame, "Space shows in the window's own frame")
         for _ in 0..<3 {
             host.space.setActive(false)
-            #expect(window.frame == frame, "and gives the terminal its frame back")
+            #expect(window.frame == frame, "and leaving it changes nothing either")
             #expect(host.terminalTree.leaves == terminalLeaves)
             #expect(terminalLeaves.allSatisfy { $0.window === window })
             #expect(spacePane.view.window == nil)
             host.space.setActive(true)
-            #expect(window.frame == screen)
+            #expect(window.frame == frame)
             #expect(spacePane.view.window === window)
             #expect(terminalLeaves.allSatisfy { $0.window == nil })
         }
@@ -292,6 +296,26 @@ struct CortaSpaceTests {
             #expect(kill(session.pty.processIdentifier, 0) == 0)
         }
         #expect(window.title == project.lastPathComponent)
+    }
+
+    @Test func theIntroductionShowsOnceAndIsRememberedInSpaceState() throws {
+        let previous = CortaSpaceController.showsIntroduction
+        CortaSpaceController.showsIntroduction = true
+        defer { CortaSpaceController.showsIntroduction = previous }
+        let (controller, host) = try makeWindow()
+        defer { close(controller, host) }
+        var shown: [String] = []
+        host.space.presentAlert = { alert, _, done in
+            shown.append(alert.messageText)
+            done(.alertFirstButtonReturn)
+        }
+        host.space.setActive(true)
+        #expect(shown == [L10n.text("space.introduction.title")])
+        host.space.setActive(false)
+        host.space.setActive(true)
+        #expect(shown.count == 1, "a second visit shows nothing")
+        host.space.saveNow()
+        #expect(SpaceStore.standard.load().introductionShown == true)
     }
 
     @Test func newSessionsSplitUntilTheLimitThenReplaceTheLeastRecentlyUsed() throws {

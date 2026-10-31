@@ -66,17 +66,14 @@ final class CortaSpaceController: NSObject {
     let content = SpaceContentController()
     var panels: [ObjectIdentifier: SpacePaneView] = [:]
     var isRebuildingGrid = false
-    /// The terminal mode's frame while Space fills the screen: where the
-    /// window goes back to, and what a saved arrangement records.
-    private(set) var terminalFrame: NSRect?
-    /// While the window animates to Space's frame: the grid's size there,
-    /// so the grid is laid out once, for where the window is going.
-    var transitionArea: CGSize?
-    /// The window's frame is animating; the grid holds its shape meanwhile.
-    var isAnimatingFrame = false
-    /// Off in tests, which read the frame right after switching.
+    /// Whether the one-time note on what ends with the window has been shown.
+    /// Kept in `space.json`, app state like the rest (D10: not `UserDefaults`).
+    private(set) var isIntroductionShown = false
+    /// Off in tests, which read the layout right after switching.
     static var animatesModeChanges = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
-    static let modeChangeDuration: TimeInterval = 0.25
+    /// Off in tests unless one asks for it: a sheet would hold every later
+    /// test's window.
+    static var showsIntroduction = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
 
     init(host: SplitViewController) {
         self.host = host
@@ -133,23 +130,12 @@ final class CortaSpaceController: NSObject {
         terminalFocus = host.focusedPane
         isActive = true
         crossfade(host.view)
-        // The terminal tree leaves the window whole and comes back whole —
-        // before the frame changes, so its shells keep their size.
+        // The terminal tree leaves the window whole and comes back whole.
+        // The window keeps its frame: the grid is laid out in the room the
+        // window already has, and a panel that does not fit stays off screen.
         host.terminalTree.root.removeFromSuperview()
         installSplit(in: host)
         host.view.layoutSubtreeIfNeeded()
-        // Space is a workspace: it takes the screen, and gives it back. The
-        // grid is built for the frame the window is going to.
-        var target: NSRect?
-        if !window.styleMask.contains(.fullScreen), let screen = window.screen ?? NSScreen.main,
-           window.frame != screen.visibleFrame {
-            terminalFrame = window.frame
-            target = screen.visibleFrame
-            let area = content.gridArea
-            transitionArea = CGSize(
-                width: area.width + screen.visibleFrame.width - window.frame.width,
-                height: area.height + screen.visibleFrame.height - window.frame.height)
-        }
         if let project = selectedProject ?? projects.first {
             selectedProject = nil
             selectProject(project)
@@ -159,7 +145,23 @@ final class CortaSpaceController: NSObject {
             applyWindowTitle()
         }
         refreshNow()
-        if let target { animate(window, to: target) } else { transitionArea = nil }
+        showIntroductionIfNeeded(in: window)
+    }
+
+    /// Once, the first time Space shows: what ends with the window, and what
+    /// comes back. Never again after it has been dismissed.
+    private func showIntroductionIfNeeded(in window: NSWindow) {
+        guard Self.showsIntroduction, !isIntroductionShown else { return }
+        isIntroductionShown = true
+        saveNow()
+        let alert = NSAlert()
+        alert.messageText = L10n.text("space.introduction.title")
+        alert.informativeText = L10n.text("space.introduction.detail")
+        alert.addButton(withTitle: L10n.text("space.introduction.dismiss"))
+        presentAlert(alert, window) { [weak self] _ in
+            guard let self, self.isActive else { return }
+            self.focus(self.focusedSession)
+        }
     }
 
     private func leave(host: SplitViewController, window: NSWindow) {
@@ -181,14 +183,6 @@ final class CortaSpaceController: NSObject {
         if let pane = host.focusedPane { window.makeFirstResponder(pane.terminalView) }
         for pane in host.panes { pane.focus.applyAppearance() }
         host.applyWindowTitle()
-        // The terminal's own frame — by default its configured grid. Its
-        // panes are back before the window shrinks, and a resize goes out
-        // only at the end, at the size they left at.
-        if let frame = terminalFrame, !window.styleMask.contains(.fullScreen) {
-            terminalFrame = nil
-            animate(window, to: WindowState.Frame(frame).onScreen())
-        }
-        terminalFrame = nil
     }
 
     private func installSplit(in host: SplitViewController) {
@@ -337,35 +331,9 @@ extension CortaSpaceController {
     }
 }
 
-// MARK: - Animating the mode change, and saving
+// MARK: - Fading the mode change, and saving
 
 extension CortaSpaceController {
-    /// The window glides to `frame`; the grid keeps its panels meanwhile and
-    /// settles once, at the end.
-    private func animate(_ window: NSWindow, to frame: NSRect) {
-        guard Self.animatesModeChanges else {
-            window.setFrame(frame, display: true)
-            finishFrameChange()
-            return
-        }
-        isAnimatingFrame = true
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = Self.modeChangeDuration
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            window.animator().setFrame(frame, display: true)
-        }, completionHandler: { [weak self] in
-            MainActor.assumeIsolated { self?.finishFrameChange() }
-        })
-    }
-
-    private func finishFrameChange() {
-        isAnimatingFrame = false
-        transitionArea = nil
-        guard isActive else { return }
-        gridAreaDidChange()
-        refreshNow()
-    }
-
     /// One mode's content fades into the other's instead of cutting.
     private func crossfade(_ view: NSView) {
         guard Self.animatesModeChanges else { return }
@@ -384,10 +352,13 @@ extension CortaSpaceController {
         let state = SpaceStore.standard.load()
         projects = state.projects.map(SpaceProject.init)
         selectedProject = projects.first { $0.path == state.selectedProject } ?? projects.first
+        isIntroductionShown = state.introductionShown == true
     }
 
     var state: SpaceState {
-        return SpaceState(projects: projects.map(\.record), selectedProject: selectedProject?.path)
+        var state = SpaceState(projects: projects.map(\.record), selectedProject: selectedProject?.path)
+        state.introductionShown = isIntroductionShown ? true : nil
+        return state
     }
 
     func scheduleSave() {

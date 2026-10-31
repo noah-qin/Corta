@@ -49615,6 +49615,183 @@
           }
         }
       }
+    },
+    "space.introduction.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Space-Sitzungen enden mit diesem Fenster"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Space sessions end with this window"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Las sesiones de Space terminan con esta ventana"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les sessions de Space se terminent avec cette fenêtre"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Space のセッションはこのウインドウとともに終了します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Space 세션은 이 윈도우와 함께 종료됩니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "As sessões do Space terminam com esta janela"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Space 里的会话随这个窗口结束"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Space 裡的工作階段隨這個視窗結束"
+          }
+        }
+      }
+    },
+    "space.introduction.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Jede Sitzung hier – im Raster oder in der Seitenleiste ausgeblendet – ist ein Prozess dieses Fensters. Schließen des Fensters oder Beenden von Corta beendet sie, nach der üblichen Rückfrage „Läuft noch“.\n\nBeim nächsten Mal stellt Space Projekte und Anordnung wieder her, startet in jedem Sitzungsordner eine neue Shell und tippt den Fortsetzen-Befehl von Claude oder Codex ein, den du mit Return bestätigst. Eine SSH-Sitzung, die weiterlaufen sollte, wird aus dem entfernten tmux wieder verbunden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every session here — on the grid or hidden in the sidebar — is a process of this window. Closing the window or quitting Corta ends them, after the usual “still running” confirmation.\n\nNext time, Space brings back your projects and layout, starts a new shell in each session’s folder, and types the Claude or Codex resume command for you to confirm with Return. An SSH session you chose to keep running is reattached from the remote tmux."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cada sesión aquí —en la cuadrícula u oculta en la barra lateral— es un proceso de esta ventana. Cerrar la ventana o salir de Corta las termina, tras la confirmación habitual de «sigue en ejecución».\n\nLa próxima vez, Space recupera tus proyectos y la disposición, inicia un shell nuevo en la carpeta de cada sesión y escribe el comando de reanudación de Claude o Codex para que lo confirmes con Retorno. Una sesión SSH que elegiste mantener se vuelve a conectar desde el tmux remoto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Chaque session ici – sur la grille ou masquée dans la barre latérale – est un processus de cette fenêtre. Fermer la fenêtre ou quitter Corta les termine, après la confirmation habituelle « toujours en cours ».\n\nLa prochaine fois, Space rétablit vos projets et la disposition, lance un nouveau shell dans le dossier de chaque session et saisit la commande de reprise de Claude ou Codex, à confirmer avec Retour. Une session SSH que vous avez choisi de garder est rattachée depuis le tmux distant."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "ここにあるすべてのセッション（グリッド上でもサイドバーに隠れていても）はこのウインドウのプロセスです。ウインドウを閉じるか Corta を終了すると、通常の「実行中」の確認のあとで終了します。\n\n次回、Space はプロジェクトとレイアウトを戻し、各セッションのフォルダで新しいシェルを開始し、Claude または Codex の再開コマンドを入力します。Return で確定してください。切断後も保持を選んだ SSH セッションはリモートの tmux から再接続されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "여기 있는 모든 세션(그리드 위든 사이드바에 숨겨져 있든)은 이 윈도우의 프로세스입니다. 윈도우를 닫거나 Corta를 종료하면 평소처럼 ‘실행 중’ 확인 후 종료됩니다.\n\n다음에 Space는 프로젝트와 레이아웃을 되살리고, 각 세션의 폴더에서 새 셸을 시작하며, Claude 또는 Codex 재개 명령을 입력해 둡니다. Return으로 확인하세요. 연결이 끊긴 뒤에도 유지하도록 선택한 SSH 세션은 원격 tmux에서 다시 연결됩니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Cada sessão aqui — na grade ou oculta na barra lateral — é um processo desta janela. Fechar a janela ou encerrar o Corta as termina, após a confirmação habitual de “ainda em execução”.\n\nNa próxima vez, o Space traz de volta seus projetos e o layout, inicia um shell novo na pasta de cada sessão e digita o comando de retomada do Claude ou Codex para você confirmar com Return. Uma sessão SSH que você escolheu manter é reconectada a partir do tmux remoto."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "这里的每个会话——无论在网格上还是隐藏在侧栏里——都是这个窗口的进程。关闭窗口或退出 Corta 会结束它们，之前照常有“仍在运行”的确认。\n\n下次打开时，Space 会恢复项目和布局，在每个会话的文件夹里启动新的 shell，并把 Claude 或 Codex 的恢复命令填进提示符，由你按回车确认。选择了断线后保留的 SSH 会话会从远端 tmux 接回。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "這裡的每個工作階段——無論在網格上還是隱藏在側邊欄裡——都是這個視窗的程序。關閉視窗或結束 Corta 會結束它們，之前照常有「仍在執行」的確認。\n\n下次開啟時，Space 會恢復專案和佈局，在每個工作階段的資料夾裡啟動新的 shell，並把 Claude 或 Codex 的恢復指令填進提示符，由你按 Return 確認。選擇了斷線後保留的 SSH 工作階段會從遠端 tmux 接回。"
+          }
+        }
+      }
+    },
+    "space.introduction.dismiss" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Verstanden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Got It"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Entendido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Compris"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "了解"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "확인"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Entendi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "知道了"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "知道了"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
