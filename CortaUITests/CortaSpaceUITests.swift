@@ -171,41 +171,6 @@ final class CortaSpaceUITests: XCTestCase {
     }
 
     @MainActor
-    func testSpaceSettingsManagesTemplates() throws {
-        let fixture = try UIFixtures.stage("space-settings")
-        let app = UIFixtures.app(stage: fixture, runner: Self.self)
-        let previous = LatinInputSource.select()
-        defer { LatinInputSource.restore(previous); app.terminate() }
-        app.launch()
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 8))
-        app.activate()
-        app.menuBars.menuBarItems.element(boundBy: 1).click()
-        app.menuBars.menuItems["Settings…"].click()
-        let settings = app.windows["Corta.Settings"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 15))
-        settings.outlines.firstMatch.staticTexts["Space"].click()
-        let name = settings.textFields.firstMatch
-        XCTAssertTrue(name.waitForExistence(timeout: 3))
-        XCTAssertEqual(name.value as? String, "Review workspace")
-        let shot = XCTAttachment(screenshot: settings.screenshot())
-        shot.name = "Space settings and templates"
-        shot.lifetime = .keepAlways
-        add(shot)
-        settings.buttons["Show Template…"].click()
-        XCTAssertTrue(settings.sheets.firstMatch.waitForExistence(timeout: 3))
-        settings.sheets.firstMatch.buttons["Close"].click()
-        name.click()
-        name.typeKey("a", modifierFlags: .command)
-        name.typeText("Renamed workspace")
-        settings.buttons["Rename Template…"].click()
-        settings.buttons["Delete Template…"].click()
-        XCTAssertFalse(name.exists)
-        let url = fixture.appendingPathComponent("ApplicationSupport/space-templates.json")
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
-        XCTAssertEqual((json["templates"] as? [Any])?.count, 0)
-    }
-
-    @MainActor
     func testProjectFilesCannotConfigureSpace() throws {
         guard let library = ProcessInfo.processInfo.environment["CORTA_FILE_AUDIT_LIBRARY"] else {
             throw XCTSkip("Provide a task-only open/openat/fopen interposer for the filesystem acceptance trace")

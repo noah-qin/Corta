@@ -378,11 +378,6 @@ ZSH
 cat > "$root/space-ssh/ApplicationSupport/space.json" <<JSON
 {"version":1,"selectedProject":"$root/space-ssh/project","projects":[{"path":"$root/space-ssh/project","sessions":[{"number":1}],"layout":{"panel":{"_0":0}},"nextNumber":2}]}
 JSON
-stage space-settings 'restore-windows = false\nconfirm-close = false\nsecure-keyboard-entry = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
-mkdir -p "$root/space-settings/ApplicationSupport"
-cat > "$root/space-settings/ApplicationSupport/space-templates.json" <<'JSON'
-{"version":1,"templates":[{"name":"Review workspace","sessions":[{"directory":"","agent":"claude","memberRole":"review","nudgeEnabled":false}],"layout":{"panel":{"_0":0}}}]}
-JSON
 stage space-trust 'restore-windows = false\nconfirm-close = false\nsecure-keyboard-entry = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 mkdir -p "$root/space-trust/ApplicationSupport" "$root/space-trust/project"
 for name in space.json .corta sessions; do

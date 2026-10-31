@@ -831,13 +831,9 @@ managed remote-edit copies. Their contents are not configuration keys.
 | `SessionRestore` | `state.json` | Window frames and split arrangement, restored on the next launch | **Window/session state** — describes *this run's* windows, not a preference about future ones |
 | `DirectoryHistoryStore` | `directory-history.json` | Ranked recent directories | **Temporary interaction history** — gated by `directory-history`; clear it in Privacy & Security ▸ History |
 | `SpaceStore` | `space.json` | Space's project folders and, for each, its sessions (persistent UUID, number, directory, preset name or SSH destination, per-connection retention, whether tmux was established, any replaced `corta-<UUID>` names, optional local conversation kind, optional UUID and source, member role and wake-up switch), which were in the grid and the grid's divider positions | **Window/session state** — never contents or a command line; nothing is written into a project folder |
-| `SpaceTemplateFile` | `space-templates.json` | Named layouts: session kind, preset name or SSH host, relative directory, display name, agent kind, member role. No UUIDs, tmux names, credentials or command lines | **App state** — never written into a project folder |
 | `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent Hosts |
 | `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — preserve undecided edits before deleting app data; used copies are pruned after 30 days unless edits are pending |
 
-Template application restores the split tree and SSH retention with fresh
-identities; SSH uses explicit connection dialogs and external directories need
-confirmation. Manage templates in Settings ▸ Space or the project menu.
 Member records also keep optional context defaults, selection-context choice
 and an exact Codex thread name. These are per-member Space state, not global
 configuration keys. Bindings, tokens, inboxes and delivery history are runtime only.

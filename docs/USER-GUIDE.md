@@ -214,7 +214,7 @@ were, still running.
   **Fill Conversation Again** in the pane's menu fills the same command again
   at an empty prompt, without executing it.
 
-### Space members, templates and Git
+### Space members and Git
 
 Enable **Settings ▸ Space ▸ Agent messages**, then use a session's **Make Member…**
 menu. Membership permits messaging with members of that project; pause or remove
@@ -244,13 +244,6 @@ reasons; **Copy Unread** remains available while queued. Messages stay in memory
 the receiver should answer in its own conversation. Shift-click adds an optional
 preface. Text is truncated safely as UTF-8, within the complete 64 KiB envelope.
 Git context is optional per member and selection, and excluded for remote sessions.
-
-Templates save the split tree, proportions, names, relative directories, agent
-kind and member roles. Applying creates fresh identities and fills agent commands
-without Return. External directories require confirmation. SSH sessions open the
-connect dialog one at a time, preserving retention; cancellation skips that
-session. Manage templates in **Settings ▸ Space** or the project menu. Opening
-a project offers saved templates.
 
 Git rows read bounded metadata and tracked-file size/mtime, off main; edits to
 tracked files trigger refresh without an index write. Untracked files, content
@@ -330,12 +323,6 @@ The note disappears after a few seconds; the command stays in the prompt.
 
 `space-panel-limit` (1–6) caps the panels on screen.
 
-A project's menu can save the layout as a template in
-`space-templates.json` (Application Support, never the project folder).
-New Sessions from Template starts the same kinds of sessions in another
-project. Agent start commands are typed and wait for Return. Templates
-do not keep conversation ids, tmux names or credentials.
-
 Settings ▸ General ▸ Agent messages (default off) lets you mark a local session as a project
 member from its menu. Corta then listens on a per-user socket and puts
 `corta` on the `PATH` of shells it starts. Members use `corta send`,
@@ -350,8 +337,7 @@ Select text in a pane and choose Send to Member, or View ▸ Send Selection to M
 to deliver that selection. A member's menu copies an introduction you can paste
 once, the delivery history (results only, not the text), and any unread
 messages. `corta wait` blocks until a message arrives or the timeout (at most
-110 seconds). Messages disappear when you quit. Templates are saved, applied
-and deleted from the project menu.
+110 seconds). Messages disappear when you quit.
 The message includes the pane's directory, branch and commit when git
 information is already known. An SSH session kept by tmux can be marked as a remote member. The next
 connection forwards Corta's socket and leaves a `corta` script in

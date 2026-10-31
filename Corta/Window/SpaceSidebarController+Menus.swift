@@ -159,11 +159,6 @@ extension SpaceSidebarController {
             add("space.worktree.reveal", to: menu) { space.revealWorktreeMain(session) }
         }
         add("space.member.directory", to: menu) { space.showMemberDirectory(for: project) }
-        add("space.template.save", to: menu) { space.saveTemplate(of: project) }
-        add("space.template.apply", to: menu) { space.applyTemplate(to: project) }
-        add("space.template.delete", to: menu) { space.deleteTemplate() }
-        add("space.template.rename", to: menu) { space.renameTemplate() }
-        add("space.template.show", to: menu) { space.showTemplate() }
         add("space.connectSSH", to: menu) { space.selectProject(project); space.connectSession() }
         let hosts = space.remoteHosts(of: project)
         if !hosts.isEmpty {

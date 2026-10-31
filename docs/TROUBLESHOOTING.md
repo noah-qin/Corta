@@ -315,15 +315,6 @@ No global tmux setting repairs a missing forward. The client directory remains
 after disconnect; remove only that session's exact directory and expired socket
 paths after removing membership and disconnecting. This does not terminate tmux.
 
-### A template did not restore its layout or SSH retention
-
-Apply through the project menu or Settings ▸ Space. External paths need explicit
-confirmation. Each SSH session opens its own connect dialog, with saved retention;
-cancelling skips that entry. Local agent commands require an empty integrated
-prompt and are filled without Return. Unknown presets or unavailable directories
-can prevent their shell from starting; inspect the pane's failure state. Template
-identities are always fresh, so a template cannot reattach the original UUID.
-
 ### Space always fills a picker instead of a specific conversation
 
 This is the reliable baseline: Return opens Claude's or Codex's official

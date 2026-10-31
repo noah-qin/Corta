@@ -124,17 +124,6 @@ struct SpaceIssueAcceptanceTests {
         #expect(!hub.exchange(AgentRequest(operation: "members"), caller: nil).ok)
     }
 
-    @Test("#441: SSH template roundtrip preserves the retention choice")
-    func templateKeepsSSHRetention() throws {
-        var record = SpaceSessionRecord(number: 1, ssh: SSHTarget(host: "fixture"))
-        record.retainSSH = true
-        let template = SpaceTemplate.capture(name: "remote", projectPath: "/work", sessions: [record],
-                                              members: [], layout: .panel(0))
-        let loaded = try JSONDecoder().decode(SpaceTemplate.self, from: JSONEncoder().encode(template))
-        #expect(loaded.sessions(in: "/other")[0].0.retainSSH == true)
-        #expect(loaded.sessions(in: "/other")[0].0.id != record.id)
-    }
-
     @Test("#442: a linked worktree's loose commit lives in the common git directory")
     func worktreeContextResolvesTheCommonRef() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

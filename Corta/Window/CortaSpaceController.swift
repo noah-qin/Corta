@@ -239,10 +239,6 @@ final class CortaSpaceController: NSObject {
             guard response == .OK, let url = panel.url else { return }
             MainActor.assumeIsolated {
                 self?.openProject(url)
-                if let project = self?.selectedProject,
-                   !SpaceTemplateFile.load(from: SpaceTemplateFile.url).templates.isEmpty {
-                    DispatchQueue.main.async { self?.applyTemplate(to: project) }
-                }
             }
         }
     }
