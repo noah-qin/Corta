@@ -71,25 +71,23 @@ final class CortaSpaceUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [echo], timeout: 3), .completed)
         let frame = window.frame
 
-        // Into Space by the toolbar's one mode button: the saved grid, and
-        // the window takes the screen.
+        // Into Space by the toolbar's one mode button: the saved grid, in
+        // the window's own frame.
         let showSpace = app.toolbars.buttons["Show Space"]
         XCTAssertTrue(showSpace.waitForExistence(timeout: 5))
         showSpace.click()
         XCTAssertTrue(panels(app).firstMatch.waitForExistence(timeout: 5))
         XCTAssertEqual(panels(app).count, 3)
-        XCTAssertGreaterThan(window.frame.width, frame.width)
+        XCTAssertEqual(window.frame, frame, "Space does not move or resize the window")
         attach(app, "Space-light-three-panels")
 
-        // Choosing a hidden session changes nothing; ⌘Return shows it, in
-        // the least recently used panel's place (the limit is 3), with a
-        // note that offers Undo.
+        // Clicking a hidden session shows it, in the least recently used
+        // panel's place (the limit is 3), with a note that offers Undo.
         let sidebar = app.outlines["Corta.Space.Sidebar"]
         let before = panels(app).allElementsBoundByIndex.map(\.label)
         sidebar.staticTexts["Terminal 5"].click()
-        XCTAssertEqual(panels(app).allElementsBoundByIndex.map(\.label), before, "choosing is not showing")
-        app.typeKey(.return, modifierFlags: .command)
         XCTAssertEqual(panels(app).count, 3)
+        XCTAssertNotEqual(panels(app).allElementsBoundByIndex.map(\.label), before, "a click shows it")
         // NSGlassEffectView does not expose its container as an AX Other.
         // Its real Undo control must be visible, and the following action restores the grid.
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 2))
@@ -146,7 +144,7 @@ final class CortaSpaceUITests: XCTestCase {
     }
 
     @MainActor
-    func testSSHRetentionIsOnlyOfferedInSpaceAndDefaultsOn() throws {
+    func testSSHRetentionIsOnlyOfferedInSpaceAndDefaultsOff() throws {
         let fixture = try UIFixtures.stage("space-ssh")
         let app = UIFixtures.app(stage: fixture, runner: Self.self)
         defer { app.terminate() }
@@ -160,13 +158,13 @@ final class CortaSpaceUITests: XCTestCase {
         XCTAssertTrue(panels(app).firstMatch.waitForExistence(timeout: 5))
         app.toolbars.buttons["Connect…"].click()
         XCTAssertTrue(retention.waitForExistence(timeout: 3))
-        XCTAssertEqual((retention.value as? NSNumber)?.intValue, 1)
+        XCTAssertEqual((retention.value as? NSNumber)?.intValue, 0, "off by default (#434)")
         retention.click()
-        XCTAssertEqual((retention.value as? NSNumber)?.intValue, 0)
-        attach(app, "Space-SSH-retention-off")
+        XCTAssertEqual((retention.value as? NSNumber)?.intValue, 1)
+        attach(app, "Space-SSH-retention-on")
         app.typeKey(.escape, modifierFlags: [])
         app.toolbars.buttons["Connect…"].click()
-        XCTAssertEqual((retention.value as? NSNumber)?.intValue, 1)
+        XCTAssertEqual((retention.value as? NSNumber)?.intValue, 0)
         app.typeKey(.escape, modifierFlags: [])
     }
 
