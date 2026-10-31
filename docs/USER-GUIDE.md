@@ -250,18 +250,6 @@ tracked files trigger refresh without an index write. Untracked files, content
 diffs and ahead/behind are excluded. Indexes v2–v4 and linked-worktree common
 refs are supported; more than 20,000 entries skips the change check.
 
-**Make Remote Member** explains the temporary client before registration.
-Reconnect to install it in `/tmp/corta-<session UUID>` and forward a private
-socket. Python 3 and tmux must already be installed. Existing retained processes
-use fresh connection credentials after reconnect. Remote wake-up uses the fixed
-nudge, with a live metadata monitor; no native remote AI push is provided.
-Disconnecting retains the tmux session and temporary client. To uninstall, first
-remove membership and disconnect, then remove only that session's displayed
-`/tmp/corta-<UUID>` directory and expired `/tmp/corta-<token>.sock`; ending its
-programs is the separate exact **End Remote Session…** action. No global tmux
-or shell configuration is changed. See [acceptance coverage](SPACE-ACCEPTANCE.md)
-for the real-account and foreground checks required when changing these paths.
-
 ### Keep Space SSH programs running after disconnecting
 
 In Space's connect dialog, **Keep running after disconnect** defaults to on.
@@ -339,11 +327,7 @@ once, the delivery history (results only, not the text), and any unread
 messages. `corta wait` blocks until a message arrives or the timeout (at most
 110 seconds). Messages disappear when you quit.
 The message includes the pane's directory, branch and commit when git
-information is already known. An SSH session kept by tmux can be marked as a remote member. The next
-connection forwards Corta's socket and leaves a `corta` script in
-`/tmp/corta-<token>` for that session. Until that connection is up,
-sending reports that the forward is unavailable. The remote needs
-`nc -U`. Nothing is written under the remote home directory.
+information is already known.
 
 A session already in a linked worktree is marked, and its menu can show
 the main repository in Finder.

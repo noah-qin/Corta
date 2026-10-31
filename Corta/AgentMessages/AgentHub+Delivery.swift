@@ -24,14 +24,6 @@ extension AgentHub {
             return AgentReply(ok: false, text: "refused(notAMember)", delivery: "refused")
         }
         switch request.operation {
-        case "state":
-            guard callingMember.host != nil, let body = request.body, body.utf8.count < 4096,
-                  var state = try? JSONDecoder().decode(AgentRemoteState.self, from: Data(body.utf8)) else {
-                return AgentReply(ok: false, text: "refused(state)", delivery: "refused")
-            }
-            state.seen = now
-            remoteStates[caller] = state
-            return AgentReply(ok: true, text: "ready", delivery: nil)
         case "members":
             let lines = bus.members.filter {
                 bus.memberProjects[$0.id] == bus.memberProjects[caller]
@@ -168,10 +160,7 @@ extension AgentHub {
     }
 
     func envelope(_ item: AgentBus.Item) -> String {
-        let member = bus.members.first { $0.id == item.to }
-        let tmux = remoteTokens.first { $0.value == item.to }.flatMap { remoteSessionNames[$0.key] }
-        let remoteCommand = tmux.map { "/tmp/" + $0 + "/corta" } ?? "corta"
-        let command = member?.host == nil ? bus.commandPath : remoteCommand
+        let command = bus.commandPath
         return AgentEnvelope.text(fromRole: role(of: item.from), fromID: item.from, number: item.number,
                                   replyTo: item.replyTo, body: item.body, context: item.context,
                                   fromUserPane: item.userPane, command: command)

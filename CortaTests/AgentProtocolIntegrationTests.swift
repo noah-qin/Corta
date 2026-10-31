@@ -67,35 +67,6 @@ struct AgentProtocolIntegrationTests {
         #expect(String(decoding: output, as: UTF8.self).contains("pipe-member"))
     }
 
-    @Test func remoteCredentialsAreBoundToTheirPrivateEndpointAndRevokedOnPause() async throws {
-        let root = URL(fileURLWithPath: "/private/tmp/grant-" + UUID().uuidString.prefix(8))
-        let hub = AgentHub()
-        hub.apply(enabled: true, development: true, executable: try #require(Bundle.main.executablePath),
-                  directoryOverride: root.path)
-        defer { hub.stop(); try? FileManager.default.removeItem(at: root) }
-        var first = AgentMemberRecord(role: "first", sessionID: UUID(), host: "test-host")
-        let second = AgentMemberRecord(role: "second", sessionID: UUID(), host: "test-host")
-        hub.sync(members: [first, second], bound: [], shells: [:])
-        hub.rememberRemote(token: "first-credential", member: first.id)
-        hub.rememberRemote(token: "second-credential", member: second.id)
-        let firstPath = try #require(hub.remoteEndpoint(token: "first-credential",
-                                                       member: first.id, tmux: "first-tmux"))
-        let secondPath = try #require(hub.remoteEndpoint(token: "second-credential",
-                                                        member: second.id, tmux: "second-tmux"))
-        let shared = try #require(hub.socketPath)
-        let request = AgentRequest(operation: "whoami", token: "first-credential", tmux: "first-tmux")
-        for (path, allowed) in [(firstPath, true), (secondPath, false), (shared, false)] {
-            let reply = await Task.detached { AgentClient.exchange(request, socketPath: path) }.value
-            #expect(reply?.ok == allowed)
-        }
-        first.paused = true
-        hub.sync(members: [first, second], bound: [], shells: [:])
-        #expect(hub.caller(token: "first-credential") == nil)
-        #expect(!FileManager.default.fileExists(atPath: firstPath))
-        let refused = await Task.detached { AgentClient.exchange(request, socketPath: firstPath) }.value
-        #expect(refused == nil)
-    }
-
     @Test func realSocketRoundTripChecksTheCallerAndProject() async throws {
         let root = URL(fileURLWithPath: "/private/tmp").appendingPathComponent("agent-wire-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

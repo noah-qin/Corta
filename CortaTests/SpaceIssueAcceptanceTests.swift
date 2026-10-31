@@ -65,27 +65,6 @@ struct SpaceIssueAcceptanceTests {
         #expect(!carriage.contains("\n"))
     }
 
-    @Test("#444: replacing a connection token invalidates the previous token")
-    func aReplacedRemoteTokenCannotAuthenticate() {
-        let (hub, members) = hub()
-        let back = members[1]
-        hub.rememberRemote(token: "old", member: back.id)
-        hub.rememberRemote(token: "new", member: back.id)
-        #expect(hub.caller(token: "old") == nil)
-        #expect(hub.caller(token: "new") == back.id)
-    }
-
-    @Test("#444: disabling the bus revokes remote tokens")
-    func stoppingRevokesRemoteTokens() {
-        let (hub, members) = hub()
-        let back = members[1]
-        hub.rememberRemote(token: "connection", member: back.id)
-        hub.markRemoteReady(back.id)
-        hub.stop()
-        #expect(hub.caller(token: "connection") == nil)
-        #expect(hub.remoteReady.isEmpty)
-    }
-
     @Test("#437: a successful immediate nudge is not repeated by the next refresh")
     func unreadMailDoesNotTriggerDuplicateNudges() {
         let (hub, members) = hub()

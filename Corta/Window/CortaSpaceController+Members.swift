@@ -127,25 +127,6 @@ extension CortaSpaceController {
         scheduleSave()
     }
 
-    func makeRemoteMember(_ session: SpaceSession) {
-        guard let project = self.session(withID: session.id)?.project,
-              let hostName = session.record.ssh?.displayName,
-              let role = AgentMemberRecord.cleanRole(hostName) else { return }
-        let alert = NSAlert()
-        alert.messageText = L10n.text("space.member.remote")
-        alert.informativeText = L10n.text("space.member.remoteDetail")
-        alert.addButton(withTitle: L10n.text("space.member.add"))
-        alert.addButton(withTitle: L10n.text("common.cancel"))
-        presentAlert(alert, host?.toolbarWindow) { [weak self, weak project] response in
-            guard response == .alertFirstButtonReturn, let self, let project else { return }
-            project.members.removeAll { $0.sessionID == session.id }
-            project.members.append(AgentMemberRecord(role: role, sessionID: session.id, host: hostName))
-            session.record.retainSSH = true
-            self.scheduleSave()
-            self.refreshNow()
-        }
-    }
-
     func removeMember(_ session: SpaceSession) {
         guard let project = self.session(withID: session.id)?.project else { return }
         syncAgentBus()

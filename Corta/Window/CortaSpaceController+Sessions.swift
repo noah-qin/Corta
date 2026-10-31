@@ -98,11 +98,6 @@ extension CortaSpaceController {
     func syncAgentBus() {
         guard Self.owner == nil || Self.owner === self else { return }
         configureAgentHubCallbacks()
-        for session in projects.flatMap(\.sessions) where session.record.ssh != nil {
-            if session.pane?.session?.pty.exitStatus != nil, let member = member(of: session) {
-                AgentHub.shared.disconnectRemote(member.id)
-            }
-        }
         let members = projects.flatMap(\.members)
         let configured = ConfigurationStore.shared.configuration.agentProcesses
         let bound = Set(projects.flatMap(\.sessions).compactMap { session -> UUID? in
@@ -311,7 +306,6 @@ extension CortaSpaceController {
     }
 
     func discard(_ session: SpaceSession) {
-        if let member = member(of: session), member.host != nil { AgentHub.shared.disconnectRemote(member.id) }
         guard let pane = session.pane else { return }
         session.pane = nil
         panels.removeValue(forKey: ObjectIdentifier(session))?.removeFromSuperview()
@@ -320,28 +314,6 @@ extension CortaSpaceController {
         pane.view.removeFromSuperview()
         pane.removeFromParent()
         AgentDirectory.refresh()
-    }
-
-    /// A remote member's connection forwards the message socket and installs a `/tmp` client.
-    func remotePreset(_ preset: Preset?, session: SpaceSession) -> Preset? {
-        guard var preset, let tmux = preset.remoteTmux, let target = preset.connectTarget,
-              ConfigurationStore.shared.configuration.agentMessages,
-              let member = member(of: session), member.host != nil,
-              AgentHub.shared.socketPath != nil else { return preset }
-        let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        AgentHub.shared.rememberRemote(token: token, member: member.id)
-        guard let socket = AgentHub.shared.remoteEndpoint(token: token, member: member.id,
-                                                         tmux: tmux.sessionName) else { return preset }
-        var extras = RemoteTmux.Extras()
-        extras.environmentName = "CORTA_MEMBER_TOKEN"
-        extras.environmentValue = token
-        extras.reverseRemote = "/tmp/corta-" + token + ".sock"
-        extras.reverseLocal = socket
-        extras.installRemoteClient = true
-        preset.arguments = SSHDestination.retainedArguments(
-            for: target, tmux: tmux, preamble: preset.retainedSSHPreamble,
-            commandLeadIn: preset.retainedCommandLeadIn, extras: extras)
-        return preset
     }
 
     func spawn(_ session: SpaceSession, in project: SpaceProject, panelSize: CGSize, preset: Preset? = nil) {
@@ -361,7 +333,7 @@ extension CortaSpaceController {
             ? template?.gridSize(fittingBelowChrome: terminalSize) : nil
         let pane = host.makePane(
             workingDirectory: record.ssh == nil ? (record.directory ?? project.path) : nil,
-            initialGridSize: grid, preset: remotePreset(resolved, session: session),
+            initialGridSize: grid, preset: resolved,
             agentPaneID: session.id)
         // The window's temporary font zoom applies to new sessions too.
         if let template {

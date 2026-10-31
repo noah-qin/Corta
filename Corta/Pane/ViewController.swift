@@ -450,9 +450,7 @@ extension ViewController {
     private func setUpPane(strictRespawn: Bool = false, keeping grid: TerminalSize? = nil) {
         if grid != nil, var retained = preset {
             retained.refreshRetainedTmuxToken(reportEstablished: remote.tmuxReport?.established == true)
-            if let space = splitController?.space, let record = space.session(for: self)?.session {
-                preset = space.remotePreset(retained, session: record)
-            } else { preset = retained }
+            preset = retained
         }
         let configuration = ConfigurationStore.shared.configuration
         if grid == nil || !isFontSizeZoomed {

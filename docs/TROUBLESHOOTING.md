@@ -295,8 +295,7 @@ and nothing here can tell — it is uncertainty, not an accusation.
 Open that session's menu and choose Delivery History. `queued` means the
 wake-up line was not typed: the member is busy, you were typing, the
 foreground process is not the agent, or wake-up is off. `pushed` means the
-Claude socket or `codex queue` accepted it. `forwardUnavailable` means a
-remote member's SSH forward is not up. The history does not include the
+Claude socket or `codex queue` accepted it. The history does not include the
 message text. Messages are forgotten when Corta quits.
 
 History retains push failures and fixed gate reasons. An unread message is not
@@ -307,13 +306,6 @@ A native `pushed` result does not mark the bus message read or approve a CLI's
 own inbound hold. If a tool shell reports `corta: command not found`, use the
 absolute executable shown in the introduction or peer envelope; some tools
 replace inherited PATH.
-
-A remote member needs reconnect after registration, Python 3 and tmux, and a
-live forwarded socket/metadata monitor. Reconnecting replaces credentials in
-its stable `/tmp/corta-<session UUID>/connection.json`; an old token is refused.
-No global tmux setting repairs a missing forward. The client directory remains
-after disconnect; remove only that session's exact directory and expired socket
-paths after removing membership and disconnecting. This does not terminate tmux.
 
 ### Space always fills a picker instead of a specific conversation
 

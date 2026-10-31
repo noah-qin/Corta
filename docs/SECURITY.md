@@ -605,21 +605,6 @@ is `tmux kill-session -t '=corta-<UUID>'`, never `kill-server`. A separate termi
 shows authentication and success/failure. This grants no authority over another
 session or a remote agent's exit protocol.
 
-**Remote members (#444).** See [D33](DECISIONS.md#d33--an-opt-in-temporary-remote-member-client).
-The explicit member dialog explains the temporary Python client, retention and
-per-window passthrough before the next connection. A private endpoint binds
-one connection's token, member and tmux name. The shared local socket refuses
-remote credentials; rotation, disconnect, pause, removal and stop revoke the
-endpoint. SSH process ancestry is not trusted as remote identity.
-
-The standard-library client encodes JSON and rereads a 0600, owned, regular
-connection file (no symlinks, at most 4 KiB) on every invocation. Its stable
-session directory lets existing tmux processes reconnect without stale token
-environment values. Its transient monitor uses process metadata, not screen or
-history text. A stale report clears readiness. Same-account processes can read
-these credentials: this is not protection against the account owner or remote
-root. No remote AI installation, configuration or native push is performed.
-
 **Agent messages (#437, off by default).** `agent-messages` starts a
 per-user socket and puts `corta` on the `PATH` of shells Corta spawns.
 Membership is the permission to send. A nudge writes only the constant

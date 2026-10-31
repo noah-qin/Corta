@@ -51,10 +51,3 @@ struct AgentWakeSnapshot: Sendable {
     var codexThread: String?
     var gate: AgentNudgeGate
 }
-
-nonisolated struct AgentRemoteState: Codable, Sendable {
-    var kind: String
-    var foreground: Bool
-    var idle: Bool?
-    var seen: TimeInterval?
-}

@@ -26,10 +26,6 @@ final class AgentHub {
     /// Shell pid → Space session id.
     var shells: [pid_t: UUID] = [:]
     var shellStarts: [pid_t: UInt64] = [:]
-    /// Remote token → member id. Not written to disk.
-    var remoteTokens: [String: UUID] = [:]
-    var remoteReady: Set<UUID> = []
-    var remoteStates: [UUID: AgentRemoteState] = [:]
     /// Filled by Space. Nil answers mean the session cannot be nudged.
     var snapshot: ((UUID) -> AgentWakeSnapshot?)?
     var writeNudge: ((UUID) -> Bool)?
@@ -41,11 +37,9 @@ final class AgentHub {
     var interrupted: Set<Int> = []
 
     private var server: AgentSocketServer?
-    var remoteEndpoints: [String: AgentSocketServer] = [:]
     var pendingDeliveries: Set<Int> = []
     var deliveryTasks: [Int: Task<AgentDelivery, Never>] = [:]
     var deliveredThrough: [UUID: Int] = [:]
-    var remoteSessionNames: [String: String] = [:]
     private(set) var socketPath: String?
 
     static func socketDirectory(development: Bool, uid: uid_t = getuid()) -> String {
@@ -54,34 +48,16 @@ final class AgentHub {
 
     func sync(members: [AgentMemberRecord], bound: Set<UUID>, shells: [pid_t: UUID],
               projects: [UUID: String] = [:]) {
-        let active = Set(members.filter { !$0.paused }.map(\.id))
-        remoteTokens = remoteTokens.filter { active.contains($0.value) }
-        pruneRemoteEndpoints()
-        remoteReady.formIntersection(active)
-        let now = Date().timeIntervalSinceReferenceDate
-        for (id, state) in remoteStates where now - (state.seen ?? 0) > 4 { disconnectRemote(id) }
         bus.memberProjects = projects
         for member in bus.members where member.host == nil && bus.boundSessions.contains(member.sessionID)
             && !bound.contains(member.sessionID) { bus.dropInbox(member: member.id) }
         bus.replaceMembers(members)
         bus.boundSessions = bound
-        bus.forwardsDown = Set(members.filter { $0.host != nil && !remoteReady.contains($0.id) }.map(\.id))
         shellStarts = shells.reduce(into: [:]) { result, entry in
             result[entry.key] = self.shells[entry.key] == entry.value
                 ? shellStarts[entry.key] : Self.processStart(entry.key)
         }
         self.shells = shells
-    }
-
-    func rememberRemote(token: String, member: UUID) {
-        remoteTokens = remoteTokens.filter { $0.value != member }
-        remoteReady.remove(member)
-        remoteTokens[token] = member
-        pruneRemoteEndpoints()
-    }
-
-    func markRemoteReady(_ member: UUID) {
-        remoteReady.insert(member)
     }
 
     /// Start or stop with `agent-messages`. A second call refreshes the link.
@@ -112,12 +88,6 @@ final class AgentHub {
     func stop() {
         server?.stop()
         server = nil
-        for endpoint in remoteEndpoints.values { endpoint.stop() }
-        remoteEndpoints = [:]
-        remoteTokens = [:]
-        remoteReady = []
-        remoteSessionNames = [:]
-        remoteStates = [:]
         for task in deliveryTasks.values { task.cancel() }
         deliveryTasks = [:]
         pendingDeliveries = []
@@ -130,7 +100,9 @@ final class AgentHub {
     func receive(_ request: AgentRequest, pid: pid_t) async -> AgentReply {
         guard socketPath != nil else { return AgentReply(ok: false, text: "refused(disabled)", delivery: "refused") }
         let identity: UUID?
-        guard request.token == nil else { return Self.identityRefusal }
+        guard request.token == nil else {
+            return AgentReply(ok: false, text: "refused(identity)", delivery: "refused")
+        }
         identity = caller(pid: pid, claimedPane: request.pane)
         var reply = handle(request, caller: identity)
         if let number = reply.number, let task = deliveryTasks[number] {
@@ -160,20 +132,6 @@ final class AgentHub {
             current = parent
         }
         return nil
-    }
-
-    func caller(token: String) -> UUID? {
-        guard let member = remoteTokens[token], bus.members.contains(where: { $0.id == member && !$0.paused })
-        else { return nil }
-        return member
-    }
-
-    func disconnectRemote(_ member: UUID) {
-        remoteReady.remove(member)
-        remoteStates[member] = nil
-        remoteTokens = remoteTokens.filter { $0.value != member }
-        pruneRemoteEndpoints()
-        bus.forwardsDown.insert(member)
     }
 
     /// A person sending a selection. Wakes the receiver the same way `corta send` does.
@@ -234,9 +192,6 @@ final class AgentHub {
 
     func capability(_ member: AgentMemberRecord) -> String {
         if member.paused { return "paused" }
-        if member.host != nil {
-            return remoteReady.contains(member.id) ? "remote/nudge" : "forwardUnavailable"
-        }
         guard bus.boundSessions.contains(member.sessionID) else { return "unbound" }
         guard let shot = snapshot?(member.sessionID) else { return "unsupported:noProcess" }
         if shot.claudeSocket != nil || (shot.codexExecutable != nil && shot.codexThread != nil) { return "push" }

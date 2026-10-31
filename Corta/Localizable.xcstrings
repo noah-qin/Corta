@@ -6905,65 +6905,6 @@
         }
       }
     },
-    "space.member.remote" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Als Remote-Mitglied festlegen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Make Remote Member"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Convertir en miembro remoto"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Définir comme membre distant"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "リモートメンバーにする"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "원격 구성원으로 설정"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Definir como membro remoto"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "设为远端成员"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "設為遠端成員"
-          }
-        }
-      }
-    },
     "space.worktree.reveal" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -51257,64 +51198,6 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Avançar para a próxima sessão em espera após atender"
-          }
-        }
-      }
-    },
-    "space.member.remoteDetail" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "On reconnect, Corta creates a private temporary Python client and socket forward on this host, enables passthrough only for this tmux window, and retains the remote session. Python 3 is required. No AI tool is installed. Reconnect after adding the member."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "重新连接时，Corta 会在此主机创建私有临时 Python 客户端和 socket 转发，仅为此 tmux 窗口启用透传，并保留远端会话。需要 Python 3，不安装 AI 工具。添加后请重新连接。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "重新連線時，Corta 會在此主機建立私有暫存 Python 用戶端及 socket 轉送，僅為此 tmux 視窗啟用透傳，並保留遠端工作階段。需要 Python 3，不安裝 AI 工具。新增後請重新連線。"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "再接続時に、このホストに専用の一時 Python クライアントとソケット転送を作成し、この tmux ウインドウのみ透過を有効にしてセッションを保持します。Python 3 が必要です。AI ツールはインストールしません。追加後に再接続してください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "다시 연결하면 이 호스트에 비공개 임시 Python 클라이언트와 소켓 전달을 만들고 이 tmux 창에만 통과를 허용하며 세션을 유지합니다. Python 3가 필요합니다. AI 도구는 설치하지 않습니다. 추가 후 다시 연결하세요."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Beim erneuten Verbinden erstellt Corta einen privaten temporären Python-Client und eine Socket-Weiterleitung, aktiviert Passthrough nur für dieses tmux-Fenster und behält die Sitzung. Python 3 ist erforderlich. Keine KI-Installation. Danach erneut verbinden."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "À la reconnexion, Corta crée un client Python temporaire privé et un transfert de socket, active le passthrough uniquement pour cette fenêtre tmux et conserve la session. Python 3 requis. Aucun outil IA installé. Reconnectez-vous après l’ajout."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Al reconectar, Corta crea un cliente Python temporal privado y un reenvío de socket, activa el paso solo para esta ventana tmux y conserva la sesión. Requiere Python 3. No instala IA. Reconecta tras añadir el miembro."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Ao reconectar, Corta cria um cliente Python temporário privado e encaminha o socket, ativa a passagem apenas nesta janela tmux e mantém a sessão. Requer Python 3. Não instala IA. Reconecte após adicionar o membro."
           }
         }
       }

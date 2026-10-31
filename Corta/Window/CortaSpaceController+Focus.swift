@@ -114,23 +114,6 @@ extension CortaSpaceController {
     func wakeSnapshot(for sessionID: UUID) -> AgentWakeSnapshot? {
         guard let session = session(withID: sessionID)?.session, let pane = session.pane,
               let terminal = pane.session else { return nil }
-        if let member = member(of: session), member.host != nil {
-            let remote = AgentHub.shared.remoteStates[member.id]
-            let userIdle = pane.terminalView?.lastUserInput.map { SuspendingClock.now - $0 >= .seconds(3) } ?? true
-            return AgentWakeSnapshot(kind: remote?.kind, claudeSocket: nil, codexExecutable: nil, codexThread: nil,
-                gate: AgentNudgeGate(
-                    enabled: ConfigurationStore.shared.configuration.agentMessages && member.nudgeEnabled,
-                    foregroundIsAgent: remote?.foreground == true,
-                    idle: pane.agents.status?.state == .idle || pane.agents.status?.state == .done
-                        || (pane.agents.status?.state != .working && pane.agents.status?.state != .blocked
-                            && remote?.idle == true),
-                    userIdle: userIdle,
-                    composing: pane.terminalView?.hasMarkedText() == true
-                        || pane.terminalView?.hasUnsubmittedInput == true,
-                    bracketedPaste: terminal.hasPendingPaste || terminal.isPasteInFlight,
-                    nudgesThisMinute: AgentHub.shared.bus.nudges(for: member.id,
-                                                               now: Date().timeIntervalSinceReferenceDate)))
-        }
         let observation = session.conversationObservation
         let kind = observation?.conversation.kind.rawValue
         let group = terminal.pty.foregroundProcessGroup

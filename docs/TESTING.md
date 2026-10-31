@@ -489,12 +489,6 @@ The fixture uses a temporary shell environment and per-invocation CLI flags;
 no persistent agent settings are changed. The same suite without
 `CORTA_MEMBERS_REAL` runs the separately opted-in conversation recovery case.
 
-For designated Linux protocol acceptance, prepare a private external directory
-with `target`, executable `askpass`, and task-local `known_hosts`; pass it as
-`TEST_RUNNER_CORTA_LINUX_TEST_ROOT` and select `CortaTests/RemoteMemberLinuxTests`.
-This runs no remote AI. It removes only its own UUID session and temporary files;
-remove the private credential directory after reviewing the run.
-
 For the Release one/six-panel comparison, prepare the same UI fixture root and
 select `CortaUITests/MeasurementUITests/testSpaceFloodOneAndSixPanels` under
 `-testPlan Release -configuration Benchmark`. The two stages use font size 10,
