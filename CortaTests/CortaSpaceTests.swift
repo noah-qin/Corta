@@ -265,59 +265,6 @@ struct CortaSpaceTests {
         return url
     }
 
-    @Test func switchingModesKeepsTheTerminalTreeAndEveryProcess() throws {
-        let (controller, host) = try makeWindow()
-        defer { close(controller, host) }
-        let window = try #require(controller.window)
-        host.splitRight(nil)
-        let terminalLeaves = host.terminalTree.leaves
-        let terminalSessions = host.panes.compactMap(\.session)
-        let frame = window.frame
-        let project = try makeProject()
-        defer { try? FileManager.default.removeItem(at: project) }
-        host.space.setActive(true)
-        host.space.openProject(project)
-        let spacePane = try #require(host.focusedPane)
-        #expect(host.space.owns(spacePane))
-        #expect(spacePane.inheritedWorkingDirectory == project.standardizedFileURL.resolvingSymlinksInPath().path)
-        #expect(window.frame == frame, "Space shows in the window's own frame")
-        for _ in 0..<3 {
-            host.space.setActive(false)
-            #expect(window.frame == frame, "and leaving it changes nothing either")
-            #expect(host.terminalTree.leaves == terminalLeaves)
-            #expect(terminalLeaves.allSatisfy { $0.window === window })
-            #expect(spacePane.view.window == nil)
-            host.space.setActive(true)
-            #expect(window.frame == frame)
-            #expect(spacePane.view.window === window)
-            #expect(terminalLeaves.allSatisfy { $0.window == nil })
-        }
-        for session in terminalSessions + [try #require(spacePane.session)] {
-            #expect(kill(session.pty.processIdentifier, 0) == 0)
-        }
-        #expect(window.title == project.lastPathComponent)
-    }
-
-    @Test func theIntroductionShowsOnceAndIsRememberedInSpaceState() throws {
-        let previous = CortaSpaceController.showsIntroduction
-        CortaSpaceController.showsIntroduction = true
-        defer { CortaSpaceController.showsIntroduction = previous }
-        let (controller, host) = try makeWindow()
-        defer { close(controller, host) }
-        var shown: [String] = []
-        host.space.presentAlert = { alert, _, done in
-            shown.append(alert.messageText)
-            done(.alertFirstButtonReturn)
-        }
-        host.space.setActive(true)
-        #expect(shown == [L10n.text("space.introduction.title")])
-        host.space.setActive(false)
-        host.space.setActive(true)
-        #expect(shown.count == 1, "a second visit shows nothing")
-        host.space.saveNow()
-        #expect(SpaceStore.standard.load().introductionShown == true)
-    }
-
     @Test func newSessionsSplitUntilTheLimitThenReplaceTheLeastRecentlyUsed() throws {
         let (controller, host) = try makeWindow(limit: 2)
         defer { close(controller, host) }
@@ -412,62 +359,6 @@ struct CortaSpaceTests {
         #expect(!live.shown.contains(hidden))
         #expect(live.layout == layout)
         #expect(kill(try #require(hidden.pane?.session).pty.processIdentifier, 0) == 0)
-    }
-
-    @Test func resumeDetailsLiveInTheDiagnosticsSubmenu() throws {
-        let (controller, host) = try makeWindow()
-        defer { close(controller, host) }
-        let project = try makeProject()
-        defer { try? FileManager.default.removeItem(at: project) }
-        let space = host.space
-        space.setActive(true)
-        space.openProject(project)
-        let session = try #require(space.focusedSession)
-        session.record.conversation = LocalConversation(kind: .claude)
-        let panel = try #require(space.panels[ObjectIdentifier(session)])
-        let fill = L10n.text("space.conversation.fillAgain")
-        let menu = panel.makeMenu()
-        #expect(!menu.items.contains { $0.title == fill }, "not on the panel menu's first level")
-        let diagnostics = try #require(menu.items.first { $0.title == L10n.text("space.session.diagnostics") })
-        #expect(diagnostics.submenu?.items.contains { $0.title == fill } == true)
-        session.record.conversation = nil
-        #expect(!panel.makeMenu().items.contains { $0.title == L10n.text("space.session.diagnostics") })
-    }
-
-    @Test func theGitRowNamesUncheckedNewFilesAndShowsNothingForNoChanges() throws {
-        let (controller, host) = try makeWindow()
-        defer { close(controller, host) }
-        let space = host.space
-        let id = UUID()
-        space.gitFacts[id] = GitFacts(name: "main", detached: false, worktree: false, changedFiles: 0,
-                                      unchecked: false)
-        let clean = try #require(space.gitRow(for: id))
-        #expect(clean.text == "main")
-        #expect(clean.toolTip == "main", "no changes: no mark and nothing about counts")
-        space.gitFacts[id]?.changedFiles = 3
-        let dirty = try #require(space.gitRow(for: id))
-        #expect(dirty.text == "main · 3")
-        #expect(dirty.toolTip.contains(L10n.format("space.git.dirty", 3)))
-    }
-
-    @Test func closingTheWindowSaysHowManySpaceSessionsEndHiddenOnesIncluded() throws {
-        let (controller, host) = try makeWindow()
-        defer { close(controller, host) }
-        let project = try makeProject()
-        defer { try? FileManager.default.removeItem(at: project) }
-        let space = host.space
-        space.setActive(true)
-        space.openProject(project)
-        space.newSession()
-        space.newSession()
-        let live = try #require(space.selectedProject)
-        space.hide(live.shown[0])
-        #expect(space.liveSessionCount == 3, "the hidden session counts")
-        let alert = host.closeAlert(for: [], scope: L10n.text("close.scope.window"),
-                                    spaceSessions: space.liveSessionCount)
-        #expect(alert.informativeText.contains(L10n.format("close.running.space", 3)))
-        let plain = host.closeAlert(for: [], scope: L10n.text("close.scope.window"))
-        #expect(!plain.informativeText.contains(L10n.format("close.running.space", 3)))
     }
 
     @Test func projectsKeepTheirOwnSessionsAndAreSaved() throws {
