@@ -107,6 +107,7 @@ final class SpacePaneView: NSView {
     private func layOut() {
         sshButton.bezelStyle = .glass
         sshButton.controlSize = .small
+        sshButton.imagePosition = .imageLeading
         sshButton.target = self
         sshButton.action = #selector(showSSHStatus)
         sshButton.setAccessibilityIdentifier("Corta.Space.SSHStatus")
@@ -171,12 +172,18 @@ final class SpacePaneView: NSView {
         icon.image = NSImage(systemSymbolName: presentation.symbol, accessibilityDescription: nil)
         titleLabel.stringValue = presentation.title
         titleLabel.textColor = isFocused ? .labelColor : .secondaryLabelColor
-        detailLabel.stringValue = presentation.detail
+        // "user@host" beside a title that already names the host says the
+        // host twice and pushes the header's right side out: keep the user.
+        let host = "@" + presentation.title
+        detailLabel.stringValue = presentation.detail.hasSuffix(host) && presentation.detail.count > host.count
+            ? String(presentation.detail.dropLast(host.count)) : presentation.detail
+        detailLabel.toolTip = presentation.detail
         status.configure(text: presentation.state, tint: presentation.tint)
         sshButton.isHidden = session.record.ssh == nil || session.record.retainSSH != true
         let sshStatus = SpaceSSHStatus(session: session)
-        sshButton.title = sshStatus.title
-        sshButton.toolTip = sshStatus.detail
+        sshButton.attributedTitle = Self.statusTitle(sshStatus)
+        sshButton.image = Self.statusImage(sshStatus)
+        sshButton.toolTip = sshStatus.title + "\n" + sshStatus.detail
         sshButton.setAccessibilityLabel(sshStatus.title + ". " + sshStatus.detail)
         applyOutline()
         setAccessibilityLabel([presentation.title, presentation.state].compactMap { $0 }.joined(separator: ", "))
@@ -486,19 +493,118 @@ extension SpacePaneView {
     @objc private func toggleMaximize() { space?.toggleMaximize(session) }
     @objc private func hidePanel() { space?.hide(session) }
     @objc private func endRemoteSession() { space?.endRemoteSession(session) }
+    /// Details in a popover under the button: no sheet to dismiss, gone on
+    /// the next click elsewhere.
     @objc private func showSSHStatus() {
-        guard let window else { return }
-        let status = SpaceSSHStatus(session: session)
-        let alert = NSAlert()
-        alert.messageText = status.title
-        alert.informativeText = status.detail + "\n\n" + RemoteTmux(id: session.id).sessionName
-        alert.addButton(withTitle: L10n.text("common.close"))
-        alert.buttons.forEach { $0.bezelStyle = .glass }
-        alert.beginSheetModal(for: window)
+        guard window != nil else { return }
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = SpaceSSHStatusController(
+            status: SpaceSSHStatus(session: session),
+            tmuxName: RemoteTmux(id: session.id).sessionName,
+            canEnd: session.record.retainSSH == true
+        ) { [weak self, weak popover] in
+            popover?.performClose(nil)
+            self?.endRemoteSession()
+        }
+        popover.show(relativeTo: sshButton.bounds, of: sshButton, preferredEdge: .maxY)
+    }
+
+    /// "Survives disconnect · Reattached", the lead in the label colour and
+    /// the state in the status's own.
+    static func statusTitle(_ status: SpaceSSHStatus) -> NSAttributedString {
+        let font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .medium)
+        let title = NSMutableAttributedString()
+        if let lead = status.lead {
+            title.append(NSAttributedString(string: lead + " · ", attributes: [
+                .font: font, .foregroundColor: NSColor.labelColor]))
+        }
+        title.append(NSAttributedString(string: status.state, attributes: [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold),
+            .foregroundColor: status.tint]))
+        return title
+    }
+
+    static func statusImage(_ status: SpaceSSHStatus) -> NSImage? {
+        let filled = status.symbolName.hasSuffix(".fill")
+        let colors: [NSColor] = filled ? [.white, status.tint] : [status.tint]
+        let configuration = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+            .applying(NSImage.SymbolConfiguration(paletteColors: colors))
+        return NSImage(systemSymbolName: status.symbolName, accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration)
     }
     @objc private func endSession() { space?.endSession(session) }
     @objc private func rename() { space?.sidebar.beginRename(session) }
     @objc private func refillConversation() { space?.refillConversation(session) }
     @objc private func browseFiles() { space?.browseFiles(of: session) }
 
+}
+
+/// What the SSH status button opens: the status, what it means, the exact
+/// tmux name with a copy button, and the separately confirmed way to end it.
+final class SpaceSSHStatusController: NSViewController {
+    private let status: SpaceSSHStatus
+    private let tmuxName: String
+    private let canEnd: Bool
+    private let onEnd: () -> Void
+
+    init(status: SpaceSSHStatus, tmuxName: String, canEnd: Bool, onEnd: @escaping () -> Void) {
+        self.status = status
+        self.tmuxName = tmuxName
+        self.canEnd = canEnd
+        self.onEnd = onEnd
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func loadView() {
+        let heading = NSTextField(labelWithAttributedString: SpacePaneView.statusTitle(status))
+        heading.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+        let icon = NSImageView(image: SpacePaneView.statusImage(status) ?? NSImage())
+        let top = NSStackView(views: [icon, heading])
+        top.spacing = 6
+        var rows: [NSView] = [top, Self.paragraph(status.detail)]
+        if status.isInTmux {
+            rows.append(Self.paragraph(L10n.text("space.ssh.note"), secondary: true))
+        }
+        let name = NSTextField(labelWithString: tmuxName)
+        name.font = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+        name.textColor = .secondaryLabelColor
+        name.isSelectable = true
+        let copy = NSButton(image: NSImage(systemSymbolName: "doc.on.doc",
+            accessibilityDescription: L10n.text("common.copy")) ?? NSImage(), target: self, action: #selector(copyName))
+        copy.bezelStyle = .glass
+        copy.controlSize = .small
+        copy.toolTip = L10n.text("common.copy")
+        rows.append(NSStackView(views: [name, copy]))
+        if canEnd {
+            let end = NSButton(title: L10n.text("space.ssh.kill.title"), target: self, action: #selector(end))
+            end.bezelStyle = .glass
+            end.controlSize = .small
+            rows.append(end)
+        }
+        let stack = NSStackView(views: rows)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 10
+        stack.edgeInsets = NSEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+        stack.setAccessibilityIdentifier("Corta.Space.SSHStatusDetails")
+        view = stack
+    }
+
+    private static func paragraph(_ text: String, secondary: Bool = false) -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.preferredMaxLayoutWidth = 340
+        label.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        label.textColor = secondary ? .secondaryLabelColor : .labelColor
+        return label
+    }
+
+    @objc private func copyName() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(tmuxName, forType: .string)
+    }
+
+    @objc private func end() { onEnd() }
 }

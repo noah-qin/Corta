@@ -301,23 +301,34 @@ Supported remote login shells are POSIX-family shells, zsh, fish and csh/tcsh.
 The fixed wrapper is a single quoted line passed to `/bin/sh`, so csh/tcsh
 can parse it before `/bin/sh` runs it. Nushell and other shells are untested.
 
-The panel's glass connection button keeps its result visible even after tmux
-clears the screen; click it for details and the exact tmux name. While SSH is
-still connecting or asking for your password it says **New tmux after
-sign-in** (this terminal has never had a tmux session) or **Reattach tmux
-after sign-in** (it had one before); nothing has run on the server yet. Then
-it shows the result:
+The panel's glass status button stays visible even after tmux clears the
+screen. Its first half answers whether this terminal's programs survive a
+disconnect; the second says where things stand. Grey means not yet in effect,
+green in effect, orange or red not in effect:
 
-- **tmux · Reconnectable**: the named remote session exists.
-- **Ordinary SSH · Limited recovery**: remote tmux was not detected. Corta
+- **Survives disconnect · On after sign-in** / **· Programs back after
+  sign-in**: SSH is still connecting or asking for your password; nothing has
+  run on the server yet. After sign-in a new tmux session starts, or the one
+  from last time is reattached.
+- **Survives disconnect · On** / **· Programs back**: the terminal runs in its
+  own `corta-<UUID>` tmux session — new, or reattached with the programs that
+  were running in it.
+- **Won't survive disconnect · No tmux on server**: tmux was not found. Corta
   checks only the PATH supplied by sshd; it does not source remote shell
-  startup scripts. An installation added only in `.zshrc` is not detected.
+  startup scripts, so an installation added only in `.zshrc` is not detected.
   Put tmux on that PATH and reconnect. This does not mean it is uninstalled.
-- **tmux failed · Ordinary SSH**: creation or attachment failed; details show
-  its exit status and up to 1,024 bytes of sanitised remote error text. A login
-  shell is provided. Normal tmux detach (exit status 0) ends SSH instead.
-- **Original session ended · New terminal**: a previously established tmux
-  session is gone. The new terminal does not restore its former programs.
+- **Won't survive disconnect · tmux error**: creation or attachment failed; the
+  details show its exit status and up to 1,024 bytes of sanitised remote error
+  text. A login shell is provided. Normal tmux detach (exit status 0) ends SSH
+  instead.
+- **Programs lost · Survives disconnect again**: the tmux session from last
+  time is gone (the server restarted, or it was ended), so its programs are
+  lost; a new one was started.
+
+Click it for a popover with what that means, the exact tmux name with a copy
+button, and **End Remote Session…**; click anywhere else to close it. When
+the panel's title already names the host, the header shows only the user
+beside it.
 
 **End Remote Session…**, separately confirmed in the panel or sidebar menu,
 terminates only that UUID with `tmux kill-session -t '=corta-<UUID>'`. Its new

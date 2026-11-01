@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import AppKit
 import CortaTerminal
 import Foundation
 import Testing
@@ -71,18 +72,31 @@ struct SpaceSSHTests {
             terminal.feed(Array("\u{1B}]6973;\(token.uuidString);\(signal)\u{7}".utf8))
             return terminal.remoteTmuxReport
         }
+        func kind(_ signal: String?, _ previously: Bool) -> SpaceSSHStatus.Kind {
+            SpaceSSHStatus(report: signal.flatMap(report), previouslyEstablished: previously).kind
+        }
+        #expect(kind("start;new", false) == .ready)
+        #expect(kind("start;new", true) == .replaced, "a lost session is not called restored")
+        #expect(kind("start;attached", true) == .attached)
+        #expect(kind("start;missing", true) == .missing)
+        #expect(kind(nil, true) == .attaching)
+        #expect(kind(nil, false) == .starting)
+        let failed = SpaceSSHStatus(report: report("start;new\u{7}\u{1B}]6973;\(token.uuidString);fail;7;626164"),
+                                    previouslyEstablished: true)
+        #expect(failed.kind == .failed)
+        #expect(failed.detail.contains("bad"))
+        // The lead answers whether programs survive a disconnect.
+        let kept = L10n.text("space.ssh.lead.kept"), notKept = L10n.text("space.ssh.lead.notKept")
+        #expect(SpaceSSHStatus(report: nil, previouslyEstablished: false).lead == kept)
+        #expect(SpaceSSHStatus(report: report("start;attached"), previouslyEstablished: true).lead == kept)
+        #expect(SpaceSSHStatus(report: report("start;missing"), previouslyEstablished: false).lead == notKept)
+        #expect(failed.lead == notKept)
+        #expect(SpaceSSHStatus(report: report("start;new"), previouslyEstablished: true).lead
+            == L10n.text("space.ssh.lead.lost"))
+        #expect(failed.tint == .systemRed)
+        #expect(SpaceSSHStatus(report: nil, previouslyEstablished: false).tint == .secondaryLabelColor)
         #expect(SpaceSSHStatus(report: report("start;new"), previouslyEstablished: false).title
-            == L10n.text("space.ssh.ready"))
-        #expect(SpaceSSHStatus(report: report("start;new"), previouslyEstablished: true).title
-            == L10n.text("space.ssh.replaced"))
-        #expect(SpaceSSHStatus(report: report("start;attached"), previouslyEstablished: true).title
-            == L10n.text("space.ssh.ready"))
-        #expect(SpaceSSHStatus(report: report("start;missing"), previouslyEstablished: true).title
-            == L10n.text("space.ssh.missing"))
-        #expect(SpaceSSHStatus(report: report("start;new\u{7}\u{1B}]6973;\(token.uuidString);fail;7;626164"),
-            previouslyEstablished: true).detail.contains("bad"))
-        #expect(SpaceSSHStatus(report: nil, previouslyEstablished: true).title == L10n.text("space.ssh.attaching"))
-        #expect(SpaceSSHStatus(report: nil, previouslyEstablished: false).title == L10n.text("space.ssh.starting"))
+            == kept + " · " + L10n.text("space.ssh.ready"))
     }
 
     @Test @MainActor func openingDialogResetsThePerConnectionChoice() {

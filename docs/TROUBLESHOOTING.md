@@ -343,13 +343,12 @@ The same Claude process kept its pid. Look for `sessionChanged` in the
 an unreadable new record falls back to the picker. Report the CLI version
 if the log never shows `sessionChanged` after you switched conversations.
 
-### Space SSH says recovery is limited, or starts a new terminal
+### Space SSH says it won't survive a disconnect, or that programs were lost
 
-Click the panel's glass connection button for details. **Remote tmux was not
-detected** means it was absent from sshd's PATH, not necessarily uninstalled.
+Click the panel's status button for details. **No tmux on server** means it was absent from sshd's PATH, not necessarily uninstalled.
 The connection does not source remote shell startup scripts; putting tmux only
-in `.zshrc` is insufficient. Put it on that PATH and reconnect. A different
-**tmux failed** result includes a bounded remote error and exit status, then
+in `.zshrc` is insufficient. Put it on that PATH and reconnect. A **tmux error**
+result includes a bounded remote error and exit status, then
 provides an ordinary login shell. A successful manual detach ends SSH without
 starting another shell. Authentication cancellation or a network failure does
 not establish or destroy a tmux session automatically.
@@ -359,7 +358,7 @@ and csh/tcsh. It is passed as one line to `/bin/sh`; csh/tcsh cannot parse
 literal newlines inside its quoted argument. Nushell and other shells have
 not been tested.
 
-**Original session ended · New terminal** means an earlier established UUID
+**Programs lost · Survives disconnect again** means an earlier established UUID
 no longer existed. Server restarts, ending the session and `destroy-unattached
 on` lose the original programs; Corta cannot recover them and does not change
 your tmux settings. History is limited by the server's tmux configuration.

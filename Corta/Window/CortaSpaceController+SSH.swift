@@ -113,37 +113,91 @@ extension CortaSpaceController {
 }
 
 /// Visible even when tmux clears the screen; also readable before the project starts.
+///
+/// Said as the answer to the question a person has — will this terminal's
+/// programs survive a disconnect? — then what is happening now: a lead
+/// ("Survives disconnect", "Won't survive disconnect", "Programs lost") and
+/// a state, in a colour that says whether retention is in effect.
 struct SpaceSSHStatus {
-    let title: String
+    enum Kind: String {
+        case starting, attaching, ready, attached, missing, failed, replaced, ended
+    }
+
+    let kind: Kind
     let detail: String
+
+    /// The first half: what happens to the programs on a disconnect.
+    var lead: String? {
+        switch kind {
+        case .starting, .attaching, .ready, .attached: return L10n.text("space.ssh.lead.kept")
+        case .missing, .failed: return L10n.text("space.ssh.lead.notKept")
+        case .replaced: return L10n.text("space.ssh.lead.lost")
+        case .ended: return nil
+        }
+    }
+
+    /// The second half: where it stands now.
+    var state: String {
+        kind == .ended ? L10n.text("space.state.ended") : L10n.text("space.ssh." + kind.rawValue)
+    }
+
+    /// Both halves, for the popover's heading and VoiceOver.
+    var title: String { lead.map { $0 + " · " + state } ?? state }
+
+    /// Grey until it is in effect, green while it is, orange or red when not.
+    var tint: NSColor {
+        switch kind {
+        case .starting, .attaching, .ended: return .secondaryLabelColor
+        case .ready, .attached: return .systemGreen
+        case .missing, .replaced: return .systemOrange
+        case .failed: return .systemRed
+        }
+    }
+
+    var symbolName: String {
+        switch kind {
+        case .starting, .attaching: return "hourglass"
+        case .ready, .attached: return "checkmark.circle.fill"
+        case .missing: return "exclamationmark.triangle.fill"
+        case .failed: return "xmark.octagon.fill"
+        case .replaced: return "arrow.clockwise.circle.fill"
+        case .ended: return "minus.circle"
+        }
+    }
+
+    /// Whether tmux holds this terminal — and so the note on what tmux keeps
+    /// from Corta applies.
+    var isInTmux: Bool { [.starting, .attaching, .ready, .attached, .replaced].contains(kind) }
 
     init(session: SpaceSession) {
         let status = Self(report: session.pane?.remote.tmuxReport,
                           previouslyEstablished: session.pane?.preset?.tmuxPreviouslyEstablished
                             ?? (session.record.tmuxEstablished == true))
-        title = session.pane?.session?.pty.exitStatus == nil ? status.title : L10n.text("space.state.ended")
-        detail = status.detail
+        if session.pane?.session?.pty.exitStatus != nil {
+            kind = .ended
+            detail = status.detail
+        } else {
+            self = status
+        }
     }
 
     init(report: RemoteTmux.Report?, previouslyEstablished: Bool) {
-        let key: String
         if let status = report?.failureStatus {
-            key = "failed"
+            kind = .failed
             detail = L10n.format("space.ssh.failed.detail", status) + "\n" + (report?.reason ?? "")
         } else if report?.outcome == .missing {
-            key = "missing"
+            kind = .missing
             detail = L10n.text("space.ssh.missing.detail")
         } else if report?.outcome == .new, previouslyEstablished {
-            key = "replaced"
+            kind = .replaced
             detail = L10n.text("space.ssh.replaced.detail")
         } else if report?.established == true {
-            key = "ready"
-            detail = L10n.text("space.ssh.ready.detail")
+            kind = report?.outcome == .attached ? .attached : .ready
+            detail = L10n.text("space.ssh." + kind.rawValue + ".detail")
         } else {
-            key = previouslyEstablished ? "attaching" : "starting"
-            detail = L10n.text("space.ssh.pending.detail")
+            kind = previouslyEstablished ? .attaching : .starting
+            detail = L10n.text(previouslyEstablished ? "space.ssh.attaching.detail" : "space.ssh.pending.detail")
         }
-        title = L10n.text("space.ssh." + key)
     }
 }
 

@@ -38416,55 +38416,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux nach Anmeldung neu"
+            "value" : "Nach Anmeldung aktiv"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "New tmux after sign-in"
+            "value" : "On after sign-in"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux nuevo tras iniciar sesión"
+            "value" : "Activo tras iniciar sesión"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Nouveau tmux après connexion"
+            "value" : "Actif après connexion"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "サインイン後に tmux を作成"
+            "value" : "サインイン後に有効"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "로그인 후 tmux 새로 만들기"
+            "value" : "로그인 후 켜짐"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Novo tmux após o login"
+            "value" : "Ativo após o login"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "登录后新建 tmux"
+            "value" : "登录后开启"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "登入後新建 tmux"
+            "value" : "登入後開啟"
           }
         }
       }
@@ -38475,55 +38475,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux nach Anmeldung wieder verbinden"
+            "value" : "Programme nach Anmeldung zurück"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reattach tmux after sign-in"
+            "value" : "Programs back after sign-in"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Reconectar tmux tras iniciar sesión"
+            "value" : "Programas de vuelta tras iniciar sesión"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Rattacher tmux après connexion"
+            "value" : "Programmes rétablis après connexion"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "サインイン後に tmux へ再接続"
+            "value" : "サインイン後に元のプログラムへ再接続"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "로그인 후 tmux 다시 연결"
+            "value" : "로그인 후 원래 프로그램 다시 연결"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Reconectar o tmux após o login"
+            "value" : "Programas de volta após o login"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "登录后接回 tmux"
+            "value" : "登录后接回原程序"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "登入後接回 tmux"
+            "value" : "登入後接回原程式"
           }
         }
       }
@@ -38534,55 +38534,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "SSH verbindet noch oder wartet auf deine Anmeldung; tmux läuft noch nicht. Danach startet Corta die eigene entfernte tmux-Sitzung dieses Terminals oder verbindet sich wieder mit ihr, falls es sie schon gibt, und zeigt das Ergebnis auf dieser Taste. Gespeicherte Sitzungen eines Projekts verbinden sich erst, wenn es zum ersten Mal geöffnet wird."
+            "value" : "Jetzt: SSH verbindet noch oder wartet auf dein Passwort; auf dem Server läuft noch nichts.\nNach der Anmeldung: Dieses Terminal läuft in einer eigenen tmux-Sitzung auf dem Server. Trennung, Schließen des Fensters oder Beenden von Corta lassen die Programme weiterlaufen; beim nächsten Verbinden sind sie wieder da."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SSH is still connecting or waiting for you to sign in; tmux has not run yet. Once you are in, Corta starts this terminal's own remote tmux session, or reattaches to it if it already exists, and this button shows the result. A project's saved sessions connect only when it is first opened."
+            "value" : "Now: SSH is connecting or waiting for your password; nothing runs on the server yet.\nAfter sign-in: this terminal runs inside its own tmux session on the server. Disconnecting, closing the window or quitting Corta leaves its programs running, and they come back the next time it connects."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "SSH sigue conectando o esperando a que inicies sesión; tmux aún no se ha ejecutado. Al entrar, Corta crea la sesión tmux remota propia de este terminal, o se reconecta a ella si ya existe, y muestra el resultado en este botón. Las sesiones guardadas de un proyecto solo se conectan la primera vez que se abre."
+            "value" : "Ahora: SSH está conectando o esperando tu contraseña; aún no se ejecuta nada en el servidor.\nTras iniciar sesión: este terminal se ejecuta en su propia sesión tmux del servidor. Desconectar, cerrar la ventana o salir de Corta deja sus programas en marcha, y vuelven en la próxima conexión."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "SSH se connecte encore ou attend votre authentification ; tmux n’a pas encore démarré. Une fois connecté, Corta crée la session tmux distante propre à ce terminal, ou s’y rattache si elle existe déjà, et affiche le résultat sur ce bouton. Les sessions enregistrées d’un projet ne se connectent qu’à sa première ouverture."
+            "value" : "Maintenant : SSH se connecte ou attend votre mot de passe ; rien ne tourne encore sur le serveur.\nAprès la connexion : ce terminal tourne dans sa propre session tmux sur le serveur. Se déconnecter, fermer la fenêtre ou quitter Corta laisse ses programmes tourner ; ils reviennent à la prochaine connexion."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "SSH は接続中か、サインインを待っています。tmux はまだ動いていません。サインイン後、Corta はこの端末専用のリモート tmux セッションを作成（既にあれば再接続）し、結果をこのボタンに表示します。プロジェクトに保存されたセッションは、最初に開いたときにだけ接続します。"
+            "value" : "現在：SSH は接続中か、パスワードを待っています。サーバではまだ何も動いていません。\nサインイン後：この端末はサーバ上の専用 tmux セッションで動きます。切断、ウインドウを閉じる、Corta を終了しても中のプログラムは動き続け、次回の接続時に戻ります。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "SSH가 아직 연결 중이거나 로그인을 기다리고 있으며, tmux는 아직 실행되지 않았습니다. 로그인하면 Corta가 이 터미널 전용 원격 tmux 세션을 새로 만들거나(이미 있으면 다시 연결) 결과를 이 버튼에 표시합니다. 프로젝트에 저장된 세션은 프로젝트를 처음 열 때만 연결됩니다."
+            "value" : "지금: SSH가 연결 중이거나 비밀번호를 기다리고 있으며, 서버에서는 아직 아무것도 실행되지 않았습니다.\n로그인 후: 이 터미널은 서버의 전용 tmux 세션 안에서 실행됩니다. 연결이 끊기거나 윈도우를 닫거나 Corta를 종료해도 프로그램은 계속 실행되고, 다음 연결 때 돌아옵니다."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "O SSH ainda está conectando ou esperando seu login; o tmux ainda não foi executado. Depois do login, o Corta cria a sessão tmux remota própria deste terminal, ou se reconecta a ela se já existir, e mostra o resultado neste botão. As sessões salvas de um projeto só se conectam na primeira vez que ele é aberto."
+            "value" : "Agora: o SSH está conectando ou esperando sua senha; nada roda no servidor ainda.\nApós o login: este terminal roda na própria sessão tmux no servidor. Desconectar, fechar a janela ou encerrar o Corta mantém os programas rodando, e eles voltam na próxima conexão."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "SSH 还在连接或等你登录，tmux 尚未运行。登录后，Corta 会为这个终端新建它自己的远端 tmux 会话（若已存在则接回），并在此按钮上显示结果。项目里保存的会话只在首次打开项目时连接。"
+            "value" : "现在：SSH 正在连接或等你输入密码，远端还没有运行任何东西。\n登录后：这个终端会在远端它自己的 tmux 会话里运行。之后断网、关窗口或退出 Corta，里面的程序都继续运行，下次连接时自动接回。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "SSH 仍在連線或等你登入，tmux 尚未執行。登入後，Corta 會為這個終端機新建它自己的遠端 tmux 工作階段（若已存在則接回），並在此按鈕上顯示結果。專案裡儲存的工作階段只在首次開啟專案時連線。"
+            "value" : "現在：SSH 正在連線或等你輸入密碼，遠端還沒有執行任何東西。\n登入後：這個終端機會在遠端它自己的 tmux 工作階段裡執行。之後斷網、關視窗或結束 Corta，裡面的程式都繼續執行，下次連線時自動接回。"
           }
         }
       }
@@ -38593,55 +38593,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux · Wiederverbindbar"
+            "value" : "Aktiv"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "tmux · Reconnectable"
+            "value" : "On"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux · Se puede reconectar"
+            "value" : "Activo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux · Reconnexion possible"
+            "value" : "Actif"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux · 再接続可能"
+            "value" : "有効"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux · 재연결 가능"
+            "value" : "켜짐"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux · Reconexão disponível"
+            "value" : "Ativo"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux · 可重连"
+            "value" : "已开启"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux · 可重新連線"
+            "value" : "已開啟"
           }
         }
       }
@@ -38652,55 +38652,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Die Programme dieser entfernten tmux-Sitzung laufen nach einer SSH-Trennung, dem Schließen des Bereichs oder Fensters und dem Beenden von Corta weiter. Bildschirm und Verlauf bleiben auf dem Server und unterliegen dessen tmux-Einstellungen."
+            "value" : "Dieses Terminal läuft in einer eigenen tmux-Sitzung auf dem Server. Trennung, Schließen des Panels oder Fensters oder Beenden von Corta lassen die Programme weiterlaufen; beim nächsten Verbinden sind sie wieder da. Bildschirm und Verlauf liegen auf dem Server, im Rahmen seiner tmux-Einstellungen."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This remote tmux session keeps its programs running after SSH disconnects, the panel or window closes, or Corta quits. Its screen and history live on the server, subject to remote tmux settings."
+            "value" : "This terminal runs inside its own tmux session on the server. Disconnecting, closing the panel or window, or quitting Corta leaves its programs running; they come back the next time it connects. Screen and history live on the server, within its tmux settings."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Los programas de esta sesión tmux remota siguen activos tras desconectar SSH, cerrar el panel o la ventana, o salir de Corta. La pantalla y el historial permanecen en el servidor según sus ajustes de tmux."
+            "value" : "Este terminal se ejecuta en su propia sesión tmux del servidor. Desconectar, cerrar el panel o la ventana, o salir de Corta deja sus programas en marcha; vuelven en la próxima conexión. La pantalla y el historial quedan en el servidor, según su configuración de tmux."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Les programmes de cette session tmux distante continuent après une déconnexion SSH, la fermeture du panneau ou de la fenêtre, ou l’arrêt de Corta. L’écran et l’historique restent sur le serveur selon ses réglages tmux."
+            "value" : "Ce terminal tourne dans sa propre session tmux sur le serveur. Se déconnecter, fermer le panneau ou la fenêtre, ou quitter Corta laisse ses programmes tourner ; ils reviennent à la prochaine connexion. L’écran et l’historique restent sur le serveur, selon ses réglages tmux."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "このリモート tmux セッション内のプログラムは、SSH の切断、パネルやウインドウの閉鎖、Corta の終了後も動作します。画面と履歴はサーバーに保持され、リモートの tmux 設定に従います。"
+            "value" : "この端末はサーバ上の専用 tmux セッションで動いています。切断、パネルやウインドウを閉じる、Corta を終了しても中のプログラムは動き続け、次回の接続時に戻ります。画面と履歴はサーバ側に保存され、tmux の設定に従います。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "이 원격 tmux 세션의 프로그램은 SSH 연결 해제, 패널이나 윈도우 닫기, Corta 종료 후에도 실행됩니다. 화면과 기록은 서버에 남으며 원격 tmux 설정의 제한을 받습니다."
+            "value" : "이 터미널은 서버의 전용 tmux 세션 안에서 실행 중입니다. 연결이 끊기거나 패널·윈도우를 닫거나 Corta를 종료해도 프로그램은 계속 실행되고, 다음 연결 때 돌아옵니다. 화면과 기록은 서버에 남으며 tmux 설정을 따릅니다."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Os programas desta sessão tmux remota continuam após desconectar o SSH, fechar o painel ou a janela, ou sair do Corta. A tela e o histórico ficam no servidor, sujeitos às configurações remotas do tmux."
+            "value" : "Este terminal roda na própria sessão tmux no servidor. Desconectar, fechar o painel ou a janela, ou encerrar o Corta mantém os programas rodando; eles voltam na próxima conexão. Tela e histórico ficam no servidor, conforme a configuração do tmux."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "此远端 tmux 会话在 SSH 断线、关闭面板或窗口、退出 Corta 后保留其中的程序。屏幕与历史由远端维护，历史长度受远端 tmux 配置约束。"
+            "value" : "这个终端在远端它自己的 tmux 会话里运行。断网、关面板或窗口、退出 Corta，里面的程序都继续运行，下次连接时自动接回。屏幕和历史保存在服务器上，长度受远端 tmux 配置限制。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "此遠端 tmux 工作階段在 SSH 中斷、關閉面板或視窗、結束 Corta 後保留其中的程式。畫面與歷史由遠端維護，歷史長度受遠端 tmux 設定約束。"
+            "value" : "這個終端機在遠端它自己的 tmux 工作階段裡執行。斷網、關面板或視窗、結束 Corta，裡面的程式都繼續執行，下次連線時自動接回。螢幕和歷史保存在伺服器上，長度受遠端 tmux 設定限制。"
           }
         }
       }
@@ -38711,55 +38711,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Ursprüngliche Sitzung beendet · Neues Terminal"
+            "value" : "Übersteht Trennung wieder"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Original session ended · New terminal"
+            "value" : "Survives disconnect again"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Sesión original finalizada · Terminal nuevo"
+            "value" : "Vuelve a sobrevivir a la desconexión"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Session initiale terminée · Nouveau terminal"
+            "value" : "Survit de nouveau à la déconnexion"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "元のセッションは終了 · 新規ターミナル"
+            "value" : "再び切断後も継続"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "원래 세션 종료 · 새 터미널"
+            "value" : "다시 유지됨"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Sessão original encerrada · Novo terminal"
+            "value" : "Volta a sobreviver à desconexão"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "原会话已结束，已新建终端"
+            "value" : "已重新开启保留"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "原工作階段已結束，已新建終端"
+            "value" : "已重新開啟保留"
           }
         }
       }
@@ -38770,55 +38770,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Die bisherige entfernte tmux-Sitzung besteht nicht mehr. Ein neues Terminal wurde erstellt; die ursprünglichen Programme wurden nicht wiederhergestellt."
+            "value" : "Die tmux-Sitzung vom letzten Mal gibt es auf dem Server nicht mehr – er wurde neu gestartet oder die Sitzung beendet –, ihre Programme sind also weg. Eine neue wurde gestartet: Ab jetzt übersteht dieses Terminal Trennungen wieder."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The previous remote tmux session no longer exists. A new terminal was created; the original programs were not restored."
+            "value" : "The tmux session from last time no longer exists on the server — it restarted, or the session was ended — so its programs are gone. A new one was started: from now on this terminal survives disconnects again."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "La sesión tmux remota anterior ya no existe. Se ha creado un terminal nuevo; los programas originales no se han restaurado."
+            "value" : "La sesión tmux de la última vez ya no existe en el servidor —se reinició o la sesión terminó—, así que sus programas se perdieron. Se inició una nueva: desde ahora este terminal vuelve a sobrevivir a las desconexiones."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "La session tmux distante précédente n’existe plus. Un nouveau terminal a été créé ; les programmes initiaux n’ont pas été restaurés."
+            "value" : "La session tmux de la dernière fois n’existe plus sur le serveur — il a redémarré ou la session a été terminée —, ses programmes sont donc perdus. Une nouvelle a été lancée : désormais, ce terminal survit de nouveau aux déconnexions."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "以前のリモート tmux セッションは存在しません。新しいターミナルを作成しました。元のプログラムは復元されていません。"
+            "value" : "前回の tmux セッションはサーバにもうありません（再起動したか、セッションが終了しました）。中のプログラムは失われました。新しいセッションを作成したので、これからは再び切断後も継続します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "이전 원격 tmux 세션이 더 이상 존재하지 않습니다. 새 터미널을 만들었으며 원래 프로그램은 복원되지 않았습니다."
+            "value" : "지난번 tmux 세션이 서버에 더 이상 없습니다(서버가 재시작되었거나 세션이 종료됨). 그 안의 프로그램은 사라졌습니다. 새 세션을 만들었으므로 이제부터 이 터미널은 다시 연결이 끊겨도 유지됩니다."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "A sessão tmux remota anterior não existe mais. Um novo terminal foi criado; os programas originais não foram restaurados."
+            "value" : "A sessão tmux da última vez não existe mais no servidor — ele reiniciou ou a sessão foi encerrada —, então os programas se perderam. Uma nova foi iniciada: a partir de agora este terminal volta a sobreviver a desconexões."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "原远端 tmux 会话已不存在，已新建终端；原来运行的程序未恢复。"
+            "value" : "上次的 tmux 会话在服务器上已经不存在了（服务器重启过，或会话被结束了），里面的程序已经没了。已经新建了一个：从现在起，这个终端断线后又会保留。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "原遠端 tmux 工作階段已不存在，已新建終端；原來執行的程式未復原。"
+            "value" : "上次的 tmux 工作階段在伺服器上已經不存在了（伺服器重新啟動過，或工作階段被結束了），裡面的程式已經沒了。已經新建了一個：從現在起，這個終端機斷線後又會保留。"
           }
         }
       }
@@ -38829,115 +38829,114 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Normales SSH · Eingeschränkte Wiederherstellung"
+            "value" : "Kein tmux auf dem Server"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ordinary SSH · Limited recovery"
+            "value" : "No tmux on server"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "SSH normal · Recuperación limitada"
+            "value" : "Sin tmux en el servidor"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "SSH ordinaire · Restauration limitée"
+            "value" : "Pas de tmux sur le serveur"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "通常の SSH · 復元に制限"
+            "value" : "サーバに tmux なし"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "일반 SSH · 복원 제한"
+            "value" : "서버에 tmux 없음"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "SSH comum · Recuperação limitada"
+            "value" : "Sem tmux no servidor"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "普通 SSH · 恢复受限"
+            "value" : "远端没装 tmux"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "一般 SSH · 復原受限"
+            "value" : "遠端沒有 tmux"
           }
         }
       }
     },
     "space.ssh.missing.detail" : {
-      "comment" : "Space SSH retention fallback, including remote csh/tcsh login shells. Not detected means absent from sshd's PATH, not necessarily uninstalled; preserve this distinction.",
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Auf dem entfernten Rechner wurde tmux nicht erkannt. Normales SSH wird verwendet; laufende Programme lassen sich nach einer Trennung möglicherweise nicht wiederherstellen. Die Verbindung lädt keine Shell-Startskripte. Falls tmux außerhalb des von sshd bereitgestellten PATH installiert ist, fügen Sie es diesem PATH hinzu und verbinden Sie erneut."
+            "value" : "Auf dem Server wurde kein tmux gefunden, also ist das gewöhnliches SSH: Eine Trennung beendet die Programme. Corta sucht nur im PATH, den sshd liefert, und liest keine Startdateien der entfernten Shell; liegt tmux woanders, lege es in diesen PATH und verbinde neu."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Remote tmux was not detected. This is ordinary SSH; running programs may not be recoverable after disconnecting. The connection does not source remote shell startup scripts. If tmux is installed outside the PATH supplied by sshd, add it to that PATH and reconnect."
+            "value" : "tmux was not found on the server, so this is ordinary SSH: disconnecting ends its programs. Corta looks only on the PATH that sshd provides and does not read remote shell startup files; if tmux is installed elsewhere, put it on that PATH and reconnect."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "No se ha detectado tmux en el equipo remoto. Se usa SSH normal; quizá no se puedan recuperar los programas tras desconectar. La conexión no carga scripts de inicio del shell. Si tmux está instalado fuera del PATH proporcionado por sshd, añádalo a ese PATH y vuelva a conectar."
+            "value" : "No se encontró tmux en el servidor, así que es SSH normal: al desconectar terminan sus programas. Corta solo busca en el PATH que da sshd y no lee los archivos de inicio del shell remoto; si tmux está en otro lugar, ponlo en ese PATH y vuelve a conectar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux n’a pas été détecté sur l’hôte distant. SSH ordinaire est utilisé ; les programmes actifs peuvent être irrécupérables après une déconnexion. La connexion ne charge pas les scripts de démarrage du shell. Si tmux est installé hors du PATH fourni par sshd, ajoutez-le à ce PATH puis reconnectez-vous."
+            "value" : "tmux est introuvable sur le serveur : c’est donc du SSH ordinaire, et une déconnexion termine ses programmes. Corta ne cherche que dans le PATH fourni par sshd et ne lit pas les fichiers de démarrage du shell distant ; si tmux est installé ailleurs, placez-le dans ce PATH et reconnectez-vous."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "リモートで tmux が検出されませんでした。通常の SSH を使用します。切断後、実行中のプログラムを復元できない場合があります。接続時にシェルの起動スクリプトは読み込みません。tmux が sshd の PATH 外にある場合、その PATH に追加して再接続してください。"
+            "value" : "サーバに tmux が見つからないため、通常の SSH です。切断するとプログラムは終了します。Corta は sshd が渡す PATH だけを探し、リモートのシェル起動ファイルは読みません。tmux が別の場所にあるなら、その PATH に置いて再接続してください。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "원격에서 tmux를 감지하지 못했습니다. 일반 SSH를 사용하며 연결 해제 후 실행 중인 프로그램을 복원하지 못할 수 있습니다. 연결은 셸 시작 스크립트를 읽지 않습니다. tmux가 sshd에서 제공하는 PATH 밖에 설치되어 있다면 해당 PATH에 추가한 후 다시 연결하십시오."
+            "value" : "서버에서 tmux를 찾지 못해 일반 SSH입니다. 연결이 끊기면 프로그램이 종료됩니다. Corta는 sshd가 제공하는 PATH만 확인하고 원격 셸 시작 파일은 읽지 않습니다. tmux가 다른 곳에 있다면 그 PATH에 두고 다시 연결하세요."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "O tmux não foi detectado no host remoto. O SSH comum está em uso; programas ativos podem não ser recuperados após a desconexão. A conexão não carrega scripts de inicialização do shell. Se o tmux estiver instalado fora do PATH fornecido pelo sshd, adicione-o a esse PATH e reconecte."
+            "value" : "O tmux não foi encontrado no servidor, então isto é SSH comum: desconectar encerra os programas. O Corta procura apenas no PATH fornecido pelo sshd e não lê os arquivos de inicialização do shell remoto; se o tmux estiver em outro lugar, coloque-o nesse PATH e reconecte."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "远端未检测到 tmux，当前使用普通 SSH。断线后可能无法恢复正在运行的程序。连接不会读取远端的 shell 启动脚本；若 tmux 已安装但不在 sshd 提供的 PATH 上，请把它放到该 PATH 之后重新连接。"
+            "value" : "服务器上没找到 tmux，所以这是普通 SSH：断线时里面的程序会结束。Corta 只在 sshd 提供的 PATH 里找，不读远端的 shell 启动文件；如果 tmux 装在别处，把它放到那个 PATH 上再重新连接。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "遠端未偵測到 tmux，目前使用一般 SSH。中斷後可能無法復原正在執行的程式。連線不會讀取遠端 Shell 啟動指令碼；若 tmux 已安裝但不在 sshd 提供的 PATH 上，請將它放到該 PATH 後重新連線。"
+            "value" : "伺服器上沒找到 tmux，所以這是普通 SSH：斷線時裡面的程式會結束。Corta 只在 sshd 提供的 PATH 裡找，不讀遠端的 shell 啟動檔；如果 tmux 裝在別處，把它放到那個 PATH 上再重新連線。"
           }
         }
       }
@@ -38948,55 +38947,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux fehlgeschlagen · Normales SSH"
+            "value" : "tmux-Fehler"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "tmux failed · Ordinary SSH"
+            "value" : "tmux error"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Error de tmux · SSH normal"
+            "value" : "Error de tmux"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Échec de tmux · SSH ordinaire"
+            "value" : "Erreur tmux"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux の失敗 · 通常の SSH"
+            "value" : "tmux エラー"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux 실패 · 일반 SSH"
+            "value" : "tmux 오류"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Falha no tmux · SSH comum"
+            "value" : "Erro do tmux"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux 失败 · 普通 SSH"
+            "value" : "tmux 出错"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux 失敗 · 一般 SSH"
+            "value" : "tmux 出錯"
           }
         }
       }
@@ -49908,6 +49907,419 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Space 裡的 1 個工作階段將結束。"
+          }
+        }
+      }
+    },
+    "space.ssh.lead.kept" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Übersteht Trennung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Survives disconnect"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Sobrevive a la desconexión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Survit à la déconnexion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "切断後も継続"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "연결 끊겨도 유지"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Sobrevive à desconexão"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "断线保留"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "斷線保留"
+          }
+        }
+      }
+    },
+    "space.ssh.lead.notKept" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Endet bei Trennung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Won't survive disconnect"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "No sobrevive a la desconexión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ne survit pas à la déconnexion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "切断で終了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "연결 끊기면 종료"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Não sobrevive à desconexão"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "断线不保留"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "斷線不保留"
+          }
+        }
+      }
+    },
+    "space.ssh.lead.lost" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Programme verloren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Programs lost"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Programas perdidos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Programmes perdus"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "元のプログラムは失われました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "원래 프로그램 유실"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Programas perdidos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "原程序已丢失"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "原程式已遺失"
+          }
+        }
+      }
+    },
+    "space.ssh.attached" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Programme zurück"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Programs back"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Programas de vuelta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Programmes rétablis"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "元のプログラムに再接続済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "원래 프로그램 다시 연결됨"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Programas de volta"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "已接回原程序"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "已接回原程式"
+          }
+        }
+      }
+    },
+    "space.ssh.attaching.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Jetzt: SSH verbindet noch oder wartet auf dein Passwort.\nNach der Anmeldung: Corta verbindet sich wieder mit der tmux-Sitzung dieses Terminals auf dem Server, samt den Programmen, die darin liefen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Now: SSH is connecting or waiting for your password.\nAfter sign-in: Corta reattaches to this terminal's tmux session on the server, with the programs that were running in it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ahora: SSH está conectando o esperando tu contraseña.\nTras iniciar sesión: Corta vuelve a conectar con la sesión tmux de este terminal en el servidor, con los programas que se ejecutaban en ella."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Maintenant : SSH se connecte ou attend votre mot de passe.\nAprès la connexion : Corta se rattache à la session tmux de ce terminal sur le serveur, avec les programmes qui y tournaient."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "現在：SSH は接続中か、パスワードを待っています。\nサインイン後：Corta はこの端末のサーバ上の tmux セッションに再接続します。中で動いていたプログラムもそのままです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "지금: SSH가 연결 중이거나 비밀번호를 기다리고 있습니다.\n로그인 후: Corta가 서버에 있는 이 터미널의 tmux 세션에 다시 연결하며, 그 안에서 실행 중이던 프로그램도 그대로입니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Agora: o SSH está conectando ou esperando sua senha.\nApós o login: o Corta se reconecta à sessão tmux deste terminal no servidor, com os programas que rodavam nela."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "现在：SSH 正在连接或等你输入密码。\n登录后：Corta 会接回这个终端在远端的 tmux 会话，里面原来在运行的程序都还在。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "現在：SSH 正在連線或等你輸入密碼。\n登入後：Corta 會接回這個終端機在遠端的 tmux 工作階段，裡面原本在執行的程式都還在。"
+          }
+        }
+      }
+    },
+    "space.ssh.attached.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Die Programme, die in der tmux-Sitzung dieses Terminals auf dem Server liefen, sind wieder da. Sie laufen auch bei einer erneuten Trennung weiter."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The programs that were running in this terminal's tmux session on the server are back. They keep running if you disconnect again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Los programas que se ejecutaban en la sesión tmux de este terminal en el servidor han vuelto. Siguen en marcha si vuelves a desconectarte."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Les programmes qui tournaient dans la session tmux de ce terminal sur le serveur sont rétablis. Ils continuent de tourner si vous vous déconnectez à nouveau."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "この端末のサーバ上の tmux セッションで動いていたプログラムに戻りました。再び切断しても動き続けます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "서버의 tmux 세션에서 실행 중이던 이 터미널의 프로그램이 돌아왔습니다. 다시 연결이 끊겨도 계속 실행됩니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Os programas que rodavam na sessão tmux deste terminal no servidor voltaram. Eles continuam rodando se você desconectar de novo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "这个终端在远端 tmux 会话里原来运行的程序已经接回。再次断线，它们也会继续运行。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "這個終端機在遠端 tmux 工作階段裡原本執行的程式已經接回。再次斷線，它們也會繼續執行。"
+          }
+        }
+      }
+    },
+    "space.ssh.note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "In tmux erreichen der Statuspunkt eines Agenten und das aktuelle Verzeichnis Corta nicht, und „Dateien auf diesem Host durchsuchen“ beginnt im Benutzerordner."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inside tmux, an agent's status dot and the current directory do not reach Corta, and Browse Files on This Host starts in your home folder."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dentro de tmux, el punto de estado de un agente y el directorio actual no llegan a Corta, y «Explorar archivos de este host» empieza en tu carpeta personal."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dans tmux, le point d’état d’un agent et le dossier courant ne parviennent pas à Corta, et « Parcourir les fichiers de cet hôte » commence dans votre dossier personnel."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux の中では、エージェントの状態ドットと現在のディレクトリは Corta に届きません。「このホストのファイルをブラウズ」はホームフォルダから始まります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "tmux 안에서는 에이전트 상태 점과 현재 디렉터리가 Corta에 전달되지 않으며, ‘이 호스트의 파일 탐색’은 홈 폴더에서 시작합니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Dentro do tmux, o ponto de estado de um agente e o diretório atual não chegam ao Corta, e “Explorar arquivos deste host” começa na sua pasta pessoal."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "在 tmux 里，agent 的状态点和当前目录传不到 Corta；「浏览此主机的文件」会从家目录开始。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "在 tmux 裡，agent 的狀態點和目前目錄傳不到 Corta；「瀏覽此主機上的檔案」會從個人目錄開始。"
           }
         }
       }
