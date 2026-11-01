@@ -23,28 +23,37 @@ extension TerminalView {
 
     func registerForFileDrags() {
         // File promises: the SFTP browser's rows, taken as a remote path on
-        // their own host (`SFTPRemoteDrag`), never read off the pasteboard.
+        // their own host (`SFTPRemoteDrag`); any other application's, received
+        // after the drop (`ExternalFileDrop`). Neither is read while tracking.
         registerForDraggedTypes([.fileURL] + NSFilePromiseReceiver.readableDraggedTypes.map { .init($0) })
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        droppedPaths(from: sender).isEmpty ? [] : .copy
+        acceptsDrop(from: sender.draggingPasteboard, isLocalDrag: sender.draggingSource != nil) ? .copy : []
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        droppedPaths(from: sender).isEmpty ? [] : .copy
+        acceptsDrop(from: sender.draggingPasteboard, isLocalDrag: sender.draggingSource != nil) ? .copy : []
     }
 
     /// Inserts the paths as quoted text at the prompt, as if typed; the shell
-    /// decides what they mean.
+    /// decides what they mean. Resident paths go in now; a promised file is
+    /// received first and its path goes in when the source has written it.
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
-        let paths = droppedPaths(from: sender)
-        guard !paths.isEmpty else { return false }
+        let pasteboard = sender.draggingPasteboard
+        let drop = drop(from: pasteboard, isLocalDrag: sender.draggingSource != nil)
+        guard !drop.paths.isEmpty || drop.hasPromise else { return false }
         if sender.draggingSource != nil, let token = SFTPRemoteDrag.currentToken,
-           SFTPRemoteDrag.isFilePromise(sender.draggingPasteboard.types ?? []) {
+           SFTPRemoteDrag.isFilePromise(pasteboard.types ?? []) {
             SFTPRemoteDrag.end(token: token)
         }
-        onDropPaths?(paths)
+        if !drop.paths.isEmpty { onDropPaths?(drop.paths) }
+        if drop.hasPromise {
+            ExternalFileDrop.receivePromisedFiles(on: pasteboard) { [weak self] paths in
+                guard !paths.isEmpty else { return }
+                self?.onDropPaths?(paths)
+            }
+        }
         return true
     }
 
@@ -55,34 +64,44 @@ extension TerminalView {
         SFTPRemoteDrag.end(token: token)
     }
 
-    /// A promise can advertise `.fileURL` too. Reading that URL during
-    /// tracking materializes the file, synchronously waiting for a download
-    /// whose queue needs this same main actor. Only the browser's own drag
-    /// is taken as a remote path; every other file URL is resident data or
-    /// a promise fulfilled after this call returns.
-    private func droppedPaths(from sender: any NSDraggingInfo) -> [String] {
-        droppedPaths(from: sender.draggingPasteboard, isLocalDrag: sender.draggingSource != nil)
+    /// What a drag holds for this pane, read without asking any source to
+    /// write: the browser's own row as remote paths on its host (none on
+    /// another host), resident file URLs as local paths, and whether another
+    /// application's file promise is there to receive after the drop.
+    struct Drop: Equatable {
+        var paths: [String]
+        var hasPromise: Bool
     }
 
-    /// Kept separate so a real table writer can exercise drag negotiation
-    /// without synthesizing a window-server drag session.
-    func droppedPaths(from pasteboard: NSPasteboard, isLocalDrag: Bool) -> [String] {
+    /// Kept apart from `NSDraggingInfo` so a real table writer can exercise
+    /// drag negotiation without synthesizing a window-server drag session.
+    func drop(from pasteboard: NSPasteboard, isLocalDrag: Bool) -> Drop {
         let types = pasteboard.types ?? []
         if SFTPRemoteDrag.isFilePromise(types), isLocalDrag,
            let url = SFTPRemoteDrag.url(forPasteboardTypes: types) {
-            return remotePathsForDrop?([url]) ?? []
+            return Drop(paths: remotePathsForDrop?([url]) ?? [], hasPromise: false)
         }
-        guard types.contains(.fileURL) || SFTPRemoteDrag.isFilePromise(types) else { return [] }
-        return ExternalFileDrop.paths(on: pasteboard)
+        guard types.contains(.fileURL) || SFTPRemoteDrag.isFilePromise(types) else {
+            return Drop(paths: [], hasPromise: false)
+        }
+        return Drop(paths: ExternalFileDrop.residentPaths(on: pasteboard),
+                    hasPromise: ExternalFileDrop.hasExternalPromise(on: pasteboard))
+    }
+
+    /// The paths known before the drop; a promise contributes none yet.
+    func droppedPaths(from pasteboard: NSPasteboard, isLocalDrag: Bool) -> [String] {
+        drop(from: pasteboard, isLocalDrag: isLocalDrag).paths
+    }
+
+    /// Whether tracking shows the drop as possible.
+    func acceptsDrop(from pasteboard: NSPasteboard, isLocalDrag: Bool) -> Bool {
+        let drop = drop(from: pasteboard, isLocalDrag: isLocalDrag)
+        return !drop.paths.isEmpty || drop.hasPromise
     }
 
     /// Apart from `NSDraggingInfo`, so tests need no synthetic Finder drag.
     static func droppedPaths(from pasteboard: NSPasteboard) -> [String] {
-        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        let urls =
-            pasteboard.readObjects(forClasses: [NSURL.self], options: options)
-            as? [URL] ?? []
-        return urls.map(\.path)
+        ExternalFileDrop.residentPaths(on: pasteboard)
     }
 
     // MARK: - Look Up (force touch, three-finger tap)

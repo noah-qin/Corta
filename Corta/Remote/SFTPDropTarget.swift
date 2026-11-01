@@ -112,12 +112,25 @@ final class SFTPDropTargetView: NSView {
         destination != nil
     }
 
+    /// Resident files upload now; a promised file is received into the
+    /// temporary folder first and uploaded from there when it has been written.
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         defer { clear() }
         guard let model, let destination else { return false }
-        let urls = Self.fileURLs(sender.draggingPasteboard)
-        guard !urls.isEmpty else { return false }
-        return model.upload(urls, into: destination.path)
+        let pasteboard = sender.draggingPasteboard
+        let urls = Self.fileURLs(pasteboard)
+        let promised = ExternalFileDrop.hasExternalPromise(on: pasteboard)
+        guard !urls.isEmpty || promised else { return false }
+        var accepted = urls.isEmpty || model.upload(urls, into: destination.path)
+        if promised {
+            let path = destination.path
+            ExternalFileDrop.receivePromisedFiles(on: pasteboard) { paths in
+                guard !paths.isEmpty else { return }
+                _ = model.upload(paths.map { URL(fileURLWithPath: $0) }, into: path)
+            }
+            accepted = true
+        }
+        return accepted
     }
 
     /// Only files from outside Corta, onto a connected listing. A row
@@ -128,8 +141,9 @@ final class SFTPDropTargetView: NSView {
             clear()
             return []
         }
-        let urls = Self.fileURLs(sender.draggingPasteboard)
-        guard !urls.isEmpty else {
+        let pasteboard = sender.draggingPasteboard
+        let count = Self.fileURLs(pasteboard).count + ExternalFileDrop.promisedFileCount(on: pasteboard)
+        guard count > 0 else {
             clear()
             return []
         }
@@ -137,10 +151,10 @@ final class SFTPDropTargetView: NSView {
         let resolved = SFTPDropDestination.resolve(
             row: row, entries: model.entries, currentPath: model.currentPath)
         let rowShown: Int? = if case .folder = resolved { row } else { nil }
-        if resolved != destination || rowShown != highlightedRow || urls.count != itemCount {
+        if resolved != destination || rowShown != highlightedRow || count != itemCount {
             destination = resolved
             highlightedRow = rowShown
-            itemCount = urls.count
+            itemCount = count
             needsDisplay = true
         }
         return .copy
@@ -154,11 +168,11 @@ final class SFTPDropTargetView: NSView {
         needsDisplay = true
     }
 
+    /// Resident files from outside Corta. The browser's own promise is a
+    /// download, not an upload; another application's promise is counted by
+    /// `ExternalFileDrop.promisedFileCount` and received after the drop.
     static func fileURLs(_ pasteboard: NSPasteboard) -> [URL] {
-        // The browser's own promise is a download, not an upload. Any other
-        // file URL — resident, or promised and already materialized off this
-        // call — is a file from outside Corta.
-        ExternalFileDrop.paths(on: pasteboard).map { URL(fileURLWithPath: $0) }
+        ExternalFileDrop.residentPaths(on: pasteboard).map { URL(fileURLWithPath: $0) }
     }
 
     // MARK: - The table under the overlay

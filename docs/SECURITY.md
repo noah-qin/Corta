@@ -544,10 +544,13 @@ Exporting that link performs no file I/O and starts no connection or download.
 Internal terminal drops use the process-local record only when the drag is
 that browser row (the record is live and, for a drag from another app, the
 pasteboard's link is that same `sftp://` URL). A resident `file-url` from
-anywhere else is the local path. A promised `file-url` from anywhere else is
-read only after the tracking call has returned, on another thread; the
-tracking call never waits, so a download whose queue needs the main actor
-cannot deadlock it. The record is cleared when the drag session ends, and
+anywhere else is the local path. Another application's file promise is
+recognised by its public pasteboard types alone while the drag is tracked —
+nothing on it is read, so a source whose write needs the main actor cannot
+deadlock tracking — and is received only after the drop, through
+`NSFilePromiseReceiver`, into an owner-only folder under Corta's temporary
+directory; the path typed into the shell, or uploaded by the SFTP browser,
+is that copy's. No private pasteboard API is used. The record is cleared when the drag session ends, and
 the two-minute lifetime remains only as a backstop. A promised file captures
 its source folder and connection generation at drag start; replacing the
 connection invalidates a delayed request.

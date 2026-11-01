@@ -79,11 +79,15 @@ Versioning for compatibility changes.
   and refuse a connection that has since been replaced. Cancelling the drag
   drops that in-process path when the drag ends.
 
-- A file dragged in from Finder is inserted as its local path even when the
-  drag also advertises a file promise, such as an iCloud placeholder. Only
-  the SFTP browser's own drag is taken as a remote path. A promised local
-  file is read after tracking returns, so the download cannot wait on the
-  main thread.
+- A file dragged in from Finder is inserted as its local path. A file another
+  application only promises — an iCloud item not yet downloaded, a photo or
+  attachment still to be exported — is received after the drop into Corta's
+  temporary folder and that copy's path is inserted once it has been
+  written; while the drag is tracked nothing is asked of the source, so it
+  cannot stall the pointer. The same applies to dropping such a file on the
+  SFTP browser, which uploads the copy. Only the SFTP browser's own drag is
+  taken as a remote path. Corta no longer queries a private pasteboard API
+  to tell the two apart.
 
 ### Tests and acceptance
 

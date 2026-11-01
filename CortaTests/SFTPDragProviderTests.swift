@@ -133,7 +133,7 @@ struct SFTPDragProviderTests {
         #expect(fake.transferCalls.isEmpty)
     }
 
-    @Test("promised file URLs are never read while a drag is negotiated")
+    @Test("a promised file URL is never read while a drag is negotiated")
     func promisedLocalURLMustNotBeMaterialized() throws {
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally(); SFTPRemoteDrag.end() }
@@ -148,30 +148,28 @@ struct SFTPDragProviderTests {
         let terminal = TerminalView(frame: .zero)
         terminal.remotePathsForDrop = { urls in urls.map(\.path) }
         #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: true) == ["/srv/notes.txt"])
-        #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: false).isEmpty)
+        #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: false).isEmpty,
+                "another application's promise has no path before the drop")
+        #expect(terminal.acceptsDrop(from: pasteboard, isLocalDrag: false), "but it can be dropped")
         terminal.remotePathsForDrop = { _ in [] }
         #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: true).isEmpty)
+        #expect(!terminal.acceptsDrop(from: pasteboard, isLocalDrag: true),
+                "the browser's own row on another host is refused, not received")
         #expect(SFTPDropTargetView.fileURLs(pasteboard).isEmpty)
-        #expect(probe.requests == 0, "the tracking call must not read a promised file URL")
-        let deadline = SuspendingClock.now + .seconds(2)
-        var materialized: [String] = []
-        while materialized != ["/tmp/materialized-promise.txt"], SuspendingClock.now < deadline {
-            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-            materialized = terminal.droppedPaths(from: pasteboard, isLocalDrag: false)
-        }
-        #expect(probe.requests >= 1)
-        #expect(probe.mainThreadRequests == 0, "materializing waits on a background thread, not this one")
-        #expect(materialized == ["/tmp/materialized-promise.txt"])
-        #expect(SFTPDropTargetView.fileURLs(pasteboard).map(\.path) == ["/tmp/materialized-promise.txt"])
-
+        #expect(probe.requests == 0, "negotiation never reads a promised file URL")
         SFTPRemoteDrag.end()
+        #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: false).isEmpty)
+        #expect(probe.requests == 0, "nor after the browser's record is gone")
+
         pasteboard.clearContents()
         pasteboard.setString("file:///tmp/ordinary-file.txt", forType: .fileURL)
         #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: false) == ["/tmp/ordinary-file.txt"])
+        #expect(terminal.drop(from: pasteboard, isLocalDrag: false)
+            == TerminalView.Drop(paths: ["/tmp/ordinary-file.txt"], hasPromise: false))
     }
 
-    @Test("a resident file URL beside a promise is the local path, not the remote drag")
-    func residentFileURLBesideAPromiseIsLocal() throws {
+    @Test("a file URL beside a promise is the promise, not a local path")
+    func fileURLBesideAPromiseIsThePromise() throws {
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally(); SFTPRemoteDrag.end() }
         let promise = try #require(NSFilePromiseReceiver.readableDraggedTypes.first)
@@ -184,8 +182,31 @@ struct SFTPDragProviderTests {
         let terminal = TerminalView(frame: .zero)
         terminal.remotePathsForDrop = { urls in urls.map(\.path) }
         #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: true) == ["/srv/notes.txt"])
-        #expect(terminal.droppedPaths(from: pasteboard, isLocalDrag: false) == ["/tmp/icloud-placeholder.txt"])
-        #expect(SFTPDropTargetView.fileURLs(pasteboard).map(\.path) == ["/tmp/icloud-placeholder.txt"])
+        // An iCloud placeholder's URL names a file that is not there yet: the
+        // promise is received after the drop instead of typing that path.
+        #expect(terminal.drop(from: pasteboard, isLocalDrag: false) == TerminalView.Drop(paths: [], hasPromise: true))
+        #expect(SFTPDropTargetView.fileURLs(pasteboard).isEmpty)
+        #expect(ExternalFileDrop.promisedFileCount(on: pasteboard) == 1, "an unnamed promise still counts as one")
+    }
+
+    /// Receiving itself (`receivePromisedFiles`) is allowed by AppKit only
+    /// inside a real drop, so a unit test covers everything up to it: what
+    /// tracking knows, how many files it counts, and that the source is
+    /// asked for nothing before the drop. The drop is checked in the app.
+    @Test("a real promise is counted from its types and never written before the drop")
+    func realPromiseIsCountedWithoutBeingWritten() throws {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let writer = PromiseWriter(contents: "promised contents")
+        let provider = NSFilePromiseProvider(fileType: "public.plain-text", delegate: writer)
+        #expect(pasteboard.writeObjects([provider]))
+        let terminal = TerminalView(frame: .zero)
+        #expect(terminal.drop(from: pasteboard, isLocalDrag: false) == TerminalView.Drop(paths: [], hasPromise: true))
+        #expect(terminal.acceptsDrop(from: pasteboard, isLocalDrag: false))
+        #expect(ExternalFileDrop.promisedFileCount(on: pasteboard) == 1, "one promised content type, one file")
+        #expect(SFTPDropTargetView.fileURLs(pasteboard).isEmpty, "not an upload until received")
+        #expect(TerminalView.droppedPaths(from: pasteboard).isEmpty)
+        #expect(writer.writes == 0, "negotiation asks the source for nothing")
     }
 
     @Test("ending the drag session drops the remote path before the lifetime does")
@@ -245,6 +266,31 @@ struct SFTPDragProviderTests {
 
 /// A bounded reproducer: the old branch reads this promised local URL;
 /// a real SwiftUI promise would instead wait for an asynchronous download.
+/// A source that writes one promised file when, and only when, it is received.
+nonisolated private final class PromiseWriter: NSObject, NSFilePromiseProviderDelegate, @unchecked Sendable {
+    private let contents: String
+    private let writeCount = Mutex(0)
+    var writes: Int { writeCount.withLock { $0 } }
+
+    init(contents: String) { self.contents = contents }
+
+    func filePromiseProvider(_ provider: NSFilePromiseProvider, fileNameForType fileType: String) -> String {
+        "promised.txt"
+    }
+
+    func filePromiseProvider(
+        _ provider: NSFilePromiseProvider, writePromiseTo url: URL, completionHandler: @escaping (Error?) -> Void
+    ) {
+        writeCount.withLock { $0 += 1 }
+        do {
+            try contents.write(to: url, atomically: true, encoding: .utf8)
+            completionHandler(nil)
+        } catch {
+            completionHandler(error)
+        }
+    }
+}
+
 nonisolated private final class PromisedURLProbe: NSObject, NSPasteboardItemDataProvider {
     private let requestCount = Mutex(0)
     private let mainCount = Mutex(0)

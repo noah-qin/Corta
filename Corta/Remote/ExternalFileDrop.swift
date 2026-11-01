@@ -15,114 +15,105 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
-import Darwin
 
-/// Whether a pasteboard item's type is still a promise. The public readers
-/// fulfill a promise synchronously, which deadlocks when that fulfillment
-/// needs the main actor that is tracking the drag. One private query
-/// distinguishes a resident file URL from that promise; if it disappears,
-/// every file URL is treated as promised and is not read on the tracking call.
-enum PasteboardPromise {
-    private static let selector = NSSelectorFromString("_isPromisedType:")
-    private static let isPromised: (@convention(c) (AnyObject, Selector, NSString) -> Bool)? = {
-        guard let symbol = dlsym(dlopen(nil, RTLD_NOW), "objc_msgSend") else { return nil }
-        return unsafeBitCast(symbol, to: (@convention(c) (AnyObject, Selector, NSString) -> Bool).self)
-    }()
-
-    static func isPromisedFileURL(_ item: NSPasteboardItem) -> Bool {
-        isPromised(item, type: .fileURL)
-    }
-
-    static func isPromised(_ item: NSPasteboardItem, type: NSPasteboard.PasteboardType) -> Bool {
-        guard item.types.contains(type), item.responds(to: selector), let isPromised else { return true }
-        return isPromised(item, selector, type.rawValue as NSString)
-    }
-}
-
-/// Local paths from a drag that is not the SFTP browser's own row.
+/// Local files dragged in from outside Corta — Finder, Photos, Mail, a
+/// browser — never the SFTP browser's own row (`SFTPRemoteDrag`).
 ///
-/// A resident `file-url` is read immediately. A promised one is read only
-/// after this call has returned, on another thread, and the path is used
-/// the next time tracking asks. The tracking call itself never waits.
+/// A `file-url` on an item that advertises no file promise is resident data
+/// and is read at once. An item that advertises a promise
+/// (`NSFilePromiseReceiver.readableDraggedTypes`) is a file its source will
+/// write when asked; a URL beside it is a placeholder — an iCloud item not
+/// yet downloaded, a photo not yet exported — and reading it while the drag
+/// is tracked makes the source write synchronously on a queue that needs the
+/// same main actor. Tracking therefore answers "can drop" from the types
+/// alone. After the drop the promise is received through the public
+/// `NSFilePromiseReceiver` API into a folder of this launch's temporary
+/// directory, and the written paths arrive on the main actor. Nothing private
+/// is queried.
 @MainActor
 enum ExternalFileDrop {
-    fileprivate nonisolated struct Key: Hashable, Sendable {
-        var name: String
-        var change: Int
-    }
-
-    /// Shared with the off-main read. A `Task` would stay on the main executor,
-    /// which drag tracking does not drain, so the promise would never be read.
-    private nonisolated static let lock = NSLock()
-    nonisolated(unsafe) private static var cache: [Key: [String]] = [:]
-    nonisolated(unsafe) private static var pending: Set<Key> = []
-
-    static func paths(on pasteboard: NSPasteboard) -> [String] {
+    /// File URLs that are resident data: items carrying no file promise.
+    static func residentPaths(on pasteboard: NSPasteboard) -> [String] {
         if SFTPRemoteDrag.matchesRecordedLink(pasteboard) { return [] }
-        let key = Key(name: pasteboard.name.rawValue, change: pasteboard.changeCount)
-        if let cached = cachedPaths(for: key) { return cached }
-        if let resident = residentFilePaths(on: pasteboard) {
-            store(resident, for: key)
-            return resident
-        }
-        guard markPending(key) else { return [] }
-        // The timer fires after this call returns. The provider runs off the
-        // main thread, so the tracking call itself never reads and never waits.
-        schedulePromisedRead(name: pasteboard.name.rawValue, key: key)
-        return []
-    }
-
-    private nonisolated static func cachedPaths(for key: Key) -> [String]? {
-        lock.lock()
-        defer { lock.unlock() }
-        return cache[key]
-    }
-
-    private nonisolated static func markPending(_ key: Key) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return pending.insert(key).inserted
-    }
-
-    private nonisolated static func schedulePromisedRead(name: String, key: Key) {
-        // A run-loop timer, not a main-actor task: drag tracking spins the
-        // run loop and would never drain the main executor. The timer only
-        // queues the read, after this call has returned.
-        let reader = PromisedFileRead(name: name, key: key)
-        Timer.scheduledTimer(
-            timeInterval: 0.001, target: reader, selector: #selector(PromisedFileRead.fire),
-            userInfo: nil, repeats: false)
-    }
-
-    fileprivate nonisolated static func finishPromisedRead(_ paths: [String], for key: Key) {
-        lock.lock()
-        defer { lock.unlock() }
-        if cache.count > 32 { cache.removeAll() }
-        cache[key] = paths
-        pending.remove(key)
-    }
-
-    private nonisolated static func store(_ paths: [String], for key: Key) {
-        finishPromisedRead(paths, for: key)
-    }
-
-    /// `nil` when a file URL is still promised. An empty array is a resident answer.
-    private static func residentFilePaths(on pasteboard: NSPasteboard) -> [String]? {
-        let items = (pasteboard.pasteboardItems ?? []).filter { $0.types.contains(.fileURL) }
+        let items = pasteboard.pasteboardItems ?? []
         if items.isEmpty {
             guard pasteboard.types?.contains(.fileURL) == true, let text = pasteboard.string(forType: .fileURL)
             else { return [] }
             return [path(fromFileURLText: text)].compactMap { $0 }
         }
-        if items.contains(where: PasteboardPromise.isPromisedFileURL) { return nil }
-        return items.compactMap { item in item.string(forType: .fileURL).flatMap(path(fromFileURLText:)) }
+        return items.filter { $0.types.contains(.fileURL) && !isPromise($0) }
+            .compactMap { $0.string(forType: .fileURL).flatMap(path(fromFileURLText:)) }
     }
 
-    fileprivate nonisolated static func readPromisedFilePaths(pasteboardName: String) -> [String] {
-        let pasteboard = NSPasteboard(name: NSPasteboard.Name(pasteboardName))
-        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL] ?? []
-        return urls.map(\.path)
+    /// A file promise from another application: droppable, received later.
+    static func hasExternalPromise(on pasteboard: NSPasteboard) -> Bool {
+        SFTPRemoteDrag.isFilePromise(pasteboard.types ?? []) && !SFTPRemoteDrag.matchesRecordedLink(pasteboard)
+    }
+
+    /// How many files are promised, for a drop overlay's count: one per
+    /// promised content type, which is pasteboard metadata (a promise's
+    /// names are not known until it is received). No file is asked for.
+    static func promisedFileCount(on pasteboard: NSPasteboard) -> Int {
+        guard hasExternalPromise(on: pasteboard) else { return 0 }
+        // A promise type without receiver metadata still promises something.
+        return max(receivers(on: pasteboard).reduce(0) { $0 + Self.fileCount(of: $1) }, 1)
+    }
+
+    private static func fileCount(of receiver: NSFilePromiseReceiver) -> Int {
+        max(receiver.fileTypes.count, receiver.fileNames.count, 1)
+    }
+
+    /// Receives every promised file into a new folder under the temporary
+    /// directory and delivers the written paths on the main actor, in the
+    /// order they finished. A file the source failed to write is left out;
+    /// `completion` gets an empty list when nothing arrived. AppKit allows
+    /// this only inside `performDragOperation` (or its prepare/conclude
+    /// neighbours), so only a drop calls it — never tracking, never a test
+    /// without a drag session.
+    static func receivePromisedFiles(
+        on pasteboard: NSPasteboard, completion: @escaping @MainActor ([String]) -> Void
+    ) {
+        let receivers = receivers(on: pasteboard)
+        let expected = receivers.reduce(0) { $0 + Self.fileCount(of: $1) }
+        guard expected > 0, let destination = makeStagingFolder() else {
+            completion([])
+            return
+        }
+        let collector = PromiseCollector(expected: expected, completion: completion)
+        let queue = OperationQueue()
+        queue.name = "dev.noahqin.Corta.dropped-files"
+        queue.qualityOfService = .userInitiated
+        for receiver in receivers {
+            receiver.receivePromisedFiles(
+                atDestination: destination, options: [:], operationQueue: queue
+            ) { url, error in
+                collector.received(error == nil ? url.path : nil)
+            }
+        }
+    }
+
+    private static func isPromise(_ item: NSPasteboardItem) -> Bool {
+        item.types.contains { NSFilePromiseReceiver.readableDraggedTypes.contains($0.rawValue) }
+    }
+
+    private static func receivers(on pasteboard: NSPasteboard) -> [NSFilePromiseReceiver] {
+        pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self], options: nil)
+            as? [NSFilePromiseReceiver] ?? []
+    }
+
+    /// `$TMPDIR/Corta-Dropped/<UUID>/`, owner-only. The system purges its
+    /// temporary folder; the path typed into the shell is this copy's.
+    private static func makeStagingFolder() -> URL? {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Corta-Dropped", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(
+                at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            return folder
+        } catch {
+            return nil
+        }
     }
 
     private static func path(fromFileURLText text: String) -> String? {
@@ -131,23 +122,27 @@ enum ExternalFileDrop {
     }
 }
 
-/// ObjC entry so the read is not a main-actor job. The timer retains it.
-private nonisolated final class PromisedFileRead: NSObject, @unchecked Sendable {
-    let name: String
-    let key: ExternalFileDrop.Key
+/// Counts the reader's calls off the main actor; completes once on it.
+private nonisolated final class PromiseCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var remaining: Int
+    private var paths: [String] = []
+    private let completion: @MainActor ([String]) -> Void
 
-    init(name: String, key: ExternalFileDrop.Key) {
-        self.name = name
-        self.key = key
+    init(expected: Int, completion: @escaping @MainActor ([String]) -> Void) {
+        remaining = expected
+        self.completion = completion
     }
 
-    /// Queued by the timer on the main run loop, then read off that thread.
-    @objc func fire() {
-        performSelector(inBackground: #selector(read), with: nil)
-    }
-
-    @objc func read() {
-        let paths = ExternalFileDrop.readPromisedFilePaths(pasteboardName: name)
-        ExternalFileDrop.finishPromisedRead(paths, for: key)
+    func received(_ path: String?) {
+        lock.lock()
+        if let path { paths.append(path) }
+        remaining -= 1
+        let done = remaining == 0
+        let result = paths
+        lock.unlock()
+        guard done else { return }
+        let completion = completion
+        DispatchQueue.main.async { MainActor.assumeIsolated { completion(result) } }
     }
 }
