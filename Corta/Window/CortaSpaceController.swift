@@ -94,6 +94,15 @@ final class CortaSpaceController: NSObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.configurationChanged() }
         })
+        // The badge shows only while the Space window is not key: follow that.
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+                     NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {
+            observers.append(NotificationCenter.default.addObserver(
+                forName: name, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshAttentionBadge() }
+            })
+        }
     }
 
     /// Sessions running in this window's Space, on the grid or hidden: what
@@ -102,7 +111,7 @@ final class CortaSpaceController: NSObject {
         projects.reduce(0) { $0 + $1.sessions.filter { $0.pane != nil }.count }
     }
 
-    /// `space-panel-limit`, within the grid's four.
+    /// `space-panel-limit`, within the grid's six.
     var panelLimit: Int {
         min(SpaceGrid.maximumPanels, max(1, ConfigurationStore.shared.configuration.spacePanelLimit))
     }
@@ -194,6 +203,9 @@ final class CortaSpaceController: NSObject {
         if splitController.splitViewItems.isEmpty {
             // A plain item: the sidebar draws its own floating glass card,
             // and a sidebar item would put the system's material under it.
+            // 200 pt is what leaves a 14-inch display room for six 64 × 18
+            // panels (D30); a session row's branch text truncates there and
+            // the tooltip carries it whole.
             let sidebarItem = NSSplitViewItem(viewController: sidebar)
             sidebarItem.minimumThickness = 200
             sidebarItem.maximumThickness = 320

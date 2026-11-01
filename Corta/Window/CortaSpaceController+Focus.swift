@@ -156,6 +156,12 @@ extension CortaSpaceController {
         refreshNow()
     }
 
+    /// The window became or stopped being key, or the app (de)activated.
+    func refreshAttentionBadge() {
+        guard isActive else { return }
+        updateAttentionBadge(ordered: waitingSessionIDs())
+    }
+
     private func updateAttentionBadge(ordered: [UUID]) {
         let window = host?.toolbarWindow
         AgentDirectory.noteSpaceWaiting(

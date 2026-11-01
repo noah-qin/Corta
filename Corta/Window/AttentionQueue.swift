@@ -22,8 +22,12 @@ import Foundation
 nonisolated struct AttentionQueue: Equatable, Sendable {
     private(set) var since: [UUID: Int] = [:]
     private(set) var clock = 0
+    /// Jumped to and still waiting: behind every session not jumped to yet,
+    /// whatever its kind, so a sign-in that keeps waiting does not hide the rest.
+    private(set) var deferred: Set<UUID> = []
 
-    /// `waiting` is the set that is waiting now. Order is the time each one entered.
+    /// `waiting` is the set that is waiting now. Order is kind priority
+    /// (lower first), then the time each one entered; jumped sessions last.
     mutating func sync(waiting: [UUID], priorities: [UUID: Int] = [:]) -> [UUID] {
         var next: [UUID: Int] = [:]
         for id in waiting where next[id] == nil {
@@ -35,17 +39,23 @@ nonisolated struct AttentionQueue: Equatable, Sendable {
             }
         }
         since = next
+        deferred = deferred.filter { next[$0] != nil }
         return next.sorted {
+            let leftDeferred = deferred.contains($0.key), rightDeferred = deferred.contains($1.key)
+            if leftDeferred != rightDeferred { return !leftDeferred }
             let left = priorities[$0.key] ?? 3, right = priorities[$1.key] ?? 3
             return left == right ? $0.value < $1.value : left < right
         }.map(\.key)
     }
 
     /// The head waits again after the others. Returns the id that was jumped.
+    /// Once every waiting session has been jumped to, the round starts over.
     mutating func deferHead(of ordered: [UUID]) -> UUID? {
         guard let head = ordered.first, since[head] != nil else { return nil }
         clock += 1
         since[head] = clock
+        deferred.insert(head)
+        if deferred.count >= since.count { deferred.removeAll() }
         return head
     }
 

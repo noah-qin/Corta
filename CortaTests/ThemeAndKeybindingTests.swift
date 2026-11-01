@@ -168,6 +168,10 @@ import Testing
         // Untouched commands keep their defaults, so a changed default still
         // reaches a user who never overrode it.
         #expect(parsed.keybindings[.newTab] == TerminalCommand.newTab.defaultShortcut)
+        // Space's jump (#438): ⌥⌘J by default, rebindable under its own key.
+        #expect(parsed.keybindings[.nextWaitingSession] == Shortcut.parse("alt+cmd+j"))
+        let rebound = Configuration.parse("bind.next-waiting-session = ctrl+alt+n").0
+        #expect(rebound.keybindings[.nextWaitingSession] == Shortcut.parse("ctrl+alt+n"))
     }
 
     /// Unbinding has to stick: a user who took ⌘W away because a TUI wants it

@@ -35,6 +35,29 @@ struct AttentionQueueTests {
         #expect(queue.deferHead(of: []) == nil)
     }
 
+    @Test func kindPriorityOrdersTheQueueAndAJumpStillReachesEveryKind() {
+        var queue = AttentionQueue()
+        let question = UUID(), permission = UUID(), auth = UUID()
+        let priorities = [auth: 0, permission: 1, question: 2]
+        #expect(queue.sync(waiting: [question], priorities: priorities) == [question])
+        #expect(queue.sync(waiting: [question, permission], priorities: priorities) == [permission, question])
+        var ordered = queue.sync(waiting: [question, permission, auth], priorities: priorities)
+        #expect(ordered == [auth, permission, question], "sign-in first, however late it came")
+        #expect(queue.deferHead(of: ordered) == auth)
+        ordered = queue.sync(waiting: [question, permission, auth], priorities: priorities)
+        #expect(ordered == [permission, question, auth], "a jumped sign-in that keeps waiting goes behind")
+        #expect(queue.deferHead(of: ordered) == permission)
+        ordered = queue.sync(waiting: [question, permission, auth], priorities: priorities)
+        #expect(ordered == [question, auth, permission])
+        #expect(queue.deferHead(of: ordered) == question)
+        ordered = queue.sync(waiting: [question, permission, auth], priorities: priorities)
+        #expect(ordered == [auth, permission, question], "every one seen: the round starts over")
+        #expect(queue.deferHead(of: ordered) == auth)
+        #expect(queue.sync(waiting: [question, auth], priorities: priorities) == [question, auth])
+        #expect(queue.sync(waiting: [question, permission, auth], priorities: priorities)
+            == [permission, question, auth], "a newcomer is not behind the jumped one")
+    }
+
     @Test func onlyBlockedWaitsDoneErrorAndUnknownDoNot() {
         #expect(AttentionQueue.isWaiting(state: .blocked))
         for state: ProgramStatus.State? in [.done, .error, .idle, .working, .unknown, nil] {

@@ -83,6 +83,10 @@ extension CortaSpaceTests {
         #expect(host.space.waitingSessionIDs() == [records[1].id, records[0].id])
         host.space.setActive(false)
         #expect(!host.space.isActive)
+        #expect(host.space.attentionQueue.since.isEmpty, "leaving Space forgets the queue")
+        host.space.setActive(true)
+        #expect(host.space.waitingSessionIDs() == [records[1].id, records[0].id],
+                "coming back rebuilds the queue from the sessions' current state")
     }
 
     func visibleText(_ session: SpaceSession) -> String {
