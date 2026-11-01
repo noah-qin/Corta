@@ -46,7 +46,7 @@ extension Notification.Name {
         "dev.noahqin.Corta.spaceConversationIdentityDidChange")
 }
 
-/// What #437 binds on. Equal samples do not notify.
+/// One sample of a session's conversation identity. Equal samples do not notify.
 nonisolated struct ConversationIdentity: Equatable, Sendable {
     var conversation: LocalConversation?
     var processes: [ConversationProcess]
@@ -106,14 +106,18 @@ extension CortaSpaceController {
             item.record.conversation, previousProcesses: item.conversationObservation?.processes)
         let settled = observation.settled()
         if observation.sessionChanged || item.conversationObservation != settled {
-            let result = observation.sessionChanged
-                ? ConversationObservation.Reason.sessionChanged.rawValue
-                : (observation.reason?.rawValue ?? "success")
+            // The probe's own result and source; `kept` is the retained record
+            // when a transient failure left an earlier verified source in place.
+            var result = observation.reason?.rawValue ?? "success"
+            if observation.sessionChanged {
+                result = ConversationObservation.Reason.sessionChanged.rawValue + "/" + result
+            }
             let kind = conversation.kind.rawValue
-            let source = conversation.source.rawValue
+            let source = observation.conversation.source.rawValue
+            let kept = conversation.source.rawValue
             Self.conversationLog.info("""
                 conversation kind=\(kind, privacy: .public) \
-                source=\(source, privacy: .public) result=\(result, privacy: .public)
+                source=\(source, privacy: .public) kept=\(kept, privacy: .public) result=\(result, privacy: .public)
                 """)
         }
         item.conversationObservation = settled
@@ -141,7 +145,6 @@ extension CortaSpaceController {
         let terminal: TerminalSession
         let inputRevision: UInt64
         var readiness = ConversationPromptReadiness()
-        var fillAttempts = 0
     }
 
     /// Wait for each new shell's first integrated prompt, not a fixed startup
@@ -204,8 +207,10 @@ extension CortaSpaceController {
             return false
         case .fill:
             guard fillConversation(item) else {
-                candidate.fillAttempts += 1
-                return candidate.fillAttempts < ConversationPromptReadiness.stableSamples
+                // Not writable yet (integration still arriving, a busy pty):
+                // let the prompt settle again and retry until the ten seconds end.
+                candidate.readiness = ConversationPromptReadiness()
+                return true
             }
             filled.append(item)
             item.conversationNeedsNotice = !(isActive && selectedProject === project && project.shown.contains(item))

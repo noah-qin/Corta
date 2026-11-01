@@ -27,7 +27,8 @@ struct SpaceConversationTests {
             try JSONDecoder().decode(SpaceSessionRecord.self, from: Data(("{\"number\":1" + fields + "}").utf8))
         }
         #expect(try decode("").conversation == nil)
-        for invalid in ["", uuid + ";echo", uuid + " ", "{" + uuid + "}", "task-123"] {
+        for invalid in ["", uuid + ";echo", uuid + " ", "{" + uuid + "}", "task-123",
+                        uuid.replacingOccurrences(of: "3f2a", with: "3g2a")] {
             let metadata = #", "conversation":{"kind":"claude","id":"\#(invalid)"}"#
             #expect(try decode(metadata).conversation == LocalConversation(kind: .claude))
         }
@@ -39,6 +40,29 @@ struct SpaceConversationTests {
         let valid = #", "conversation":{"kind":"claude","id":"\#(uuid)"}"#
         #expect(try decode(valid).conversation?.command == "claude --resume " + uuid)
         #expect(try decode(valid + #", "ssh":{"host":"fixture"}"#).conversation == nil)
+    }
+
+    /// Whatever the record holds, the filled text is one of four shapes: the
+    /// two picker commands, or each with one lowercase standard UUID.
+    @Test func everyDecodedRecordFillsOneOfFourCommandShapes() throws {
+        let shape = /^(claude --resume|codex resume)( [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$/
+        let hostile = [uuid, uuid.uppercased(), uuid + ";echo", uuid + " ", "{" + uuid + "}", "--continue",
+                       uuid + " --continue", "--last", uuid.replacingOccurrences(of: "3f2a", with: "3g2a"),
+                       String(uuid.dropLast()), uuid + "0", "", "task-123", "\u{1B}]52;c;x\u{7}"]
+        for kind in ["claude", "codex"] {
+            for id in hostile {
+                for source in ["sessionRecord", "openFile", "picker", "future", ""] {
+                    let json = "{\"kind\":\"\(kind)\",\"id\":\"\(id)\",\"source\":\"\(source)\"}"
+                    let conversation = try JSONDecoder().decode(LocalConversation.self, from: Data(json.utf8))
+                    #expect(conversation.command.wholeMatch(of: shape) != nil, "\(json) → \(conversation.command)")
+                    #expect(!conversation.command.contains("\n"))
+                }
+                #expect(LocalConversation(kind: .codex, id: UUID(uuidString: id), source: .openFile)
+                    .command.wholeMatch(of: shape) != nil)
+            }
+        }
+        #expect(LocalConversation(kind: .claude, id: UUID(uuidString: uuid.uppercased()), source: .sessionRecord)
+            .command == "claude --resume " + uuid, "filled lowercase")
     }
 
     @Test func pickerLegacySourcesAndAllFourNotes() throws {
