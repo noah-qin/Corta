@@ -38416,55 +38416,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux wird gestartet…"
+            "value" : "tmux nach Anmeldung neu"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Starting tmux…"
+            "value" : "New tmux after sign-in"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Iniciando tmux…"
+            "value" : "tmux nuevo tras iniciar sesión"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Démarrage de tmux…"
+            "value" : "Nouveau tmux après connexion"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux を開始中…"
+            "value" : "サインイン後に tmux を作成"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "tmux 시작 중…"
+            "value" : "로그인 후 tmux 새로 만들기"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Iniciando tmux…"
+            "value" : "Novo tmux após o login"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "正在新建 tmux…"
+            "value" : "登录后新建 tmux"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "正在新建 tmux…"
+            "value" : "登入後新建 tmux"
           }
         }
       }
@@ -38475,55 +38475,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Wird wieder verbunden…"
+            "value" : "tmux nach Anmeldung wieder verbinden"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Will reattach…"
+            "value" : "Reattach tmux after sign-in"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Se volverá a conectar…"
+            "value" : "Reconectar tmux tras iniciar sesión"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Rattachement prévu…"
+            "value" : "Rattacher tmux après connexion"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "再接続予定…"
+            "value" : "サインイン後に tmux へ再接続"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "다시 연결할 예정…"
+            "value" : "로그인 후 tmux 다시 연결"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Reconexão prevista…"
+            "value" : "Reconectar o tmux após o login"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "将要接入…"
+            "value" : "登录后接回 tmux"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "將要接入…"
+            "value" : "登入後接回 tmux"
           }
         }
       }
@@ -38534,55 +38534,55 @@
         "de" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Dieses Projekt verbindet sich erst beim ersten Öffnen. Corta prüft, ob die entfernte tmux-Sitzung noch besteht."
+            "value" : "SSH verbindet noch oder wartet auf deine Anmeldung; tmux läuft noch nicht. Danach startet Corta die eigene entfernte tmux-Sitzung dieses Terminals oder verbindet sich wieder mit ihr, falls es sie schon gibt, und zeigt das Ergebnis auf dieser Taste. Gespeicherte Sitzungen eines Projekts verbinden sich erst, wenn es zum ersten Mal geöffnet wird."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This project connects only when first opened. Corta will check whether its remote tmux session still exists."
+            "value" : "SSH is still connecting or waiting for you to sign in; tmux has not run yet. Once you are in, Corta starts this terminal's own remote tmux session, or reattaches to it if it already exists, and this button shows the result. A project's saved sessions connect only when it is first opened."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Este proyecto se conecta solo al abrirlo por primera vez. Corta comprobará si su sesión tmux remota sigue existiendo."
+            "value" : "SSH sigue conectando o esperando a que inicies sesión; tmux aún no se ha ejecutado. Al entrar, Corta crea la sesión tmux remota propia de este terminal, o se reconecta a ella si ya existe, y muestra el resultado en este botón. Las sesiones guardadas de un proyecto solo se conectan la primera vez que se abre."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Ce projet se connecte uniquement à sa première ouverture. Corta vérifiera si sa session tmux distante existe encore."
+            "value" : "SSH se connecte encore ou attend votre authentification ; tmux n’a pas encore démarré. Une fois connecté, Corta crée la session tmux distante propre à ce terminal, ou s’y rattache si elle existe déjà, et affiche le résultat sur ce bouton. Les sessions enregistrées d’un projet ne se connectent qu’à sa première ouverture."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "このプロジェクトは初めて開いたときだけ接続します。Corta はリモートの tmux セッションが残っているか確認します。"
+            "value" : "SSH は接続中か、サインインを待っています。tmux はまだ動いていません。サインイン後、Corta はこの端末専用のリモート tmux セッションを作成（既にあれば再接続）し、結果をこのボタンに表示します。プロジェクトに保存されたセッションは、最初に開いたときにだけ接続します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "이 프로젝트를 처음 열 때만 연결합니다. Corta가 원격 tmux 세션이 남아 있는지 확인합니다."
+            "value" : "SSH가 아직 연결 중이거나 로그인을 기다리고 있으며, tmux는 아직 실행되지 않았습니다. 로그인하면 Corta가 이 터미널 전용 원격 tmux 세션을 새로 만들거나(이미 있으면 다시 연결) 결과를 이 버튼에 표시합니다. 프로젝트에 저장된 세션은 프로젝트를 처음 열 때만 연결됩니다."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Este projeto só se conecta ao ser aberto pela primeira vez. O Corta verificará se a sessão tmux remota ainda existe."
+            "value" : "O SSH ainda está conectando ou esperando seu login; o tmux ainda não foi executado. Depois do login, o Corta cria a sessão tmux remota própria deste terminal, ou se reconecta a ela se já existir, e mostra o resultado neste botão. As sessões salvas de um projeto só se conectam na primeira vez que ele é aberto."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "本项目只在首次打开时连接。Corta 将检查原远端 tmux 会话是否仍存在。"
+            "value" : "SSH 还在连接或等你登录，tmux 尚未运行。登录后，Corta 会为这个终端新建它自己的远端 tmux 会话（若已存在则接回），并在此按钮上显示结果。项目里保存的会话只在首次打开项目时连接。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "本專案只在首次開啟時連線。Corta 將檢查原遠端 tmux 工作階段是否仍存在。"
+            "value" : "SSH 仍在連線或等你登入，tmux 尚未執行。登入後，Corta 會為這個終端機新建它自己的遠端 tmux 工作階段（若已存在則接回），並在此按鈕上顯示結果。專案裡儲存的工作階段只在首次開啟專案時連線。"
           }
         }
       }

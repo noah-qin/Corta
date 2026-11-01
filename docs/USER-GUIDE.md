@@ -302,7 +302,11 @@ The fixed wrapper is a single quoted line passed to `/bin/sh`, so csh/tcsh
 can parse it before `/bin/sh` runs it. Nushell and other shells are untested.
 
 The panel's glass connection button keeps its result visible even after tmux
-clears the screen; click it for details and the exact tmux name:
+clears the screen; click it for details and the exact tmux name. While SSH is
+still connecting or asking for your password it says **New tmux after
+sign-in** (this terminal has never had a tmux session) or **Reattach tmux
+after sign-in** (it had one before); nothing has run on the server yet. Then
+it shows the result:
 
 - **tmux · Reconnectable**: the named remote session exists.
 - **Ordinary SSH · Limited recovery**: remote tmux was not detected. Corta
