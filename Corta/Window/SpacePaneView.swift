@@ -379,57 +379,7 @@ private final class SpacePaneHeader: NSView, NSDraggingSource {
 
 /// The session's state as a dot and a word, in the state's colour.
 @MainActor
-final class SpaceStatusPill: NSView {
-    private let dot = NSView()
-    private let label = NSTextField(labelWithString: "")
 
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        dot.wantsLayer = true
-        dot.layer?.cornerRadius = 3.5
-        label.font = .systemFont(ofSize: NSFont.smallSystemFontSize, weight: .medium)
-        let stack = NSStackView(views: [dot, label])
-        stack.spacing = 5
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-        NSLayoutConstraint.activate([
-            dot.widthAnchor.constraint(equalToConstant: 7),
-            dot.heightAnchor.constraint(equalToConstant: 7),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-        ])
-        setContentCompressionResistancePriority(.required, for: .horizontal)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
-
-    func configure(text: String?, tint: NSColor?) {
-        isHidden = text == nil
-        label.stringValue = text ?? ""
-        let color = tint ?? .tertiaryLabelColor
-        label.textColor = tint == nil ? .secondaryLabelColor : color
-        dot.layer?.backgroundColor = color.resolved(in: effectiveAppearance).cgColor
-    }
-}
-
-private extension NSColor {
-    /// Whether text on this colour wants the dark appearance's chrome.
-    var isDark: Bool {
-        guard let rgb = usingColorSpace(.sRGB) else { return false }
-        return 0.2126 * rgb.redComponent + 0.7152 * rgb.greenComponent + 0.0722 * rgb.blueComponent < 0.5
-    }
-
-    func resolved(in appearance: NSAppearance) -> NSColor {
-        var result = self
-        appearance.performAsCurrentDrawingAppearance { result = self.usingColorSpace(.sRGB) ?? self }
-        return result
-    }
-}
-
-// Panel actions share the card's private controls.
 extension SpacePaneView {
     // MARK: - The panel's menu
 
@@ -445,6 +395,10 @@ extension SpacePaneView {
         }
         menu.addItem(withTitle: L10n.text("space.session.rename"), action: #selector(rename), keyEquivalent: "")
             .target = self
+        if session.record.ssh == nil, space?.gitFacts[session.id]?.worktree == true {
+            menu.addItem(withTitle: L10n.text("space.worktree.reveal"), action: #selector(revealWorktreeMain),
+                         keyEquivalent: "").target = self
+        }
         if space?.canBrowseFiles(of: session) == true {
             menu.addItem(withTitle: L10n.text("space.session.browseFiles"), action: #selector(browseFiles),
                          keyEquivalent: "").target = self
@@ -501,7 +455,7 @@ extension SpacePaneView {
         popover.behavior = .transient
         popover.contentViewController = SpaceSSHStatusController(
             status: SpaceSSHStatus(session: session),
-            tmuxName: RemoteTmux(id: session.id).sessionName,
+            killCommand: RemoteTmux(id: session.id).killCommand,
             canEnd: session.record.retainSSH == true
         ) { [weak self, weak popover] in
             popover?.performClose(nil)
@@ -537,74 +491,6 @@ extension SpacePaneView {
     @objc private func rename() { space?.sidebar.beginRename(session) }
     @objc private func refillConversation() { space?.refillConversation(session) }
     @objc private func browseFiles() { space?.browseFiles(of: session) }
+    @objc private func revealWorktreeMain() { space?.revealWorktreeMain(session) }
 
-}
-
-/// What the SSH status button opens: the status, what it means, the exact
-/// tmux name with a copy button, and the separately confirmed way to end it.
-final class SpaceSSHStatusController: NSViewController {
-    private let status: SpaceSSHStatus
-    private let tmuxName: String
-    private let canEnd: Bool
-    private let onEnd: () -> Void
-
-    init(status: SpaceSSHStatus, tmuxName: String, canEnd: Bool, onEnd: @escaping () -> Void) {
-        self.status = status
-        self.tmuxName = tmuxName
-        self.canEnd = canEnd
-        self.onEnd = onEnd
-        super.init(nibName: nil, bundle: nil)
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
-
-    override func loadView() {
-        let heading = NSTextField(labelWithAttributedString: SpacePaneView.statusTitle(status))
-        heading.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
-        let icon = NSImageView(image: SpacePaneView.statusImage(status) ?? NSImage())
-        let top = NSStackView(views: [icon, heading])
-        top.spacing = 6
-        var rows: [NSView] = [top, Self.paragraph(status.detail)]
-        if status.isInTmux {
-            rows.append(Self.paragraph(L10n.text("space.ssh.note"), secondary: true))
-        }
-        let name = NSTextField(labelWithString: tmuxName)
-        name.font = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
-        name.textColor = .secondaryLabelColor
-        name.isSelectable = true
-        let copy = NSButton(image: NSImage(systemSymbolName: "doc.on.doc",
-            accessibilityDescription: L10n.text("common.copy")) ?? NSImage(), target: self, action: #selector(copyName))
-        copy.bezelStyle = .glass
-        copy.controlSize = .small
-        copy.toolTip = L10n.text("common.copy")
-        rows.append(NSStackView(views: [name, copy]))
-        if canEnd {
-            let end = NSButton(title: L10n.text("space.ssh.kill.title"), target: self, action: #selector(end))
-            end.bezelStyle = .glass
-            end.controlSize = .small
-            rows.append(end)
-        }
-        let stack = NSStackView(views: rows)
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 10
-        stack.edgeInsets = NSEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
-        stack.setAccessibilityIdentifier("Corta.Space.SSHStatusDetails")
-        view = stack
-    }
-
-    private static func paragraph(_ text: String, secondary: Bool = false) -> NSTextField {
-        let label = NSTextField(wrappingLabelWithString: text)
-        label.preferredMaxLayoutWidth = 340
-        label.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        label.textColor = secondary ? .secondaryLabelColor : .labelColor
-        return label
-    }
-
-    @objc private func copyName() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(tmuxName, forType: .string)
-    }
-
-    @objc private func end() { onEnd() }
 }

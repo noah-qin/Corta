@@ -38,9 +38,14 @@ extension CortaSpaceController {
         presentAlert(alert, alertWindow()) { [weak self] result in
             if result == .alertFirstButtonReturn { completion() }
             if result == .alertSecondButtonReturn {
+                // Every name the dialog listed, each by one exact kill-session;
+                // a name superseded by a duplicate-UUID repair is this session's too.
                 for session in sessions where session.record.retainSSH == true {
                     if let target = session.record.ssh {
-                        self?.launchTermination(target: target, command: RemoteTmux(id: session.id).killCommand)
+                        let names = Self.retainedRemovalNames([session])
+                        self?.launchTermination(target: target, command: names.map {
+                            "tmux kill-session -t '=\($0)'"
+                        }.joined(separator: "; "))
                     }
                 }
                 completion()

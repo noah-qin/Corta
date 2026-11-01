@@ -87,14 +87,26 @@ struct RemoteTmuxTests {
         let token = UUID()
         var terminal = Terminal()
         terminal.expectRemoteTmux(token: token)
-        for payload in ["fail;0;00", "fail;999;00", "fail;1;zz", "fail;1;0", "start;evil"] {
+        let overlong = "fail;1;" + String(repeating: "61", count: 1025)
+        for payload in ["fail;0;00", "fail;999;00", "fail;1;zz", "fail;1;0", "start;evil", overlong] {
             terminal.feed(Array("\u{1B}]6973;\(token.uuidString);\(payload)\u{7}".utf8))
         }
+        // No token at all is not this connection's signal either.
+        terminal.feed(Array("\u{1B}]6973;start;new\u{7}".utf8))
+        terminal.feed(Array("\u{1B}]6973;fail;1;00\u{7}".utf8))
+        #expect(terminal.remoteTmuxReport?.outcome == nil, "nothing malformed or token-less opens the handshake")
         #expect(terminal.remoteTmuxReport?.failureStatus == nil)
         terminal.feed(Array("\u{1B}]6973;\(token.uuidString);start;missing\u{7}".utf8))
         terminal.feed(Array("\u{1B}]6973;\(token.uuidString);fail;1;00\u{7}".utf8))
         #expect(terminal.remoteTmuxReport?.outcome == .missing)
         #expect(terminal.remoteTmuxReport?.failureStatus == nil)
+
+        var attached = Terminal()
+        attached.expectRemoteTmux(token: token)
+        attached.feed(Array("\u{1B}]6973;\(token.uuidString);start;attached\u{7}".utf8))
+        attached.feed(Array("\u{1B}]6973;\(token.uuidString);\(overlong)\u{7}".utf8))
+        #expect(attached.remoteTmuxReport?.failureStatus == nil, "a reason over 1 KiB is not a failure report")
+        #expect(attached.remoteTmuxReport?.reason == nil)
     }
 
     @Test func commandContainsOnlyCanonicalQuotedIdentitiesAndExactKill() {
@@ -114,8 +126,11 @@ struct RemoteTmuxTests {
         #expect(!tmux.command.contains("export "), "#434: no environment is passed")
     }
 
-    @Test(arguments: ["missing", "new", "attached", "prepare-failed", "attach-failed"],
-          ["/bin/sh", "/bin/zsh", "/bin/bash", "/bin/tcsh"])
+    /// fish is not part of macOS; its row runs where Homebrew installed it.
+    static let loginShells = ["/bin/sh", "/bin/zsh", "/bin/bash", "/bin/tcsh"]
+        + ["/opt/homebrew/bin/fish"].filter { FileManager.default.isExecutableFile(atPath: $0) }
+
+    @Test(arguments: ["missing", "new", "attached", "prepare-failed", "attach-failed"], loginShells)
     func wrapperBranchesAndZeroExitNeverStartsFallback(_ branch: String, _ loginShell: String) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("corta-tmux-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

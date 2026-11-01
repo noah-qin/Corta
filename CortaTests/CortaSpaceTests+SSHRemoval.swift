@@ -49,8 +49,9 @@ extension CortaSpaceTests {
         host.space.presentAlert = { _, _, done in done(.alertSecondButtonReturn) }
         host.space.confirmRetainedRemoval([session]) { completed = true }
         #expect(completed)
-        #expect(launched == [command])
-        #expect(!launched.contains { $0.contains(previous) })
+        #expect(launched == [command + "; tmux kill-session -t '=" + previous + "'"],
+                "one exact kill-session per listed name, the superseded one included; never kill-server")
+        #expect(!launched.contains { $0.contains("kill-server") })
     }
 
     @Test func retainedRemovalWithoutAWindowStillAsksAndCompletes() throws {
