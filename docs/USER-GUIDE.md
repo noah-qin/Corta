@@ -162,8 +162,8 @@ running. The first time Space shows, a note says what ends with the window.
   place of the one you used least recently — outlines it once and shows a
   note with **Undo**; ⌘Z puts the grid back, and every process keeps running.
   To choose where it goes, use the add button at the end of its row (it
-  appears on hover and says what it will join or replace), **Show in Panel ▸**
-  in its context menu, or a drag.
+  appears on hover; its tooltip says which panel it will split or replace),
+  **Show in Panel ▸** in its context menu, or a drag.
 - **Names and kinds.** A session is named by its program — an agent's own
   name, the SSH host, the command running — or *Terminal N* at a prompt.
   Double-click its row, press Return on it, or choose **Rename…** to give it
@@ -228,8 +228,8 @@ record cannot be confirmed, the pane falls back to the picker.
 Only an empty integrated shell prompt is filled; a busy prompt, or one with
 text at the cursor, is left alone. A prompt's right-hand side (RPROMPT,
 Starship, Powerlevel10k) is not text you typed: Corta waits until that line
-has stopped changing, then fills, and tries a few more times if the write
-does not land. With no recorded kind, nothing is filled. SSH, remote agents
+has stopped changing, then fills, and keeps trying for up to ten seconds if
+the write does not land. With no recorded kind, nothing is filled. SSH, remote agents
 and SFTP are excluded; preset commands are unchanged.
 
 A brief Liquid Glass note at the grid's foot explains a successful fill,
@@ -268,15 +268,17 @@ the Space window is not key.
 #### Git rows and worktrees
 
 Each local session's row shows the Git branch of its directory, read from
-`.git` without running `git`. A number is about how many tracked files differ
+`.git` without running `git`. A detached HEAD shows its first seven
+characters and *detached*. A number is about how many tracked files differ
 in size or modification time; new (untracked) files are not checked, and a
 clean directory shows no number. Content diffs and ahead/behind are not
-counted. A repository with more than 20,000 index entries says changes were
-not checked. Indexes v2–v4 and linked worktrees are supported; a session
-already in a linked worktree is marked, its tooltip names the main
-repository, and its menu can show the main repository in Finder. A directory
-that is not a repository shows nothing. The metadata is read off the main
-thread, and edits to tracked files refresh it without an index write.
+counted. A repository with more than 20,000 index entries, or an index over
+32 MiB, says changes were not checked. Indexes v2–v4 and linked worktrees are
+supported; a session already in a linked worktree is marked, its tooltip names
+the main repository, and its menu can show the main repository in Finder. A
+submodule checkout is not marked as a worktree. A directory that is not a
+repository shows nothing. The metadata is read off the main thread, and edits
+to tracked files refresh it without an index write.
 
 ### Keep Space SSH programs running after disconnecting
 
@@ -297,9 +299,11 @@ do not reach Corta: **Browse Files on This Host…** starts in your home
 directory. Corta changes no global tmux settings, installs nothing and starts
 no local daemon.
 
-Supported remote login shells are POSIX-family shells, zsh, fish and csh/tcsh.
-The fixed wrapper is a single quoted line passed to `/bin/sh`, so csh/tcsh
-can parse it before `/bin/sh` runs it. Nushell and other shells are untested.
+Supported remote login shells are POSIX-family shells, zsh, fish and csh/tcsh
+(sh, zsh, bash and tcsh are exercised by the test suite on every run; fish
+where it is installed). The fixed wrapper is a single quoted line passed to
+`/bin/sh`, so csh/tcsh can parse it before `/bin/sh` runs it. Nushell and
+other shells are untested.
 
 The panel's glass status button stays visible even after tmux clears the
 screen. Its first half answers whether this terminal's programs survive a
@@ -325,20 +329,36 @@ green in effect, orange or red not in effect:
   time is gone (the server restarted, or it was ended), so its programs are
   lost; a new one was started.
 
-Click it for a popover with what that means, the exact tmux name with a copy
-button, and **End Remote Session…**; click anywhere else to close it. When
-the panel's title already names the host, the header shows only the user
-beside it.
+Click it for a popover with what that means, the exact
+`tmux kill-session -t '=corta-<UUID>'` command for this terminal with a copy
+button, and **End Remote Session…**; click anywhere else to close it. Inside
+tmux the popover also says where the output went while you were disconnected
+(below). When the panel's title already names the host, the header shows only
+the user beside it.
+
+**History lives in the remote tmux, not in Corta.** Corta's scrollback and
+⌘F search hold only what this connection received; output from while you were
+disconnected, and from before a reattach, is in tmux's history on the server.
+With tmux's default bindings, press the prefix (Control-B) then `[` to enter
+copy mode and scroll or search there, and `q` to leave it; your own
+`.tmux.conf` bindings apply instead if you changed them. That history is as
+long as the server's `history-limit` option allows, a full-screen program's
+output is not kept the way plain output is, and it is gone once evicted, once
+the tmux session ends, or after a server restart. Corta does not import it
+into its scrollback and does not write it back to the shell.
 
 **End Remote Session…**, separately confirmed in the panel or sidebar menu,
 terminates only that UUID with `tmux kill-session -t '=corta-<UUID>'`. Its new
 terminal shows authentication and the result. Cancel runs nothing. Ordinary
 close and removing a local session/project never kill tmux; removal warns that
 it may keep consuming remote resources and gives the manual cleanup command.
-The warning is a sheet on the Space window, or a dialog when that window
-cannot show a sheet; Cancel leaves the session in place. If a saved UUID was
-replaced because the file listed it twice, the warning also lists the previous
-`corta-<UUID>`.
+Its default button, **Remove and Keep Remote Sessions**, removes only the local
+record; **End Remote Session** also runs one exact `kill-session` for each
+name the warning lists, in a new terminal that shows authentication and the
+result. The warning is a sheet on the Space window, or a dialog when that
+window cannot show a sheet; Cancel leaves the session in place. If a saved UUID
+was replaced because the file listed it twice, the warning also lists the
+previous `corta-<UUID>`, and **End Remote Session** ends that one too.
 
 A server restart or an ended tmux session loses those processes permanently.
 `destroy-unattached on` can destroy the session when SSH disconnects; Corta

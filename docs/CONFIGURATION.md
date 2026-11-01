@@ -82,7 +82,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `rows` | 5–300 | `30` | As above. The window's size in pixels is this grid times the font's cell metrics plus the pane insets — so two terminals showing the same `columns × rows` are still different sizes on screen if their fonts differ. |
 | `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. The Quick Terminal is excluded. |
 | `confirm-close` | boolean | `true` | Ask before closing a pane, window or the app while a shell still has a foreground job. |
-| `space-panel-limit` | integer, 1–6 | `6` | The most panels Space's grid shows at once. No split makes a panel smaller than 64 × 18 cells, so a small screen holds fewer. Lowering it takes the least recently used panels off screen; their sessions keep running. |
+| `space-panel-limit` | integer, 1–6 | `6` | The most panels Space's grid shows at once. No split makes a panel smaller than 64 × 18 cells, so a small screen holds fewer. Lowering it takes the least recently used panels off screen; their sessions keep running. A value outside 1–6 is clamped to the nearer end; a value that is not an integer is rejected and the default stays. |
 | `space-attention-badge` | boolean | `true` | While Space is showing and its window is not key, the Dock badge is how many sessions are waiting on you. `false` leaves the ordinary agent badge. |
 
 #### Quick Terminal

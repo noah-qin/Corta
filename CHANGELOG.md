@@ -24,11 +24,14 @@ Versioning for compatibility changes.
   Projects, sessions and grids are restored after a restart as new shells,
   presets or SSH connections. `space-panel-limit` caps the panels on screen.
   The first visit says that Space's sessions end with the window, and closing
-  a window says how many of them will end, hidden ones included.
+  the window or quitting asks before ending them — even at a prompt, under
+  `confirm-close` — saying how many will end, hidden ones included. Entering
+  Space never grows a window to the grid's minimum.
 
 - Space counts the sessions whose program reports it is blocked on you
   (OSC 7501) — sign-in, then permission, then question — and View ▸ Jump to
-  Next Waiting Session (⌥⌘J) shows the one that waited longest. Focus moves
+  Next Waiting Session (⌥⌘J) shows the one that waited longest; a session you
+  jumped to waits behind the others until each has had its turn. Focus moves
   only when you ask. Done, error and program notifications keep their colour
   but are not counted; a CLI recognised only by its process name shows
   *State unknown · not queued*. The Dock badge shows the count while the
@@ -52,7 +55,9 @@ Versioning for compatibility changes.
   by a persistent UUID. Reconnect reattaches; ordinary close and removal keep
   the remote session, and a separately confirmed action ends only that one.
   Glass connection details distinguish missing or broken tmux, limited
-  ordinary SSH and a lost session replaced by a new terminal. Login shells
+  ordinary SSH and a lost session replaced by a new terminal, show the exact
+  `kill-session` command with a copy button, and say that the output from
+  while you were disconnected is in the remote tmux's history. Login shells
   from POSIX sh to csh/tcsh work. Corta sets no tmux option, so a kept
   session's state and directory reports do not reach it. Traditional, preset
   and typed SSH and SFTP are unchanged; no remote rc or global tmux setting

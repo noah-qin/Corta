@@ -570,7 +570,10 @@ command parameters. No rc is explicitly sourced and no configuration is changed.
 
 The wrapper passes no environment assignment and no `ssh -R` forward, and
 sets no tmux option — not `allow-passthrough`. Nothing in this path reads a
-command from a file.
+command from a file. The only text placed in front of the wrapper is a
+test-only lead-in (`Preset.retainedCommandLeadIn`) that the isolated sshd
+fixture uses to put a fake `tmux` on PATH; it is never read from the
+configuration file or persisted, and `persistedArguments` strips it.
 
 One SSH runs a fixed `/bin/sh` wrapper, as one line with no single quotes
 inside its outer single-quoted argument so the remote login shell (including
@@ -662,7 +665,8 @@ validated UUID: `claude --resume`, `codex resume`, and those same commands
 with one UUID. They go through `fillPrompt(with:)` at the first integrated,
 empty prompt after that project's first opening in a launch. No Return is
 sent; preset commands are unchanged. Failed fills produce no success note;
-a user may delete the line or explicitly fill it again from the pane menu.
+a user may delete the line or explicitly fill it again from the session's
+**Diagnostics ▸** submenu, not its first-level menu.
 
 Two residual risks, accepted:
 

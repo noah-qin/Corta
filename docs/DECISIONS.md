@@ -892,7 +892,7 @@ replaces the old identity, even when it yields only a kind; an exited process
 leaves the last observation. A failed probe of an unchanged record retains a
 previously verified UUID and the source that obtained it; only the log reason
 reflects that probe. `picker` never accompanies a UUID. Source/result changes are logged without identity
-or paths and each pane's menu shows its source. Kind, UUID, source or process
+or paths and each session's **Diagnostics ▸** submenu shows its source. Kind, UUID, source or process
 identity changes notify listeners with the session id alone.
 
 On the project's first opening next launch, the fixed resume command fills

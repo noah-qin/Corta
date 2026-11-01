@@ -319,12 +319,16 @@ Corta never substitutes the directory's newest conversation.
 
 Inspect Console for subsystem `dev.noahqin.Corta`, category `space`, or run
 `log show --last 10m --info --predicate 'subsystem == "dev.noahqin.Corta" AND category == "space"'`.
-Each source/result change reports the kind and a fixed reason, with no UUID,
-path or conversation content: `recordMissing`, `recordUnreadable` (also a
-symlink or invalid JSON), `recordTooLarge`, `fieldMissing`, `notStandardUUID`,
-`processMismatch`, `noOpenFile`, `ambiguousOpenFiles` (multiple candidates),
-`openFilesUnreadable` (an unreadable/full fd table), or `sessionChanged`
-(the same process's record file changed and was rechecked). Claude reads from the
+Each source/result change reports the kind, the source this probe found, the
+source the record kept (`kept=`) and a fixed reason, with no UUID, path or
+conversation content: `recordMissing`, `recordUnreadable` (also a symlink,
+invalid JSON, or a Claude process whose HOME could not be read),
+`recordTooLarge`, `fieldMissing`, `notStandardUUID`, `processMismatch` (the
+record names another process, or more than one Claude runs in the pane's
+process group), `noOpenFile`, `ambiguousOpenFiles` (multiple candidates),
+`openFilesUnreadable` (an unreadable/full fd table), or `sessionChanged/…`
+(the same process's record file changed and was rechecked; the part after the
+slash is that recheck's result). Claude reads from the
 agent process's HOME, including a preset's override. A successful record is
 cached by PID, kernel start and the file's stat four-tuple; the file is
 reread only when that tuple changes. Failures get at most three non-ENOENT
@@ -354,7 +358,8 @@ starting another shell. Authentication cancellation or a network failure does
 not establish or destroy a tmux session automatically.
 
 The retention wrapper supports POSIX-family remote login shells, zsh, fish
-and csh/tcsh. It is passed as one line to `/bin/sh`; csh/tcsh cannot parse
+and csh/tcsh (sh, zsh, bash and tcsh are tested on every run, fish where it
+is installed). It is passed as one line to `/bin/sh`; csh/tcsh cannot parse
 literal newlines inside its quoted argument. Nushell and other shells have
 not been tested.
 
@@ -375,6 +380,18 @@ resources, connect to the same host and run the exact `tmux kill-session -t
 a previous name kept when a duplicated UUID was replaced. The warning is shown
 even when the Space window cannot present a sheet. **End Remote
 Session…** confirms this separately and never runs `kill-server`.
+
+To find every session Corta ever created on a host, and to end all of them at
+once, run these on the host yourself; Corta never runs them:
+
+```sh
+tmux ls -F '#S' | grep '^corta-'
+tmux ls -F '#S' | grep '^corta-' | xargs -n1 tmux kill-session -t
+```
+
+The second line terminates every program in every one of those sessions,
+including ones other Corta installations or other people's accounts on that
+host may still be using.
 
 ### Browse Remote Files… says authentication failed, but `ssh` works in the pane
 

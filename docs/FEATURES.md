@@ -90,7 +90,7 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 ### Space
 
 See [Space acceptance](SPACE-ACCEPTANCE.md) for regression coverage and the
-separate launched-app, real-account and Linux protocol checks.
+separate launched-app and real-account checks.
 
 - Project folders in a sidebar, each with its own local, SSH and agent CLI
   sessions; the toolbar's mode button, ⌥⌘S and ⌘O switch to it. Space shows
@@ -113,8 +113,11 @@ separate launched-app, real-account and Linux protocol checks.
 - Each local session row shows its Git branch and about how many tracked files
   differ, using bounded Git metadata and tracked-file size/mtime; new files are
   not checked, a clean directory shows no number, and ahead/behind is not
-  shown. More than 20,000 index entries skips the change check. A linked
-  worktree is marked, and its main repository can be shown in Finder.
+  shown. More than 20,000 index entries, or an index over 32 MiB, skips the
+  change check. A tracked symlink counts by its link, a submodule's entry is
+  not counted, and a submodule checkout is not a worktree. A linked worktree
+  is marked (its main repository found through `commondir` or the
+  `.git/worktrees` path), and its main repository can be shown in Finder.
 - A sidebar of every session with its state; clicking a hidden session shows
   it (Undo, ⌘Z), and its add button says what it will join or replace; rename
   (kept over program titles), and an icon per kind: local, SSH, agent CLI.
