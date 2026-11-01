@@ -84,13 +84,37 @@ nonisolated enum GitStatusReader {
             guard let target = gitdir(in: git) else { return nil }
             let resolved = URL(fileURLWithPath: target, relativeTo: git.deletingLastPathComponent())
                 .standardizedFileURL
+            // A submodule checkout also keeps a `gitdir:` file; it is not a linked worktree.
+            if isSubmodule(resolved) {
+                return Located(gitDir: resolved, workTree: current, worktree: false, main: nil)
+            }
             return Located(gitDir: resolved, workTree: current, worktree: true, main: mainRepository(of: resolved))
         }
         return nil
     }
 
+    /// `<main>/.git/modules/<name>` is where a submodule's repository lives.
+    private static func isSubmodule(_ gitDir: URL) -> Bool {
+        let parts = gitDir.standardizedFileURL.pathComponents
+        guard let modules = parts.lastIndex(of: "modules"), modules >= 1 else { return false }
+        return parts[modules - 1] == ".git"
+    }
+
+    /// The main repository of a linked worktree: `commondir` names its `.git`
+    /// (also when the worktree was moved or the repository is bare); otherwise
     /// `<main>/.git/worktrees/<name>` points back at `<main>`.
     static func mainRepository(of gitDir: URL) -> String? {
+        let common = commonDirectory(gitDir)
+        if common != gitDir.standardizedFileURL {
+            let path = common.path
+            if common.lastPathComponent == ".git" {
+                return common.deletingLastPathComponent().path
+            }
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue {
+                return path
+            }
+        }
         let parts = gitDir.standardizedFileURL.pathComponents
         guard let worktrees = parts.lastIndex(of: "worktrees"), worktrees >= 2,
               parts[worktrees - 1] == ".git" else { return nil }
@@ -130,8 +154,14 @@ nonisolated enum GitStatusReader {
 
     private enum Changes { case counted(Int), unchecked }
 
+    static let maximumIndexBytes = 32 * 1024 * 1024
+
     private static func changedFiles(index: URL, workTree: URL) -> Changes {
-        guard let data = boundedData(index, limit: 32 * 1024 * 1024), data.count >= 12 else { return .counted(0) }
+        var info = stat()
+        // No index yet (a fresh repository) is zero changes; one too large to read is unchecked.
+        guard lstat(index.path, &info) == 0 else { return .counted(0) }
+        guard info.st_size <= maximumIndexBytes,
+              let data = boundedData(index, limit: maximumIndexBytes), data.count >= 12 else { return .unchecked }
         guard data.prefix(4) == Data("DIRC".utf8) else { return .unchecked }
         let version = Int(integer(data, at: 4))
         let count = Int(integer(data, at: 8))
@@ -145,13 +175,19 @@ nonisolated enum GitStatusReader {
             guard let entry = entry(data, at: &offset, version: version, previous: &previous) else { return .unchecked }
             let file = (root as NSString).appendingPathComponent(entry.path)
             guard file == root || file.hasPrefix(root + "/") else { return .unchecked }
-            if differs(file, size: entry.size, mtime: entry.mtime) { changed += 1 }
+            switch entry.kind {
+            case .gitlink: continue // a submodule's commit is not a tracked file of this tree
+            case .regular, .symlink:
+                if differs(file, kind: entry.kind, size: entry.size, mtime: entry.mtime) { changed += 1 }
+            }
         }
         return .counted(changed)
     }
 
     private struct Entry {
+        enum Kind { case regular, symlink, gitlink }
         var path: String
+        var kind: Kind
         var size: UInt32
         var mtime: UInt32
     }
@@ -160,7 +196,14 @@ nonisolated enum GitStatusReader {
         let start = offset
         guard data.count >= start + 62 else { return nil }
         let mtime = integer(data, at: start + 8)
+        let mode = integer(data, at: start + 24)
         let size = integer(data, at: start + 36)
+        let kind: Entry.Kind
+        switch mode & 0o170000 {
+        case 0o120000: kind = .symlink
+        case 0o160000: kind = .gitlink
+        default: kind = .regular
+        }
         let flags = u16(data, at: start + 60)
         var cursor = start + 62
         if flags & 0x4000 != 0 {
@@ -189,7 +232,7 @@ nonisolated enum GitStatusReader {
         guard !path.isEmpty, !path.contains("\0"), !path.hasPrefix("/"), !path.contains("..") else { return nil }
         offset = cursor
         previous = path
-        return Entry(path: path, size: size, mtime: mtime)
+        return Entry(path: path, kind: kind, size: size, mtime: mtime)
     }
 
     /// v4: a variable-width strip count, then the suffix up to NUL.
@@ -213,9 +256,11 @@ nonisolated enum GitStatusReader {
         return kept + suffix
     }
 
-    private static func differs(_ path: String, size: UInt32, mtime: UInt32) -> Bool {
+    private static func differs(_ path: String, kind: Entry.Kind, size: UInt32, mtime: UInt32) -> Bool {
         var info = stat()
-        guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return true }
+        guard lstat(path, &info) == 0 else { return true }
+        let expected = kind == .symlink ? S_IFLNK : S_IFREG
+        guard info.st_mode & S_IFMT == expected else { return true }
         return UInt32(truncatingIfNeeded: info.st_size) != size
             || UInt32(truncatingIfNeeded: info.st_mtimespec.tv_sec) != mtime
     }

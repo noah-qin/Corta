@@ -88,6 +88,99 @@ struct GitStatusReaderTests {
         #expect(parsed.changedFiles == 2)
     }
 
+    @Test func symlinksCompareAsLinksGitlinksAreSkippedAndAnOversizedIndexIsUnchecked() throws {
+        let root = try temporary()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let git = root.appendingPathComponent(".git")
+        try FileManager.default.createDirectory(at: git, withIntermediateDirectories: true)
+        try "ref: refs/heads/main\n".write(to: git.appendingPathComponent("HEAD"), atomically: true, encoding: .utf8)
+        let link = root.appendingPathComponent("link")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: "target.txt")
+        var info = stat()
+        #expect(lstat(link.path, &info) == 0)
+        // A tracked symlink is compared by lstat; a submodule's gitlink is not a file here.
+        let entries = [
+            IndexEntry("link", UInt32(info.st_size), UInt32(info.st_mtimespec.tv_sec), mode: 0o120000),
+            IndexEntry("vendor/lib", 0, 0, mode: 0o160000),
+        ]
+        try index(entries: entries, version: 2).write(to: git.appendingPathComponent("index"))
+        #expect(GitStatusReader.read(directory: root.path)?.changedFiles == 0)
+        try FileManager.default.removeItem(at: link)
+        try Data("now a file".utf8).write(to: link)
+        #expect(GitStatusReader.read(directory: root.path)?.changedFiles == 1, "a link that became a file differs")
+        // One byte over the reader's limit is unchecked rather than zero changes.
+        let huge = FileHandle(forWritingAtPath: git.appendingPathComponent("index").path)
+        try huge?.truncate(atOffset: UInt64(GitStatusReader.maximumIndexBytes + 1))
+        try huge?.close()
+        #expect(GitStatusReader.read(directory: root.path)?.unchecked == true)
+        try FileManager.default.removeItem(at: git.appendingPathComponent("index"))
+        #expect(GitStatusReader.read(directory: root.path)?.changedFiles == 0, "no index yet is a fresh repository")
+    }
+
+    @Test func corruptIndexesAndHeadsNeverCrash() throws {
+        let root = try temporary()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let git = root.appendingPathComponent(".git")
+        try FileManager.default.createDirectory(at: git, withIntermediateDirectories: true)
+        try "ref: refs/heads/main\n".write(to: git.appendingPathComponent("HEAD"), atomically: true, encoding: .utf8)
+        let whole = index(entries: [IndexEntry("a.txt", 1, 1), IndexEntry("b.txt", 1, 1)], version: 2)
+        // Cutting only trailing padding still parses; cutting into a name does not.
+        for cut in [13, 40, 70, whole.count - 6] {
+            try whole.prefix(cut).write(to: git.appendingPathComponent("index"))
+            #expect(GitStatusReader.read(directory: root.path)?.unchecked == true, "truncated at \(cut)")
+        }
+        var badVersion = whole
+        badVersion[7] = 9
+        try badVersion.write(to: git.appendingPathComponent("index"))
+        #expect(GitStatusReader.read(directory: root.path)?.unchecked == true)
+        var escaping = index(entries: [IndexEntry("../outside", 1, 1)], version: 2)
+        try escaping.write(to: git.appendingPathComponent("index"))
+        #expect(GitStatusReader.read(directory: root.path)?.unchecked == true)
+        escaping.removeAll()
+        try Data([0xFF, 0xFE, 0x00, 0x41]).write(to: git.appendingPathComponent("HEAD"))
+        #expect(GitStatusReader.read(directory: root.path) == nil, "a HEAD that is not text shows nothing")
+        try Data(repeating: 0x61, count: 600).write(to: git.appendingPathComponent("HEAD"))
+        #expect(GitStatusReader.read(directory: root.path) == nil, "an oversized HEAD shows nothing")
+    }
+
+    @Test func commondirNamesTheMainRepositoryAndSubmodulesAreNotWorktrees() throws {
+        let root = try temporary()
+        defer { try? FileManager.default.removeItem(at: root) }
+        // A bare-style layout the path pattern cannot see: `repo.git/worktrees/x`.
+        let bare = root.appendingPathComponent("repo.git")
+        let gitdir = bare.appendingPathComponent("worktrees/x")
+        try FileManager.default.createDirectory(at: gitdir, withIntermediateDirectories: true)
+        try "ref: refs/heads/x\n".write(to: gitdir.appendingPathComponent("HEAD"), atomically: true, encoding: .utf8)
+        try "../..\n".write(to: gitdir.appendingPathComponent("commondir"), atomically: true, encoding: .utf8)
+        let checkout = root.appendingPathComponent("x")
+        try FileManager.default.createDirectory(at: checkout, withIntermediateDirectories: true)
+        try "gitdir: \(gitdir.path)\n".write(to: checkout.appendingPathComponent(".git"), atomically: true,
+            encoding: .utf8)
+        let facts = try #require(GitStatusReader.read(directory: checkout.path))
+        #expect(facts.worktree)
+        #expect(facts.mainRepository == bare.path)
+        // A moved main repository: `commondir` points at its `.git`, so the main is its parent.
+        let main = root.appendingPathComponent("moved-main")
+        try FileManager.default.createDirectory(at: main.appendingPathComponent(".git"),
+            withIntermediateDirectories: true)
+        try "\(main.path)/.git\n".write(to: gitdir.appendingPathComponent("commondir"), atomically: true,
+            encoding: .utf8)
+        #expect(GitStatusReader.read(directory: checkout.path)?.mainRepository == main.path)
+        // A submodule checkout keeps a `gitdir:` file under `.git/modules`; it is no worktree.
+        let superproject = root.appendingPathComponent("super")
+        let module = superproject.appendingPathComponent(".git/modules/lib")
+        try FileManager.default.createDirectory(at: module, withIntermediateDirectories: true)
+        try "ref: refs/heads/main\n".write(to: module.appendingPathComponent("HEAD"), atomically: true, encoding: .utf8)
+        let sub = superproject.appendingPathComponent("lib")
+        try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
+        try "gitdir: ../.git/modules/lib\n".write(to: sub.appendingPathComponent(".git"), atomically: true,
+            encoding: .utf8)
+        let submodule = try #require(GitStatusReader.read(directory: sub.path))
+        #expect(!submodule.worktree)
+        #expect(submodule.mainRepository == nil)
+        #expect(submodule.name == "main")
+    }
+
     @MainActor @Test func trackedWorktreeEditsRefreshWithoutGitMetadataChanges() async throws {
         let root = try temporary()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -128,8 +221,9 @@ struct GitStatusReaderTests {
         var path: String
         var size: UInt32
         var mtime: UInt32
-        init(_ path: String, _ size: UInt32, _ mtime: UInt32) {
-            self.path = path; self.size = size; self.mtime = mtime
+        var mode: UInt32
+        init(_ path: String, _ size: UInt32, _ mtime: UInt32, mode: UInt32 = 0o100644) {
+            self.path = path; self.size = size; self.mtime = mtime; self.mode = mode
         }
     }
 
@@ -144,7 +238,7 @@ struct GitStatusReaderTests {
             let start = data.count
             u32(0); u32(0)
             u32(entry.mtime); u32(0)
-            u32(0); u32(0); u32(0); u32(0); u32(0)
+            u32(0); u32(0); u32(entry.mode); u32(0); u32(0)
             u32(entry.size)
             data.append(Data(count: 20))
             if version == 4 {

@@ -22,7 +22,6 @@ nonisolated final class GitStatusMonitor: @unchecked Sendable {
     private let queue = DispatchQueue(label: "dev.noahqin.Corta.git", qos: .utility)
     private let lock = NSLock()
     private var directories: [UUID: String] = [:]
-    private var watched: [String] = []
     private var stream: FSEventStreamRef?
     private var debounce: DispatchWorkItem?
     var onUpdate: (@MainActor @Sendable ([UUID: GitFacts]) -> Void)?
@@ -54,7 +53,6 @@ nonisolated final class GitStatusMonitor: @unchecked Sendable {
             paths.insert(GitStatusReader.commonDirectory(located.gitDir).path)
         }
         let sorted = paths.sorted()
-        watched = sorted
         guard !sorted.isEmpty else { return }
         var context = FSEventStreamContext(
             version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil,

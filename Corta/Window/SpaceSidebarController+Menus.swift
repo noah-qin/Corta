@@ -135,7 +135,10 @@ extension SpaceSidebarController {
 
     private func addProjectItems(to menu: NSMenu, project: SpaceProject, space: CortaSpaceController) {
         add("space.newSession", to: menu) { space.selectProject(project); space.newSession() }
-        if let session = project.sessions.first(where: { space.gitFacts[$0.id]?.mainRepository != nil }) {
+        // Only when the project's worktree sessions agree on one main repository.
+        let worktrees = project.sessions.filter { space.gitFacts[$0.id]?.mainRepository != nil }
+        if let session = worktrees.first,
+           Set(worktrees.compactMap { space.gitFacts[$0.id]?.mainRepository }).count == 1 {
             add("space.worktree.reveal", to: menu) { space.revealWorktreeMain(session) }
         }
         add("space.connectSSH", to: menu) { space.selectProject(project); space.connectSession() }
