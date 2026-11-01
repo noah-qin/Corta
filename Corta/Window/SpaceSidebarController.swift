@@ -181,11 +181,13 @@ final class SpaceSidebarController: NSViewController, NSOutlineViewDataSource, N
 
     private func content(of session: SpaceSession) -> SpaceSessionCell.Content {
         let onScreen = space?.selectedProject?.shown.contains { $0 === session } == true
+        let canShow = !onScreen && space?.session(withID: session.id)?.project === space?.selectedProject
         return SpaceSessionCell.Content(
             presentation: SpaceSessionPresentation(session: session), isOnScreen: onScreen,
             hint: session === chosen && !onScreen ? space?.placementHint(for: session) : nil,
             // Only the project on screen has a grid to add to.
-            canShow: !onScreen && space?.session(withID: session.id)?.project === space?.selectedProject,
+            canShow: canShow,
+            showHint: canShow ? space?.placementHint(for: session) : nil,
             git: space?.gitRow(for: session.id))
     }
 

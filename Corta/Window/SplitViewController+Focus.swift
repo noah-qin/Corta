@@ -145,9 +145,14 @@ extension SplitViewController {
     func updateWindowMinSize() {
         guard let window = view.window, let pane = panes.first else { return }
         if space.isActive {
+            // Entering Space keeps the window's frame (#445): a window smaller
+            // than the grid's minimum is not grown; panels that do not fit
+            // stay off screen instead.
             let minimum = space.minimumContentSize
+            let current = window.contentRect(forFrameRect: window.frame).size
             window.contentMinSize = NSSize(
-                width: minimum.width, height: minimum.height + pane.windowChrome + statusBarHeight)
+                width: min(minimum.width, current.width),
+                height: min(minimum.height + pane.windowChrome + statusBarHeight, current.height))
             return
         }
         let treeMinimum = terminalTree.minimumSize(

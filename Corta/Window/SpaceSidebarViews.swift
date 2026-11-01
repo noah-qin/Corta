@@ -58,12 +58,16 @@ final class SpaceSidebarHeader: NSView {
 
     func setWaitingCount(_ count: Int) {
         defer {
+            // Once per change, in the label's words; nothing to say when none wait.
             if count != announcedWaiting {
                 announcedWaiting = count
-                NSAccessibility.post(element: self, notification: .announcementRequested, userInfo: [
-                    .announcement: L10n.format("space.waiting.count", count),
-                    .priority: NSAccessibilityPriorityLevel.medium.rawValue,
-                ])
+                if count > 0 {
+                    NSAccessibility.post(element: self, notification: .announcementRequested, userInfo: [
+                        .announcement: count == 1
+                            ? L10n.text("space.waiting.one") : L10n.format("space.waiting.count", count),
+                        .priority: NSAccessibilityPriorityLevel.medium.rawValue,
+                    ])
+                }
             }
         }
         if count <= 0 {
@@ -145,6 +149,8 @@ final class SpaceSessionCell: NSTableCellView {
         var hint: String?
         /// Off screen: the add button shows while the pointer is over it.
         var canShow = false
+        /// What the add button will do: split beside a panel, or replace one.
+        var showHint: String?
         var git: GitRow?
 
         struct GitRow: Equatable {
@@ -173,7 +179,6 @@ final class SpaceSessionCell: NSTableCellView {
         hint.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         hint.textColor = .secondaryLabelColor
         hint.lineBreakMode = .byTruncatingTail
-        hint.setContentCompressionResistancePriority(.defaultLow - 1, for: .horizontal)
         showButton.image = NSImage(
             systemSymbolName: "rectangle.badge.plus", accessibilityDescription: L10n.text("space.panel.show"))
         showButton.isBordered = false
@@ -187,8 +192,18 @@ final class SpaceSessionCell: NSTableCellView {
             child.translatesAutoresizingMaskIntoConstraints = false
             addSubview(child)
         }
+        // The row is ~170 pt at the sidebar's minimum. The branch (or the
+        // placement hint) outranks the title for the remaining width — the
+        // title is still named in the tooltip — but the title keeps at least
+        // a few characters and the hint at most half the row.
         title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        hint.setContentCompressionResistancePriority(.defaultLow + 1, for: .horizontal)
+        let titleFloor = title.widthAnchor.constraint(greaterThanOrEqualToConstant: 48)
+        titleFloor.priority = .defaultHigh
+        let hintCeiling = hint.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.5)
+        hintCeiling.priority = .defaultHigh + 1
         NSLayoutConstraint.activate([
+            titleFloor, hintCeiling,
             icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
             icon.centerYAnchor.constraint(equalTo: centerYAnchor),
             icon.widthAnchor.constraint(equalToConstant: 18),
@@ -262,7 +277,9 @@ extension SpaceSessionCell {
     fileprivate func updateButton() {
         let show = (content?.canShow ?? false) && (isHovered || content?.hint != nil)
         showButton.isHidden = !show
-        showButton.toolTip = L10n.text("space.panel.show")
+        let title = L10n.text("space.panel.show")
+        showButton.toolTip = content?.showHint.map { title + " — " + $0 } ?? title
+        showButton.setAccessibilityLabel(content?.showHint.map { title + ", " + $0 } ?? title)
     }
 }
 
