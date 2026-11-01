@@ -325,29 +325,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         splitController?.updateDirectPresentation()
     }
 
-    /// Asks as a sheet, so the answer comes after this returns: refuse now,
-    /// and close once confirmed. `close()` does not ask again.
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
-        guard let splitController else { return true }
-        let running = splitController.panesWithRunningJobs
-        guard splitController.needsCloseConfirmation(for: running) else { return true }
-        // A second ⌘W while the sheet is up: the sheet already asks.
-        if sender.attachedSheet != nil, sender.isVisible { return false }
-        // A background tab or a minimised window has nowhere to show a sheet:
-        // ask now and answer now, rather than close it from inside this call.
-        // Space's sessions are this window's processes too, hidden ones included.
-        let spaceSessions = splitController.space.liveSessionCount
-        guard NSAlert.canPresentSheet(on: sender) else {
-            let alert = splitController.closeAlert(
-                for: running, scope: L10n.text("close.scope.window"), spaceSessions: spaceSessions)
-            return alert.runModal() == .alertFirstButtonReturn
-        }
-        splitController.confirmClose(
-            of: running, scope: L10n.text("close.scope.window"), in: sender, spaceSessions: spaceSessions
-        ) { [weak sender] confirmed in if confirmed { sender?.close() } }
-        return false
-    }
-
     /// Read at quit and on every window close.
     var restorableState: WindowState? {
         guard let window, let splitController, !isQuickTerminal else { return nil }
@@ -357,6 +334,30 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         state?.customTabTitle = customTabTitle
         state?.isSpace = splitController.space.isActive
         return state
+    }
+}
+
+extension TerminalWindowController {
+    /// Asks as a sheet, so the answer comes after this returns: refuse now,
+    /// and close once confirmed. `close()` does not ask again.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard let splitController else { return true }
+        let running = splitController.panesWithRunningJobs
+        let spaceSessions = splitController.space.liveSessionCount // hidden ones included
+        guard splitController.needsCloseConfirmation(for: running, spaceSessions: spaceSessions) else { return true }
+        // A second ⌘W while the sheet is up: the sheet already asks.
+        if sender.attachedSheet != nil, sender.isVisible { return false }
+        // A background tab or a minimised window has nowhere to show a sheet:
+        // ask now and answer now, rather than close it from inside this call.
+        guard NSAlert.canPresentSheet(on: sender) else {
+            let alert = splitController.closeAlert(
+                for: running, scope: L10n.text("close.scope.window"), spaceSessions: spaceSessions)
+            return alert.runModal() == .alertFirstButtonReturn
+        }
+        splitController.confirmClose(
+            of: running, scope: L10n.text("close.scope.window"), in: sender, spaceSessions: spaceSessions
+        ) { [weak sender] confirmed in if confirmed { sender?.close() } }
+        return false
     }
 }
 

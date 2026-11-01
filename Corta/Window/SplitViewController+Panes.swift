@@ -90,9 +90,10 @@ extension SplitViewController {
 
     /// Whether closing `running` asks first: something is running and
     /// `confirm-close` is on. Checks the pty's foreground process group, not
-    /// output, so a bare prompt never asks.
-    func needsCloseConfirmation(for running: [ViewController]) -> Bool {
-        ConfigurationStore.shared.configuration.confirmClose && !running.isEmpty
+    /// output, so a bare prompt never asks. Space's sessions, hidden ones
+    /// included, end with their window too, so they ask even at a prompt.
+    func needsCloseConfirmation(for running: [ViewController], spaceSessions: Int = 0) -> Bool {
+        ConfigurationStore.shared.configuration.confirmClose && (!running.isEmpty || spaceSessions > 0)
     }
 
     /// Asks before discarding work, as a sheet on `window`, and reports
@@ -102,7 +103,7 @@ extension SplitViewController {
         of running: [ViewController], scope: String, in window: NSWindow?, spaceSessions: Int = 0,
         completion: @escaping @MainActor (Bool) -> Void
     ) {
-        guard needsCloseConfirmation(for: running) else {
+        guard needsCloseConfirmation(for: running, spaceSessions: spaceSessions) else {
             completion(true)
             return
         }
@@ -118,15 +119,18 @@ extension SplitViewController {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = L10n.format("close.running.title", scope)
-        alert.informativeText =
-            names.isEmpty
-            ? L10n.text("close.running.single")
-            : L10n.format(
-                "close.running.multiple", ListFormatter.localizedString(byJoining: Array(Set(names)).sorted()))
+        var lines: [String] = []
+        if !running.isEmpty {
+            lines.append(names.isEmpty
+                ? L10n.text("close.running.single")
+                : L10n.format(
+                    "close.running.multiple", ListFormatter.localizedString(byJoining: Array(Set(names)).sorted())))
+        }
         if spaceSessions > 0 {
-            alert.informativeText += "\n\n" + (spaceSessions == 1
+            lines.append(spaceSessions == 1
                 ? L10n.text("close.running.spaceOne") : L10n.format("close.running.space", spaceSessions))
         }
+        alert.informativeText = lines.joined(separator: "\n\n")
         alert.addButton(withTitle: L10n.text("close.running.closeAnyway"))
         alert.addButton(withTitle: L10n.text("common.cancel"))
         // Keep the destructive action explicit; Return defaults to Cancel.

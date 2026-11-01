@@ -452,8 +452,10 @@ extension AppDelegate {
         let running = windowControllers.compactMap {
             ($0.contentViewController as? SplitViewController)
         }.flatMap(\.panesWithRunningJobs)
+        // Quitting ends Space's sessions too, the hidden ones included.
+        let spaceSessions = CortaSpaceController.owner?.liveSessionCount ?? 0
         guard let split = windowControllers.first?.contentViewController as? SplitViewController,
-            split.needsCloseConfirmation(for: running)
+            split.needsCloseConfirmation(for: running, spaceSessions: spaceSessions)
         else { return .terminateNow }
         // Already asking: that sheet answers this quit too.
         guard !isAskingToTerminate else { return .terminateCancel }
@@ -467,11 +469,14 @@ extension AppDelegate {
         guard let window = windows.first(where: \.isKeyWindow) ?? windows.first,
             let presenter = window.contentViewController as? SplitViewController
         else {
-            let alert = split.closeAlert(for: running, scope: L10n.text("close.scope.app"))
+            let alert = split.closeAlert(
+                for: running, scope: L10n.text("close.scope.app"), spaceSessions: spaceSessions)
             return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
         }
         isAskingToTerminate = true
-        presenter.confirmClose(of: running, scope: L10n.text("close.scope.app"), in: window) { [weak self] in
+        presenter.confirmClose(
+            of: running, scope: L10n.text("close.scope.app"), in: window, spaceSessions: spaceSessions
+        ) { [weak self] in
             self?.isAskingToTerminate = false
             NSApp.reply(toApplicationShouldTerminate: $0)
         }
