@@ -111,6 +111,7 @@ nonisolated struct SpaceProjectRecord: Codable, Equatable, Sendable {
 
     func validated() -> SpaceProjectRecord {
         let sessions = Array(sessions.prefix(SpaceState.maximumSessions)).map { $0.validated() }
+            .filter(\.isConnectable)
         let highest = sessions.map(\.number).max() ?? 0
         var result = SpaceProjectRecord(
             path: path, sessions: sessions, layout: layout?.validated(sessionCount: sessions.count),
@@ -307,6 +308,13 @@ nonisolated struct SpaceSessionRecord: Codable, Equatable, Sendable {
         }
         return record
     }
+
+    /// An SSH record whose target no longer parses would otherwise come back
+    /// as a local shell in the project folder, with its tmux dialogs: it is
+    /// dropped instead, and the user starts that connection again by hand.
+    var isConnectable: Bool { ssh != nil || self.ssh == nil && !isLostRemote }
+
+    private var isLostRemote: Bool { ssh == nil && (retainSSH == true || tmuxEstablished == true) }
 }
 
 /// The grid's rules, on plain values so they are testable without a window.

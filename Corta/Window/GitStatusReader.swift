@@ -141,7 +141,7 @@ nonisolated enum GitStatusReader {
         let file = gitDir.appendingPathComponent("HEAD")
         guard let data = try? Data(contentsOf: file), data.count <= 512,
               let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !text.isEmpty, text.utf8.allSatisfy({ $0 >= 0x20 && $0 < 0x7F }) else { return nil }
+              !text.isEmpty, text.utf8.allSatisfy({ $0 >= 0x20 && $0 != 0x7F }) else { return nil }
         let ref = "ref: refs/heads/"
         if text.hasPrefix(ref) {
             let name = String(text.dropFirst(ref.count))
@@ -176,7 +176,7 @@ nonisolated enum GitStatusReader {
             let file = (root as NSString).appendingPathComponent(entry.path)
             guard file == root || file.hasPrefix(root + "/") else { return .unchecked }
             switch entry.kind {
-            case .gitlink: continue // a submodule's commit is not a tracked file of this tree
+            case .gitlink, .skipped: continue // a submodule's commit, or a file git itself does not compare
             case .regular, .symlink:
                 if differs(file, kind: entry.kind, size: entry.size, mtime: entry.mtime) { changed += 1 }
             }
@@ -185,7 +185,7 @@ nonisolated enum GitStatusReader {
     }
 
     private struct Entry {
-        enum Kind { case regular, symlink, gitlink }
+        enum Kind { case regular, symlink, gitlink, skipped }
         var path: String
         var kind: Kind
         var size: UInt32
@@ -206,8 +206,12 @@ nonisolated enum GitStatusReader {
         }
         let flags = u16(data, at: start + 60)
         var cursor = start + 62
+        // assume-valid (`update-index --assume-unchanged`) is not compared by git either.
+        var skipped = flags & 0x8000 != 0
         if flags & 0x4000 != 0 {
             guard data.count >= cursor + 2 else { return nil }
+            // Extended flags: skip-worktree (sparse checkout) files are absent on purpose.
+            if u16(data, at: cursor) & 0x4000 != 0 { skipped = true }
             cursor += 2
         }
         let path: String
@@ -232,7 +236,7 @@ nonisolated enum GitStatusReader {
         guard !path.isEmpty, !path.contains("\0"), !path.hasPrefix("/"), !path.contains("..") else { return nil }
         offset = cursor
         previous = path
-        return Entry(path: path, kind: kind, size: size, mtime: mtime)
+        return Entry(path: path, kind: skipped ? .skipped : kind, size: size, mtime: mtime)
     }
 
     /// v4: a variable-width strip count, then the suffix up to NUL.

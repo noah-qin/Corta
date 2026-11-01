@@ -158,6 +158,9 @@ extension CortaSpaceController: NSSplitViewDelegate {
 
     /// Takes a panel out of the tree; its neighbour fills the space.
     func remove(_ panel: SpacePaneView, from project: SpaceProject) {
+        // A maximized panel has left its split, whose other child would be
+        // closed into nothing: put it back first so the tree stays whole.
+        if let maximized = project.maximized, maximized !== panel.session { setMaximized(nil, in: project) }
         guard let tree = project.tree, tree.leaves.contains(where: { $0 === panel }) else { return }
         if tree.root === panel {
             project.tree = nil

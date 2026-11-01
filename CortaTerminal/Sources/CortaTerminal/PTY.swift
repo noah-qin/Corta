@@ -49,6 +49,8 @@ public final class PTY: @unchecked Sendable {
 
     private let state = Mutex(State())
     let conversationCache = Mutex(ClaudeConversationCache())
+    /// argv[0] per live process in this pane's foreground group, read once each.
+    let conversationNames = ConversationProcess.NameCache()
     private let exited = DispatchGroup()
     private let exitQueue: DispatchQueue
     private let exitSource: DispatchSourceProcess

@@ -16,6 +16,7 @@
 
 import Darwin
 import Foundation
+import Synchronization
 
 /// A kernel identity, including subsecond start time, never persisted in Space.
 public struct ConversationProcess: Hashable, Sendable {
@@ -32,19 +33,57 @@ public struct ConversationProcess: Hashable, Sendable {
     }
 
     static func read(_ pid: pid_t) -> Self? {
+        read(pid, names: nil)
+    }
+
+    /// `names` remembers, per kernel identity, which argv[0] named an agent:
+    /// a recognised name cannot change for a live pid, so a sampler that
+    /// passes the same cache pays the 64 KiB `KERN_PROCARGS2` query once per
+    /// agent. An unrecognised name is not cached — `exec` keeps the pid and
+    /// start time while it replaces the image, so a shell about to become
+    /// codex must be asked again.
+    static func read(_ pid: pid_t, names: NameCache?) -> Self? {
         var info = proc_bsdinfo()
         let size = Int32(MemoryLayout<proc_bsdinfo>.size)
         guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size,
               let name = PTY.processName(of: pid) else { return nil }
+        let identity = Identity(pid: pid, seconds: info.pbi_start_tvsec, microseconds: info.pbi_start_tvusec)
         let recognizedName: String
-        if LocalConversation.Kind(processName: name) == nil,
-           let invocation = invocationName(pid), LocalConversation.Kind(processName: invocation) != nil {
-            recognizedName = invocation
-        } else {
+        if LocalConversation.Kind(processName: name) != nil {
             recognizedName = name
+        } else if let cached = names?[identity] {
+            recognizedName = cached
+        } else {
+            if let invocation = invocationName(pid), LocalConversation.Kind(processName: invocation) != nil {
+                recognizedName = invocation
+                names?[identity] = invocation
+            } else {
+                recognizedName = name
+            }
         }
-        return Self(pid: pid, seconds: info.pbi_start_tvsec,
-                    microseconds: info.pbi_start_tvusec, name: recognizedName)
+        return Self(pid: pid, seconds: identity.seconds, microseconds: identity.microseconds, name: recognizedName)
+    }
+
+    /// The kernel identity alone: what the name cache is keyed by.
+    public struct Identity: Hashable, Sendable {
+        public var pid: Int32
+        public var seconds: UInt64
+        public var microseconds: UInt64
+    }
+
+    /// argv[0] per live process, bounded; a pane's foreground group is small.
+    public final class NameCache: Sendable {
+        private let names = Mutex<[Identity: String]>([:])
+        public init() {}
+        subscript(identity: Identity) -> String? {
+            get { names.withLock { $0[identity] } }
+            set {
+                names.withLock { cache in
+                    if cache.count >= 256 { cache.removeAll() }
+                    cache[identity] = newValue
+                }
+            }
+        }
     }
     /// Native Claude installs execute a version-named symlink target. `ps comm`
     /// still calls it claude: use only argv[0], never decode later arguments/environment.

@@ -108,7 +108,9 @@ final class CortaSpaceController: NSObject {
     /// Sessions running in this window's Space, on the grid or hidden: what
     /// closing the window ends.
     var liveSessionCount: Int {
-        projects.reduce(0) { $0 + $1.sessions.filter { $0.pane != nil }.count }
+        projects.reduce(0) { total, project in
+            total + project.sessions.filter { $0.pane != nil && $0.pane?.session?.pty.exitStatus == nil }.count
+        }
     }
 
     /// `space-panel-limit`, within the grid's six.
@@ -342,6 +344,8 @@ extension CortaSpaceController {
         conversationMonitor = nil
         for project in projects { project.conversationPreparation?.cancel() }
         saveNow()
+        // The window's badge count goes with it; other windows badge again.
+        AgentDirectory.noteSpaceWaiting(count: 0, active: false, windowIsKey: true)
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
         observers = []
         if Self.owner === self { Self.owner = nil }

@@ -342,8 +342,9 @@ extension TerminalWindowController {
     /// and close once confirmed. `close()` does not ask again.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard let splitController else { return true }
-        let running = splitController.panesWithRunningJobs
-        let spaceSessions = splitController.space.liveSessionCount // hidden ones included
+        // Space's panes are counted as its sessions (hidden ones included), not twice.
+        let running = splitController.panesWithRunningJobs.filter { !splitController.space.owns($0) }
+        let spaceSessions = splitController.space.liveSessionCount
         guard splitController.needsCloseConfirmation(for: running, spaceSessions: spaceSessions) else { return true }
         // A second ⌘W while the sheet is up: the sheet already asks.
         if sender.attachedSheet != nil, sender.isVisible { return false }

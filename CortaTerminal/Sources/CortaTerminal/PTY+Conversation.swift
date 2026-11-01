@@ -25,10 +25,11 @@ extension PTY {
         var members = [pid_t](repeating: 0, count: 256)
         let count = proc_listpgrppids(group, &members, Int32(members.count * MemoryLayout<pid_t>.size))
         guard count > 0, count < members.count else { return nil }
-        let identities = members.prefix(Int(count)).compactMap(ConversationProcess.read)
+        let names = conversationNames
+        let identities = members.prefix(Int(count)).compactMap { ConversationProcess.read($0, names: names) }
         if ConversationSample.isMixed(identities) {
             guard exitStatus == nil, foregroundProcessGroup == group,
-                  identities.allSatisfy({ ConversationProcess.read($0.pid) == $0 }) else { return nil }
+                  identities.allSatisfy({ ConversationProcess.read($0.pid, names: names) == $0 }) else { return nil }
             return .mixedProcesses
         }
         guard let (kind, agents) = ConversationObservation.recognized(identities) else { return nil }
@@ -44,7 +45,7 @@ extension PTY {
                 }
                 let directory = home.appendingPathComponent(".claude/sessions", isDirectory: true)
                 return cache.read(process: agent, directory: directory) {
-                    ConversationProcess.read(agent.pid) == agent
+                    ConversationProcess.read(agent.pid, names: names) == agent
                 }
             }
         } else {
@@ -53,7 +54,7 @@ extension PTY {
             result = ConversationObservation.codex(processes: agents, files: files)
         }
         guard exitStatus == nil, foregroundProcessGroup == group,
-              agents.allSatisfy({ ConversationProcess.read($0.pid) == $0 }) else { return nil }
+              agents.allSatisfy({ ConversationProcess.read($0.pid, names: names) == $0 }) else { return nil }
         return .observed(result)
     }
 

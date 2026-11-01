@@ -32,9 +32,11 @@ extension SplitViewController {
         guard space.isActive else { return false }
         if let session = space.focusedSession {
             space.endSession(session)
-        } else {
+        } else if space.liveSessionCount == 0 {
             view.window?.performClose(sender)
         }
+        // Sessions exist but none is focused (all hidden, or the sidebar has
+        // the keyboard): ⌘W ends nothing rather than the whole window.
         return true
     }
 

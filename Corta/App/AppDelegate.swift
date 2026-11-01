@@ -449,10 +449,11 @@ extension AppDelegate {
     /// visible one), answered later; app-modal, answered now, when none is
     /// visible.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Quitting ends Space's sessions too, the hidden ones included; they
+        // are counted as Space's, not again among the running panes.
         let running = windowControllers.compactMap {
             ($0.contentViewController as? SplitViewController)
-        }.flatMap(\.panesWithRunningJobs)
-        // Quitting ends Space's sessions too, the hidden ones included.
+        }.flatMap { split in split.panesWithRunningJobs.filter { !split.space.owns($0) } }
         let spaceSessions = CortaSpaceController.owner?.liveSessionCount ?? 0
         guard let split = windowControllers.first?.contentViewController as? SplitViewController,
             split.needsCloseConfirmation(for: running, spaceSessions: spaceSessions)

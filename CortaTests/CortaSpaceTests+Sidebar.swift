@@ -105,6 +105,44 @@ extension CortaSpaceTests {
         #expect(dirty.toolTip.contains(L10n.format("space.git.dirty", 3)))
     }
 
+    /// A maximized panel has left its split; hiding the panel it covers must
+    /// not close that split into nothing and lose the maximized one's place.
+    @Test func hidingACoveredPanelWhileAnotherIsMaximizedKeepsTheTreeWhole() throws {
+        let (controller, host) = try makeWindow()
+        defer { close(controller, host) }
+        let project = try makeProject()
+        defer { try? FileManager.default.removeItem(at: project) }
+        let space = host.space
+        space.setActive(true)
+        space.openProject(project)
+        space.newSession()
+        space.newSession()
+        let live = try #require(space.selectedProject)
+        try #require(live.shown.count == 3)
+        let big = live.shown[0], covered = live.shown[1]
+        space.toggleMaximize(big)
+        try #require(live.maximized === big)
+        space.hide(covered)
+        #expect(live.maximized == nil, "hiding under a maximized panel puts it back first")
+        #expect(live.shown.count == 2)
+        #expect(live.shown.contains(big))
+        #expect(!live.shown.contains(covered))
+        #expect(space.gridTree?.leafCount == 2)
+        func splits(under view: NSView) -> [NSSplitView] {
+            (view as? NSSplitView).map { [$0] + $0.subviews.flatMap(splits) } ?? []
+        }
+        for split in space.gridTree.map({ splits(under: $0.root) }) ?? [] {
+            #expect(split.subviews.count == 2, "no one-child split survives")
+        }
+        #expect(live.layout != nil, "the layout still captures the grid")
+        // The same path when a covered session ends.
+        space.toggleMaximize(big)
+        try #require(live.maximized === big)
+        space.removeSession(try #require(live.shown[1].pane))
+        #expect(live.maximized == nil)
+        #expect(space.gridTree?.leafCount == 1)
+    }
+
     @Test func closingTheWindowSaysHowManySpaceSessionsEndHiddenOnesIncluded() throws {
         let (controller, host) = try makeWindow()
         defer { close(controller, host) }
