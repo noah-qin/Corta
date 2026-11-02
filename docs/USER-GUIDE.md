@@ -219,8 +219,9 @@ Settings ▸ Keyboard & Mouse ▸ Input Source Indicator chooses **Automatically
 enables the indicator for users with an enabled non-Latin keyboard layout or
 an IME; Latin-only keyboard setups remain uncluttered. Switching back to a Latin
 layout keeps a quiet `A` on a faint background — gray in the toolbar, the
-theme's own text colour beside the prompt. Non-Latin layouts and built-in IME
-modes use a soft indigo tint; unknown IME modes use gray. Beside the prompt,
+theme's own text colour beside the prompt. Beside the prompt, non-Latin
+layouts and built-in IME modes use a soft indigo tint; in the toolbar every
+source is gray, the glyph itself telling them apart. Beside the prompt,
 colours follow the terminal theme's darkness rather than macOS's. In the
 toolbar the badge stays while a program runs — Claude Code, an editor — since
 it covers no output. At the right edge of the command line, shell integration

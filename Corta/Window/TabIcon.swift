@@ -20,6 +20,7 @@ import AppKit
 /// Only the tab's public attributed title is decorated here.
 enum TabIcon {
     static let side: CGFloat = 18
+    private static let stackStep: CGFloat = 4
     private static var compositions: [String: NSImage] = [:]
     private static let signatures = NSMapTable<NSWindow, NSString>.weakToStrongObjects()
 
@@ -31,7 +32,7 @@ enum TabIcon {
         let custom = (window.windowController as? TerminalWindowController)?.customTabTitle
         let name = custom ?? label.name
         let context = custom == nil ? label.context : ""
-        let text = context.isEmpty ? name : name + "  " + context
+        let text = context.isEmpty ? name : name + " " + context
         // The focused program leads the stack; another branded program is
         // visible behind it even when a shell pane currently has the keyboard.
         let others = (split?.panes ?? []).filter { $0 !== focused }
@@ -49,15 +50,15 @@ enum TabIcon {
             attachment.image = image
             attachment.bounds = NSRect(x: 0, y: -4, width: image.size.width, height: side)
             result.append(NSAttributedString(attachment: attachment))
-            result.append(NSAttributedString(string: "  "))
+            result.append(NSAttributedString(string: " "))
         }
         result.append(NSAttributedString(string: name, attributes: [
-            .font: NSFont.systemFont(ofSize: 12, weight: .medium),
+            .font: NSFont.systemFont(ofSize: 12.5),
             .foregroundColor: NSColor.labelColor,
         ]))
         if !context.isEmpty {
-            result.append(NSAttributedString(string: "  " + context, attributes: [
-                .font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor,
+            result.append(NSAttributedString(string: " " + context, attributes: [
+                .font: NSFont.systemFont(ofSize: 12.5), .foregroundColor: NSColor.tertiaryLabelColor,
             ]))
         }
         window.tab.attributedTitle = result
@@ -68,15 +69,23 @@ enum TabIcon {
         let key = programs.map(\.rawValue).joined(separator: ",")
         if let cached = compositions[key] { return cached }
         guard let lead = first.tabImage else { return nil }
-        let width = side + (programs.count > 1 ? 8 : 0)
         let images = programs.map { $0.tabImage ?? lead }
+        let width = side + CGFloat(images.count - 1) * stackStep
         let image = NSImage(size: NSSize(width: width, height: side), flipped: false) { _ in
+            // Back to front: each card behind peeks out to the right, a
+            // little smaller. A clear ring cut around every card keeps their
+            // edges apart at this size, so the stack reads as a stack and the
+            // focused program in front is unmistakable.
             for index in images.indices.reversed() {
-                let offset = CGFloat(index) * 4
-                let height = side - CGFloat(index)
-                // Opaque tile edges separate the stacked brands at small sizes.
-                images[index].draw(in: NSRect(x: offset, y: CGFloat(index) / 2,
-                                             width: side, height: height))
+                let size = side - CGFloat(index) * 2
+                let frame = NSRect(x: CGFloat(index) * stackStep,
+                                   y: (side - size) / 2, width: size, height: size)
+                if index < images.count - 1, let context = NSGraphicsContext.current {
+                    context.compositingOperation = .clear
+                    NSBezierPath(roundedRect: frame.insetBy(dx: -1, dy: -1), xRadius: 5.5, yRadius: 5.5).fill()
+                    context.compositingOperation = .sourceOver
+                }
+                images[index].draw(in: frame)
             }
             return true
         }

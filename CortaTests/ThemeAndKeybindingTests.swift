@@ -385,7 +385,13 @@ extension ThemeAndKeybindingTests {
             controller.applyCanvasAppearance()
             #expect(window.isOpaque)
             #expect(window.backgroundColor.alphaComponent == 1)
-            #expect(!window.titlebarAppearsTransparent)
+            // The titlebar band is the opaque window background, in the
+            // theme's colour, and carries no title text (D24, amended).
+            #expect(window.titlebarAppearsTransparent)
+            #expect(window.titleVisibility == .hidden)
+            let canvas = TerminalColorPalette.defaultBackground
+            let background = window.backgroundColor.usingColorSpace(.sRGB)
+            #expect(abs((background?.redComponent ?? -1) - CGFloat(canvas.x)) < 0.002)
         }
     }
 

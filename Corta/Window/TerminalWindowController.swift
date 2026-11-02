@@ -124,7 +124,15 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         window.isOpaque = true
         window.backgroundColor = NSColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y),
                                          blue: CGFloat(color.z), alpha: 1)
-        window.titlebarAppearsTransparent = false
+        // The titlebar band is the theme's own colour, not a material: the
+        // window's background shows through it, and the grid's top inset
+        // keeps output below it (D24, amended). The tabs and pane headers
+        // already name what runs, so the title text is not repeated above
+        // them; it stays the window's title for the Window menu and
+        // accessibility.
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.titlebarSeparatorStyle = .none
     }
 
     /// A titlebar lock while Secure Keyboard Entry is engaged — the effect is

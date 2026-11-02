@@ -64,6 +64,8 @@ extension SplitViewController: NSToolbarDelegate {
             item.image = NSImage(systemSymbolName: "plus", accessibilityDescription: item.label)
             item.target = self
             item.action = #selector(newTabInThisWindow(_:))
+            // A bare symbol, not a glass capsule: the band stays quiet.
+            item.isBordered = false
             return item
         }
         let key: String
@@ -82,6 +84,7 @@ extension SplitViewController: NSToolbarDelegate {
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: item.label)
         item.target = self
         item.action = action
+        item.isBordered = false
         return item
     }
     /// Only the focused pane can publish into this window's single status slot.

@@ -119,12 +119,50 @@ enum ProgramIcon: String, CaseIterable {
 
     private static var tiles: [Self: NSImage] = [:]
 
+    /// A shell: a near-black tile with a prompt, the way a terminal reads
+    /// at a glance, light enough in weight that a row of them is calm.
+    private static var shellTile: NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+            let tile = rect.insetBy(dx: 0.5, dy: 0.5)
+            NSColor(srgbRed: 0.17, green: 0.17, blue: 0.18, alpha: 1).setFill()
+            NSBezierPath(roundedRect: tile, xRadius: 4.5, yRadius: 4.5).fill()
+            NSColor.white.withAlphaComponent(0.22).setStroke()
+            let edge = NSBezierPath(roundedRect: tile.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
+            edge.lineWidth = 0.5
+            edge.stroke()
+            let green = NSColor(srgbRed: 0.55, green: 0.90, blue: 0.62, alpha: 1)
+            green.setStroke()
+            let chevron = NSBezierPath()
+            chevron.lineWidth = 1.4
+            chevron.lineCapStyle = .round
+            chevron.lineJoinStyle = .round
+            chevron.move(to: NSPoint(x: 4.5, y: 12))
+            chevron.line(to: NSPoint(x: 7.5, y: 9))
+            chevron.line(to: NSPoint(x: 4.5, y: 6))
+            chevron.stroke()
+            NSColor.white.withAlphaComponent(0.85).setStroke()
+            let cursor = NSBezierPath()
+            cursor.lineWidth = 1.4
+            cursor.lineCapStyle = .round
+            cursor.move(to: NSPoint(x: 9, y: 6))
+            cursor.line(to: NSPoint(x: 13, y: 6))
+            cursor.stroke()
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+
     /// Coloured tiles in the tab strip, monochrome marks in pane headers.
     /// The result is cached; streaming output does not redraw these bitmaps.
     var tabImage: NSImage? {
         if let cached = Self.tiles[self] { return cached }
+        if self == .terminal {
+            let image = Self.shellTile
+            Self.tiles[self] = image
+            return image
+        }
         guard let symbol else { return nil }
-        if self == .terminal { return symbol }
         let mark = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
             symbol.draw(in: rect)
             NSColor.white.setFill()

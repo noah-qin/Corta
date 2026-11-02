@@ -253,7 +253,9 @@ nonisolated struct InputSourceIndicatorPlacement {
         // Default presentation stays quiet. Explicit custom backgrounds retain
         // their original contrast-aware behavior.
         if custom.isEmpty || source.kind == .unknown {
-            let tinted = source.kind == .ime || source.kind == .nonLatinLayout
+            // In the toolbar the glyph itself ("中", "あ") is the cue; a tint
+            // there drew the eye from the tabs beside it.
+            let tinted = canvas != nil && (source.kind == .ime || source.kind == .nonLatinLayout)
             if let canvas, !tinted {
                 // Direct input on the canvas: the theme's own text, faded, so
                 // a theme darker or lighter than macOS still reads (#348).

@@ -17,8 +17,13 @@ Versioning for compatibility changes.
 
 ### Changed
 
-- Native window tabs now show a metal-framed terminal icon before the title,
-  stacked when the tab contains split panes.
+- Native window tabs show the program running in each pane as an icon
+  before the title — a dark prompt tile for a shell, the program's own
+  colours otherwise. With split panes the icons stack, the focused pane's
+  in front and each other pane's peeking out behind it.
+- The titlebar band is the theme's own colour, without the window title or
+  a separator line, and the toolbar's Connect and New Tab buttons are bare
+  symbols. In the toolbar, the input-source badge is grey for every source.
 
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
 

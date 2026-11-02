@@ -652,6 +652,14 @@ chrome well; a line of text does not.
 **Consequence.** Reopen with a design for what the titlebar band should
 show (a solid theme colour, say) rather than with the API alone.
 
+**Amended (2026-11-03).** That design: the band is a solid theme colour.
+`titlebarAppearsTransparent` is set with no extension view, so the band
+shows the opaque window background — the canvas colour — and the grid's
+top inset still keeps every row of output below it; nothing is mirrored
+or blurred. The band carries no title text (`titleVisibility = .hidden`)
+and no separator: the tabs and pane headers already name what runs, and
+the title stays the window's for the Window menu and accessibility.
+
 ## D25 — Metal frames present on their own, not with the transaction
 
 **Decision.** The terminal's `CAMetalLayer` keeps `presentsWithTransaction`
