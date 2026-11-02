@@ -454,7 +454,10 @@ extension SplitViewController {
         orientation: SplitOrientation, workingDirectory: String? = nil, preset: Preset? = nil
     ) {
         guard let focusedPane else { return }
-        defer { noteLayoutChanged() }
+        defer {
+            noteLayoutChanged()
+            (view.window?.windowController as? TerminalWindowController)?.refreshTabTitle()
+        }
         unzoomPane()
         // The node takes the leaf's old frame and the halves are pre-set, so the
         // first layout is already 50/50 instead of flashing a zero-size pane.
@@ -539,7 +542,10 @@ extension SplitViewController {
 
     func closePane(_ pane: ViewController) {
         splitTransition.finish()
-        defer { noteLayoutChanged() }
+        defer {
+            noteLayoutChanged()
+            (view.window?.windowController as? TerminalWindowController)?.refreshTabTitle()
+        }
         unzoomIfNeeded(closing: pane)
         // Before the tree changes, while its split still exists.
         noteClosing(pane)

@@ -12,6 +12,9 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Native window tabs now show a metal-framed terminal icon before the title,
+  stacked when the tab contains split panes.
+
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
 
 ## [1.5.1] - 2026-10-27
