@@ -28,7 +28,6 @@ Corta가 할 수 있는 모든 것과 그 위치입니다. 각 절은 기능이 
 - [원격 작업: SSH와 SFTP](#remote-work-ssh-and-sftp)
 - [터미널 속 이미지](#images-in-the-terminal)
 - [명령 팔레트](#the-command-palette)
-- [퀵 터미널](#the-quick-terminal)
 - [macOS 연동](#macos-integration)
 - [속도와 배터리](#speed-and-battery)
 - [설정과 설정 파일](#settings-and-the-config-file)
@@ -73,7 +72,6 @@ Corta에는 가져오기 기능이 없습니다. 읽는 것은 텍스트 파일 
 | :--- | :--- |
 | ⌥를 Meta / Alt로 사용(iTerm2의 *Left Option key: Esc+*, Ghostty의 `macos-option-as-alt`) | `option-as-meta = true`. 기본값은 꺼짐이라 ⌥는 macOS처럼 `é`, `ø`, `–`를 입력합니다. |
 | 선택 시 복사 | `copy-on-select`, 기본값 **켜짐**. ⌘C만 쓰려면 `false`. |
-| 단축키 윈도우나 퀵 터미널 | `quick-terminal = true`. 키는 `quick-terminal-key`(기본값 ⌥Space). 기본값은 꺼짐입니다. 전역 단축키는 모든 앱에서 그 키를 차지하기 때문입니다. [퀵 터미널](#the-quick-terminal). |
 | `ssh` 너머나 `tmux` 안의 프로그램이 클립보드에 복사(OSC 52) | `allow-clipboard-write = true`. 기본값은 꺼짐. 어떤 설정에서도 클립보드 읽기는 불가능합니다. |
 | 작업 중인 윈도우를 닫기 전에 확인 | `confirm-close`, 기본값 켜짐. |
 | 윈도우가 떠났던 자리에서 다시 열림 | `restore-windows`, 기본값 켜짐. 레이아웃, 탭, 작업 디렉터리는 돌아오지만 프로세스와 터미널 텍스트는 돌아오지 않습니다. |
@@ -91,7 +89,7 @@ Corta에는 가져오기 기능이 없습니다. 읽는 것은 텍스트 파일 
 **`TERM`.** Corta는 `xterm-256color`로 자신을 알립니다(D08). iTerm2나 Terminal.app에서 이미 잘 동작하는 원격 호스트는
 바꿀 것이 없습니다. `xterm-ghostty`나 `xterm-kitty`에 맞춰 설정된 호스트는 대신 이 일반적인 값을 받게 됩니다.
 
-복사, 닫기, 퀵 터미널 단축키, 원격 배지처럼 조금씩 다른 동작은
+복사, 닫기, 원격 배지처럼 조금씩 다른 동작은
 [문제 해결 → 다른 터미널과 다른 동작](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals)에 모아 두었습니다.
 
 <a id="windows-tabs-and-panes"></a>
@@ -119,7 +117,6 @@ Corta에는 가져오기 기능이 없습니다. 읽는 것은 텍스트 파일 
 - 명령이 아직 실행 중인 페인을 닫으면 먼저 묻습니다(`confirm-close`).
 - **윈도우 복원.** 종료했다가 다시 실행하면 모든 윈도우가 탭, 분할, 구분선 위치, 각 페인의 작업 디렉터리와 함께 돌아옵니다
   (`restore-windows`, 기본값 켜짐). 각 페인은 새 프로세스를 시작하며, 터미널 텍스트와 실행 중이던 작업은 복원되지 않습니다.
-  퀵 터미널은 제외됩니다.
 - **프리셋.** 프리셋은 설정 파일에 정의한, 이름이 붙은 셸·디렉터리·환경 변수 묶음입니다. **셸 ▸ 프리셋으로 새 페인**으로 열고,
   ⌥를 누르고 있으면 별도의 윈도우에서 엽니다([Presets](../../CONFIGURATION.md#4a-presets)).
 - 새 윈도우는 `columns` × `rows` 셀 크기로 열립니다(기본값 120 × 30).
@@ -519,25 +516,11 @@ kitten icat --transfer-mode=stream picture.png
 명령의 설정 이름(`new-tab`)으로도 찾을 수 있습니다. 최근에 실행한 명령이 먼저 나옵니다. 다른 윈도우를 클릭하면 팔레트가 닫히고
 그 윈도우가 앞에 남습니다. 기본 단축키가 없는 명령에 닿는 가장 빠른 방법입니다.
 
-<a id="the-quick-terminal"></a>
-
-## 퀵 터미널
-
-하던 일 위로 내려오는 터미널입니다. **보기 ▸ 퀵 터미널**, 명령 팔레트, 또는 켜 둔 시스템 전역 단축키로 엽니다:
-
-```ini
-quick-terminal = true
-quick-terminal-key = alt+space
-quick-terminal-position = top      # top, bottom, center
-```
-
-단축키는 기본으로 꺼져 있습니다. 시스템 전역 키는 다른 모든 앱에서 빼앗기기 때문입니다.
-
 <a id="macos-integration"></a>
 
 ## macOS 연동
 
-- **단축어.** 동작 세 가지: **Corta 윈도우 열기**(폴더 지정 가능), **Corta 윈도우 앞으로 가져오기**, **퀵 터미널 전환**.
+- **단축어.** 두 가지 동작: **Corta 윈도우 열기**(폴더 지정 가능), **Corta 윈도우 앞으로 가져오기**.
   어느 것도 셸에서 명령을 실행하지 않습니다.
 - **서비스.** 선택한 터미널 텍스트를 **서비스** 메뉴에 넘깁니다.
 - **보안 키보드 입력.** **셸 ▸ 보안 키보드 입력**은 Corta가 앞에 있는 동안 다른 앱이 키 입력을 읽지 못하게 막습니다 — 암호 입력용입니다.
@@ -588,7 +571,6 @@ Corta는 빠른 방법을 스스로 고릅니다. 여기서는 설정이 필요 
 - **키보드 및 마우스** — Option을 Meta로 사용, 링크 여는 방식, 프로그램이 마우스를 쓰는 동안 텍스트를 선택하는 보조 키, 선택 시 복사,
   입력 소스 표시의 모드와 색상.
 - **단축키** — 모든 명령의 키. 바꾼 것 옆에는 재설정 화살표가 나타납니다.
-- **퀵 터미널** — 시스템 전역 단축키, 위치, 화면.
 - **연결** — 호스트에 연결, 저장된 프리셋.
 - **개인정보 보호 및 보안** — 프로그램의 클립보드 쓰기(OSC 52), 보안 키보드 입력, 디렉터리 기록, 최근 호스트.
 

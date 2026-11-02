@@ -30,27 +30,10 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// A window whose root pane spawns from `setup`, dressed and sized for
     /// its first grid before anything shows it. Unrestored windows are
     /// centred on the main screen; the caller cascades or places them after.
-    ///
-    /// `asPanel` makes the window a non-activating `NSPanel`, for the Quick
-    /// Terminal: an inactive app's window never reaches a full-screen Space,
-    /// whatever its collection behaviour, and `NSApp.activate()` is refused
-    /// or drags the user out of the Space. Measured on macOS 27 over
-    /// full-screen TextEdit: `kCGWindowIsOnscreen` stayed false for every
-    /// `NSWindow` variant and became true for a `.nonactivatingPanel`.
-    convenience init(setup: SplitViewController.Setup, asPanel: Bool = false) {
+    convenience init(setup: SplitViewController.Setup) {
         let placeholder = NSRect(x: 0, y: 0, width: 480, height: 270)
-        let window: NSWindow
-        if asPanel {
-            let panel = NSPanel(
-                contentRect: placeholder, styleMask: Self.styleMask.union(.nonactivatingPanel),
-                backing: .buffered, defer: false)
-            // `QuickTerminalController` owns dismissal and focus return.
-            panel.hidesOnDeactivate = false
-            window = panel
-        } else {
-            window = NSWindow(
-                contentRect: placeholder, styleMask: Self.styleMask, backing: .buffered, defer: false)
-        }
+        let window = NSWindow(
+            contentRect: placeholder, styleMask: Self.styleMask, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         // Link and tab tooltips only while Corta is active, as the storyboard
         // window had it.
@@ -73,9 +56,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// `WindowState` so it survives a relaunch. Never the title, which the
     /// child writes.
     var windowID: String = UUID().uuidString
-
-    /// The Quick Terminal's window: not saved or listed as an ordinary one.
-    var isQuickTerminal = false
 
     /// User-owned title; terminal output must never overwrite it. Part of
     /// the saved arrangement, so a rename is written like a move.
@@ -144,9 +124,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         window.isOpaque = true
         window.backgroundColor = NSColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y),
                                          blue: CGFloat(color.z), alpha: 1)
-        // The Quick Terminal hides its titlebar; a theme change must not
-        // bring the band back.
-        if !isQuickTerminal { window.titlebarAppearsTransparent = false }
+        window.titlebarAppearsTransparent = false
     }
 
     /// A titlebar lock while Secure Keyboard Entry is engaged — the effect is
@@ -347,7 +325,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
 
     /// Read at quit and on every window close.
     var restorableState: WindowState? {
-        guard let window, let splitController, !isQuickTerminal else { return nil }
+        guard let window, let splitController else { return nil }
         var state = splitController.windowState(frame: window.frame)
         state?.id = windowID
         state?.customTabTitle = customTabTitle

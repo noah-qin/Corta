@@ -114,12 +114,4 @@ struct AppIntentTests {
         #expect(try delegate.focusWindow(id: id) == false)
     }
 
-    @Test("the Quick Terminal is not an entity: it is summoned, not arranged")
-    func quickTerminalIsNotListed() throws {
-        let controller = try makeTrackedWindow()
-        defer { controller.window?.close() }
-        controller.isQuickTerminal = true
-        #expect(!TerminalWindowQuery.openWindows().contains { $0.id == controller.windowID })
-        #expect(controller.restorableState == nil, "the panel is never saved into the arrangement")
-    }
 }

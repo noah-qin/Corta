@@ -213,7 +213,6 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case resetTerminal = "reset-terminal"
     case reconnectRemote = "reconnect-remote"
     case browseRemoteFiles = "browse-remote-files"
-    case quickTerminal = "quick-terminal"
     case secureKeyboardEntry = "secure-keyboard-entry"
     case settings
     case commandPalette = "command-palette"
@@ -277,7 +276,6 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .resetTerminal: return L10n.text("command.resetTerminal")
         case .reconnectRemote: return L10n.text("command.reconnectRemote")
         case .browseRemoteFiles: return L10n.text("command.browseRemoteFiles")
-        case .quickTerminal: return L10n.text("command.quickTerminal")
         case .secureKeyboardEntry: return L10n.text("command.secureKeyboardEntry")
         case .settings: return L10n.text("command.settings")
         case .commandPalette: return L10n.text("command.commandPalette")
@@ -354,7 +352,6 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .resetTerminal: return #selector(PaneCommands.resetTerminal(_:))
         case .reconnectRemote: return #selector(PaneRemote.reconnectRemote(_:))
         case .browseRemoteFiles: return #selector(PaneRemote.browseRemoteFiles(_:))
-        case .quickTerminal: return #selector(AppDelegate.toggleQuickTerminal(_:))
         case .secureKeyboardEntry: return #selector(AppDelegate.toggleSecureKeyboardEntry(_:))
         case .settings: return #selector(AppDelegate.showSettings(_:))
         case .commandPalette: return #selector(AppDelegate.showCommandPalette(_:))

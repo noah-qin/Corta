@@ -418,20 +418,16 @@ also blocks accessibility clients, macro tools and text expanders.
 
 ### 4.6 External automation is a third trust boundary
 
-B16 adds two ways for something *outside* a Corta window to act on Corta:
-a system-wide hotkey and three App Intents (open a window, focus a window,
-toggle the Quick Terminal). Neither accepts text for a child's stdin, and
-neither ever will: an automation assembled from a shared Shortcut or a web
-page is no more trusted than escape sequences off the PTY. The one
-parameter an intent takes is a directory, checked to exist and handed to
-`spawn` as its working directory. Windows are addressed by an identity
-minted at creation (`TerminalWindowController.windowID`), never by title —
-titles are written by the child process — and a stale identity fails with
-an error rather than resolving to whichever window is nearest. The hotkey
-is a Carbon `RegisterEventHotKey`, dispatched by the window server: it
-needs no Accessibility permission (rule 7) and, unlike an `NSEvent`
-global monitor, keeps working under Secure Keyboard Entry. Terminal
-transcripts are never indexed for Spotlight.
+Two App Intents let something *outside* a Corta window act on Corta: open a
+window and focus a window. Neither accepts text for a child's stdin, and neither
+ever will: an automation assembled from a shared Shortcut or a web page is no
+more trusted than escape sequences off the PTY. The one parameter an intent
+takes is a directory, checked to exist and handed to `spawn` as its working
+directory. Windows are addressed by an identity minted at creation
+(`TerminalWindowController.windowID`), never by title — titles are written by
+the child process — and a stale identity fails with an error rather than
+resolving to whichever window is nearest. Terminal transcripts are never
+indexed for Spotlight.
 
 ### 4.7 The update feed is signed, and its key sits in the release environment
 

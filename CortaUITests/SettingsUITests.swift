@@ -52,23 +52,20 @@ final class SettingsUITests: XCTestCase {
         let sidebar = settings.outlines.firstMatch
         XCTAssertTrue(sidebar.waitForExistence(timeout: 3), "the settings page must have a sidebar")
         for category in [
-            "General", "Appearance", "Terminal", "Keyboard & Mouse", "Shortcuts",
-            "Quick Terminal", "Connections", "Privacy & Security",
+            "General", "Appearance", "Themes", "Terminal", "Keyboard & Mouse", "Shortcuts",
+            "Connections", "Privacy & Security",
         ] {
             XCTAssertTrue(
                 sidebar.staticTexts[category].waitForExistence(timeout: 3),
                 "the \(category) category must exist")
         }
 
-        // The Appearance pane: light-or-dark, the font family and the size
-        // field. The theme pop-up is hidden while only one theme is offered.
-        // The catalog's string, letter for letter ("Light or dark"); whether
-        // SwiftUI exposes a `Picker`'s label as a static text or as the
-        // pop-up's own label varies by release, so any element will do.
+        // The appearance choices are compact visual cards. Themes have a
+        // separate sidebar destination, while typography remains here.
         sidebar.staticTexts["Appearance"].click()
         XCTAssertTrue(
-            settings.descendants(matching: .any)["Light or dark"].waitForExistence(timeout: 3),
-            "the Appearance pane must show the light-or-dark picker")
+            settings.descendants(matching: .any)["Color Scheme"].waitForExistence(timeout: 3),
+            "the Appearance pane must show the color-scheme choices")
 
         // Terminal: the bell is a pop-up-style picker, the search defaults
         // are switches, scrollback is a field.

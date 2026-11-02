@@ -15,64 +15,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
-import Carbon.HIToolbox
 import Testing
 import Synchronization
 import CortaPOSIX
 
 @testable import Corta
 
-/// The system entry points: the Quick Terminal's hotkey and geometry,
-/// Secure Keyboard Entry's state machine, the App Intents' window identity,
-/// and the config keys all three read.
-///
-/// Nothing here registers a real hotkey or flips the machine's secure-input
-/// mode: `GlobalHotKey` is tested at its key-code mapping and `SecureInput`
-/// through an injected `System`, because a test that changes what every
-/// other application on the machine can see is a test that should not run.
-struct GlobalHotKeyTests {
-    @Test("config-file spellings map to ANSI virtual key codes")
-    func spellingsMapToKeyCodes() {
-        #expect(GlobalHotKey.keyCode(for: "a") == UInt32(kVK_ANSI_A))
-        #expect(GlobalHotKey.keyCode(for: "`") == UInt32(kVK_ANSI_Grave))
-        #expect(GlobalHotKey.keyCode(for: " ") == UInt32(kVK_Space))
-        #expect(GlobalHotKey.keyCode(for: Shortcut.parse("space")!.key) == UInt32(kVK_Space))
-        #expect(GlobalHotKey.keyCode(for: Shortcut.parse("return")!.key) == UInt32(kVK_Return))
-        #expect(GlobalHotKey.keyCode(for: Shortcut.parse("up")!.key) == UInt32(kVK_UpArrow))
-        #expect(GlobalHotKey.keyCode(for: Shortcut.parse("escape")!.key) == UInt32(kVK_Escape))
-    }
-
-    @Test("a key Carbon has no code for is refused rather than registered as something else")
-    func unknownKeysAreRefused() {
-        #expect(GlobalHotKey.keyCode(for: "é") == nil)
-        #expect(GlobalHotKey.keyCode(for: "ab") == nil)
-        #expect(GlobalHotKey.keyCode(for: "") == nil)
-    }
-
-    @Test("a hotkey needs a modifier: a bare key claimed system-wide would swallow typing everywhere")
-    func bareKeysAreNotRegistrable() {
-        #expect(GlobalHotKey.isRegistrable(Shortcut.parse("alt+space")!))
-        #expect(GlobalHotKey.isRegistrable(Shortcut.parse("ctrl+`")!))
-        #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("space")!))
-        #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("a")!))
-        // Shift alone is typing: a capital letter, a symbol, a selection.
-        #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("shift+a")!))
-        #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("shift+1")!))
-        #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("shift+space")!))
-        #expect(GlobalHotKey.isRegistrable(Shortcut.parse("ctrl+shift+a")!))
-        #expect(!GlobalHotKey.isRegistrable(Shortcut.parse("cmd+é")!))
-    }
-
-    @Test("modifier flags translate to Carbon's bits")
-    func modifierTranslation() {
-        #expect(GlobalHotKey.carbonModifiers([.option]) == UInt32(optionKey))
-        #expect(
-            GlobalHotKey.carbonModifiers([.command, .shift, .control])
-                == UInt32(cmdKey) | UInt32(shiftKey) | UInt32(controlKey))
-        #expect(GlobalHotKey.carbonModifiers([]) == 0)
-    }
-}
-
+/// Secure Keyboard Entry is tested through an injected system, without
+/// changing input protection for other applications.
 @MainActor
 struct SecureInputTests {
     /// Counts the system calls so the balance — never above one, back to
@@ -157,61 +107,34 @@ struct SecureInputTests {
 }
 
 struct SystemEntryPointConfigurationTests {
-    @Test("the defaults claim nothing: no hotkey, secure entry off")
-    func defaults() {
-        let configuration = Configuration()
-        #expect(!configuration.quickTerminal)
-        #expect(configuration.quickTerminalKey == Shortcut.parse("alt+space"))
-        #expect(configuration.quickTerminalPosition == .top)
-        #expect(configuration.quickTerminalScreen == .mouse)
-        #expect(!configuration.secureKeyboardEntry)
-    }
-
-    @Test("every key parses, round-trips, and the file says what was set")
-    func roundTrip() {
-        let text = """
-            quick-terminal = true
-            quick-terminal-key = ctrl+`
-            quick-terminal-position = bottom
-            quick-terminal-screen = main
-            secure-keyboard-entry = yes
-            """
-        let (configuration, unknown) = Configuration.parse(text)
-        #expect(unknown.isEmpty)
-        #expect(configuration.quickTerminal)
-        #expect(configuration.quickTerminalKey == Shortcut.parse("ctrl+`"))
-        #expect(configuration.quickTerminalPosition == .bottom)
-        #expect(configuration.quickTerminalScreen == .main)
-        #expect(configuration.secureKeyboardEntry)
-        let (again, _) = Configuration.parse(configuration.serialized())
-        #expect(again == configuration)
-        #expect(configuration.serialized().contains("quick-terminal-key = ctrl+`"))
-    }
-
-    @Test("an empty hotkey means none; a bare key or an unknown key is preserved as a typo, not applied")
-    func hotKeyValidation() {
-        let (none, unknownNone) = Configuration.parse("quick-terminal-key =")
-        #expect(none.quickTerminalKey == nil)
-        #expect(unknownNone.isEmpty)
-        #expect(none.serialized().contains("quick-terminal-key = \n"))
-
-        let (bare, unknownBare) = Configuration.parse("quick-terminal-key = space")
-        #expect(bare.quickTerminalKey == Configuration().quickTerminalKey)
-        #expect(unknownBare.map(\.0) == ["quick-terminal-key"])
-
-        let (odd, unknownOdd) = Configuration.parse("quick-terminal-position = left")
-        #expect(odd.quickTerminalPosition == .top)
-        #expect(unknownOdd.map(\.0) == ["quick-terminal-position"])
-    }
-
-    @Test("the two commands are in the table with no default key, and under the groups the menus use")
-    func commandsInTheTable() {
-        #expect(TerminalCommand.quickTerminal.defaultShortcut == nil)
+    @Test("secure keyboard entry defaults off and round-trips")
+    func secureEntryConfiguration() {
+        #expect(!Configuration().secureKeyboardEntry)
+        let (config, unknown) = Configuration.parse("secure-keyboard-entry = yes")
+        #expect(unknown.isEmpty && config.secureKeyboardEntry)
+        #expect(Configuration.parse(config.serialized()).configuration == config)
         #expect(TerminalCommand.secureKeyboardEntry.defaultShortcut == nil)
-        #expect(TerminalCommand.quickTerminal.category == .window)
         #expect(TerminalCommand.secureKeyboardEntry.category == .terminal)
-        #expect(TerminalCommand(rawValue: "quick-terminal") == .quickTerminal)
-        #expect(TerminalCommand(rawValue: "secure-keyboard-entry") == .secureKeyboardEntry)
+    }
+
+    @Test("retired quick-terminal settings migrate away without warnings or a command entry")
+    func retiredPanelConfiguration() {
+        let old = """
+            quick-terminal = true
+            quick-terminal-key = alt+space
+            quick-terminal-position = top
+            quick-terminal-screen = main
+            quick-terminal-width = 960
+            quick-terminal-height = 360
+            bind.quick-terminal = cmd+`
+            font-size = 16
+            """
+        let (config, unknown) = Configuration.parse(old)
+        #expect(unknown.isEmpty)
+        #expect(config.fontSize == 16)
+        #expect(!config.serialized().contains("quick-terminal"))
+        #expect(TerminalCommand(rawValue: "quick-terminal") == nil)
+        #expect(Configuration.parse("future-option = true").unknown.map(\.0) == ["future-option"])
     }
 }
 

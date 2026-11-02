@@ -157,7 +157,7 @@ coordinates keeps, and the tests that pin them.
 **Decision.** The renderer draws into a given rect, never into "the
 window". No singletons in the core.
 
-**Why.** Splits, tabs and the Quick Terminal are all "another viewport";
+**Why.** Splits, tabs and floating panes are all "another viewport";
 a renderer that assumed one window would have had to be rewritten for
 the first of them. Written against a `TerminalSession` and a target
 rectangle, a split is "instantiate another session".

@@ -33,26 +33,26 @@ struct TabIconTests {
         }
         controller.showWindow(nil)
         controller.refreshTabTitle()
-        #expect(try iconWidth(in: window) == 16)
+        #expect(try iconWidth(in: window) == 18)
 
         split.splitFocusedPane(orientation: .columns)
         #expect(split.panes.count == 2)
-        #expect(try iconWidth(in: window) == 24)
+        #expect(try iconWidth(in: window) == 26)
         split.zoomFocusedPane()
         controller.refreshTabTitle()
-        #expect(try iconWidth(in: window) == 24, "zoom does not remove the other sessions")
+        #expect(try iconWidth(in: window) == 26, "zoom does not remove the other sessions")
         split.unzoomPane()
 
         split.splitFocusedPane(orientation: .rows)
-        #expect(try iconWidth(in: window) == 24)
+        #expect(try iconWidth(in: window) == 26)
         split.closePane(try #require(split.focusedPane))
-        #expect(try iconWidth(in: window) == 24)
+        #expect(try iconWidth(in: window) == 26)
         split.closePane(try #require(split.focusedPane))
         #expect(split.panes.count == 1)
-        #expect(try iconWidth(in: window) == 16)
+        #expect(try iconWidth(in: window) == 18)
         split.reopenClosedPane(nil)
         #expect(split.panes.count == 2)
-        #expect(try iconWidth(in: window) == 24)
+        #expect(try iconWidth(in: window) == 26)
     }
 
     private func iconWidth(in window: NSWindow) throws -> CGFloat {

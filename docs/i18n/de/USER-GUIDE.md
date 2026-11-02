@@ -28,7 +28,6 @@ und alle außer „Nächsten suchen“ und „Vorherigen suchen“ lassen sich �
 - [Arbeiten aus der Ferne: SSH und SFTP](#remote-work-ssh-and-sftp)
 - [Bilder im Terminal](#images-in-the-terminal)
 - [Die Befehlspalette](#the-command-palette)
-- [Das Schnellterminal](#the-quick-terminal)
 - [macOS-Integration](#macos-integration)
 - [Geschwindigkeit und Akku](#speed-and-battery)
 - [Einstellungen und die Konfigurationsdatei](#settings-and-the-config-file)
@@ -74,7 +73,6 @@ hat die Werte und wann sie gelten).
 | :--- | :--- |
 | ⌥ als Meta / Alt (iTerm2: *Left Option key: Esc+*, Ghostty: `macos-option-as-alt`) | `option-as-meta = true`. Standardmäßig aus, damit ⌥ wie unter macOS `é`, `ø` und `–` tippt. |
 | Kopieren beim Auswählen | `copy-on-select`, standardmäßig **an**. Setze `false`, um nur mit ⌘C zu kopieren. |
-| Ein Hotkey-Fenster oder Schnellterminal | `quick-terminal = true`; die Taste ist `quick-terminal-key` (Standard ⌥Leertaste). Standardmäßig aus: Ein globaler Hotkey wird in jeder App belegt. [Das Schnellterminal](#the-quick-terminal). |
 | Programme, die über `ssh` oder aus `tmux` in die Zwischenablage kopieren (OSC 52) | `allow-clipboard-write = true`. Standardmäßig aus; Lesen der Zwischenablage ist mit keiner Einstellung möglich. |
 | Nachfrage vor dem Schließen eines beschäftigten Fensters | `confirm-close`, standardmäßig an. |
 | Fenster, die dort wieder aufgehen, wo du sie verlassen hast | `restore-windows`, standardmäßig an. Layouts, Tabs und Arbeitsverzeichnisse kommen zurück; Prozesse und Terminaltext nicht. |
@@ -93,7 +91,7 @@ beide können Prompt-Markierungen ausgeben. Siehe [Shell-Integration](#shell-int
 funktioniert, braucht nichts Neues; einer, der für `xterm-ghostty` oder `xterm-kitty` eingerichtet ist, bekommt
 stattdessen den gängigen Wert.
 
-Kleinere Unterschiede im Verhalten – Kopieren, Schließen, der Hotkey des Schnellterminals, Remote-Kennzeichen – sind unter
+Kleinere Unterschiede im Verhalten – Kopieren, Schließen, Remote-Kennzeichen – sind unter
 [Fehlerbehebung → Verhalten, das sich von anderen Terminals unterscheidet](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals)
 gesammelt.
 
@@ -126,7 +124,6 @@ gesammelt.
 - **Fenster wiederherstellen.** Beende Corta und starte es neu, und jedes Fenster kommt mit seinen Tabs, Teilungen,
   Trennlinienpositionen und dem Arbeitsverzeichnis jedes Bereichs zurück (`restore-windows`, standardmäßig an).
   Jeder Bereich startet einen neuen Prozess; Terminaltext und laufende Jobs werden nicht wiederhergestellt.
-  Das Schnellterminal ist ausgenommen.
 - **Voreinstellungen.** Eine Voreinstellung ist eine benannte Kombination aus Shell, Verzeichnis und Umgebung, definiert
   in der Konfigurationsdatei. **Shell ▸ Neuer Bereich mit Voreinstellung** öffnet eine; halte ⌥ gedrückt, um sie in
   einem eigenen Fenster zu öffnen ([Presets](../../CONFIGURATION.md#4a-presets)).
@@ -598,27 +595,12 @@ Tippe ein paar Buchstaben und drücke Return. Buchstaben passen in ihrer Reihenf
 (`new-tab`) findet ihn. Kürzlich ausgeführte Befehle stehen oben. Ein Klick auf ein anderes Fenster schließt die Palette
 und lässt dieses Fenster vorne. Sie ist der schnellste Weg zu den Befehlen ohne Standard-Kurzbefehl.
 
-<a id="the-quick-terminal"></a>
-
-## Das Schnellterminal
-
-Ein Terminal, das über das herunterfährt, woran du gerade arbeitest. Öffne es über **Darstellung ▸ Schnellterminal**,
-über die Befehlspalette oder mit einem systemweiten Hotkey, sobald du einen einschaltest:
-
-```ini
-quick-terminal = true
-quick-terminal-key = alt+space
-quick-terminal-position = top      # top, bottom oder center
-```
-
-Der Hotkey ist standardmäßig aus, weil eine systemweite Taste jeder anderen App weggenommen wird.
-
 <a id="macos-integration"></a>
 
 ## macOS-Integration
 
-- **Kurzbefehle.** Drei Aktionen: **Corta-Fenster öffnen** (optional in einem Ordner), **Corta-Fenster in den Vordergrund**
-  und **Schnellterminal ein-/ausblenden**. Keine davon führt einen Befehl in einer Shell aus.
+- **Kurzbefehle.** Zwei Aktionen: **Corta-Fenster öffnen** (optional in einem Ordner) und **Corta-Fenster in den Vordergrund**.
+  Keine davon führt einen Befehl in einer Shell aus.
 - **Dienste.** Ausgewählter Terminaltext wird dem Menü **Dienste** angeboten.
 - **Sichere Tastatureingabe.** **Shell ▸ Sichere Tastatureingabe** hindert andere Apps daran, deine Tastenanschläge zu
   lesen, während Corta vorne ist – zum Eintippen von Passwörtern. Ein Schloss in der Titelleiste zeigt, wann sie
@@ -679,7 +661,6 @@ Die Einstellungen sind eine Seitenleiste mit Kategorien, aufgebaut wie die Syste
 - **Tastatur & Maus** – Wahltaste als Meta, wie Links sich öffnen, die Sondertaste, die Text auswählt, während ein
   Programm die Maus belegt, Kopieren beim Auswählen sowie Modi und Farben der Eingabequellenanzeige.
 - **Tastaturkurzbefehle** – die Taste jedes Befehls; neben einer geänderten erscheint ein Pfeil zum Zurücksetzen.
-- **Schnellterminal** – der systemweite Hotkey, Position und Bildschirm.
 - **Verbindungen** – Mit Host verbinden und gespeicherte Vorgaben.
 - **Datenschutz & Sicherheit** – Schreiben in die Zwischenablage durch Programme (OSC 52), Sichere Tastatureingabe, der
   Verzeichnisverlauf und zuletzt verbundene Hosts.

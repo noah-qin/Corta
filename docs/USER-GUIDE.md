@@ -24,7 +24,6 @@ and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 - [Remote work: SSH and SFTP](#remote-work-ssh-and-sftp)
 - [Images in the terminal](#images-in-the-terminal)
 - [The command palette](#the-command-palette)
-- [The Quick Terminal](#the-quick-terminal)
 - [macOS integration](#macos-integration)
 - [Speed and battery](#speed-and-battery)
 - [Settings and the config file](#settings-and-the-config-file)
@@ -68,7 +67,6 @@ values and when it applies).
 | :--- | :--- |
 | ⌥ as Meta / Alt (iTerm2's *Left Option key: Esc+*, Ghostty's `macos-option-as-alt`) | `option-as-meta = true`. Off by default, so ⌥ types `é`, `ø` and `–` as macOS does. |
 | Copy on select | `copy-on-select`, **on** by default. Set `false` for ⌘C only. |
-| A hotkey window or quick terminal | `quick-terminal = true`; the key is `quick-terminal-key` (default ⌥Space). Off by default: a global hotkey is claimed in every application. [The Quick Terminal](#the-quick-terminal). |
 | Programs copying to the clipboard over `ssh` or from `tmux` (OSC 52) | `allow-clipboard-write = true`. Off by default; reading the clipboard is not possible under any setting. |
 | Being asked before closing a busy window | `confirm-close`, on by default. |
 | Windows reopening where you left them | `restore-windows`, on by default. Layouts, tabs and working directories come back; processes and terminal text do not. |
@@ -89,8 +87,7 @@ says it may conflict; the two can both emit prompt marks. See
 already works with iTerm2 or Terminal.app needs nothing new; one set up for
 `xterm-ghostty` or `xterm-kitty` gets the common value instead.
 
-Behaviour that differs in smaller ways — copying, closing, the Quick
-Terminal hotkey, remote badges — is collected in
+Behaviour that differs in smaller ways — copying, closing, remote badges — is collected in
 [Troubleshooting → Behaviour that differs](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals).
 
 ## Windows, tabs and panes
@@ -127,7 +124,7 @@ Tabs containing split panes show a stack of icons, including while a pane is zoo
 - **Restoring windows.** Quit and relaunch, and every window comes back
   with its tabs, splits, divider positions and each pane's working directory
   (`restore-windows`, on by default). Each pane starts a fresh process;
-  terminal text and running jobs are not restored. The Quick Terminal is excluded.
+  terminal text and running jobs are not restored.
 - **Presets.** A preset is a named shell, directory and environment,
   defined in the config file. **Shell ▸ New Pane with Preset** opens one;
   hold ⌥ to open it in a window of its own
@@ -666,26 +663,10 @@ Right); a group's name (`panes`) or a command's configuration name
 Clicking another window closes the palette and leaves that window in front.
 It is the quickest way to reach the commands that have no default shortcut.
 
-## The Quick Terminal
-
-A terminal that drops down over whatever you are doing. Open it from
-**View ▸ Quick Terminal**, from the command palette, or with a system-wide
-hotkey once you turn one on:
-
-```ini
-quick-terminal = true
-quick-terminal-key = alt+space
-quick-terminal-position = top      # top, bottom or center
-```
-
-The hotkey is off by default, because a system-wide key is taken from
-every other application.
-
 ## macOS integration
 
-- **Shortcuts.** Three actions: **Open Corta Window** (optionally in a
-  folder), **Focus Corta Window** and **Toggle Quick Terminal**. None of
-  them runs a command in a shell.
+- **Shortcuts.** Two actions: **Open Corta Window** (optionally in a
+  folder) and **Focus Corta Window**. Neither runs a command in a shell.
 - **Services.** Selected terminal text is offered to the **Services** menu.
 - **Secure Keyboard Entry.** **Shell ▸ Secure Keyboard Entry** stops other
   applications from reading your keystrokes while Corta is in front — for
@@ -758,7 +739,6 @@ Settings is a sidebar of categories, the way System Settings is laid out:
   indicator modes/colors.
 - **Shortcuts** — every command's key; a reset arrow appears beside one you
   have changed.
-- **Quick Terminal** — the system-wide hotkey, position and screen.
 - **Connections** — Connect to Host, and saved presets.
 - **Privacy & Security** — clipboard writes from programs (OSC 52), Secure
   Keyboard Entry, the directory history and recent hosts.

@@ -74,7 +74,7 @@ choose Update and open a new shell. See the
 
 | | |
 | :--- | :--- |
-| **Native Mac input** | CJK input and IME composition, Core Text font fallback, VoiceOver, Secure Keyboard Entry, Services, the Quick Terminal and Shortcuts actions — through AppKit, not around it. |
+| **Native Mac input** | CJK input and IME composition, Core Text font fallback, VoiceOver, Secure Keyboard Entry, Services and Shortcuts actions — through AppKit, not around it. |
 | **Fast, with evidence** | 2.3× the core throughput of 1.1, a frame less of full-screen input latency, and 11 MiB instead of 185 MiB for 100,000 lines of history. Every figure is published with its method and its gaps (below). |
 | **Remote work built in** | System OpenSSH with your `~/.ssh/config`, a Finder-like SFTP browser with drag and drop, and remote files opened in your local editor with a conflict check before upload. |
 | **One settings file** | The native Settings window and `~/.config/corta/config` edit the same store; automated checks keep the documented keys and shortcuts aligned with the code. |

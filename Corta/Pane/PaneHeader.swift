@@ -23,6 +23,8 @@ final class PaneHeader: NSView {
     static let height: CGFloat = 28
     weak var pane: ViewController?
     private let title = NSTextField(labelWithString: "")
+    private let icon = NSImageView()
+    private var displayedProgram: ProgramIcon?
     private var buttons: [NSButton] = []
 
     private struct Command {
@@ -35,7 +37,7 @@ final class PaneHeader: NSView {
     init(pane: ViewController) {
         self.pane = pane
         super.init(frame: NSRect(x: 0, y: 0, width: 230, height: Self.height))
-        let icon = NSImageView(image: NSImage(systemSymbolName: "terminal", accessibilityDescription: nil)!)
+        icon.image = NSImage(systemSymbolName: "terminal", accessibilityDescription: nil)
         icon.contentTintColor = .secondaryLabelColor
         title.font = .systemFont(ofSize: 11)
         title.textColor = .secondaryLabelColor
@@ -115,10 +117,17 @@ final class PaneHeader: NSView {
         let dark = color.x * 0.2126 + color.y * 0.7152 + color.z * 0.0722 < 0.5
         let name: NSAppearance.Name = dark ? .darkAqua : .aqua
         if appearance?.name != name { appearance = NSAppearance(named: name) }
-        title.stringValue = pane.windowTitle.composed
-        title.toolTip = title.stringValue
+        let fullTitle = pane.windowTitle.composed
+        let tabLabel = pane.windowTitle.tabLabel
+        if displayedProgram != tabLabel.icon {
+            icon.image = tabLabel.icon == .terminal
+                ? NSImage(systemSymbolName: "terminal", accessibilityDescription: nil) : tabLabel.icon.symbol
+            displayedProgram = tabLabel.icon
+        }
+        title.stringValue = tabLabel.text
+        title.toolTip = fullTitle
         title.textColor = pane.isFocusedPane ? .labelColor : .secondaryLabelColor
-        buttons[2].isEnabled = split.isFloating || (split.hasMultiplePanes && !(pane.view.window is NSPanel))
+        buttons[2].isEnabled = split.isFloating || split.hasMultiplePanes
         let dockLabel = L10n.text(split.isFloating ? "command.dockPane" : "command.detachPane")
         buttons[2].toolTip = dockLabel
         buttons[2].setAccessibilityLabel(dockLabel)

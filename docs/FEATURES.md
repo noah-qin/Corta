@@ -164,10 +164,8 @@ files, remote connections and child-process input.
 
 ## macOS integration
 
-- Open, focus and Quick Terminal Shortcuts actions. These actions do not send
+- Open and focus Shortcuts actions. These actions do not send
   commands to a shell.
-- Quick Terminal with an optional global hotkey, disabled by default. Enable
-  it with `quick-terminal = true`, or open it from **View ▸ Quick Terminal**.
 - Secure Keyboard Entry under **Shell**, with an indicator of engaged state.
 - Persistent input-source status (`A`, `中`, `あ`, `한` and other language codes)
   in an independent upper-right toolbar group. Automatic display follows enabled
@@ -268,8 +266,6 @@ Corta as terminal programs.
   line boundary. Programs must count the full sequence, not each scalar.
 - **Kitty graphics support direct transmission only.** File-based transmission
   is rejected by design. Animation and Unicode-placeholder placement are absent.
-- **Quick Terminal hotkeys use physical key positions**, not characters emitted
-  by the active input source. Multi-display placement still needs verification.
 - **Prompt marks are not nested.** Inside `ssh` to a host whose shell marks
   its own prompts (OSC 133), the remote commands are recorded as commands of
   their own, the `ssh` command itself is never recorded as finished, and its

@@ -156,6 +156,7 @@ extension TerminalSession {
 
     /// Shell included, for a title bar.
     public var activeProcessName: String? { pty.activeProcessName }
+    public var activeProcessEntryPoint: String? { pty.activeProcessEntryPoint }
 
     /// OSC 7 first (the shell's own answer); else the kernel's for the
     /// foreground group, since stock macOS zsh sends OSC 7 only to Terminal.app.

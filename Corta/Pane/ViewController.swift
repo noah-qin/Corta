@@ -401,7 +401,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         // view at its placeholder size would strand blank rows under the
         // prompt. The session is born at the target size, so nothing is lost.
         guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil,
-            splitController?.splitTransition.isRunning != true
+            splitController?.splitTransition.isRunning != true,
+            (view.window?.windowController as? FloatingPaneController)?.isPresenting != true
         else { return }
         let grid = gridSize(fitting: view.bounds.size)
         let pixels = pixelSize(
@@ -782,6 +783,11 @@ extension ViewController {
             guard let self else { return false }
             return !didTeardown && isFocusedPane
         }
+        title.refreshBackgroundPresentation = { [weak self] in
+            guard let self, !self.didTeardown else { return }
+            self.paneHeader.refresh()
+            (self.view.window?.windowController as? TerminalWindowController)?.refreshTabTitle()
+        }
         return title
     }
 
@@ -794,6 +800,10 @@ extension ViewController {
         paneHeader.refresh()
         if isFocusedPane {
             windowTitle.apply()
+        } else {
+            // A background pane may change the program behind a stacked tab
+            // icon without taking keyboard focus. TabIcon caches the artwork.
+            (view.window?.windowController as? TerminalWindowController)?.refreshTabTitle()
         }
         if scrollOffset > 0, !sawOutputWhileScrolled {
             // Nothing else says so: no scroll bar, and the live screen is off view.

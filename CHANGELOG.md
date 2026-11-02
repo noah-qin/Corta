@@ -10,6 +10,11 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Removed
+
+- Removed Quick Terminal, its settings page, global hotkey and Shortcuts action.
+  Existing configuration entries are retired on the next config save.
+
 ### Changed
 
 - Native window tabs now show a metal-framed terminal icon before the title,

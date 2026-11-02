@@ -23,7 +23,7 @@ import AppKit
 /// and on the hosted CI runner that stalled the test host's main thread
 /// ~40 s. Shortcuts reads intents from bundle metadata without it.
 ///
-/// **Surfaces, never text.** Open, focus, toggle the Quick Terminal; no
+/// **Surfaces, never text.** Open and focus windows; no
 /// "run a command", nothing that reaches a child's stdin. Automation is
 /// external input (`SECURITY.md` §2). The one parameter is a working
 /// directory: a path handed to `spawn`, checked, never typed.
@@ -161,22 +161,6 @@ struct FocusTerminalWindowIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         guard let delegate = NSApp.delegate as? AppDelegate, delegate.focusWindow(id: window.id)
         else { throw CortaIntentError.windowNotFound }
-        return .result()
-    }
-}
-
-/// The hotkey's toggle, for binding outside Corta.
-struct ToggleQuickTerminalIntent: AppIntent {
-    static let title: LocalizedStringResource = "Toggle Quick Terminal"
-    // periphery:ignore - AppIntent metadata the system reads, not this code
-    static let description = IntentDescription(
-        "Shows the Quick Terminal if it is hidden, and hides it if it is showing.",
-        categoryName: "Windows")
-    static let openAppWhenRun = true
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        QuickTerminalController.shared.toggle()
         return .result()
     }
 }

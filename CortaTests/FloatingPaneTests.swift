@@ -34,6 +34,75 @@ struct FloatingPaneTests {
         controller.window?.close()
     }
 
+    @Test func presentationSpringOvershootsAndSettles() {
+        let destination = NSRect(x: 100, y: 200, width: 420, height: 460)
+        let start = FloatingPaneController.presentationFrame(destination: destination, elapsed: 0)
+        #expect(start.width < destination.width)
+        #expect(start.midY < destination.midY)
+        let overshoot = FloatingPaneController.presentationFrame(destination: destination, elapsed: 0.14)
+        #expect(overshoot.width > destination.width)
+        let settled = FloatingPaneController.presentationFrame(destination: destination, elapsed: 0.56)
+        #expect(abs(settled.width - destination.width) < 0.1)
+        #expect(abs(settled.midY - destination.midY) < 0.1)
+    }
+
+    @Test func dockingDuringPresentationSettlesAndPreservesSession() throws {
+        let (controller, source) = try makeSource()
+        defer { stop(controller, source) }
+        let floating = try #require(source.floatFocusedPane())
+        let window = try #require(floating.window)
+        let pane = try #require(floating.split.focusedPane)
+        let session = pane.session
+        let destination = window.frame
+        floating.present(animated: true)
+        #expect(floating.isPresenting)
+        #expect(window.frame.width < destination.width)
+        floating.dock()
+        #expect(!floating.isPresenting)
+        #expect(window.frame == destination)
+        #expect(window.alphaValue == 1)
+        #expect(pane.parent === source)
+        #expect(pane.session === session)
+        #expect(!pane.didTeardown)
+    }
+
+    @Test func presentationCompletesAtTheOriginalSize() throws {
+        let (controller, source) = try makeSource()
+        defer { stop(controller, source) }
+        let floating = try #require(source.floatFocusedPane())
+        let window = try #require(floating.window)
+        let destination = window.frame
+        let pane = try #require(floating.split.focusedPane)
+        let grid = pane.lastRequestedSize
+        floating.present(animated: true)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.08))
+        pane.resizeSessionToFitView(coalesce: false)
+        #expect(pane.lastRequestedSize == grid)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.62))
+        #expect(!floating.isPresenting)
+        #expect(window.frame == destination)
+        #expect(window.alphaValue == 1)
+        floating.close()
+    }
+
+    @Test func reducedMotionPresentationAndClosingLeaveNoAnimation() throws {
+        let (controller, source) = try makeSource()
+        defer { stop(controller, source) }
+        let floating = try #require(source.floatFocusedPane())
+        let window = try #require(floating.window)
+        let destination = window.frame
+        floating.present(animated: false)
+        #expect(!floating.isPresenting)
+        #expect(window.frame == destination)
+        window.orderOut(nil)
+        floating.present(animated: true)
+        #expect(floating.isPresenting)
+        floating.close()
+        #expect(!floating.isPresenting)
+        #expect(window.alphaValue == 1)
+        #expect(source.floatingPanels.isEmpty)
+    }
+
     @Test func floatingPaneHasNoTitlebarAndDocksBackWithoutRestarting() throws {
         let (controller, source) = try makeSource()
         defer { stop(controller, source) }

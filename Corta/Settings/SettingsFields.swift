@@ -75,16 +75,25 @@ struct InputSourceColorField: View {
 
     var body: some View {
         LabeledContent(L10n.text(direct ? "inputSource.color.direct" : "inputSource.color.ime")) {
-            TextField("", text: $draft, prompt: Text(L10n.text("inputSource.color.system")))
-                .labelsHidden()
-                .frame(width: 110)
-                .focused($focused)
-                .accessibilityIdentifier(direct ? "input-source-direct-color" : "input-source-ime-color")
-                .onSubmit { commit() }
-                .onChange(of: focused) { _, active in if !active { commit() } }
-                .onAppear { draft = value }
-                .onChange(of: value) { _, newValue in if !focused { draft = newValue } }
-                .help(L10n.text("inputSource.color.help"))
+            HStack(spacing: 8) {
+                if let color = Theme.color(value) {
+                    Circle().fill(Color(themeColor: color)).frame(width: 18, height: 18)
+                        .overlay(Circle().strokeBorder(.primary.opacity(0.15)))
+                        .accessibilityHidden(true)
+                } else {
+                    Image(systemName: "circle.lefthalf.filled").foregroundStyle(.secondary).accessibilityHidden(true)
+                }
+                TextField("", text: $draft, prompt: Text(L10n.text("inputSource.color.system")))
+                    .labelsHidden()
+                    .frame(width: 110)
+                    .focused($focused)
+                    .accessibilityIdentifier(direct ? "input-source-direct-color" : "input-source-ime-color")
+                    .onSubmit { commit() }
+                    .onChange(of: focused) { _, active in if !active { commit() } }
+                    .onAppear { draft = value }
+                    .onChange(of: value) { _, newValue in if !focused { draft = newValue } }
+                    .help(L10n.text("inputSource.color.help"))
+            }
         }
     }
 
@@ -98,12 +107,17 @@ struct StatusNetworkInterfaceField: View {
     @Bindable var model: SettingsModel
     @State private var value = "auto"
     var body: some View {
-        TextField(L10n.text("status.interface"), text: $value)
-            .accessibilityIdentifier("status-network-interface")
-            .onSubmit { model.setStatusNetworkInterface(value); value = model.statusNetworkInterface }
-            .onAppear { value = model.statusNetworkInterface }
-            .onChange(of: model.statusNetworkInterface) { _, name in value = name }
-            .help(L10n.text("status.network.help"))
+        LabeledContent(L10n.text("status.interface")) {
+            TextField("", text: $value).labelsHidden().frame(width: 180)
+                .accessibilityIdentifier("status-network-interface")
+                .onSubmit {
+                    model.setStatusNetworkInterface(value)
+                    value = model.statusNetworkInterface
+                }
+                .onAppear { value = model.statusNetworkInterface }
+                .onChange(of: model.statusNetworkInterface) { _, name in value = name }
+                .help(L10n.text("status.network.help"))
+        }
     }
 }
 

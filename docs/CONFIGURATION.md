@@ -80,25 +80,8 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | --- | --- | --- | --- |
 | `columns` | 20–500 | `120` | The grid a **new** window opens with, in cells. |
 | `rows` | 5–300 | `30` | As above. The window's size in pixels is this grid times the font's cell metrics plus the pane insets — so two terminals showing the same `columns × rows` are still different sizes on screen if their fonts differ. |
-| `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. The Quick Terminal is excluded. |
+| `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. |
 | `confirm-close` | boolean | `true` | Ask before closing a pane, window or the app while a shell still has a foreground job. |
-
-#### Quick Terminal
-
-One terminal window summoned and dismissed from any application. It is an
-ordinary Corta window dressed as a panel — the same panes, splits and
-teardown — that floats above other windows, appears on every Space and
-beside full-screen apps, takes no tabs (⌘T from it opens a normal window)
-and is never saved into the restored arrangement. Dismissing it with the
-hotkey returns focus to the application it was summoned from; clicking
-into another application hides it without moving focus again.
-
-| Key | Values | Default | Notes |
-| --- | --- | --- | --- |
-| `quick-terminal` | boolean | `false` | Whether Corta holds `quick-terminal-key` **system-wide**. Off by default: a global hotkey is claimed in every application, and the key a person would want is one their launcher may already own. The panel is always reachable from View ▸ Quick Terminal, the command palette and the *Toggle Quick Terminal* Shortcuts action — this key only adds the hotkey. |
-| `quick-terminal-key` | a shortcut, or empty | `alt+space` | In `bind.*` notation (§5). Needs a modifier other than Shift — a bare key, or a Shift one (a capital letter, a symbol, a selection), claimed everywhere would swallow ordinary typing. The key is matched by **position on the ANSI layout**, the way every Carbon hotkey is, so `t` names the key cap, not what the current input source types there. Empty means no hotkey. If the system refuses the registration (another app holds the key) Settings ▸ Quick Terminal says so; the panel then opens from the menu only. |
-| `quick-terminal-position` | `top`, `bottom`, `center` | `top` | `top`/`bottom`: a band the width of the screen and 40% of its visible height, on that edge — under the menu bar and clear of the Dock. `center`: a panel 70% × 60% of the screen, centred. |
-| `quick-terminal-screen` | `mouse`, `main` | `mouse` | Which display the panel opens on: the one under the pointer when the hotkey is pressed, or `NSScreen.main` (the display holding the key window, else the primary). |
 
 ### Terminal
 
@@ -121,7 +104,7 @@ into another application hides it without moving focus again.
 | `mouse-override-modifier` | `option`, `shift`, `control` | `option` | Hold this modifier when beginning a drag to select terminal text while a TUI owns the mouse. Applies immediately. The pane shows a hint on first use; `copy-on-select` controls automatic copying. |
 | `link-activation` | `command`, `click` | `command` | `command` opens a link on ⌘-click. `click` opens it on a plain click and underlines the link under the pointer; dragging across a URL still selects it. |
 | `allow-clipboard-write` | boolean | `false` | Whether OSC 52 may put text on the system clipboard — the only route from inside `tmux` or an `ssh` session. Off by default because *any* output could use it. The **read** direction does not exist under any setting (`SECURITY.md` §6). |
-| `secure-keyboard-entry` | boolean | `false` | Secure Keyboard Entry: while a Corta terminal window is key and Corta is the active application, the system stops delivering keystrokes to any other process — event taps, keyloggers, macro tools and accessibility clients alike. Shell ▸ Secure Keyboard Entry toggles this key and shows a checkmark; a lock in the titlebar shows when it is *actually engaged*, which is not while another app is frontmost or Settings is key. Off by default because it is system-wide and also silences the tools a person may rely on (`SECURITY.md` §4.5). The Quick Terminal's hotkey keeps working while it is on. |
+| `secure-keyboard-entry` | boolean | `false` | Secure Keyboard Entry: while a Corta terminal window is key and Corta is the active application, the system stops delivering keystrokes to any other process — event taps, keyloggers, macro tools and accessibility clients alike. Shell ▸ Secure Keyboard Entry toggles this key and shows a checkmark; a lock in the titlebar shows when it is *actually engaged*, which is not while another app is frontmost or Settings is key. Off by default because it is system-wide and also silences the tools a person may rely on (`SECURITY.md` §4.5). |
 
 #### Following a file reference
 
@@ -345,11 +328,6 @@ rows = 30
 restore-windows = true
 confirm-close = true
 
-# Quick Terminal
-quick-terminal = false
-quick-terminal-key = alt+space
-quick-terminal-position = top
-quick-terminal-screen = mouse
 
 # Terminal
 scrollback-lines = 50000           # default 10000
@@ -610,7 +588,6 @@ the key against both rows, which is how you spot it.
 | `browse-remote-files` | Browse Remote Files… | *(none)* |
 | `previous-command` | Previous Command | `cmd+up` |
 | `next-command` | Next Command | `cmd+down` |
-| `quick-terminal` | Quick Terminal | *(none — the system-wide key is `quick-terminal-key`)* |
 | `secure-keyboard-entry` | Secure Keyboard Entry | *(none)* |
 | `settings` | Settings… | `cmd+,` |
 | `command-palette` | Command Palette… | `shift+cmd+p` |
@@ -783,8 +760,6 @@ search away.
 | `scrollback-lines` | Sessions started afterwards; a running shell keeps the history it has. |
 | `command-history-limit` | Sessions started afterwards, same reason as `scrollback-lines`. |
 | `restore-windows` | The next launch. |
-| `quick-terminal`, `quick-terminal-key` | Immediately — the hotkey is re-registered on every file change. |
-| `quick-terminal-position`, `quick-terminal-screen` | The next time the panel is summoned. |
 | `secure-keyboard-entry` | Immediately, whenever a terminal window is key. |
 | `update-auto-check` | Immediately — applied to the live Sparkle updater on every file change. |
 | `suggest-applications-folder` | The next launch. |

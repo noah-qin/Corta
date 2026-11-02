@@ -21,36 +21,64 @@ extension SettingsView {
 
     /// Every command's key, in the menu order; written as `bind.` keys.
     var shortcutsPage: some View {
-        Form {
-            Section(L10n.text("settings.section.commands")) {
-                ForEach(TerminalCommand.allCases, id: \.self) { command in
-                    LabeledContent(command.title) {
-                        HStack(spacing: 6) {
-                            ShortcutRecorder(
-                                value: model.keybindings[command], onChange: { model.setShortcut($0, for: command) })
-                            // Only where there is something to restore; the
-                            // slot stays, so the recorders line up.
-                            let isDefault = model.keybindings[command] == command.defaultShortcut
-                            Button {
-                                model.resetShortcut(command)
-                            } label: {
-                                Image(systemName: "arrow.counterclockwise")
+        SettingsPage {
+            HStack {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField(L10n.text("settings.shortcuts.search"), text: $shortcutSearch)
+                    .textFieldStyle(.plain).accessibilityIdentifier("shortcuts-search")
+                if !shortcutSearch.isEmpty {
+                    Button {
+                        shortcutSearch = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.plain).accessibilityLabel(L10n.text("settings.search.clear"))
+                }
+            }
+            .padding(12).background(.quaternary, in: .rect(cornerRadius: 10))
+            ForEach(CommandCategory.allCases, id: \.self) { category in
+                let commands = TerminalCommand.allCases.filter {
+                    $0.category == category
+                        && (shortcutSearch.isEmpty || $0.title.localizedStandardContains(shortcutSearch))
+                }.sorted { $0.paletteRank < $1.paletteRank }
+                if !commands.isEmpty {
+                    SettingsSection(category.title) {
+                        ForEach(commands, id: \.self) { command in
+                            LabeledContent(command.title) {
+                                HStack(spacing: 6) {
+                                    ShortcutRecorder(
+                                        value: model.keybindings[command],
+                                        onChange: { model.setShortcut($0, for: command) })
+                                    // Only where there is something to restore; the
+                                    // slot stays, so the recorders line up.
+                                    let isDefault = model.keybindings[command] == command.defaultShortcut
+                                    Button {
+                                        model.resetShortcut(command)
+                                    } label: {
+                                        Image(systemName: "arrow.counterclockwise")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help(L10n.text("ui.shortcut.reset"))
+                                    .accessibilityLabel(L10n.text("ui.shortcut.reset"))
+                                    .opacity(isDefault ? 0 : 1)
+                                    .disabled(isDefault)
+                                    .accessibilityHidden(isDefault)
+                                }
                             }
-                            .buttonStyle(.borderless)
-                            .help(L10n.text("ui.shortcut.reset"))
-                            .accessibilityLabel(L10n.text("ui.shortcut.reset"))
-                            .opacity(isDefault ? 0 : 1)
-                            .disabled(isDefault)
-                            .accessibilityHidden(isDefault)
                         }
                     }
                 }
+            }
+            if !TerminalCommand.allCases.contains(where: {
+                shortcutSearch.isEmpty || $0.title.localizedStandardContains(shortcutSearch)
+            }) {
+                ContentUnavailableView.search(text: shortcutSearch)
             }
         }
     }
 
     var windowSection: some View {
-        Section(L10n.text("settings.section.window")) {
+        SettingsSection(L10n.text("settings.section.window")) {
             LabeledContent(L10n.text("settings.label.newWindow")) {
                 HStack(spacing: 6) {
                     numberField(bind(model.columns, model.setColumns), width: 54)
@@ -65,44 +93,8 @@ extension SettingsView {
         }
     }
 
-    /// Untitled: it is the whole page, and the page already says its name.
-    var quickTerminalSection: some View {
-        Section {
-            Toggle(
-                L10n.text("settings.label.quickTerminalHotkey"),
-                isOn: bind(\.quickTerminal)
-            )
-            .help(L10n.text("settings.help.quickTerminal"))
-            LabeledContent(L10n.text("ui.shortcut.global")) {
-                ShortcutRecorder(value: model.quickTerminalKey, onChange: model.setQuickTerminalKey)
-            }
-            // The switch already says "off"; the row is for which key, or
-            // why none.
-            if model.quickTerminalStatus.kind != .none {
-                StatusRowView(status: model.quickTerminalStatus)
-            }
-            Picker(
-                L10n.text("settings.label.quickTerminalPosition"),
-                selection: bind(\.quickTerminalPosition)
-            ) {
-                ForEach(Configuration.QuickTerminalPosition.allCases, id: \.self) { position in
-                    Text(L10n.text("settings.quickTerminalPosition.\(position.rawValue)"))
-                        .tag(position)
-                }
-            }
-            Picker(
-                L10n.text("settings.label.quickTerminalScreen"),
-                selection: bind(\.quickTerminalScreen)
-            ) {
-                ForEach(Configuration.QuickTerminalScreen.allCases, id: \.self) { screen in
-                    Text(L10n.text("settings.quickTerminalScreen.\(screen.rawValue)")).tag(screen)
-                }
-            }
-        }
-    }
-
     var notificationsSection: some View {
-        Section(L10n.text("settings.section.notifications")) {
+        SettingsSection(L10n.text("settings.section.notifications")) {
             Toggle(
                 L10n.text("settings.label.notifyOnLongTasks"),
                 isOn: bind(\.notifyOnLongTask)
@@ -126,7 +118,7 @@ extension SettingsView {
     }
 
     var historySection: some View {
-        Section(L10n.text("settings.section.history")) {
+        SettingsSection(L10n.text("settings.section.history")) {
             Toggle(
                 L10n.text("settings.label.directoryHistory"),
                 isOn: bind(\.directoryHistory)

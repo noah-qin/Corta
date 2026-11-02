@@ -74,7 +74,7 @@ Ist eine installierte Integration veraltet, wähle „Aktualisieren“ und öffn
 
 | | |
 | :--- | :--- |
-| **Native Mac-Eingabe** | CJK-Eingabe und IME-Komposition, Core-Text-Schriftersatz, VoiceOver, Sichere Tastatureingabe, Dienste, das Schnellterminal und Kurzbefehle-Aktionen – über AppKit, nicht an AppKit vorbei. |
+| **Native Mac-Eingabe** | CJK-Eingabe und IME-Komposition, Core-Text-Schriftersatz, VoiceOver, Sichere Tastatureingabe, Dienste und Kurzbefehle-Aktionen – über AppKit, nicht an AppKit vorbei. |
 | **Schnell, mit Belegen** | 2,3-facher Kerndurchsatz gegenüber 1.1, ein Frame weniger Eingabelatenz im Vollbild und 11 MiB statt 185 MiB für 100.000 Zeilen Verlauf. Jede Zahl wird mit ihrer Methode und ihren Lücken veröffentlicht (siehe unten). |
 | **Remote-Arbeit eingebaut** | Das OpenSSH des Systems mit deiner `~/.ssh/config`, ein Finder-ähnlicher SFTP-Browser mit Drag-and-drop und entfernte Dateien, die in deinem lokalen Editor geöffnet werden – mit Konfliktprüfung vor dem Hochladen. |
 | **Eine Einstellungsdatei** | Das native Einstellungsfenster und `~/.config/corta/config` bearbeiten denselben Speicher; automatische Prüfungen halten die dokumentierten Schlüssel und Kurzbefehle mit dem Code in Einklang. |

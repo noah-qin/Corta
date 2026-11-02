@@ -38,6 +38,7 @@ final class PaneWindowTitle {
     /// Whether a deferred rebuild may still apply: the pane is open and
     /// focused. An unfocused pane's title applies on focus.
     var canApplyDeferred: () -> Bool = { false }
+    var refreshBackgroundPresentation: () -> Void = {}
     /// Whether a path is a directory — a `stat`, which can block on a mount
     /// that never answers, so it runs off the main actor.
     private let isDirectory: @Sendable (String) -> Bool
@@ -53,6 +54,7 @@ final class PaneWindowTitle {
     }
 
     private var cachedProcessName: String?
+    private var cachedEntryPoint: String?
     private var cachedDirectory: String?
     /// `cachedDirectory` if it was a directory when it last changed: the
     /// title bar's proxy icon.
@@ -125,6 +127,18 @@ final class PaneWindowTitle {
             parts.append("\(size.columns)×\(size.rows)")
         }
         return parts.isEmpty ? "Corta" : parts.joined(separator: " — ")
+    }
+
+    /// Compact chrome uses the same bounded process/directory cache as the
+    /// full title. The complete OSC title remains in the window and tooltip.
+    var tabLabel: ProgramTabLabel {
+        if let session { refreshProcessFactsIfStale(session, scheduleTrailing: false) }
+        let process = Self.sanitizedTitleComponent(cachedProcessName) ?? "Corta"
+        let icon = ProgramIcon.identify(process, entryPoint: cachedEntryPoint)
+        let directory = Self.sanitizedTitleComponent(cachedDirectory.map(Self.abbreviated)) ?? ""
+        let remote = Self.sanitizedTitleComponent(cachedRemoteState.titleComponent)
+        return ProgramTabLabel(icon: icon, name: icon.displayName ?? process,
+                               context: remote.map { $0 + (directory.isEmpty ? "" : " · " + directory) } ?? directory)
     }
 
     /// The finished-task notice's title: the user's own tab name, else the
@@ -235,15 +249,16 @@ final class PaneWindowTitle {
     /// exiting announces itself with output — the far end's banner, the
     /// local shell's returning prompt — so the badge follows within one
     /// interval, with no timer of its own.
-    private func refreshProcessFactsIfStale(_ session: TerminalSession) {
+    private func refreshProcessFactsIfStale(_ session: TerminalSession, scheduleTrailing: Bool = true) {
         let now = CACurrentMediaTime()
         let elapsed = now - lastProcessFactsRefresh
         guard elapsed >= Self.processFactsInterval else {
-            scheduleTrailingTitleRefresh(after: Self.processFactsInterval - elapsed)
+            if scheduleTrailing { scheduleTrailingTitleRefresh(after: Self.processFactsInterval - elapsed) }
             return
         }
         lastProcessFactsRefresh = now
         cachedProcessName = session.activeProcessName
+        cachedEntryPoint = session.activeProcessEntryPoint
         let directory = session.currentDirectory
         if directory != cachedDirectory {
             cachedDirectory = directory
@@ -261,8 +276,8 @@ final class PaneWindowTitle {
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             trailingTitleRefresh = nil
-            guard !isStopped, canApplyDeferred() else { return }
-            apply()
+            guard !isStopped else { return }
+            if canApplyDeferred() { apply() } else { refreshBackgroundPresentation() }
         }
         trailingTitleRefresh = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)

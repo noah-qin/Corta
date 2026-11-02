@@ -20,9 +20,33 @@ import SwiftUI
 /// controller (which names the window after it).
 @MainActor @Observable
 final class SettingsNavigation {
-    var selection: SettingsView.Category = .general
+    private(set) var selection: SettingsView.Category = .general
+    private var backStack: [SettingsView.Category] = []
+    private var forwardStack: [SettingsView.Category] = []
     var showHostDetails = false
     var themeEditorRequest = 0
+
+    var canGoBack: Bool { !backStack.isEmpty }
+    var canGoForward: Bool { !forwardStack.isEmpty }
+
+    func go(to category: SettingsView.Category) {
+        guard category != selection else { return }
+        backStack.append(selection)
+        forwardStack.removeAll()
+        selection = category
+    }
+
+    func goBack() {
+        guard let previous = backStack.popLast() else { return }
+        forwardStack.append(selection)
+        selection = previous
+    }
+
+    func goForward() {
+        guard let next = forwardStack.popLast() else { return }
+        backStack.append(selection)
+        selection = next
+    }
 }
 
 /// The category list. AppKit hosts it as the split view's sidebar item, which
@@ -31,16 +55,68 @@ final class SettingsNavigation {
 struct SettingsSidebar: View {
     @Bindable var navigation: SettingsNavigation
 
+    @State private var search = ""
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var categories: [SettingsView.Category] {
+        SettingsView.Category.allCases.filter { $0.matches(search) }
+    }
+
     var body: some View {
-        List(
-            SettingsView.Category.allCases,
-            selection: Binding(
-                get: { navigation.selection },
-                set: { if let category = $0 { navigation.selection = category } })
-        ) { category in
-            SettingsSidebarRow(category: category).tag(category)
+        VStack(spacing: 8) {
+            HStack(spacing: 7) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(colorScheme == .dark ? Color(white: 0.65) : Color(white: 0.45))
+                TextField(L10n.text("settings.search.placeholder"), text: $search)
+                    .textFieldStyle(.plain).accessibilityIdentifier("settings-search")
+                if !search.isEmpty {
+                    Button {
+                        search = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .accessibilityLabel(L10n.text("settings.search.clear"))
+                }
+            }
+            .padding(.horizontal, 10).frame(height: 30).background(Color.primary.opacity(0.055), in: .capsule)
+            .padding(.horizontal, 12).padding(.top, 6)
+            if categories.isEmpty {
+                Text(L10n.text("settings.search.empty")).foregroundStyle(.secondary).padding()
+            }
+            List(categories) { category in
+                Button {
+                    navigation.go(to: category)
+                } label: {
+                    SettingsSidebarRow(category: category)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10).padding(.vertical, 2)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(colorScheme == .dark ? Color(white: 0.9) : Color(white: 0.15))
+                .background(
+                    navigation.selection == category ? Color.primary.opacity(0.07) : .clear,
+                    in: .rect(cornerRadius: 10)
+                )
+                .accessibilityAddTraits(navigation.selection == category ? [.isSelected] : [])
+                .listRowInsets(
+                    EdgeInsets(
+                        top: search.isEmpty && [.terminal, .connections, .privacy].contains(category) ? 12 : 1,
+                        leading: 6, bottom: 1, trailing: 6))
+            }
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .onMoveCommand { direction in
+                guard let index = categories.firstIndex(of: navigation.selection) else { return }
+                switch direction {
+                case .up: navigation.go(to: categories[max(0, index - 1)])
+                case .down: navigation.go(to: categories[min(categories.count - 1, index + 1)])
+                default: break
+                }
+            }
         }
-        .listStyle(.sidebar)
+        .background(Color(nsColor: .controlBackgroundColor).ignoresSafeArea())
     }
 }
 
@@ -52,14 +128,9 @@ private struct SettingsSidebarRow: View {
     let category: SettingsView.Category
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: category.symbol)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
-                .background(category.tileColor.gradient, in: .rect(cornerRadius: 6))
-                .accessibilityHidden(true)
-            Text(category.title)
-        }
+        HStack(spacing: 10) {
+            SettingsIconTile(color: category.tileColor, symbol: category.symbol, size: 24)
+            Text(category.title).font(.system(size: 13))
+        }.padding(.vertical, 2)
     }
 }

@@ -301,14 +301,13 @@ final class SearchAndTabUITests: XCTestCase {
         let settings = app.windows["Corta.Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.outlines.firstMatch.staticTexts["Appearance"].click()
-        let theme = settings.popUpButtons["appearance-theme"]
-        XCTAssertTrue(theme.waitForExistence(timeout: 3))
-        theme.click()
-        XCTAssertTrue(theme.menuItems["Corta"].exists)
-        XCTAssertTrue(theme.menuItems["Mono"].exists)
-        theme.menuItems["Solarized"].click()
+        settings.outlines.firstMatch.staticTexts["Themes"].click()
+        XCTAssertTrue(settings.buttons["theme-choice-corta"].waitForExistence(timeout: 3))
+        XCTAssertTrue(settings.buttons["theme-choice-mono"].exists)
+        settings.buttons["theme-choice-solarized"].click()
         let config = try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
         XCTAssertTrue(config.contains("theme = solarized"))
+        settings.outlines.firstMatch.staticTexts["Appearance"].click()
         let preview = settings.descendants(matching: .any).matching(identifier: "appearance-preview").firstMatch
         XCTAssertEqual(preview.value as? String, "light")
         keep(settings.screenshot(), named: "feedback-settings")

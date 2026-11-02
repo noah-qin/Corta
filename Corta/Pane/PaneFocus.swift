@@ -290,10 +290,18 @@ final class PaneFocus: NSObject {
     func applyAppearance() {
         guard let host else { return }
         let subtle = host.view is PaneSurfaceView && !SystemAccessibility.increaseContrast
-        dimView?.layer?.backgroundColor = NSColor.black.withAlphaComponent(
-            subtle ? 0.025 : Self.unfocusedDim).cgColor
-        highlightView?.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(
-            subtle ? 0.01 : Self.focusHighlightAlpha).cgColor
+        if subtle {
+            // A veil in the theme's own colour softens inactive text without
+            // making the entire card look disabled or tinting the active one.
+            let canvas = PaneSurfaceView.canvasColor
+            let light = canvas.redComponent + canvas.greenComponent + canvas.blueComponent > 1.5
+            let veil = canvas.blended(withFraction: 0.05, of: light ? .black : .white) ?? canvas
+            dimView?.layer?.backgroundColor = veil.withAlphaComponent(0.24).cgColor
+        } else {
+            dimView?.layer?.backgroundColor = NSColor.black.withAlphaComponent(Self.unfocusedDim).cgColor
+        }
+        highlightView?.layer?.backgroundColor = NSColor.controlAccentColor
+            .withAlphaComponent(Self.focusHighlightAlpha).cgColor
         // One pane needs neither.
         let inSplit = host.splitController?.hasMultiplePanes == true
         // The dim is structural and stays while the app is inactive; ring and
@@ -301,9 +309,13 @@ final class PaneFocus: NSObject {
         dimView?.isHidden = host.isFocusedPane || !inSplit
         let highlighted = hasUserFocus && inSplit
         ringView?.isHidden = !highlighted
-        highlightView?.isHidden = !highlighted
-        // The accent can change at runtime; Increase Contrast wants more.
-        ringView?.layer?.borderColor = Self.focusRingColor.cgColor
+        highlightView?.isHidden = !highlighted || subtle
+        // Normal cards use a neutral keyline; Increase Contrast retains the
+        // stronger system accent and highlight as an explicit focus signal.
+        let canvas = PaneSurfaceView.canvasColor
+        let light = canvas.redComponent + canvas.greenComponent + canvas.blueComponent > 1.5
+        let neutral = (light ? NSColor.black : .white).withAlphaComponent(light ? 0.16 : 0.24)
+        ringView?.layer?.borderColor = (subtle ? neutral : Self.focusRingColor).cgColor
         ringView?.layer?.borderWidth =
             SystemAccessibility.increaseContrast ? Self.focusRingWidth + 1 : Self.focusRingWidth
         reportIfNeeded()

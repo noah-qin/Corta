@@ -39,10 +39,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Nothing else retains a window controller, and dropping one takes its
     /// window and session down.
     private var windowControllers: [NSWindowController] = []
-    /// The windows an App Intent may name, in opening order; the Quick
-    /// Terminal has its own intent.
+    /// The windows an App Intent may name, in opening order.
     var terminalWindowControllers: [TerminalWindowController] {
-        windowControllers.compactMap { $0 as? TerminalWindowController }.filter { !$0.isQuickTerminal }
+        windowControllers.compactMap { $0 as? TerminalWindowController }
     }
     /// The debounced arrangement write; see `noteLayoutChanged`.
     var pendingLayoutSave: DispatchWorkItem?
@@ -69,14 +68,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return controller
     }
 
-    /// Cascades a new window from the key window, or a second ⌘N looks like
-    /// it did nothing — except from the Quick Terminal's screen-edge band —
-    /// and keeps it on screen.
+    /// Cascades a new window from the key window and keeps it on screen.
     func cascade(_ controller: TerminalWindowController) {
         guard let window = controller.window else { return }
-        if let previous = NSApp.keyWindow, previous !== window,
-            !QuickTerminalController.shared.owns(previous)
-        {
+        if let previous = NSApp.keyWindow, previous !== window {
             window.setFrameTopLeftPoint(
                 NSPoint(x: previous.frame.minX + 24, y: previous.frame.maxY - 24))
         }
@@ -118,7 +113,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         guard let window = controller.window else { return }
         window.tabbingMode = .automatic
         if let keyWindow = existing, keyWindow !== window,
-            !QuickTerminalController.shared.owns(keyWindow),
             keyWindow.contentViewController is SplitViewController {
             let members = keyWindow.tabbedWindows ?? [keyWindow]
             let frame = keyWindow.frame
@@ -157,12 +151,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     /// One tracked terminal window controller, its root pane spawned from
-    /// `setup` and its window sized, not yet shown. `asPanel` makes it the
-    /// Quick Terminal's non-activating panel.
+    /// `setup` and its window sized, not yet shown.
     func makeWindowController(
-        setup: SplitViewController.Setup = .init(), asPanel: Bool = false
+        setup: SplitViewController.Setup = .init()
     ) -> TerminalWindowController {
-        let controller = TerminalWindowController(setup: setup, asPanel: asPanel)
+        let controller = TerminalWindowController(setup: setup)
         track(controller)
         return controller
     }
@@ -219,12 +212,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     // MARK: - System entry points
-
-    /// Menu, palette and App Intent; the hotkey calls
-    /// `QuickTerminalController.toggle` directly.
-    @objc func toggleQuickTerminal(_: Any?) {
-        QuickTerminalController.shared.toggle()
-    }
 
     /// Writes the config file, the setting's only store; `SecureInput`
     /// follows the file.
@@ -285,7 +272,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // Before any window: the hotkey must be held from launch, and Secure
         // Keyboard Entry must see the first window become key.
         SecureInput.shared.start()
-        QuickTerminalController.shared.start()
         installMenus()
         // Before any window, so a move-and-relaunch never spawns a shell first.
         ApplicationsFolderMover.promptIfNeeded()
@@ -311,6 +297,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         #if DEBUG
         if CommandLine.arguments.contains("--sftp-preview") { SFTPBrowserController.showDevelopmentPreview() }
         if CommandLine.arguments.contains("--glass-preview") { GlassAppearancePreview.show() }
+        if CommandLine.arguments.contains("--tab-preview"), let window = terminalWindowControllers.first?.window {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self, weak window] in
+                guard let self, let window else { return }
+                (window.contentViewController as? SplitViewController)?.splitRight(nil)
+                self.newTab(beside: window, sender: nil)
+                self.newTab(beside: window, sender: nil)
+                window.tabGroup?.selectedWindow = window
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
         if CommandLine.arguments.contains("--pane-preview")
             || CommandLine.arguments.contains("--floating-pane-preview"),
            let split = terminalWindowControllers.first?.contentViewController as? SplitViewController {
@@ -469,10 +465,9 @@ extension AppDelegate {
         else { return .terminateNow }
         // Already asking: that sheet answers this quit too.
         guard !isAskingToTerminate else { return .terminateCancel }
-        // Not the Quick Terminal, which hides — sheet and all — when Corta
-        // loses activation, nor a window already showing a sheet.
+        // Only terminal windows with room to present a confirmation sheet.
         let windows = windowControllers.compactMap { controller -> NSWindow? in
-            guard let terminal = controller as? TerminalWindowController, !terminal.isQuickTerminal
+            guard let terminal = controller as? TerminalWindowController
             else { return nil }
             return terminal.window
         }.filter { NSAlert.canPresentSheet(on: $0) }
@@ -501,7 +496,6 @@ extension AppDelegate {
         SSHAskpassBroker.shared.stop()
         // The secure-input count must reach zero before exit.
         SecureInput.shared.disengage()
-        QuickTerminalController.shared.teardown()
         // Not every quit path reaches `windowWillClose`; tear down explicitly
         // rather than leave children to SIGHUP.
         for controller in windowControllers {

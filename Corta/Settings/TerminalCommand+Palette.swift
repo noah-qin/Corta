@@ -26,7 +26,7 @@ nonisolated extension TerminalCommand {
     /// replacing that knowledge.
     var category: CommandCategory {
         switch self {
-        case .newWindow, .newTab, .previousTab, .nextTab, .renameTab, .close, .quickTerminal: return .window
+        case .newWindow, .newTab, .previousTab, .nextTab, .renameTab, .close: return .window
         case .splitRight, .splitDown, .focusLeft, .focusRight, .focusUp, .focusDown,
             .growPaneHorizontally, .shrinkPaneHorizontally, .growPaneVertically,
             .shrinkPaneVertically, .equalizePanes, .zoomPane, .reopenClosedPane:
@@ -56,7 +56,6 @@ nonisolated extension TerminalCommand {
         case .newTab: return 0
         case .newWindow: return 1
         case .close: return 2
-        case .quickTerminal: return 3
         case .previousTab: return 4
         case .nextTab: return 5
         case .renameTab: return 6

@@ -187,9 +187,6 @@ extension AppDelegate {
         }
         view.addItem(.separator())
         view.addItem(item(for: .commandPalette))
-        // No key equivalent: the system-wide hotkey is `quick-terminal-key`,
-        // held by `GlobalHotKey`.
-        view.addItem(item(for: .quickTerminal))
         view.addItem(.separator())
 
         view.addSubmenu(makeThemeMenu())

@@ -28,7 +28,6 @@ Corta 能做的一切，以及從哪裡找到它。每一節都會說明功能�
 - [遠端工作：SSH 與 SFTP](#remote-work-ssh-and-sftp)
 - [終端機裡的圖片](#images-in-the-terminal)
 - [命令面板](#the-command-palette)
-- [快捷終端機](#the-quick-terminal)
 - [macOS 整合](#macos-integration)
 - [速度與電池](#speed-and-battery)
 - [設定與設定檔](#settings-and-the-config-file)
@@ -72,7 +71,6 @@ Corta 沒有匯入工具：它只讀一個文字檔 `~/.config/corta/config`，�
 | :--- | :--- |
 | ⌥ 用作 Meta / Alt（iTerm2 的 *Left Option key: Esc+*，Ghostty 的 `macos-option-as-alt`） | `option-as-meta = true`。預設關閉，所以 ⌥ 會像 macOS 一樣輸入 `é`、`ø` 和 `–`。 |
 | 選取時複製 | `copy-on-select`，預設**開啟**。設為 `false` 則只用 ⌘C。 |
-| 熱鍵視窗或快捷終端機 | `quick-terminal = true`；按鍵是 `quick-terminal-key`（預設 ⌥Space）。預設關閉：全域熱鍵會在所有 App 裡佔用這個鍵。見[快捷終端機](#the-quick-terminal)。 |
 | 程式透過 `ssh` 或在 `tmux` 裡複製到剪貼簿（OSC 52） | `allow-clipboard-write = true`。預設關閉；任何設定下都無法讀取剪貼簿。 |
 | 關閉忙碌的視窗前先詢問 | `confirm-close`，預設開啟。 |
 | 視窗在上次離開的位置重新打開 | `restore-windows`，預設開啟。版面、標籤頁和工作目錄會還原；程序和終端機文字不會。 |
@@ -89,7 +87,7 @@ Corta 沒有匯入工具：它只讀一個文字檔 `~/.config/corta/config`，�
 **`TERM`。** Corta 宣告為 `xterm-256color`（D08）。已經能配合 iTerm2 或 Terminal.app
 運作的遠端主機無需任何改動；為 `xterm-ghostty` 或 `xterm-kitty` 設定的主機則會拿到這個通用值。
 
-複製、關閉、快捷終端機熱鍵、遠端標記等細節上的不同，集中在
+複製、關閉、遠端標記等細節上的不同，集中在
 [疑難排解 → 與其他終端機不同的行為](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals)。
 
 <a id="windows-tabs-and-panes"></a>
@@ -117,7 +115,6 @@ Corta 沒有匯入工具：它只讀一個文字檔 `~/.config/corta/config`，�
 - 關閉仍有命令在執行的窗格前會先詢問（`confirm-close`）。
 - **還原視窗。** 結束再重新打開，每個視窗都會連同標籤頁、分割、分隔線位置和每個窗格的工作目錄一起回來
   （`restore-windows`，預設開啟）。每個窗格都會啟動新的程序；終端機文字和正在執行的工作不會還原。
-  快捷終端機不在還原之列。
 - **預設集。** 預設集是在設定檔中定義的一組具名的 shell、目錄和環境變數。**Shell ▸ 使用預設集新增窗格**
   會打開一個預設集；按住 ⌥ 則在單獨的視窗中打開（[Presets](../../CONFIGURATION.md#4a-presets)）。
 - 新視窗依 `columns` × `rows` 個字元格打開（預設 120 × 30）。
@@ -504,26 +501,11 @@ kitten icat --transfer-mode=stream picture.png
 最近執行過的命令排在最前。按一下另一個視窗會關閉面板，並讓那個視窗留在最前。
 它是使用沒有預設快速鍵的命令最快的方法。
 
-<a id="the-quick-terminal"></a>
-
-## 快捷終端機
-
-一個從螢幕邊緣落下、蓋在你手邊工作之上的終端機。從 **檢視 ▸ 快捷終端機**、命令面板打開，
-或在開啟後用全域熱鍵打開：
-
-```ini
-quick-terminal = true
-quick-terminal-key = alt+space
-quick-terminal-position = top      # top、bottom 或 center
-```
-
-熱鍵預設關閉，因為全域按鍵會從所有其他 App 中被佔用。
-
 <a id="macos-integration"></a>
 
 ## macOS 整合
 
-- **捷徑。** 三個動作：**開啟 Corta 視窗**（可選在某個資料夾中）、**聚焦 Corta 視窗** 和 **切換快捷終端機**。
+- **捷徑。** 兩個動作：**開啟 Corta 視窗**（可選指定資料夾）和 **聚焦 Corta 視窗**。
   它們都不會在 shell 中執行命令。
 - **服務。** 選取的終端機文字會提供給 **服務** 選單。
 - **安全鍵盤輸入。** **Shell ▸ 安全鍵盤輸入** 會在 Corta 位於最前方時阻止其他 App 讀取你的按鍵——用於輸入密碼。
@@ -573,7 +555,6 @@ Corta 會自己選擇更快的做法；這裡的一切都不需要設定。下�
 - **鍵盤與滑鼠** —— 將 Option 用作 Meta、連結的開啟方式、程式佔用滑鼠時用於選取文字的修飾鍵、選取時複製，
   以及輸入法狀態提示的模式和顏色。
 - **快速鍵** —— 每個命令的按鍵；改過的快速鍵旁會出現一個重置箭頭。
-- **快捷終端機** —— 全域熱鍵、位置和螢幕。
 - **連線** —— 連線到主機，以及已儲存的預設集。
 - **隱私權與安全性** —— 程式寫入剪貼簿（OSC 52）、安全鍵盤輸入、目錄歷史和最近連線的主機。
 

@@ -240,27 +240,7 @@ nonisolated extension Configuration {
             .flag("suggest-applications-folder", \.suggestApplicationsFolder),
             .flag("secure-keyboard-entry", \.secureKeyboardEntry),
         ]),
-        ("# Quick Terminal: a panel summoned by a system-wide hotkey.", [
-            .flag("quick-terminal", \.quickTerminal),
-            ConfigurationKey(
-                name: "quick-terminal-key",
-                // Empty means no hotkey (menu and palette only). A shortcut
-                // with no modifier is refused: it would swallow the key
-                // system-wide.
-                read: { configuration, value in
-                    if value.isEmpty {
-                        configuration.quickTerminalKey = nil
-                        return true
-                    }
-                    guard let shortcut = Shortcut.parse(value), GlobalHotKey.isRegistrable(shortcut)
-                    else { return false }
-                    configuration.quickTerminalKey = shortcut
-                    return true
-                },
-                write: { $0.quickTerminalKey?.text ?? "" }),
-            .choice("quick-terminal-position", \.quickTerminalPosition),
-            .choice("quick-terminal-screen", \.quickTerminalScreen),
-        ]),
+
         ("# Notifications", [
             .flag("notify-from-programs", \.notifyFromPrograms),
             .flag("agent-status", \.agentStatus),

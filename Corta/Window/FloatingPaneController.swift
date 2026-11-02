@@ -41,6 +41,9 @@ final class FloatingPaneController: NSWindowController, NSWindowDelegate {
     private(set) weak var source: SplitViewController?
     let anchor: Anchor
     let split: SplitViewController
+    private var presentationTimer: Timer?
+    private var presentationFrame: NSRect?
+    var isPresenting: Bool { presentationFrame != nil }
 
     init(source: SplitViewController, anchor: Anchor, setup: SplitViewController.Setup) {
         self.source = source
@@ -78,6 +81,71 @@ final class FloatingPaneController: NSWindowController, NSWindowDelegate {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
+    override func showWindow(_ sender: Any?) {
+        present(animated: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+    }
+
+    /// Animate the window geometry, keeping Metal glyphs at their native scale.
+    /// The PTY keeps its settled grid throughout the transient window sizes.
+    func present(animated: Bool) {
+        guard let window else { return }
+        guard animated, !window.isVisible else {
+            finishPresentation()
+            super.showWindow(nil)
+            return
+        }
+        let destination = window.frame
+        presentationFrame = destination
+        window.alphaValue = 0
+        window.setFrame(Self.presentationFrame(destination: destination, elapsed: 0), display: false)
+        super.showWindow(nil)
+        let began = ProcessInfo.processInfo.systemUptime
+        let timer = Timer(timeInterval: 1 / 120, repeats: true) { [weak self] timer in
+            guard self != nil else { timer.invalidate(); return }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let elapsed = ProcessInfo.processInfo.systemUptime - began
+                guard elapsed < 0.56, let window = self.window, window.isVisible,
+                      !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+                    self.finishPresentation()
+                    return
+                }
+                window.setFrame(Self.presentationFrame(destination: destination, elapsed: elapsed), display: true)
+                window.alphaValue = min(1, elapsed / 0.1)
+            }
+        }
+        presentationTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    static func presentationFrame(destination: NSRect, elapsed: TimeInterval) -> NSRect {
+        // Underdamped spring: grow from 88%, overshoot slightly, then settle.
+        let remainder = exp(-12 * elapsed) * (cos(22 * elapsed) + 12.0 / 22 * sin(22 * elapsed))
+        let scale = 1 - 0.12 * remainder
+        let size = NSSize(width: destination.width * scale, height: destination.height * scale)
+        return NSRect(x: destination.midX - size.width / 2,
+                      y: destination.midY - size.height / 2 - 14 * remainder,
+                      width: size.width, height: size.height)
+    }
+
+    /// Input, docking and closure settle first, so no timer can resize a pane
+    /// after it has been moved or returned to the source split.
+    func finishPresentation() {
+        presentationTimer?.invalidate()
+        presentationTimer = nil
+        guard let destination = presentationFrame else { return }
+        window?.setFrame(destination, display: true)
+        window?.alphaValue = 1
+        presentationFrame = nil
+        split.view.layoutSubtreeIfNeeded()
+        for pane in split.panes { pane.resizeSessionToFitView(coalesce: false) }
+    }
+
+    override func close() {
+        finishPresentation()
+        super.close()
+    }
+
     var returnSubtree: NSView? {
         guard let source, let root = source.layoutRoot, let sibling = anchor.sibling,
               sibling === root || sibling.isDescendant(of: root) else { return nil }
@@ -101,6 +169,7 @@ final class FloatingPaneController: NSWindowController, NSWindowDelegate {
 
     /// The entire live floating tree can be embedded, even if split while out.
     func dock() {
+        finishPresentation()
         guard let source else { return }
         source.unzoomPane()
         split.unzoomPane()
@@ -146,6 +215,7 @@ final class FloatingPaneController: NSWindowController, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        finishPresentation()
         split.teardown()
         if let window { window.parent?.removeChildWindow(window) }
         source?.floatingPanels.removeAll { $0 === self }
@@ -158,4 +228,11 @@ final class FloatingPaneController: NSWindowController, NSWindowDelegate {
 final class FloatingPaneWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown || event.type == .rightMouseDown || event.type == .keyDown {
+            (windowController as? FloatingPaneController)?.finishPresentation()
+        }
+        super.sendEvent(event)
+    }
 }

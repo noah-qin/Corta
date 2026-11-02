@@ -119,22 +119,6 @@ struct SettingsModelTests {
 
     /// Settings applies the registration's own rule: a Shift-only key the
     /// config parser and the hotkey would refuse is never written.
-    @Test("the quick terminal key refuses Shift alone")
-    func quickTerminalKeyNeedsMoreThanShift() throws {
-        let model = SettingsModel()
-        let original = ConfigurationStore.shared.configuration.quickTerminalKey
-        defer { model.setQuickTerminalKey(original) }
-        // Unwrapped on their own: passed straight to the `Shortcut?`
-        // parameter, `#require` checked the optional it was wrapped into.
-        let shiftOnly: Shortcut = try #require(Shortcut.parse("shift+a"))
-        let controlShift: Shortcut = try #require(Shortcut.parse("ctrl+shift+a"))
-        model.setQuickTerminalKey(shiftOnly)
-        #expect(model.saveStatus.message == L10n.text("ui.shortcut.modifierRequired"))
-        #expect(ConfigurationStore.shared.configuration.quickTerminalKey != shiftOnly)
-        model.setQuickTerminalKey(controlShift)
-        #expect(ConfigurationStore.shared.configuration.quickTerminalKey == controlShift)
-    }
-
     @Test("a font size outside 10...24 is clamped")
     func fontSizeIsClamped() {
         let model = SettingsModel()

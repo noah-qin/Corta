@@ -97,11 +97,6 @@ nonisolated extension TerminalCommand {
         // is a mouse's or a menu's gesture more than a keystroke's — and a
         // key spent here is a key the child process can never have.
         case .browseRemoteFiles: return nil
-        // Unbound in the app: the Quick Terminal's key is the *system-wide*
-        // hotkey `quick-terminal-key` names, held by `GlobalHotKey`, and
-        // an in-app key equivalent beside it would be a second binding for
-        // the same gesture that only works while Corta is frontmost.
-        case .quickTerminal: return nil
         // Unbound: a key that flips a system-wide input mode by accident
         // is not a default, and the state is a checkmark in a menu, not a
         // thing anyone toggles rapidly.

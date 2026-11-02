@@ -266,17 +266,6 @@ turns it on, which is what `tmux` and a remote `ssh` session need. The
 Something in that window still has a foreground job. `confirm-close =
 false` turns the question off everywhere.
 
-### The Quick Terminal hotkey does nothing
-
-Three possibilities, in order. `quick-terminal` is `false` (the default):
-no key is claimed until you set it to `true`. Another application already
-holds the key: Settings ▸ Quick Terminal says so, and
-`quick-terminal-key` takes any other combination with at least one
-modifier. Or the key is one Corta cannot map to a key position (`é`, a
-two-character spelling): the line is preserved in the config file
-unchanged and the default applies. View ▸ Quick Terminal and the *Toggle
-Quick Terminal* Shortcuts action open the panel regardless.
-
 ### A remote pane's badge says "Remote: host unknown", or a local `tmux` says "Remote?"
 
 The badge names a host from the remote shell's own `OSC 7` report, or —

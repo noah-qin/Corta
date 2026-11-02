@@ -504,38 +504,11 @@ design, and a check that reads the wrong window is a check that proves
 nothing. To run these against a *Release* build instead, stage it with
 `CORTA_STAGE_DIR`.
 
-**System entry points (B16) are checked by hand, and the record says
-what was and was not.** A hotkey and a floating panel are properties of
-the window server, not of the view hierarchy, so the check is: with
-`quick-terminal = true` in a staged config (`CORTA_STAGE_DIR`), the key
-summons the panel over another application and dismisses it again;
-dismissing returns focus to that application; the panel appears beside a
-full-screen app without leaving its Space; ⌘T from it opens a normal
-window; Shell ▸ Secure Keyboard Entry shows the titlebar lock only while
-a terminal window is key, and the lock clears when another app comes
-forward. Multi-display placement (`quick-terminal-screen`) needs two
-displays and is recorded as *not judged* when the machine has one — and
-so does **display reconfiguration while the panel is open**: summon it,
-then unplug the external display, change its resolution, and change which
-display is the main one. Each time the panel must end up correctly sized
-for a screen that exists — full width of that screen's visible frame for a
-band, centred for the centred position — and it keeps the screen it is on
-rather than jumping to the configured one. Unplugging is *not* expected to
-re-apply `quick-terminal-screen`: the window server relocates windows off
-a departing display before the notification is delivered, so the panel is
-already on a surviving screen by the time Corta sees the change and is
-merely resized to it. Worth repeating during the summon and dismissal
-slides, where the reposition is deferred to the end of the animation.
-`QuickTerminalController.frameAfterScreenChange` is the rule, and
-`QuickTerminalGeometryTests` pins it against synthetic arrangements, but
-the notification reaching it and the window accepting the frame are only
-established by doing this by hand. A
-simulated keypress (`osascript` `key code`) does reach a Carbon hotkey,
-which is how the summon/dismiss half and the titlebar lock were
-exercised when B16 landed — over a single display, with the panel
-opening as a top band and hiding when another app came forward.
-The 2026-09-18 run of these four checks, one failure and its fix, are in
-[`test-results/2026-09-18-release-checks.md`](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-09-18-release-checks.md).
+**Secure Keyboard Entry is checked by hand.** Shell ▸ Secure Keyboard Entry
+shows the titlebar lock only while a terminal window is key, and the lock clears
+when another app comes forward. Test the engaged state without recording input
+from another application. Historical system-entry-point checks are retained in
+the dated test-results records below.
 
 **Remote workflows (B13/B14) have a launched-app check of their own**,
 `CortaUITests/RemoteWorkflowUITests`, which is the shape every

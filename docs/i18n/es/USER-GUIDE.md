@@ -28,7 +28,6 @@ Buscar anterior se pueden cambiar ([Atajos de teclado](#keyboard-shortcuts)).
 - [Trabajo remoto: SSH y SFTP](#remote-work-ssh-and-sftp)
 - [Imágenes en el terminal](#images-in-the-terminal)
 - [La paleta de comandos](#the-command-palette)
-- [El Terminal rápido](#the-quick-terminal)
 - [Integración con macOS](#macos-integration)
 - [Velocidad y batería](#speed-and-battery)
 - [Ajustes y archivo de configuración](#settings-and-the-config-file)
@@ -74,7 +73,6 @@ valores de cada una y cuándo se aplica).
 | :--- | :--- |
 | ⌥ como Meta / Alt (*Left Option key: Esc+* de iTerm2, `macos-option-as-alt` de Ghostty) | `option-as-meta = true`. Desactivado por defecto, para que ⌥ escriba `é`, `ø` y `–` como hace macOS. |
 | Copiar al seleccionar | `copy-on-select`, **activado** por defecto. Pon `false` para copiar solo con ⌘C. |
-| Una ventana con atajo global o un terminal rápido | `quick-terminal = true`; la tecla es `quick-terminal-key` (⌥Espacio por defecto). Desactivado por defecto: un atajo global se reserva en todas las aplicaciones. [El Terminal rápido](#the-quick-terminal). |
 | Programas que copian al portapapeles a través de `ssh` o desde `tmux` (OSC 52) | `allow-clipboard-write = true`. Desactivado por defecto; leer el portapapeles no es posible con ningún ajuste. |
 | Que pregunte antes de cerrar una ventana ocupada | `confirm-close`, activado por defecto. |
 | Ventanas que se reabren donde las dejaste | `restore-windows`, activado por defecto. Vuelven las disposiciones, las pestañas y los directorios de trabajo; los procesos y el texto del terminal, no. |
@@ -92,7 +90,7 @@ emitir marcas de prompt. Consulta [Integración del shell](#shell-integration).
 **`TERM`.** Corta se anuncia como `xterm-256color` (D08). Un host remoto que ya funciona con iTerm2 o Terminal.app no
 necesita nada nuevo; uno configurado para `xterm-ghostty` o `xterm-kitty` recibe en su lugar el valor habitual.
 
-Los comportamientos que difieren en cosas más pequeñas — copiar, cerrar, el atajo del Terminal rápido, las insignias
+Los comportamientos que difieren en cosas más pequeñas — copiar, cerrar, las insignias
 remotas — están reunidos en
 [Solución de problemas → Comportamientos distintos de otros terminales](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals).
 
@@ -124,7 +122,7 @@ remotas — están reunidos en
 - Cerrar un panel con un comando aún en ejecución pregunta primero (`confirm-close`).
 - **Restaurar ventanas.** Sal y vuelve a abrir, y cada ventana regresa con sus pestañas, divisiones, posiciones de los
   separadores y el directorio de trabajo de cada panel (`restore-windows`, activado por defecto). Cada panel inicia un
-  proceso nuevo; el texto del terminal y los trabajos en ejecución no se restauran. El Terminal rápido queda excluido.
+  proceso nuevo; el texto del terminal y los trabajos en ejecución no se restauran.
 - **Preajustes.** Un preajuste es un shell, un directorio y un entorno con nombre, definidos en el archivo de
   configuración. **Shell ▸ Panel nuevo con preajuste** abre uno; mantén ⌥ para abrirlo en una ventana aparte
   ([Presets](../../CONFIGURATION.md#4a-presets)).
@@ -591,27 +589,12 @@ nombre de un grupo (`panes`) o el nombre de configuración de un comando (`new-t
 que ejecutaste hace poco aparecen primero. Hacer clic en otra ventana cierra la paleta y deja esa ventana delante. Es la
 forma más rápida de llegar a los comandos que no tienen atajo predeterminado.
 
-<a id="the-quick-terminal"></a>
-
-## El Terminal rápido
-
-Un terminal que se despliega sobre lo que estés haciendo. Ábrelo desde **Visualización ▸ Terminal rápido**, desde la
-paleta de comandos o con un atajo global una vez que lo actives:
-
-```ini
-quick-terminal = true
-quick-terminal-key = alt+space
-quick-terminal-position = top      # top, bottom o center
-```
-
-El atajo está desactivado por defecto, porque una tecla global se le quita a todas las demás aplicaciones.
-
 <a id="macos-integration"></a>
 
 ## Integración con macOS
 
-- **Atajos.** Tres acciones: **Abrir ventana de Corta** (opcionalmente en una carpeta), **Traer ventana de Corta al frente**
-  y **Mostrar u ocultar el terminal rápido**. Ninguna ejecuta un comando en un shell.
+- **Atajos.** Dos acciones: **Abrir ventana de Corta** (opcionalmente en una carpeta) y **Traer ventana de Corta al frente**.
+  Ninguna ejecuta un comando en un shell.
 - **Servicios.** El texto seleccionado del terminal se ofrece al menú **Servicios**.
 - **Entrada de teclado segura.** **Shell ▸ Entrada de teclado segura** impide que otras aplicaciones lean tus pulsaciones
   mientras Corta está delante — para escribir contraseñas. Un candado en la barra de título indica cuándo está realmente activa.
@@ -671,7 +654,6 @@ Los Ajustes son una barra lateral de categorías, con la misma disposición que 
 - **Teclado y ratón** — Usar Opción como Meta, cómo se abren los enlaces, el modificador que selecciona texto mientras un
   programa controla el ratón, copiar al seleccionar, y los modos y colores del indicador de fuente de entrada.
 - **Atajos** — la tecla de cada comando; aparece una flecha de restablecer junto a los que has cambiado.
-- **Terminal rápido** — el atajo global, la posición y la pantalla.
 - **Conexiones** — Conectar con un host y los preajustes guardados.
 - **Privacidad y seguridad** — la escritura en el portapapeles desde programas (OSC 52), la Entrada de teclado segura, el
   historial de directorios y los hosts recientes.

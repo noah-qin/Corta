@@ -75,8 +75,8 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
         openSettings(app)
         let settings = app.windows["Corta.Settings"]
-        settings.outlines.firstMatch.staticTexts["Appearance"].click()
-        settings.buttons["theme-create"].click()
+        settings.outlines.firstMatch.staticTexts["Themes"].click()
+        settings.buttons["theme-create-dark"].click()
         let name = app.textFields["theme-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 3))
         replace(name, text: "Midnight")
@@ -99,7 +99,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
         openSettings(app)
-        settings.outlines.firstMatch.staticTexts["Appearance"].click()
+        settings.outlines.firstMatch.staticTexts["Themes"].click()
         XCTAssertTrue(settings.buttons["theme-edit"].waitForExistence(timeout: 3))
     }
 
@@ -116,14 +116,12 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         XCTAssertTrue(app.textFields["theme-name"].waitForExistence(timeout: 3))
         app.buttons["Cancel"].click()
         let settings = app.windows["Corta.Settings"]
+        settings.outlines.firstMatch.staticTexts["Appearance"].click()
         XCTAssertTrue(settings.popUpButtons["font-family"].exists)
-        let mode = settings.popUpButtons["appearance-mode"]
         let preview = settings.descendants(matching: .any).matching(identifier: "appearance-preview").firstMatch
-        mode.click()
-        mode.menuItems["Dark"].click()
+        settings.buttons["appearance-dark"].click()
         XCTAssertEqual(preview.value as? String, "dark")
-        mode.click()
-        mode.menuItems["Light"].click()
+        settings.buttons["appearance-light"].click()
         XCTAssertEqual(preview.value as? String, "light")
         attach(settings.screenshot(), name: "feedback-appearance")
         settings.buttons[XCUIIdentifierCloseWindow].click()

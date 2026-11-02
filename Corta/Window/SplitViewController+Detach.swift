@@ -31,7 +31,7 @@ extension SplitViewController {
 
     @discardableResult
     func floatFocusedPane() -> FloatingPaneController? {
-        guard hasMultiplePanes, let pane = focusedPane, !(view.window is NSPanel) else { return nil }
+        guard hasMultiplePanes, let pane = focusedPane else { return nil }
         unzoomPane()
         guard let anchor = FloatingPaneController.Anchor(pane: pane),
               var setup = takeFocusedPaneForTransfer() else { return nil }

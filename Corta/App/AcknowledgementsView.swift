@@ -37,12 +37,21 @@ struct AcknowledgementsView: View {
             .flatMap { try? String(contentsOf: $0, encoding: .utf8) }
     }
 
+    static var programIconLicenses: String {
+        ["LobeIcons", "SimpleIcons"].compactMap { name in
+            Bundle.main.url(forResource: name + "-LICENSE", withExtension: "txt")
+                .flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+                .map { name + "\n\n" + $0 }
+        }.joined(separator: "\n\n")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(L10n.format("acknowledgements.sparkle", Self.sparkleVersion))
                 .font(.system(size: 12))
             ScrollView {
-                Text(Self.sparkleLicense ?? L10n.text("acknowledgements.missing"))
+                Text((Self.sparkleLicense ?? L10n.text("acknowledgements.missing"))
+                     + "\n\nProgram icons\n\n" + Self.programIconLicenses)
                     .font(.system(size: 11, design: .monospaced))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)

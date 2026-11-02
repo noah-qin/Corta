@@ -28,7 +28,6 @@ Corta 能做的一切，以及从哪里找到它。每一节都会说明功能�
 - [远程工作：SSH 与 SFTP](#remote-work-ssh-and-sftp)
 - [终端里的图片](#images-in-the-terminal)
 - [命令面板](#the-command-palette)
-- [快捷终端](#the-quick-terminal)
 - [macOS 集成](#macos-integration)
 - [速度与电池](#speed-and-battery)
 - [设置与配置文件](#settings-and-the-config-file)
@@ -72,7 +71,6 @@ Corta 没有导入工具：它只读一个文本文件 `~/.config/corta/config`�
 | :--- | :--- |
 | ⌥ 用作 Meta / Alt（iTerm2 的 *Left Option key: Esc+*，Ghostty 的 `macos-option-as-alt`） | `option-as-meta = true`。默认关闭，所以 ⌥ 会像 macOS 一样输入 `é`、`ø` 和 `–`。 |
 | 选中即复制 | `copy-on-select`，默认**开启**。设为 `false` 则只用 ⌘C。 |
-| 热键窗口或快捷终端 | `quick-terminal = true`；按键是 `quick-terminal-key`（默认 ⌥Space）。默认关闭：全局热键会在所有应用里占用这个键。见[快捷终端](#the-quick-terminal)。 |
 | 程序通过 `ssh` 或在 `tmux` 里复制到剪贴板（OSC 52） | `allow-clipboard-write = true`。默认关闭；任何设置下都无法读取剪贴板。 |
 | 关闭忙碌的窗口前先询问 | `confirm-close`，默认开启。 |
 | 窗口在上次离开的位置重新打开 | `restore-windows`，默认开启。布局、标签页和工作目录会恢复；进程和终端文本不会。 |
@@ -89,7 +87,7 @@ Corta 没有导入工具：它只读一个文本文件 `~/.config/corta/config`�
 **`TERM`。** Corta 声明为 `xterm-256color`（D08）。已经能配合 iTerm2 或 Terminal.app
 工作的远程主机无需任何改动；为 `xterm-ghostty` 或 `xterm-kitty` 设置的主机则会拿到这个通用值。
 
-复制、关闭、快捷终端热键、远程标记等细节上的不同，集中在
+复制、关闭、远程标记等细节上的不同，集中在
 [故障排除 → 与其他终端不同的行为](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals)。
 
 <a id="windows-tabs-and-panes"></a>
@@ -117,7 +115,6 @@ Corta 没有导入工具：它只读一个文本文件 `~/.config/corta/config`�
 - 关闭仍有命令在运行的窗格前会先询问（`confirm-close`）。
 - **恢复窗口。** 退出再重新打开，每个窗口都会连同标签页、分屏、分隔线位置和每个窗格的工作目录一起回来
   （`restore-windows`，默认开启）。每个窗格都会启动新的进程；终端文本和正在运行的任务不会恢复。
-  快捷终端不在恢复之列。
 - **预设。** 预设是在配置文件中定义的一组命名的 shell、目录和环境变量。**Shell ▸ 使用预设新建窗格**
   会打开一个预设；按住 ⌥ 则在单独的窗口中打开（[Presets](../../CONFIGURATION.md#4a-presets)）。
 - 新窗口按 `columns` × `rows` 个字符格打开（默认 120 × 30）。
@@ -504,26 +501,11 @@ kitten icat --transfer-mode=stream picture.png
 最近运行过的命令排在最前。点按另一个窗口会关闭面板，并让那个窗口留在最前。
 它是使用没有默认快捷键的命令最快的方法。
 
-<a id="the-quick-terminal"></a>
-
-## 快捷终端
-
-一个从屏幕边缘落下、盖在你手头工作之上的终端。从 **显示 ▸ 快捷终端**、命令面板打开，
-或在开启后用全局热键打开：
-
-```ini
-quick-terminal = true
-quick-terminal-key = alt+space
-quick-terminal-position = top      # top、bottom 或 center
-```
-
-热键默认关闭，因为全局按键会从所有其他应用中被占用。
-
 <a id="macos-integration"></a>
 
 ## macOS 集成
 
-- **快捷指令。** 三个操作：**打开 Corta 窗口**（可选在某个文件夹中）、**聚焦 Corta 窗口** 和 **切换快捷终端**。
+- **快捷指令。** 两个操作：**打开 Corta 窗口**（可选指定文件夹）和 **聚焦 Corta 窗口**。
   它们都不会在 shell 中执行命令。
 - **服务。** 选中的终端文本会提供给 **服务** 菜单。
 - **安全键盘输入。** **Shell ▸ 安全键盘输入** 会在 Corta 位于最前时阻止其他应用读取你的按键——用于输入密码。
@@ -573,7 +555,6 @@ Corta 会自己选择更快的做法；这里的一切都不需要设置。下�
 - **键盘与鼠标** —— 将 Option 用作 Meta、链接的打开方式、程序占用鼠标时用于选择文字的修饰键、选中即复制，
   以及输入法状态提示的模式和颜色。
 - **快捷键** —— 每个命令的按键；改过的快捷键旁会出现一个重置箭头。
-- **快捷终端** —— 全局热键、位置和屏幕。
 - **连接** —— 连接到主机，以及已保存的预设。
 - **隐私与安全性** —— 程序写入剪贴板（OSC 52）、安全键盘输入、目录历史和最近连接的主机。
 

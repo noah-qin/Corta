@@ -7,6 +7,18 @@ This product includes software developed by the Corta project
 Licensed under the Apache License, Version 2.0. See the LICENSE file
 for the full terms.
 
+Program identification artwork:
+  - AI CLI SVGs (Claude, OpenAI, Kimi, Grok, Gemini, Qwen, OpenCode,
+    Ollama, Copilot and Goose): Lobe Icons 1.102.0, MIT,
+    Copyright (c) 2023 LobeHub. https://github.com/lobehub/lobe-icons
+  - Language and developer-tool SVGs: Simple Icons 16.36.0, CC0-1.0.
+    https://github.com/simple-icons/simple-icons
+The original SVGs are in Corta/Assets.xcassets/Program*.imageset.
+License texts are included in Corta/Acknowledgements and in the app's
+Acknowledgements window. Brand marks remain their owners' trademarks.
+SSH, file transfer, Mosh, Aider, Screen and process monitors use system
+SF Symbols as generic category icons, rather than brand artwork.
+
 --------------------------------------------------------------------
 Trademarks and artwork
 --------------------------------------------------------------------

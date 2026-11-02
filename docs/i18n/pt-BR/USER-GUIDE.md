@@ -28,7 +28,6 @@ alterados ([Atalhos de teclado](#keyboard-shortcuts)).
 - [Trabalho remoto: SSH e SFTP](#remote-work-ssh-and-sftp)
 - [Imagens no terminal](#images-in-the-terminal)
 - [A paleta de comandos](#the-command-palette)
-- [O Terminal rápido](#the-quick-terminal)
 - [Integração com o macOS](#macos-integration)
 - [Velocidade e bateria](#speed-and-battery)
 - [Ajustes e arquivo de configuração](#settings-and-the-config-file)
@@ -74,7 +73,6 @@ e quando se aplica).
 | :--- | :--- |
 | ⌥ como Meta / Alt (*Left Option key: Esc+* do iTerm2, `macos-option-as-alt` do Ghostty) | `option-as-meta = true`. Desativado por padrão, para que ⌥ digite `é`, `ø` e `–` como o macOS faz. |
 | Copiar ao selecionar | `copy-on-select`, **ativado** por padrão. Use `false` para copiar só com ⌘C. |
-| Uma janela com atalho global ou um terminal rápido | `quick-terminal = true`; a tecla é `quick-terminal-key` (⌥Espaço por padrão). Desativado por padrão: um atalho global é reservado em todos os aplicativos. [O Terminal rápido](#the-quick-terminal). |
 | Programas que copiam para a área de transferência via `ssh` ou de dentro do `tmux` (OSC 52) | `allow-clipboard-write = true`. Desativado por padrão; ler a área de transferência não é possível em nenhum ajuste. |
 | Ser perguntado antes de fechar uma janela ocupada | `confirm-close`, ativado por padrão. |
 | Janelas que reabrem onde você as deixou | `restore-windows`, ativado por padrão. Layouts, abas e diretórios de trabalho voltam; processos e texto do terminal, não. |
@@ -92,7 +90,7 @@ conflito; as duas podem emitir marcas de prompt. Veja [Integração com o shell]
 **`TERM`.** O Corta se anuncia como `xterm-256color` (D08). Um host remoto que já funciona com o iTerm2 ou o Terminal.app
 não precisa de nada novo; um configurado para `xterm-ghostty` ou `xterm-kitty` recebe o valor comum no lugar.
 
-Comportamentos que diferem em detalhes menores — copiar, fechar, o atalho do Terminal rápido, insígnias remotas — estão
+Comportamentos que diferem em detalhes menores — copiar, fechar, insígnias remotas — estão
 reunidos em
 [Solução de problemas → Comportamentos diferentes de outros terminais](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals).
 
@@ -574,27 +572,12 @@ nome de um grupo (`panes`) ou o nome de configuração de um comando (`new-tab`)
 recentemente aparecem primeiro. Clicar em outra janela fecha a paleta e deixa essa janela na frente. É o jeito mais rápido
 de chegar aos comandos que não têm atalho padrão.
 
-<a id="the-quick-terminal"></a>
-
-## O Terminal rápido
-
-Um terminal que desce por cima do que você estiver fazendo. Abra-o em **Visualização ▸ Terminal rápido**, pela paleta de
-comandos ou com um atalho global depois de ativá-lo:
-
-```ini
-quick-terminal = true
-quick-terminal-key = alt+space
-quick-terminal-position = top      # top, bottom ou center
-```
-
-O atalho vem desativado, porque uma tecla global é tirada de todos os outros aplicativos.
-
 <a id="macos-integration"></a>
 
 ## Integração com o macOS
 
-- **Atalhos.** Três ações: **Abrir janela do Corta** (opcionalmente numa pasta), **Trazer janela do Corta para a frente** e
-  **Mostrar ou ocultar o terminal rápido**. Nenhuma delas executa um comando num shell.
+- **Atalhos.** Duas ações: **Abrir janela do Corta** (opcionalmente numa pasta) e **Trazer janela do Corta para a frente**.
+  Nenhuma delas executa um comando num shell.
 - **Serviços.** O texto selecionado no terminal é oferecido ao menu **Serviços**.
 - **Entrada de teclado segura.** **Shell ▸ Entrada de teclado segura** impede que outros aplicativos leiam suas teclas
   enquanto o Corta está na frente — para digitar senhas. Um cadeado na barra de título mostra quando ela está realmente ativa.
@@ -653,7 +636,6 @@ Os Ajustes são uma barra lateral de categorias, no mesmo arranjo dos Ajustes do
 - **Teclado e mouse** — Usar Option como Meta, como os links abrem, o modificador que seleciona texto enquanto um programa
   controla o mouse, copiar ao selecionar e os modos e cores do indicador de fonte de entrada.
 - **Atalhos** — a tecla de cada comando; uma seta de redefinição aparece ao lado dos que você mudou.
-- **Terminal rápido** — o atalho global, a posição e a tela.
 - **Conexões** — Conectar a um host e predefinições salvas.
 - **Privacidade e Segurança** — gravação na área de transferência por programas (OSC 52), Entrada de teclado segura, o
   histórico de diretórios e os hosts recentes.

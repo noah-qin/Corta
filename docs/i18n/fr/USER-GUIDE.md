@@ -28,7 +28,6 @@ sauf Rechercher le suivant et Rechercher le précédent peuvent être modifiés 
 - [Travail à distance : SSH et SFTP](#remote-work-ssh-and-sftp)
 - [Images dans le terminal](#images-in-the-terminal)
 - [La palette de commandes](#the-command-palette)
-- [Le Terminal rapide](#the-quick-terminal)
 - [Intégration à macOS](#macos-integration)
 - [Vitesse et batterie](#speed-and-battery)
 - [Réglages et fichier de configuration](#settings-and-the-config-file)
@@ -74,7 +73,6 @@ donne les valeurs de chacune et quand elle s’applique).
 | :--- | :--- |
 | ⌥ comme Meta / Alt (*Left Option key: Esc+* dans iTerm2, `macos-option-as-alt` dans Ghostty) | `option-as-meta = true`. Désactivé par défaut, pour que ⌥ tape `é`, `ø` et `–` comme le fait macOS. |
 | Copier à la sélection | `copy-on-select`, **activé** par défaut. Mettez `false` pour ⌘C uniquement. |
-| Une fenêtre à raccourci global ou un terminal rapide | `quick-terminal = true` ; la touche est `quick-terminal-key` (⌥Espace par défaut). Désactivé par défaut : un raccourci global est réservé dans toutes les applications. [Le Terminal rapide](#the-quick-terminal). |
 | Des programmes qui copient dans le presse-papiers via `ssh` ou depuis `tmux` (OSC 52) | `allow-clipboard-write = true`. Désactivé par défaut ; lire le presse-papiers est impossible quel que soit le réglage. |
 | Une confirmation avant de fermer une fenêtre occupée | `confirm-close`, activé par défaut. |
 | Des fenêtres qui rouvrent là où vous les aviez laissées | `restore-windows`, activé par défaut. Dispositions, onglets et répertoires de travail reviennent ; les processus et le texte du terminal, non. |
@@ -92,7 +90,7 @@ possible ; les deux peuvent émettre des marques d’invite. Voir [Intégration 
 **`TERM`.** Corta s’annonce comme `xterm-256color` (D08). Un hôte distant qui fonctionne déjà avec iTerm2 ou Terminal.app
 n’a besoin de rien de nouveau ; un hôte configuré pour `xterm-ghostty` ou `xterm-kitty` reçoit à la place la valeur courante.
 
-Les comportements qui diffèrent plus légèrement — copie, fermeture, raccourci du Terminal rapide, badges distants — sont
+Les comportements qui diffèrent plus légèrement — copie, fermeture, badges distants — sont
 rassemblés dans
 [Dépannage → Comportements différents des autres terminaux](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals).
 
@@ -123,8 +121,7 @@ rassemblés dans
 - Fermer un volet où une commande tourne encore demande d’abord confirmation (`confirm-close`).
 - **Restauration des fenêtres.** Quittez et relancez : chaque fenêtre revient avec ses onglets, ses divisions, la position
   de ses séparateurs et le répertoire de travail de chaque volet (`restore-windows`, activé par défaut). Chaque volet
-  démarre un nouveau processus ; le texte du terminal et les tâches en cours ne sont pas restaurés. Le Terminal rapide
-  est exclu.
+  démarre un nouveau processus ; le texte du terminal et les tâches en cours ne sont pas restaurés.
 - **Préréglages.** Un préréglage est un shell, un dossier et un environnement nommés, définis dans le fichier de
   configuration. **Shell ▸ Nouveau volet avec préréglage** en ouvre un ; maintenez ⌥ pour l’ouvrir dans une fenêtre à
   part ([Presets](../../CONFIGURATION.md#4a-presets)).
@@ -602,28 +599,12 @@ Tapez quelques lettres et appuyez sur Retour. Les lettres correspondent dans l�
 trouve aussi. Les commandes récemment exécutées apparaissent en premier. Cliquer sur une autre fenêtre ferme la palette et
 laisse cette fenêtre au premier plan. C’est le moyen le plus rapide d’atteindre les commandes sans raccourci par défaut.
 
-<a id="the-quick-terminal"></a>
-
-## Le Terminal rapide
-
-Un terminal qui descend par-dessus ce que vous êtes en train de faire. Ouvrez-le depuis
-**Présentation ▸ Terminal rapide**, depuis la palette de commandes, ou avec un raccourci global une fois activé :
-
-```ini
-quick-terminal = true
-quick-terminal-key = alt+space
-quick-terminal-position = top      # top, bottom ou center
-```
-
-Le raccourci est désactivé par défaut, car une touche globale est retirée à toutes les autres applications.
-
 <a id="macos-integration"></a>
 
 ## Intégration à macOS
 
-- **Raccourcis.** Trois actions : **Ouvrir une fenêtre Corta** (éventuellement dans un dossier),
-  **Mettre une fenêtre Corta au premier plan** et **Afficher/masquer le terminal rapide**. Aucune n’exécute de commande
-  dans un shell.
+- **Raccourcis.** Deux actions : **Ouvrir une fenêtre Corta** (éventuellement dans un dossier) et **Mettre une fenêtre Corta au premier plan**.
+  Aucune n’exécute de commande dans un shell.
 - **Services.** Le texte sélectionné dans le terminal est proposé au menu **Services**.
 - **Saisie clavier sécurisée.** **Shell ▸ Saisie clavier sécurisée** empêche les autres applications de lire vos frappes
   tant que Corta est au premier plan — pour taper des mots de passe. Un cadenas dans la barre de titre indique quand elle
@@ -686,7 +667,6 @@ Les Réglages se présentent comme une barre latérale de catégories, à la man
   sélectionne du texte quand un programme a la souris, la copie à la sélection, et les modes et couleurs de l’indicateur
   de source de saisie.
 - **Raccourcis** — la touche de chaque commande ; une flèche de réinitialisation apparaît à côté de celles que vous avez modifiées.
-- **Terminal rapide** — le raccourci global, la position et l’écran.
 - **Connexions** — Se connecter à un hôte et préréglages enregistrés.
 - **Confidentialité et sécurité** — l’écriture dans le presse-papiers par les programmes (OSC 52), la Saisie clavier
   sécurisée, l’historique des dossiers et les hôtes récents.

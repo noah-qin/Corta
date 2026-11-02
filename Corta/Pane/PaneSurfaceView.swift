@@ -31,7 +31,7 @@ final class PaneSurfaceView: NSView {
     static var gutterColor: NSColor {
         let color = canvasColor
         let light = color.redComponent + color.greenComponent + color.blueComponent > 1.5
-        return color.blended(withFraction: 0.035, of: light ? .black : .white) ?? color
+        return color.blended(withFraction: light ? 0.012 : 0.025, of: light ? .black : .white) ?? color
     }
 
     override init(frame frameRect: NSRect) {

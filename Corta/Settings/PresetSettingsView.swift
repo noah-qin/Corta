@@ -22,16 +22,21 @@ struct PresetSettingsView: View {
     @State private var removing: String?
 
     var body: some View {
-        Form {
-            Section {
+        SettingsPage {
+            SettingsSection {
                 Text(L10n.text("ui.presets.help")).foregroundStyle(.secondary)
-                Button { RemoteConnectController.shared.show(.ssh, sender: nil) } label: {
+                Button {
+                    RemoteConnectController.shared.show(.ssh, sender: nil)
+                } label: {
                     Label(L10n.text("ui.ssh.title"), systemImage: "network")
                 }
             }
-            Section(L10n.text("ui.presets.title")) {
+            SettingsSection(L10n.text("ui.presets.title"), summary: L10n.text("ui.sftp.authHelp")) {
                 if model.presets.isEmpty {
-                    Text(L10n.text("ui.presets.empty")).foregroundStyle(.secondary)
+                    VStack(spacing: 12) {
+                        Image(systemName: "terminal").font(.system(size: 30)).foregroundStyle(.secondary)
+                        Text(L10n.text("ui.presets.empty")).foregroundStyle(.secondary)
+                    }.frame(maxWidth: .infinity).padding(.vertical, 20)
                 }
                 ForEach(model.presets, id: \.name) { preset in
                     HStack {
@@ -44,20 +49,23 @@ struct PresetSettingsView: View {
                         Button(L10n.text("ui.presets.open")) {
                             (NSApp.delegate as? AppDelegate)?.launchPreset(preset, inNewWindow: true)
                         }
-                        Button(L10n.text("ui.presets.edit")) {
-                            editor = PresetDraft(preset: preset, originalName: preset.name)
+                        Menu {
+                            Button(L10n.text("ui.presets.edit")) {
+                                editor = PresetDraft(preset: preset, originalName: preset.name)
+                            }
+                            Button(L10n.text("ui.presets.remove"), role: .destructive) { removing = preset.name }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
                         }
-                        Button { removing = preset.name } label: { Image(systemName: "trash") }
-                            .help(L10n.text("ui.presets.remove"))
-                            .accessibilityLabel(L10n.text("ui.presets.remove"))
+                        .menuStyle(.borderlessButton).fixedSize()
+                        .accessibilityLabel(L10n.format("settings.presets.actions", preset.name))
                     }
                 }
-                Button { editor = PresetDraft(preset: Preset(name: ""), originalName: nil) } label: {
+                Button {
+                    editor = PresetDraft(preset: Preset(name: ""), originalName: nil)
+                } label: {
                     Label(L10n.text("ui.presets.add"), systemImage: "plus")
                 }
-            }
-            Section {
-                Text(L10n.text("ui.sftp.authHelp")).font(.caption).foregroundStyle(.secondary)
             }
         }
         .sheet(item: $editor) { draft in PresetEditor(model: model, draft: draft) }
@@ -70,7 +78,9 @@ struct PresetSettingsView: View {
                 if let removing { model.removePreset(removing) }
                 removing = nil
             }
-        } message: { Text(L10n.text("ui.presets.removeHelp")) }
+        } message: {
+            Text(L10n.text("ui.presets.removeHelp"))
+        }
     }
 }
 
@@ -99,47 +109,78 @@ private struct PresetEditor: View {
         _directory = State(initialValue: draft.preset.directory ?? "")
         _arguments = State(initialValue: draft.preset.arguments.joined(separator: " "))
         _environment = State(
-            initialValue: draft.preset.environment.keys.sorted().map { "\($0)=\(draft.preset.environment[$0] ?? "")" }
-                .joined(separator: "\n"))
+            initialValue: draft.preset.environment.keys.sorted().map {
+                "\($0)=\(draft.preset.environment[$0] ?? "")"
+            }
+            .joined(separator: "\n"))
     }
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(L10n.text("ui.presets.edit")).font(.headline)
-            Form {
-                TextField(L10n.text("ui.presets.name"), text: $name)
-                TextField(L10n.text("ui.presets.shell"), text: $shell)
-                TextField(L10n.text("ui.presets.arguments"), text: $arguments)
-                TextField(L10n.text("ui.presets.directory"), text: $directory)
-                LabeledContent(L10n.text("ui.presets.environment")) {
-                    TextEditor(text: $environment).font(.system(.caption, design: .monospaced))
-                        .frame(height: 80).border(.quaternary)
-                        .accessibilityLabel(L10n.text("ui.presets.environment"))
+        VStack(spacing: 0) {
+            HStack {
+                Text(L10n.text("ui.presets.edit")).font(.title2.bold())
+                Spacer()
+            }.padding(24)
+            SettingsPage {
+                SettingsSection(L10n.text("settings.presets.basics")) {
+                    LabeledContent(L10n.text("ui.presets.name")) {
+                        TextField("", text: $name).labelsHidden().frame(width: 260)
+                    }
+                    LabeledContent(L10n.text("ui.presets.shell")) {
+                        TextField("", text: $shell).labelsHidden().frame(width: 260)
+                    }
+                    LabeledContent(L10n.text("ui.presets.directory")) {
+                        TextField("", text: $directory).labelsHidden().frame(width: 260)
+                    }
                 }
+                SettingsSection(
+                    L10n.text("settings.presets.launch"), summary: L10n.text("ui.presets.formatHelp")
+                ) {
+                    LabeledContent(L10n.text("ui.presets.arguments")) {
+                        TextField("", text: $arguments).labelsHidden().frame(width: 260)
+                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(L10n.text("ui.presets.environment"))
+                        TextEditor(text: $environment).font(.system(.callout, design: .monospaced))
+                            .frame(height: 100).padding(6)
+                            .background(Color(nsColor: .textBackgroundColor), in: .rect(cornerRadius: 8))
+                            .accessibilityLabel(L10n.text("ui.presets.environment"))
+                    }
+                }
+                if error { Text(L10n.text("ui.presets.invalid")).foregroundStyle(.red).font(.callout) }
             }
-            Text(L10n.text("ui.presets.formatHelp")).font(.caption).foregroundStyle(.secondary)
-            if error { Text(L10n.text("ui.presets.invalid")).foregroundStyle(.red).font(.caption) }
+            Divider()
             HStack {
                 Spacer()
                 Button(L10n.text("common.cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(L10n.text("ui.common.save"), action: save).keyboardShortcut(.defaultAction)
-            }
-        }.padding(24).frame(width: 520)
+                    .buttonStyle(.borderedProminent)
+            }.padding(20)
+        }.frame(width: 600, height: 600)
     }
+
     private func save() {
         var preset = Preset(name: name.trimmingCharacters(in: .whitespaces))
         guard SettingsModel.validPresetName(preset.name),
-              !shell.contains(where: { $0.isNewline || $0 == "\0" }),
-              !directory.contains(where: { $0.isNewline || $0 == "\0" }),
-              !arguments.contains(where: { $0.isNewline || $0 == "\0" }) else { error = true; return }
+            !shell.contains(where: { $0.isNewline || $0 == "\0" }),
+            !directory.contains(where: { $0.isNewline || $0 == "\0" }),
+            !arguments.contains(where: { $0.isNewline || $0 == "\0" })
+        else {
+            error = true
+            return
+        }
         preset.shell = shell.isEmpty ? nil : shell
         preset.directory = directory.isEmpty ? nil : (directory as NSString).expandingTildeInPath
         preset.arguments = arguments.split(separator: " ").map(String.init)
         for line in environment.split(separator: "\n") {
-            guard let separator = line.firstIndex(of: "="), separator != line.startIndex else { error = true; return }
+            guard let separator = line.firstIndex(of: "="), separator != line.startIndex else {
+                error = true
+                return
+            }
             let key = String(line[..<separator])
             let value = String(line[line.index(after: separator)...])
             guard !key.contains(where: { $0.isWhitespace || $0 == "\0" }), !value.contains("\0") else {
-                error = true; return
+                error = true
+                return
             }
             preset.environment[key] = value
         }
