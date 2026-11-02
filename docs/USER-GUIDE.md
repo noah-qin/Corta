@@ -95,6 +95,11 @@ Terminal hotkey, remote badges — is collected in
 
 ## Windows, tabs and panes
 
+Native window tabs show a metal-framed terminal icon before the session title.
+Tabs containing split panes show a stack of icons, including while a pane is zoomed.
+
+![Single-pane and split-pane native tab icons](brand/native-tab-icon.png)
+
 | To… | Use |
 | --- | --- |
 | Open a window / a tab | ⌘N / ⌘T |

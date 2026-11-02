@@ -93,7 +93,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
             let field = TabTitleField(controller: self)
             tabTitleField = field
         }
-        if tabTitleField?.isEditingTitle != true { window.tab.title = window.title }
+        if tabTitleField?.isEditingTitle != true { TabIcon.apply(to: window) }
         window.tab.toolTip = window.title + "\n" + L10n.text("tab.rename.gesture")
         tabTitleField?.refresh(title: window.title)
     }
@@ -412,6 +412,7 @@ private final class TabTitleField: NSTextField, NSTextFieldDelegate {
         frame = NSRect(x: tabFrame.midX - width / 2, y: tabFrame.midY - height / 2,
                        width: width, height: height)
         host.addSubview(self, positioned: .above, relativeTo: nil)
+        window.tab.attributedTitle = nil
         window.tab.title = ""
         isHidden = false
         setAccessibilityIdentifier("tab-title-editor")
