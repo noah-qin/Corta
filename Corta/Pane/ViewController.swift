@@ -160,11 +160,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// font's size, family and backing scale applied.
     private(set) lazy var appearance = PaneAppearance(host: self)
     let inputSourceIndicator = PaneInputSourceIndicator()
+    private(set) lazy var paneHeader = PaneHeader(pane: self)
 
     /// The child sees the final size now, not after the debounce.
-    func endLiveResize() {
-        resizeDebouncer?.flush()
-    }
+    func endLiveResize() { resizeDebouncer?.flush() }
 
     /// Read per pane, not at launch: a config change applies to the next
     /// window, the only moment an initial size can apply.
@@ -182,9 +181,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// Only a pane touching the window's top sits under the chrome.
     var topInset: CGFloat {
         guard view.window != nil else {
-            return TerminalLayout.titlebarHeight + TerminalLayout.insets.top
+            return TerminalLayout.titlebarHeight + TerminalLayout.insets.top + PaneHeader.height
         }
-        return TerminalLayout.insets.top + chromeOverlap
+        return TerminalLayout.insets.top + chromeOverlap + PaneHeader.height
     }
     /// The chrome share alone — what the focus ring, drawn flush, needs.
     var chromeOverlap: CGFloat {
@@ -236,8 +235,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     var minimumContentSize: CGSize {
         let metrics = cellMetrics
         return CGSize(
-            width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight)
+            width: max(230, CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth),
+            height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight + PaneHeader.height)
     }
 
     /// How a split predicts the new pane's winsize before layout settles it.
@@ -277,10 +276,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let metrics = cellMetrics
         let grid = initialGridSize ?? configuredGridSize
         return NSSize(
-            width: CGFloat(grid.columns) * metrics.cellWidth + TerminalLayout.insetWidth,
+            width: CGFloat(grid.columns) * metrics.cellWidth + TerminalLayout.insetWidth + 2 * PaneSurfaceView.margin,
             height: CGFloat(grid.rows) * metrics.cellHeight + TerminalLayout.insetHeight
-                + windowChrome)
+                + windowChrome + PaneHeader.height + 2 * PaneSurfaceView.margin)
     }
+
+    override func loadView() { view = PaneSurfaceView(frame: .zero) }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -328,6 +329,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         invalidateDisplay()
         resizeSessionToFitView()
         focus.updateLayout()
+        paneHeader.place()
         search.placeClearOfContent()
     }
 
@@ -398,7 +400,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         // Nothing reaches the child before the window is sized: a layout of the
         // view at its placeholder size would strand blank rows under the
         // prompt. The session is born at the target size, so nothing is lost.
-        guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil
+        guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil,
+            splitController?.splitTransition.isRunning != true
         else { return }
         let grid = gridSize(fitting: view.bounds.size)
         let pixels = pixelSize(
@@ -561,6 +564,7 @@ extension ViewController {
         ])
         terminalView = view
         focus.installViews(in: self.view)
+        self.view.addSubview(paneHeader)
     }
 
     private func installSessionCallbacks() {
@@ -787,6 +791,7 @@ extension ViewController {
     /// focus.
     private func noteOutputBatch() {
         guard let session else { return }
+        paneHeader.refresh()
         if isFocusedPane {
             windowTitle.apply()
         }

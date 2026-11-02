@@ -128,6 +128,8 @@ final class PaneAppearance: NSObject {
     @objc func appearanceChanged() {
         guard let host else { return }
         (host.view.window?.windowController as? TerminalWindowController)?.applyCanvasAppearance()
+        (host.view as? PaneSurfaceView)?.refreshAppearance()
+        host.splitController?.view.needsDisplay = true
         // OSC 10/11/12 answers follow the live variant.
         session?.updateTheme(
             colors: AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark).dynamicColors,

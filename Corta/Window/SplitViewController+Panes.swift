@@ -67,7 +67,7 @@ extension SplitViewController {
         guard let split = subtree as? NSSplitView, split.subviews.count == 2 else { return }
         for child in split.subviews { equalize(child) }
         let axis = split.isVertical ? split.bounds.width : split.bounds.height
-        split.setPosition(axis / 2, ofDividerAt: 0)
+        split.setPosition((axis - split.dividerThickness) / 2, ofDividerAt: 0)
     }
 
     /// Deliver now, not after the debounce, or the grid lags each press.
@@ -83,6 +83,7 @@ extension SplitViewController {
 
     var panesWithRunningJobs: [ViewController] {
         panes.filter { $0.session?.hasForegroundJob == true }
+            + floatingPanels.flatMap { $0.split.panesWithRunningJobs }
     }
 
     /// Whether closing `running` asks first: something is running and
@@ -150,5 +151,27 @@ extension SplitViewController {
         let title = value.trimmingCharacters(in: .whitespacesAndNewlines)
         controller.customTabTitle = title.isEmpty ? nil : String(title.prefix(200))
         applyWindowTitle()
+    }
+}
+
+extension SplitViewController {
+    /// Spring only visible, user-created splits; restore and hidden windows
+    /// remain immediate. Accessibility's Reduce Motion preference wins.
+    func animateSplit(_ node: NSSplitView, newPane pane: ViewController) {
+        let axis = node.isVertical ? node.bounds.width : node.bounds.height
+        if view.window?.isVisible == true, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            let minimum = pane.minimumContentSize
+            let extent = node.isVertical ? minimum.width : minimum.height
+            let end = (axis - node.dividerThickness) / 2
+            let start = max(end, axis - extent - node.dividerThickness)
+            splitTransition.start(node: node, from: start, to: end, revealing: pane.view) { [weak self] in
+                guard let self else { return }
+                self.view.layoutSubtreeIfNeeded()
+                for child in self.panes {
+                    child.resizeSessionToFitView(coalesce: false)
+                    child.paneHeader.refresh()
+                }
+            }
+        }
     }
 }

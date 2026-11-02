@@ -28,6 +28,7 @@ extension SplitViewController {
         pane.invalidateDisplay()
         previous?.focus.applyAppearance()
         pane.focus.applyAppearance()
+        for child in panes { child.paneHeader.refresh() }
         applyWindowTitle()
     }
 
@@ -104,10 +105,21 @@ extension SplitViewController {
     func updateWindowMinSize() {
         guard let window = view.window, let pane = panes.first else { return }
         let treeMinimum = tree.minimumSize(
-            of: tree.root, leafSize: leafMinimumSize, dividerThickness: 1)
-        window.contentMinSize = NSSize(
-            width: treeMinimum.width,
-            height: treeMinimum.height + pane.windowChrome + statusBarHeight)
+            of: tree.root, leafSize: leafMinimumSize, dividerThickness: PaneSurfaceView.gap)
+        let minimum = NSSize(
+            width: treeMinimum.width + 2 * contentMargin,
+            height: treeMinimum.height + pane.windowChrome + statusBarHeight + 2 * contentMargin)
+        window.contentMinSize = minimum
+        // Setting a minimum does not enlarge an already smaller window.
+        // Grow it before positioning dividers so both new cards actually fit.
+        if !window.styleMask.contains(.fullScreen),
+           window.frame.width < minimum.width || window.frame.height < minimum.height {
+            var frame = window.frame
+            let height = max(frame.height, minimum.height)
+            frame.origin.y -= height - frame.height
+            frame.size = NSSize(width: max(frame.width, minimum.width), height: height)
+            window.setFrame(frame, display: true)
+        }
     }
 
     private func leafMinimumSize(_ leaf: NSView) -> CGSize {
@@ -116,7 +128,7 @@ extension SplitViewController {
 
     private func minimumAxis(of subtree: NSView, vertical: Bool) -> CGFloat {
         let size = tree.minimumSize(
-            of: subtree, leafSize: leafMinimumSize, dividerThickness: 1)
+            of: subtree, leafSize: leafMinimumSize, dividerThickness: PaneSurfaceView.gap)
         return vertical ? size.width : size.height
     }
 }

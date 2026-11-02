@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Cocoa
+import CortaTerminal
 import UserNotifications
 
 @main
@@ -109,6 +110,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// toolbar's button names its own window: the key window is nil while
     /// Corta is inactive, and the tab would have opened as a window.
     func newTab(beside existing: NSWindow?, sender: Any?) {
+        if let floating = existing?.windowController as? FloatingPaneController {
+            newTab(beside: floating.source?.view.window, sender: sender)
+            return
+        }
         let controller = makeWindowController()
         guard let window = controller.window else { return }
         window.tabbingMode = .automatic
@@ -306,6 +311,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         #if DEBUG
         if CommandLine.arguments.contains("--sftp-preview") { SFTPBrowserController.showDevelopmentPreview() }
         if CommandLine.arguments.contains("--glass-preview") { GlassAppearancePreview.show() }
+        if CommandLine.arguments.contains("--pane-preview")
+            || CommandLine.arguments.contains("--floating-pane-preview"),
+           let split = terminalWindowControllers.first?.contentViewController as? SplitViewController {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                split.splitRight(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    split.splitDown(nil)
+                    if CommandLine.arguments.contains("--floating-pane-preview") {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { split.detachFocusedPane() }
+                    }
+                }
+            }
+        }
         #endif
         // A notification click jumps back to its command
         // (`AppDelegate+Notifications.swift`).
@@ -445,7 +463,7 @@ extension AppDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let running = windowControllers.compactMap {
             ($0.contentViewController as? SplitViewController)
-        }.flatMap(\.panesWithRunningJobs)
+        }.flatMap(\.panes).filter { $0.session?.hasForegroundJob == true }
         guard let split = windowControllers.first?.contentViewController as? SplitViewController,
             split.needsCloseConfirmation(for: running)
         else { return .terminateNow }

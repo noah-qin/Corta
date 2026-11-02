@@ -137,7 +137,7 @@ struct SplitTreeTests {
     /// A 2×2 split — columns, then each column split into rows, exactly the
     /// shape ⌘D then ⌘⇧D on each half produces — must tile the window
     /// completely once AppKit has laid the split views out: the four leaves
-    /// share only the hairline dividers, with no gap and no overlap
+    /// share only the specified gutters, with no extra gap and no overlap
     /// anywhere. A screenshot test alone (`SplitPaneUITests`) can show this
     /// to a person but asserts nothing; this is the geometric check behind
     /// it.
@@ -185,12 +185,13 @@ struct SplitTreeTests {
         #expect(abs(union.maxY - container.bounds.maxY) < 1)
 
         // Their combined area accounts for the whole container save for the
-        // two hairline dividers — nothing else is unaccounted for.
+        // three measured gutters — nothing else is unaccounted for.
         let totalLeafArea = frames.reduce(CGFloat(0)) { $0 + $1.width * $1.height }
         let containerArea = container.bounds.width * container.bounds.height
-        let dividerAllowance =
-            2 * 1 * max(container.bounds.width, container.bounds.height)
-        #expect(containerArea - totalLeafArea <= dividerAllowance)
+        let dividerArea = columns.dividerThickness * columns.bounds.height
+            + leftColumn.dividerThickness * leftColumn.bounds.width
+            + rightColumn.dividerThickness * rightColumn.bounds.width
+        #expect(abs(containerArea - totalLeafArea - dividerArea) < 1)
     }
 
     /// The window's minimum size is the tree's minimum: along a split's

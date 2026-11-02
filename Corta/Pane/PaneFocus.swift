@@ -268,6 +268,12 @@ final class PaneFocus: NSObject {
     func updateLayout() {
         guard let host, let ring = ringView else { return }
         ringTopConstraint?.constant = host.chromeOverlap + Self.focusRingWidth / 2
+        if host.view is PaneSurfaceView {
+            ring.layer?.cornerRadius = PaneSurfaceView.radius
+            ring.layer?.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner,
+                                        .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+            return
+        }
         // Only corners that are the window's, as `TerminalView` does for the
         // drawable; the pane's view is not flipped, so `MaxY` is the top.
         guard let window = host.view.window else { return }
@@ -283,6 +289,11 @@ final class PaneFocus: NSObject {
     /// The indicators for the pane's focus now, and the report to the child.
     func applyAppearance() {
         guard let host else { return }
+        let subtle = host.view is PaneSurfaceView && !SystemAccessibility.increaseContrast
+        dimView?.layer?.backgroundColor = NSColor.black.withAlphaComponent(
+            subtle ? 0.025 : Self.unfocusedDim).cgColor
+        highlightView?.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(
+            subtle ? 0.01 : Self.focusHighlightAlpha).cgColor
         // One pane needs neither.
         let inSplit = host.splitController?.hasMultiplePanes == true
         // The dim is structural and stays while the app is inactive; ring and

@@ -36,12 +36,15 @@ final class SplitViewController: NSViewController {
     /// Where the last closed pane was, for reopening; one deep
     /// (`SplitViewController+Reopen.swift`).
     var lastClosedPane: ClosedPane?
+    var floatingPanels: [FloatingPaneController] = []
+    var isFloating: Bool { setup.isFloating }
+    var contentMargin: CGFloat { isFloating ? 0 : PaneSurfaceView.margin }
     private let systemStatusBar = SystemStatusBar(frame: .zero)
     let inputSourceToolbarHost = NSView(frame: CGRect(x: 0, y: 0, width: 28, height: 24))
     var inputSourceToolbarSpacer: NSToolbarItem?
     private var statusBarHeightConstraint: NSLayoutConstraint?
     var statusBarHeight: CGFloat {
-        ConfigurationStore.shared.configuration.statusBar && !directPresentation.contains(.overlays)
+        !isFloating && ConfigurationStore.shared.configuration.statusBar && !directPresentation.contains(.overlays)
             ? SystemStatusBar.height : 0
     }
     /// What direct presentation changes right now (`updateDirectPresentation`).
@@ -65,17 +68,20 @@ final class SplitViewController: NSViewController {
     weak var toolbarWindow: NSWindow?
 
     var panes: [ViewController] { children.compactMap { $0 as? ViewController } }
-    var hasMultiplePanes: Bool { tree?.leafCount ?? 1 > 1 }
+    var hasMultiplePanes: Bool { panes.count > 1 }
 
     /// What the window's root pane spawns as: given at construction, since
     /// the root pane spawns as the view loads.
     struct Setup {
+        var transferredPane: ViewController?
+        var isFloating = false
         var restore: WindowState?
         var preset: Preset?
         /// The directory an App Intent asked for; ignored when `restore` or
         /// `preset` names one.
         var workingDirectory: String?
     }
+    let splitTransition = SplitTransition()
     private let setup: Setup
 
     /// The layout being restored: taken in `viewDidLoad` (the root pane needs
@@ -110,9 +116,17 @@ final class SplitViewController: NSViewController {
         let restoredPreset = pendingRestore?.layout.firstPresetName.flatMap { name in
             ConfigurationStore.shared.configuration.presets.first { $0.name == name }
         }
-        let pane = makePane(
-            workingDirectory: pendingRestore?.layout.firstDirectory ?? setup.workingDirectory,
-            initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
+        let pane: ViewController
+        if let transferred = setup.transferredPane {
+            pane = transferred
+            pane.didSizeWindow = false
+            pane.initialGridSize = nil
+            addChild(pane)
+        } else {
+            pane = makePane(
+                workingDirectory: pendingRestore?.layout.firstDirectory ?? setup.workingDirectory,
+                initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
+        }
         focusedPane = pane
         tree = SplitTree(root: pane.view)
         systemStatusBar.onVisibilityChange = { [weak self] in self?.updateStatusBarLayout() }
@@ -131,6 +145,7 @@ final class SplitViewController: NSViewController {
         guard !didSetUpWindow, let pane = focusedPane else { return }
         didSetUpWindow = true
         window.title = "Corta"
+        if prepareFloatingWindowIfNeeded(window, pane: pane) { return }
         installToolbar(on: window)
         window.tabbingMode = .automatic
         // Chrome follows the system appearance; the terminal surface stays dark.
@@ -305,13 +320,9 @@ final class SplitViewController: NSViewController {
         return pane
     }
 
-    func pane(forLeaf leaf: NSView) -> ViewController? {
-        panes.first { $0.view === leaf }
-    }
-
     /// The terminal root changes identity on the first split and last collapse;
     /// the optional status bar remains anchored beneath it.
-    private func installRoot() {
+    func installRoot() {
         // A zoomed pane fills the view; the tree stays intact, just detached.
         let root = zoomedPane?.view ?? tree.root
         guard root.superview !== view else { return }
@@ -330,10 +341,10 @@ final class SplitViewController: NSViewController {
         root.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(root, positioned: .below, relativeTo: systemStatusBar)
         NSLayoutConstraint.activate([
-            root.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            root.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            root.topAnchor.constraint(equalTo: view.topAnchor),
-            root.bottomAnchor.constraint(equalTo: systemStatusBar.topAnchor),
+            root.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: contentMargin),
+            root.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -contentMargin),
+            root.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: contentMargin),
+            root.bottomAnchor.constraint(equalTo: systemStatusBar.topAnchor, constant: -contentMargin),
         ])
         updateDirectPresentation()
     }
@@ -370,6 +381,7 @@ extension SplitViewController {
 
     /// Fills the window with the focused pane; a no-op with one pane.
     func zoomFocusedPane() {
+        splitTransition.finish()
         guard hasMultiplePanes, let pane = focusedPane, zoomedPane == nil,
             let superview = pane.view.superview,
             let index = superview.subviews.firstIndex(of: pane.view)
@@ -389,6 +401,7 @@ extension SplitViewController {
     }
 
     func unzoomPane() {
+        splitTransition.finish()
         guard let pane = zoomedPane else { return }
         zoomedPane = nil
         // Back into its own slot: the split lost this child on zoom, and
@@ -456,27 +469,32 @@ extension SplitViewController {
         let node = tree.split(
             leaf: focusedPane.view, orientation: orientation, newLeaf: pane.view)
         node.delegate = self
+        (node as? PaneSplitView)?.onDividerInteraction = { [weak self] in
+            self?.splitTransition.finish()
+        }
         if node === tree.root { installRoot() }
         node.frame = oldFrame
         let (firstFrame, secondFrame) = halvedFrames(of: oldFrame, orientation: orientation)
         focusedPane.view.frame = firstFrame
         pane.view.frame = secondFrame
+        updateWindowMinSize()
         view.layoutSubtreeIfNeeded()
         let axis = node.isVertical ? node.bounds.width : node.bounds.height
-        node.setPosition(axis / 2, ofDividerAt: 0)
+        node.setPosition((axis - node.dividerThickness) / 2, ofDividerAt: 0)
         // A split is one resize, not a drag: deliver now rather than render the
         // old grid into the halves through the debounce window.
         focusedPane.endLiveResize()
         pane.endLiveResize()
-        updateWindowMinSize()
         view.window?.makeFirstResponder(pane.terminalView)
+        animateSplit(node, newPane: pane)
+        for child in panes { child.paneHeader.refresh() }
     }
 
     /// The two halves of a frame, in the node's flipped coordinates.
     private func halvedFrames(of frame: NSRect, orientation: SplitOrientation)
         -> (NSRect, NSRect)
     {
-        let divider: CGFloat = 1  // .thin dividerStyle
+        let divider = PaneSurfaceView.gap
         if orientation == .columns {
             let width = (frame.width - divider) / 2
             return (
@@ -520,6 +538,7 @@ extension SplitViewController {
     }
 
     func closePane(_ pane: ViewController) {
+        splitTransition.finish()
         defer { noteLayoutChanged() }
         unzoomIfNeeded(closing: pane)
         // Before the tree changes, while its split still exists.
@@ -545,7 +564,9 @@ extension SplitViewController {
     /// Whole-window teardown for closes that bypass `closePane` (red button,
     /// tab close, ⌘Q). Idempotent per pane.
     func teardown() {
+        splitTransition.finish()
         systemStatusBar.stop()
+        for panel in floatingPanels { panel.close() }
         for pane in panes { pane.teardown() }
     }
 
@@ -553,7 +574,7 @@ extension SplitViewController {
     private func halvedGridSize(of pane: ViewController, orientation: SplitOrientation)
         -> TerminalSize
     {
-        let divider: CGFloat = 1  // .thin dividerStyle
+        let divider = PaneSurfaceView.gap
         let bounds = pane.view.bounds
         let target =
             orientation == .columns
@@ -562,20 +583,4 @@ extension SplitViewController {
         return pane.gridSize(fitting: target)
     }
 
-}
-
-/// The window's content view. With `.fullSizeContentView` the content
-/// covers the titlebar band and wins hit-testing there; passing the
-/// chrome band back to the frame restores titlebar drag and double-click.
-final class WindowContentView: NSView {
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        if let window {
-            let chrome = window.frame.height - window.contentLayoutRect.height
-            // Unflipped: the top band is high y. It holds no cells or controls.
-            if chrome > 0, convert(point, from: superview).y > bounds.height - chrome {
-                return nil
-            }
-        }
-        return super.hitTest(point)
-    }
 }

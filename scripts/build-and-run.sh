@@ -24,8 +24,8 @@ TASK_BINARY="$TASK_APP/Contents/MacOS/CortaDev"
 # pgrep uses an extended regular expression; match the checkout literally.
 TASK_PATTERN="$(printf '%s' "$TASK_BINARY" | sed 's/[][(){}.^$*+?|\\]/\\&/g')"
 case "$TASK_MODE" in
-  run|--debug|--logs|--telemetry|--verify|--sftp-preview|--repair-metal-cache) ;;
-  *) echo "usage: $0 [--debug|--logs|--telemetry|--verify|--sftp-preview|--repair-metal-cache]" >&2; exit 2 ;;
+  run|--debug|--logs|--telemetry|--verify|--sftp-preview|--pane-preview|--floating-pane-preview|--repair-metal-cache) ;;
+  *) echo "usage: $0 [--debug|--logs|--telemetry|--verify|--sftp-preview|--pane-preview|--floating-pane-preview|--repair-metal-cache]" >&2; exit 2 ;;
 esac
 # Match the executable path, so another checkout or installed app stays open.
 while read -r task_pid; do
@@ -58,6 +58,8 @@ xcodebuild -project "$TASK_ROOT/Corta.xcodeproj" -scheme 'Corta (Dev)' \
   -configuration Debug -derivedDataPath "$TASK_ROOT/.build/ui" build
 case "$TASK_MODE" in
   --debug) exec lldb -- "$TASK_BINARY" ;;
+  --floating-pane-preview) /usr/bin/open -n "$TASK_APP" --env CORTA_RESTORE_WINDOWS=0 --args --floating-pane-preview ;;
+  --pane-preview) /usr/bin/open -n "$TASK_APP" --env CORTA_RESTORE_WINDOWS=0 --args --pane-preview ;;
   --sftp-preview) /usr/bin/open -n "$TASK_APP" --args --sftp-preview ;;
   *) /usr/bin/open -n "$TASK_APP" ;;
 esac
