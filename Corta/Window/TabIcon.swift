@@ -19,8 +19,8 @@ import AppKit
 /// AppKit keeps ownership of selection, close buttons, dragging and renaming.
 /// Only the tab's public attributed title is decorated here.
 enum TabIcon {
-    static let side: CGFloat = 18
-    private static let stackStep: CGFloat = 4
+    static let side: CGFloat = 20
+    private static let stackStep: CGFloat = 7
     private static var compositions: [String: NSImage] = [:]
     private static let signatures = NSMapTable<NSWindow, NSString>.weakToStrongObjects()
 
@@ -48,7 +48,7 @@ enum TabIcon {
         if let image = image(for: programs) {
             let attachment = NSTextAttachment()
             attachment.image = image
-            attachment.bounds = NSRect(x: 0, y: -4, width: image.size.width, height: side)
+            attachment.bounds = NSRect(x: 0, y: -5, width: image.size.width, height: side)
             result.append(NSAttributedString(attachment: attachment))
             result.append(NSAttributedString(string: " "))
         }
@@ -72,19 +72,26 @@ enum TabIcon {
         let images = programs.map { $0.tabImage ?? lead }
         let width = side + CGFloat(images.count - 1) * stackStep
         let image = NSImage(size: NSSize(width: width, height: side), flipped: false) { _ in
-            // Back to front: each card behind peeks out to the right, a
-            // little smaller. A clear ring cut around every card keeps their
-            // edges apart at this size, so the stack reads as a stack and the
-            // focused program in front is unmistakable.
+            // Back to front, like cards in a hand: every card behind is a
+            // whole tile, a little smaller and further right. A white rim and
+            // a soft shadow lift each card off the one behind it, so the
+            // stack reads as a stack and the focused program in front is
+            // unmistakable.
             for index in images.indices.reversed() {
-                let size = side - CGFloat(index) * 2
-                let frame = NSRect(x: CGFloat(index) * stackStep,
+                let size = side - 2 - CGFloat(index) * 1.5
+                let frame = NSRect(x: 1 + CGFloat(index) * stackStep,
                                    y: (side - size) / 2, width: size, height: size)
-                if index < images.count - 1, let context = NSGraphicsContext.current {
-                    context.compositingOperation = .clear
-                    NSBezierPath(roundedRect: frame.insetBy(dx: -1, dy: -1), xRadius: 5.5, yRadius: 5.5).fill()
-                    context.compositingOperation = .sourceOver
-                }
+                NSGraphicsContext.saveGraphicsState()
+                let shadow = NSShadow()
+                shadow.shadowColor = NSColor.black.withAlphaComponent(0.28)
+                shadow.shadowBlurRadius = 1.5
+                shadow.shadowOffset = NSSize(width: -0.5, height: -0.5)
+                shadow.set()
+                NSColor.white.setFill()
+                let radius = size * 0.27
+                NSBezierPath(roundedRect: frame.insetBy(dx: -1, dy: -1),
+                             xRadius: radius + 1, yRadius: radius + 1).fill()
+                NSGraphicsContext.restoreGraphicsState()
                 images[index].draw(in: frame)
             }
             return true
