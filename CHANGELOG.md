@@ -22,6 +22,14 @@ Versioning for compatibility changes.
 
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
 
+### Fixed
+
+- Claude Code installed by its native installer showed as "2.1.316" with a
+  plain terminal icon: it runs an executable named after its version
+  (`…/claude/versions/2.1.316`). A version-named process now reads as the
+  tool whose `versions` directory holds it, in the title, the tab and the
+  pane header.
+
 ## [1.5.1] - 2026-10-27
 
 ### Changed

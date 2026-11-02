@@ -345,7 +345,8 @@ extension PTY {
         guard length > 0 else { return nil }
         let bytes = buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }
         let name = String(decoding: bytes, as: UTF8.self)
-        return name.isEmpty ? nil : name
+        guard !name.isEmpty else { return nil }
+        return VersionedExecutable.resolve(pid: pid, name: name) ?? name
     }
 
     /// From the kernel (`proc_pidinfo`): stock macOS zsh emits OSC 7 only for
