@@ -112,10 +112,11 @@ final class TabStripView: NSView {
     }
 
     private var trackColor: NSColor {
-        let canvas = PaneSurfaceView.canvasColor
+        // One step from the band it sits on.
+        let ground = PaneSurfaceView.gutterColor
         return isLightCanvas
-            ? canvas.blended(withFraction: 0.065, of: .black) ?? canvas
-            : canvas.blended(withFraction: 0.09, of: .white) ?? canvas
+            ? ground.blended(withFraction: 0.045, of: .black) ?? ground
+            : ground.blended(withFraction: 0.08, of: .white) ?? ground
     }
 
     var selectedFill: NSColor {

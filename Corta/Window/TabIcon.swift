@@ -60,7 +60,7 @@ enum TabIcon {
             let shrink = CGFloat(index)
             // Nearly full height: the cards stand close behind the front one.
             let size = NSSize(width: tile.width - shrink * 2 / 3, height: tile.height - shrink / 2)
-            guard let card = tilted(card(images[index], size: size)) else { return nil }
+            guard let card = tilted(card(images[index], size: size, squash: tiltWidth)) else { return nil }
             let right = frontSize.width + CGFloat(index) * stackStep
             let frame = NSRect(x: right - card.size.width, y: (side - card.size.height) / 2,
                                width: card.size.width, height: card.size.height)
@@ -86,14 +86,25 @@ enum TabIcon {
         return image
     }
 
-    /// A tile on a white rim, one point wider on every side.
-    private static func card(_ tile: NSImage, size: NSSize) -> NSImage {
+    /// How wide a turned card is drawn, as a share of its width.
+    private static let tiltWidth: CGFloat = 0.4
+
+    /// A tile on a white rim, one point wider on every side. A card that
+    /// will be squashed to `squash` of its width is drawn with corners
+    /// stretched by the inverse, so they come out round, not clipped.
+    private static func card(_ tile: NSImage, size: NSSize, squash: CGFloat = 1) -> NSImage {
         let outer = NSSize(width: size.width + 2, height: size.height + 2)
         let image = NSImage(size: outer, flipped: false) { rect in
             let radius = size.height * 0.27 + 1
+            let xRadius = min(rect.width / 2, radius / squash)
             NSColor.white.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
-            tile.draw(in: rect.insetBy(dx: 1, dy: 1))
+            NSBezierPath(roundedRect: rect, xRadius: xRadius, yRadius: radius).fill()
+            let inner = rect.insetBy(dx: 1, dy: 1)
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(roundedRect: inner, xRadius: min(inner.width / 2, (radius - 1) / squash),
+                         yRadius: radius - 1).addClip()
+            tile.draw(in: inner)
+            NSGraphicsContext.restoreGraphicsState()
             return true
         }
         image.isTemplate = false
@@ -118,7 +129,7 @@ enum TabIcon {
         NSGraphicsContext.restoreGraphicsState()
         guard let source = bitmap.cgImage else { return nil }
         let height = CGFloat(pixelsHigh)
-        let width = (CGFloat(pixelsWide) * 0.4).rounded()
+        let width = (CGFloat(pixelsWide) * tiltWidth).rounded()
         let inset = height * 0.08
         let filter = CIFilter(name: "CIPerspectiveTransform")
         filter?.setValue(CIImage(cgImage: source), forKey: kCIInputImageKey)

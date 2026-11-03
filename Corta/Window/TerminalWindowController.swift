@@ -208,10 +208,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
 
     func applyCanvasAppearance() {
         guard let window else { return }
-        let color = TerminalColorPalette.defaultBackground
         window.isOpaque = true
-        window.backgroundColor = NSColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y),
-                                         blue: CGFloat(color.z), alpha: 1)
+        // The band shares the gaps' ground colour; the cards sit on it.
+        window.backgroundColor = PaneSurfaceView.gutterColor
         // The titlebar band is the theme's own colour, not a material: the
         // window's background shows through it, and the grid's top inset
         // keeps output below it (D24, amended). The tabs and pane headers
