@@ -25,7 +25,8 @@ enum TabIcon {
     private static let fanAngle: CGFloat = 8
     private static let fanPivotDepth: CGFloat = 1.1
     private static let fanStep: CGFloat = 8
-    private static let shadowPad: CGFloat = 3
+    /// Room around the stack for the turned cards' corners.
+    private static let margin: CGFloat = 3
     private static var compositions: [String: NSImage] = [:]
 
     static func item(for tab: TerminalTab) -> TabStripItem {
@@ -44,7 +45,7 @@ enum TabIcon {
         let programs = Array(([label.icon] + others).prefix(3))
         let full = focused?.windowTitle.composed ?? name
         return TabStripItem(
-            programs: programs, name: name, context: context,
+            id: tab.id, programs: programs, name: name, context: context,
             toolTip: full, status: tab.agentStatus, progress: tab.agentProgress)
     }
 
@@ -60,17 +61,12 @@ enum TabIcon {
         // further about a point well below the stack, so it fans out from
         // behind the front card's right edge.
         let width = cardSize.width + CGFloat(images.count - 1) * fanStep
-        let pad = shadowPad
+        let pad = margin
         let image = NSImage(size: NSSize(width: width + pad * 2, height: side + pad * 2), flipped: false) { _ in
             NSGraphicsContext.saveGraphicsState()
             let offset = NSAffineTransform()
             offset.translateX(by: pad, yBy: pad)
             offset.concat()
-            let shadow = NSShadow()
-            shadow.shadowColor = NSColor.black.withAlphaComponent(0.3)
-            shadow.shadowBlurRadius = 1.5
-            shadow.shadowOffset = NSSize(width: 0.5, height: -0.5)
-            shadow.set()
             let frame = NSRect(x: 0, y: (side - cardSize.height) / 2,
                                width: cardSize.width, height: cardSize.height)
             let pivot = NSPoint(x: frame.midX, y: frame.minY - frame.height * fanPivotDepth)
@@ -97,30 +93,35 @@ enum TabIcon {
     }
 
     /// A tile on a white rim, one point wide. Tile and rim are cut from one
-    /// radius, so their corners are concentric. A card behind the front one
-    /// is `shaded`, a little in its shadow.
+    /// radius, so their corners are concentric. No blurred shadow: at this
+    /// size a halo reads as a soft edge. Hairlines draw each edge instead —
+    /// inside, where tile meets rim, so a white tile (Codex) has an edge;
+    /// outside a card behind, so its rim shows on a white pill. A card
+    /// behind is also `shaded`, a little in the front card's shadow.
     private static func drawCard(_ tile: NSImage, in rect: NSRect, shaded: Bool = false) {
         let radius = (rect.height - 2) * 0.27 + 1
+        let rim = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
         NSColor.white.setFill()
-        NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+        rim.fill()
         let inner = rect.insetBy(dx: 1, dy: 1)
         let face = NSBezierPath(roundedRect: inner, xRadius: radius - 1, yRadius: radius - 1)
         NSGraphicsContext.saveGraphicsState()
-        NSShadow().set()
         face.addClip()
         tile.draw(in: inner)
         if shaded {
-            NSColor.black.withAlphaComponent(0.12).setFill()
+            NSColor.black.withAlphaComponent(0.1).setFill()
             inner.fill(using: .sourceAtop)
         }
         NSGraphicsContext.restoreGraphicsState()
-        // A hairline where tile meets rim, so a white tile (Codex) still has
-        // an edge.
-        NSGraphicsContext.saveGraphicsState()
-        NSShadow().set()
-        NSColor.black.withAlphaComponent(0.1).setStroke()
+        NSColor.black.withAlphaComponent(0.12).setStroke()
         face.lineWidth = 0.5
         face.stroke()
-        NSGraphicsContext.restoreGraphicsState()
+        if shaded {
+            let edge = NSBezierPath(roundedRect: rect.insetBy(dx: 0.25, dy: 0.25),
+                                    xRadius: radius - 0.25, yRadius: radius - 0.25)
+            edge.lineWidth = 0.5
+            NSColor.black.withAlphaComponent(0.2).setStroke()
+            edge.stroke()
+        }
     }
 }
