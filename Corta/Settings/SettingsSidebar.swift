@@ -84,26 +84,15 @@ struct SettingsSidebar: View {
             if categories.isEmpty {
                 Text(L10n.text("settings.search.empty")).foregroundStyle(.secondary).padding()
             }
-            List(categories) { category in
-                Button {
-                    navigation.go(to: category)
-                } label: {
-                    SettingsSidebarRow(category: category)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 10).padding(.vertical, 2)
-                        .contentShape(.rect)
+            // Groups as sections, so the gaps between them are the list's
+            // own and all alike; a top inset on a group's first row also
+            // stretched the row after it.
+            List {
+                ForEach(groups, id: \.self) { group in
+                    Section {
+                        ForEach(group) { row($0) }
+                    }
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(colorScheme == .dark ? Color(white: 0.9) : Color(white: 0.15))
-                .background(
-                    navigation.selection == category ? Color.primary.opacity(0.07) : .clear,
-                    in: .rect(cornerRadius: 10)
-                )
-                .accessibilityAddTraits(navigation.selection == category ? [.isSelected] : [])
-                .listRowInsets(
-                    EdgeInsets(
-                        top: search.isEmpty && [.terminal, .connections, .privacy].contains(category) ? 12 : 1,
-                        leading: 6, bottom: 1, trailing: 6))
             }
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
@@ -117,6 +106,36 @@ struct SettingsSidebar: View {
             }
         }
         .background(Color(nsColor: .controlBackgroundColor).ignoresSafeArea())
+    }
+
+    /// Setting up the window, then what runs in it, then where it connects
+    /// and what it keeps. One group while searching: the matches are a list.
+    private var groups: [[SettingsView.Category]] {
+        guard search.isEmpty else { return [categories] }
+        return [[.general, .appearance, .themes], [.terminal, .keyboardMouse, .shortcuts], [.connections, .privacy]]
+            .map { $0.filter(categories.contains) }.filter { !$0.isEmpty }
+    }
+
+    private func row(_ category: SettingsView.Category) -> some View {
+        Button {
+            navigation.go(to: category)
+        } label: {
+            SettingsSidebarRow(category: category)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10).padding(.vertical, 2)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(colorScheme == .dark ? Color(white: 0.9) : Color(white: 0.15))
+        .background(
+            navigation.selection == category ? Color.primary.opacity(0.07) : .clear,
+            in: .rect(cornerRadius: 10)
+        )
+        .accessibilityAddTraits(navigation.selection == category ? [.isSelected] : [])
+        // A plain-style button around a tile and a text has no name of its
+        // own: VoiceOver read each row as just "button".
+        .accessibilityLabel(category.title)
+        .listRowInsets(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
     }
 }
 

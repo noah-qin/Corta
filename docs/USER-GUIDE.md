@@ -161,7 +161,7 @@ right-click it for New Tab, Rename Tab…, Close Tab and Close Other Tabs.
   Apple SD Gothic Neo by your system language, kana from Hiragino Sans and
   Hangul from Apple SD Gothic Neo whatever the language. To draw them in
   a font of your own — Menlo for letters and Sarasa Gothic or LXGW WenKai
-  for Chinese, say — choose it under **CJK Font** (`font-family-cjk`). Any
+  for Chinese, say — choose it under **CJK font** (`font-family-cjk`). Any
   installed font with Chinese, Japanese or Korean characters is listed,
   monospaced or not: it draws only those characters, centred in their two
   cells, and the main font keeps the cell size. Emoji come from
@@ -254,7 +254,7 @@ Direct-input and IME colors accept hex values; clear a field for the subtle defa
 
 ### Optional local system status
 
-Open Settings (⌘,) → Terminal, enable Bottom status bar, then select the
+Open Settings (⌘,) → Terminal, enable Show system status under Bottom Status Bar, then select the
 metrics you want to see: CPU usage, system load,
 memory usage, network rates, disk free space and thermal state. It is off
 by default; each metric has its own toggle. Click the bar to see the local

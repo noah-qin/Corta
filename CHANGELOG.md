@@ -57,6 +57,9 @@ Versioning for compatibility changes.
 - The `corta` and `mono` themes' colours were retuned: every hue in both
   variants now reads at 4.5:1 or better on its background (the default
   dark theme's blue was 1.9:1). Solarized is unchanged, as published.
+- Settings: the shortcut keys line up in one column, the sidebar's groups
+  are evenly spaced, the Shortcuts search field matches the sidebar's, and
+  setting names use one capitalisation.
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
 
 ### Fixed

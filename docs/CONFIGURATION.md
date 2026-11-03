@@ -788,7 +788,7 @@ managed remote-edit copies. Their contents are not configuration keys.
 | `Configuration.presets` | same file | Named shell/directory/environment combinations | **Pane-launch configuration** — read once, at the moment a pane spawns from that preset; never re-applied afterwards (`docs/CONFIGURATION.md` §4a) |
 | `SessionRestore` | `state.json` | Window frames and split arrangement, restored on the next launch | **Window/session state** — describes *this run's* windows, not a preference about future ones |
 | `DirectoryHistoryStore` | `directory-history.json` | Ranked recent directories | **Temporary interaction history** — gated by `directory-history`; clear it in Privacy & Security ▸ History |
-| `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent Hosts |
+| `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent hosts |
 | `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — preserve undecided edits before deleting app data; used copies are pruned after 30 days unless edits are pending |
 
 Why separate stores: `Configuration` is line-oriented text

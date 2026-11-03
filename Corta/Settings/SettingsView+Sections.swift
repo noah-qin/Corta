@@ -35,7 +35,8 @@ extension SettingsView {
                     .buttonStyle(.plain).accessibilityLabel(L10n.text("settings.search.clear"))
                 }
             }
-            .padding(12).background(.quaternary, in: .rect(cornerRadius: 10))
+            // The sidebar's search field, at page width.
+            .padding(.horizontal, 10).frame(height: 30).background(Color.primary.opacity(0.055), in: .capsule)
             ForEach(CommandCategory.allCases, id: \.self) { category in
                 let commands = TerminalCommand.allCases.filter {
                     $0.category == category

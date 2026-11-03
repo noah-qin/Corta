@@ -13579,7 +13579,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Remember Visited Directories"
+            "value": "Remember visited directories"
           }
         },
         "zh-Hans": {
@@ -13697,7 +13697,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Directory History"
+            "value": "Directory history"
           }
         },
         "zh-Hans": {
@@ -24818,7 +24818,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Saved presets"
+            "value": "Saved Presets"
           }
         },
         "zh-Hans": {
@@ -28159,7 +28159,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Recent Hosts"
+            "value": "Recent hosts"
           }
         },
         "zh-Hans": {
@@ -31219,7 +31219,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bottom status bar"
+            "value": "Bottom Status Bar"
           }
         },
         "zh-Hans": {
@@ -36883,7 +36883,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Line Spacing"
+            "value": "Line spacing"
           }
         },
         "zh-Hans": {
@@ -37178,7 +37178,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ambiguous-Width Characters"
+            "value": "Ambiguous-width characters"
           }
         },
         "zh-Hans": {
@@ -37414,7 +37414,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "CJK Font"
+            "value": "CJK font"
           }
         },
         "zh-Hans": {
