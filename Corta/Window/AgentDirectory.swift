@@ -35,7 +35,7 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     }
 
     static var panes: [ViewController] {
-        NSApp.windows.compactMap { $0.contentViewController as? SplitViewController }.flatMap(\.panes)
+        NSApp.windows.flatMap(\.terminalSplits).flatMap(\.panes)
     }
     static var entries: [Entry] {
         guard ConfigurationStore.shared.configuration.agentStatus else { return [] }
@@ -53,7 +53,7 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         guard let pane = panes.first(where: { $0.taskNotifier.paneID == id }),
               let window = pane.view.window else { return }
         NSApp.activate()
-        window.tabGroup?.selectedWindow = window
+        if let tab = pane.splitController?.tab { tab.controller?.selectTab(tab) }
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(pane.terminalView)
     }
@@ -76,28 +76,24 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         NotificationCenter.default.post(name: didChange, object: nil)
     }
 
-    /// Each window's tab shows its most urgent pane status, or its progress.
+    /// Each tab shows its most urgent pane status, or its progress, in the
+    /// strip (D30).
     private static func refreshTabs(enabled: Bool) {
         for window in NSApp.windows {
-            guard let split = window.contentViewController as? SplitViewController else { continue }
-            let statuses = enabled ? split.panes.compactMap { $0.agents.status } : []
-            let status = statuses.max { $0.urgency < $1.urgency }
-            let progress = enabled ? split.panes.compactMap { $0.agents.progress }.first : nil
-            if status != nil || progress != nil {
-                let view =
-                    (window.tab.accessoryView as? AgentTabView)
-                    ?? AgentTabView(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
-                guard view.status != status || view.progress != progress || window.tab.accessoryView !== view
-                else { continue }
-                view.status = status; view.progress = progress
-                var label = status.map { L10n.text("agent.state." + $0.state.rawValue) }
-                    ?? L10n.text("agent.progress")
-                if let value = progress?.value { label += " · \(value)%" }
-                view.toolTip = label
-                view.setAccessibilityLabel(view.toolTip ?? L10n.text("agent.progress"))
-                view.needsDisplay = true
-                window.tab.accessoryView = view
-            } else { window.tab.accessoryView = nil }
+            guard let controller = window.windowController as? TerminalWindowController else { continue }
+            var changed = false
+            for tab in controller.tabs {
+                let panes = tab.split.panes
+                let statuses = enabled ? panes.compactMap { $0.agents.status } : []
+                let status = statuses.max { $0.urgency < $1.urgency }
+                let progress = enabled ? panes.compactMap { $0.agents.progress }.first : nil
+                if tab.agentStatus != status || tab.agentProgress != progress {
+                    tab.agentStatus = status
+                    tab.agentProgress = progress
+                    changed = true
+                }
+            }
+            if changed { controller.refreshTabStrip() }
         }
     }
 

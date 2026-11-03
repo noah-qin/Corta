@@ -24,7 +24,7 @@ import Testing
 struct FloatingPaneTests {
     private func makeSource() throws -> (TerminalWindowController, SplitViewController) {
         let controller = TerminalWindowController(setup: .init())
-        let split = try #require(controller.contentViewController as? SplitViewController)
+        let split = try #require(controller.selectedTab?.split)
         split.splitRight(nil)
         return (controller, split)
     }

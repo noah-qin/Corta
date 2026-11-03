@@ -40,8 +40,6 @@ final class SplitViewController: NSViewController {
     var isFloating: Bool { setup.isFloating }
     var contentMargin: CGFloat { isFloating ? 0 : PaneSurfaceView.margin }
     private let systemStatusBar = SystemStatusBar(frame: .zero)
-    let inputSourceToolbarHost = NSView(frame: CGRect(x: 0, y: 0, width: 28, height: 24))
-    var inputSourceToolbarSpacer: NSToolbarItem?
     private var statusBarHeightConstraint: NSLayoutConstraint?
     var statusBarHeight: CGFloat {
         !isFloating && ConfigurationStore.shared.configuration.statusBar && !directPresentation.contains(.overlays)
@@ -59,13 +57,14 @@ final class SplitViewController: NSViewController {
     private(set) var didSetUpWindow = false
     /// The splits were rebuilt and first responder taken (`viewWillAppear`).
     private var didAppear = false
-    /// The chrome height at the last layout, for absorbing tab-bar changes
-    /// into the frame.
+    /// The tab this split view is (D30); `nil` for a floating pane's window
+    /// and for a split a test hosts in a bare window.
+    weak var tab: TerminalTab?
+    /// The chrome height at the last layout, for absorbing a change — the
+    /// toolbar shown or hidden — into the frame.
     private var lastChromeHeight: CGFloat?
-    var isJoiningTabGroup = false
-    /// Toolbar actions can be queued while AppKit detaches the content view
-    /// during a tab switch. Its window remains the action's destination.
-    weak var toolbarWindow: NSWindow?
+    /// Whether this split is what its window shows.
+    var isSelectedTab: Bool { tab?.isSelected ?? true }
 
     var panes: [ViewController] { children.compactMap { $0 as? ViewController } }
     var hasMultiplePanes: Bool { panes.count > 1 }
@@ -146,8 +145,8 @@ final class SplitViewController: NSViewController {
         didSetUpWindow = true
         window.title = "Corta"
         if prepareFloatingWindowIfNeeded(window, pane: pane) { return }
-        installToolbar(on: window)
-        window.tabbingMode = .automatic
+        // Corta draws its own tabs (D30).
+        window.tabbingMode = .disallowed
         // Chrome follows the system appearance; the terminal surface stays dark.
         window.appearance = nil
         // Its content is a live process, not a document. Left restorable, AppKit
@@ -163,7 +162,6 @@ final class SplitViewController: NSViewController {
         }
         updateWindowMinSize()
         if let restore = pendingRestore {
-            (window.windowController as? TerminalWindowController)?.customTabTitle = restore.customTabTitle
             // The saved frame is authoritative; clamped to a display that
             // exists now — see `Frame.onScreen`.
             window.setFrame(restore.frame.onScreen(), display: false)
@@ -172,15 +170,9 @@ final class SplitViewController: NSViewController {
             // toolbar just set, and the status bar — centred on the main
             // screen and kept inside its visible frame, so AppKit never
             // shrinks it after the child has its size. The opener may
-            // cascade it from there (`AppDelegate.cascade`).
-            //
-            // A tab bar the user keeps shown (View ▸ Show Tab Bar) is chrome
-            // too, but AppKit attaches it when the window's tab group is
-            // created, which is otherwise when the window first shows: the
-            // frame came out a tab bar short and the child lost two or three
-            // rows (#305). Creating the group here puts the bar in the chrome
-            // measured below.
-            _ = window.tabGroup
+            // cascade it from there (`AppDelegate.cascade`). The tab strip
+            // lives in the toolbar, already installed, so it is in the chrome
+            // measured here (D30).
             var size = pane.initialWindowContentSize
             size.height += statusBarHeight
             let screen = NSScreen.main ?? NSScreen.screens.first
@@ -196,6 +188,39 @@ final class SplitViewController: NSViewController {
         view.layoutSubtreeIfNeeded()
     }
 
+    /// A tab added to a window that is already sized (D30): the window keeps
+    /// its frame, and the root pane, born at the configured grid, resizes
+    /// once to this tab's share of it.
+    func joinWindow(_ window: NSWindow) {
+        guard !didSetUpWindow, let pane = focusedPane else { return }
+        didSetUpWindow = true
+        if let metrics = pane.terminalRenderer?.pointMetrics {
+            window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        }
+        pane.didSizeWindow = true
+        view.frame = view.superview?.bounds ?? view.frame
+        view.layoutSubtreeIfNeeded()
+        pane.resizeSessionToFitView()
+        applyPendingRestore()
+        applyWindowTitle()
+    }
+
+    /// The tab came to the front: its panes draw again and its focused pane
+    /// takes the toolbar's input-source slot.
+    func didBecomeSelectedTab() {
+        updateWindowMinSize()
+        view.layoutSubtreeIfNeeded()
+        for pane in panes {
+            pane.resizeSessionToFitView()
+            pane.invalidateDisplay()
+            pane.focus.applyAppearance()
+        }
+        if let focusedPane {
+            placeInputSourceIndicator(from: focusedPane, configuration: ConfigurationStore.shared.configuration)
+        }
+        updateDirectPresentation()
+    }
+
     override func viewWillAppear() {
         super.viewWillAppear()
         guard !didAppear, let window = view.window, let pane = focusedPane else { return }
@@ -204,8 +229,9 @@ final class SplitViewController: NSViewController {
         // here instead.
         prepareWindow(window)
         // Nothing else claims first responder; without it keyDown never fires
-        // and First Responder menu actions (⌘V, ⌘=, ⌘D) dead-end.
-        window.makeFirstResponder(pane.terminalView)
+        // and First Responder menu actions (⌘V, ⌘=, ⌘D) dead-end. A tab
+        // restored behind another leaves the keyboard to the selected one.
+        if isSelectedTab { window.makeFirstResponder(pane.terminalView) }
         // The first title, before any output: the root pane was focused at
         // creation, so no focus change applies one, and a child that says
         // nothing at first — an ssh still connecting — left "Corta" there.
@@ -216,11 +242,18 @@ final class SplitViewController: NSViewController {
         pane.terminalView?.drawNow()
 
         // The splits go last: they halve the window's final frame.
-        if let restore = pendingRestore {
-            pendingRestore = nil
-            view.layoutSubtreeIfNeeded()
-            self.restore(layout: restore.layout)
-        }
+        applyPendingRestore()
+    }
+
+    /// Rebuilds a restored layout's splits. A selected tab does this as it
+    /// appears; a tab restored behind it as it joins the window (D30), since
+    /// AppKit delays a hidden view's `viewWillAppear` until it shows, and its
+    /// panes, and the saved layout, must not wait for that.
+    func applyPendingRestore() {
+        guard let restore = pendingRestore else { return }
+        pendingRestore = nil
+        view.layoutSubtreeIfNeeded()
+        self.restore(layout: restore.layout)
     }
 
     override func viewDidLayout() {
@@ -237,7 +270,7 @@ final class SplitViewController: NSViewController {
     func absorbChromeChange() {
         // Not before the window is sized and shown: until then there is no
         // chrome to keep.
-        guard !isJoiningTabGroup, let window = view.window, didSetUpWindow, window.isVisible
+        guard isSelectedTab, let window = view.window, didSetUpWindow, window.isVisible
         else { return }
         let chrome = window.frame.height - window.contentLayoutRect.height
         let last = lastChromeHeight
@@ -282,22 +315,6 @@ final class SplitViewController: NSViewController {
         }
         systemStatusBar.isHidden = hidesOverlays || !ConfigurationStore.shared.configuration.statusBar
         if active != previous { updateStatusBarLayout() }
-    }
-
-    /// The chrome changed under a window that must keep its frame: a restored
-    /// window rejoining its tab group (`AppDelegate.regroupRestoredTabs`),
-    /// whose saved frame already includes the tab bar. Records the chrome so
-    /// it is not absorbed, then lays the panes out — an unselected tab never
-    /// lays out on its own.
-    func adoptChromeWithoutAbsorbing() {
-        guard let window = view.window else { return }
-        lastChromeHeight = window.frame.height - window.contentLayoutRect.height
-        for pane in panes { pane.view.needsLayout = true }
-        view.layoutSubtreeIfNeeded()
-        for pane in panes {
-            pane.resizeSessionToFitView()
-            pane.invalidateDisplay()
-        }
     }
 
     // MARK: - Panes
@@ -397,7 +414,7 @@ extension SplitViewController {
         view.layoutSubtreeIfNeeded()
         resizeAllPanes()
         applyFocusAppearance(to: pane)
-        view.window?.makeFirstResponder(pane.terminalView)
+        takeFocus(pane)
     }
 
     func unzoomPane() {
@@ -420,7 +437,7 @@ extension SplitViewController {
         view.layoutSubtreeIfNeeded()
         resizeAllPanes()
         applyFocusAppearance(to: pane)
-        view.window?.makeFirstResponder(pane.terminalView)
+        takeFocus(pane)
     }
 
     /// Leaves zoom if `pane` is zoomed, so a close never leaves a removed
@@ -488,7 +505,7 @@ extension SplitViewController {
         // old grid into the halves through the debounce window.
         focusedPane.endLiveResize()
         pane.endLiveResize()
-        view.window?.makeFirstResponder(pane.terminalView)
+        takeFocus(pane)
         animateSplit(node, newPane: pane)
         for child in panes { child.paneHeader.refresh() }
     }
@@ -516,12 +533,13 @@ extension SplitViewController {
         )
     }
 
-    /// ⌘W closes the focused pane; with one pane left it is the window's
-    /// own close (a tab closes the tab).
+    /// ⌘W closes the focused pane; with one pane left it closes the tab,
+    /// and the last tab is the window's own close.
     @objc func performClose(_ sender: Any?) {
         guard hasMultiplePanes, let focusedPane else {
-            // `windowShouldClose` asks for confirmation; asking here would ask twice.
-            view.window?.performClose(sender)
+            // The tab or the window asks for confirmation; asking here would
+            // ask twice.
+            performCloseTab(sender)
             return
         }
         guard view.window?.attachedSheet == nil else { return }
@@ -533,7 +551,7 @@ extension SplitViewController {
             // may have, leaving it the last: then it is the window that closes.
             guard confirmed, let self, let focusedPane, self.panes.contains(focusedPane) else { return }
             guard self.hasMultiplePanes else {
-                self.view.window?.close()
+                self.closeTabWithoutAsking()
                 return
             }
             self.closePane(focusedPane)
@@ -557,9 +575,27 @@ extension SplitViewController {
         if let subtree = survivingSubtree, let target = panes.first(where: {
             $0.view === subtree || $0.view.isDescendant(of: subtree)
         }) {
-            view.window?.makeFirstResponder(target.terminalView)
+            takeFocus(target)
         } else {
             invalidateRemainingPanes()
+        }
+    }
+
+    /// Closes this tab, asking first when something runs in it.
+    func performCloseTab(_ sender: Any?) {
+        if let tab, let controller = tab.controller {
+            controller.performCloseTab(tab, sender: sender)
+        } else {
+            view.window?.performClose(sender)
+        }
+    }
+
+    /// Closes this tab; the caller already asked.
+    func closeTabWithoutAsking() {
+        if let tab, let controller = tab.controller {
+            controller.closeTab(tab)
+        } else {
+            view.window?.close()
         }
     }
 

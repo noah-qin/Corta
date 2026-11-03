@@ -488,11 +488,12 @@ under `Corta/` is therefore verified by launching the app and checking:
 5. gestures and menu actions reach the pane — the terminal view is first
    responder, so `keyDown` fires and First-Responder menu items (⌘V, ⌘=)
    are not dead,
-6. a *restored* tabbed window (three tabs, `kill -9`, relaunch) comes
-   back in saved order with the saved tab selected and its first row
-   below the tab bar — the one arrangement whose layout nothing but
-   `regroupRestoredTabs` drives, and where 2026-09-17 found both the
-   order and the inset wrong,
+6. a *restored* tabbed window (three tabs, one of them split and not
+   selected, quit, relaunch) comes back as one window, tabs in saved
+   order, the saved tab selected, and the background tab's split and
+   stacked icon there before it is first shown — the arrangement whose
+   layout only `AppDelegate.restoredWindows` and `applyPendingRestore`
+   drive (D30),
 7. in a non-English locale (`-AppleLanguages '(zh-Hans)'` on the launch),
    the *menu bar* is translated, not only the menus beneath it.
 

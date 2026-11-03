@@ -40,7 +40,6 @@ final class PaneAgents {
         guard let host, let window = host.view.window else { return false }
         return NSApp.isActive && window.occlusionState.contains(.visible)
             && !host.view.isHiddenOrHasHiddenAncestor
-            && (window.tabGroup.map { $0.selectedWindow === window } ?? true)
     }
 
     func reset() {

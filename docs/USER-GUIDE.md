@@ -92,10 +92,15 @@ Behaviour that differs in smaller ways — copying, closing, remote badges — i
 
 ## Windows, tabs and panes
 
-Native window tabs show a metal-framed terminal icon before the session title.
-Tabs containing split panes show a stack of icons, including while a pane is zoomed.
+Tabs sit in the titlebar row, beside the window's close, minimise and zoom
+buttons. Each shows the program its focused pane runs — a dark prompt tile for
+a shell, the program's own colours otherwise — then its name and directory,
+left-aligned. A tab with split panes stacks the other panes' icons behind the
+front one, turned away; clicking a pane brings its program to the front. Hover
+a tab for its close button, drag it to reorder, double-click it to rename, and
+right-click it for New Tab, Rename Tab…, Close Tab and Close Other Tabs.
 
-![Single-pane and split-pane native tab icons](brand/native-tab-icon.png)
+![Tabs in the titlebar row with their program icons](brand/native-tab-icon.png)
 
 | To… | Use |
 | --- | --- |
@@ -114,8 +119,10 @@ Tabs containing split panes show a stack of icons, including while a pane is zoo
   from its right-click menu. Return saves, Esc cancels, and an empty name
   restores the automatic title. Custom names survive shell output and session
   restoration. The tab and terminal right-click menus also offer New Tab, and
-  the toolbar's **+** button opens one whether or not the tab bar shows; the
-  tab bar has no **+** of its own.
+  the toolbar's **+** button opens one; the strip has no **+** of its own.
+- Tabs belong to their window: there is no Show Tab Bar, Merge All Windows
+  or Move Tab to New Window, and a tab cannot yet be dragged out into a
+  window of its own (#451).
 - **Zoom Pane** is temporary: nothing closes and no process is disturbed.
 - **Reopen Closed Pane** restores the pane's place, size and working
   directory — not the program that was running in it.
@@ -838,7 +845,7 @@ to any program; process detection is not a full agent integration. See the
 
 By default, agent panes distinguish Working (accent colour), Waiting for you (orange),
 Done (green), Failed (red), Idle (grey), and State unknown (a hollow grey dot)
-on their native tab. Idle means no active turn is reported, including before
+on their tab. Idle means no active turn is reported, including before
 work starts or after it stops; only an explicit `done` means completion.
 A progress ring follows OSC 7501 or OSC 9;4 reports. The Dock counts waiting
 panes and shows aggregate progress. Open the command palette or Window →

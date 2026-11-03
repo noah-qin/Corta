@@ -71,6 +71,7 @@ final class TerminalView: NSView, CALayerDelegate {
     }
 
     func refreshFrameDriver() {
+        frameScheduler.isHidden = { [weak self] in self?.isHiddenOrHasHiddenAncestor ?? true }
         frameScheduler.attach(to: window)
     }
 

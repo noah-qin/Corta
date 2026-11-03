@@ -123,7 +123,7 @@ struct PaneTransferTests {
 
     @Test func movedPaneUsesTheSameDefaultWindowSizeAsANewTerminal() throws {
         let source = TerminalWindowController(setup: .init())
-        let split = try #require(source.contentViewController as? SplitViewController)
+        let split = try #require(source.selectedTab?.split)
         let sourceWindow = try #require(source.window)
         sourceWindow.setFrame(NSRect(x: 50, y: 50, width: 1400, height: 850), display: false)
         split.splitRight(nil)
@@ -133,30 +133,26 @@ struct PaneTransferTests {
         let fresh = TerminalWindowController(setup: .init())
         defer {
             for controller in [source, moved, fresh] {
-                (controller.contentViewController as? SplitViewController)?.teardown()
+                controller.selectedTab?.split.teardown()
                 controller.window?.close()
             }
         }
         #expect(moved.window?.frame.size == fresh.window?.frame.size)
     }
 
-    @Test func eachOfFiveNativeTabsRetainsItsInsetCard() throws {
-        let controllers = (0..<5).map { _ in TerminalWindowController(setup: .init()) }
+    @Test func eachOfFiveTabsRetainsItsInsetCard() throws {
+        let controller = TerminalWindowController(setup: .init())
         defer {
-            for controller in controllers {
-                (controller.contentViewController as? SplitViewController)?.teardown()
-                controller.window?.close()
-            }
+            for tab in controller.tabs { tab.split.teardown() }
+            controller.window?.close()
         }
-        let first = try #require(controllers.first?.window)
-        for controller in controllers.dropFirst() {
-            first.addTabbedWindow(try #require(controller.window), ordered: .above)
-        }
-        #expect(first.tabbedWindows?.count == 5)
-        for controller in controllers {
-            let window = try #require(controller.window)
-            window.tabGroup?.selectedWindow = window
-            let split = try #require(controller.contentViewController as? SplitViewController)
+        for _ in 0..<4 { controller.addTab() }
+        #expect(controller.tabs.count == 5)
+        for tab in controller.tabs {
+            controller.selectTab(tab)
+            let split = tab.split
+            #expect(!split.view.isHidden)
+            #expect(controller.tabs.filter { !$0.split.view.isHidden }.count == 1, "one tab shows")
             split.view.layoutSubtreeIfNeeded()
             let pane = try #require(split.focusedPane)
             #expect(pane.view.layer?.cornerRadius == PaneSurfaceView.radius)

@@ -33,6 +33,9 @@ final class PaneWindowTitle {
     var resolveRemoteState: () -> PaneRemoteState = { .local }
     /// The window the title is applied to.
     var window: () -> NSWindow? = { nil }
+    /// The tab the pane is in (D30); a background tab's title shows only in
+    /// the strip, never as the window's.
+    var tab: () -> TerminalTab? = { nil }
     /// The grid size last sent to the child, shown while it is changing.
     var gridSize: () -> TerminalSize? = { nil }
     /// Whether a deferred rebuild may still apply: the pane is open and
@@ -146,7 +149,7 @@ final class PaneWindowTitle {
     /// badge — a program's text, which macOS would show as Corta's own words
     /// in a system notification, on the lock screen too.
     var notificationTitle: String {
-        if let custom = (window()?.windowController as? TerminalWindowController)?.customTabTitle {
+        if let custom = tab()?.customTitle {
             return custom
         }
         return Self.sanitizedTitleComponent(session?.currentDirectory.map(Self.abbreviated)) ?? "Corta"
@@ -165,7 +168,12 @@ final class PaneWindowTitle {
     /// path here to offer a drag of.
     func apply() {
         guard let window = window() else { return }
-        let title = (window.windowController as? TerminalWindowController)?.customTabTitle ?? composed
+        let tab = tab()
+        if let tab, !tab.isSelected {
+            tab.controller?.refreshTabStrip()
+            return
+        }
+        let title = tab?.customTitle ?? composed
         if window.title != title { window.title = title }
         (window.windowController as? TerminalWindowController)?.refreshTabTitle()
 

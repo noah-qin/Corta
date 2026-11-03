@@ -26,32 +26,13 @@ extension SplitViewController {
     func windowState(frame: NSRect) -> WindowState? {
         // While zoomed the hierarchy holds one pane and the tree is incomplete;
         // save the layout recorded at zoom, or the splits are lost on disk.
-        let tab = tabState()
+        // Tab group, index and selection are the window controller's to fill
+        // in (`TerminalWindowController.restorableStates`).
         if let zoomed = layoutBeforeZoom {
-            return WindowState(
-                frame: WindowState.Frame(frame), layout: zoomed, tabGroupID: tab.groupID,
-                tabIndex: tab.index, isSelectedTab: tab.isSelected)
+            return WindowState(frame: WindowState.Frame(frame), layout: zoomed)
         }
         guard let root = layoutRoot else { return nil }
-        return WindowState(
-            frame: WindowState.Frame(frame), layout: layout(of: root), tabGroupID: tab.groupID,
-            tabIndex: tab.index, isSelectedTab: tab.isSelected)
-    }
-
-    /// This window's native tab group and index (in `tabbedWindows` order;
-    /// AppKit doesn't number tabs), or nil if never tabbed.
-    private struct TabState {
-        var groupID: String?
-        var index: Int?
-        var isSelected: Bool
-    }
-
-    private func tabState() -> TabState {
-        guard let window = view.window, let tabbed = window.tabbedWindows, tabbed.count > 1
-        else { return TabState(groupID: nil, index: nil, isSelected: true) }
-        return TabState(
-            groupID: window.tabbingIdentifier, index: tabbed.firstIndex(of: window),
-            isSelected: window.tabGroup?.selectedWindow === window)
+        return WindowState(frame: WindowState.Frame(frame), layout: layout(of: root))
     }
 
     private func layout(of subtree: NSView) -> PaneLayout {
@@ -94,7 +75,7 @@ extension SplitViewController {
             pane.endLiveResize()
         }
         // The saved focused pane, else the first.
-        view.window?.makeFirstResponder((focusTarget ?? root).terminalView)
+        takeFocus(focusTarget ?? root)
     }
 
     /// Resolved against the current config; a vanished preset degrades to

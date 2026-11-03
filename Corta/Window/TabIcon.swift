@@ -17,52 +17,31 @@
 import AppKit
 import CoreImage
 
-/// AppKit keeps ownership of selection, close buttons, dragging and renaming.
-/// Only the tab's public attributed title is decorated here.
+/// What a tab shows in Corta's strip (D30): the focused pane's program in
+/// front of the others', its name or the user's, and where it is.
 enum TabIcon {
     static let side: CGFloat = 20
     private static let stackStep: CGFloat = 5
     private static var compositions: [String: NSImage] = [:]
-    private static let signatures = NSMapTable<NSWindow, NSString>.weakToStrongObjects()
 
-    static func apply(to window: NSWindow) {
-        let split = window.contentViewController as? SplitViewController
-        let focused = split?.focusedPane
+    static func item(for tab: TerminalTab) -> TabStripItem {
+        let split = tab.split
+        let focused = split.focusedPane
         let label = focused?.windowTitle.tabLabel
-            ?? ProgramTabLabel(icon: .terminal, name: window.title, context: "")
-        let custom = (window.windowController as? TerminalWindowController)?.customTabTitle
+            ?? ProgramTabLabel(icon: .terminal, name: "Corta", context: "")
+        let custom = tab.customTitle
         let name = custom ?? label.name
         let context = custom == nil ? label.context : ""
-        let text = context.isEmpty ? name : name + " " + context
         // The focused program leads the stack; another branded program is
         // visible behind it even when a shell pane currently has the keyboard.
-        let others = (split?.panes ?? []).filter { $0 !== focused }
+        let others = split.panes.filter { $0 !== focused }
             .map { $0.windowTitle.tabLabel.icon }
             .sorted { $0 != .terminal && $1 == .terminal }
         let programs = Array(([label.icon] + others).prefix(3))
-        let signature = programs.map(\.rawValue).joined(separator: ",") + "|" + text
-        if signatures.object(forKey: window) as String? == signature,
-           window.tab.title == text, window.tab.attributedTitle != nil { return }
-        signatures.setObject(signature as NSString, forKey: window)
-        window.tab.title = text
-        let result = NSMutableAttributedString(string: "")
-        if let image = image(for: programs) {
-            let attachment = NSTextAttachment()
-            attachment.image = image
-            attachment.bounds = NSRect(x: 0, y: -5, width: image.size.width, height: side)
-            result.append(NSAttributedString(attachment: attachment))
-            result.append(NSAttributedString(string: " "))
-        }
-        result.append(NSAttributedString(string: name, attributes: [
-            .font: NSFont.systemFont(ofSize: 12.5),
-            .foregroundColor: NSColor.labelColor,
-        ]))
-        if !context.isEmpty {
-            result.append(NSAttributedString(string: " " + context, attributes: [
-                .font: NSFont.systemFont(ofSize: 12.5), .foregroundColor: NSColor.tertiaryLabelColor,
-            ]))
-        }
-        window.tab.attributedTitle = result
+        let full = focused?.windowTitle.composed ?? name
+        return TabStripItem(
+            programs: programs, name: name, context: context,
+            toolTip: full, status: tab.agentStatus, progress: tab.agentProgress)
     }
 
     static func image(for programs: [ProgramIcon]) -> NSImage? {

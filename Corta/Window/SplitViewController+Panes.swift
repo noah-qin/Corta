@@ -135,21 +135,17 @@ extension SplitViewController {
     @objc func selectNextCortaTab(_: Any?) { selectAdjacentTab(offset: 1) }
 
     func selectAdjacentTab(offset: Int) {
-        guard let window = view.window, let tabs = window.tabbedWindows,
-              let index = tabs.firstIndex(of: window), tabs.count > 1 else { return }
-        let target = tabs[(index + offset + tabs.count) % tabs.count]
-        window.tabGroup?.selectedWindow = target
-        target.makeKeyAndOrderFront(nil)
+        tab?.controller?.selectAdjacentTab(offset: offset)
     }
 
     @objc func renameCurrentTab(_: Any?) {
-        (view.window?.windowController as? TerminalWindowController)?.beginTabRename()
+        tab?.controller?.beginTabRename()
     }
 
     func setCustomTabTitle(_ value: String) {
-        guard let controller = view.window?.windowController as? TerminalWindowController else { return }
+        guard let tab else { return }
         let title = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        controller.customTabTitle = title.isEmpty ? nil : String(title.prefix(200))
+        tab.customTitle = title.isEmpty ? nil : String(title.prefix(200))
         applyWindowTitle()
     }
 }

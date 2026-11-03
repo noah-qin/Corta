@@ -36,15 +36,19 @@ struct AppIntentTests {
         get throws { try #require(NSApp.delegate as? AppDelegate) }
     }
 
-    /// A tracked terminal window controller with no terminal in it.
+    /// A tracked terminal window controller with no terminal in it: one tab
+    /// whose split view never loads, so no pane spawns. An intent's window
+    /// is a tab (D30); `title` is the tab's own name.
     private func makeTrackedWindow(title: String = "") throws -> TerminalWindowController {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        window.title = title
         let controller = TerminalWindowController(window: window)
         controller.contentViewController = NSViewController()
+        let tab = TerminalTab(split: SplitViewController())
+        controller.adopt(tab)
+        tab.customTitle = title
         try delegate.track(controller)
         return controller
     }
@@ -102,7 +106,8 @@ struct AppIntentTests {
     func emptyTitleFallsBack() throws {
         let controller = try makeTrackedWindow(title: "")
         defer { controller.window?.close() }
-        #expect(TerminalWindowEntity(controller: controller).title == "Corta")
+        let tab = try #require(controller.selectedTab)
+        #expect(TerminalWindowEntity(tab: tab).title == "Corta")
     }
 
     @Test("a closed window leaves the listing, so its id resolves to nothing")

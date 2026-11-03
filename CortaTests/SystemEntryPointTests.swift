@@ -223,44 +223,29 @@ struct WindowSetupStagingTests {
     }
 }
 
-/// Restored tab groups come back in saved order with the saved tab
-/// selected. Programmatic windows with plain view controllers, tabbed for
-/// real: AppKit's own `addTabbedWindow` ordering is what was wrong.
+/// Restored tab groups come back as one window each, tabs in saved order
+/// (D30). The grouping is a function of the saved states alone.
 @MainActor
 struct RestoredTabOrderTests {
-    private func makeWindow(_ title: String) -> TerminalWindowController {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
-            styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.title = title
-        window.tabbingMode = .preferred
-        let controller = TerminalWindowController(window: window)
-        controller.contentViewController = NSViewController()
-        window.orderFront(nil)
-        return controller
-    }
-
-    private func state(index: Int, selected: Bool) -> WindowState {
-        WindowState(
+    private func state(_ group: String?, index: Int?, selected: Bool = false, id: String) -> WindowState {
+        var state = WindowState(
             frame: WindowState.Frame(NSRect(x: 0, y: 0, width: 400, height: 300)),
-            layout: .pane(directory: nil), tabGroupID: "group", tabIndex: index,
+            layout: .pane(directory: nil), tabGroupID: group, tabIndex: index,
             isSelectedTab: selected)
+        state.id = id
+        return state
     }
 
-    @Test("three saved tabs come back first, second, third — not first, third, second")
-    func savedOrderIsKept() throws {
-        let delegate = try #require(NSApp.delegate as? AppDelegate)
-        let windowA = makeWindow("a"), windowB = makeWindow("b"), windowC = makeWindow("c")
-        defer { for w in [windowA, windowB, windowC] { w.window?.close() } }
-        delegate.regroupRestoredTabs([
-            (state(index: 2, selected: true), windowC),
-            (state(index: 0, selected: false), windowA),
-            (state(index: 1, selected: false), windowB),
+    @Test("three saved tabs come back first, second, third, in one window")
+    func savedOrderIsKept() {
+        let windows = AppDelegate.restoredWindows([
+            state("group", index: 2, selected: true, id: "c"),
+            state(nil, index: nil, id: "alone"),
+            state("group", index: 0, id: "a"),
+            state("group", index: 1, id: "b"),
         ])
-        let tabs = try #require(windowA.window?.tabbedWindows)
-        #expect(tabs.map(\.title) == ["a", "b", "c"])
-        #expect(windowA.window?.tabGroup?.selectedWindow === windowC.window)
+        #expect(windows.map { $0.map(\.id) } == [["a", "b", "c"], ["alone"]])
+        #expect(windows.first?.firstIndex(where: \.isSelectedTab) == 2)
     }
 }
 

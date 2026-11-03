@@ -68,7 +68,7 @@ extension SplitViewController {
             pane.paneHeader.refresh()
             pane.focus.applyAppearance()
         }
-        view.window?.makeFirstResponder(focusedPane?.terminalView)
+        if let focusedPane { takeFocus(focusedPane) }
         applyWindowTitle()
     }
 

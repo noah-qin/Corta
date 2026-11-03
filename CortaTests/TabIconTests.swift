@@ -26,7 +26,7 @@ struct TabIconTests {
     func iconTracksSplitsEvenWhenZoomedAndAfterReopening() throws {
         let controller = TerminalWindowController(setup: .init())
         let window = try #require(controller.window)
-        let split = try #require(controller.contentViewController as? SplitViewController)
+        let split = try #require(controller.selectedTab?.split)
         defer {
             split.teardown()
             window.close()
@@ -56,10 +56,12 @@ struct TabIconTests {
         #expect(try iconWidth(in: window) == 25)
     }
 
+    /// The width of the icon stack the strip shows for the selected tab.
     private func iconWidth(in window: NSWindow) throws -> CGFloat {
-        let title = try #require(window.tab.attributedTitle)
-        let attachment = try #require(title.attribute(.attachment, at: 0, effectiveRange: nil) as? NSTextAttachment)
-        #expect(title.string.hasSuffix(window.tab.title))
-        return attachment.bounds.width
+        let controller = try #require(window.windowController as? TerminalWindowController)
+        let tab = try #require(controller.selectedTab)
+        let item = TabIcon.item(for: tab)
+        #expect(controller.tabStrip.items.first?.programs == item.programs)
+        return try #require(TabIcon.image(for: item.programs)).size.width
     }
 }

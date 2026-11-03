@@ -12,7 +12,7 @@ repository root.
 | `corta-pangolin-mascot.png` | Transparent mascot master, 1254 × 1254                           |
 | `corta-pangolin-loop.gif`   | Looping mascot animation, 360 × 360                              |
 | `session-ended.png` | Ended session: the centered glass status panel over dimmed, retained output, from an isolated local-zsh UI fixture |
-| `native-tab-icon.png` | Single-pane and split-pane native tab icons, from an isolated development build |
+| `native-tab-icon.png` | The tab strip in the titlebar row, with single-pane and split-pane program icons, from an isolated development build |
 | `screenshot.png`            | The README screenshot — light theme, a clean demo shell          |
 | `input-source-indicator.png` | Independent Chinese input-source badge, separated from toolbar action buttons, from an isolated demo shell |
 | `input-source-long-command.png` | Right-edge badge moved below a long command, without changing the grid |

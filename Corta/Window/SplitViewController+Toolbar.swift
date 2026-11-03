@@ -20,30 +20,47 @@ extension NSToolbarItem.Identifier {
     static let cortaConnect = Self("corta.connect")
     static let cortaNewTab = Self("corta.new-tab")
     static let cortaInputSource = Self("corta.input-source")
+    static let cortaTabs = Self("corta.tabs")
 }
 
-/// Native toolbar actions and a stable, window-local input-source status slot.
-extension SplitViewController: NSToolbarDelegate {
+/// The titlebar row (D30): the tab strip, then the actions. The window
+/// controller owns the toolbar; its actions go to the selected tab.
+extension TerminalWindowController: NSToolbarDelegate {
     func installToolbar(on window: NSWindow) {
-        toolbarWindow = window
         let toolbar = NSToolbar(identifier: "Corta.TerminalToolbar")
         toolbar.delegate = self
         toolbar.displayMode = .iconOnly
-        toolbar.allowsUserCustomization = true
+        toolbar.allowsUserCustomization = false
         toolbar.autosavesConfiguration = false
-        window.toolbarStyle = .unifiedCompact
+        window.toolbarStyle = .unified
         window.toolbar = toolbar
-
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .cortaConnect, .cortaNewTab]
+        [.cortaTabs, .cortaConnect, .cortaNewTab]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .space, .cortaConnect, .cortaNewTab, .cortaInputSource]
+        [.cortaTabs, .flexibleSpace, .space, .cortaConnect, .cortaNewTab, .cortaInputSource]
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        if identifier == .cortaInputSource {
+        switch identifier {
+        case .cortaTabs:
+            let item = NSToolbarItem(itemIdentifier: identifier)
+            item.label = L10n.text("tabs.strip")
+            item.paletteLabel = item.label
+            item.view = tabStrip
+            item.isBordered = false
+            item.visibilityPriority = .high
+            // As wide as the row allows: the strip takes what the actions leave.
+            // A range, not a size: the toolbar resizes the item within it.
+            tabStrip.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                tabStrip.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
+                tabStrip.widthAnchor.constraint(lessThanOrEqualToConstant: 4_000),
+                tabStrip.heightAnchor.constraint(equalToConstant: TabStripView.height),
+            ])
+            return item
+        case .cortaInputSource:
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.label = L10n.text("inputSource.settings.title")
             item.paletteLabel = item.label
@@ -51,12 +68,8 @@ extension SplitViewController: NSToolbarDelegate {
             item.isBordered = false
             item.visibilityPriority = .high
             return item
-        }
-        if identifier == .cortaNewTab {
-            // The only "+": the tab bar has none (`AppDelegate` does not
-            // implement `newWindowForTab(_:)`), and this one stays whether or
-            // not the bar shows. The menu's command and title, joined to this
-            // window's group whichever window is key.
+        case .cortaNewTab:
+            // The tab strip has no "+" of its own; this one is always there.
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.label = TerminalCommand.newTab.title
             item.paletteLabel = item.label
@@ -67,31 +80,47 @@ extension SplitViewController: NSToolbarDelegate {
             // A bare symbol, not a glass capsule: the band stays quiet.
             item.isBordered = false
             return item
+        case .cortaConnect:
+            // One button for a terminal and for files: the dialog switches
+            // between them, and offers a remote pane's own files first.
+            let item = NSToolbarItem(itemIdentifier: identifier)
+            item.label = L10n.text("ui.toolbar.connect")
+            item.paletteLabel = item.label
+            item.toolTip = L10n.text("ui.toolbar.connectHelp")
+            item.image = NSImage(systemSymbolName: "network", accessibilityDescription: item.label)
+            item.target = self
+            item.action = #selector(connectRemote(_:))
+            item.isBordered = false
+            return item
+        default:
+            return nil
         }
-        let key: String
-        let symbol: String
-        let action: Selector
-        switch identifier {
-        // One button for a terminal and for files: the dialog switches
-        // between them, and offers a remote pane's own files first.
-        case .cortaConnect: key = "ui.toolbar.connect"; symbol = "network"; action = #selector(connectRemote(_:))
-        default: return nil
-        }
-        let item = NSToolbarItem(itemIdentifier: identifier)
-        item.label = L10n.text(key)
-        item.paletteLabel = item.label
-        item.toolTip = L10n.text("ui.toolbar.connectHelp")
-        item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: item.label)
-        item.target = self
-        item.action = action
-        item.isBordered = false
-        return item
     }
+
+    @objc private func newTabInThisWindow(_ sender: Any?) {
+        (NSApp.delegate as? AppDelegate)?.newTab(beside: window, sender: sender)
+    }
+
+    /// The connect dialog; from a remote pane, with that host's files
+    /// offered first — Return opens them, as the old Files button did.
+    @objc private func connectRemote(_ sender: Any?) {
+        var paneFiles: RemoteConnectPaneFiles?
+        if let pane = selectedTab?.split.focusedPane, pane.remote.canBrowseFiles {
+            paneFiles = RemoteConnectPaneFiles(
+                host: PaneRemote.browseHostName(state: pane.remote.state)
+            ) { [weak pane] in pane?.remote.browseRemoteFiles(nil) }
+        }
+        RemoteConnectController.shared.show(.ssh, sender: sender, paneFiles: paneFiles)
+    }
+}
+
+extension SplitViewController {
     /// Only the focused pane can publish into this window's single status slot.
     /// Reparent the existing accessible view instead of duplicating input state.
     func placeInputSourceIndicator(from pane: ViewController, configuration: Configuration) {
         let badge = pane.inputSourceIndicator.view
-        if focusedPane === pane, let toolbar = pane.view.window?.toolbar {
+        if focusedPane === pane, tab?.isSelected ?? true, let host = tab?.controller,
+           let toolbar = pane.view.window?.toolbar {
             // Reserve a stable slot while a relevant source is enabled, even
             // when command output temporarily hides the badge. Off, prompt
             // placement and Latin-only automatic mode leave no empty slot.
@@ -103,20 +132,20 @@ extension SplitViewController: NSToolbarDelegate {
                 // A native fixed space separates the status badge from the
                 // action buttons' shared glass background. Track this exact
                 // spacer so disabling the badge preserves user-added spaces.
-                if let spacer = inputSourceToolbarSpacer,
+                if let spacer = host.inputSourceToolbarSpacer,
                    let spacerIndex = toolbar.items.firstIndex(where: { $0 === spacer }) {
                     toolbar.removeItem(at: spacerIndex)
                 }
                 toolbar.insertItem(withItemIdentifier: .space, at: toolbar.items.count)
-                inputSourceToolbarSpacer = toolbar.items.last
+                host.inputSourceToolbarSpacer = toolbar.items.last
                 toolbar.insertItem(withItemIdentifier: .cortaInputSource, at: toolbar.items.count)
             } else if !wanted {
                 if let index { toolbar.removeItem(at: index) }
-                if let spacer = inputSourceToolbarSpacer,
+                if let spacer = host.inputSourceToolbarSpacer,
                    let spacerIndex = toolbar.items.firstIndex(where: { $0 === spacer }) {
                     toolbar.removeItem(at: spacerIndex)
                 }
-                inputSourceToolbarSpacer = nil
+                host.inputSourceToolbarSpacer = nil
             }
         }
         if configuration.inputSourceIndicatorPosition == .prompt {
@@ -126,7 +155,9 @@ extension SplitViewController: NSToolbarDelegate {
                 badge.removeFromSuperview()
                 terminalView.addSubview(badge)
             }
-        } else if focusedPane === pane, badge.superview !== inputSourceToolbarHost {
+        } else if focusedPane === pane, tab?.isSelected ?? true,
+                  let inputSourceToolbarHost = tab?.controller?.inputSourceToolbarHost,
+                  badge.superview !== inputSourceToolbarHost {
             inputSourceToolbarHost.subviews.forEach { $0.removeFromSuperview() }
             badge.removeFromSuperview()
             badge.frame = inputSourceToolbarHost.bounds
@@ -135,20 +166,4 @@ extension SplitViewController: NSToolbarDelegate {
         }
     }
 
-    @objc private func newTabInThisWindow(_ sender: Any?) {
-        guard let window = toolbarWindow else { return }
-        (NSApp.delegate as? AppDelegate)?.newTab(beside: window, sender: sender)
-    }
-
-    /// The connect dialog; from a remote pane, with that host's files
-    /// offered first — Return opens them, as the old Files button did.
-    @objc private func connectRemote(_ sender: Any?) {
-        var paneFiles: RemoteConnectPaneFiles?
-        if let pane = focusedPane, pane.remote.canBrowseFiles {
-            paneFiles = RemoteConnectPaneFiles(
-                host: PaneRemote.browseHostName(state: pane.remote.state)
-            ) { [weak pane] in pane?.remote.browseRemoteFiles(nil) }
-        }
-        RemoteConnectController.shared.show(.ssh, sender: sender, paneFiles: paneFiles)
-    }
 }

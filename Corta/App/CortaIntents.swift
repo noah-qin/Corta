@@ -47,10 +47,12 @@ struct TerminalWindowEntity: AppEntity {
         DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title))
     }
 
+    /// A tab is what an intent calls a window (D30): it is what had its
+    /// own identity when every tab was a window.
     @MainActor
-    init(controller: TerminalWindowController) {
-        id = controller.windowID
-        let title = controller.window?.title ?? ""
+    init(tab: TerminalTab) {
+        id = tab.id
+        let title = tab.customTitle ?? tab.split.focusedPane?.windowTitle.composed ?? ""
         self.title = title.isEmpty ? "Corta" : title
     }
 }
@@ -71,7 +73,7 @@ struct TerminalWindowQuery: EntityQuery {
     @MainActor
     static func openWindows() -> [TerminalWindowEntity] {
         guard let delegate = NSApp.delegate as? AppDelegate else { return [] }
-        return delegate.terminalWindowControllers.map(TerminalWindowEntity.init)
+        return delegate.terminalTabs.map(TerminalWindowEntity.init(tab:))
     }
 }
 
@@ -111,10 +113,10 @@ struct OpenTerminalWindowIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<TerminalWindowEntity> {
         let path = try await Self.validatedDirectoryOffMain(directory)
         guard let delegate = NSApp.delegate as? AppDelegate,
-            let controller = delegate.openWindow(workingDirectory: path)
+            let tab = delegate.openWindow(workingDirectory: path)?.selectedTab
         else { throw CortaIntentError.windowNotCreated }
         NSApp.activate()
-        return .result(value: TerminalWindowEntity(controller: controller))
+        return .result(value: TerminalWindowEntity(tab: tab))
     }
 
     /// An existing directory's path, or nil for home. Anything else is

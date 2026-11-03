@@ -52,17 +52,16 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let window = view.window
         let visible =
             window?.occlusionState.contains(.visible) == true && !view.isHiddenOrHasHiddenAncestor
-        let selected = window?.tabGroup.map { $0.selectedWindow === window } ?? true
-        if visible && selected {
+        if visible {
             readerHiddenSince = nil
         } else if readerHiddenSince == nil {
             readerHiddenSince = now
         }
         let priority = ReaderPriorityPolicy.priority(
-            visible: visible, selected: selected,
+            visible: visible, selected: true,
             hiddenSince: readerHiddenSince, lastInput: readerLastInput, now: now)
         session.setReaderPriority(priority)
-        if priority == .interactive, !(visible && selected) {
+        if priority == .interactive, !visible {
             let work = DispatchWorkItem { [weak self] in self?.updateReaderPriority() }
             readerDemotion = work
             DispatchQueue.main.asyncAfter(
@@ -778,6 +777,7 @@ extension ViewController {
         let title = PaneWindowTitle()
         title.resolveRemoteState = { [weak self] in self?.remote.resolveState() ?? .local }
         title.window = { [weak self] in self?.viewIfLoaded?.window }
+        title.tab = { [weak self] in self?.splitController?.tab }
         title.gridSize = { [weak self] in self?.lastRequestedSize }
         title.canApplyDeferred = { [weak self] in
             guard let self else { return false }
@@ -955,7 +955,7 @@ extension ViewController {
         if let split = splitController, split.hasMultiplePanes {
             split.closePane(self)
         } else {
-            view.window?.performClose(nil)
+            if let split = splitController { split.performCloseTab(nil) } else { view.window?.performClose(nil) }
         }
     }
 

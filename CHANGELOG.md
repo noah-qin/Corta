@@ -12,15 +12,23 @@ Versioning for compatibility changes.
 
 ### Removed
 
+- macOS's own window tabs: Show Tab Bar, Merge All Windows, Move Tab to New
+  Window and the tab overview are gone with them, and a tab cannot be
+  dragged out into a new window until #451's second part lands. Restored
+  windows bring their tabs back as before.
 - Removed Quick Terminal, its settings page, global hotkey and Shortcuts action.
   Existing configuration entries are retired on the next config save.
 
 ### Changed
 
-- Native window tabs show the program running in each pane as an icon
-  before the title — a dark prompt tile for a shell, the program's own
-  colours otherwise. With split panes the icons stack, the focused pane's
-  in front and each other pane's peeking out behind it.
+- Tabs are Corta's own and sit in the titlebar row beside the window
+  buttons, titles left-aligned (D30, #451). Each tab shows the program
+  running in its focused pane as an icon — a dark prompt tile for a shell,
+  the program's own colours otherwise — and a tab with split panes stacks
+  the other panes' icons behind it, turned away. Hover for the close
+  button, drag to reorder, double-click to rename; the right-click menu
+  adds Close Other Tabs. A tab's background panes stop drawing while it is
+  hidden and keep running.
 - The titlebar band is the theme's own colour, without the window title or
   a separator line, and the toolbar's Connect and New Tab buttons are bare
   symbols. In the toolbar, the input-source badge is grey for every source.

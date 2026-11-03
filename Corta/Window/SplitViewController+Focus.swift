@@ -19,6 +19,17 @@ import Cocoa
 // MARK: - Focus
 
 extension SplitViewController {
+    /// Gives `pane` the keyboard. In a tab behind the selected one (D30) it
+    /// becomes the tab's focused pane without taking first responder, which
+    /// would route the selected tab's typing to a hidden pane.
+    func takeFocus(_ pane: ViewController) {
+        if isSelectedTab {
+            view.window?.makeFirstResponder(pane.terminalView)
+        } else {
+            noteFocus(pane)
+        }
+    }
+
     func noteFocus(_ pane: ViewController) {
         guard focusedPane !== pane else { return }
         let previous = focusedPane
@@ -35,6 +46,11 @@ extension SplitViewController {
     /// The focused pane's title; a title in an unfocused pane waits for focus.
     func applyWindowTitle() {
         guard let window = view.window else { return }
+        // A background tab's title shows in the strip only (D30).
+        guard isSelectedTab else {
+            tab?.controller?.refreshTabStrip()
+            return
+        }
         guard let focusedPane else {
             window.title = "Corta"
             window.representedURL = nil
@@ -53,16 +69,16 @@ extension SplitViewController {
             let leaf = tree.leaf(from: focusedPane.view, direction: direction, inContainer: view),
             let target = pane(forLeaf: leaf)
         else { return }
-        view.window?.makeFirstResponder(target.terminalView)
+        takeFocus(target)
     }
 
     /// Focus moves need more than one pane.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
         case #selector(selectPreviousCortaTab(_:)), #selector(selectNextCortaTab(_:)):
-            return (view.window?.tabbedWindows?.count ?? 0) > 1
+            return (tab?.controller?.tabs.count ?? 0) > 1
         case #selector(renameCurrentTab(_:)):
-            return view.window != nil
+            return tab != nil
         case #selector(moveFocusLeft(_:)), #selector(moveFocusRight(_:)),
             #selector(moveFocusUp(_:)), #selector(moveFocusDown(_:)):
             return tree != nil && tree.leafCount > 1

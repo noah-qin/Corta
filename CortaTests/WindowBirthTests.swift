@@ -42,7 +42,7 @@ struct WindowBirthTests {
     func aNewWindowsChildKeepsTheGridItWasBornAt() throws {
         let controller = TerminalWindowController(setup: .init())
         let window = try #require(controller.window)
-        let split = try #require(controller.contentViewController as? SplitViewController)
+        let split = try #require(controller.selectedTab?.split)
         defer {
             split.teardown()
             window.close()
@@ -62,38 +62,6 @@ struct WindowBirthTests {
         let fitted = pane.gridSize(fitting: pane.view.bounds.size)
         #expect(Int(fitted.rows) == configuredGrid.rows)
         #expect(Int(fitted.columns) == configuredGrid.columns)
-    }
-
-    /// With View ▸ Show Tab Bar on, the bar is chrome the window is sized for,
-    /// not a band that appears at show time and takes rows from the grid
-    /// (#305). The preference is AppKit's per-window-class default, set here
-    /// in the registration domain: in memory, this process only (D13).
-    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
-    func aShownTabBarIsPartOfTheFrameANewWindowIsBornWith() throws {
-        let key = "NSWindowTabbingShoudShowTabBarKey-NSWindow-"
-            + "Corta.TerminalWindowController-Corta.TerminalWindowController-VT-FS"
-        UserDefaults.standard.register(defaults: [key: true])
-        defer { UserDefaults.standard.register(defaults: [key: false]) }
-
-        let controller = TerminalWindowController(setup: .init())
-        let window = try #require(controller.window)
-        let split = try #require(controller.contentViewController as? SplitViewController)
-        defer {
-            split.teardown()
-            window.close()
-        }
-        let pane = try #require(split.focusedPane)
-        controller.showWindow(nil)
-        split.view.layoutSubtreeIfNeeded()
-
-        // Without this the test would pass for the wrong reason once AppKit
-        // renames its key: there would be no bar to size for.
-        #expect(window.tabGroup?.isTabBarVisible == true, "the registered preference shows the bar")
-        let fitted = pane.gridSize(fitting: pane.view.bounds.size)
-        #expect(Int(fitted.rows) == configuredGrid.rows)
-        #expect(Int(fitted.columns) == configuredGrid.columns)
-        let sent = try #require(pane.lastRequestedSize)
-        #expect(Int(sent.rows) == configuredGrid.rows)
     }
 
     /// Before the window is sized, a layout at any other size reaches the
