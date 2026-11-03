@@ -43,6 +43,9 @@ struct WindowTabsTests {
         let items = window.toolbar?.items.map(\.itemIdentifier) ?? []
         #expect(items.first == .cortaTabs, "the strip leads the row, beside the traffic lights")
         #expect(controller.tabStrip.items.count == 1)
+        #expect(controller.tabStrip.layer?.backgroundColor == nil, "a lone tab has no track")
+        controller.addTab()
+        #expect(controller.tabStrip.layer?.backgroundColor != nil, "two tabs share a track")
     }
 
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))

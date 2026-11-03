@@ -32,7 +32,7 @@ extension TerminalWindowController: NSToolbarDelegate {
         toolbar.displayMode = .iconOnly
         toolbar.allowsUserCustomization = false
         toolbar.autosavesConfiguration = false
-        window.toolbarStyle = .unified
+        window.toolbarStyle = .unifiedCompact
         window.toolbar = toolbar
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {

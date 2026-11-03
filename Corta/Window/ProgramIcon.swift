@@ -119,10 +119,13 @@ enum ProgramIcon: String, CaseIterable {
 
     private static var tiles: [Self: NSImage] = [:]
 
+    /// A tab tile is a small window, wider than tall, as a terminal is.
+    static let tileSize = NSSize(width: 24, height: 18)
+
     /// A shell: a near-black tile with a prompt, the way a terminal reads
     /// at a glance, light enough in weight that a row of them is calm.
     private static var shellTile: NSImage {
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+        let image = NSImage(size: Self.tileSize, flipped: false) { rect in
             let tile = rect.insetBy(dx: 0.5, dy: 0.5)
             NSColor(srgbRed: 0.17, green: 0.17, blue: 0.18, alpha: 1).setFill()
             NSBezierPath(roundedRect: tile, xRadius: 4.5, yRadius: 4.5).fill()
@@ -136,16 +139,16 @@ enum ProgramIcon: String, CaseIterable {
             chevron.lineWidth = 1.4
             chevron.lineCapStyle = .round
             chevron.lineJoinStyle = .round
-            chevron.move(to: NSPoint(x: 4.5, y: 12))
-            chevron.line(to: NSPoint(x: 7.5, y: 9))
-            chevron.line(to: NSPoint(x: 4.5, y: 6))
+            chevron.move(to: NSPoint(x: 6, y: 12))
+            chevron.line(to: NSPoint(x: 9, y: 9))
+            chevron.line(to: NSPoint(x: 6, y: 6))
             chevron.stroke()
             NSColor.white.withAlphaComponent(0.85).setStroke()
             let cursor = NSBezierPath()
             cursor.lineWidth = 1.4
             cursor.lineCapStyle = .round
-            cursor.move(to: NSPoint(x: 9, y: 6))
-            cursor.line(to: NSPoint(x: 13, y: 6))
+            cursor.move(to: NSPoint(x: 11, y: 6))
+            cursor.line(to: NSPoint(x: 17, y: 6))
             cursor.stroke()
             return true
         }
@@ -170,7 +173,7 @@ enum ProgramIcon: String, CaseIterable {
             return true
         }
         let color = tileColor
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+        let image = NSImage(size: Self.tileSize, flipped: false) { rect in
             let tile = rect.insetBy(dx: 0.5, dy: 0.5)
             color.setFill()
             NSBezierPath(roundedRect: tile, xRadius: 4.5, yRadius: 4.5).fill()
@@ -178,7 +181,7 @@ enum ProgramIcon: String, CaseIterable {
             let edge = NSBezierPath(roundedRect: tile.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
             edge.lineWidth = 0.5
             edge.stroke()
-            mark.draw(in: rect.insetBy(dx: 3.5, dy: 3.5))
+            mark.draw(in: NSRect(x: (rect.width - 12) / 2, y: (rect.height - 12) / 2, width: 12, height: 12))
             return true
         }
         image.isTemplate = false

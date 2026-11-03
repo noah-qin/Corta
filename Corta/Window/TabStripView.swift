@@ -42,7 +42,7 @@ protocol TabStripDelegate: AnyObject {
 /// slot, titles leading-aligned, the selected tab raised. Plain views and
 /// public API only; it sits in a toolbar item.
 final class TabStripView: NSView {
-    static let height: CGFloat = 30
+    static let height: CGFloat = 28
     weak var delegate: TabStripDelegate?
     private(set) var items: [TabStripItem] = []
     private(set) var selectedIndex = 0
@@ -94,9 +94,13 @@ final class TabStripView: NSView {
         setAccessibilityChildren(views)
     }
 
+    /// A lone tab is a pill on its own, no wider than a title needs; the
+    /// track appears once there is a second tab to sit beside it.
+    static let singleTabWidth: CGFloat = 220
+
     private func updateTrack() {
         layer?.cornerRadius = Self.height / 2
-        layer?.backgroundColor = trackColor.cgColor
+        layer?.backgroundColor = views.count > 1 ? trackColor.cgColor : nil
     }
 
     private var trackColor: NSColor {
@@ -115,7 +119,9 @@ final class TabStripView: NSView {
         super.layout()
         guard !views.isEmpty else { return }
         let inset: CGFloat = 2
-        let width = (bounds.width - inset * 2) / CGFloat(views.count)
+        let width = views.count == 1
+            ? min(Self.singleTabWidth, bounds.width - inset * 2)
+            : (bounds.width - inset * 2) / CGFloat(views.count)
         for (index, view) in views.enumerated() where !(drag?.moved == true && drag?.index == index) {
             view.frame = NSRect(x: inset + CGFloat(index) * width, y: inset,
                                 width: width, height: bounds.height - inset * 2).integral
@@ -293,6 +299,9 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         layer?.backgroundColor = selected ? strip.selectedFill.cgColor
             : hovering ? NSColor.labelColor.withAlphaComponent(0.04).cgColor : nil
         layer?.shadowOpacity = selected ? 0.12 : 0
+        // A hairline keeps a lone white pill visible on a white band.
+        layer?.borderWidth = selected ? 0.5 : 0
+        layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.1).cgColor
         layer?.shadowRadius = 2
         layer?.shadowOffset = CGSize(width: 0, height: -0.5)
         layer?.masksToBounds = false

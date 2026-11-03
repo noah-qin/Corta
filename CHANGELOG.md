@@ -27,7 +27,8 @@ Versioning for compatibility changes.
   the program's own colours otherwise — and a tab with split panes stacks
   the other panes' icons behind it, turned away. Hover for the close
   button, drag to reorder, double-click to rename; the right-click menu
-  adds Close Other Tabs. A tab's background panes stop drawing while it is
+  adds Close Other Tabs. A lone tab is a single pill; the track appears
+  with the second tab. A tab's background panes stop drawing while it is
   hidden and keep running.
 - The titlebar band is the theme's own colour, without the window title or
   a separator line, and the toolbar's Connect and New Tab buttons are bare

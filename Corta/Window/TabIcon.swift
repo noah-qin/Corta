@@ -50,19 +50,22 @@ enum TabIcon {
         if let cached = compositions[key] { return cached }
         guard let lead = first.tabImage else { return nil }
         let images = programs.map { $0.tabImage ?? lead }
-        let width = side + CGFloat(images.count - 1) * stackStep
+        let tile = ProgramIcon.tileSize
+        let frontSize = NSSize(width: tile.width + 2, height: tile.height + 2)
+        let width = frontSize.width + CGFloat(images.count - 1) * stackStep
         // Cards behind the front one are turned away from the viewer, as in
         // a fanned deck seen at an angle: narrower, and shorter at the far
         // edge. Rendered once per composition, which is cached below.
         let backs = images.indices.dropFirst().map { index -> (NSImage, NSRect)? in
-            let size = side - 2 - CGFloat(index)
+            let shrink = CGFloat(index)
+            let size = NSSize(width: tile.width - shrink * 4 / 3, height: tile.height - shrink)
             guard let card = tilted(card(images[index], size: size)) else { return nil }
-            let right = side + CGFloat(index) * stackStep
+            let right = frontSize.width + CGFloat(index) * stackStep
             let frame = NSRect(x: right - card.size.width, y: (side - card.size.height) / 2,
                                width: card.size.width, height: card.size.height)
             return (card, frame)
         }
-        let front = card(images[0], size: side - 2)
+        let front = card(images[0], size: tile)
         let image = NSImage(size: NSSize(width: width, height: side), flipped: false) { _ in
             NSGraphicsContext.saveGraphicsState()
             let shadow = NSShadow()
@@ -71,7 +74,8 @@ enum TabIcon {
             shadow.shadowOffset = NSSize(width: 0.5, height: -0.5)
             shadow.set()
             for case let (back, frame)? in backs.reversed() { back.draw(in: frame) }
-            front.draw(in: NSRect(x: 0, y: 0, width: front.size.width, height: front.size.height))
+            front.draw(in: NSRect(x: 0, y: (side - front.size.height) / 2,
+                                  width: front.size.width, height: front.size.height))
             NSGraphicsContext.restoreGraphicsState()
             return true
         }
@@ -82,10 +86,10 @@ enum TabIcon {
     }
 
     /// A tile on a white rim, one point wider on every side.
-    private static func card(_ tile: NSImage, size: CGFloat) -> NSImage {
-        let outer = size + 2
-        let image = NSImage(size: NSSize(width: outer, height: outer), flipped: false) { rect in
-            let radius = size * 0.27 + 1
+    private static func card(_ tile: NSImage, size: NSSize) -> NSImage {
+        let outer = NSSize(width: size.width + 2, height: size.height + 2)
+        let image = NSImage(size: outer, flipped: false) { rect in
+            let radius = size.height * 0.27 + 1
             NSColor.white.setFill()
             NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
             tile.draw(in: rect.insetBy(dx: 1, dy: 1))
@@ -95,35 +99,36 @@ enum TabIcon {
         return image
     }
 
-    /// `card` turned about its leading edge: 62% as wide, its far edge 74%
+    /// `card` turned about its leading edge: 55% as wide, its far edge 74%
     /// as tall. Core Image's perspective transform, on a 4× raster.
     private static func tilted(_ card: NSImage) -> NSImage? {
         let scale: CGFloat = 4
-        let pixels = Int((card.size.width * scale).rounded())
-        guard pixels > 0,
+        let pixelsWide = Int((card.size.width * scale).rounded())
+        let pixelsHigh = Int((card.size.height * scale).rounded())
+        guard pixelsWide > 0, pixelsHigh > 0,
               let bitmap = NSBitmapImageRep(
-                bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
+                bitmapDataPlanes: nil, pixelsWide: pixelsWide, pixelsHigh: pixelsHigh, bitsPerSample: 8,
                 samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
                 bytesPerRow: 0, bitsPerPixel: 0),
               let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return nil }
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context
-        card.draw(in: NSRect(x: 0, y: 0, width: pixels, height: pixels))
+        card.draw(in: NSRect(x: 0, y: 0, width: pixelsWide, height: pixelsHigh))
         NSGraphicsContext.restoreGraphicsState()
         guard let source = bitmap.cgImage else { return nil }
-        let side = CGFloat(pixels)
-        let width = (side * 0.62).rounded()
-        let inset = side * 0.13
+        let height = CGFloat(pixelsHigh)
+        let width = (CGFloat(pixelsWide) * 0.55).rounded()
+        let inset = height * 0.13
         let filter = CIFilter(name: "CIPerspectiveTransform")
         filter?.setValue(CIImage(cgImage: source), forKey: kCIInputImageKey)
-        filter?.setValue(CIVector(x: 0, y: side), forKey: "inputTopLeft")
-        filter?.setValue(CIVector(x: width, y: side - inset), forKey: "inputTopRight")
+        filter?.setValue(CIVector(x: 0, y: height), forKey: "inputTopLeft")
+        filter?.setValue(CIVector(x: width, y: height - inset), forKey: "inputTopRight")
         filter?.setValue(CIVector(x: width, y: inset), forKey: "inputBottomRight")
         filter?.setValue(CIVector(x: 0, y: 0), forKey: "inputBottomLeft")
         guard let output = filter?.outputImage,
               let result = CIContext().createCGImage(
-                output, from: CGRect(x: 0, y: 0, width: width, height: side)) else { return nil }
-        let image = NSImage(cgImage: result, size: NSSize(width: width / scale, height: side / scale))
+                output, from: CGRect(x: 0, y: 0, width: width, height: height)) else { return nil }
+        let image = NSImage(cgImage: result, size: NSSize(width: width / scale, height: height / scale))
         image.isTemplate = false
         return image
     }
