@@ -22,6 +22,7 @@ import CoreImage
 enum TabIcon {
     static let side: CGFloat = 20
     private static let stackStep: CGFloat = 3.5
+    private static let shadowPad: CGFloat = 2
     private static var compositions: [String: NSImage] = [:]
 
     static func item(for tab: TerminalTab) -> TabStripItem {
@@ -67,8 +68,14 @@ enum TabIcon {
             return (card, frame)
         }
         let front = card(images[0], size: tile)
-        let image = NSImage(size: NSSize(width: width, height: side), flipped: false) { _ in
+        // Room on every side for the shadow, which a tight bound cut off
+        // into a hard edge.
+        let pad = shadowPad
+        let image = NSImage(size: NSSize(width: width + pad * 2, height: side + pad * 2), flipped: false) { _ in
             NSGraphicsContext.saveGraphicsState()
+            let offset = NSAffineTransform()
+            offset.translateX(by: pad, yBy: pad)
+            offset.concat()
             let shadow = NSShadow()
             shadow.shadowColor = NSColor.black.withAlphaComponent(0.3)
             shadow.shadowBlurRadius = 1.5
@@ -95,16 +102,25 @@ enum TabIcon {
     private static func card(_ tile: NSImage, size: NSSize, squash: CGFloat = 1) -> NSImage {
         let outer = NSSize(width: size.width + 2, height: size.height + 2)
         let image = NSImage(size: outer, flipped: false) { rect in
+            // One radius for both: the tile's corner is the rim's less the
+            // rim's width, so the two curves are concentric.
             let radius = size.height * 0.27 + 1
-            let xRadius = min(rect.width / 2, radius / squash)
+            let rim = NSBezierPath(roundedRect: rect, xRadius: min(rect.width / 2, radius / squash),
+                                   yRadius: radius)
             NSColor.white.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: xRadius, yRadius: radius).fill()
+            rim.fill()
             let inner = rect.insetBy(dx: 1, dy: 1)
+            let face = NSBezierPath(roundedRect: inner, xRadius: min(inner.width / 2, (radius - 1) / squash),
+                                    yRadius: radius - 1)
             NSGraphicsContext.saveGraphicsState()
-            NSBezierPath(roundedRect: inner, xRadius: min(inner.width / 2, (radius - 1) / squash),
-                         yRadius: radius - 1).addClip()
+            face.addClip()
             tile.draw(in: inner)
             NSGraphicsContext.restoreGraphicsState()
+            // A hairline where tile meets rim, so a white tile (Codex) still
+            // has an edge.
+            NSColor.black.withAlphaComponent(0.1).setStroke()
+            face.lineWidth = 0.5
+            face.stroke()
             return true
         }
         image.isTemplate = false

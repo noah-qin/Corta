@@ -323,13 +323,14 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         super.layout()
         let height = bounds.height
         let size = icon.image?.size ?? .zero
-        icon.frame = NSRect(x: 10, y: ((height - size.height) / 2).rounded(),
+        // The image carries its shadow's margin; the tile itself sits 10 in.
+        icon.frame = NSRect(x: 8, y: ((height - size.height) / 2).rounded(),
                             width: size.width, height: size.height)
         let closeSide: CGFloat = 16
         closeButton.frame = NSRect(x: bounds.width - closeSide - 8, y: (height - closeSide) / 2,
                                    width: closeSide, height: closeSide)
         badge.frame = NSRect(x: closeButton.frame.minX - 18, y: (height - 16) / 2, width: 16, height: 16)
-        let titleX = icon.frame.maxX + 7
+        let titleX = icon.frame.maxX + 5
         let trailing = badge.isHidden ? closeButton.frame.minX - 4 : badge.frame.minX - 4
         let titleHeight = title.intrinsicContentSize.height
         title.frame = NSRect(x: titleX, y: ((height - titleHeight) / 2).rounded(),

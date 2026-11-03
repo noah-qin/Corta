@@ -125,14 +125,11 @@ enum ProgramIcon: String, CaseIterable {
     /// A shell: a near-black tile with a prompt, the way a terminal reads
     /// at a glance, light enough in weight that a row of them is calm.
     private static var shellTile: NSImage {
+        // Square-cornered: the card around it (`TabIcon.card`) rounds tile and
+        // rim from one radius, so their corners stay concentric.
         let image = NSImage(size: Self.tileSize, flipped: false) { rect in
-            let tile = rect.insetBy(dx: 0.5, dy: 0.5)
             NSColor(srgbRed: 0.17, green: 0.17, blue: 0.18, alpha: 1).setFill()
-            NSBezierPath(roundedRect: tile, xRadius: 4.5, yRadius: 4.5).fill()
-            NSColor.white.withAlphaComponent(0.22).setStroke()
-            let edge = NSBezierPath(roundedRect: tile.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
-            edge.lineWidth = 0.5
-            edge.stroke()
+            rect.fill()
             let green = NSColor(srgbRed: 0.55, green: 0.90, blue: 0.62, alpha: 1)
             green.setStroke()
             let chevron = NSBezierPath()
@@ -177,14 +174,10 @@ enum ProgramIcon: String, CaseIterable {
             rect.fill(using: .sourceIn)
             return true
         }
+        // Square-cornered, as the shell tile: `TabIcon.card` rounds it.
         let image = NSImage(size: Self.tileSize, flipped: false) { rect in
-            let tile = rect.insetBy(dx: 0.5, dy: 0.5)
             color.setFill()
-            NSBezierPath(roundedRect: tile, xRadius: 4.5, yRadius: 4.5).fill()
-            (light ? NSColor.black.withAlphaComponent(0.14) : NSColor.white.withAlphaComponent(0.28)).setStroke()
-            let edge = NSBezierPath(roundedRect: tile.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
-            edge.lineWidth = 0.5
-            edge.stroke()
+            rect.fill()
             mark.draw(in: NSRect(x: (rect.width - 12) / 2, y: (rect.height - 12) / 2, width: 12, height: 12))
             return true
         }
