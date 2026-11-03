@@ -965,7 +965,12 @@ extension ViewController {
         frameLoop.invalidate()
     }
 
-    func refreshFocusAppearance() { focus.applyAppearance() }
+    /// The header too: its light or dark follows the canvas, and its title
+    /// the focus.
+    func refreshFocusAppearance() {
+        focus.applyAppearance()
+        paneHeader.refresh()
+    }
 
     /// The grid now, or nil for a failed pane.
     func snapshot() -> Grid? {

@@ -130,10 +130,12 @@ nonisolated extension Configuration {
                 name: "theme",
                 // Resolved at use: a custom theme may be defined further down.
                 read: { configuration, value in
-                    configuration.theme = value.isEmpty ? Theme.corta.name : value
+                    guard let choice = Configuration.themeChoice(value) else { return false }
+                    configuration.theme = choice.light
+                    configuration.darkTheme = choice.dark
                     return true
                 },
-                write: { $0.theme }),
+                write: { $0.themeChoice }),
             .choice("appearance", \.appearance),
             .choice("input-source-indicator", \.inputSourceIndicator),
             .choice("input-source-indicator-position", \.inputSourceIndicatorPosition),

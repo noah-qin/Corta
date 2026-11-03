@@ -304,3 +304,27 @@ struct WindowTabsTests {
         }
     }
 }
+
+@MainActor struct TabStripAppearanceTests {
+    /// The selected pill follows the canvas: a theme switch that kept the
+    /// same tabs and selection left it in the old theme's colour, a white
+    /// pill on a dark band.
+    @Test func theSelectedFillFollowsAThemeSwitch() throws {
+        let saved = TerminalColorPalette.activeVariant
+        defer { TerminalColorPalette.apply(saved) }
+        let strip = TabStripView(frame: NSRect(x: 0, y: 0, width: 600, height: TabStripView.height))
+        let items = (0..<2).map {
+            TabStripItem(id: "\($0)", programs: [], name: "zsh", context: "", toolTip: "", status: nil, progress: nil)
+        }
+        func pillRed() throws -> CGFloat {
+            let view = try #require(strip.subviews.compactMap { $0 as? TabItemView }.last)
+            let fill = try #require(view.layer?.backgroundColor.flatMap { NSColor(cgColor: $0) })
+            return try #require(fill.usingColorSpace(.sRGB)).redComponent
+        }
+        for (variant, light) in [(Theme.corta.dark, false), (Theme.corta.light, true), (Theme.mono.dark, false)] {
+            TerminalColorPalette.apply(variant)
+            strip.update(items: items, selectedIndex: 1)
+            #expect(try light ? pillRed() > 0.99 : pillRed() < 0.5)
+        }
+    }
+}

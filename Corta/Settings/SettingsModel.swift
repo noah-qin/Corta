@@ -157,7 +157,7 @@ final class SettingsModel {
         let configuration = ConfigurationStore.shared.configuration
         self.configuration = configuration
         listedThemes = Theme.all(in: configuration)
-        previewTheme = Theme.named(configuration.theme, in: configuration) ?? .corta
+        previewTheme = Theme.selected(in: configuration)
         if previewedFont?.size != configuration.fontSize || previewedFont?.style != FontStyle(configuration) {
             refreshPreviewFont()
         }
@@ -303,6 +303,11 @@ extension SettingsModel {
     /// A field written as given.
     func set<Value>(_ path: WritableKeyPath<Configuration, Value>, _ value: Value) {
         commit { $0[keyPath: path] = value; return nil }
+    }
+
+    /// One appearance's theme; the other keeps its own.
+    func setTheme(_ name: String, dark: Bool) {
+        commit { $0.setTheme(name, dark: dark); return nil }
     }
 
     /// A numeric field the file clamps: the nearest value in `range` is

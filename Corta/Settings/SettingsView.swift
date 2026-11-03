@@ -84,7 +84,12 @@ struct SettingsView: View {
                 ThemeEditorView(editor: editor, previewFont: model.previewFont)
             }
             .onChange(of: navigation.themeEditorRequest) { _, _ in
-                themeEditor = ThemeEditorModel(source: model.previewTheme, editing: false)
+                let dark = model.previewIsDark
+                let source = Theme.named(model.configuration.themeName(dark: dark), in: model.configuration) ?? .corta
+                let editor = ThemeEditorModel(source: source, editing: false)
+                editor.isDark = dark
+                editor.selectsForDark = dark
+                themeEditor = editor
             }
             .sheet(
                 isPresented: Binding(
@@ -271,20 +276,26 @@ extension SettingsView {
         }
     }
 
+    /// One appearance's theme, chosen apart from the other's: a light
+    /// Solarized beside a dark Corta is a choice, not a mismatch.
     private func themePaletteSection(dark: Bool) -> some View {
         let customNames = Set(model.configuration.customThemes.map(\.name))
         let builtIn = model.listedThemes.filter { !customNames.contains($0.name) }
         let custom = model.listedThemes.filter { customNames.contains($0.name) }
-        let canEdit = customNames.contains(model.theme)
+        let selected = model.configuration.themeName(dark: dark)
+        let canEdit = customNames.contains(selected)
         return SettingsSection(
             L10n.text(dark ? "settings.theme.darkMode" : "settings.theme.lightMode"),
             action: SettingsSectionAction(
-                title: L10n.text(dark && canEdit ? "theme.edit" : "settings.action.new"),
-                symbol: dark && canEdit ? "pencil.circle" : "plus.circle",
-                identifier: dark ? (canEdit ? "theme-edit" : "theme-create-dark") : "theme-create",
+                title: L10n.text(canEdit ? "theme.edit" : "settings.action.new"),
+                symbol: canEdit ? "pencil.circle" : "plus.circle",
+                identifier: canEdit ? (dark ? "theme-edit" : "theme-edit-light")
+                    : (dark ? "theme-create-dark" : "theme-create"),
                 handler: {
-                    let editor = ThemeEditorModel(source: model.previewTheme, editing: dark && canEdit)
+                    let source = Theme.named(selected, in: model.configuration) ?? .corta
+                    let editor = ThemeEditorModel(source: source, editing: canEdit)
                     editor.isDark = dark
+                    editor.selectsForDark = dark
                     themeEditor = editor
                 })
         ) {
@@ -307,8 +318,10 @@ extension SettingsView {
             Text(title).font(.callout.weight(.medium)).foregroundStyle(.secondary).padding(.leading, 5)
             HStack(alignment: .top, spacing: 14) {
                 ForEach(themes, id: \.name) { theme in
-                    ThemePreviewCard(theme: theme, isDark: dark, isSelected: model.theme == theme.name) {
-                        model.set(\.theme, theme.name)
+                    ThemePreviewCard(
+                        theme: theme, isDark: dark, isSelected: model.configuration.themeName(dark: dark) == theme.name
+                    ) {
+                        model.setTheme(theme.name, dark: dark)
                     }
                     .accessibilityIdentifier("theme-choice-\(theme.name)\(dark ? "-dark" : "")")
                 }

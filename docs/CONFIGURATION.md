@@ -59,7 +59,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
-| `theme` | a theme name | `corta` | Built in: `corta`, `solarized` and `mono`, all offered in the UI (§4). A theme defined in this file wins over a built-in of the same name. |
+| `theme` | a theme name, or `light:<name>,dark:<name>` | `corta` | One name serves both appearances; the pair gives light and dark mode a theme each, and a side left out is `corta`; a name with `:` or `,` in it cannot be chosen. Built in: `corta`, `solarized` and `mono`, all offered in the UI (§4). A theme defined in this file wins over a built-in of the same name. |
 | `appearance` | `auto`, `light`, `dark` | `auto` | Which of the theme's two variants is live. `auto` follows macOS and switches while running. |
 | `status-bar` | boolean | `false` | Show a bottom bar of local system metrics. Click it for local host details. Sampling pauses when every enabled bar is hidden. |
 | `status-items` | comma-separated `cpu`, `load`, `memory`, `network`, `disk`, `thermal` | all six | Choose metrics to collect and display. Empty shows the local-host details button without periodic sampling. |
@@ -378,7 +378,8 @@ are *not* part of a theme: xterm defines them numerically, so a program
 asking for colour 137 means one specific colour.
 
 Corta offers three previewable themes: `corta`, `solarized` and `mono`.
-Select a preset in Settings → Appearance to preview it immediately.
+Settings → Themes lists them once for light mode and once for dark mode,
+and each mode keeps its own choice (`theme = light:solarized,dark:corta`).
 Existing custom selections and inheritance continue to work.
 
 ### Keys

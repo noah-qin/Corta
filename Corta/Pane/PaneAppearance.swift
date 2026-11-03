@@ -53,6 +53,7 @@ final class PaneAppearance: NSObject {
     private static let observedNotifications: [(Notification.Name, Selector)] = [
         (ConfigurationStore.didChange, #selector(configurationChanged)),
         (AppearanceController.didChange, #selector(appearanceChanged)),
+        (AppearanceController.paletteDidStep, #selector(paletteStepped)),
     ]
 
     init(host: PaneAppearanceHost? = nil) {
@@ -125,20 +126,22 @@ final class PaneAppearance: NSObject {
         invalidateDisplay()
     }
 
-    @objc func appearanceChanged() {
+    @objc func appearanceChanged() { paletteStepped() }
+
+    /// Also each step of a switch's blend. The session's defaults draw the
+    /// canvas, so they follow the palette on screen, not the theme it is
+    /// headed for.
+    @objc func paletteStepped() {
         guard let host else { return }
+        let variant = TerminalColorPalette.activeVariant
+        // OSC 10/11/12 answers follow the live variant.
+        session?.updateTheme(colors: variant.dynamicColors, isDark: AppearanceController.shared.isDark)
+        // Only the defaults: an OSC 4'd index is terminal state, and a
+        // get-then-set would race the reader thread.
+        session?.updateIndexedPaletteDefaults(to: variant.indexedPaletteDefaults.defaults)
         (host.view.window?.windowController as? TerminalWindowController)?.applyCanvasAppearance()
         (host.view as? PaneSurfaceView)?.refreshAppearance()
         host.splitController?.view.needsDisplay = true
-        // OSC 10/11/12 answers follow the live variant.
-        session?.updateTheme(
-            colors: AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark).dynamicColors,
-            isDark: AppearanceController.shared.isDark)
-        // Only the defaults: an OSC 4'd index is terminal state, and a
-        // get-then-set would race the reader thread.
-        session?.updateIndexedPaletteDefaults(
-            to: AppearanceController.shared.theme.variant(dark: AppearanceController.shared.isDark)
-                .indexedPaletteDefaults.defaults)
         // Colours are baked into the instance buffer, so rebuild it all; a
         // forced frame alone kept the old glyph colours (dark on dark).
         terminalRenderer?.invalidate()

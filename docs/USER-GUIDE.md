@@ -183,7 +183,10 @@ right-click it for New Tab, Rename Tab…, Close Tab and Close Other Tabs.
   changes the config file. Font changes never move or resize the window: the visible rows and
   columns refit to it, and what is left of a cell shows as background under the last row.
 - **Theme.** Three built-in themes, `corta`, `solarized` and `mono`, each with light and dark variants;
-  `appearance = auto` follows macOS as it switches. You can define your
+  `appearance = auto` follows macOS as it switches. Light and dark mode
+  choose their themes separately in Settings → Themes — a light Solarized
+  beside a dark Corta is `theme = light:solarized,dark:corta`. A switch
+  blends the window into its new colours. You can define your
   own theme through **View ▸ Theme editor…** or in the config file, or inherit
   from one and change a few
   colours ([Themes](CONFIGURATION.md#4-themes)).
@@ -270,7 +273,8 @@ value and the host-details popover.
 
 ### Creating and editing themes
 
-Settings → Appearance → Create theme opens a graphical editor. Name your
+Settings → Themes → New, beside Light Mode or Dark Mode, opens a graphical
+editor; what you save becomes that mode's theme. Name your
 copy, switch between dark and light variants, and change colors using color
 pickers or HEX values. The preview updates without changing terminal windows.
 Save theme activates and persists it; Cancel keeps your previous theme.

@@ -132,7 +132,11 @@ nonisolated struct Configuration: Equatable, Sendable {
     var fontFallback: Bool = true
     var ambiguousWidth: AmbiguousWidth = .narrow
     var emojiRendering: EmojiRendering = .color
+    /// The light appearance's theme, and the dark one's too unless
+    /// `darkTheme` names another.
     var theme: String = Theme.corta.name
+    /// The dark appearance's theme when it is not `theme`.
+    var darkTheme: String?
     var appearance: Appearance = .auto
     var scrollbackLines: Int = 10_000
     /// Caps `CommandRecordStore`'s structured command records per session,

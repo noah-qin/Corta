@@ -42952,55 +42952,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Each theme includes a light and a dark palette. The selected appearance determines which one is used."
+            "value": "Light mode and dark mode each use their own theme; choose one for each. The appearance decides which is in use."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "每套主题均包含浅色与深色配色，随所选外观切换。"
+            "value": "浅色模式和深色模式各用一套主题，可以分别选择。当前外观决定使用哪一套。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "每套主題均包含淺色與深色配色，隨所選外觀切換。"
+            "value": "淺色模式和深色模式各用一套主題，可以分別選擇。目前外觀決定使用哪一套。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "各テーマにはライトとダークの配色が含まれ、選択した外観に応じて切り替わります。"
+            "value": "ライトモードとダークモードはそれぞれ別のテーマを使います。個別に選択でき、外観に応じて切り替わります。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "각 테마는 밝은 팔레트와 어두운 팔레트를 포함하며 선택한 모양에 따라 전환됩니다."
+            "value": "라이트 모드와 다크 모드는 각각 별도의 테마를 사용하며 따로 선택할 수 있습니다. 현재 모양에 따라 사용할 테마가 정해집니다."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Jedes Thema enthält eine helle und eine dunkle Palette. Die gewählte Darstellung bestimmt die verwendete Palette."
+            "value": "Heller und dunkler Modus verwenden jeweils ein eigenes Thema, das sich getrennt wählen lässt. Die Darstellung bestimmt, welches gilt."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Chaque thème comprend une palette claire et une palette sombre, utilisées selon l’apparence choisie."
+            "value": "Les modes clair et sombre utilisent chacun leur propre thème, à choisir séparément. L’apparence détermine celui qui s’applique."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Cada tema incluye una paleta clara y una oscura. La apariencia seleccionada determina cuál se usa."
+            "value": "Los modos claro y oscuro usan cada uno su propio tema, que se elige por separado. La apariencia determina cuál se usa."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Cada tema inclui uma paleta clara e uma escura, usadas conforme a aparência selecionada."
+            "value": "Os modos claro e escuro usam cada um seu próprio tema, escolhido separadamente. A aparência determina qual é usado."
           }
         }
       }

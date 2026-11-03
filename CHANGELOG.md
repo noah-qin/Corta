@@ -47,10 +47,23 @@ Versioning for compatibility changes.
   a separator line, and the toolbar's Connect and New Tab buttons are bare
   symbols. In the toolbar, the input-source badge is grey for every source.
 
+- Light and dark mode choose their themes separately: Settings ▸ Themes
+  keeps a choice per mode, written `theme = light:<name>,dark:<name>`; a
+  single name still serves both. New beside a mode saves the theme for
+  that mode.
+- Switching theme or appearance blends the window into the new colours
+  over a fifth of a second instead of jumping, titlebar and terminal
+  together.
+- The `corta` and `mono` themes' colours were retuned: every hue in both
+  variants now reads at 4.5:1 or better on its background (the default
+  dark theme's blue was 1.9:1). Solarized is unchanged, as published.
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
 
 ### Fixed
 
+- After a theme or appearance switch the selected tab kept the old
+  theme's fill — a white pill on a dark titlebar — and the pane header
+  kept its old text colour until the next output.
 - Splitting a pane again while the previous split was still opening
   crushed the new panes to a sliver, and the crushed layout was saved and
   restored. A split now settles first; ⌘D / ⇧⌘D beeps instead of making a

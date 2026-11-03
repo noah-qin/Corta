@@ -86,6 +86,9 @@ final class TabItemView: NSView, NSTextFieldDelegate {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     func configure(_ item: TabStripItem, selected: Bool) {
+        // Every pass, not only on a change: the fill follows the canvas,
+        // which a theme switch moves with the same item and selection.
+        defer { updateChrome() }
         guard item != self.item || selected != self.selected else { return }
         if item.id != self.item?.id {
             // Another tab now: an edit under way was the old one's, and the
@@ -112,17 +115,26 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         badge.needsDisplay = true
         setAccessibilityLabel(item.name)
         setAccessibilityValue(selected)
-        updateChrome()
         needsLayout = true
     }
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateChrome()
+    }
+
     private func updateChrome() {
-        layer?.backgroundColor = selected ? strip.selectedFill.cgColor
-            : hovering ? NSColor.labelColor.withAlphaComponent(0.04).cgColor : nil
+        // A layer takes a resolved colour: resolve it in this view's
+        // appearance, which the strip sets from the canvas, not in
+        // whatever appearance happens to be current.
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = selected ? strip.selectedFill.cgColor
+                : hovering ? NSColor.labelColor.withAlphaComponent(0.06).cgColor : nil
+            // A hairline keeps a lone white pill visible on a white band.
+            layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.1).cgColor
+        }
         layer?.shadowOpacity = selected ? 0.12 : 0
-        // A hairline keeps a lone white pill visible on a white band.
         layer?.borderWidth = selected ? 0.5 : 0
-        layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.1).cgColor
         layer?.shadowRadius = 2
         layer?.shadowOffset = CGSize(width: 0, height: -0.5)
         layer?.masksToBounds = false

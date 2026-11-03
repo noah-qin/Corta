@@ -198,7 +198,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func selectTheme(_ sender: NSMenuItem) {
         let themes = Theme.all(in: ConfigurationStore.shared.configuration)
         guard sender.tag < themes.count else { return }
-        ConfigurationStore.shared.update { $0.theme = themes[sender.tag].name }
+        ConfigurationStore.shared.update { $0.setTheme(themes[sender.tag].name) }
     }
 
     @objc func selectAppearance(_ sender: NSMenuItem) {
@@ -213,7 +213,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         case #selector(selectTheme(_:)):
             let themes = Theme.all(in: configuration)
             menuItem.state =
-                menuItem.tag < themes.count && themes[menuItem.tag].name == configuration.theme
+                menuItem.tag < themes.count
+                && themes[menuItem.tag].name == configuration.themeName(dark: AppearanceController.shared.isDark)
                 ? .on : .off
         case #selector(selectAppearance(_:)):
             menuItem.state =
