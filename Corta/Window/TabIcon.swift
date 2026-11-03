@@ -21,7 +21,7 @@ import CoreImage
 /// front of the others', its name or the user's, and where it is.
 enum TabIcon {
     static let side: CGFloat = 20
-    private static let stackStep: CGFloat = 3.5
+    private static let stackStep: CGFloat = 3
     private static let shadowPad: CGFloat = 2
     private static var compositions: [String: NSImage] = [:]
 
@@ -61,7 +61,10 @@ enum TabIcon {
             let shrink = CGFloat(index)
             // Nearly full height: the cards stand close behind the front one.
             let size = NSSize(width: tile.width - shrink * 2 / 3, height: tile.height - shrink / 2)
-            guard let card = tilted(card(images[index], size: size, squash: tiltWidth)) else { return nil }
+            // No rim of their own: each rim drew another outline, and the
+            // stack read as fanned out rather than standing behind.
+            guard let card = tilted(card(images[index], size: size, squash: tiltWidth, rim: false))
+            else { return nil }
             let right = frontSize.width + CGFloat(index) * stackStep
             let frame = NSRect(x: right - card.size.width, y: (side - card.size.height) / 2,
                                width: card.size.width, height: card.size.height)
@@ -99,22 +102,29 @@ enum TabIcon {
     /// A tile on a white rim, one point wider on every side. A card that
     /// will be squashed to `squash` of its width is drawn with corners
     /// stretched by the inverse, so they come out round, not clipped.
-    private static func card(_ tile: NSImage, size: NSSize, squash: CGFloat = 1) -> NSImage {
+    private static func card(_ tile: NSImage, size: NSSize, squash: CGFloat = 1, rim: Bool = true) -> NSImage {
         let outer = NSSize(width: size.width + 2, height: size.height + 2)
         let image = NSImage(size: outer, flipped: false) { rect in
             // One radius for both: the tile's corner is the rim's less the
             // rim's width, so the two curves are concentric.
             let radius = size.height * 0.27 + 1
-            let rim = NSBezierPath(roundedRect: rect, xRadius: min(rect.width / 2, radius / squash),
+            let rimPath = NSBezierPath(roundedRect: rect, xRadius: min(rect.width / 2, radius / squash),
                                    yRadius: radius)
-            NSColor.white.setFill()
-            rim.fill()
+            if rim {
+                NSColor.white.setFill()
+                rimPath.fill()
+            }
             let inner = rect.insetBy(dx: 1, dy: 1)
             let face = NSBezierPath(roundedRect: inner, xRadius: min(inner.width / 2, (radius - 1) / squash),
                                     yRadius: radius - 1)
             NSGraphicsContext.saveGraphicsState()
             face.addClip()
             tile.draw(in: inner)
+            // Behind the front card, a little in shadow.
+            if !rim {
+                NSColor.black.withAlphaComponent(0.18).setFill()
+                inner.fill(using: .sourceAtop)
+            }
             NSGraphicsContext.restoreGraphicsState()
             // A hairline where tile meets rim, so a white tile (Codex) still
             // has an edge.

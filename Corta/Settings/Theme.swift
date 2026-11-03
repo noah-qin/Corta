@@ -144,7 +144,8 @@ extension Theme {
             ]),
         light: Variant(
             foreground: rgb(38, 42, 51),
-            background: rgb(252, 252, 250),
+            // Pure white: panes are the lightest layer on a grey ground.
+            background: rgb(255, 255, 255),
             // A slate grey, not the foreground: a near-black block read as a
             // hole in the page. Still 4.7:1 against the background.
             cursor: rgb(108, 114, 126),

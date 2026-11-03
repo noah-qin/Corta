@@ -31,7 +31,8 @@ Versioning for compatibility changes.
   share the row only once they no longer fit; a lone tab is a single pill,
   and the track appears with the second tab. Codex's tile is white. The titlebar band and the
   gaps between panes share a ground colour a step darker than the panes,
-  and the tab track a step darker again. Pane cards come up to within a margin of the
+  and the tab track a step darker again. The default light theme's background is
+  pure white (was a warm off-white). Pane cards come up to within a margin of the
   tabs, and their corners are concentric with the window's. A tab's background panes stop drawing while it is
   hidden and keep running.
 - The titlebar band is the theme's own colour, without the window title or
