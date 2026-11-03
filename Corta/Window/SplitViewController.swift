@@ -36,13 +36,11 @@ final class SplitViewController: NSViewController {
     /// Where the last closed pane was, for reopening; one deep
     /// (`SplitViewController+Reopen.swift`).
     var lastClosedPane: ClosedPane?
-    var floatingPanels: [FloatingPaneController] = []
-    var isFloating: Bool { setup.isFloating }
-    var contentMargin: CGFloat { isFloating ? 0 : PaneSurfaceView.margin }
+    var contentMargin: CGFloat { PaneSurfaceView.margin }
     private let systemStatusBar = SystemStatusBar(frame: .zero)
     private var statusBarHeightConstraint: NSLayoutConstraint?
     var statusBarHeight: CGFloat {
-        !isFloating && ConfigurationStore.shared.configuration.statusBar && !directPresentation.contains(.overlays)
+        ConfigurationStore.shared.configuration.statusBar && !directPresentation.contains(.overlays)
             ? SystemStatusBar.height : 0
     }
     /// What direct presentation changes right now (`updateDirectPresentation`).
@@ -57,8 +55,8 @@ final class SplitViewController: NSViewController {
     private(set) var didSetUpWindow = false
     /// The splits were rebuilt and first responder taken (`viewWillAppear`).
     private var didAppear = false
-    /// The tab this split view is (D30); `nil` for a floating pane's window
-    /// and for a split a test hosts in a bare window.
+    /// The tab this split view is (D30); `nil` for a split a test hosts in a
+    /// bare window.
     weak var tab: TerminalTab?
     /// The chrome height at the last layout, for absorbing a change — the
     /// toolbar shown or hidden — into the frame.
@@ -72,8 +70,6 @@ final class SplitViewController: NSViewController {
     /// What the window's root pane spawns as: given at construction, since
     /// the root pane spawns as the view loads.
     struct Setup {
-        var transferredPane: ViewController?
-        var isFloating = false
         var restore: WindowState?
         var preset: Preset?
         /// The directory an App Intent asked for; ignored when `restore` or
@@ -115,17 +111,9 @@ final class SplitViewController: NSViewController {
         let restoredPreset = pendingRestore?.layout.firstPresetName.flatMap { name in
             ConfigurationStore.shared.configuration.presets.first { $0.name == name }
         }
-        let pane: ViewController
-        if let transferred = setup.transferredPane {
-            pane = transferred
-            pane.didSizeWindow = false
-            pane.initialGridSize = nil
-            addChild(pane)
-        } else {
-            pane = makePane(
-                workingDirectory: pendingRestore?.layout.firstDirectory ?? setup.workingDirectory,
-                initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
-        }
+        let pane = makePane(
+            workingDirectory: pendingRestore?.layout.firstDirectory ?? setup.workingDirectory,
+            initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
         focusedPane = pane
         tree = SplitTree(root: pane.view)
         systemStatusBar.onVisibilityChange = { [weak self] in self?.updateStatusBarLayout() }
@@ -144,7 +132,6 @@ final class SplitViewController: NSViewController {
         guard !didSetUpWindow, let pane = focusedPane else { return }
         didSetUpWindow = true
         window.title = "Corta"
-        if prepareFloatingWindowIfNeeded(window, pane: pane) { return }
         // Corta draws its own tabs (D30).
         window.tabbingMode = .disallowed
         // Chrome follows the system appearance; the terminal surface stays dark.
@@ -362,7 +349,7 @@ final class SplitViewController: NSViewController {
             root.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -contentMargin),
             root.topAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.topAnchor,
-                constant: isFloating ? contentMargin : contentMargin - TerminalLayout.titlebarOverlap),
+                constant: contentMargin - TerminalLayout.titlebarOverlap),
             root.bottomAnchor.constraint(equalTo: systemStatusBar.topAnchor, constant: -contentMargin),
         ])
         updateDirectPresentation()
@@ -633,7 +620,6 @@ extension SplitViewController {
     func teardown() {
         splitTransition.finish()
         systemStatusBar.stop()
-        for panel in floatingPanels { panel.close() }
         for pane in panes { pane.teardown() }
     }
 

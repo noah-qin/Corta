@@ -52,7 +52,7 @@ final class SplitPaneUITests: XCTestCase {
     }
 
     @MainActor
-    func testPaneHeaderActionsAndTransfer() throws {
+    func testPaneHeaderActions() throws {
         let app = XCUIApplication()
         app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
         app.launch()
@@ -71,14 +71,6 @@ final class SplitPaneUITests: XCTestCase {
         attachment.name = "pane-controls-preview"
         attachment.lifetime = .keepAlways
         add(attachment)
-        window.buttons.matching(identifier: "pane.detach").firstMatch.click()
-        expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: app.windows)
-        waitForExpectations(timeout: 5)
-        XCTAssertEqual(app.buttons.matching(identifier: "pane.splitRight").count, 3)
-        let floating = app.windows["Corta.FloatingPane"]
-        floating.buttons.matching(identifier: "pane.detach").firstMatch.click()
-        expectation(for: NSPredicate(format: "count == 1"), evaluatedWith: app.windows)
-        waitForExpectations(timeout: 5)
     }
 
     /// A visual record rather than an assertion: the panes are Metal

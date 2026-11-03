@@ -21,7 +21,6 @@ import AppKit
 /// chrome band back to the frame restores titlebar drag and double-click.
 final class WindowContentView: NSView {
     override func draw(_ dirtyRect: NSRect) {
-        guard !(window?.windowController is FloatingPaneController) else { return }
         PaneSurfaceView.gutterColor.setFill()
         dirtyRect.fill()
     }

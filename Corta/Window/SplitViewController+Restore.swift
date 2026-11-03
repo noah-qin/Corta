@@ -38,20 +38,19 @@ extension SplitViewController {
     private func layout(of subtree: NSView) -> PaneLayout {
         guard let split = subtree as? NSSplitView, split.subviews.count == 2 else {
             let pane = pane(forView: subtree)
-            return includingFloatingLayouts(.pane(
+            return .pane(
                 directory: pane?.session?.workingDirectory, presetName: pane?.preset?.name,
-                isFocused: pane === focusedPane && !floatingPanels.contains { $0.window?.isKeyWindow == true }),
-                beside: subtree)
+                isFocused: pane === focusedPane)
         }
         let axis = split.isVertical ? split.bounds.width : split.bounds.height
         let first = split.subviews[0].frame
         let extent = split.isVertical ? first.width : first.height
-        return includingFloatingLayouts(.split(
+        return .split(
             vertical: split.isVertical,
             // A zero axis would save NaN, which JSON can't encode.
             position: axis > 0 ? Double(extent / axis) : 0.5,
             first: layout(of: split.subviews[0]),
-            second: layout(of: split.subviews[1])), beside: subtree)
+            second: layout(of: split.subviews[1]))
     }
 
     private func pane(forView view: NSView) -> ViewController? {

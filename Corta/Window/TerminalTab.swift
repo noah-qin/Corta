@@ -82,8 +82,8 @@ final class TabContainerViewController: NSViewController {
 }
 
 extension NSWindow {
-    /// The split view a window shows: its selected tab's, or a floating
-    /// pane's own.
+    /// The split view a window shows: its selected tab's, or the content of
+    /// a window that is not a tabbed one (tests host splits that way).
     var terminalSplit: SplitViewController? {
         if let controller = windowController as? TerminalWindowController {
             return controller.selectedTab?.split

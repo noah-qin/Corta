@@ -22,38 +22,6 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct PaneTransferTests {
-    @Test func transferPreservesControllerAndLiveSession() throws {
-        let source = SplitViewController()
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
-                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
-        window.contentViewController = source
-        _ = source.view
-        // Laid out at the window's size: ⌘D measures the pane it halves.
-        window.setContentSize(NSSize(width: 900, height: 600))
-        source.view.layoutSubtreeIfNeeded()
-        source.splitRight(nil)
-        let pane = try #require(source.focusedPane)
-        let session = pane.session
-        source.zoomFocusedPane()
-        let setup = try #require(source.takeFocusedPaneForTransfer())
-        let destination = SplitViewController(setup: setup)
-        let newWindow = NSWindow(contentRect: window.frame, styleMask: [.titled, .resizable],
-                                 backing: .buffered, defer: false)
-        newWindow.contentViewController = destination
-        _ = destination.view
-        defer { source.teardown(); destination.teardown() }
-        #expect(source.panes.count == 1)
-        #expect(source.tree.leafCount == 1)
-        #expect(!source.isPaneZoomed)
-        #expect(destination.focusedPane === pane)
-        #expect(pane.parent === destination)
-        #expect(pane.session === session)
-        #expect(pane.initialGridSize == nil)
-        #expect(!pane.didTeardown)
-        #expect(!source.panes.contains { $0 === pane })
-        #expect(pane.view.isDescendant(of: destination.view))
-    }
-
     @Test func headerButtonsStayAtTheRightAndOperateOnTheirOwnPane() throws {
         let source = SplitViewController()
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 600),
@@ -129,25 +97,6 @@ struct PaneTransferTests {
         #expect(abs(source.zoomedPane!.view.frame.minX - PaneSurfaceView.margin) < 1)
     }
 
-    @Test func movedPaneUsesTheSameDefaultWindowSizeAsANewTerminal() throws {
-        let source = TerminalWindowController(setup: .init())
-        let split = try #require(source.selectedTab?.split)
-        let sourceWindow = try #require(source.window)
-        sourceWindow.setFrame(NSRect(x: 50, y: 50, width: 1400, height: 850), display: false)
-        split.splitRight(nil)
-        split.splitDown(nil)
-        let setup = try #require(split.takeFocusedPaneForTransfer())
-        let moved = TerminalWindowController(setup: setup)
-        let fresh = TerminalWindowController(setup: .init())
-        defer {
-            for controller in [source, moved, fresh] {
-                controller.selectedTab?.split.teardown()
-                controller.window?.close()
-            }
-        }
-        #expect(moved.window?.frame.size == fresh.window?.frame.size)
-    }
-
     @Test func eachOfFiveTabsRetainsItsInsetCard() throws {
         let controller = TerminalWindowController(setup: .init())
         defer {
@@ -169,14 +118,6 @@ struct PaneTransferTests {
             #expect(pane.view.frame.maxY < split.view.bounds.maxY - pane.windowChrome
                 + TerminalLayout.titlebarOverlap)
         }
-    }
-
-    @Test func cannotTransferTheLastPane() {
-        let source = SplitViewController()
-        _ = source.view
-        defer { source.teardown() }
-        #expect(source.takeFocusedPaneForTransfer() == nil)
-        #expect(source.panes.count == 1)
     }
 
     @Test func interruptingSpringSettlesAndCompletesExactlyOnce() {

@@ -77,8 +77,6 @@ final class PaneHeader: NSView {
                   action: #selector(splitRight), identifier: "pane.splitRight"),
             .init(symbol: "rectangle.split.1x2", label: TerminalCommand.splitDown.title,
                   action: #selector(splitDown), identifier: "pane.splitDown"),
-            .init(symbol: "rectangle.on.rectangle", label: L10n.text("command.detachPane"),
-                  action: #selector(detach), identifier: "pane.detach"),
             .init(symbol: "arrow.up.left.and.arrow.down.right", label: TerminalCommand.zoomPane.title,
                   action: #selector(zoom), identifier: "pane.zoom"),
             .init(symbol: "xmark", label: TerminalCommand.close.title,
@@ -127,24 +125,14 @@ final class PaneHeader: NSView {
         title.stringValue = tabLabel.text
         title.toolTip = fullTitle
         title.textColor = pane.isFocusedPane ? .labelColor : .secondaryLabelColor
-        buttons[2].isEnabled = split.isFloating || split.hasMultiplePanes
-        let dockLabel = L10n.text(split.isFloating ? "command.dockPane" : "command.detachPane")
-        buttons[2].toolTip = dockLabel
-        buttons[2].setAccessibilityLabel(dockLabel)
-        buttons[2].contentTintColor = split.isFloating ? .controlAccentColor : .secondaryLabelColor
-        buttons[2].alphaValue = split.isFloating ? 1 : 0.6
-        buttons[2].wantsLayer = true
-        buttons[2].layer?.cornerRadius = 10
-        buttons[2].layer?.backgroundColor = split.isFloating
-            ? NSColor.controlAccentColor.withAlphaComponent(0.1).cgColor : NSColor.clear.cgColor
-        buttons[3].isEnabled = split.hasMultiplePanes
+        buttons[2].isEnabled = split.hasMultiplePanes
         let zoomed = split.zoomedPane === pane
         let label = L10n.text(zoomed ? "command.unzoomPane" : "command.zoomPane")
-        buttons[3].image = NSImage(systemSymbolName: zoomed
+        buttons[2].image = NSImage(systemSymbolName: zoomed
             ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
             accessibilityDescription: label)
-        buttons[3].toolTip = label
-        buttons[3].setAccessibilityLabel(label)
+        buttons[2].toolTip = label
+        buttons[2].setAccessibilityLabel(label)
     }
 
     private func perform(_ action: (SplitViewController) -> Void) {
@@ -156,22 +144,10 @@ final class PaneHeader: NSView {
 
     @objc private func splitRight() { perform { $0.splitRight(nil) } }
     @objc private func splitDown() { perform { $0.splitDown(nil) } }
-    @objc private func detach() { perform { $0.detachFocusedPane() } }
     @objc private func zoom() { perform { $0.toggleZoomPane(nil) } }
     @objc private func closePane() { perform { $0.performClose(nil) } }
 
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        guard let hit = super.hitTest(point) else { return nil }
-        return window is FloatingPaneWindow && !(hit is NSButton) ? self : hit
-    }
-
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    override func mouseDown(with event: NSEvent) {
-        if let window = window as? FloatingPaneWindow {
-            window.performDrag(with: event)
-        } else {
-            perform { _ in }
-        }
-    }
+    override func mouseDown(with event: NSEvent) { perform { _ in } }
 }

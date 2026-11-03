@@ -83,7 +83,6 @@ extension SplitViewController {
 
     var panesWithRunningJobs: [ViewController] {
         panes.filter { $0.session?.hasForegroundJob == true }
-            + floatingPanels.flatMap { $0.split.panesWithRunningJobs }
     }
 
     /// Whether closing `running` asks first: something is running and

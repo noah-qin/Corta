@@ -108,10 +108,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// toolbar's button names its own window: the key window is nil while
     /// Corta is inactive, and the tab would have opened as a window.
     func newTab(beside existing: NSWindow?, sender: Any?) {
-        if let floating = existing?.windowController as? FloatingPaneController {
-            newTab(beside: floating.source?.view.window, sender: sender)
-            return
-        }
         // A tab of the window that asked (D30); with none, a window.
         if let owner = existing?.windowController as? TerminalWindowController {
             owner.addTab()
@@ -281,17 +277,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 window.makeKeyAndOrderFront(nil)
             }
         }
-        if CommandLine.arguments.contains("--pane-preview")
-            || CommandLine.arguments.contains("--floating-pane-preview"),
+        if CommandLine.arguments.contains("--pane-preview"),
            let split = terminalWindowControllers.first?.window?.terminalSplit {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                 split.splitRight(nil)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    split.splitDown(nil)
-                    if CommandLine.arguments.contains("--floating-pane-preview") {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { split.detachFocusedPane() }
-                    }
-                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { split.splitDown(nil) }
             }
         }
         #endif
