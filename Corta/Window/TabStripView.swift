@@ -63,7 +63,9 @@ final class TabStripView: NSView {
 
     override var isFlipped: Bool { true }
     override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: Self.height) }
-    override var mouseDownCanMoveWindow: Bool { false }
+    /// The strip's empty part is titlebar; its tabs say otherwise for
+    /// themselves (`TabItemView.mouseDownCanMoveWindow`).
+    override var mouseDownCanMoveWindow: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     /// Light or dark follows the terminal canvas, whose colour the

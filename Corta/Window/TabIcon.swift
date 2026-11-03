@@ -15,14 +15,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
-import CoreImage
 
 /// What a tab shows in Corta's strip (D30): the focused pane's program in
 /// front of the others', its name or the user's, and where it is.
 enum TabIcon {
     static let side: CGFloat = 20
-    private static let stackStep: CGFloat = 3
-    private static let shadowPad: CGFloat = 2
+    /// Each card behind turns this much further, about a point this many
+    /// card heights below the stack, and needs this much more width.
+    private static let fanAngle: CGFloat = 8
+    private static let fanPivotDepth: CGFloat = 1.1
+    private static let fanStep: CGFloat = 8
+    private static let shadowPad: CGFloat = 3
     private static var compositions: [String: NSImage] = [:]
 
     static func item(for tab: TerminalTab) -> TabStripItem {
@@ -52,27 +55,11 @@ enum TabIcon {
         guard let lead = first.tabImage else { return nil }
         let images = programs.map { $0.tabImage ?? lead }
         let tile = ProgramIcon.tileSize
-        let frontSize = NSSize(width: tile.width + 2, height: tile.height + 2)
-        let width = frontSize.width + CGFloat(images.count - 1) * stackStep
-        // Cards behind the front one are turned away from the viewer, as in
-        // a fanned deck seen at an angle: narrower, and shorter at the far
-        // edge. Rendered once per composition, which is cached below.
-        let backs = images.indices.dropFirst().map { index -> (NSImage, NSRect)? in
-            let shrink = CGFloat(index)
-            // Nearly full height: the cards stand close behind the front one.
-            let size = NSSize(width: tile.width - shrink * 2 / 3, height: tile.height - shrink / 2)
-            // No rim of their own: each rim drew another outline, and the
-            // stack read as fanned out rather than standing behind.
-            guard let card = tilted(card(images[index], size: size, squash: tiltWidth, rim: false))
-            else { return nil }
-            let right = frontSize.width + CGFloat(index) * stackStep
-            let frame = NSRect(x: right - card.size.width, y: (side - card.size.height) / 2,
-                               width: card.size.width, height: card.size.height)
-            return (card, frame)
-        }
-        let front = card(images[0], size: tile)
-        // Room on every side for the shadow, which a tight bound cut off
-        // into a hard edge.
+        let cardSize = NSSize(width: tile.width + 2, height: tile.height + 2)
+        // Like a hand of playing cards: each card behind turns a few degrees
+        // further about a point well below the stack, so it fans out from
+        // behind the front card's right edge.
+        let width = cardSize.width + CGFloat(images.count - 1) * fanStep
         let pad = shadowPad
         let image = NSImage(size: NSSize(width: width + pad * 2, height: side + pad * 2), flipped: false) { _ in
             NSGraphicsContext.saveGraphicsState()
@@ -84,9 +71,22 @@ enum TabIcon {
             shadow.shadowBlurRadius = 1.5
             shadow.shadowOffset = NSSize(width: 0.5, height: -0.5)
             shadow.set()
-            for case let (back, frame)? in backs.reversed() { back.draw(in: frame) }
-            front.draw(in: NSRect(x: 0, y: (side - front.size.height) / 2,
-                                  width: front.size.width, height: front.size.height))
+            let frame = NSRect(x: 0, y: (side - cardSize.height) / 2,
+                               width: cardSize.width, height: cardSize.height)
+            let pivot = NSPoint(x: frame.midX, y: frame.minY - frame.height * fanPivotDepth)
+            // Drawn in place under the rotation, not rotated as bitmaps,
+            // so the turned edges stay smooth.
+            for (index, back) in images.dropFirst().enumerated().reversed() {
+                NSGraphicsContext.saveGraphicsState()
+                let turn = NSAffineTransform()
+                turn.translateX(by: pivot.x, yBy: pivot.y)
+                turn.rotate(byDegrees: -fanAngle * CGFloat(index + 1))
+                turn.translateX(by: -pivot.x, yBy: -pivot.y)
+                turn.concat()
+                drawCard(back, in: frame, shaded: true)
+                NSGraphicsContext.restoreGraphicsState()
+            }
+            drawCard(images[0], in: frame)
             NSGraphicsContext.restoreGraphicsState()
             return true
         }
@@ -96,78 +96,31 @@ enum TabIcon {
         return image
     }
 
-    /// How wide a turned card is drawn, as a share of its width.
-    private static let tiltWidth: CGFloat = 0.4
-
-    /// A tile on a white rim, one point wider on every side. A card that
-    /// will be squashed to `squash` of its width is drawn with corners
-    /// stretched by the inverse, so they come out round, not clipped.
-    private static func card(_ tile: NSImage, size: NSSize, squash: CGFloat = 1, rim: Bool = true) -> NSImage {
-        let outer = NSSize(width: size.width + 2, height: size.height + 2)
-        let image = NSImage(size: outer, flipped: false) { rect in
-            // One radius for both: the tile's corner is the rim's less the
-            // rim's width, so the two curves are concentric.
-            let radius = size.height * 0.27 + 1
-            let rimPath = NSBezierPath(roundedRect: rect, xRadius: min(rect.width / 2, radius / squash),
-                                   yRadius: radius)
-            if rim {
-                NSColor.white.setFill()
-                rimPath.fill()
-            }
-            let inner = rect.insetBy(dx: 1, dy: 1)
-            let face = NSBezierPath(roundedRect: inner, xRadius: min(inner.width / 2, (radius - 1) / squash),
-                                    yRadius: radius - 1)
-            NSGraphicsContext.saveGraphicsState()
-            face.addClip()
-            tile.draw(in: inner)
-            // Behind the front card, a little in shadow.
-            if !rim {
-                NSColor.black.withAlphaComponent(0.18).setFill()
-                inner.fill(using: .sourceAtop)
-            }
-            NSGraphicsContext.restoreGraphicsState()
-            // A hairline where tile meets rim, so a white tile (Codex) still
-            // has an edge.
-            NSColor.black.withAlphaComponent(0.1).setStroke()
-            face.lineWidth = 0.5
-            face.stroke()
-            return true
-        }
-        image.isTemplate = false
-        return image
-    }
-
-    /// `card` turned about its leading edge: 40% as wide, its far edge 74%
-    /// as tall. Core Image's perspective transform, on a 4× raster.
-    private static func tilted(_ card: NSImage) -> NSImage? {
-        let scale: CGFloat = 4
-        let pixelsWide = Int((card.size.width * scale).rounded())
-        let pixelsHigh = Int((card.size.height * scale).rounded())
-        guard pixelsWide > 0, pixelsHigh > 0,
-              let bitmap = NSBitmapImageRep(
-                bitmapDataPlanes: nil, pixelsWide: pixelsWide, pixelsHigh: pixelsHigh, bitsPerSample: 8,
-                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
-                bytesPerRow: 0, bitsPerPixel: 0),
-              let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return nil }
+    /// A tile on a white rim, one point wide. Tile and rim are cut from one
+    /// radius, so their corners are concentric. A card behind the front one
+    /// is `shaded`, a little in its shadow.
+    private static func drawCard(_ tile: NSImage, in rect: NSRect, shaded: Bool = false) {
+        let radius = (rect.height - 2) * 0.27 + 1
+        NSColor.white.setFill()
+        NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+        let inner = rect.insetBy(dx: 1, dy: 1)
+        let face = NSBezierPath(roundedRect: inner, xRadius: radius - 1, yRadius: radius - 1)
         NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = context
-        card.draw(in: NSRect(x: 0, y: 0, width: pixelsWide, height: pixelsHigh))
+        NSShadow().set()
+        face.addClip()
+        tile.draw(in: inner)
+        if shaded {
+            NSColor.black.withAlphaComponent(0.12).setFill()
+            inner.fill(using: .sourceAtop)
+        }
         NSGraphicsContext.restoreGraphicsState()
-        guard let source = bitmap.cgImage else { return nil }
-        let height = CGFloat(pixelsHigh)
-        let width = (CGFloat(pixelsWide) * tiltWidth).rounded()
-        let inset = height * 0.08
-        let filter = CIFilter(name: "CIPerspectiveTransform")
-        filter?.setValue(CIImage(cgImage: source), forKey: kCIInputImageKey)
-        filter?.setValue(CIVector(x: 0, y: height), forKey: "inputTopLeft")
-        filter?.setValue(CIVector(x: width, y: height - inset), forKey: "inputTopRight")
-        filter?.setValue(CIVector(x: width, y: inset), forKey: "inputBottomRight")
-        filter?.setValue(CIVector(x: 0, y: 0), forKey: "inputBottomLeft")
-        guard let output = filter?.outputImage,
-              let result = CIContext().createCGImage(
-                output, from: CGRect(x: 0, y: 0, width: width, height: height)) else { return nil }
-        let image = NSImage(cgImage: result, size: NSSize(width: width / scale, height: height / scale))
-        image.isTemplate = false
-        return image
+        // A hairline where tile meets rim, so a white tile (Codex) still has
+        // an edge.
+        NSGraphicsContext.saveGraphicsState()
+        NSShadow().set()
+        NSColor.black.withAlphaComponent(0.1).setStroke()
+        face.lineWidth = 0.5
+        face.stroke()
+        NSGraphicsContext.restoreGraphicsState()
     }
 }

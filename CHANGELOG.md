@@ -24,10 +24,11 @@ Versioning for compatibility changes.
 - Tabs are Corta's own and sit in the titlebar row beside the window
   buttons, titles left-aligned (D30, #451). Each tab shows the program
   running in its focused pane as an icon — a dark prompt tile for a shell,
-  the program's own colours otherwise — and a tab with split panes stacks
-  the other panes' icons behind it, turned away. Hover for the close
+  the program's own colours otherwise — and a tab with split panes fans
+  the other panes' icons out behind it, like a hand of cards. Hover for the close
   button, drag to reorder, double-click to rename; the right-click menu
-  adds Close Other Tabs. Tabs keep a fixed width at the leading edge and
+  adds Close Other Tabs. The row beside the tabs drags the window and
+  double-clicks like the rest of the titlebar. Tabs keep a fixed width at the leading edge and
   share the row only once they no longer fit; a lone tab is a single pill,
   and the track appears with the second tab. Codex's tile is white. The titlebar band and the
   gaps between panes share a ground colour a step darker than the panes,
