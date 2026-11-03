@@ -56,9 +56,35 @@ extension PaneCommands {
                 }
                 pasteboard.clearContents()
                 pasteboard.setString(text, forType: .string)
-                // Confirm only a write that happened: copy-on-select is never silent.
-                self.host?.terminalView?.showToast(L10n.text("toast.copied"))
+                // Confirm only a write that happened: copy-on-select is never
+                // silent. Light runs along the copied text; a copy wholly
+                // scrolled out of view says so in a toast instead.
+                self.confirmCopy(of: range)
             }
+        }
+    }
+
+    /// The copied range's visible cells, one rect per row, in the terminal
+    /// view's coordinates; the glint runs along them.
+    private func confirmCopy(of range: SelectionRange) {
+        guard let host, let terminalView = host.terminalView, let session = host.session else { return }
+        let grid = session.snapshot()
+        var rects: [CGRect] = []
+        for row in range.start.row...range.end.row {
+            let screenRow = row + host.scrollOffset
+            guard screenRow >= 0, screenRow < grid.rows else { continue }
+            let first = row == range.start.row ? range.start.column : 0
+            let last = row == range.end.row ? range.end.column : grid.columns - 1
+            guard last >= first,
+                let start = host.pointer.cellFrame(row: screenRow, column: first, rows: grid.rows),
+                let end = host.pointer.cellFrame(row: screenRow, column: min(last, grid.columns - 1), rows: grid.rows)
+            else { continue }
+            rects.append(start.union(end))
+        }
+        if rects.isEmpty {
+            terminalView.showToast(L10n.text("toast.copied"))
+        } else {
+            CopyGlintView.show(over: terminalView, rects: rects)
         }
     }
 

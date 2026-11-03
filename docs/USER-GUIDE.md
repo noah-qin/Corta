@@ -335,7 +335,9 @@ own error text is under **Details**.
   pane. Each pane has its own bar.
 - **Selecting.** Drag to select, double-click for a word, triple-click for
   a line. A finished selection is copied at once (`copy-on-select`); ⌘C
-  copies too. Inside a program that uses the mouse — `vim`, `htop` — hold
+  copies too. A copy is confirmed by a band of light sweeping once along the
+  copied text (a single soft flash with Reduce Motion), or a toast when the
+  text is scrolled out of view. Inside a program that uses the mouse — `vim`, `htop` — hold
   ⌥ while you start dragging to select text anyway
   (`mouse-override-modifier`).
 - **Paste.** ⌘V. Pasted text is marked as a paste (bracketed paste), so a

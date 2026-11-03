@@ -21,6 +21,9 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- A copy is confirmed by a band of light sweeping along the copied text
+  instead of a "Copied" toast in the corner; with Reduce Motion it is a
+  single soft flash, and a copy scrolled out of view keeps the toast.
 - Tabs are Corta's own and sit in the titlebar row beside the window
   buttons, titles left-aligned (D30, #451). Each tab shows the program
   running in its focused pane as an icon — a dark prompt tile for a shell,

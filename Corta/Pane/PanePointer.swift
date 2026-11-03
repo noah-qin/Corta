@@ -202,6 +202,8 @@ final class PanePointer: NSObject {
     }
 
     /// A screen cell's rect in the terminal view's coordinates.
+    func cellFrame(row: Int, column: Int, rows: Int) -> CGRect? { cellRect(row: row, column: column, rows: rows) }
+
     private func cellRect(row: Int, column: Int, rows: Int) -> CGRect? {
         guard let terminalRenderer, let terminalView else { return nil }
         return Self.cellFrame(
