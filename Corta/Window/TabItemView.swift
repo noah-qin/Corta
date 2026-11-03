@@ -1,0 +1,267 @@
+// Copyright 2026 Noah Qin
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
+
+import AppKit
+
+/// One tab: program icons, name and context leading-aligned, a close button
+/// on hover, and an agent badge when a pane reports one.
+final class TabItemView: NSView, NSTextFieldDelegate {
+    unowned let strip: TabStripView
+    var index = 0
+    private let icon = NSImageView()
+    private let title = NSTextField(labelWithString: "")
+    private let closeButton = NSButton()
+    private let badge = AgentTabView(frame: NSRect(x: 0, y: 0, width: 16, height: 16))
+    private var editor: NSTextField?
+    /// The tab being renamed, held by identity: the view may be handed
+    /// another tab, or leave the strip, before the edit ends.
+    private var editingID: String?
+    private var editingName = ""
+    private var hovering = false { didSet { updateChrome() } }
+    private var selected = false
+    private var item: TabStripItem?
+
+    init(strip: TabStripView) {
+        self.strip = strip
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = TabStripView.height / 2
+        icon.imageScaling = .scaleNone
+        title.lineBreakMode = .byTruncatingTail
+        title.cell?.truncatesLastVisibleLine = true
+        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: L10n.text("tabs.close"))
+        closeButton.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 9, weight: .semibold)
+        closeButton.isBordered = false
+        closeButton.contentTintColor = .secondaryLabelColor
+        closeButton.target = self
+        closeButton.action = #selector(closeTab)
+        closeButton.setAccessibilityLabel(L10n.text("tabs.close"))
+        closeButton.setAccessibilityIdentifier("tab-close")
+        for view in [icon, title, badge, closeButton] as [NSView] { addSubview(view) }
+        // The tab is the element VoiceOver presses; its parts are not.
+        icon.setAccessibilityElement(false)
+        title.setAccessibilityElement(false)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.radioButton)
+        setAccessibilityIdentifier("tab-item")
+        // The × shows only under the pointer; VoiceOver closes by action.
+        setAccessibilityCustomActions([
+            NSAccessibilityCustomAction(name: L10n.text("tabs.close")) { [weak self] in
+                guard let self else { return false }
+                self.strip.close(self.index)
+                return true
+            },
+        ])
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    func configure(_ item: TabStripItem, selected: Bool) {
+        guard item != self.item || selected != self.selected else { return }
+        if item.id != self.item?.id {
+            // Another tab now: an edit under way was the old one's, and the
+            // pointer may have left without an exit event.
+            cancelRename()
+            hovering = isPointerInside
+        }
+        self.item = item
+        self.selected = selected
+        let text = NSMutableAttributedString(string: item.name, attributes: [
+            .font: NSFont.systemFont(ofSize: 13),
+            .foregroundColor: selected ? NSColor.labelColor : NSColor.secondaryLabelColor,
+        ])
+        if !item.context.isEmpty {
+            text.append(NSAttributedString(string: " " + item.context, attributes: [
+                .font: NSFont.systemFont(ofSize: 13), .foregroundColor: NSColor.tertiaryLabelColor,
+            ]))
+        }
+        title.attributedStringValue = text
+        toolTip = item.toolTip
+        badge.status = item.status
+        badge.progress = item.progress
+        badge.isHidden = item.status == nil && item.progress == nil
+        badge.needsDisplay = true
+        setAccessibilityLabel(item.name)
+        setAccessibilityValue(selected)
+        updateChrome()
+        needsLayout = true
+    }
+
+    private func updateChrome() {
+        layer?.backgroundColor = selected ? strip.selectedFill.cgColor
+            : hovering ? NSColor.labelColor.withAlphaComponent(0.04).cgColor : nil
+        layer?.shadowOpacity = selected ? 0.12 : 0
+        // A hairline keeps a lone white pill visible on a white band.
+        layer?.borderWidth = selected ? 0.5 : 0
+        layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.1).cgColor
+        layer?.shadowRadius = 2
+        layer?.shadowOffset = CGSize(width: 0, height: -0.5)
+        layer?.masksToBounds = false
+        // Only under the pointer: a row of × marks is clutter.
+        closeButton.isHidden = !hovering || editor != nil || bounds.width < Self.compactWidth
+    }
+
+    private var isPointerInside: Bool {
+        guard let window else { return false }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        return bounds.contains(point)
+    }
+
+    /// Below this width a tab keeps only its front card, centred.
+    private static let compactWidth: CGFloat = 64
+
+    override func layout() {
+        super.layout()
+        let height = bounds.height
+        let compact = bounds.width < Self.compactWidth
+        let programs = item?.programs ?? []
+        let image = TabIcon.image(for: compact ? Array(programs.prefix(1)) : programs)
+        if icon.image !== image { icon.image = image }
+        let size = image?.size ?? .zero
+        // The image carries a margin for the turned cards; the front tile
+        // sits 12 in. Whole points, so its edges fall on device pixels.
+        let iconX = compact ? ((bounds.width - size.width) / 2).rounded(.down) : 8
+        icon.frame = NSRect(x: iconX, y: ((height - size.height) / 2).rounded(),
+                            width: size.width, height: size.height)
+        if compact {
+            title.isHidden = true
+            closeButton.isHidden = true
+            badge.frame = .zero
+            editor?.frame = bounds.insetBy(dx: 2, dy: 4)
+            return
+        }
+        let closeSide: CGFloat = 16
+        closeButton.frame = NSRect(x: bounds.width - closeSide - 8, y: (height - closeSide) / 2,
+                                   width: closeSide, height: closeSide)
+        badge.frame = NSRect(x: closeButton.frame.minX - 18, y: (height - 16) / 2, width: 16, height: 16)
+        let titleX = icon.frame.maxX + 5
+        let trailing = badge.isHidden ? closeButton.frame.minX - 4 : badge.frame.minX - 4
+        let titleHeight = title.intrinsicContentSize.height
+        title.frame = NSRect(x: titleX, y: ((height - titleHeight) / 2).rounded(),
+                             width: max(0, trailing - titleX), height: titleHeight)
+        editor?.frame = title.frame.insetBy(dx: -2, dy: -1)
+        // Very narrow tabs keep only the icon.
+        title.isHidden = title.frame.width < 24 || editor != nil
+        closeButton.isHidden = !hovering || editor != nil
+    }
+
+    override func mouseEntered(with event: NSEvent) { hovering = true }
+    override func mouseExited(with event: NSEvent) { hovering = false }
+
+    override func mouseDown(with event: NSEvent) {
+        if editor != nil { super.mouseDown(with: event); return }
+        strip.itemMouseDown(index, event: event)
+    }
+    override func mouseDragged(with event: NSEvent) { strip.itemMouseDragged(event) }
+    override func mouseUp(with event: NSEvent) { strip.itemMouseUp() }
+    override func otherMouseUp(with event: NSEvent) {
+        if event.buttonNumber == 2 { strip.close(index) }
+    }
+    override func menu(for event: NSEvent) -> NSMenu? { strip.menu(forTab: index) }
+
+    @objc private func closeTab() { strip.close(index) }
+
+    override func accessibilityPerformPress() -> Bool {
+        strip.delegate?.tabStrip(strip, select: index)
+        return true
+    }
+
+    // MARK: - Rename in place
+
+    func beginRename() {
+        guard editor == nil, let item, superview != nil else { return }
+        let field = NSTextField(string: item.name)
+        field.font = .systemFont(ofSize: 13)
+        field.isBordered = false
+        field.focusRingType = .none
+        field.drawsBackground = true
+        field.backgroundColor = .textBackgroundColor
+        field.wantsLayer = true
+        field.layer?.cornerRadius = 4
+        field.delegate = self
+        field.setAccessibilityIdentifier("tab-title-editor")
+        editor = field
+        editingID = item.id
+        editingName = item.name
+        addSubview(field)
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        title.isHidden = true
+        updateChrome()
+        // Taking first responder selects the whole name. A further
+        // `selectText` ended the edit at once when the window was not key.
+        window?.makeFirstResponder(field)
+    }
+
+    /// Ends an edit without saving it: the tab under it closed or changed.
+    func cancelRename() {
+        guard editor != nil else { return }
+        cancelling = true
+        endRename(save: false)
+        cancelling = false
+    }
+
+    private func endRename(save: Bool) {
+        guard let field = editor else { return }
+        let id = editingID
+        let originalName = editingName
+        editor = nil
+        editingID = nil
+        let value = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let window = self.window
+        field.delegate = nil
+        field.removeFromSuperview()
+        updateChrome()
+        needsLayout = true
+        // An empty name clears the custom title; Escape keeps the old one.
+        // By identity: the tab may have moved while it was being named.
+        // An unchanged name is no rename: saving it would freeze the
+        // program's own title, which then stops following what runs.
+        if save, let id, value != originalName {
+            strip.rename(tab: id, to: value.isEmpty ? nil : String(value.prefix(200)))
+        }
+        // Typing goes back to the terminal, unless a click put it elsewhere.
+        if let window, window.firstResponder == nil || window.firstResponder === window {
+            window.makeFirstResponder(window.terminalSplit?.focusedPane?.terminalView)
+        }
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if selector == #selector(NSResponder.cancelOperation(_:)) {
+            editor?.stringValue = item?.name ?? ""
+            cancelling = true
+            window?.makeFirstResponder(nil)
+            return true
+        }
+        return false
+    }
+
+    private var cancelling = false
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        let save = !cancelling
+        cancelling = false
+        endRename(save: save)
+    }
+}

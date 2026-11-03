@@ -153,12 +153,86 @@ struct WindowTabsTests {
         let controller = try makeWindow()
         defer { close(controller) }
         let tab = try #require(controller.selectedTab)
-        controller.tabStrip(controller.tabStrip, rename: 0, to: "Production")
+        controller.tabStrip(controller.tabStrip, rename: tab.id, to: "Production")
         #expect(tab.customTitle == "Production")
         #expect(controller.tabStrip.items.first?.name == "Production")
         #expect(controller.window?.title == "Production")
-        controller.tabStrip(controller.tabStrip, rename: 0, to: nil)
+        controller.tabStrip(controller.tabStrip, rename: tab.id, to: nil)
         #expect(tab.customTitle == nil)
+    }
+
+    /// A rename under way when another tab closes: the view is handed a
+    /// different tab, and the edit must not land on it.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aRenameEndsWithoutSavingWhenTheTabsShift() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        let first = try #require(controller.selectedTab)
+        let second = controller.addTab()
+        let third = controller.addTab()
+        controller.tabStrip.beginRename(at: 1)
+        let view = try #require(controller.tabStrip.tabView(at: 1))
+        #expect(editor(in: view) != nil)
+        controller.closeTab(first)
+        #expect(editor(in: view) == nil, "the edit was the closed neighbour's slot")
+        #expect(second.customTitle == nil, "an unchanged name is not a rename")
+        #expect(third.customTitle == nil)
+
+        // The last view leaves the strip while it edits: nothing is saved.
+        controller.tabStrip.beginRename(at: 1)
+        let last = try #require(controller.tabStrip.tabView(at: 1))
+        (editor(in: last) as? NSTextField)?.stringValue = "Lost"
+        controller.closeTab(third)
+        #expect(editor(in: last) == nil)
+        #expect(second.customTitle == nil, "the name typed for a closed tab lands nowhere")
+    }
+
+    private func editor(in view: NSView) -> NSView? {
+        view.subviews.first { $0.accessibilityIdentifier() == "tab-title-editor" }
+    }
+
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aMenuActsOnItsTabAfterTheTabsMove() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        let first = try #require(controller.selectedTab)
+        let second = controller.addTab()
+        let menu = controller.tabStrip.menu(forTab: 0)
+        controller.moveTab(from: 0, to: 1)
+        let close = try #require(menu.items.first { $0.title == L10n.text("tabs.close") })
+        _ = (close.target as? NSObject)?.perform(close.action)
+        #expect(controller.tabs.map(\.id) == [second.id], "closed the tab the menu opened over")
+        #expect(first.split.panes.allSatisfy { $0.didTeardown })
+    }
+
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func closeOtherTabsClosesEveryOther() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        controller.addTab()
+        let keep = controller.addTab()
+        controller.addTab()
+        controller.closeOtherTabs(than: keep)
+        #expect(controller.tabs.map(\.id) == [keep.id])
+        #expect(controller.selectedTab === keep)
+    }
+
+    /// Too many tabs to fit: each keeps one card, inside its own slot.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aNarrowTabKeepsItsIconInsideItsSlot() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        let split = try #require(controller.selectedTab?.split)
+        split.splitRight(nil)
+        for _ in 0..<7 { controller.addTab(select: false) }
+        let strip = controller.tabStrip
+        strip.frame.size.width = 296
+        strip.layout()
+        let tab = try #require(strip.tabView(at: 0))
+        tab.layoutSubtreeIfNeeded()
+        let icon = try #require(tab.subviews.first { $0 is NSImageView })
+        #expect(tab.frame.width == 37)
+        #expect(icon.frame.minX >= 0 && icon.frame.maxX <= tab.bounds.width)
     }
 
     /// ⇧⌘D pressed again while the last split still springs open measured a

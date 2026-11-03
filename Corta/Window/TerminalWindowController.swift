@@ -158,10 +158,14 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
             closeTab(tab)
             return
         }
-        guard window.attachedSheet == nil else { return }
+        // One question at a time: a sheet already up is still asking.
+        guard window.attachedSheet == nil else {
+            NSSound.beep()
+            return
+        }
         if selectedTab !== tab { selectTab(tab) }
-        tab.split.confirmClose(of: running, scope: L10n.text("close.scope.tab"), in: window) {
-            [weak self, weak tab] confirmed in
+        let scope = L10n.text("close.scope.tab")
+        tab.split.confirmClose(of: running, scope: scope, in: window) { [weak self, weak tab] confirmed in
             guard confirmed, let self, let tab else { return }
             self.closeTab(tab)
         }
@@ -185,8 +189,32 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
     }
 
+    /// Closes every tab but `keep`, asking once for all of them: one sheet
+    /// per tab would leave all but the first unasked and open.
     func closeOtherTabs(than keep: TerminalTab) {
-        for tab in tabs where tab !== keep { performCloseTab(tab) }
+        guard let window, tabs.contains(where: { $0 === keep }) else { return }
+        let others = tabs.filter { $0 !== keep }
+        guard !others.isEmpty else { return }
+        let running = others.flatMap { $0.split.panesWithRunningJobs }
+        let closeAll: @MainActor () -> Void = { [weak self] in
+            guard let self else { return }
+            // Re-read: a tab may have closed itself while the sheet was up.
+            for tab in self.tabs where tab !== keep && others.contains(where: { $0 === tab }) {
+                self.closeTab(tab)
+            }
+        }
+        guard keep.split.needsCloseConfirmation(for: running) else {
+            closeAll()
+            return
+        }
+        guard window.attachedSheet == nil else {
+            NSSound.beep()
+            return
+        }
+        if selectedTab !== keep { selectTab(keep) }
+        keep.split.confirmClose(of: running, scope: L10n.text("close.scope.otherTabs"), in: window) { confirmed in
+            if confirmed { closeAll() }
+        }
     }
 
     /// Redraws the strip from every tab's focused program and title, and the
@@ -317,7 +345,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         ) { [weak sender] confirmed in if confirmed { sender?.close() } }
         return false
     }
+}
 
+extension TerminalWindowController {
     /// Read at quit and on every window close: one state per tab, grouped
     /// by a window identity when there is more than one.
     var restorableStates: [WindowState] {
@@ -355,10 +385,10 @@ extension TerminalWindowController: TabStripDelegate {
         moveTab(from: from, to: to)
     }
 
-    func tabStrip(_ strip: TabStripView, rename index: Int, to title: String?) {
-        guard tabs.indices.contains(index) else { return }
-        tabs[index].customTitle = title
-        tabs[index].split.applyWindowTitle()
+    func tabStrip(_ strip: TabStripView, rename id: String, to title: String?) {
+        guard let tab = tabs.first(where: { $0.id == id }) else { return }
+        tab.customTitle = title
+        tab.split.applyWindowTitle()
         refreshTabStrip()
     }
 
