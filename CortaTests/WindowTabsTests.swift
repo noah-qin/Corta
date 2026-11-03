@@ -43,9 +43,17 @@ struct WindowTabsTests {
         let items = window.toolbar?.items.map(\.itemIdentifier) ?? []
         #expect(items.first == .cortaTabs, "the strip leads the row, beside the traffic lights")
         #expect(controller.tabStrip.items.count == 1)
-        #expect(controller.tabStrip.layer?.backgroundColor == nil, "a lone tab has no track")
+        // Tabs keep their width and sit leading; they do not fill the row.
         controller.addTab()
-        #expect(controller.tabStrip.layer?.backgroundColor != nil, "two tabs share a track")
+        let strip = controller.tabStrip
+        // Laid out directly: in the toolbar, Auto Layout owns the frame.
+        strip.frame.size.width = 900
+        strip.layout()
+        #expect(strip.tabView(at: 0)?.frame.width == TabStripView.tabWidth)
+        #expect(strip.tabView(at: 1)?.frame.minX == TabStripView.tabWidth)
+        strip.frame.size.width = 300
+        strip.layout()
+        #expect(strip.tabView(at: 1)?.frame.maxX == 300, "too many to fit: they share the row")
     }
 
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))

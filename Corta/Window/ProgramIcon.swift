@@ -19,7 +19,7 @@ enum ProgramIcon: String, CaseIterable {
         .terminal: Style(name: nil, artwork: "TerminalTabIcon", color: 0x444444, aliases: []),
         .python: Style(name: "Python", artwork: "ProgramPython", color: 0x366EA1, aliases: ["python", "python3", "ipython", "ipython3", "pypy", "pypy3"]),
         .claude: Style(name: "Claude", artwork: "ProgramClaude", color: 0xC96E52, aliases: ["claude", "claude-code"]),
-        .codex: Style(name: "Codex", artwork: "ProgramCodex", color: 0x29313B, aliases: ["codex", "codex-aarch64-apple-darwin", "codex-x86_64-apple-darwin"]),
+        .codex: Style(name: "Codex", artwork: "ProgramCodex", color: 0xFFFFFF, aliases: ["codex", "codex-aarch64-apple-darwin", "codex-x86_64-apple-darwin"]),
         .kimi: Style(name: "Kimi", artwork: "ProgramKimi", color: 0x2E45E6, aliases: ["kimi", "kimi-cli", "kimi_cli"]),
         .grok: Style(name: "Grok", artwork: "ProgramGrok", color: 0x242424, aliases: ["grok", "grok-cli"]),
         .gemini: Style(name: "Gemini", artwork: "ProgramGemini", color: 0x526CE8, aliases: ["gemini", "gemini-cli"]),
@@ -166,18 +166,22 @@ enum ProgramIcon: String, CaseIterable {
             return image
         }
         guard let symbol else { return nil }
+        let color = tileColor
+        // A light tile (Codex's white) carries a dark mark and a grey edge.
+        let rgb = color.usingColorSpace(.sRGB) ?? color
+        let light = rgb.redComponent * 0.2126 + rgb.greenComponent * 0.7152 + rgb.blueComponent * 0.0722 > 0.6
+        let markColor: NSColor = light ? NSColor(white: 0.1, alpha: 1) : .white
         let mark = NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
             symbol.draw(in: rect)
-            NSColor.white.setFill()
+            markColor.setFill()
             rect.fill(using: .sourceIn)
             return true
         }
-        let color = tileColor
         let image = NSImage(size: Self.tileSize, flipped: false) { rect in
             let tile = rect.insetBy(dx: 0.5, dy: 0.5)
             color.setFill()
             NSBezierPath(roundedRect: tile, xRadius: 4.5, yRadius: 4.5).fill()
-            NSColor.white.withAlphaComponent(0.28).setStroke()
+            (light ? NSColor.black.withAlphaComponent(0.14) : NSColor.white.withAlphaComponent(0.28)).setStroke()
             let edge = NSBezierPath(roundedRect: tile.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
             edge.lineWidth = 0.5
             edge.stroke()

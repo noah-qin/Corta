@@ -96,11 +96,19 @@ final class TabStripView: NSView {
 
     /// A lone tab is a pill on its own, no wider than a title needs; the
     /// track appears once there is a second tab to sit beside it.
-    static let singleTabWidth: CGFloat = 220
+    static let tabWidth: CGFloat = 196
+
+    /// Tabs keep their own width and sit at the leading edge; they share the
+    /// row only once there are more than fit. The track spans the tabs, not
+    /// the row.
+    private var slotWidth: CGFloat {
+        guard !views.isEmpty else { return 0 }
+        return min(Self.tabWidth, bounds.width / CGFloat(views.count))
+    }
 
     private func updateTrack() {
-        layer?.cornerRadius = Self.height / 2
-        layer?.backgroundColor = views.count > 1 ? trackColor.cgColor : nil
+        layer?.backgroundColor = nil
+        needsDisplay = true
     }
 
     private var trackColor: NSColor {
@@ -119,13 +127,9 @@ final class TabStripView: NSView {
         super.layout()
         guard !views.isEmpty else { return }
         // Flush with the track: the selected pill is the track's own edge.
-        let inset: CGFloat = 0
-        let width = views.count == 1
-            ? min(Self.singleTabWidth, bounds.width - inset * 2)
-            : (bounds.width - inset * 2) / CGFloat(views.count)
+        let width = slotWidth
         for (index, view) in views.enumerated() where !(drag?.moved == true && drag?.index == index) {
-            view.frame = NSRect(x: inset + CGFloat(index) * width, y: inset,
-                                width: width, height: bounds.height - inset * 2).integral
+            view.frame = NSRect(x: CGFloat(index) * width, y: 0, width: width, height: bounds.height).integral
         }
         needsDisplay = true
     }
@@ -133,6 +137,10 @@ final class TabStripView: NSView {
     /// Hairlines between two unselected neighbours, as a segmented track.
     override func draw(_ dirtyRect: NSRect) {
         guard views.count > 1 else { return }
+        // A lone tab is a pill on its own; the track appears with the second.
+        let track = NSRect(x: 0, y: 0, width: slotWidth * CGFloat(views.count), height: bounds.height)
+        trackColor.setFill()
+        NSBezierPath(roundedRect: track, xRadius: bounds.height / 2, yRadius: bounds.height / 2).fill()
         NSColor.separatorColor.setFill()
         for index in 1..<views.count where index != selectedIndex && index - 1 != selectedIndex {
             let x = views[index].frame.minX
@@ -159,7 +167,7 @@ final class TabStripView: NSView {
         let view = views[current.index]
         let width = view.frame.width
         var frame = view.frame
-        frame.origin.x = min(max(0, point.x - width / 2), bounds.width - width)
+        frame.origin.x = min(max(0, point.x - width / 2), width * CGFloat(views.count - 1))
         view.frame = frame
         addSubview(view, positioned: .above, relativeTo: nil)
         // Swap with the neighbour the dragged tab's centre has crossed into.
@@ -276,7 +284,7 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         self.selected = selected
         icon.image = TabIcon.image(for: item.programs)
         let text = NSMutableAttributedString(string: item.name, attributes: [
-            .font: NSFont.systemFont(ofSize: 13, weight: selected ? .medium : .regular),
+            .font: NSFont.systemFont(ofSize: 13),
             .foregroundColor: selected ? NSColor.labelColor : NSColor.secondaryLabelColor,
         ])
         if !item.context.isEmpty {
@@ -306,7 +314,8 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         layer?.shadowRadius = 2
         layer?.shadowOffset = CGSize(width: 0, height: -0.5)
         layer?.masksToBounds = false
-        closeButton.isHidden = !(hovering || selected) || editor != nil
+        // Only under the pointer: a row of × marks is clutter.
+        closeButton.isHidden = !hovering || editor != nil
     }
 
     override func layout() {
