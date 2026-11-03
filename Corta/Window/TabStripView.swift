@@ -118,7 +118,8 @@ final class TabStripView: NSView {
     override func layout() {
         super.layout()
         guard !views.isEmpty else { return }
-        let inset: CGFloat = 2
+        // Flush with the track: the selected pill is the track's own edge.
+        let inset: CGFloat = 0
         let width = views.count == 1
             ? min(Self.singleTabWidth, bounds.width - inset * 2)
             : (bounds.width - inset * 2) / CGFloat(views.count)
@@ -158,11 +159,11 @@ final class TabStripView: NSView {
         let view = views[current.index]
         let width = view.frame.width
         var frame = view.frame
-        frame.origin.x = min(max(2, point.x - width / 2), bounds.width - width - 2)
+        frame.origin.x = min(max(0, point.x - width / 2), bounds.width - width)
         view.frame = frame
         addSubview(view, positioned: .above, relativeTo: nil)
         // Swap with the neighbour the dragged tab's centre has crossed into.
-        let target = max(0, min(views.count - 1, Int((frame.midX - 2) / width)))
+        let target = max(0, min(views.count - 1, Int(frame.midX / width)))
         if target != current.index {
             let moving = views.remove(at: current.index)
             views.insert(moving, at: target)
@@ -238,7 +239,7 @@ private final class TabItemView: NSView, NSTextFieldDelegate {
         self.strip = strip
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = (TabStripView.height - 4) / 2
+        layer?.cornerRadius = TabStripView.height / 2
         icon.imageScaling = .scaleNone
         title.lineBreakMode = .byTruncatingTail
         title.cell?.truncatesLastVisibleLine = true

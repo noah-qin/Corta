@@ -23,8 +23,13 @@ nonisolated enum TerminalLayout {
     /// Below the traffic lights; `.fullSizeContentView` runs the background
     /// to the top.
     static let titlebarHeight: CGFloat = 28
-    /// The window's own curvature.
-    static let windowCornerRadius: CGFloat = 12
+    /// The window's own curvature: macOS 26 rounds a window with a compact
+    /// toolbar to 16 pt (measured from a capture, 2026-11-03).
+    static let windowCornerRadius: CGFloat = 16
+    /// How far pane cards reach up into the titlebar band (D30): the band's
+    /// lower edge holds no controls once the tabs sit in the toolbar row, so
+    /// the gap under the tabs matches the margin at the window's sides.
+    static let titlebarOverlap: CGFloat = 8
     /// Padding only, or the left column clips: 8 pt above and below, 10 pt
     /// at each side. Chrome (titlebar, tab bar) is measured at runtime from
     /// `contentLayoutRect` and added; a fixed value hid the first row under
@@ -42,7 +47,7 @@ nonisolated enum TerminalLayout {
     /// for lower and interior panes. Shared by `ViewController.topInset` and
     /// `updateFocusRingLayout`, so the grid and focus ring agree.
     static func chromeOverlap(windowChrome: CGFloat, paneDistanceFromTop: CGFloat) -> CGFloat {
-        max(0, windowChrome - paneDistanceFromTop)
+        max(0, windowChrome - titlebarOverlap - paneDistanceFromTop)
     }
 
     /// Which pane edges are window edges (window coordinates), so only those

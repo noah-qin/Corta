@@ -21,7 +21,7 @@ import CoreImage
 /// front of the others', its name or the user's, and where it is.
 enum TabIcon {
     static let side: CGFloat = 20
-    private static let stackStep: CGFloat = 5
+    private static let stackStep: CGFloat = 3.5
     private static var compositions: [String: NSImage] = [:]
 
     static func item(for tab: TerminalTab) -> TabStripItem {
@@ -58,7 +58,8 @@ enum TabIcon {
         // edge. Rendered once per composition, which is cached below.
         let backs = images.indices.dropFirst().map { index -> (NSImage, NSRect)? in
             let shrink = CGFloat(index)
-            let size = NSSize(width: tile.width - shrink * 4 / 3, height: tile.height - shrink)
+            // Nearly full height: the cards stand close behind the front one.
+            let size = NSSize(width: tile.width - shrink * 2 / 3, height: tile.height - shrink / 2)
             guard let card = tilted(card(images[index], size: size)) else { return nil }
             let right = frontSize.width + CGFloat(index) * stackStep
             let frame = NSRect(x: right - card.size.width, y: (side - card.size.height) / 2,
@@ -99,7 +100,7 @@ enum TabIcon {
         return image
     }
 
-    /// `card` turned about its leading edge: 55% as wide, its far edge 74%
+    /// `card` turned about its leading edge: 40% as wide, its far edge 74%
     /// as tall. Core Image's perspective transform, on a 4× raster.
     private static func tilted(_ card: NSImage) -> NSImage? {
         let scale: CGFloat = 4
@@ -117,8 +118,8 @@ enum TabIcon {
         NSGraphicsContext.restoreGraphicsState()
         guard let source = bitmap.cgImage else { return nil }
         let height = CGFloat(pixelsHigh)
-        let width = (CGFloat(pixelsWide) * 0.55).rounded()
-        let inset = height * 0.13
+        let width = (CGFloat(pixelsWide) * 0.4).rounded()
+        let inset = height * 0.08
         let filter = CIFilter(name: "CIPerspectiveTransform")
         filter?.setValue(CIImage(cgImage: source), forKey: kCIInputImageKey)
         filter?.setValue(CIVector(x: 0, y: height), forKey: "inputTopLeft")

@@ -220,6 +220,7 @@ final class PaneFocus: NSObject {
         ring.wantsLayer = true
         ring.layer?.borderWidth = Self.focusRingWidth
         ring.layer?.cornerRadius = TerminalLayout.windowCornerRadius
+        ring.layer?.cornerCurve = .continuous
         ring.layer?.borderColor = Self.focusRingColor.cgColor
         ring.isHidden = true
         ring.translatesAutoresizingMaskIntoConstraints = false

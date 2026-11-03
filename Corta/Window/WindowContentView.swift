@@ -28,7 +28,10 @@ final class WindowContentView: NSView {
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         if let window {
+            // Pane cards reach `titlebarOverlap` into the band; that part
+            // is theirs.
             let chrome = window.frame.height - window.contentLayoutRect.height
+                - (window.windowController is TerminalWindowController ? TerminalLayout.titlebarOverlap : 0)
             // Unflipped: the top band is high y. It holds no cells or controls.
             if chrome > 0, convert(point, from: superview).y > bounds.height - chrome {
                 return nil

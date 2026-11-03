@@ -20,7 +20,8 @@ import AppKit
 final class PaneSurfaceView: NSView {
     static let margin: CGFloat = 7
     static let gap: CGFloat = 8
-    static let radius: CGFloat = 8
+    /// Concentric with the window's corner: its radius less the margin.
+    static let radius: CGFloat = TerminalLayout.windowCornerRadius - margin
 
     static var canvasColor: NSColor {
         let color = TerminalColorPalette.defaultBackground
@@ -39,6 +40,7 @@ final class PaneSurfaceView: NSView {
         wantsLayer = true
         layer?.masksToBounds = true
         layer?.cornerRadius = Self.radius
+        layer?.cornerCurve = .continuous
         layer?.borderWidth = 0.5
         refreshAppearance()
     }

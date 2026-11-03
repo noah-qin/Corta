@@ -28,8 +28,11 @@ struct TerminalLayoutTests {
     /// A pane touching the window's top edge pays for the whole chrome —
     /// the case that leaves the ring's top edge under the tab bar if the
     /// ring computes no overlap of its own.
+    /// Less the band's lower `titlebarOverlap` points, which hold no
+    /// controls and which the cards may cover (D30).
     @Test func chromeOverlapIsFullChromeForATopPane() {
-        #expect(TerminalLayout.chromeOverlap(windowChrome: 28, paneDistanceFromTop: 0) == 28)
+        let usable = TerminalLayout.titlebarOverlap
+        #expect(TerminalLayout.chromeOverlap(windowChrome: 28, paneDistanceFromTop: 0) == 28 - usable)
     }
 
     /// A tab bar appearing grows the chrome; a pane still flush with the
@@ -38,8 +41,9 @@ struct TerminalLayoutTests {
     /// the old (smaller) chrome and the tab bar paints over the difference.
     @Test func chromeOverlapGrowsWithTheChromeItself() {
         // Titlebar alone, then titlebar + tab bar (~40pt).
-        #expect(TerminalLayout.chromeOverlap(windowChrome: 28, paneDistanceFromTop: 0) == 28)
-        #expect(TerminalLayout.chromeOverlap(windowChrome: 68, paneDistanceFromTop: 0) == 68)
+        let usable = TerminalLayout.titlebarOverlap
+        #expect(TerminalLayout.chromeOverlap(windowChrome: 28, paneDistanceFromTop: 0) == 28 - usable)
+        #expect(TerminalLayout.chromeOverlap(windowChrome: 68, paneDistanceFromTop: 0) == 68 - usable)
     }
 
     /// A bottom-row pane in a split has no titlebar above it: its

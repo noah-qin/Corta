@@ -35,25 +35,25 @@ struct TabIconTests {
         controller.refreshTabTitle()
         #expect(try iconWidth(in: window) == 26)
 
-        // Each pane behind the focused one peeks out 5 points further.
+        // Each pane behind the focused one peeks out 3.5 points further.
         split.splitFocusedPane(orientation: .columns)
         #expect(split.panes.count == 2)
-        #expect(try iconWidth(in: window) == 31)
+        #expect(try iconWidth(in: window) == 29.5)
         split.zoomFocusedPane()
         controller.refreshTabTitle()
-        #expect(try iconWidth(in: window) == 31, "zoom does not remove the other sessions")
+        #expect(try iconWidth(in: window) == 29.5, "zoom does not remove the other sessions")
         split.unzoomPane()
 
         split.splitFocusedPane(orientation: .rows)
-        #expect(try iconWidth(in: window) == 36)
+        #expect(try iconWidth(in: window) == 33)
         split.closePane(try #require(split.focusedPane))
-        #expect(try iconWidth(in: window) == 31)
+        #expect(try iconWidth(in: window) == 29.5)
         split.closePane(try #require(split.focusedPane))
         #expect(split.panes.count == 1)
         #expect(try iconWidth(in: window) == 26)
         split.reopenClosedPane(nil)
         #expect(split.panes.count == 2)
-        #expect(try iconWidth(in: window) == 31)
+        #expect(try iconWidth(in: window) == 29.5)
     }
 
     /// The width of the icon stack the strip shows for the selected tab.

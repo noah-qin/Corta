@@ -360,7 +360,9 @@ final class SplitViewController: NSViewController {
         NSLayoutConstraint.activate([
             root.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: contentMargin),
             root.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -contentMargin),
-            root.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: contentMargin),
+            root.topAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.topAnchor,
+                constant: isFloating ? contentMargin : contentMargin - TerminalLayout.titlebarOverlap),
             root.bottomAnchor.constraint(equalTo: systemStatusBar.topAnchor, constant: -contentMargin),
         ])
         updateDirectPresentation()

@@ -108,8 +108,10 @@ struct PaneTransferTests {
         #expect(single.view.layer?.cornerRadius == PaneSurfaceView.radius)
         #expect(abs(single.view.frame.minX - PaneSurfaceView.margin) < 1)
         #expect(abs(single.view.frame.maxX - (source.view.bounds.width - PaneSurfaceView.margin)) < 1)
-        #expect(abs(single.view.frame.maxY
-            - (source.view.bounds.maxY - single.windowChrome - PaneSurfaceView.margin)) < 1)
+        // The top margin is measured from the titlebar band less the part of
+        // it the cards may use (D30).
+        #expect(abs(single.view.frame.maxY - (source.view.bounds.maxY - single.windowChrome
+            - PaneSurfaceView.margin + TerminalLayout.titlebarOverlap)) < 1)
         source.splitRight(nil)
         source.splitDown(nil)
         source.view.layoutSubtreeIfNeeded()
@@ -157,7 +159,9 @@ struct PaneTransferTests {
             let pane = try #require(split.focusedPane)
             #expect(pane.view.layer?.cornerRadius == PaneSurfaceView.radius)
             #expect(abs(pane.view.frame.minX - PaneSurfaceView.margin) < 1)
-            #expect(pane.view.frame.maxY < split.view.bounds.maxY - pane.windowChrome)
+            // The card reaches `titlebarOverlap` into the titlebar band, no further.
+            #expect(pane.view.frame.maxY < split.view.bounds.maxY - pane.windowChrome
+                + TerminalLayout.titlebarOverlap)
         }
     }
 
