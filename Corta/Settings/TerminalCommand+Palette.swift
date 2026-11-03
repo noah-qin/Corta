@@ -26,7 +26,10 @@ nonisolated extension TerminalCommand {
     /// replacing that knowledge.
     var category: CommandCategory {
         switch self {
-        case .newWindow, .newTab, .previousTab, .nextTab, .renameTab, .close: return .window
+        case .newWindow, .newTab, .previousTab, .nextTab, .renameTab, .close, .selectTab1,
+            .selectTab2, .selectTab3, .selectTab4, .selectTab5, .selectTab6, .selectTab7,
+            .selectTab8, .selectLastTab:
+            return .window
         case .splitRight, .splitDown, .focusLeft, .focusRight, .focusUp, .focusDown,
             .growPaneHorizontally, .shrinkPaneHorizontally, .growPaneVertically,
             .shrinkPaneVertically, .equalizePanes, .zoomPane, .reopenClosedPane:
@@ -59,6 +62,9 @@ nonisolated extension TerminalCommand {
         case .previousTab: return 4
         case .nextTab: return 5
         case .renameTab: return 6
+        case .selectTab1, .selectTab2, .selectTab3, .selectTab4, .selectTab5, .selectTab6,
+            .selectTab7, .selectTab8, .selectLastTab:
+            return 6 + (tabNumber ?? 9)
         case .splitRight: return 0
         case .splitDown: return 1
         case .focusLeft: return 2

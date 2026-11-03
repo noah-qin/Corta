@@ -26,7 +26,7 @@ enum TabIcon {
     private static let fanPivotDepth: CGFloat = 1.1
     private static let fanStep: CGFloat = 8
     /// Room around the stack for the turned cards' corners.
-    private static let margin: CGFloat = 3
+    static let margin: CGFloat = 3
     private static var compositions: [String: NSImage] = [:]
 
     static func item(for tab: TerminalTab) -> TabStripItem {

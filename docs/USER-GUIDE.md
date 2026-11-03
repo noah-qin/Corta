@@ -106,6 +106,7 @@ right-click it for New Tab, Rename Tab…, Close Tab and Close Other Tabs.
 | --- | --- |
 | Open a window / a tab | ⌘N / ⌘T |
 | Previous / next tab | ⇧⌘[ / ⇧⌘] |
+| Show tab 1–8 / the last tab | ⌘1–⌘8 / ⌘9 |
 | Rename the current tab | Double-click the tab title, or right-click ▸ Rename Tab… |
 | Split the pane to the right / downwards | ⌘D / ⇧⌘D |
 | Move focus between panes | ⌥⌘ + arrow key |

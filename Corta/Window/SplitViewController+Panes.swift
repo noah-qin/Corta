@@ -132,6 +132,15 @@ extension SplitViewController {
 extension SplitViewController {
     @objc func selectPreviousCortaTab(_: Any?) { selectAdjacentTab(offset: -1) }
     @objc func selectNextCortaTab(_: Any?) { selectAdjacentTab(offset: 1) }
+    @objc func selectCortaTab1(_: Any?) { tab?.controller?.selectTab(number: 1) }
+    @objc func selectCortaTab2(_: Any?) { tab?.controller?.selectTab(number: 2) }
+    @objc func selectCortaTab3(_: Any?) { tab?.controller?.selectTab(number: 3) }
+    @objc func selectCortaTab4(_: Any?) { tab?.controller?.selectTab(number: 4) }
+    @objc func selectCortaTab5(_: Any?) { tab?.controller?.selectTab(number: 5) }
+    @objc func selectCortaTab6(_: Any?) { tab?.controller?.selectTab(number: 6) }
+    @objc func selectCortaTab7(_: Any?) { tab?.controller?.selectTab(number: 7) }
+    @objc func selectCortaTab8(_: Any?) { tab?.controller?.selectTab(number: 8) }
+    @objc func selectLastCortaTab(_: Any?) { tab?.controller?.selectTab(number: 9) }
 
     func selectAdjacentTab(offset: Int) {
         tab?.controller?.selectAdjacentTab(offset: offset)

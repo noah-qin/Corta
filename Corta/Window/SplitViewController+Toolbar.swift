@@ -73,11 +73,9 @@ extension TerminalWindowController: NSToolbarDelegate {
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.label = TerminalCommand.newTab.title
             item.paletteLabel = item.label
-            item.toolTip = item.label
-            item.image = NSImage(systemSymbolName: "plus", accessibilityDescription: item.label)
-            item.target = self
-            item.action = #selector(newTabInThisWindow(_:))
             // A bare symbol, not a glass capsule: the band stays quiet.
+            item.view = TitlebarButton(symbol: "plus", label: item.label, target: self,
+                                       action: #selector(newTabInThisWindow(_:)))
             item.isBordered = false
             return item
         case .cortaConnect:
@@ -86,10 +84,10 @@ extension TerminalWindowController: NSToolbarDelegate {
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.label = L10n.text("ui.toolbar.connect")
             item.paletteLabel = item.label
-            item.toolTip = L10n.text("ui.toolbar.connectHelp")
-            item.image = NSImage(systemSymbolName: "network", accessibilityDescription: item.label)
-            item.target = self
-            item.action = #selector(connectRemote(_:))
+            let button = TitlebarButton(symbol: "network", label: item.label, target: self,
+                                        action: #selector(connectRemote(_:)))
+            button.toolTip = L10n.text("ui.toolbar.connectHelp")
+            item.view = button
             item.isBordered = false
             return item
         default:

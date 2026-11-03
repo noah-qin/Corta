@@ -161,6 +161,35 @@ struct WindowTabsTests {
         #expect(tab.customTitle == nil)
     }
 
+    /// ⌘1–⌘8 show that tab, ⌘9 the last; a number past the last does
+    /// nothing, and its menu item says so by being disabled.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func numberedTabCommandsSelectByPlace() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        let first = try #require(controller.selectedTab)
+        let second = controller.addTab()
+        let third = controller.addTab()
+        let split = { try #require(controller.selectedTab?.split) }
+        NSApp.sendAction(TerminalCommand.selectTab1.action, to: try split(), from: nil)
+        #expect(controller.selectedTab === first)
+        NSApp.sendAction(TerminalCommand.selectLastTab.action, to: try split(), from: nil)
+        #expect(controller.selectedTab === third)
+        NSApp.sendAction(TerminalCommand.selectTab2.action, to: try split(), from: nil)
+        #expect(controller.selectedTab === second)
+        NSApp.sendAction(TerminalCommand.selectTab5.action, to: try split(), from: nil)
+        #expect(controller.selectedTab === second, "there is no fifth tab")
+
+        func enabled(_ command: TerminalCommand) throws -> Bool {
+            let item = NSMenuItem(title: "", action: command.action, keyEquivalent: "")
+            return try split().validateMenuItem(item)
+        }
+        #expect(try enabled(.selectTab3))
+        #expect(try !enabled(.selectTab4))
+        #expect(try enabled(.selectLastTab))
+        #expect(TerminalCommand.tabSelection.map { $0.defaultShortcut?.key } == (1...9).map { String($0) })
+    }
+
     /// A rename under way when another tab closes: the view is handed a
     /// different tab, and the edit must not land on it.
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))

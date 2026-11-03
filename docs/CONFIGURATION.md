@@ -542,6 +542,15 @@ the key against both rows, which is how you spot it.
 | `previous-tab` | Previous Tab | `shift+cmd+[` |
 | `next-tab` | Next Tab | `shift+cmd+]` |
 | `rename-tab` | Rename Tab… | *(none)* |
+| `select-tab-1` | Show Tab 1 | `cmd+1` |
+| `select-tab-2` | Show Tab 2 | `cmd+2` |
+| `select-tab-3` | Show Tab 3 | `cmd+3` |
+| `select-tab-4` | Show Tab 4 | `cmd+4` |
+| `select-tab-5` | Show Tab 5 | `cmd+5` |
+| `select-tab-6` | Show Tab 6 | `cmd+6` |
+| `select-tab-7` | Show Tab 7 | `cmd+7` |
+| `select-tab-8` | Show Tab 8 | `cmd+8` |
+| `select-last-tab` | Show Last Tab | `cmd+9` |
 | `close` | Close | `cmd+w` |
 | `split-right` | Split Pane Right | `cmd+d` |
 | `split-down` | Split Pane Down | `shift+cmd+d` |

@@ -95,6 +95,12 @@ extension AppDelegate {
         for command in [TerminalCommand.previousTab, .nextTab, .renameTab] {
             menu.addItem(item(for: command))
         }
+        // ⌘1–⌘9 in a submenu of their own: nine rows would bury the menu.
+        let tabs = NSMenu(title: L10n.text("menu.showTab"))
+        for command in TerminalCommand.tabSelection { tabs.addItem(item(for: command)) }
+        let showTab = NSMenuItem(title: tabs.title, action: nil, keyEquivalent: "")
+        showTab.submenu = tabs
+        menu.addItem(showTab)
         return menu
     }
 

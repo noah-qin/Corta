@@ -30,7 +30,12 @@ final class TabItemView: NSView, NSTextFieldDelegate {
     /// another tab, or leave the strip, before the edit ends.
     private var editingID: String?
     private var editingName = ""
-    private var hovering = false { didSet { updateChrome() } }
+    private var hovering = false {
+        didSet {
+            updateChrome()
+            needsLayout = true
+        }
+    }
     private var selected = false
     private var item: TabStripItem?
 
@@ -40,7 +45,10 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         wantsLayer = true
         layer?.cornerRadius = TabStripView.height / 2
         icon.imageScaling = .scaleNone
-        title.lineBreakMode = .byTruncatingTail
+        // Clipped and faded, not ellipsised: a narrow tab still shows the
+        // start of its name, and "…" would take the little room there is.
+        title.lineBreakMode = .byClipping
+        title.wantsLayer = true
         title.cell?.truncatesLastVisibleLine = true
         title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: L10n.text("tabs.close"))
@@ -119,7 +127,7 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         layer?.shadowOffset = CGSize(width: 0, height: -0.5)
         layer?.masksToBounds = false
         // Only under the pointer: a row of × marks is clutter.
-        closeButton.isHidden = !hovering || editor != nil || bounds.width < Self.compactWidth
+        closeButton.isHidden = !hovering || editor != nil || bounds.width < Self.iconOnlyWidth
     }
 
     private var isPointerInside: Bool {
@@ -128,23 +136,26 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         return bounds.contains(point)
     }
 
-    /// Below this width a tab keeps only its front card, centred.
-    private static let compactWidth: CGFloat = 64
+    /// Below this width a tab shows its front card only; below the second,
+    /// the card alone, centred, without a name.
+    private static let singleCardWidth: CGFloat = 110
+    private static let iconOnlyWidth: CGFloat = 44
 
     override func layout() {
         super.layout()
         let height = bounds.height
-        let compact = bounds.width < Self.compactWidth
+        let iconOnly = bounds.width < Self.iconOnlyWidth
         let programs = item?.programs ?? []
-        let image = TabIcon.image(for: compact ? Array(programs.prefix(1)) : programs)
+        let single = bounds.width < Self.singleCardWidth
+        let image = TabIcon.image(for: single ? Array(programs.prefix(1)) : programs)
         if icon.image !== image { icon.image = image }
         let size = image?.size ?? .zero
         // The image carries a margin for the turned cards; the front tile
         // sits 12 in. Whole points, so its edges fall on device pixels.
-        let iconX = compact ? ((bounds.width - size.width) / 2).rounded(.down) : 8
+        let iconX = iconOnly ? ((bounds.width - size.width) / 2).rounded(.down) : single ? 5 : 8
         icon.frame = NSRect(x: iconX, y: ((height - size.height) / 2).rounded(),
                             width: size.width, height: size.height)
-        if compact {
+        if iconOnly {
             title.isHidden = true
             closeButton.isHidden = true
             badge.frame = .zero
@@ -154,16 +165,42 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         let closeSide: CGFloat = 16
         closeButton.frame = NSRect(x: bounds.width - closeSide - 8, y: (height - closeSide) / 2,
                                    width: closeSide, height: closeSide)
-        badge.frame = NSRect(x: closeButton.frame.minX - 18, y: (height - 16) / 2, width: 16, height: 16)
-        let titleX = icon.frame.maxX + 5
-        let trailing = badge.isHidden ? closeButton.frame.minX - 4 : badge.frame.minX - 4
+        closeButton.isHidden = !hovering || editor != nil
+        // The name runs to the edge; the × takes its room only when shown.
+        var trailing = closeButton.isHidden ? bounds.width - 6 : closeButton.frame.minX - 4
+        if !badge.isHidden {
+            badge.frame = NSRect(x: trailing - 16, y: (height - 16) / 2, width: 16, height: 16)
+            trailing = badge.frame.minX - 4
+        }
+        // From the cards' edge, not the image's: its margin is empty.
+        let titleX = icon.frame.maxX - TabIcon.margin + 6
         let titleHeight = title.intrinsicContentSize.height
         title.frame = NSRect(x: titleX, y: ((height - titleHeight) / 2).rounded(),
                              width: max(0, trailing - titleX), height: titleHeight)
         editor?.frame = title.frame.insetBy(dx: -2, dy: -1)
-        // Very narrow tabs keep only the icon.
-        title.isHidden = title.frame.width < 24 || editor != nil
-        closeButton.isHidden = !hovering || editor != nil
+        title.isHidden = title.frame.width < 8 || editor != nil
+        fadeTitleIfClipped()
+    }
+
+    /// A name wider than its room fades out over its last few points.
+    private func fadeTitleIfClipped() {
+        guard let layer = title.layer else { return }
+        let width = title.bounds.width
+        guard title.attributedStringValue.size().width > width, width > 0 else {
+            layer.mask = nil
+            return
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        let fade = (layer.mask as? CAGradientLayer) ?? CAGradientLayer()
+        fade.frame = title.bounds
+        fade.startPoint = CGPoint(x: 0, y: 0.5)
+        fade.endPoint = CGPoint(x: 1, y: 0.5)
+        fade.colors = [NSColor.black.cgColor, NSColor.black.cgColor, NSColor.clear.cgColor]
+        let start = max(0, (width - 14) / width)
+        fade.locations = [0, NSNumber(value: Double(start)), 1]
+        layer.mask = fade
     }
 
     override func mouseEntered(with event: NSEvent) { hovering = true }

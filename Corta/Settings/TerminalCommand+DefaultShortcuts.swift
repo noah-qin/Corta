@@ -28,6 +28,9 @@ nonisolated extension TerminalCommand {
         case .previousTab: return Shortcut("[", [.command, .shift])
         case .nextTab: return Shortcut("]", [.command, .shift])
         case .renameTab: return nil
+        case .selectTab1, .selectTab2, .selectTab3, .selectTab4, .selectTab5, .selectTab6,
+            .selectTab7, .selectTab8, .selectLastTab:
+            return Shortcut(String(tabNumber ?? 9), .command)
         case .close: return Shortcut("w", .command)
         case .splitRight: return Shortcut("d", .command)
         case .splitDown: return Shortcut("d", [.command, .shift])

@@ -38,7 +38,11 @@ Versioning for compatibility changes.
   and the tab track a step darker again. The default light theme's background is
   pure white (was a warm off-white). Pane cards come up to within a margin of the
   tabs, and their corners are concentric with the window's. A tab's background panes stop drawing while it is
-  hidden and keep running.
+  hidden and keep running. A narrow tab keeps the start of its name, fading
+  out, and the Connect and New Tab buttons answer the pointer as the tabs do.
+- ⌘1–⌘8 show that tab and ⌘9 the last, from File ▸ Show Tab; each is a
+  command of its own (`select-tab-1` … `select-tab-8`, `select-last-tab`)
+  that `bind.` can move or clear.
 - The titlebar band is the theme's own colour, without the window title or
   a separator line, and the toolbar's Connect and New Tab buttons are bare
   symbols. In the toolbar, the input-source badge is grey for every source.

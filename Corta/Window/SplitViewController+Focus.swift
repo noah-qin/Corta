@@ -79,6 +79,14 @@ extension SplitViewController {
             return (tab?.controller?.tabs.count ?? 0) > 1
         case #selector(renameCurrentTab(_:)):
             return tab != nil
+        case #selector(selectCortaTab1(_:)), #selector(selectCortaTab2(_:)), #selector(selectCortaTab3(_:)),
+            #selector(selectCortaTab4(_:)), #selector(selectCortaTab5(_:)), #selector(selectCortaTab6(_:)),
+            #selector(selectCortaTab7(_:)), #selector(selectCortaTab8(_:)):
+            // Only a tab that is there; ⌘9 always has a last one.
+            let number = TerminalCommand.tabSelection.first { $0.action == menuItem.action }?.tabNumber ?? 0
+            return number <= (tab?.controller?.tabs.count ?? 0)
+        case #selector(selectLastCortaTab(_:)):
+            return tab?.controller != nil
         case #selector(moveFocusLeft(_:)), #selector(moveFocusRight(_:)),
             #selector(moveFocusUp(_:)), #selector(moveFocusDown(_:)):
             return tree != nil && tree.leafCount > 1

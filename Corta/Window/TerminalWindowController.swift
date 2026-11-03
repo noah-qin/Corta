@@ -134,7 +134,12 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// ⌘1–⌘8 select that tab; ⌘9 the last, as browsers do.
     func selectTab(number: Int) {
         guard !tabs.isEmpty, number >= 1 else { return }
-        selectTab(number >= 9 ? tabs[tabs.count - 1] : tabs[min(number, tabs.count) - 1])
+        // A tab past the last is not there: nothing, as in a browser.
+        if number >= 9 {
+            selectTab(tabs[tabs.count - 1])
+        } else if number <= tabs.count {
+            selectTab(tabs[number - 1])
+        }
     }
 
     func moveTab(from source: Int, to destination: Int) {
