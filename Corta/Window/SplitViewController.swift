@@ -466,8 +466,26 @@ extension SplitViewController {
 
 extension SplitViewController {
 
-    @objc func splitRight(_: Any?) { splitFocusedPane(orientation: .columns) }
-    @objc func splitDown(_: Any?) { splitFocusedPane(orientation: .rows) }
+    @objc func splitRight(_: Any?) { userSplit(.columns) }
+    @objc func splitDown(_: Any?) { userSplit(.rows) }
+
+    /// ⌘D and ⇧⌘D: refused with a beep when either half would be smaller
+    /// than a pane can be, rather than leave two crushed panes. A restored
+    /// layout is never refused; its dividers are clamped instead.
+    private func userSplit(_ orientation: SplitOrientation) {
+        splitTransition.finish()
+        view.layoutSubtreeIfNeeded()
+        guard let focusedPane else { return }
+        let bounds = focusedPane.view.bounds
+        let minimum = focusedPane.minimumContentSize
+        let half = orientation == .columns
+            ? (bounds.width - PaneSurfaceView.gap) / 2 : (bounds.height - PaneSurfaceView.gap) / 2
+        guard half >= (orientation == .columns ? minimum.width : minimum.height) else {
+            NSSound.beep()
+            return
+        }
+        splitFocusedPane(orientation: orientation)
+    }
 
     func splitFocusedPane(
         orientation: SplitOrientation, workingDirectory: String? = nil, preset: Preset? = nil
@@ -477,6 +495,11 @@ extension SplitViewController {
             noteLayoutChanged()
             (view.window?.windowController as? TerminalWindowController)?.refreshTabTitle()
         }
+        // Settle a split still springing open first: measured mid-spring, the
+        // pane is a sliver, and halving it crushed both new panes (a quick
+        // ⇧⌘D ⇧⌘D left dividers saved at 0.95).
+        splitTransition.finish()
+        view.layoutSubtreeIfNeeded()
         unzoomPane()
         // The node takes the leaf's old frame and the halves are pre-set, so the
         // first layout is already 50/50 instead of flashing a zero-size pane.

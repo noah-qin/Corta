@@ -28,6 +28,9 @@ struct PaneTransferTests {
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
         window.contentViewController = source
         _ = source.view
+        // Laid out at the window's size: ⌘D measures the pane it halves.
+        window.setContentSize(NSSize(width: 900, height: 600))
+        source.view.layoutSubtreeIfNeeded()
         source.splitRight(nil)
         let pane = try #require(source.focusedPane)
         let session = pane.session
@@ -58,6 +61,9 @@ struct PaneTransferTests {
         window.contentViewController = source
         _ = source.view
         defer { source.teardown() }
+        // Laid out at the window's size: ⌘D measures the pane it halves.
+        window.setContentSize(NSSize(width: 1000, height: 600))
+        source.view.layoutSubtreeIfNeeded()
         source.splitRight(nil)
         let first = try #require(source.panes.first)
         let second = try #require(source.focusedPane)

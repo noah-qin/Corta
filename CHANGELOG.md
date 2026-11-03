@@ -44,6 +44,11 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Splitting a pane again while the previous split was still opening
+  crushed the new panes to a sliver, and the crushed layout was saved and
+  restored. A split now settles first; ⌘D / ⇧⌘D beeps instead of making a
+  pane smaller than its minimum; and a restored layout keeps every pane at
+  least that size.
 - Claude Code installed by its native installer showed as "2.1.316" with a
   plain terminal icon: it runs an executable named after its version
   (`…/claude/versions/2.1.316`). A version-named process now reads as the

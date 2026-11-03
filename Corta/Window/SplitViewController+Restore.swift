@@ -111,14 +111,37 @@ extension SplitViewController {
 
     /// Dividers go last, after the tree lays out: each split re-halves what
     /// it touches.
+    /// Parent first: a child's split is a share of the size its parent gives
+    /// it. Each divider is kept where both sides fit their panes' minimum, so
+    /// a layout saved crushed — or restored into a smaller window — comes
+    /// back usable.
     private func applyDividerPositions(_ node: PaneLayout, subtree: NSView?) {
         guard case .split(_, let position, let first, let second) = node,
             let split = subtree as? NSSplitView, split.subviews.count == 2
         else { return }
+        let axis = split.isVertical ? split.bounds.width : split.bounds.height
+        if axis > 0 {
+            let room = axis - split.dividerThickness
+            let low = minimumExtent(of: split.subviews[0], vertical: split.isVertical)
+            let high = room - minimumExtent(of: split.subviews[1], vertical: split.isVertical)
+            let saved = axis * CGFloat(position)
+            split.setPosition(low <= high ? min(max(saved, low), high) : room / 2, ofDividerAt: 0)
+            split.layoutSubtreeIfNeeded()
+        }
         applyDividerPositions(first, subtree: split.subviews[0])
         applyDividerPositions(second, subtree: split.subviews[1])
-        let axis = split.isVertical ? split.bounds.width : split.bounds.height
-        guard axis > 0 else { return }
-        split.setPosition(axis * CGFloat(position), ofDividerAt: 0)
+    }
+
+    /// The least a subtree can be along one axis: its panes' minimum sizes,
+    /// summed across splits on that axis.
+    func minimumExtent(of subtree: NSView, vertical: Bool) -> CGFloat {
+        if let split = subtree as? NSSplitView, split.subviews.count == 2 {
+            let first = minimumExtent(of: split.subviews[0], vertical: vertical)
+            let second = minimumExtent(of: split.subviews[1], vertical: vertical)
+            return split.isVertical == vertical ? first + second + split.dividerThickness : max(first, second)
+        }
+        guard let pane = pane(forView: subtree) else { return 0 }
+        let size = pane.minimumContentSize
+        return vertical ? size.width : size.height
     }
 }

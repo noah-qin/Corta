@@ -160,4 +160,44 @@ struct WindowTabsTests {
         controller.tabStrip(controller.tabStrip, rename: 0, to: nil)
         #expect(tab.customTitle == nil)
     }
+
+    /// ⇧⌘D pressed again while the last split still springs open measured a
+    /// sliver and crushed the panes (dividers saved at 0.95); and a split
+    /// too small for two panes is refused.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func quickSplitsKeepEveryPaneUsable() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        controller.window?.setFrame(NSRect(x: 100, y: 100, width: 1000, height: 900), display: true)
+        let split = try #require(controller.selectedTab?.split)
+        // 900 pt: halves of 450 and 225 fit; a third ⇧⌘D would leave two
+        // panes under the minimum, and is refused.
+        for _ in 0..<3 { split.splitDown(nil) }
+        split.splitTransition.finish()
+        split.view.layoutSubtreeIfNeeded()
+        #expect(split.panes.count == 3)
+        for pane in split.panes {
+            #expect(pane.view.frame.height >= pane.minimumContentSize.height - 1,
+                    "a pane \(pane.view.frame.height) pt tall")
+        }
+    }
+
+    /// A layout saved crushed comes back with each pane at least its minimum.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aCrushedSavedLayoutIsRestoredUsable() throws {
+        let state = WindowState(
+            frame: WindowState.Frame(NSRect(x: 100, y: 100, width: 900, height: 700)),
+            layout: .split(vertical: false, position: 0.97,
+                           first: .pane(directory: nil, isFocused: true), second: .pane(directory: nil)))
+        let controller = TerminalWindowController(setup: .init(restore: state))
+        controller.showWindow(nil)
+        defer { close(controller) }
+        let split = try #require(controller.selectedTab?.split)
+        split.view.layoutSubtreeIfNeeded()
+        #expect(split.panes.count == 2)
+        for pane in split.panes {
+            #expect(pane.view.frame.height >= pane.minimumContentSize.height - 1,
+                    "a pane \(pane.view.frame.height) pt tall")
+        }
+    }
 }
