@@ -88,6 +88,8 @@ line each:
   library, tested in `scripts/tests/`).
   **D29** No Homebrew cask until `homebrew/cask` accepts one; no tap of
   our own.
+  **D30** Tabs are Corta's own, drawn in the titlebar row; `NSWindow`
+  tabbing is off, public API only.
 
 ## Working Rules
 

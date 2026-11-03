@@ -816,3 +816,39 @@ stars lets a user submit the cask, 225 lets the maintainer — or when
 Homebrew's maintainers accept it as a notability exception. The cask then
 sets `auto_updates true` so `brew upgrade` leaves updates to Sparkle, and
 `depends_on macos: ">= :tahoe"` with `depends_on arch: :arm64` (D21).
+
+## D30 — Tabs are Corta's own, drawn in the titlebar row
+
+**Decision.** A terminal window holds its tabs itself. `NSWindow` tabbing
+is off (`tabbingMode = .disallowed`); `TerminalWindowController` owns an
+ordered list of `TerminalTab`s — each a `SplitViewController`, its
+identity and its custom title — and shows the selected one. The tab strip
+is Corta's view, placed as a toolbar item in the row beside the traffic
+lights, titles leading-aligned. Only public AppKit API is used.
+
+**Why.** The native tab bar is a row of its own below the titlebar, with
+each tab's title centred, and it cannot be restyled. The two ways to put
+tabs in the titlebar row differ in what a macOS update does to them:
+
+- Moving or restyling the native tab bar means reaching into private
+  titlebar views. Their structure is not API and has changed between
+  releases; a terminal that relies on it breaks until it ships a fix.
+- Hiding the native bar and drawing our own over native tabbing is not
+  possible: with more than one tab, `toggleTabBar(_:)` leaves the bar
+  visible (probed 2026-11-03), and nothing public hides it.
+
+So the strip is ours, and the tabs behind it are ours too. Every part of
+it — toolbar items, views, the window's content — is public API, and an
+update can at most leave its look behind the system's, not break it.
+
+**What it costs.** What AppKit gave for free is now Corta's code: the tab
+bar itself, reordering by drag, dragging a tab out into a new window,
+merging windows, the Window menu's tab commands, the tab overview, and
+⌃Tab / ⌘1–9. Background tabs' views stay in the window, hidden, so their
+panes keep a window; rendering is gated on `isHiddenOrHasHiddenAncestor`
+as well as occlusion. Restore groups saved tabs into one window instead of
+regrouping windows.
+
+**Consequence.** Reopen if macOS gains public API to place or restyle the
+native tab bar, or if keeping parity with native tab behaviour costs more
+than the look is worth.
