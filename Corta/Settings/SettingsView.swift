@@ -141,10 +141,9 @@ extension SettingsView {
                                     ? "settings.appearance.followSystem"
                                     : "settings.appearance.\(appearance.rawValue)"),
                             selected: model.appearance == appearance,
-                            action: { model.set(\.appearance, appearance) }
-                        ) {
-                            SettingsAppearancePreview(appearance: appearance)
-                        }
+                            action: { model.set(\.appearance, appearance) },
+                            content: { SettingsAppearancePreview(appearance: appearance) }
+                        )
                         .accessibilityIdentifier("appearance-\(appearance.rawValue)")
                     }
                 }
@@ -250,10 +249,9 @@ extension SettingsView {
                         SettingsChoice(
                             title: L10n.text("settings.cursor.\(shape.rawValue)"),
                             selected: model.cursorShape == shape,
-                            action: { model.set(\.cursorShape, shape) }
-                        ) {
-                            CursorThumbnail(shape: shape)
-                        }.accessibilityIdentifier("cursor-shape-\(shape.rawValue)")
+                            action: { model.set(\.cursorShape, shape) },
+                            content: { CursorThumbnail(shape: shape) }
+                        ).accessibilityIdentifier("cursor-shape-\(shape.rawValue)")
                     }
                 }
                 Toggle(L10n.text("settings.label.cursorBlink"), isOn: bind(\.cursorBlink))

@@ -195,12 +195,6 @@ final class PaneFocus: NSObject {
         self.host = host
     }
 
-    /// Focused means this pane holds the keyboard and its window is key.
-    var hasUserFocus: Bool {
-        guard let host else { return false }
-        return host.isFocusedPane && (host.view.window?.isKeyWindow ?? false)
-    }
-
     // MARK: - Views
 
     /// Adds the dim, highlight and ring over `view`'s content, replacing any
@@ -350,6 +344,11 @@ final class PaneFocus: NSObject {
 // MARK: - Focus reporting
 
 extension PaneFocus {
+    /// Focused means this pane holds the keyboard and its window is key.
+    var hasUserFocus: Bool {
+        guard let host else { return false }
+        return host.isFocusedPane && (host.view.window?.isKeyWindow ?? false)
+    }
 
     /// Reports only real changes; AppKit's key and responder churn would
     /// otherwise stream reports. Two fixed byte strings, no stream text

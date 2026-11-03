@@ -27,6 +27,7 @@ version = 1
 [[annotations]]
 path = [
   "**/*.md",
+  "docs/program-icons-sources.json",
   "NOTICE",
   "CortaTerminal/Tests/CortaTerminalTests/Golden/**",
   "CortaTerminal/Tests/Fuzz/**",

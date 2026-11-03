@@ -1,4 +1,17 @@
 // Copyright 2026 Noah Qin
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 // SPDX-License-Identifier: Apache-2.0
 
 import Darwin
@@ -10,8 +23,10 @@ import Testing
 
 struct ProcessEntryPointTests {
     @Test func interpreterFlagsDoNotBecomeProgramNames() {
-        #expect(ProcessEntryPoint.resolve(process: "node", arguments: ["node", "--require", "init.js", "/opt/kimi"]) == "/opt/kimi")
-        #expect(ProcessEntryPoint.resolve(process: "Python", arguments: ["python", "-u", "-m", "kimi_cli"]) == "kimi_cli")
+        #expect(ProcessEntryPoint.resolve(process: "node", arguments: ["node", "--require", "init.js", "/opt/kimi"])
+            == "/opt/kimi")
+        #expect(ProcessEntryPoint.resolve(process: "Python", arguments: ["python", "-u", "-m", "kimi_cli"])
+            == "kimi_cli")
         #expect(ProcessEntryPoint.resolve(process: "bun", arguments: ["bun", "run", "agent.js"]) == "agent.js")
         #expect(ProcessEntryPoint.resolve(process: "node", arguments: ["node", "-e", "claude"]) == nil)
         #expect(ProcessEntryPoint.resolve(process: "python3", arguments: ["python3", "-c", "kimi"]) == nil)

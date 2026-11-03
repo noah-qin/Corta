@@ -1,4 +1,17 @@
 // Copyright 2026 Noah Qin
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 // SPDX-License-Identifier: Apache-2.0
 
 import Darwin
@@ -49,36 +62,53 @@ enum ProcessEntryPoint {
 
     static func resolve(process: String, arguments: [String]) -> String? {
         guard isInterpreter(process), !arguments.isEmpty else { return nil }
+        let python = process.lowercased().hasPrefix("python")
         var index = 1
         while index < arguments.count {
             let value = arguments[index]
+            let next = arguments.dropFirst(index + 1).first
             guard value != "-" else { return nil }
-            if value == "--" { return arguments.dropFirst(index + 1).first }
-            if process.lowercased().hasPrefix("python") {
-                if value == "-c" { return nil }
-                if value == "-m" { return arguments.dropFirst(index + 1).first }
-                if ["-W", "-X"].contains(value) { index += 2; continue }
-                if ["-u", "-B", "-E", "-I", "-s", "-S", "-O", "-OO", "-q"].contains(value) {
-                    index += 1; continue
-                }
-            } else {
-                if ["-e", "--eval", "-p", "--print"].contains(value)
-                    || value.hasPrefix("--eval=") || value.hasPrefix("--print=") { return nil }
-                if ["-r", "--require", "--import", "--loader", "--experimental-loader"].contains(value) {
-                    index += 2; continue
-                }
-                if ["--no-warnings", "--no-deprecation", "--enable-source-maps", "--inspect",
-                    "--inspect-brk", "--experimental-strip-types"].contains(value)
-                    || ["--require=", "--import=", "--loader=", "--inspect="].contains(where: value.hasPrefix) {
-                    index += 1; continue
-                }
-                if ["bun", "deno"].contains(process.lowercased()), value == "run" {
-                    index += 1; continue
-                }
+            if value == "--" { return next }
+            let step = python ? pythonStep(value, next: next) : scriptStep(value, process: process)
+            switch step {
+            case .skip(let count): index += count
+            case .done(let entry): return entry
             }
-            guard !value.hasPrefix("-") else { return nil }
-            return value
         }
         return nil
     }
+
+    /// What one interpreter argument means: skip it (and its value), or
+    /// the answer — the entry point, or nil when the code is inline.
+    private enum Step {
+        case skip(Int)
+        case done(String?)
+    }
+
+    private static func pythonStep(_ value: String, next: String?) -> Step {
+        if value == "-c" { return .done(nil) }
+        if value == "-m" { return .done(next) }
+        if ["-W", "-X"].contains(value) { return .skip(2) }
+        if ["-u", "-B", "-E", "-I", "-s", "-S", "-O", "-OO", "-q"].contains(value) { return .skip(1) }
+        return script(value)
+    }
+
+    /// Node, Bun and Deno.
+    private static func scriptStep(_ value: String, process: String) -> Step {
+        if ["-e", "--eval", "-p", "--print"].contains(value)
+            || value.hasPrefix("--eval=") || value.hasPrefix("--print=") { return .done(nil) }
+        if ["-r", "--require", "--import", "--loader", "--experimental-loader"].contains(value) {
+            return .skip(2)
+        }
+        if ["--no-warnings", "--no-deprecation", "--enable-source-maps", "--inspect",
+            "--inspect-brk", "--experimental-strip-types"].contains(value)
+            || ["--require=", "--import=", "--loader=", "--inspect="].contains(where: value.hasPrefix) {
+            return .skip(1)
+        }
+        if ["bun", "deno"].contains(process.lowercased()), value == "run" { return .skip(1) }
+        return script(value)
+    }
+
+    /// The first plain argument is the script; an unknown flag ends the search.
+    private static func script(_ value: String) -> Step { .done(value.hasPrefix("-") ? nil : value) }
 }

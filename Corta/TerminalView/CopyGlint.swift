@@ -60,42 +60,52 @@ final class CopyGlintView: NSView {
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in self?.removeFromSuperview() }
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            light.frame = bounds
-            light.colors = [white.withAlphaComponent(0.45).cgColor, white.withAlphaComponent(0.45).cgColor]
-            mask.frame = light.bounds
-            let fade = CABasicAnimation(keyPath: "opacity")
-            fade.fromValue = 1
-            fade.toValue = 0
-            fade.duration = Self.duration
-            light.opacity = 0
-            light.add(fade, forKey: "corta.copy.flash")
+            flash(light, mask: mask)
         } else {
-            // A band a third as wide as the copy (at least a few cells),
-            // travelling from just before it to just past it. The mask stays
-            // on the text while the band moves, so it holds still in the
-            // band's own coordinates by moving the opposite way.
-            let band = max(area.width / 3, 48)
-            light.frame = CGRect(x: area.minX - band, y: 0, width: band, height: bounds.height)
-            mask.frame = CGRect(x: -light.frame.minX, y: 0, width: bounds.width, height: bounds.height)
-            let travel = area.width + band
-            let lightStart = light.position.x
-            let maskStart = mask.position.x
-            let timing = CAMediaTimingFunction(name: .easeInEaseOut)
-            let move = CABasicAnimation(keyPath: "position.x")
-            move.fromValue = lightStart
-            move.toValue = lightStart + travel
-            move.duration = Self.duration
-            move.timingFunction = timing
-            let hold = CABasicAnimation(keyPath: "position.x")
-            hold.fromValue = maskStart
-            hold.toValue = maskStart - travel
-            hold.duration = Self.duration
-            hold.timingFunction = timing
-            light.position.x = lightStart + travel
-            mask.position.x = maskStart - travel
-            light.add(move, forKey: "corta.copy.sweep")
-            mask.add(hold, forKey: "corta.copy.sweep")
+            sweep(light, mask: mask, across: area)
         }
         CATransaction.commit()
+    }
+
+    /// Reduce Motion: the copy brightens once in place and fades.
+    private func flash(_ light: CAGradientLayer, mask: CAShapeLayer) {
+        let white = NSColor.white
+        light.frame = bounds
+        light.colors = [white.withAlphaComponent(0.45).cgColor, white.withAlphaComponent(0.45).cgColor]
+        mask.frame = light.bounds
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+        fade.duration = Self.duration
+        light.opacity = 0
+        light.add(fade, forKey: "corta.copy.flash")
+    }
+
+    /// A band a third as wide as the copy (at least a few cells), travelling
+    /// from just before it to just past it. The mask stays on the text while
+    /// the band moves, so it holds still in the band's own coordinates by
+    /// moving the opposite way.
+    private func sweep(_ light: CAGradientLayer, mask: CAShapeLayer, across area: CGRect) {
+        let band = max(area.width / 3, 48)
+        light.frame = CGRect(x: area.minX - band, y: 0, width: band, height: bounds.height)
+        mask.frame = CGRect(x: -light.frame.minX, y: 0, width: bounds.width, height: bounds.height)
+        let travel = area.width + band
+        let lightStart = light.position.x
+        let maskStart = mask.position.x
+        let timing = CAMediaTimingFunction(name: .easeInEaseOut)
+        let move = CABasicAnimation(keyPath: "position.x")
+        move.fromValue = lightStart
+        move.toValue = lightStart + travel
+        move.duration = Self.duration
+        move.timingFunction = timing
+        let hold = CABasicAnimation(keyPath: "position.x")
+        hold.fromValue = maskStart
+        hold.toValue = maskStart - travel
+        hold.duration = Self.duration
+        hold.timingFunction = timing
+        light.position.x = lightStart + travel
+        mask.position.x = maskStart - travel
+        light.add(move, forKey: "corta.copy.sweep")
+        mask.add(hold, forKey: "corta.copy.sweep")
     }
 }

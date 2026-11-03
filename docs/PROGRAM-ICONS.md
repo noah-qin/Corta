@@ -64,4 +64,4 @@ An SSH connection displays SSH, not a guessed remote executable: the local proce
 
 AI SVGs come from [Lobe Icons](https://github.com/lobehub/lobe-icons), version 1.102.0 (MIT). Language and development-tool SVGs come from [Simple Icons](https://github.com/simple-icons/simple-icons), version 16.36.0 (CC0-1.0). SSH, SFTP/file transfer, Mosh, Aider, Screen and process monitors use system SF Symbols as generic category icons. Brand marks remain their owners' trademarks.
 
-Original downloaded SVGs are in the app's asset catalogue. The [source manifest](brand/program-icons-sources.json) records fixed download URLs and SHA-256 checksums. Licenses are bundled in the app and visible in About → Acknowledgements.
+Original downloaded SVGs are in the app's asset catalogue. The [source manifest](program-icons-sources.json) records fixed download URLs and SHA-256 checksums. Licenses are bundled in the app and visible in About → Acknowledgements.
