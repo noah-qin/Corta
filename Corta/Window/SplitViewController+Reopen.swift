@@ -83,7 +83,7 @@ extension SplitViewController {
         }
         view.layoutSubtreeIfNeeded()
         for pane in panes { pane.resizeSessionToFitView() }
-        view.window?.makeFirstResponder(reopened.terminalView)
+        takeFocus(reopened)
         noteLayoutChanged()
     }
 }

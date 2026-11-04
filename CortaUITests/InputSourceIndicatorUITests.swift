@@ -204,7 +204,11 @@ final class InputSourceIndicatorUITests: XCTestCase {
         XCTAssertFalse((app.textViews.firstMatch.value as? String)?.contains("\nline-1\n") == true)
         let liveViewport = app.textViews.firstMatch.value as? String
         app.typeKey(.home, modifierFlags: .shift)
-        XCTAssertNotEqual(app.textViews.firstMatch.value as? String, liveViewport)
+        // The accessibility value follows the next frame, not the key.
+        expectation(for: NSPredicate { _, _ in
+            app.textViews.firstMatch.value as? String != liveViewport
+        }, evaluatedWith: nil)
+        waitForExpectations(timeout: 3)
         // Toolbar placement stays visible in history; only a prompt overlay
         // steps aside when the viewport leaves the command line.
         XCTAssertTrue(badge.exists)
@@ -223,7 +227,7 @@ final class InputSourceIndicatorUITests: XCTestCase {
         let settings = app.windows["Corta.Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         waitForAbsence(badge)
-        settings.outlines.firstMatch.staticTexts["Keyboard & Mouse"].click()
+        settings.settingsCategory("Keyboard & Mouse").click()
         let mode = settings.popUpButtons["input-source-indicator-mode"]
         XCTAssertTrue(mode.waitForExistence(timeout: 5), settings.debugDescription)
         mode.click(); mode.menuItems["Off"].click()

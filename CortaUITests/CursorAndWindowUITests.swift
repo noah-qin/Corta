@@ -48,11 +48,10 @@ final class CursorAndWindowUITests: XCTestCase {
         appMenu.menuItems["Settings…"].click()
         let settings = app.windows["Corta.Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        settings.outlines.firstMatch.staticTexts["Appearance"].click()
-        let shape = settings.popUpButtons["cursor-shape"]
+        settings.settingsCategory("Appearance").click()
+        let shape = settings.buttons["cursor-shape-underline"]
         XCTAssertTrue(shape.waitForExistence(timeout: 5), settings.debugDescription)
         shape.click()
-        shape.menuItems["Underline"].click()
         let blink = settings.switches["cursor-blink"]
         XCTAssertTrue(blink.exists)
         blink.click()
@@ -60,8 +59,7 @@ final class CursorAndWindowUITests: XCTestCase {
         XCTAssertTrue(config.contains("cursor-shape = underline"))
         XCTAssertTrue(config.contains("cursor-blink = false"))
         blink.click()
-        shape.click()
-        shape.menuItems["Bar"].click()
+        settings.buttons["cursor-shape-bar"].click()
         let settingsShot = XCTAttachment(screenshot: settings.screenshot())
         settingsShot.name = "cursor-settings"
         settingsShot.lifetime = .keepAlways

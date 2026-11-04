@@ -238,15 +238,6 @@ sesión `ssh` remota. La dirección de *lectura* no existe con ningún ajuste.
 
 Algo en esa ventana todavía tiene un trabajo en primer plano. `confirm-close = false` desactiva la pregunta en todas partes.
 
-### El atajo del Terminal rápido no hace nada
-
-Tres posibilidades, en este orden. `quick-terminal` está en `false` (por defecto): no se reserva ninguna tecla hasta que lo
-pongas en `true`. Otra aplicación ya tiene la tecla: Ajustes ▸ Terminal rápido lo indica, y `quick-terminal-key` acepta
-cualquier otra combinación con al menos un modificador. O la tecla es una que Corta no puede asociar a una posición de
-tecla (`é`, una forma escrita de dos caracteres): la línea se conserva sin cambios en el archivo de configuración y se
-aplica el valor predeterminado. Visualización ▸ Terminal rápido y la acción de Atajos *Mostrar u ocultar el terminal rápido*
-abren el panel en cualquier caso.
-
 ### La insignia de un panel remoto dice «Remoto: host desconocido», o un `tmux` local dice «¿Remoto?»
 
 La insignia toma el nombre del host del propio informe `OSC 7` del shell remoto o — en una conexión abierta desde la hoja

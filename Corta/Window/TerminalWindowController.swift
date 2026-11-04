@@ -17,7 +17,8 @@
 import Cocoa
 
 /// The window controller behind every terminal window: it builds the window
-/// with its final style mask and its content, and is its delegate —
+/// with its final style mask, owns the window's tabs (D30) and the toolbar
+/// whose strip shows them, and is the window's delegate —
 /// `windowShouldClose` is where the "still running" confirmation lives.
 final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// The mask every terminal window has from creation. Content runs under
@@ -27,127 +28,81 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         .titled, .closable, .miniaturizable, .resizable, .fullSizeContentView,
     ]
 
+    /// The window's tabs, in strip order; never empty while the window is open.
+    private(set) var tabs: [TerminalTab] = []
+    private(set) weak var selectedTab: TerminalTab?
+    let container = TabContainerViewController()
+    let tabStrip = TabStripView(frame: NSRect(x: 0, y: 0, width: 400, height: TabStripView.height))
+    /// The toolbar's input-source slot; the selected tab's focused pane
+    /// places its badge here (`SplitViewController.placeInputSourceIndicator`).
+    let inputSourceToolbarHost = NSView(frame: CGRect(x: 0, y: 0, width: 28, height: 24))
+    var inputSourceToolbarSpacer: NSToolbarItem?
+
     /// A window whose root pane spawns from `setup`, dressed and sized for
     /// its first grid before anything shows it. Unrestored windows are
     /// centred on the main screen; the caller cascades or places them after.
-    ///
-    /// `asPanel` makes the window a non-activating `NSPanel`, for the Quick
-    /// Terminal: an inactive app's window never reaches a full-screen Space,
-    /// whatever its collection behaviour, and `NSApp.activate()` is refused
-    /// or drags the user out of the Space. Measured on macOS 27 over
-    /// full-screen TextEdit: `kCGWindowIsOnscreen` stayed false for every
-    /// `NSWindow` variant and became true for a `.nonactivatingPanel`.
-    convenience init(setup: SplitViewController.Setup, asPanel: Bool = false) {
+    convenience init(setup: SplitViewController.Setup) {
+        self.init(window: Self.makeWindow())
+        dressWindow()
+        // Loads the split's view, which spawns the root pane from `setup`.
+        let tab = makeTab(setup: setup, hidden: false)
+        selectedTab = tab
+        tab.split.prepareWindow(window!)
+        refreshTabStrip()
+    }
+
+    /// A window for a tab that is already running, taken from another
+    /// window (D30, between windows): its panes keep their sessions, and
+    /// the window takes `frame` rather than a size from the grid.
+    convenience init(adopting tab: TerminalTab, frame: NSRect) {
+        let window = Self.makeWindow()
+        self.init(window: window)
+        dressWindow()
+        // `prepareWindow` does this for a window born with its tab.
+        applyCanvasAppearance()
+        window.setFrame(frame, display: false)
+        adopt(tab)
+        container.add(tab.split, hidden: false)
+        tab.split.rejoinWindow(window)
+        selectedTab = tab
+        refreshTabStrip()
+    }
+
+    private static func makeWindow() -> NSWindow {
         let placeholder = NSRect(x: 0, y: 0, width: 480, height: 270)
-        let window: NSWindow
-        if asPanel {
-            let panel = NSPanel(
-                contentRect: placeholder, styleMask: Self.styleMask.union(.nonactivatingPanel),
-                backing: .buffered, defer: false)
-            // `QuickTerminalController` owns dismissal and focus return.
-            panel.hidesOnDeactivate = false
-            window = panel
-        } else {
-            window = NSWindow(
-                contentRect: placeholder, styleMask: Self.styleMask, backing: .buffered, defer: false)
-        }
+        let window = NSWindow(
+            contentRect: placeholder, styleMask: styleMask, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
+        // Corta draws its own tabs (D30); AppKit's would add a second bar.
+        window.tabbingMode = .disallowed
         // Link and tab tooltips only while Corta is active, as the storyboard
         // window had it.
         window.allowsToolTipsWhenApplicationIsInactive = false
-        self.init(window: window)
+        return window
+    }
+
+    private func dressWindow() {
+        guard let window else { return }
         window.delegate = self
+        tabStrip.delegate = self
+        installToolbar(on: window)
         installSecureInputIndicator()
-        installTabInteractions()
-        // Loads the view, which spawns the root pane from `setup`.
-        let split = SplitViewController(setup: setup)
-        window.contentViewController = split
-        split.prepareWindow(window)
+        window.contentViewController = container
     }
 
-    private var splitController: SplitViewController? {
-        contentViewController as? SplitViewController
+    /// The App Intent identity of the selected tab (`TerminalWindowEntity`).
+    var windowID: String {
+        get { selectedTab?.id ?? "" }
+        set { selectedTab?.id = newValue }
     }
 
-    /// The App Intent identity (`TerminalWindowEntity`), carried through
-    /// `WindowState` so it survives a relaunch. Never the title, which the
-    /// child writes.
-    var windowID: String = UUID().uuidString
-
-    /// The Quick Terminal's window: not saved or listed as an ordinary one.
-    var isQuickTerminal = false
-
-    /// User-owned title; terminal output must never overwrite it. Part of
-    /// the saved arrangement, so a rename is written like a move.
+    /// The selected tab's user-given title.
     var customTabTitle: String? {
-        didSet {
-            if customTabTitle != oldValue { (NSApp.delegate as? AppDelegate)?.noteLayoutChanged() }
-        }
-    }
-    private var tabTitleField: TabTitleField?
-    private var tabEventMonitor: Any?
-
-    func refreshTabTitle() {
-        guard let window else { return }
-        if tabTitleField == nil {
-            let field = TabTitleField(controller: self)
-            tabTitleField = field
-        }
-        if tabTitleField?.isEditingTitle != true { window.tab.title = window.title }
-        window.tab.toolTip = window.title + "\n" + L10n.text("tab.rename.gesture")
-        tabTitleField?.refresh(title: window.title)
+        get { selectedTab?.customTitle }
+        set { selectedTab?.customTitle = newValue }
     }
 
-    /// Find the selected native tab through its public accessibility frame.
-    fileprivate func selectedTabFrame(in host: NSView) -> NSRect? {
-        guard let window else { return nil }
-        func find(_ element: NSAccessibilityProtocol, depth: Int) -> NSRect? {
-            guard depth < 12 else { return nil }
-            if element.accessibilitySubrole()?.rawValue == "AXTabButton",
-               element.accessibilityValue() as? Bool == true {
-                return host.convert(window.convertFromScreen(element.accessibilityFrame()), from: nil)
-            }
-            for child in element.accessibilityChildren() ?? [] {
-                if let child = child as? NSAccessibilityProtocol,
-                   let frame = find(child, depth: depth + 1) { return frame }
-            }
-            return nil
-        }
-        return find(window, depth: 0)
-    }
-
-    /// Commits an in-progress rename. The editor is an overlay placed over
-    /// the selected tab once, with the native title blanked beneath it:
-    /// anything that deselects or moves that tab would otherwise strand it,
-    /// leaving the tab empty and the name unsaved.
-    func commitTabRename() {
-        tabTitleField?.commitIfEditing()
-    }
-
-    func beginTabRename() {
-        guard let window else { return }
-        for other in window.tabGroup?.windows ?? [] where other !== window {
-            (other.windowController as? TerminalWindowController)?.commitTabRename()
-        }
-        if window.tabGroup?.isTabBarVisible != true { window.toggleTabBar(nil) }
-        window.tabGroup?.selectedWindow = window
-        window.makeKeyAndOrderFront(nil)
-        refreshTabTitle()
-        // Native tab selection finishes its responder/layout changes after
-        // this action returns. Begin editing once that transition has settled.
-        DispatchQueue.main.async { [weak self] in self?.tabTitleField?.beginEditing() }
-    }
-
-    func applyCanvasAppearance() {
-        guard let window else { return }
-        let color = TerminalColorPalette.defaultBackground
-        window.isOpaque = true
-        window.backgroundColor = NSColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y),
-                                         blue: CGFloat(color.z), alpha: 1)
-        // The Quick Terminal hides its titlebar; a theme change must not
-        // bring the band back.
-        if !isQuickTerminal { window.titlebarAppearsTransparent = false }
-    }
+    private var splitController: SplitViewController? { selectedTab?.split }
 
     /// A titlebar lock while Secure Keyboard Entry is engaged — the effect is
     /// invisible otherwise. Follows `SecureInput.engaged`, not the setting.
@@ -156,108 +111,260 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
 
     isolated deinit {
         if let secureInputObserver { NotificationCenter.default.removeObserver(secureInputObserver) }
-        if let tabEventMonitor { NSEvent.removeMonitor(tabEventMonitor) }
-        if let tabCloseObserver { NotificationCenter.default.removeObserver(tabCloseObserver) }
     }
 
-    private var tabCloseObserver: NSObjectProtocol?
+}
 
-    /// Keyboard tab switching and ⌘T deselect this tab without a click in
-    /// it. Checked after the switch settles: losing key to another app keeps
-    /// the tab selected, and the rename open.
-    func windowDidResignKey(_ notification: Notification) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let window = self.window else { return }
-            if !window.isVisible || window.tabGroup.map({ $0.selectedWindow !== window }) == true {
-                self.commitTabRename()
-            }
+// MARK: - Tabs
+
+extension TerminalWindowController {
+
+    private func makeTab(setup: SplitViewController.Setup, hidden: Bool) -> TerminalTab {
+        let split = SplitViewController(setup: setup)
+        let tab = TerminalTab(split: split)
+        adopt(tab)
+        if let restore = setup.restore {
+            if let id = restore.id { tab.id = id }
+            tab.customTitle = restore.customTabTitle
         }
+        container.add(split, hidden: hidden)
+        return tab
     }
 
-    func windowWillEnterFullScreen(_ notification: Notification) {
-        commitTabRename()
+    /// Takes `tab` into the window's list, selected if it is the first; its
+    /// view is the caller's to place.
+    func adopt(_ tab: TerminalTab) {
+        tab.controller = self
+        tabs.append(tab)
+        if selectedTab == nil { selectedTab = tab }
     }
 
-    /// A local monitor sees clicks before AppKit's native tab cell starts its
-    /// tracking loop. Public accessibility frames identify the tab; no private
-    /// classes, selectors or replacement tab bar are required.
-    private func installTabInteractions() {
-        guard tabEventMonitor == nil else { return }
-        // Another tab closing — its close button, or its shell exiting —
-        // shifts this tab under the rename overlay.
-        tabCloseObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.willCloseNotification, object: nil, queue: .main
-        ) { [weak self] notification in
-            let closing = notification.object as? NSWindow
-            MainActor.assumeIsolated {
-                guard let self, let window = self.window, let closing, closing !== window,
-                      window.tabGroup?.windows.contains(closing) == true else { return }
-                self.commitTabRename()
-            }
-        }
-        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
-        tabEventMonitor = NSEvent.addLocalMonitorForEvents(matching: clicks) { [weak self] event in
-            guard let self, let eventWindow = event.window, eventWindow === self.window else { return event }
-            // A click anywhere but the editor ends the rename, as in Finder:
-            // another tab, a close button, a tab drag, the window edge.
-            self.tabTitleField?.commitIfEditing(unlessHitBy: event)
-            guard event.type == .rightMouseDown || event.modifierFlags.contains(.control) || event.clickCount == 2
-            else { return event }
-            let point = eventWindow.convertPoint(toScreen: event.locationInWindow)
-            guard let target = self.tabController(at: point, in: eventWindow),
-                  target.tabTitleField?.isEditingTitle != true else { return event }
-            if event.type == .rightMouseDown || event.modifierFlags.contains(.control) {
-                let nativeMenu = self.nativeTabMenu(for: event, in: eventWindow)
-                target.window?.tabGroup?.selectedWindow = target.window
-                target.window?.makeKeyAndOrderFront(nil)
-                target.refreshTabTitle()
-                if let menu = target.tabTitleField?.makeTabMenu(base: nativeMenu),
-                    let content = eventWindow.contentView
-                {
-                    NSMenu.popUpContextMenu(menu, with: event, for: content)
+    /// A new tab after the last, its root pane spawned from `setup`. A
+    /// restored background tab passes `select: false`.
+    @discardableResult
+    func addTab(setup: SplitViewController.Setup = .init(), select: Bool = true) -> TerminalTab {
+        let tab = makeTab(setup: setup, hidden: true)
+        if let window { tab.split.joinWindow(window) }
+        if select {
+            // The tab in front stays drawn until the new shell's first output
+            // is on the canvas, so the switch never shows an empty one.
+            let previous = window?.isVisible == true ? selectedTab?.split : nil
+            if let previous, let pane = tab.split.focusedPane, !pane.drewFirstOutput {
+                pane.onFirstOutputFrame = { [weak container, weak previous] in
+                    // The frame being prepared presents within a vsync or so.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + TabContainerViewController.firstFrameDelay) {
+                        // Only the hold it was for: a second ⌘T holds another.
+                        container?.releaseHeld(ifHolding: previous)
+                    }
                 }
+                selectTab(tab, holding: previous)
             } else {
-                target.beginTabRename()
+                selectTab(tab)
             }
-            return nil
+        } else {
+            refreshTabStrip()
+        }
+        (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
+        return tab
+    }
+
+    func selectTab(_ tab: TerminalTab, holding previous: SplitViewController? = nil) {
+        guard let window, tabs.contains(where: { $0 === tab }) else { return }
+        let changed = selectedTab !== tab
+        let leaving = selectedTab
+        selectedTab = tab
+        container.show(tab.split, holding: previous)
+        tab.split.didBecomeSelectedTab()
+        if window.isKeyWindow || !window.isVisible || changed {
+            window.makeFirstResponder(tab.split.focusedPane?.terminalView)
+        }
+        tab.split.applyWindowTitle()
+        refreshTabStrip()
+        if changed {
+            // Focus reports (?1004) for the tab left and the tab shown: a
+            // program in a hidden tab is not focused, whatever its split says.
+            for pane in (leaving?.split.panes ?? []) + tab.split.panes { pane.focus.reportIfNeeded() }
+            (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
         }
     }
 
-    private func nativeTabMenu(for event: NSEvent, in window: NSWindow) -> NSMenu? {
-        guard let frameView = window.contentView?.superview else { return nil }
-        var view = frameView.hitTest(frameView.convert(event.locationInWindow, from: nil))
-        while let candidate = view {
-            if let menu = candidate.menu(for: event), !menu.items.isEmpty {
-                let copy = menu.copy() as? NSMenu
-                copy?.delegate = nil
-                return copy
-            }
-            view = candidate.superview
-        }
-        return nil
+    func selectAdjacentTab(offset: Int) {
+        guard tabs.count > 1, let current = selectedTab,
+              let index = tabs.firstIndex(where: { $0 === current }) else { return }
+        selectTab(tabs[(index + offset + tabs.count) % tabs.count])
     }
 
-    private func tabController(at point: NSPoint, in eventWindow: NSWindow) -> TerminalWindowController? {
-        var element = eventWindow.accessibilityHitTest(point) as? NSAccessibilityProtocol
-        for _ in 0..<12 {
-            guard let current = element else { return nil }
-            if current.accessibilitySubrole()?.rawValue == "AXTabButton",
-               let parent = current.accessibilityParent() as? NSAccessibilityProtocol {
-                let tabs = (parent.accessibilityChildren() ?? []).compactMap { $0 as? NSAccessibilityProtocol }
-                    .filter { $0.accessibilitySubrole()?.rawValue == "AXTabButton" }
-                guard let index = tabs.firstIndex(where: { $0.accessibilityFrame().contains(point) }),
-                      let windows = eventWindow.tabGroup?.windows, index < windows.count else { return nil }
-                // Let native close buttons retain their own double-click behaviour.
-                if let children = current.accessibilityChildren(), children.contains(where: {
-                    guard let child = $0 as? NSAccessibilityProtocol else { return false }
-                    return child.accessibilityRole()?.rawValue == "AXButton"
-                        && child.accessibilityFrame().contains(point)
-                }) { return nil }
-                return windows[index].windowController as? TerminalWindowController
-            }
-            element = current.accessibilityParent() as? NSAccessibilityProtocol
+    /// ⌘1–⌘8 select that tab; ⌘9 the last, as browsers do.
+    func selectTab(number: Int) {
+        guard !tabs.isEmpty, number >= 1 else { return }
+        // A tab past the last is not there: nothing, as in a browser.
+        if number >= 9 {
+            selectTab(tabs[tabs.count - 1])
+        } else if number <= tabs.count {
+            selectTab(tabs[number - 1])
         }
-        return nil
+    }
+
+    func moveTab(from source: Int, to destination: Int) {
+        guard tabs.indices.contains(source), tabs.indices.contains(destination), source != destination
+        else { return }
+        tabs.insert(tabs.remove(at: source), at: destination)
+        refreshTabStrip()
+        (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
+    }
+
+    /// Closes `tab`, asking first when something runs in it; the last tab is
+    /// the window's own close, which asks in `windowShouldClose`.
+    func performCloseTab(_ tab: TerminalTab, sender: Any? = nil) {
+        guard let window else { return }
+        guard tabs.count > 1 else {
+            window.performClose(sender)
+            return
+        }
+        let running = tab.split.panesWithRunningJobs
+        guard tab.split.needsCloseConfirmation(for: running) else {
+            closeTab(tab)
+            return
+        }
+        // One question at a time: a sheet already up is still asking.
+        guard window.attachedSheet == nil else {
+            NSSound.beep()
+            return
+        }
+        if selectedTab !== tab { selectTab(tab) }
+        let scope = L10n.text("close.scope.tab")
+        tab.split.confirmClose(of: running, scope: scope, in: window) { [weak self, weak tab] confirmed in
+            guard confirmed, let self, let tab else { return }
+            self.closeTab(tab)
+        }
+    }
+
+    /// Takes `tab` out of this window with its panes still running, for
+    /// another window to receive. Never the last tab: that is the window.
+    @discardableResult
+    func release(_ tab: TerminalTab) -> Bool {
+        guard tabs.count > 1, let index = tabs.firstIndex(where: { $0 === tab }) else { return false }
+        tabs.remove(at: index)
+        container.remove(tab.split)
+        if selectedTab === tab {
+            selectTab(tabs[min(index, tabs.count - 1)])
+        } else {
+            refreshTabStrip()
+        }
+        (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
+        return true
+    }
+
+    /// Every tab, still running, out of this window, which is left empty
+    /// for the caller to close: a closing window tears down only the tabs
+    /// it still holds (`AppDelegate.windowWillClose`).
+    func releaseAllTabs() -> [TerminalTab] {
+        let released = tabs
+        for tab in released { container.remove(tab.split) }
+        tabs.removeAll()
+        selectedTab = nil
+        return released
+    }
+
+    /// A running tab from another window, at `index` (after the last by
+    /// default), brought to the front.
+    func receive(_ tab: TerminalTab, at index: Int? = nil) {
+        guard let window, !tabs.contains(where: { $0 === tab }) else { return }
+        tab.controller = self
+        tabs.insert(tab, at: min(max(0, index ?? tabs.count), tabs.count))
+        container.add(tab.split, hidden: true)
+        tab.split.rejoinWindow(window)
+        selectTab(tab)
+        (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
+    }
+
+    /// Closes `tab` without asking; the last tab closes the window.
+    func closeTab(_ tab: TerminalTab) {
+        guard let index = tabs.firstIndex(where: { $0 === tab }) else { return }
+        guard tabs.count > 1 else {
+            window?.close()
+            return
+        }
+        tab.split.teardown()
+        tabs.remove(at: index)
+        if selectedTab === tab {
+            container.retire(tab.split)
+        } else {
+            container.remove(tab.split)
+        }
+        if selectedTab === tab || selectedTab == nil {
+            selectTab(tabs[min(index, tabs.count - 1)])
+        } else {
+            refreshTabStrip()
+        }
+        (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
+    }
+
+    /// Closes every tab but `keep`, asking once for all of them: one sheet
+    /// per tab would leave all but the first unasked and open.
+    func closeOtherTabs(than keep: TerminalTab) {
+        guard let window, tabs.contains(where: { $0 === keep }) else { return }
+        let others = tabs.filter { $0 !== keep }
+        guard !others.isEmpty else { return }
+        let running = others.flatMap { $0.split.panesWithRunningJobs }
+        let closeAll: @MainActor () -> Void = { [weak self] in
+            guard let self else { return }
+            // Re-read: a tab may have closed itself while the sheet was up.
+            for tab in self.tabs where tab !== keep && others.contains(where: { $0 === tab }) {
+                self.closeTab(tab)
+            }
+        }
+        guard keep.split.needsCloseConfirmation(for: running) else {
+            closeAll()
+            return
+        }
+        guard window.attachedSheet == nil else {
+            NSSound.beep()
+            return
+        }
+        if selectedTab !== keep { selectTab(keep) }
+        keep.split.confirmClose(of: running, scope: L10n.text("close.scope.otherTabs"), in: window) { confirmed in
+            if confirmed { closeAll() }
+        }
+    }
+
+    /// Redraws the strip from every tab's focused program and title, and the
+    /// window title from the selected tab.
+    /// Output from any pane asks for this, many times a second while a
+    /// program streams: the strip's views are touched only when an item or
+    /// the selection changed, or `force` says the colours did.
+    func refreshTabStrip(force: Bool = false) {
+        let items = tabs.map(TabIcon.item(for:))
+        let selected = tabs.firstIndex { $0 === selectedTab } ?? 0
+        guard force || items != tabStrip.items || selected != tabStrip.selectedIndex else { return }
+        tabStrip.update(items: items, selectedIndex: selected)
+    }
+
+    /// Kept for the panes and splits that report a title change.
+    func refreshTabTitle() { refreshTabStrip() }
+
+    func beginTabRename() {
+        guard let selectedTab, let index = tabs.firstIndex(where: { $0 === selectedTab }) else { return }
+        window?.makeKeyAndOrderFront(nil)
+        tabStrip.beginRename(at: index)
+    }
+
+    func applyCanvasAppearance() {
+        guard let window else { return }
+        window.isOpaque = true
+        // The band shares the gaps' ground colour; the cards sit on it.
+        window.backgroundColor = PaneSurfaceView.gutterColor
+        // The titlebar band is the theme's own colour, not a material: the
+        // window's background shows through it, and the grid's top inset
+        // keeps output below it (D24, amended). The tabs and pane headers
+        // already name what runs, so the title text is not repeated above
+        // them; it stays the window's title for the Window menu and
+        // accessibility.
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.titlebarSeparatorStyle = .none
+        // The theme moved: same items, new colours.
+        refreshTabStrip(force: true)
     }
 
     private func installSecureInputIndicator() {
@@ -326,15 +433,16 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Asks as a sheet, so the answer comes after this returns: refuse now,
-    /// and close once confirmed. `close()` does not ask again.
+    /// and close once confirmed. `close()` does not ask again. Every tab's
+    /// running jobs count: the window takes them all.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard let splitController else { return true }
-        let running = splitController.panesWithRunningJobs
+        let running = tabs.flatMap { $0.split.panesWithRunningJobs }
         guard splitController.needsCloseConfirmation(for: running) else { return true }
         // A second ⌘W while the sheet is up: the sheet already asks.
         if sender.attachedSheet != nil, sender.isVisible { return false }
-        // A background tab or a minimised window has nowhere to show a sheet:
-        // ask now and answer now, rather than close it from inside this call.
+        // A minimised window has nowhere to show a sheet: ask now and answer
+        // now, rather than close it from inside this call.
         guard NSAlert.canPresentSheet(on: sender) else {
             let alert = splitController.closeAlert(for: running, scope: L10n.text("close.scope.window"))
             return alert.runModal() == .alertFirstButtonReturn
@@ -344,165 +452,64 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         ) { [weak sender] confirmed in if confirmed { sender?.close() } }
         return false
     }
+}
 
-    /// Read at quit and on every window close.
-    var restorableState: WindowState? {
-        guard let window, let splitController, !isQuickTerminal else { return nil }
-        var state = splitController.windowState(frame: window.frame)
-        state?.id = windowID
-        state?.customTabTitle = customTabTitle
-        return state
+extension TerminalWindowController {
+    /// Read at quit and on every window close: one state per tab, grouped
+    /// by a window identity when there is more than one.
+    var restorableStates: [WindowState] {
+        guard let window else { return [] }
+        let group = tabs.count > 1 ? (tabs.first?.id ?? UUID().uuidString) : nil
+        return tabs.enumerated().compactMap { index, tab in
+            var state = tab.split.windowState(frame: window.frame)
+            state?.id = tab.id
+            state?.customTabTitle = tab.customTitle
+            state?.tabGroupID = group
+            state?.tabIndex = group == nil ? nil : index
+            state?.isSelectedTab = tab === selectedTab
+            return state
+        }
     }
 }
 
-/// Owns only the native tab's title. AppKit still owns the tab bar, its close
-/// buttons, drag/reorder behaviour and grouping. No private view classes.
-private final class TabTitleField: NSTextField, NSTextFieldDelegate {
-    private weak var controller: TerminalWindowController?
-    private var editingTitle = false
-    var isEditingTitle: Bool { editingTitle }
-    private var startingEditor = false
-
-    override var acceptsFirstResponder: Bool { editingTitle }
-    private var originalTitle = ""
-
-    init(controller: TerminalWindowController) {
-        self.controller = controller
-        super.init(frame: NSRect(x: 0, y: 0, width: 120, height: 22))
-        delegate = self
-        font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        lineBreakMode = .byTruncatingTail
-        alignment = .center
-        isEditable = false
-        isSelectable = false
-        isBordered = false
-        drawsBackground = false
-        focusRingType = .none
-        setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        setAccessibilityIdentifier("tab-title")
+extension TerminalWindowController: TabStripDelegate {
+    func tabStrip(_ strip: TabStripView, select index: Int) {
+        guard tabs.indices.contains(index) else { return }
+        selectTab(tabs[index])
     }
 
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override var intrinsicContentSize: NSSize {
-        let count = max(1, controller?.window?.tabGroup?.windows.count ?? 1)
-        let width = ((controller?.window?.frame.width ?? 400) - 40) / CGFloat(count) - 32
-        return NSSize(width: editingTitle ? max(80, width) : 0, height: 22)
+    func tabStrip(_ strip: TabStripView, close index: Int) {
+        guard tabs.indices.contains(index) else { return }
+        performCloseTab(tabs[index])
     }
 
-    func refresh(title: String) {
-        guard !editingTitle else { return }
-        stringValue = title
-        toolTip = L10n.text("tab.rename.gesture")
-        setAccessibilityLabel(title)
-        invalidateIntrinsicContentSize()
+    func tabStrip(_ strip: TabStripView, closeOthersThan index: Int) {
+        guard tabs.indices.contains(index) else { return }
+        closeOtherTabs(than: tabs[index])
     }
 
-    func beginEditing() {
-        guard !editingTitle else { return }
-        startingEditor = true
-        defer { startingEditor = false }
-        guard let window = controller?.window, let host = window.contentView?.superview,
-              let tabFrame = controller?.selectedTabFrame(in: host) else { return }
-        originalTitle = stringValue
-        editingTitle = true
-        // Overlay the native title at its center; an accessory is trailing-aligned.
-        let width = max(40, min(tabFrame.width - 32, max(120, tabFrame.width * 0.8)))
-        let height = cell?.cellSize.height ?? 16
-        frame = NSRect(x: tabFrame.midX - width / 2, y: tabFrame.midY - height / 2,
-                       width: width, height: height)
-        host.addSubview(self, positioned: .above, relativeTo: nil)
-        window.tab.title = ""
-        isHidden = false
-        setAccessibilityIdentifier("tab-title-editor")
-        isEditable = true
-        isSelectable = true
-        isBordered = false
-        drawsBackground = false
-        invalidateIntrinsicContentSize()
-        selectText(nil)
+    func tabStrip(_ strip: TabStripView, move from: Int, to: Int) {
+        moveTab(from: from, to: to)
     }
 
-    func commitIfEditing(unlessHitBy event: NSEvent? = nil) {
-        guard editingTitle else { return }
-        if let event, superview != nil, bounds.contains(convert(event.locationInWindow, from: nil)) { return }
-        finishEditing(save: true)
+    func tabStrip(_ strip: TabStripView, rename id: String, to title: String?) {
+        guard let tab = tabs.first(where: { $0.id == id }) else { return }
+        tab.customTitle = title
+        tab.split.applyWindowTitle()
+        refreshTabStrip()
     }
 
-    private func finishEditing(save: Bool) {
-        guard editingTitle else { return }
-        let value = stringValue
-        editingTitle = false
-        window?.makeFirstResponder(nil)
-        removeFromSuperview()
-        setAccessibilityIdentifier("tab-title")
-        isEditable = false
-        isSelectable = false
-        isBordered = false
-        drawsBackground = false
-        if save, let split = controller?.contentViewController as? SplitViewController {
-            split.setCustomTabTitle(value)
-        } else {
-            refresh(title: originalTitle)
-        }
-        controller?.refreshTabTitle()
-        if let split = controller?.contentViewController as? SplitViewController {
-            controller?.window?.makeFirstResponder(split.focusedPane?.terminalView)
-        }
+    func tabStripNewTab(_ strip: TabStripView) {
+        (NSApp.delegate as? AppDelegate)?.newTab(beside: window, sender: nil)
     }
 
-    override func menu(for event: NSEvent) -> NSMenu? {
-        editingTitle ? super.menu(for: event) : makeTabMenu()
+    func tabStrip(_ strip: TabStripView, drop index: Int, atScreenPoint point: NSPoint) {
+        guard tabs.indices.contains(index) else { return }
+        drop(tabs[index], atScreenPoint: point)
     }
 
-    func makeTabMenu(base: NSMenu? = nil) -> NSMenu {
-        let menu = base ?? NSMenu()
-        if base == nil {
-            let close = NSMenuItem(title: TerminalCommand.close.title,
-                action: #selector(NSWindow.performClose(_:)), keyEquivalent: "")
-            close.target = controller?.window
-            menu.addItem(close)
-        }
-        menu.insertItem(.separator(), at: 0)
-        let newTab = NSMenuItem(title: TerminalCommand.newTab.title,
-            action: TerminalCommand.newTab.action, keyEquivalent: "")
-        newTab.target = NSApp.delegate
-        let shortcut = ConfigurationStore.shared.configuration.keybindings[.newTab]
-        newTab.keyEquivalent = shortcut?.menuKeyEquivalent ?? ""
-        newTab.keyEquivalentModifierMask = shortcut?.menuModifierMask ?? []
-        if let existing = menu.items.first(where: { $0.title == newTab.title }) { menu.removeItem(existing) }
-        menu.insertItem(newTab, at: 0)
-        let rename = NSMenuItem(title: TerminalCommand.renameTab.title,
-            action: #selector(renameFromMenu(_:)), keyEquivalent: "")
-        rename.target = self
-        menu.insertItem(rename, at: 1)
-        return menu
-    }
-
-    override func rightMouseDown(with event: NSEvent) {
-        if editingTitle { super.rightMouseDown(with: event); return }
-        guard let target = controller?.window else { return }
-        target.tabGroup?.selectedWindow = target
-        target.makeKeyAndOrderFront(nil)
-        if let menu = menu(for: event) { NSMenu.popUpContextMenu(menu, with: event, for: self) }
-    }
-
-    @objc private func renameFromMenu(_: Any?) { controller?.beginTabRename() }
-
-    func controlTextDidEndEditing(_ obj: Notification) {
-        guard !startingEditor else { return }
-        finishEditing(save: true)
-    }
-
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        if selector == #selector(NSResponder.cancelOperation(_:)) {
-            finishEditing(save: false)
-            return true
-        }
-        if selector == #selector(NSResponder.insertNewline(_:)) {
-            finishEditing(save: true)
-            return true
-        }
-        return false
+    func tabStrip(_ strip: TabStripView, moveToNewWindow index: Int) {
+        guard tabs.indices.contains(index) else { return }
+        moveToNewWindow(tabs[index])
     }
 }

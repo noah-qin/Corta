@@ -58,6 +58,10 @@ struct MenuShortcutTests {
 
     @Test func noKeystrokeIsClaimedByTwoMenuItems() throws {
         let menu = try #require(NSApp.mainMenu)
+        // As a menu opens: AppKit's injected Edit items are pruned then, and a
+        // runner with no interactive session injects Emoji & Symbols twice.
+        let delegate = try #require(NSApp.delegate as? AppDelegate)
+        for item in menu.items { if let submenu = item.submenu { delegate.menuNeedsUpdate(submenu) } }
         var seen: [String: String] = [:]
         var duplicates: [String] = []
         for (item, path) in Self.shortcuts(in: menu) {

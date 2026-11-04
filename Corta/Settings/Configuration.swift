@@ -52,23 +52,6 @@ nonisolated struct Configuration: Equatable, Sendable {
         case click
     }
 
-    /// Where the Quick Terminal's panel sits on its screen.
-    enum QuickTerminalPosition: String, CaseIterable, Sendable {
-        /// A band across the top edge, the width of the screen.
-        case top
-        case bottom
-        /// A centred window, smaller than either band.
-        case center
-    }
-
-    /// Which display the Quick Terminal opens on.
-    enum QuickTerminalScreen: String, CaseIterable, Sendable {
-        /// The screen under the pointer when the hotkey is pressed.
-        case mouse
-        /// `NSScreen.main`: the key window's screen, else the primary.
-        case main
-    }
-
     enum CursorShape: String, CaseIterable, Sendable {
         case block, bar, underline
 
@@ -149,7 +132,11 @@ nonisolated struct Configuration: Equatable, Sendable {
     var fontFallback: Bool = true
     var ambiguousWidth: AmbiguousWidth = .narrow
     var emojiRendering: EmojiRendering = .color
+    /// The light appearance's theme, and the dark one's too unless
+    /// `darkTheme` names another.
     var theme: String = Theme.corta.name
+    /// The dark appearance's theme when it is not `theme`.
+    var darkTheme: String?
     var appearance: Appearance = .auto
     var scrollbackLines: Int = 10_000
     /// Caps `CommandRecordStore`'s structured command records per session,
@@ -255,14 +242,6 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// off once the user moves it or declines.
     var suggestApplicationsFolder: Bool = true
 
-    /// Whether a global hotkey summons the Quick Terminal. Off by default: the
-    /// key is claimed system-wide, and another tool may own it.
-    var quickTerminal: Bool = false
-    /// The hotkey in `bind.*` notation, matched by ANSI key position
-    /// (`GlobalHotKey`), not by the character typed.
-    var quickTerminalKey: Shortcut? = Shortcut.parse(Configuration.defaultQuickTerminalKey)
-    var quickTerminalPosition: QuickTerminalPosition = .top
-    var quickTerminalScreen: QuickTerminalScreen = .mouse
     /// Secure Keyboard Entry while a Corta window is key (`SecureInput`). Off
     /// by default: it also blocks accessibility tools and text expanders.
     var secureKeyboardEntry: Bool = false
@@ -280,10 +259,14 @@ nonisolated struct Configuration: Equatable, Sendable {
     /// Means the CJK face for the system language (`TerminalFont.CJKLead`).
     static let automaticCJKFontFamily = "auto"
 
-    /// The default hotkey: ⌥Space, the Mac's usual launcher key.
-    static let defaultQuickTerminalKey = "alt+space"
-
     // MARK: - Parsing
+
+    /// Retired feature keys are accepted only to migrate older config files.
+    /// They have no runtime state and are not written back on the next save.
+    private static let retiredKeys: Set<String> = [
+        "quick-terminal", "quick-terminal-key", "quick-terminal-position",
+        "quick-terminal-screen", "quick-terminal-width", "quick-terminal-height", "bind.quick-terminal",
+    ]
 
     /// Parses a config file. Bad lines are skipped, never fatal. Returns the
     /// keys it did not recognise, including recognised keys with unparseable
@@ -302,6 +285,7 @@ nonisolated struct Configuration: Equatable, Sendable {
             guard let line = keyAndValue(of: rawLine) else { continue }
             let key = line.key
             let value = line.value
+            if Self.retiredKeys.contains(key) { continue }
             if key.hasPrefix("theme.") {
                 if applyThemeKey(key, value: value, drafts: &themeDrafts, order: &themeOrder) {
                     continue

@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Cocoa
+import CortaTerminal
 import UserNotifications
 
 @main
@@ -38,11 +39,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Nothing else retains a window controller, and dropping one takes its
     /// window and session down.
     private var windowControllers: [NSWindowController] = []
-    /// The windows an App Intent may name, in opening order; the Quick
-    /// Terminal has its own intent.
+    /// The windows an App Intent may name, in opening order.
     var terminalWindowControllers: [TerminalWindowController] {
-        windowControllers.compactMap { $0 as? TerminalWindowController }.filter { !$0.isQuickTerminal }
+        windowControllers.compactMap { $0 as? TerminalWindowController }
     }
+    /// Every window's tabs, windows in opening order (D30); what an App
+    /// Intent calls a window.
+    var terminalTabs: [TerminalTab] { terminalWindowControllers.flatMap(\.tabs) }
     /// The debounced arrangement write; see `noteLayoutChanged`.
     var pendingLayoutSave: DispatchWorkItem?
     /// Set at quit, so closing windows don't save an empty arrangement over
@@ -68,14 +71,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return controller
     }
 
-    /// Cascades a new window from the key window, or a second ⌘N looks like
-    /// it did nothing — except from the Quick Terminal's screen-edge band —
-    /// and keeps it on screen.
+    /// Cascades a new window from the key window and keeps it on screen.
     func cascade(_ controller: TerminalWindowController) {
         guard let window = controller.window else { return }
-        if let previous = NSApp.keyWindow, previous !== window,
-            !QuickTerminalController.shared.owns(previous)
-        {
+        if let previous = NSApp.keyWindow, previous !== window {
             window.setFrameTopLeftPoint(
                 NSPoint(x: previous.frame.minX + 24, y: previous.frame.maxY - 24))
         }
@@ -88,9 +87,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// app so it really reaches the front. False if the id is gone.
     @discardableResult
     func focusWindow(id: String) -> Bool {
-        guard let controller = terminalWindowControllers.first(where: { $0.windowID == id }),
+        guard let tab = terminalTabs.first(where: { $0.id == id }), let controller = tab.controller,
             let window = controller.window
         else { return false }
+        controller.selectTab(tab)
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         // Activation is asynchronous. An inactive app otherwise leaves its
@@ -99,8 +99,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return true
     }
 
-    /// File > New Tab (⌘T): a full window joined to the key window's tab
-    /// group, so it can be dragged out again.
+    /// File > New Tab (⌘T): a tab of the key window (D30).
     @objc func newTab(_ sender: Any?) {
         newTab(beside: NSApp.keyWindow, sender: sender)
     }
@@ -109,55 +108,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// toolbar's button names its own window: the key window is nil while
     /// Corta is inactive, and the tab would have opened as a window.
     func newTab(beside existing: NSWindow?, sender: Any?) {
+        // A tab of the window that asked (D30); with none, a window.
+        if let owner = existing?.windowController as? TerminalWindowController {
+            owner.addTab()
+            owner.window?.makeKeyAndOrderFront(sender)
+            return
+        }
         let controller = makeWindowController()
         guard let window = controller.window else { return }
-        window.tabbingMode = .automatic
-        if let keyWindow = existing, keyWindow !== window,
-            !QuickTerminalController.shared.owns(keyWindow),
-            keyWindow.contentViewController is SplitViewController {
-            let members = keyWindow.tabbedWindows ?? [keyWindow]
-            let frame = keyWindow.frame
-            let oldChrome = frame.height - keyWindow.contentLayoutRect.height
-            let splits = (members + [window]).compactMap { $0.contentViewController as? SplitViewController }
-            for split in splits { split.isJoiningTabGroup = true }
-            window.setFrame(frame, display: false)
-            // Queued toolbar clicks may still name an earlier tab while
-            // AppKit selects the previous addition. Append to the group
-            // explicitly instead of inserting relative to that stale tab.
-            if let group = keyWindow.tabGroup {
-                group.insertWindow(window, at: group.windows.count)
-            } else {
-                keyWindow.addTabbedWindow(window, ordered: .above)
-            }
-            controller.showWindow(sender)
-            window.makeKeyAndOrderFront(sender)
-            window.tabGroup?.selectedWindow = window
-            // Only the first tab bar adds chrome. New tabs' setup/layout must
-            // not each absorb the same bar into the shared frame again.
-            let delta = members.count == 1
-                ? max(0, window.frame.height - window.contentLayoutRect.height - oldChrome) : 0
-            var target = frame
-            target.origin.y -= delta
-            target.size.height += delta
-            window.setFrame(target, display: true)
-            for split in splits {
-                split.adoptChromeWithoutAbsorbing()
-                split.isJoiningTabGroup = false
-            }
-        } else {
-            cascade(controller)
-            controller.showWindow(sender)
-            window.makeKeyAndOrderFront(sender)
-        }
+        cascade(controller)
+        controller.showWindow(sender)
+        window.makeKeyAndOrderFront(sender)
     }
 
     /// One tracked terminal window controller, its root pane spawned from
-    /// `setup` and its window sized, not yet shown. `asPanel` makes it the
-    /// Quick Terminal's non-activating panel.
+    /// `setup` and its window sized, not yet shown.
     func makeWindowController(
-        setup: SplitViewController.Setup = .init(), asPanel: Bool = false
+        setup: SplitViewController.Setup = .init()
     ) -> TerminalWindowController {
-        let controller = TerminalWindowController(setup: setup, asPanel: asPanel)
+        let controller = TerminalWindowController(setup: setup)
         track(controller)
         return controller
     }
@@ -186,8 +155,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         guard let window = note.object as? NSWindow else { return }
         // Window closes bypass `SplitViewController.closePane`, so tear the
         // sessions and observers down here.
-        if let controller = windowControllers.first(where: { $0.window === window }) {
-            (controller.contentViewController as? SplitViewController)?.teardown()
+        if windowControllers.contains(where: { $0.window === window }) {
+            for split in window.terminalSplits { split.teardown() }
         }
         windowControllers.removeAll { $0.window === window }
         for name in [
@@ -215,12 +184,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     // MARK: - System entry points
 
-    /// Menu, palette and App Intent; the hotkey calls
-    /// `QuickTerminalController.toggle` directly.
-    @objc func toggleQuickTerminal(_: Any?) {
-        QuickTerminalController.shared.toggle()
-    }
-
     /// Writes the config file, the setting's only store; `SecureInput`
     /// follows the file.
     @objc func toggleSecureKeyboardEntry(_: Any?) {
@@ -228,14 +191,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ConfigurationStore.shared.update { $0.secureKeyboardEntry = turningOn }
         // A toast, because the effect itself is invisible.
         let key = turningOn ? "secureInput.toast.on" : "secureInput.toast.off"
-        (NSApp.keyWindow?.contentViewController as? SplitViewController)?
+        NSApp.keyWindow?.terminalSplit?
             .focusedPane?.terminalView?.showToast(L10n.text(key))
     }
 
     @objc func selectTheme(_ sender: NSMenuItem) {
         let themes = Theme.all(in: ConfigurationStore.shared.configuration)
         guard sender.tag < themes.count else { return }
-        ConfigurationStore.shared.update { $0.theme = themes[sender.tag].name }
+        ConfigurationStore.shared.update { $0.setTheme(themes[sender.tag].name) }
     }
 
     @objc func selectAppearance(_ sender: NSMenuItem) {
@@ -250,7 +213,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         case #selector(selectTheme(_:)):
             let themes = Theme.all(in: configuration)
             menuItem.state =
-                menuItem.tag < themes.count && themes[menuItem.tag].name == configuration.theme
+                menuItem.tag < themes.count
+                && themes[menuItem.tag].name == configuration.themeName(dark: AppearanceController.shared.isDark)
                 ? .on : .off
         case #selector(selectAppearance(_:)):
             menuItem.state =
@@ -280,7 +244,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // Before any window: the hotkey must be held from launch, and Secure
         // Keyboard Entry must see the first window become key.
         SecureInput.shared.start()
-        QuickTerminalController.shared.start()
         installMenus()
         // Before any window, so a move-and-relaunch never spawns a shell first.
         ApplicationsFolderMover.promptIfNeeded()
@@ -306,6 +269,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         #if DEBUG
         if CommandLine.arguments.contains("--sftp-preview") { SFTPBrowserController.showDevelopmentPreview() }
         if CommandLine.arguments.contains("--glass-preview") { GlassAppearancePreview.show() }
+        if CommandLine.arguments.contains("--tab-preview"), let window = terminalWindowControllers.first?.window {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self, weak window] in
+                guard let self, let window else { return }
+                window.terminalSplit?.splitRight(nil)
+                self.newTab(beside: window, sender: nil)
+                self.newTab(beside: window, sender: nil)
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
+        if CommandLine.arguments.contains("--pane-preview"),
+           let split = terminalWindowControllers.first?.window?.terminalSplit {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                split.splitRight(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { split.splitDown(nil) }
+            }
+        }
         #endif
         // A notification click jumps back to its command
         // (`AppDelegate+Notifications.swift`).
@@ -358,48 +337,49 @@ extension AppDelegate {
         // crash still has a last-known-good layout.
         defer { SessionRestore.standard.endRestore() }
 
-        var restored: [(state: WindowState, controller: NSWindowController)] = []
-        for state in states {
-            let controller = makeWindowController(setup: SplitViewController.Setup(restore: state))
-            // Keep the saved identity for intents resolved last run.
-            if let id = state.id { controller.windowID = id }
+        var opened = 0
+        for ordered in Self.restoredWindows(states) {
+            guard let first = ordered.first else { continue }
+            let controller = makeWindowController(setup: SplitViewController.Setup(restore: first))
+            for state in ordered.dropFirst() {
+                controller.addTab(setup: SplitViewController.Setup(restore: state), select: false)
+            }
+            // Every tab's splits now, while each is still laid out at the
+            // window's frame; a tab hidden behind the selected one would
+            // otherwise wait until it is first shown.
+            for tab in controller.tabs { tab.split.applyPendingRestore() }
+            if let selected = ordered.firstIndex(where: \.isSelectedTab), ordered.count > 1 {
+                controller.selectTab(controller.tabs[selected])
+            }
             controller.showWindow(nil)
             controller.window?.makeKeyAndOrderFront(nil)
-            restored.append((state, controller))
+            opened += 1
         }
-        regroupRestoredTabs(restored)
-        return !restored.isEmpty
+        return opened > 0
     }
 
-    /// Regroups restored windows by `tabGroupID`, in saved order, reselecting
-    /// the frontmost. Groups of one are left alone.
-    func regroupRestoredTabs(
-        _ restored: [(state: WindowState, controller: NSWindowController)]
-    ) {
-        let byGroup = Dictionary(grouping: restored.filter { $0.state.tabGroupID != nil }) {
-            $0.state.tabGroupID!
-        }
-        for (_, members) in byGroup {
-            guard members.count > 1 else { continue }
-            let ordered = members.sorted { ($0.state.tabIndex ?? 0) < ($1.state.tabIndex ?? 0) }
-            guard var previous = ordered.first?.controller.window else { continue }
-            // Add each tab after the previous one: `.above` inserts right after the
-            // receiver, so adding to the first reversed the order.
-            for member in ordered.dropFirst() {
-                guard let window = member.controller.window else { continue }
-                previous.addTabbedWindow(window, ordered: .above)
-                previous = window
-            }
-            if let selected = ordered.first(where: { $0.state.isSelectedTab })?.controller.window {
-                selected.makeKeyAndOrderFront(nil)
-            }
-            // Only the selected window lays out on its own, and the saved frames
-            // already include the tab bar (`adoptChromeWithoutAbsorbing`).
-            for member in ordered {
-                (member.controller.contentViewController as? SplitViewController)?
-                    .adoptChromeWithoutAbsorbing()
+    /// Saved states as windows, each its tabs in saved order (D30): one
+    /// window per tab group, in the order its first tab was saved; a state
+    /// with no group is a window of its own.
+    ///
+    /// A group is its identity and its frame together. Arrangements saved
+    /// with macOS's own tabs gave every group the same identity — the
+    /// windows' shared `tabbingIdentifier` — and only the frame, which
+    /// every tab of one window shares, tells two of those windows apart.
+    static func restoredWindows(_ states: [WindowState]) -> [[WindowState]] {
+        var windows: [[WindowState]] = []
+        var groupIndex: [String: Int] = [:]
+        for state in states {
+            let frame = state.frame
+            let key = state.tabGroupID.map { "\($0)|\(frame.x),\(frame.y),\(frame.width),\(frame.height)" }
+            if let key, let index = groupIndex[key] {
+                windows[index].append(state)
+            } else {
+                if let key { groupIndex[key] = windows.count }
+                windows.append([state])
             }
         }
+        return windows.map { members in members.sorted { ($0.tabIndex ?? 0) < ($1.tabIndex ?? 0) } }
     }
 
     private func saveWindowStates() {
@@ -408,7 +388,7 @@ extension AppDelegate {
             return
         }
         SessionRestore.standard.save(
-            windowControllers.compactMap { ($0 as? TerminalWindowController)?.restorableState })
+            windowControllers.flatMap { ($0 as? TerminalWindowController)?.restorableStates ?? [] })
     }
 
     // MARK: - Keeping the arrangement current
@@ -443,23 +423,21 @@ extension AppDelegate {
     /// visible one), answered later; app-modal, answered now, when none is
     /// visible.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        let running = windowControllers.compactMap {
-            ($0.contentViewController as? SplitViewController)
-        }.flatMap(\.panesWithRunningJobs)
-        guard let split = windowControllers.first?.contentViewController as? SplitViewController,
+        let running = windowControllers.flatMap { $0.window?.terminalSplits ?? [] }
+            .flatMap(\.panes).filter { $0.session?.hasForegroundJob == true }
+        guard let split = windowControllers.first?.window?.terminalSplit,
             split.needsCloseConfirmation(for: running)
         else { return .terminateNow }
         // Already asking: that sheet answers this quit too.
         guard !isAskingToTerminate else { return .terminateCancel }
-        // Not the Quick Terminal, which hides — sheet and all — when Corta
-        // loses activation, nor a window already showing a sheet.
+        // Only terminal windows with room to present a confirmation sheet.
         let windows = windowControllers.compactMap { controller -> NSWindow? in
-            guard let terminal = controller as? TerminalWindowController, !terminal.isQuickTerminal
+            guard let terminal = controller as? TerminalWindowController
             else { return nil }
             return terminal.window
         }.filter { NSAlert.canPresentSheet(on: $0) }
         guard let window = windows.first(where: \.isKeyWindow) ?? windows.first,
-            let presenter = window.contentViewController as? SplitViewController
+            let presenter = window.terminalSplit
         else {
             let alert = split.closeAlert(for: running, scope: L10n.text("close.scope.app"))
             return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
@@ -483,11 +461,10 @@ extension AppDelegate {
         SSHAskpassBroker.shared.stop()
         // The secure-input count must reach zero before exit.
         SecureInput.shared.disengage()
-        QuickTerminalController.shared.teardown()
         // Not every quit path reaches `windowWillClose`; tear down explicitly
         // rather than leave children to SIGHUP.
         for controller in windowControllers {
-            (controller.contentViewController as? SplitViewController)?.teardown()
+            for split in controller.window?.terminalSplits ?? [] { split.teardown() }
         }
     }
 

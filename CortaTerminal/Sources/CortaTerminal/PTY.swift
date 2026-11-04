@@ -314,6 +314,13 @@ extension PTY {
         return Self.processName(ofGroup: group)
     }
 
+    /// An interpreter's script or module, read from the foreground leader.
+    /// Absent for unreadable processes and native executables.
+    public var activeProcessEntryPoint: String? {
+        guard let group = foregroundProcessGroup, let name = Self.processName(of: group) else { return nil }
+        return ProcessEntryPoint.read(pid: group, process: name)
+    }
+
     /// The group leader's name, else a live member's: in `seq 1 500 | less`
     /// the leader is `seq`, gone at once while `less` holds the terminal, and
     /// a nameless foreground job read as "remote?" in the title.
@@ -338,7 +345,8 @@ extension PTY {
         guard length > 0 else { return nil }
         let bytes = buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }
         let name = String(decoding: bytes, as: UTF8.self)
-        return name.isEmpty ? nil : name
+        guard !name.isEmpty else { return nil }
+        return VersionedExecutable.resolve(pid: pid, name: name) ?? name
     }
 
     /// From the kernel (`proc_pidinfo`): stock macOS zsh emits OSC 7 only for

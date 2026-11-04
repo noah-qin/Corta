@@ -33,11 +33,15 @@ final class PaneWindowTitle {
     var resolveRemoteState: () -> PaneRemoteState = { .local }
     /// The window the title is applied to.
     var window: () -> NSWindow? = { nil }
+    /// The tab the pane is in (D30); a background tab's title shows only in
+    /// the strip, never as the window's.
+    var tab: () -> TerminalTab? = { nil }
     /// The grid size last sent to the child, shown while it is changing.
     var gridSize: () -> TerminalSize? = { nil }
     /// Whether a deferred rebuild may still apply: the pane is open and
     /// focused. An unfocused pane's title applies on focus.
     var canApplyDeferred: () -> Bool = { false }
+    var refreshBackgroundPresentation: () -> Void = {}
     /// Whether a path is a directory — a `stat`, which can block on a mount
     /// that never answers, so it runs off the main actor.
     private let isDirectory: @Sendable (String) -> Bool
@@ -53,6 +57,12 @@ final class PaneWindowTitle {
     }
 
     private var cachedProcessName: String?
+    private var cachedEntryPoint: String?
+    /// The foreground program has taken the terminal (no `ICANON`, no
+    /// `ECHO`): a REPL, an editor, an agent, a connected `ssh`. Only then
+    /// does a tab wear its icon — `java -version` or `git status` run and
+    /// are gone, and their icon flashed by and read as some other program's.
+    private var cachedIsInteractive = false
     private var cachedDirectory: String?
     /// `cachedDirectory` if it was a directory when it last changed: the
     /// title bar's proxy icon.
@@ -66,6 +76,9 @@ final class PaneWindowTitle {
     /// A title rebuild waiting out `processFactsInterval`; at most one, and
     /// cancelled by `stop`.
     private var trailingTitleRefresh: DispatchWorkItem?
+    /// The trailing refresh is running: what it redraws reads the facts it
+    /// just took, and must not schedule another (a 0.4 s loop per pane).
+    private var isRunningTrailingRefresh = false
     private var isShowingTransientSize = false
     private var transientSizeReset: DispatchWorkItem?
     private var isStopped = false
@@ -127,12 +140,28 @@ final class PaneWindowTitle {
         return parts.isEmpty ? "Corta" : parts.joined(separator: " — ")
     }
 
+    /// Compact chrome uses the same bounded process/directory cache as the
+    /// full title. The complete OSC title remains in the window and tooltip.
+    var tabLabel: ProgramTabLabel {
+        // No trailing refresh from here: the strip reads every label, and the
+        // pass a trailing refresh redraws would schedule the next, pane after
+        // pane. Output schedules it instead (`noteOutput`).
+        if let session { refreshProcessFactsIfStale(session, scheduleTrailing: false) }
+        let process = Self.sanitizedTitleComponent(cachedProcessName) ?? "Corta"
+        let program = ProgramIcon.identify(process, entryPoint: cachedEntryPoint)
+        let icon = cachedIsInteractive ? program : .terminal
+        let directory = Self.sanitizedTitleComponent(cachedDirectory.map(Self.abbreviated)) ?? ""
+        let remote = Self.sanitizedTitleComponent(cachedRemoteState.titleComponent)
+        return ProgramTabLabel(icon: icon, name: icon.displayName ?? process,
+                               context: remote.map { $0 + (directory.isEmpty ? "" : " · " + directory) } ?? directory)
+    }
+
     /// The finished-task notice's title: the user's own tab name, else the
     /// directory the kernel confirms. Never the OSC 0/2 title or the remote
     /// badge — a program's text, which macOS would show as Corta's own words
     /// in a system notification, on the lock screen too.
     var notificationTitle: String {
-        if let custom = (window()?.windowController as? TerminalWindowController)?.customTabTitle {
+        if let custom = tab()?.customTitle {
             return custom
         }
         return Self.sanitizedTitleComponent(session?.currentDirectory.map(Self.abbreviated)) ?? "Corta"
@@ -151,7 +180,12 @@ final class PaneWindowTitle {
     /// path here to offer a drag of.
     func apply() {
         guard let window = window() else { return }
-        let title = (window.windowController as? TerminalWindowController)?.customTabTitle ?? composed
+        let tab = tab()
+        if let tab, !tab.isSelected {
+            tab.controller?.refreshTabStrip()
+            return
+        }
+        let title = tab?.customTitle ?? composed
         if window.title != title { window.title = title }
         (window.windowController as? TerminalWindowController)?.refreshTabTitle()
 
@@ -235,15 +269,17 @@ final class PaneWindowTitle {
     /// exiting announces itself with output — the far end's banner, the
     /// local shell's returning prompt — so the badge follows within one
     /// interval, with no timer of its own.
-    private func refreshProcessFactsIfStale(_ session: TerminalSession) {
+    private func refreshProcessFactsIfStale(_ session: TerminalSession, scheduleTrailing: Bool = true) {
         let now = CACurrentMediaTime()
         let elapsed = now - lastProcessFactsRefresh
         guard elapsed >= Self.processFactsInterval else {
-            scheduleTrailingTitleRefresh(after: Self.processFactsInterval - elapsed)
+            if scheduleTrailing { scheduleTrailingTitleRefresh(after: Self.processFactsInterval - elapsed) }
             return
         }
         lastProcessFactsRefresh = now
         cachedProcessName = session.activeProcessName
+        cachedEntryPoint = session.activeProcessEntryPoint
+        cachedIsInteractive = session.pty.isInRawMode
         let directory = session.currentDirectory
         if directory != cachedDirectory {
             cachedDirectory = directory
@@ -257,15 +293,27 @@ final class PaneWindowTitle {
     /// back the prompt within the interval is followed by nothing: without
     /// this, `kitten icat` left "— kitten" in the title until the next output.
     private func scheduleTrailingTitleRefresh(after delay: CFTimeInterval) {
-        guard trailingTitleRefresh == nil, !isStopped else { return }
+        guard trailingTitleRefresh == nil, !isStopped, !isRunningTrailingRefresh else { return }
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             trailingTitleRefresh = nil
-            guard !isStopped, canApplyDeferred() else { return }
-            apply()
+            guard !isStopped else { return }
+            isRunningTrailingRefresh = true
+            defer { isRunningTrailingRefresh = false }
+            // The header and the strip as well as the window title: `apply`
+            // alone left the focused pane's header on the old program.
+            if canApplyDeferred() { apply() }
+            refreshBackgroundPresentation()
         }
         trailingTitleRefresh = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    /// Output arrived, from any pane, shown or not: one rebuild follows once
+    /// the interval has passed, so a program that quits inside it does not
+    /// leave its icon and name on a background tab or an unfocused pane.
+    func noteOutput() {
+        scheduleTrailingTitleRefresh(after: Self.processFactsInterval)
     }
 
     /// On focus and command boundaries, where waiting out the interval would

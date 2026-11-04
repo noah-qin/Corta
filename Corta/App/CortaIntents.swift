@@ -23,7 +23,7 @@ import AppKit
 /// and on the hosted CI runner that stalled the test host's main thread
 /// ~40 s. Shortcuts reads intents from bundle metadata without it.
 ///
-/// **Surfaces, never text.** Open, focus, toggle the Quick Terminal; no
+/// **Surfaces, never text.** Open and focus windows; no
 /// "run a command", nothing that reaches a child's stdin. Automation is
 /// external input (`SECURITY.md` §2). The one parameter is a working
 /// directory: a path handed to `spawn`, checked, never typed.
@@ -47,10 +47,12 @@ struct TerminalWindowEntity: AppEntity {
         DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title))
     }
 
+    /// A tab is what an intent calls a window (D30): it is what had its
+    /// own identity when every tab was a window.
     @MainActor
-    init(controller: TerminalWindowController) {
-        id = controller.windowID
-        let title = controller.window?.title ?? ""
+    init(tab: TerminalTab) {
+        id = tab.id
+        let title = tab.customTitle ?? tab.split.focusedPane?.windowTitle.composed ?? ""
         self.title = title.isEmpty ? "Corta" : title
     }
 }
@@ -71,7 +73,7 @@ struct TerminalWindowQuery: EntityQuery {
     @MainActor
     static func openWindows() -> [TerminalWindowEntity] {
         guard let delegate = NSApp.delegate as? AppDelegate else { return [] }
-        return delegate.terminalWindowControllers.map(TerminalWindowEntity.init)
+        return delegate.terminalTabs.map(TerminalWindowEntity.init(tab:))
     }
 }
 
@@ -111,10 +113,10 @@ struct OpenTerminalWindowIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<TerminalWindowEntity> {
         let path = try await Self.validatedDirectoryOffMain(directory)
         guard let delegate = NSApp.delegate as? AppDelegate,
-            let controller = delegate.openWindow(workingDirectory: path)
+            let tab = delegate.openWindow(workingDirectory: path)?.selectedTab
         else { throw CortaIntentError.windowNotCreated }
         NSApp.activate()
-        return .result(value: TerminalWindowEntity(controller: controller))
+        return .result(value: TerminalWindowEntity(tab: tab))
     }
 
     /// An existing directory's path, or nil for home. Anything else is
@@ -161,22 +163,6 @@ struct FocusTerminalWindowIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         guard let delegate = NSApp.delegate as? AppDelegate, delegate.focusWindow(id: window.id)
         else { throw CortaIntentError.windowNotFound }
-        return .result()
-    }
-}
-
-/// The hotkey's toggle, for binding outside Corta.
-struct ToggleQuickTerminalIntent: AppIntent {
-    static let title: LocalizedStringResource = "Toggle Quick Terminal"
-    // periphery:ignore - AppIntent metadata the system reads, not this code
-    static let description = IntentDescription(
-        "Shows the Quick Terminal if it is hidden, and hides it if it is showing.",
-        categoryName: "Windows")
-    static let openAppWhenRun = true
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        QuickTerminalController.shared.toggle()
         return .result()
     }
 }

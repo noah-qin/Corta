@@ -62,12 +62,10 @@ final class CompatibilityUITests: XCTestCase {
         menu.menuItems["Settings…"].click()
         let settings = app.windows["Corta.Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        settings.outlines.firstMatch.staticTexts["Appearance"].click()
-        let mode = settings.popUpButtons["appearance-mode"]
+        settings.settingsCategory("Appearance").click()
         let reports = stage.appendingPathComponent("reports.txt")
         for (choice, expected) in [("Light", "1b5b3f3939373b326e"), ("Dark", "1b5b3f3939373b316e")] {
-            mode.click()
-            mode.menuItems[choice].click()
+            settings.buttons["appearance-" + choice.lowercased()].click()
             let observed = NSPredicate { _, _ in
                 (try? String(contentsOf: reports, encoding: .utf8).contains(expected)) == true
             }

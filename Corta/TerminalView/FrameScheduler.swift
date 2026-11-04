@@ -37,6 +37,9 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     /// The per-frame prepare/diff work; returns whether anything is still
     /// pending. The drawable is presented either way; `false` only pauses.
     var shouldRenderFrame: (() -> Bool)?
+    /// The view is hidden — a background tab (D30): no frames until it shows,
+    /// which asks for one.
+    var isHidden: () -> Bool = { false }
 
     private let driver: DiagnosticsEnvironment.FrameDriver
     private weak var window: NSWindow?
@@ -117,7 +120,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
 
     /// Wakes the scheduler for the next vsync. Idempotent, main thread.
     func resume() {
-        guard window?.occlusionState.contains(.visible) != false else { return }
+        guard window?.occlusionState.contains(.visible) != false, !isHidden() else { return }
         if RenderMetrics.isEnabled, isPaused {
             resumedAt = CACurrentMediaTime()
             previousPresentationTimestamp = nil

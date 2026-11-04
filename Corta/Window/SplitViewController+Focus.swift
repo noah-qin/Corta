@@ -19,6 +19,19 @@ import Cocoa
 // MARK: - Focus
 
 extension SplitViewController {
+    /// Gives `pane` the keyboard. In a tab behind the selected one (D30) it
+    /// becomes the tab's focused pane without taking first responder, which
+    /// would route the selected tab's typing to a hidden pane.
+    func takeFocus(_ pane: ViewController) {
+        // Noted first: a pane whose renderer failed has no terminal view to
+        // become first responder, and a header button then acted on the
+        // pane focused before it.
+        noteFocus(pane)
+        if isSelectedTab, let terminalView = pane.terminalView {
+            view.window?.makeFirstResponder(terminalView)
+        }
+    }
+
     func noteFocus(_ pane: ViewController) {
         guard focusedPane !== pane else { return }
         let previous = focusedPane
@@ -28,12 +41,18 @@ extension SplitViewController {
         pane.invalidateDisplay()
         previous?.focus.applyAppearance()
         pane.focus.applyAppearance()
+        for child in panes { child.paneHeader.refresh() }
         applyWindowTitle()
     }
 
     /// The focused pane's title; a title in an unfocused pane waits for focus.
     func applyWindowTitle() {
         guard let window = view.window else { return }
+        // A background tab's title shows in the strip only (D30).
+        guard isSelectedTab else {
+            tab?.controller?.refreshTabStrip()
+            return
+        }
         guard let focusedPane else {
             window.title = "Corta"
             window.representedURL = nil
@@ -52,16 +71,24 @@ extension SplitViewController {
             let leaf = tree.leaf(from: focusedPane.view, direction: direction, inContainer: view),
             let target = pane(forLeaf: leaf)
         else { return }
-        view.window?.makeFirstResponder(target.terminalView)
+        takeFocus(target)
     }
 
     /// Focus moves need more than one pane.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
         case #selector(selectPreviousCortaTab(_:)), #selector(selectNextCortaTab(_:)):
-            return (view.window?.tabbedWindows?.count ?? 0) > 1
+            return (tab?.controller?.tabs.count ?? 0) > 1
         case #selector(renameCurrentTab(_:)):
-            return view.window != nil
+            return tab != nil
+        case #selector(selectCortaTab1(_:)), #selector(selectCortaTab2(_:)), #selector(selectCortaTab3(_:)),
+            #selector(selectCortaTab4(_:)), #selector(selectCortaTab5(_:)), #selector(selectCortaTab6(_:)),
+            #selector(selectCortaTab7(_:)), #selector(selectCortaTab8(_:)):
+            // Only a tab that is there; ⌘9 always has a last one.
+            let number = TerminalCommand.tabSelection.first { $0.action == menuItem.action }?.tabNumber ?? 0
+            return number <= (tab?.controller?.tabs.count ?? 0)
+        case #selector(selectLastCortaTab(_:)):
+            return tab?.controller != nil
         case #selector(moveFocusLeft(_:)), #selector(moveFocusRight(_:)),
             #selector(moveFocusUp(_:)), #selector(moveFocusDown(_:)):
             return tree != nil && tree.leafCount > 1
@@ -101,13 +128,27 @@ extension SplitViewController {
 
     /// The tree's minimum plus the chrome; the divider constraints keep drags
     /// from crushing a pane first.
+    /// Only the tab in front sets it: the window is shared (D30), and a
+    /// background tab's tree recomputes it when it comes to the front
+    /// (`didBecomeSelectedTab`).
     func updateWindowMinSize() {
-        guard let window = view.window, let pane = panes.first else { return }
+        guard let window = view.window, let pane = panes.first, tab?.isSelected ?? true else { return }
         let treeMinimum = tree.minimumSize(
-            of: tree.root, leafSize: leafMinimumSize, dividerThickness: 1)
-        window.contentMinSize = NSSize(
-            width: treeMinimum.width,
-            height: treeMinimum.height + pane.windowChrome + statusBarHeight)
+            of: tree.root, leafSize: leafMinimumSize, dividerThickness: PaneSurfaceView.gap)
+        let minimum = NSSize(
+            width: treeMinimum.width + 2 * contentMargin,
+            height: treeMinimum.height + pane.windowChrome + statusBarHeight + 2 * contentMargin)
+        window.contentMinSize = minimum
+        // Setting a minimum does not enlarge an already smaller window.
+        // Grow it before positioning dividers so both new cards actually fit.
+        if !window.styleMask.contains(.fullScreen),
+           window.frame.width < minimum.width || window.frame.height < minimum.height {
+            var frame = window.frame
+            let height = max(frame.height, minimum.height)
+            frame.origin.y -= height - frame.height
+            frame.size = NSSize(width: max(frame.width, minimum.width), height: height)
+            window.setFrame(frame, display: true)
+        }
     }
 
     private func leafMinimumSize(_ leaf: NSView) -> CGSize {
@@ -116,7 +157,7 @@ extension SplitViewController {
 
     private func minimumAxis(of subtree: NSView, vertical: Bool) -> CGFloat {
         let size = tree.minimumSize(
-            of: subtree, leafSize: leafMinimumSize, dividerThickness: 1)
+            of: subtree, leafSize: leafMinimumSize, dividerThickness: PaneSurfaceView.gap)
         return vertical ? size.width : size.height
     }
 }

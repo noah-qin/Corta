@@ -1,0 +1,220 @@
+[
+  {
+    "name": "Grok",
+    "library": "lobe",
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.102.0/icons/grok.svg",
+    "sha256": "9175fc90c22655160231976c849f25a03b888d7cc0e04c5f1b987b659bb07c95"
+  },
+  {
+    "name": "Gemini",
+    "library": "lobe",
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.102.0/icons/gemini.svg",
+    "sha256": "87d5b3c4be75a66f54c1936482a263df68185545b741129badd1b7c2449c18d3",
+    "note": "Arc flags written out (`0 0 1` for `01`): Xcode's SVG reader stopped at the run-together form and drew a dot. The shape is unchanged; sha256 is the downloaded file's.",
+    "shippedSha256": "dd1c612362a901bfc4c9d580987a5e6874e8c03cabd5265de2466a445f6f0c83"
+  },
+  {
+    "name": "Qwen",
+    "library": "lobe",
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.102.0/icons/qwen.svg",
+    "sha256": "b2c16efc3bd32b88a941842d41222e1e1e0e40441222218b725afc0aef6d9a36"
+  },
+  {
+    "name": "Opencode",
+    "library": "lobe",
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.102.0/icons/opencode.svg",
+    "sha256": "7cfa6e9d6726f7c9fa26c7d9aef0dfec52d20a137380454340f30f12ccbfd302"
+  },
+  {
+    "name": "Ollama",
+    "library": "lobe",
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.102.0/icons/ollama.svg",
+    "sha256": "3a268218fb2e6e81fa31df70f70b51331625047794db81db21d35359428fae7a"
+  },
+  {
+    "name": "Copilot",
+    "library": "lobe",
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.102.0/icons/githubcopilot.svg",
+    "sha256": "bbc7fddc13448236e5edea8c399d2072dc40aa5da5bca07f7a2f412405c500a3"
+  },
+  {
+    "name": "Goose",
+    "library": "lobe",
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.102.0/icons/goose.svg",
+    "sha256": "8779d9a61c5b0be78a3d36cab6843ba5af86218ba2ff1b18eb918c7a8d25bb99"
+  },
+  {
+    "name": "Node",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/nodedotjs.svg",
+    "sha256": "021851b758cde7d3e04819c3ac02047d0ff281c712e8387afa0c76a6dac6db6c"
+  },
+  {
+    "name": "Bun",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/bun.svg",
+    "sha256": "f356fc1ec5659e73e9b1e881ef2785a4fc4e0e3d82b446e6484f55303546dc6d"
+  },
+  {
+    "name": "Deno",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/deno.svg",
+    "sha256": "cc9065552101a5e8662ff0d380ab81dc9135de13930a6a2c536b5577931adef7"
+  },
+  {
+    "name": "Ruby",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/ruby.svg",
+    "sha256": "956992a81b988b916efdd6f7a78b9f19fe352b5c04f2019af2ce1a89e390ac9d"
+  },
+  {
+    "name": "Go",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/go.svg",
+    "sha256": "36a745fe15584bf138d02ae6abcbdd155bc1cd4f4976634ad34861b2059db559"
+  },
+  {
+    "name": "Rust",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/rust.svg",
+    "sha256": "95a291d8887610d103704adcc5c5f2cbfa4c80a96f8e72b00531d5691beb67a8"
+  },
+  {
+    "name": "Php",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/php.svg",
+    "sha256": "cd1beaa0dde7e765b5d2cbae786c1f6db967f72073eb7b9f9bbc63da55b9d0f6"
+  },
+  {
+    "name": "Lua",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/lua.svg",
+    "sha256": "ea6e362187dd07d589930f3bb12e5c624253c60767a554d9ecbea4585cc29a60"
+  },
+  {
+    "name": "Swift",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/swift.svg",
+    "sha256": "b3d5f49cc459b7a3417db134ec70052c30305c3799d0f854796544c52c18a4bc"
+  },
+  {
+    "name": "Julia",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/julia.svg",
+    "sha256": "d7471ddca5a25f72c43f433726b00c324175f0fe1b80011ff3e77e750f273f9d"
+  },
+  {
+    "name": "R",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/r.svg",
+    "sha256": "3f2e47349d136c4a75cf081318b72c08ecf816c70c99d08a694a43ed5e10bf81"
+  },
+  {
+    "name": "Git",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/git.svg",
+    "sha256": "95724d436215d483de82288610c3c144854138f49945424697fcdf8be66e17d6"
+  },
+  {
+    "name": "Docker",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/docker.svg",
+    "sha256": "65571291c261ef869c31540a38f3ca0f0ee3bb73f179c172211c8860f19a6359"
+  },
+  {
+    "name": "Kubernetes",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/kubernetes.svg",
+    "sha256": "ceee2f4e87fa1533600672190c156194039f744fa9b5da10e83f002178e84b47"
+  },
+  {
+    "name": "Vim",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/vim.svg",
+    "sha256": "d3a39e8a2820764d98e9f481f6dd8bc90fe49788fb5f682e742eb3c98f2fc39e"
+  },
+  {
+    "name": "Neovim",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/neovim.svg",
+    "sha256": "b82225d459a28530dfdabb93b78bee75e1cf070feebfee70fd393266710e6b04"
+  },
+  {
+    "name": "Emacs",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/gnuemacs.svg",
+    "sha256": "2136713d4eb0d749347f1a720524d93b2b094b8cc523b0c8fac10dfd36f9a07c"
+  },
+  {
+    "name": "Tmux",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/tmux.svg",
+    "sha256": "c1cd9bc882acccfc1d6b590b82b0b1786416601250bc4c7e15ead08d40f3d34f"
+  },
+  {
+    "name": "Npm",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/npm.svg",
+    "sha256": "00b410dc2c839cfa62910a065eaf28a48cbdb4babe503cf34d475cc94ba03be1"
+  },
+  {
+    "name": "Pnpm",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/pnpm.svg",
+    "sha256": "c6285a2d1fa28b8d6c42cd7f7edf360434371ff6f15744425c4444e41fed812b"
+  },
+  {
+    "name": "Yarn",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/yarn.svg",
+    "sha256": "c2addf3dc035d6d2ddeb4b8b828a0bdc2ed358b48e7e50725aa7bbdc08466904"
+  },
+  {
+    "name": "Postgres",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/postgresql.svg",
+    "sha256": "c8ccadbd88c9312c2ad3734c4861b31d3485ce179ee91d64793143f83cfa745c"
+  },
+  {
+    "name": "Mysql",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/mysql.svg",
+    "sha256": "67c144cc3e44ad14062a3f20ebe29c5e7eeb2c2c9c0f43cf48d87fe6291a8b2d"
+  },
+  {
+    "name": "Redis",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/redis.svg",
+    "sha256": "428b86deb14c8bdacdcdf75987fe454f367bcd078a7e4ae3f84de29aa5bdf136"
+  },
+  {
+    "name": "Sqlite",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/sqlite.svg",
+    "sha256": "71d4153bc9661dfe6b92dad70f737ec2b6c7c839311e502b4ca66fe664fe12b6"
+  },
+  {
+    "name": "Python",
+    "library": "simple",
+    "url": "https://unpkg.com/simple-icons@16.36.0/icons/python.svg",
+    "sha256": "ad9468e1c4903f73ae7eebfbe980f0f727a10db695be3d914e7d8bd25356a862"
+  },
+  {
+    "name": "Claude",
+    "library": "lobe",
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.102.0/icons/claude.svg",
+    "sha256": "365a70a7eb3956d9b9a96086058ebe04e1dbd8e291a756ad964e8a283fbd6d38"
+  },
+  {
+    "name": "Codex",
+    "library": "lobe",
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.102.0/icons/openai.svg",
+    "sha256": "a595df6b423920c67a7f8f73c063e4bfb72d415948097b6cac063a2366bb5186"
+  },
+  {
+    "name": "Kimi",
+    "library": "lobe",
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.102.0/icons/kimi.svg",
+    "sha256": "ed08131b46acf70e6e2144eceb775e74098b58ea65fa21eaee04be7b05cfe63b"
+  }
+]

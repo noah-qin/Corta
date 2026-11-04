@@ -86,3 +86,21 @@ enum UIFixtures {
             file: file, line: line)
     }
 }
+
+extension XCUIElement {
+    /// A category row in the Settings window's sidebar, once the sidebar is
+    /// there: the window can exist a moment before its outline does.
+    /// A context menu's item by title. The Edit menu holds one of the same
+    /// name, so `menuItems[title]` matched two; only the open menu's is
+    /// hittable.
+    func openContextMenuItem(_ title: String) -> XCUIElement {
+        let matches = menuItems.matching(NSPredicate(format: "title == %@", title))
+        return matches.allElementsBoundByIndex.first { $0.isHittable } ?? matches.firstMatch
+    }
+
+    func settingsCategory(_ name: String) -> XCUIElement {
+        let sidebar = outlines.firstMatch
+        _ = sidebar.waitForExistence(timeout: 5)
+        return sidebar.buttons[name]
+    }
+}

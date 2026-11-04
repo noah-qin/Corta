@@ -187,21 +187,18 @@ final class SplitTree {
     }
 }
 
-/// The tree's internal node. The only reason to subclass is the divider:
-/// the stock `.thin` divider draws in a system chrome colour that reads as
-/// a harsh bright seam against the terminal's dark surface — and any
-/// *translucent* fill shows straight through the window (the window's
-/// background is `.clear`, so the 1pt strip between two opaque Metal
-/// surfaces is a see-through slit). The divider is therefore the pane
-/// background, painted opaque, with a barely-there light lift on top.
+/// The splitter is the gutter between independent rounded terminal cards.
 final class PaneSplitView: NSSplitView {
+    var onDividerInteraction: (() -> Void)?
+    override var dividerThickness: CGFloat { PaneSurfaceView.gap }
+
+    override func mouseDown(with event: NSEvent) {
+        onDividerInteraction?()
+        super.mouseDown(with: event)
+    }
+
     override func drawDivider(in rect: NSRect) {
-        let canvasColor = TerminalColorPalette.defaultBackground
-        NSColor(
-            srgbRed: CGFloat(canvasColor.x), green: CGFloat(canvasColor.y), blue: CGFloat(canvasColor.z), alpha: 1
-        ).setFill()
-        rect.fill()
-        NSColor.white.withAlphaComponent(0.12).setFill()
+        PaneSurfaceView.gutterColor.setFill()
         rect.fill()
     }
 }

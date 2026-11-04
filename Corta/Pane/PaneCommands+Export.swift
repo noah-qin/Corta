@@ -31,6 +31,7 @@ extension PaneCommands {
         host.pointer.dropSelectionIfRewritten(in: grid)
         guard let selection = host.selection else { return }
         let range = host.pointer.selectionRange(for: selection, in: grid)
+        let pushedAtCopy = grid.scrollback.totalPushed
         // The pasteboard is shared by every pane and app: recheck `changeCount`
         // before writing so a slow copy never clobbers a newer write.
         let changeCountAtStart = pasteboard.changeCount
@@ -56,9 +57,41 @@ extension PaneCommands {
                 }
                 pasteboard.clearContents()
                 pasteboard.setString(text, forType: .string)
-                // Confirm only a write that happened: copy-on-select is never silent.
-                self.host?.terminalView?.showToast(L10n.text("toast.copied"))
+                // Confirm only a write that happened: copy-on-select is never
+                // silent. Light runs along the copied text; a copy wholly
+                // scrolled out of view says so in a toast instead.
+                self.confirmCopy(of: range, pushedAtCopy: pushedAtCopy)
             }
+        }
+    }
+
+    /// The copied range's visible cells, one rect per row, in the terminal
+    /// view's coordinates; the glint runs along them.
+    /// `range` was measured against the snapshot taken at the copy; lines
+    /// pushed into scrollback since moved that text up, and so does the glint.
+    private func confirmCopy(of measured: SelectionRange, pushedAtCopy: Int) {
+        guard let host, let terminalView = host.terminalView, let session = host.session else { return }
+        let grid = session.snapshot()
+        let shift = grid.scrollback.totalPushed - pushedAtCopy
+        var range = measured
+        range.start.row -= shift
+        range.end.row -= shift
+        var rects: [CGRect] = []
+        for row in range.start.row...range.end.row {
+            let screenRow = row + host.scrollOffset
+            guard screenRow >= 0, screenRow < grid.rows else { continue }
+            let first = row == range.start.row ? range.start.column : 0
+            let last = row == range.end.row ? range.end.column : grid.columns - 1
+            guard last >= first,
+                let start = host.pointer.cellFrame(row: screenRow, column: first, rows: grid.rows),
+                let end = host.pointer.cellFrame(row: screenRow, column: min(last, grid.columns - 1), rows: grid.rows)
+            else { continue }
+            rects.append(start.union(end))
+        }
+        if rects.isEmpty {
+            terminalView.showToast(L10n.text("toast.copied"))
+        } else {
+            CopyGlintView.show(over: terminalView, rects: rects)
         }
     }
 

@@ -51,6 +51,28 @@ final class SplitPaneUITests: XCTestCase {
         waitForExpectations(timeout: 5)
     }
 
+    @MainActor
+    func testPaneHeaderActions() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
+        app.launch()
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+        let right = window.buttons.matching(identifier: "pane.splitRight").firstMatch
+        XCTAssertTrue(right.waitForExistence(timeout: 3))
+        right.click()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertEqual(window.buttons.matching(identifier: "pane.splitRight").count, 2)
+        // The first pane is unfocused. Its action must still operate on itself.
+        window.buttons.matching(identifier: "pane.splitDown").firstMatch.click()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertEqual(window.buttons.matching(identifier: "pane.splitRight").count, 3)
+        let attachment = XCTAttachment(screenshot: window.screenshot())
+        attachment.name = "pane-controls-preview"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     /// A visual record rather than an assertion: the panes are Metal
     /// surfaces, so the divider, the dim wash on the unfocused pane and the
     /// 50/50 geometry are verified by looking at the attachment in the

@@ -59,7 +59,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
-| `theme` | a theme name | `corta` | Built in: `corta`, `solarized` and `mono`, all offered in the UI (§4). A theme defined in this file wins over a built-in of the same name. |
+| `theme` | a theme name, or `light:<name>,dark:<name>` | `corta` | One name serves both appearances; the pair gives light and dark mode a theme each, and a side left out is `corta`; a name with `:` or `,` in it cannot be chosen. Built in: `corta`, `solarized` and `mono`, all offered in the UI (§4). A theme defined in this file wins over a built-in of the same name. |
 | `appearance` | `auto`, `light`, `dark` | `auto` | Which of the theme's two variants is live. `auto` follows macOS and switches while running. |
 | `status-bar` | boolean | `false` | Show a bottom bar of local system metrics. Click it for local host details. Sampling pauses when every enabled bar is hidden. |
 | `status-items` | comma-separated `cpu`, `load`, `memory`, `network`, `disk`, `thermal` | all six | Choose metrics to collect and display. Empty shows the local-host details button without periodic sampling. |
@@ -80,25 +80,8 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | --- | --- | --- | --- |
 | `columns` | 20–500 | `120` | The grid a **new** window opens with, in cells. |
 | `rows` | 5–300 | `30` | As above. The window's size in pixels is this grid times the font's cell metrics plus the pane insets — so two terminals showing the same `columns × rows` are still different sizes on screen if their fonts differ. |
-| `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. The Quick Terminal is excluded. |
+| `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. |
 | `confirm-close` | boolean | `true` | Ask before closing a pane, window or the app while a shell still has a foreground job. |
-
-#### Quick Terminal
-
-One terminal window summoned and dismissed from any application. It is an
-ordinary Corta window dressed as a panel — the same panes, splits and
-teardown — that floats above other windows, appears on every Space and
-beside full-screen apps, takes no tabs (⌘T from it opens a normal window)
-and is never saved into the restored arrangement. Dismissing it with the
-hotkey returns focus to the application it was summoned from; clicking
-into another application hides it without moving focus again.
-
-| Key | Values | Default | Notes |
-| --- | --- | --- | --- |
-| `quick-terminal` | boolean | `false` | Whether Corta holds `quick-terminal-key` **system-wide**. Off by default: a global hotkey is claimed in every application, and the key a person would want is one their launcher may already own. The panel is always reachable from View ▸ Quick Terminal, the command palette and the *Toggle Quick Terminal* Shortcuts action — this key only adds the hotkey. |
-| `quick-terminal-key` | a shortcut, or empty | `alt+space` | In `bind.*` notation (§5). Needs a modifier other than Shift — a bare key, or a Shift one (a capital letter, a symbol, a selection), claimed everywhere would swallow ordinary typing. The key is matched by **position on the ANSI layout**, the way every Carbon hotkey is, so `t` names the key cap, not what the current input source types there. Empty means no hotkey. If the system refuses the registration (another app holds the key) Settings ▸ Quick Terminal says so; the panel then opens from the menu only. |
-| `quick-terminal-position` | `top`, `bottom`, `center` | `top` | `top`/`bottom`: a band the width of the screen and 40% of its visible height, on that edge — under the menu bar and clear of the Dock. `center`: a panel 70% × 60% of the screen, centred. |
-| `quick-terminal-screen` | `mouse`, `main` | `mouse` | Which display the panel opens on: the one under the pointer when the hotkey is pressed, or `NSScreen.main` (the display holding the key window, else the primary). |
 
 ### Terminal
 
@@ -111,7 +94,7 @@ into another application hides it without moving focus again.
 | `input-source-indicator` | `auto`, `always`, `off` | `auto` | A persistent input-source badge in the window toolbar by default. `auto` enables it only when the user has enabled a non-Latin keyboard layout or an IME; `always` shows it for any input source. Every mode hides it in unfocused panes. In the toolbar it stays while a program runs, since it covers no output. With prompt placement, `auto` shows it at a ready shell prompt (without OSC 133 shell integration it falls back to the focused pane), `always` also during command output, and both hide it in scrollback and alternate-screen programs. With prompt placement, long input moves it downward without changing the grid; if no safe space remains it hides until the next prompt. Toolbar placement stays fixed. Applies immediately. Settings ▸ Keyboard & Mouse. |
 | `input-source-indicator-position` | `toolbar`, `prompt` | `toolbar` | Fixed window-toolbar status separated from network/file actions, or the original right-edge prompt overlay with long-command avoidance. Uses the focused pane’s state. Off and prompt placement remove the toolbar slot and its spacer. Applies immediately. Settings ▸ Keyboard & Mouse. |
 | `input-source-direct-color` | hex color, or empty | *(empty)* | Background for confirmed direct input (`A`). Empty uses quiet text over a faint fill: the theme's text colour when the badge sits beside the prompt, the system's in the toolbar. Accepts `#rgb` / `#rrggbb`; text automatically uses black or white for contrast. |
-| `input-source-ime-color` | hex color, or empty | *(empty)* | Background for a non-Latin keyboard layout or a reported built-in IME mode (`中`, `あ`, `한`). Empty uses a soft indigo tint. Third-party IMEs that do not expose their internal ASCII mode keep a neutral badge, independent of this color. |
+| `input-source-ime-color` | hex color, or empty | *(empty)* | Background for a non-Latin keyboard layout or a reported built-in IME mode (`中`, `あ`, `한`). Empty uses a soft indigo tint beside the prompt and gray in the toolbar. Third-party IMEs that do not expose their internal ASCII mode keep a neutral badge, independent of this color. |
 | `option-as-meta` | boolean | `false` | Whether ⌥ acts as Meta — an ESC prefix on the base character, the way a PC keyboard's Alt does — instead of composing the layout's alternate character. Off by default because on macOS ⌥ *is* text input: it types `é`, `ø`, `–`, and starts dead-key sequences, and an international layout needs that. Turn it on when a program wants `M-x` and `M-b`. Special keys are unaffected either way: ⌥ already reaches the child there as the xterm modifier parameter, and an IME still sees every event it would otherwise see. |
 | `open-file-command` | string | *(empty)* | The command run when a `path:line` reference in program output is ⌘-clicked. `{file}`, `{line}` and `{column}` are substituted, one argument at a time. The executable must be an **absolute path** and is run directly — never through a shell — so a path containing `;` or `$(…)` stays a path. For both local and remote references, a nonempty editor command is required. Empty disables opening: system default handlers can execute some file types. The hover tooltip names the required setting. The same template is used for the managed local copy the remote-editing flow downloads — `{file}` is the copy, the line and column are the reference's own. |
 | `search-regex` | boolean | `false` | Whether the search field is read as a regular expression (ICU syntax, as `NSRegularExpression` accepts it). The **`*`** button in the search bar writes this key. Three things are reported rather than shown as "no results": a pattern that does not compile, a pattern whose shape makes a backtracking engine take exponential time (`(a+)+`, `(a*)*`, `(a\|a)+` — every one has a linear equivalent, and it is refused *before* it runs because ICU's time limit is not reachable from Swift), and a sweep that stopped on its 500 ms budget or on a line longer than 64,000 units, which the match count marks with a `+`. |
@@ -121,7 +104,7 @@ into another application hides it without moving focus again.
 | `mouse-override-modifier` | `option`, `shift`, `control` | `option` | Hold this modifier when beginning a drag to select terminal text while a TUI owns the mouse. Applies immediately. The pane shows a hint on first use; `copy-on-select` controls automatic copying. |
 | `link-activation` | `command`, `click` | `command` | `command` opens a link on ⌘-click. `click` opens it on a plain click and underlines the link under the pointer; dragging across a URL still selects it. |
 | `allow-clipboard-write` | boolean | `false` | Whether OSC 52 may put text on the system clipboard — the only route from inside `tmux` or an `ssh` session. Off by default because *any* output could use it. The **read** direction does not exist under any setting (`SECURITY.md` §6). |
-| `secure-keyboard-entry` | boolean | `false` | Secure Keyboard Entry: while a Corta terminal window is key and Corta is the active application, the system stops delivering keystrokes to any other process — event taps, keyloggers, macro tools and accessibility clients alike. Shell ▸ Secure Keyboard Entry toggles this key and shows a checkmark; a lock in the titlebar shows when it is *actually engaged*, which is not while another app is frontmost or Settings is key. Off by default because it is system-wide and also silences the tools a person may rely on (`SECURITY.md` §4.5). The Quick Terminal's hotkey keeps working while it is on. |
+| `secure-keyboard-entry` | boolean | `false` | Secure Keyboard Entry: while a Corta terminal window is key and Corta is the active application, the system stops delivering keystrokes to any other process — event taps, keyloggers, macro tools and accessibility clients alike. Shell ▸ Secure Keyboard Entry toggles this key and shows a checkmark; a lock in the titlebar shows when it is *actually engaged*, which is not while another app is frontmost or Settings is key. Off by default because it is system-wide and also silences the tools a person may rely on (`SECURITY.md` §4.5). |
 
 #### Following a file reference
 
@@ -345,11 +328,6 @@ rows = 30
 restore-windows = true
 confirm-close = true
 
-# Quick Terminal
-quick-terminal = false
-quick-terminal-key = alt+space
-quick-terminal-position = top
-quick-terminal-screen = mouse
 
 # Terminal
 scrollback-lines = 50000           # default 10000
@@ -400,7 +378,8 @@ are *not* part of a theme: xterm defines them numerically, so a program
 asking for colour 137 means one specific colour.
 
 Corta offers three previewable themes: `corta`, `solarized` and `mono`.
-Select a preset in Settings → Appearance to preview it immediately.
+Settings → Themes lists them once for light mode and once for dark mode,
+and each mode keeps its own choice (`theme = light:solarized,dark:corta`).
 Existing custom selections and inheritance continue to work.
 
 ### Keys
@@ -564,6 +543,15 @@ the key against both rows, which is how you spot it.
 | `previous-tab` | Previous Tab | `shift+cmd+[` |
 | `next-tab` | Next Tab | `shift+cmd+]` |
 | `rename-tab` | Rename Tab… | *(none)* |
+| `select-tab-1` | Show Tab 1 | `cmd+1` |
+| `select-tab-2` | Show Tab 2 | `cmd+2` |
+| `select-tab-3` | Show Tab 3 | `cmd+3` |
+| `select-tab-4` | Show Tab 4 | `cmd+4` |
+| `select-tab-5` | Show Tab 5 | `cmd+5` |
+| `select-tab-6` | Show Tab 6 | `cmd+6` |
+| `select-tab-7` | Show Tab 7 | `cmd+7` |
+| `select-tab-8` | Show Tab 8 | `cmd+8` |
+| `select-last-tab` | Show Last Tab | `cmd+9` |
 | `close` | Close | `cmd+w` |
 | `split-right` | Split Pane Right | `cmd+d` |
 | `split-down` | Split Pane Down | `shift+cmd+d` |
@@ -610,7 +598,6 @@ the key against both rows, which is how you spot it.
 | `browse-remote-files` | Browse Remote Files… | *(none)* |
 | `previous-command` | Previous Command | `cmd+up` |
 | `next-command` | Next Command | `cmd+down` |
-| `quick-terminal` | Quick Terminal | *(none — the system-wide key is `quick-terminal-key`)* |
 | `secure-keyboard-entry` | Secure Keyboard Entry | *(none)* |
 | `settings` | Settings… | `cmd+,` |
 | `command-palette` | Command Palette… | `shift+cmd+p` |
@@ -783,8 +770,6 @@ search away.
 | `scrollback-lines` | Sessions started afterwards; a running shell keeps the history it has. |
 | `command-history-limit` | Sessions started afterwards, same reason as `scrollback-lines`. |
 | `restore-windows` | The next launch. |
-| `quick-terminal`, `quick-terminal-key` | Immediately — the hotkey is re-registered on every file change. |
-| `quick-terminal-position`, `quick-terminal-screen` | The next time the panel is summoned. |
 | `secure-keyboard-entry` | Immediately, whenever a terminal window is key. |
 | `update-auto-check` | Immediately — applied to the live Sparkle updater on every file change. |
 | `suggest-applications-folder` | The next launch. |
@@ -803,7 +788,7 @@ managed remote-edit copies. Their contents are not configuration keys.
 | `Configuration.presets` | same file | Named shell/directory/environment combinations | **Pane-launch configuration** — read once, at the moment a pane spawns from that preset; never re-applied afterwards (`docs/CONFIGURATION.md` §4a) |
 | `SessionRestore` | `state.json` | Window frames and split arrangement, restored on the next launch | **Window/session state** — describes *this run's* windows, not a preference about future ones |
 | `DirectoryHistoryStore` | `directory-history.json` | Ranked recent directories | **Temporary interaction history** — gated by `directory-history`; clear it in Privacy & Security ▸ History |
-| `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent Hosts |
+| `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent hosts |
 | `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — preserve undecided edits before deleting app data; used copies are pruned after 30 days unless edits are pending |
 
 Why separate stores: `Configuration` is line-oriented text

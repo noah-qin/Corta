@@ -52,17 +52,16 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let window = view.window
         let visible =
             window?.occlusionState.contains(.visible) == true && !view.isHiddenOrHasHiddenAncestor
-        let selected = window?.tabGroup.map { $0.selectedWindow === window } ?? true
-        if visible && selected {
+        if visible {
             readerHiddenSince = nil
         } else if readerHiddenSince == nil {
             readerHiddenSince = now
         }
         let priority = ReaderPriorityPolicy.priority(
-            visible: visible, selected: selected,
+            visible: visible, selected: true,
             hiddenSince: readerHiddenSince, lastInput: readerLastInput, now: now)
         session.setReaderPriority(priority)
-        if priority == .interactive, !(visible && selected) {
+        if priority == .interactive, !visible {
             let work = DispatchWorkItem { [weak self] in self?.updateReaderPriority() }
             readerDemotion = work
             DispatchQueue.main.asyncAfter(
@@ -123,6 +122,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     /// The fact a person scrolled up to wait for.
     var sawOutputWhileScrolled = false
+    /// A frame has drawn the child's output: a new tab can show this pane
+    /// without an empty canvas (`TabContainerViewController.show(_:holding:)`).
+    private(set) var drewFirstOutput = false
+    /// Runs once, as the first frame with output is prepared.
+    var onFirstOutputFrame: (() -> Void)?
     var selection: TerminalSelection?
     /// Non-nil exactly when `isOperable` is false.
     var failureView: PaneFailureView?
@@ -160,11 +164,10 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// font's size, family and backing scale applied.
     private(set) lazy var appearance = PaneAppearance(host: self)
     let inputSourceIndicator = PaneInputSourceIndicator()
+    private(set) lazy var paneHeader = PaneHeader(pane: self)
 
     /// The child sees the final size now, not after the debounce.
-    func endLiveResize() {
-        resizeDebouncer?.flush()
-    }
+    func endLiveResize() { resizeDebouncer?.flush() }
 
     /// Read per pane, not at launch: a config change applies to the next
     /// window, the only moment an initial size can apply.
@@ -182,9 +185,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// Only a pane touching the window's top sits under the chrome.
     var topInset: CGFloat {
         guard view.window != nil else {
-            return TerminalLayout.titlebarHeight + TerminalLayout.insets.top
+            return TerminalLayout.titlebarHeight + TerminalLayout.insets.top + PaneHeader.height
         }
-        return TerminalLayout.insets.top + chromeOverlap
+        return TerminalLayout.insets.top + chromeOverlap + PaneHeader.height
     }
     /// The chrome share alone — what the focus ring, drawn flush, needs.
     var chromeOverlap: CGFloat {
@@ -198,6 +201,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     var splitController: SplitViewController? { parent as? SplitViewController }
     /// Only the focused pane draws a cursor — part of the focus indicator.
     var isFocusedPane: Bool { splitController?.focusedPane === self }
+    /// The focused pane of the tab in front: the one whose own UI may take
+    /// the keyboard. A background tab's focused pane must not (D30).
+    var holdsWindowFocus: Bool { isFocusedPane && splitController?.tab?.isSelected ?? true }
 
     /// False when `setUpPane` failed: everything the window and split tree call
     /// must survive that rather than trap on an implicitly unwrapped nil.
@@ -236,27 +242,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     var minimumContentSize: CGSize {
         let metrics = cellMetrics
         return CGSize(
-            width: CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth,
-            height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight)
-    }
-
-    /// How a split predicts the new pane's winsize before layout settles it.
-    /// Also the grid `resizeSessionToFitView` sends, so a prediction and the
-    /// session never disagree. Half a point of slack: a window fitted to
-    /// whole cells can land a rounding step short of the last one, and the
-    /// right and bottom insets absorb the overhang.
-    func gridSize(fitting size: CGSize) -> TerminalSize {
-        let metrics = cellMetrics
-        let usable = usableSize(fitting: size)
-        return TerminalSize(
-            rows: Self.cellCount((usable.height + Self.fitSlack) / metrics.cellHeight),
-            columns: Self.cellCount((usable.width + Self.fitSlack) / metrics.cellWidth))
-    }
-
-    /// The area of a pane `size` large that the grid may use: the size less
-    /// the insets.
-    func usableSize(fitting size: CGSize) -> CGSize {
-        CGSize(width: size.width - TerminalLayout.insetWidth, height: size.height - verticalInsets)
+            width: max(230, CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth),
+            height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight + PaneHeader.height)
     }
 
     nonisolated static let fitSlack: CGFloat = 0.5
@@ -277,10 +264,12 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         let metrics = cellMetrics
         let grid = initialGridSize ?? configuredGridSize
         return NSSize(
-            width: CGFloat(grid.columns) * metrics.cellWidth + TerminalLayout.insetWidth,
+            width: CGFloat(grid.columns) * metrics.cellWidth + TerminalLayout.insetWidth + 2 * PaneSurfaceView.margin,
             height: CGFloat(grid.rows) * metrics.cellHeight + TerminalLayout.insetHeight
-                + windowChrome)
+                + windowChrome + PaneHeader.height + 2 * PaneSurfaceView.margin)
     }
+
+    override func loadView() { view = PaneSurfaceView(frame: .zero) }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -328,6 +317,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         invalidateDisplay()
         resizeSessionToFitView()
         focus.updateLayout()
+        paneHeader.place()
         search.placeClearOfContent()
     }
 
@@ -398,7 +388,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         // Nothing reaches the child before the window is sized: a layout of the
         // view at its placeholder size would strand blank rows under the
         // prompt. The session is born at the target size, so nothing is lost.
-        guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil
+        guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil,
+            splitController?.splitTransition.isRunning != true
         else { return }
         let grid = gridSize(fitting: view.bounds.size)
         let pixels = pixelSize(
@@ -429,6 +420,29 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             if view.inLiveResize { windowTitle.noteTransientSizeChange() } else { windowTitle.endTransientSize() }
             windowTitle.apply()
         }
+    }
+}
+
+// MARK: - Sizes in cells
+
+extension ViewController {
+    /// How a split predicts the new pane's winsize before layout settles it.
+    /// Also the grid `resizeSessionToFitView` sends, so a prediction and the
+    /// session never disagree. Half a point of slack: a window fitted to
+    /// whole cells can land a rounding step short of the last one, and the
+    /// right and bottom insets absorb the overhang.
+    func gridSize(fitting size: CGSize) -> TerminalSize {
+        let metrics = cellMetrics
+        let usable = usableSize(fitting: size)
+        return TerminalSize(
+            rows: Self.cellCount((usable.height + Self.fitSlack) / metrics.cellHeight),
+            columns: Self.cellCount((usable.width + Self.fitSlack) / metrics.cellWidth))
+    }
+
+    /// The area of a pane `size` large that the grid may use: the size less
+    /// the insets.
+    func usableSize(fitting size: CGSize) -> CGSize {
+        CGSize(width: size.width - TerminalLayout.insetWidth, height: size.height - verticalInsets)
     }
 }
 
@@ -561,6 +575,7 @@ extension ViewController {
         ])
         terminalView = view
         focus.installViews(in: self.view)
+        self.view.addSubview(paneHeader)
     }
 
     private func installSessionCallbacks() {
@@ -578,6 +593,7 @@ extension ViewController {
             guard let self else { return }
             self.agents.readOutput()
             if !self.agents.visible, self.session?.takeBell() == true { self.handleBell() }
+            self.windowTitle.noteOutput()
         }
         taskNotifier.programCanDeliver = { [weak self] notice in
             guard let self, !self.didTeardown, self.frameLoop.isCurrent(generation) else { return false }
@@ -626,7 +642,7 @@ extension ViewController {
             showsSettings: false, backdrop: .dim,
             symbol: reconnect ? "bolt.horizontal.circle" : "exclamationmark.triangle",
             tint: reconnect ? .systemRed : .systemOrange,
-            takesFocus: isFocusedPane)
+            takesFocus: holdsWindowFocus)
     }
 
     private func installTerminalCallbacks(on view: TerminalView) {
@@ -759,7 +775,7 @@ extension ViewController {
                 canRetry: !reconnect, canReconnect: reconnect,
                 details: "\(error)",
                 note: L10n.text(reconnect ? "session.ended.connection.note" : "failure.retryHint"),
-                showsSettings: false, takesFocus: self.isFocusedPane)
+                showsSettings: false, takesFocus: self.holdsWindowFocus)
         }
         loop.cursorHandoffSignal = focus.handoffSignal
         loop.onPresented = { [weak self] in
@@ -773,10 +789,16 @@ extension ViewController {
         let title = PaneWindowTitle()
         title.resolveRemoteState = { [weak self] in self?.remote.resolveState() ?? .local }
         title.window = { [weak self] in self?.viewIfLoaded?.window }
+        title.tab = { [weak self] in self?.splitController?.tab }
         title.gridSize = { [weak self] in self?.lastRequestedSize }
         title.canApplyDeferred = { [weak self] in
             guard let self else { return false }
             return !didTeardown && isFocusedPane
+        }
+        title.refreshBackgroundPresentation = { [weak self] in
+            guard let self, !self.didTeardown else { return }
+            self.paneHeader.refresh()
+            (self.view.window?.windowController as? TerminalWindowController)?.refreshTabTitle()
         }
         return title
     }
@@ -787,8 +809,19 @@ extension ViewController {
     /// focus.
     private func noteOutputBatch() {
         guard let session else { return }
+        if !drewFirstOutput {
+            drewFirstOutput = true
+            let first = onFirstOutputFrame
+            onFirstOutputFrame = nil
+            first?()
+        }
+        paneHeader.refresh()
         if isFocusedPane {
             windowTitle.apply()
+        } else {
+            // A background pane may change the program behind a stacked tab
+            // icon without taking keyboard focus. TabIcon caches the artwork.
+            (view.window?.windowController as? TerminalWindowController)?.refreshTabTitle()
         }
         if scrollOffset > 0, !sawOutputWhileScrolled {
             // Nothing else says so: no scroll bar, and the live screen is off view.
@@ -940,7 +973,7 @@ extension ViewController {
         if let split = splitController, split.hasMultiplePanes {
             split.closePane(self)
         } else {
-            view.window?.performClose(nil)
+            if let split = splitController { split.performCloseTab(nil) } else { view.window?.performClose(nil) }
         }
     }
 
@@ -951,7 +984,12 @@ extension ViewController {
         frameLoop.invalidate()
     }
 
-    func refreshFocusAppearance() { focus.applyAppearance() }
+    /// The header too: its light or dark follows the canvas, and its title
+    /// the focus.
+    func refreshFocusAppearance() {
+        focus.applyAppearance()
+        paneHeader.refresh()
+    }
 
     /// The grid now, or nil for a failed pane.
     func snapshot() -> Grid? {

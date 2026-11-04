@@ -84,6 +84,7 @@ public enum LicenseHeaders {
         ("scripts/disk-image/background.tiff", .reuse),
         ("scripts/disk-image/DS_Store", .reuse),
         ("**/*.md", .reuse),
+        ("docs/program-icons-sources.json", .reuse),
         ("NOTICE", .reuse),
 
         // Source. The sole C file is the D02 system varargs ABI bridge.

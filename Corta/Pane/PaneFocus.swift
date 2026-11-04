@@ -23,6 +23,9 @@ protocol PaneFocusHost: AnyObject {
     var session: TerminalSession! { get }
     var splitController: SplitViewController? { get }
     var isFocusedPane: Bool { get }
+    /// The focused pane of the tab in front (D30): tabs share a window, so
+    /// every tab has a focused pane, but only one holds the keyboard.
+    var holdsWindowFocus: Bool { get }
     var scrollOffset: Int { get }
     var didTeardown: Bool { get }
     var inputSourceIndicator: PaneInputSourceIndicator { get }
@@ -195,12 +198,6 @@ final class PaneFocus: NSObject {
         self.host = host
     }
 
-    /// Focused means this pane holds the keyboard and its window is key.
-    var hasUserFocus: Bool {
-        guard let host else { return false }
-        return host.isFocusedPane && (host.view.window?.isKeyWindow ?? false)
-    }
-
     // MARK: - Views
 
     /// Adds the dim, highlight and ring over `view`'s content, replacing any
@@ -220,6 +217,7 @@ final class PaneFocus: NSObject {
         ring.wantsLayer = true
         ring.layer?.borderWidth = Self.focusRingWidth
         ring.layer?.cornerRadius = TerminalLayout.windowCornerRadius
+        ring.layer?.cornerCurve = .continuous
         ring.layer?.borderColor = Self.focusRingColor.cgColor
         ring.isHidden = true
         ring.translatesAutoresizingMaskIntoConstraints = false
@@ -268,6 +266,12 @@ final class PaneFocus: NSObject {
     func updateLayout() {
         guard let host, let ring = ringView else { return }
         ringTopConstraint?.constant = host.chromeOverlap + Self.focusRingWidth / 2
+        if host.view is PaneSurfaceView {
+            ring.layer?.cornerRadius = PaneSurfaceView.radius
+            ring.layer?.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner,
+                                        .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+            return
+        }
         // Only corners that are the window's, as `TerminalView` does for the
         // drawable; the pane's view is not flipped, so `MaxY` is the top.
         guard let window = host.view.window else { return }
@@ -283,6 +287,19 @@ final class PaneFocus: NSObject {
     /// The indicators for the pane's focus now, and the report to the child.
     func applyAppearance() {
         guard let host else { return }
+        let subtle = host.view is PaneSurfaceView && !SystemAccessibility.increaseContrast
+        if subtle {
+            // A veil in the theme's own colour softens inactive text without
+            // making the entire card look disabled or tinting the active one.
+            let canvas = PaneSurfaceView.canvasColor
+            let light = canvas.redComponent + canvas.greenComponent + canvas.blueComponent > 1.5
+            let veil = canvas.blended(withFraction: 0.05, of: light ? .black : .white) ?? canvas
+            dimView?.layer?.backgroundColor = veil.withAlphaComponent(0.24).cgColor
+        } else {
+            dimView?.layer?.backgroundColor = NSColor.black.withAlphaComponent(Self.unfocusedDim).cgColor
+        }
+        highlightView?.layer?.backgroundColor = NSColor.controlAccentColor
+            .withAlphaComponent(Self.focusHighlightAlpha).cgColor
         // One pane needs neither.
         let inSplit = host.splitController?.hasMultiplePanes == true
         // The dim is structural and stays while the app is inactive; ring and
@@ -290,9 +307,13 @@ final class PaneFocus: NSObject {
         dimView?.isHidden = host.isFocusedPane || !inSplit
         let highlighted = hasUserFocus && inSplit
         ringView?.isHidden = !highlighted
-        highlightView?.isHidden = !highlighted
-        // The accent can change at runtime; Increase Contrast wants more.
-        ringView?.layer?.borderColor = Self.focusRingColor.cgColor
+        highlightView?.isHidden = !highlighted || subtle
+        // Normal cards use a neutral keyline; Increase Contrast retains the
+        // stronger system accent and highlight as an explicit focus signal.
+        let canvas = PaneSurfaceView.canvasColor
+        let light = canvas.redComponent + canvas.greenComponent + canvas.blueComponent > 1.5
+        let neutral = (light ? NSColor.black : .white).withAlphaComponent(light ? 0.16 : 0.24)
+        ringView?.layer?.borderColor = (subtle ? neutral : Self.focusRingColor).cgColor
         ringView?.layer?.borderWidth =
             SystemAccessibility.increaseContrast ? Self.focusRingWidth + 1 : Self.focusRingWidth
         reportIfNeeded()
@@ -326,6 +347,13 @@ final class PaneFocus: NSObject {
 // MARK: - Focus reporting
 
 extension PaneFocus {
+    /// Focused means this pane holds the keyboard and its window is key.
+    /// A background tab's focused pane does not: the window is the front
+    /// tab's (D30).
+    var hasUserFocus: Bool {
+        guard let host else { return false }
+        return host.holdsWindowFocus && (host.view.window?.isKeyWindow ?? false)
+    }
 
     /// Reports only real changes; AppKit's key and responder churn would
     /// otherwise stream reports. Two fixed byte strings, no stream text

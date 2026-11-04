@@ -67,7 +67,7 @@ extension SplitViewController {
         guard let split = subtree as? NSSplitView, split.subviews.count == 2 else { return }
         for child in split.subviews { equalize(child) }
         let axis = split.isVertical ? split.bounds.width : split.bounds.height
-        split.setPosition(axis / 2, ofDividerAt: 0)
+        split.setPosition((axis - split.dividerThickness) / 2, ofDividerAt: 0)
     }
 
     /// Deliver now, not after the debounce, or the grid lags each press.
@@ -132,23 +132,50 @@ extension SplitViewController {
 extension SplitViewController {
     @objc func selectPreviousCortaTab(_: Any?) { selectAdjacentTab(offset: -1) }
     @objc func selectNextCortaTab(_: Any?) { selectAdjacentTab(offset: 1) }
+    @objc func selectCortaTab1(_: Any?) { tab?.controller?.selectTab(number: 1) }
+    @objc func selectCortaTab2(_: Any?) { tab?.controller?.selectTab(number: 2) }
+    @objc func selectCortaTab3(_: Any?) { tab?.controller?.selectTab(number: 3) }
+    @objc func selectCortaTab4(_: Any?) { tab?.controller?.selectTab(number: 4) }
+    @objc func selectCortaTab5(_: Any?) { tab?.controller?.selectTab(number: 5) }
+    @objc func selectCortaTab6(_: Any?) { tab?.controller?.selectTab(number: 6) }
+    @objc func selectCortaTab7(_: Any?) { tab?.controller?.selectTab(number: 7) }
+    @objc func selectCortaTab8(_: Any?) { tab?.controller?.selectTab(number: 8) }
+    @objc func selectLastCortaTab(_: Any?) { tab?.controller?.selectTab(number: 9) }
 
     func selectAdjacentTab(offset: Int) {
-        guard let window = view.window, let tabs = window.tabbedWindows,
-              let index = tabs.firstIndex(of: window), tabs.count > 1 else { return }
-        let target = tabs[(index + offset + tabs.count) % tabs.count]
-        window.tabGroup?.selectedWindow = target
-        target.makeKeyAndOrderFront(nil)
+        tab?.controller?.selectAdjacentTab(offset: offset)
     }
 
     @objc func renameCurrentTab(_: Any?) {
-        (view.window?.windowController as? TerminalWindowController)?.beginTabRename()
+        tab?.controller?.beginTabRename()
     }
 
     func setCustomTabTitle(_ value: String) {
-        guard let controller = view.window?.windowController as? TerminalWindowController else { return }
+        guard let tab else { return }
         let title = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        controller.customTabTitle = title.isEmpty ? nil : String(title.prefix(200))
+        tab.customTitle = title.isEmpty ? nil : String(title.prefix(200))
         applyWindowTitle()
+    }
+}
+
+extension SplitViewController {
+    /// Spring only visible, user-created splits; restore and hidden windows
+    /// remain immediate. Accessibility's Reduce Motion preference wins.
+    func animateSplit(_ node: NSSplitView, newPane pane: ViewController) {
+        let axis = node.isVertical ? node.bounds.width : node.bounds.height
+        if view.window?.isVisible == true, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            let minimum = pane.minimumContentSize
+            let extent = node.isVertical ? minimum.width : minimum.height
+            let end = (axis - node.dividerThickness) / 2
+            let start = max(end, axis - extent - node.dividerThickness)
+            splitTransition.start(node: node, from: start, to: end, revealing: pane.view) { [weak self] in
+                guard let self else { return }
+                self.view.layoutSubtreeIfNeeded()
+                for child in self.panes {
+                    child.resizeSessionToFitView(coalesce: false)
+                    child.paneHeader.refresh()
+                }
+            }
+        }
     }
 }

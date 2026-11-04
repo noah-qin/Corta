@@ -29,6 +29,8 @@ import Observation
     var light: Theme.Variant
     var revision = 0
     var isDark = true
+    /// The appearance the saved theme is chosen for; nil chooses it for both.
+    var selectsForDark: Bool?
     var error: String?
 
     init(source: Theme, editing: Bool) {
@@ -83,10 +85,11 @@ import Observation
             return false
         }
         let value = draft
+        let side = selectsForDark
         guard store.update({ config in
             config.customThemes.removeAll { $0.name == value.name }
             config.customThemes.append(value)
-            config.theme = value.name
+            if let side { config.setTheme(value.name, dark: side) } else { config.setTheme(value.name) }
         }) else {
             error = L10n.text("theme.saveFailed")
             return false

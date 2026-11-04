@@ -69,6 +69,25 @@ nonisolated extension Theme.Variant {
     }
 }
 
+nonisolated extension Theme.Variant {
+    /// A dark background, by its luminance.
+    var isDarkBackground: Bool {
+        0.2126 * background.x + 0.7152 * background.y + 0.0722 * background.z < 0.5
+    }
+
+    /// Part of the way to `other`, channel by channel: a theme switch blends
+    /// through these rather than jumping.
+    func mixed(with other: Theme.Variant, by amount: Float) -> Theme.Variant {
+        func mix(_ a: SIMD4<Float>, _ b: SIMD4<Float>) -> SIMD4<Float> { a + (b - a) * amount }
+        // The ends exactly: a blend's last step is the theme itself.
+        if amount <= 0 { return self }
+        if amount >= 1 || ansi.count != other.ansi.count { return amount < 0.5 ? self : other }
+        return Theme.Variant(
+            foreground: mix(foreground, other.foreground), background: mix(background, other.background),
+            cursor: mix(cursor, other.cursor), ansi: zip(ansi, other.ansi).map(mix))
+    }
+}
+
 /// The colours a variant does not name but the renderer paints: highlights
 /// and rules over the text. Derived, so a light theme gets a selection
 /// chosen for a light background and a custom theme needs no extra keys
@@ -126,9 +145,11 @@ private nonisolated func rgb(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> SIMD4<Float>
 }
 
 extension Theme {
-    /// The default: Terminal.app's "Basic" sixteen over a dark blue surface.
-    /// The light variant darkens the bright half rather than inverting, which
-    /// gives pastels with no contrast on white.
+    /// The default, over a dark blue-grey surface and white. Every hue in
+    /// both variants reads at 4.5:1 or more on its background; bright black,
+    /// which shells use for suggestions and comments, stays dimmer by
+    /// design. The light variant darkens the bright half rather than
+    /// inverting, which gives pastels with no contrast on white.
     nonisolated static let corta = Theme(
         name: "corta",
         displayName: "Corta",
@@ -137,22 +158,23 @@ extension Theme {
             background: rgb(35, 40, 51),
             cursor: rgb(245, 245, 245),
             ansi: [
-                rgb(0, 0, 0), rgb(194, 54, 33), rgb(37, 188, 36), rgb(173, 173, 39),
-                rgb(73, 46, 225), rgb(211, 56, 211), rgb(51, 187, 200), rgb(203, 204, 205),
-                rgb(129, 131, 131), rgb(252, 57, 31), rgb(49, 231, 34), rgb(234, 236, 35),
-                rgb(88, 51, 255), rgb(249, 53, 248), rgb(20, 240, 240), rgb(233, 235, 235),
+                rgb(59, 66, 82), rgb(242, 112, 122), rgb(127, 207, 124), rgb(232, 194, 122),
+                rgb(111, 168, 247), rgb(199, 146, 234), rgb(95, 201, 214), rgb(200, 205, 214),
+                rgb(122, 130, 148), rgb(255, 138, 147), rgb(155, 228, 148), rgb(245, 214, 143),
+                rgb(146, 190, 255), rgb(220, 170, 247), rgb(132, 221, 232), rgb(247, 248, 250),
             ]),
         light: Variant(
             foreground: rgb(38, 42, 51),
-            background: rgb(252, 252, 250),
+            // Pure white: panes are the lightest layer on a grey ground.
+            background: rgb(255, 255, 255),
             // A slate grey, not the foreground: a near-black block read as a
             // hole in the page. Still 4.7:1 against the background.
             cursor: rgb(108, 114, 126),
             ansi: [
-                rgb(0, 0, 0), rgb(170, 34, 20), rgb(24, 132, 24), rgb(140, 108, 20),
-                rgb(38, 62, 190), rgb(160, 42, 160), rgb(24, 130, 142), rgb(120, 122, 124),
-                rgb(90, 92, 94), rgb(200, 44, 26), rgb(30, 160, 30), rgb(160, 126, 24),
-                rgb(52, 78, 220), rgb(190, 50, 190), rgb(28, 152, 166), rgb(30, 32, 34),
+                rgb(43, 47, 56), rgb(196, 47, 58), rgb(35, 122, 49), rgb(138, 95, 0),
+                rgb(45, 91, 203), rgb(146, 53, 184), rgb(14, 115, 128), rgb(107, 112, 121),
+                rgb(95, 101, 115), rgb(210, 60, 70), rgb(41, 132, 54), rgb(154, 108, 0),
+                rgb(58, 104, 216), rgb(164, 67, 201), rgb(19, 130, 143), rgb(30, 32, 38),
             ]))
 
     /// As Ethan Schoonover published it.
@@ -180,7 +202,7 @@ extension Theme {
                 rgb(101, 123, 131), rgb(108, 113, 196), rgb(88, 110, 117), rgb(0, 43, 54),
             ]))
 
-    /// Neutral greys.
+    /// Neutral greys with muted hues, held to the same 4.5:1 as the default.
     nonisolated static let mono = Theme(
         name: "mono",
         displayName: "Mono",
@@ -189,20 +211,20 @@ extension Theme {
             background: rgb(24, 24, 24),
             cursor: rgb(225, 225, 225),
             ansi: [
-                rgb(40, 40, 40), rgb(190, 90, 80), rgb(120, 170, 110), rgb(190, 170, 100),
-                rgb(110, 140, 190), rgb(170, 120, 180), rgb(110, 170, 175), rgb(200, 200, 200),
-                rgb(110, 110, 110), rgb(215, 115, 105), rgb(145, 195, 135), rgb(215, 195, 125),
-                rgb(135, 165, 215), rgb(195, 145, 205), rgb(135, 195, 200), rgb(240, 240, 240),
+                rgb(48, 48, 48), rgb(210, 104, 94), rgb(130, 181, 114), rgb(200, 174, 108),
+                rgb(126, 159, 207), rgb(177, 132, 189), rgb(114, 179, 184), rgb(200, 200, 200),
+                rgb(124, 124, 124), rgb(224, 126, 116), rgb(152, 200, 135), rgb(217, 192, 128),
+                rgb(151, 180, 222), rgb(195, 155, 206), rgb(140, 198, 202), rgb(240, 240, 240),
             ]),
         light: Variant(
             foreground: rgb(32, 32, 32),
             background: rgb(250, 250, 250),
             cursor: rgb(32, 32, 32),
             ansi: [
-                rgb(20, 20, 20), rgb(160, 60, 50), rgb(50, 120, 60), rgb(140, 110, 30),
-                rgb(50, 80, 150), rgb(130, 60, 140), rgb(40, 120, 130), rgb(140, 140, 140),
-                rgb(80, 80, 80), rgb(185, 75, 60), rgb(60, 145, 70), rgb(160, 130, 40),
-                rgb(60, 95, 175), rgb(150, 75, 160), rgb(50, 140, 150), rgb(10, 10, 10),
+                rgb(20, 20, 20), rgb(168, 59, 48), rgb(47, 118, 56), rgb(128, 95, 18),
+                rgb(52, 90, 158), rgb(134, 66, 143), rgb(38, 114, 124), rgb(110, 110, 110),
+                rgb(92, 92, 92), rgb(181, 68, 52), rgb(45, 125, 58), rgb(138, 103, 20),
+                rgb(61, 99, 170), rgb(146, 71, 156), rgb(41, 123, 133), rgb(10, 10, 10),
             ]))
 
     /// A small curated choice; custom themes continue to take precedence.
@@ -220,19 +242,79 @@ extension Theme {
         configuration.customThemes.first { $0.name == name } ?? named(name)
     }
 
-    /// Offered built-ins, then the user's. The selected theme is always
-    /// included, or the settings popup would show nothing and the next click
-    /// would overwrite the user's choice.
+    /// Offered built-ins, then the user's. The selected themes are always
+    /// included, or the settings page would show nothing selected and the
+    /// next click would overwrite the user's choice.
     nonisolated static func all(in configuration: Configuration) -> [Theme] {
         let custom = configuration.customThemes
         let customNames = Set(custom.map(\.name))
         var themes = builtIn.filter { !customNames.contains($0.name) } + custom
-        if !themes.contains(where: { $0.name == configuration.theme }),
-            let active = named(configuration.theme)
-        {
-            themes.append(active)
+        for name in [configuration.theme, configuration.darkTheme].compactMap(\.self)
+        where !themes.contains(where: { $0.name == name }) {
+            if let active = named(name) { themes.append(active) }
         }
         return themes
+    }
+
+    /// What the panes draw: the light theme's light variant and the dark
+    /// theme's dark one. An unknown name falls back to the default.
+    nonisolated static func selected(in configuration: Configuration) -> Theme {
+        let light = named(configuration.theme, in: configuration) ?? .corta
+        guard let darkName = configuration.darkTheme else { return light }
+        let dark = named(darkName, in: configuration) ?? .corta
+        guard dark.name != light.name else { return light }
+        return Theme(
+            name: configuration.themeChoice, displayName: light.displayName + " / " + dark.displayName,
+            dark: dark.dark, light: light.light)
+    }
+}
+
+// MARK: - The choice in the file
+
+nonisolated extension Configuration {
+    /// The `theme` value: one name for both appearances, or
+    /// `light:<name>,dark:<name>` for two. Nil for anything else; a side
+    /// left out is the default theme.
+    static func themeChoice(_ value: String) -> (light: String, dark: String?)? {
+        let value = value.trimmingCharacters(in: .whitespaces)
+        guard value.contains(":") else { return (value.isEmpty ? Theme.corta.name : value, nil) }
+        var light: String?
+        var dark: String?
+        for part in value.split(separator: ",", omittingEmptySubsequences: false) {
+            let pair = part.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            guard pair.count == 2, !pair[1].isEmpty else { return nil }
+            switch pair[0] {
+            case "light" where light == nil: light = pair[1]
+            case "dark" where dark == nil: dark = pair[1]
+            default: return nil
+            }
+        }
+        let lightName = light ?? Theme.corta.name
+        let darkName = dark ?? Theme.corta.name
+        return (lightName, darkName == lightName ? nil : darkName)
+    }
+
+    /// As `theme` is written: one name while both appearances share it.
+    var themeChoice: String {
+        guard let darkTheme, darkTheme != theme else { return theme }
+        return "light:\(theme),dark:\(darkTheme)"
+    }
+
+    /// The theme named for one appearance.
+    func themeName(dark: Bool) -> String { dark ? darkTheme ?? theme : theme }
+
+    /// Chooses the theme for one appearance and leaves the other as it was.
+    mutating func setTheme(_ name: String, dark: Bool) {
+        let other = themeName(dark: !dark)
+        theme = dark ? other : name
+        let darkName = dark ? name : other
+        darkTheme = darkName == theme ? nil : darkName
+    }
+
+    /// One theme for both appearances, as the View menu chooses.
+    mutating func setTheme(_ name: String) {
+        theme = name
+        darkTheme = nil
     }
 }
 

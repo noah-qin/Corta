@@ -10,9 +10,88 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Removed
+
+- macOS's own window tabs: Show Tab Bar and the tab overview are gone with
+  them. Restored windows bring their tabs back as before.
+- Removed Quick Terminal, its settings page, global hotkey and Shortcuts action.
+  Existing configuration entries are retired on the next config save.
+
 ### Changed
 
+- A copy is confirmed by a band of light sweeping along the copied text
+  instead of a "Copied" toast in the corner; with Reduce Motion it is a
+  single soft flash, and a copy scrolled out of view keeps the toast.
+- Tabs are Corta's own and sit in the titlebar row beside the window
+  buttons, titles left-aligned (D30, #451). Each tab shows the program
+  running in its focused pane as an icon — a dark prompt tile for a shell,
+  the program's own colours otherwise — and a tab with split panes fans
+  the other panes' icons out behind it, like a hand of cards. Hover for the close
+  button, drag to reorder, double-click to rename; the right-click menu
+  adds Close Other Tabs. The row beside the tabs drags the window and
+  double-clicks like the rest of the titlebar. Tabs keep a fixed width at the leading edge and
+  share the row only once they no longer fit; past that the row scrolls
+  sideways, fading at its edges, and keeps the selected tab in view, so every
+  tab keeps its name and close button. A new tab springs in. Opening or closing a
+  tab cross-fades the canvas: the old one stays until the new one has drawn
+  — a new shell's prompt included — so no empty frame flashes between them. A lone tab is a single pill,
+  and the track appears with the second tab. Codex's tile is white. The titlebar band and the
+  gaps between panes share a ground colour a step darker than the panes,
+  and the tab track a step darker again. The default light theme's background is
+  pure white (was a warm off-white). Pane cards come up to within a margin of the
+  tabs, and their corners are concentric with the window's. A tab's background panes stop drawing while it is
+  hidden and keep running. A narrow tab keeps the start of its name, fading
+  out, and the Connect and New Tab buttons answer the pointer as the tabs do.
+- Tabs move between windows with their panes still running: drag one off
+  the strip into a window of its own or onto another window's strip, or use
+  Window ▸ Move Tab to New Window (also in the tab's menu) and Merge All
+  Windows. ⌃Tab and ⇧⌃Tab step through the tabs, as before; a closing tab
+  shrinks out while the others and the track close the gap, and a dragged
+  tab held at a scrolling strip's end carries the row along.
+- ⌘1–⌘8 show that tab and ⌘9 the last, from File ▸ Show Tab; each is a
+  command of its own (`select-tab-1` … `select-tab-8`, `select-last-tab`)
+  that `bind.` can move or clear.
+- The titlebar band is the theme's own colour, without the window title or
+  a separator line, and the toolbar's Connect and New Tab buttons are bare
+  symbols. In the toolbar, the input-source badge is grey for every source.
+
+- Light and dark mode choose their themes separately: Settings ▸ Themes
+  keeps a choice per mode, written `theme = light:<name>,dark:<name>`; a
+  single name still serves both. New beside a mode saves the theme for
+  that mode.
+- Switching theme or appearance blends the window into the new colours
+  over a fifth of a second instead of jumping, titlebar and terminal
+  together.
+- The `corta` and `mono` themes' colours were retuned: every hue in both
+  variants now reads at 4.5:1 or better on its background (the default
+  dark theme's blue was 1.9:1). Solarized is unchanged, as published.
+- Settings: the shortcut keys line up in one column, the sidebar's groups
+  are evenly spaced, the Shortcuts search field matches the sidebar's, and
+  setting names use one capitalisation.
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
+
+### Fixed
+
+- Gemini's tab tile showed only a dot, and Java's orange tile read as Claude's
+  while `java` started: Gemini's star is drawn whole, and Java shows a cup on
+  Java's blue. A program's icon now appears only once it takes the terminal
+  (a REPL, an editor, an agent); a command that only runs and prints keeps
+  the prompt tile. Kimi, Copilot, Goose and SQLite tiles take their brands'
+  colours.
+
+- After a theme or appearance switch the selected tab kept the old
+  theme's fill — a white pill on a dark titlebar — and the pane header
+  kept its old text colour until the next output.
+- Splitting a pane again while the previous split was still opening
+  crushed the new panes to a sliver, and the crushed layout was saved and
+  restored. A split now settles first; ⌘D / ⇧⌘D beeps instead of making a
+  pane smaller than its minimum; and a restored layout keeps every pane at
+  least that size.
+- Claude Code installed by its native installer showed as "2.1.316" with a
+  plain terminal icon: it runs an executable named after its version
+  (`…/claude/versions/2.1.316`). A version-named process now reads as the
+  tool whose `versions` directory holds it, in the title, the tab and the
+  pane header.
 
 ## [1.5.1] - 2026-10-27
 

@@ -24,25 +24,33 @@ struct ShortcutRecorder: View {
     @State private var recording = false
 
     var body: some View {
-        HStack(spacing: 6) {
-            Button(value?.displayText ?? L10n.text("ui.shortcut.record")) { recording = true }
-                .frame(minWidth: 84)
-                .help(L10n.text("ui.shortcut.recordHelp"))
-                .popover(isPresented: $recording) {
-                    VStack(spacing: 12) {
-                        Text(L10n.text("ui.shortcut.press")).font(.headline)
-                        Text(L10n.text("ui.shortcut.escape")).font(.caption).foregroundStyle(.secondary)
-                        ShortcutCapture { shortcut in
-                            recording = false
-                            if let shortcut { onChange(shortcut) }
-                        }.frame(width: 220, height: 40)
-                    }.padding(20)
-                }
-            if value != nil {
-                Button { onChange(nil) } label: { Image(systemName: "xmark.circle") }
-                    .buttonStyle(.borderless).help(L10n.text("ui.shortcut.clear"))
-                    .accessibilityLabel(L10n.text("ui.shortcut.clear"))
+        // One column: every key cap is at least as wide as the widest
+        // common chord, and the clear button keeps its slot when there is
+        // nothing to clear, so caps of different lengths share a right edge.
+        HStack(spacing: 8) {
+            Button {
+                recording = true
+            } label: {
+                Text(value?.displayText ?? L10n.text("ui.shortcut.record"))
+                    .frame(minWidth: 52)
             }
+            .help(L10n.text("ui.shortcut.recordHelp"))
+            .popover(isPresented: $recording) {
+                VStack(spacing: 12) {
+                    Text(L10n.text("ui.shortcut.press")).font(.headline)
+                    Text(L10n.text("ui.shortcut.escape")).font(.caption).foregroundStyle(.secondary)
+                    ShortcutCapture { shortcut in
+                        recording = false
+                        if let shortcut { onChange(shortcut) }
+                    }.frame(width: 220, height: 40)
+                }.padding(20)
+            }
+            Button { onChange(nil) } label: { Image(systemName: "xmark.circle") }
+                .buttonStyle(.borderless).help(L10n.text("ui.shortcut.clear"))
+                .accessibilityLabel(L10n.text("ui.shortcut.clear"))
+                .opacity(value == nil ? 0 : 1)
+                .disabled(value == nil)
+                .accessibilityHidden(value == nil)
         }
     }
 }

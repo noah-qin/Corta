@@ -242,15 +242,6 @@ presse-papiers un texte que vous colleriez ensuite. `allow-clipboard-write = tru
 
 Quelque chose dans cette fenêtre a encore une tâche au premier plan. `confirm-close = false` désactive la question partout.
 
-### Le raccourci du Terminal rapide ne fait rien
-
-Trois possibilités, dans l’ordre. `quick-terminal` vaut `false` (par défaut) : aucune touche n’est réservée tant que vous
-ne le mettez pas à `true`. Une autre application détient déjà la touche : Réglages ▸ Terminal rapide le signale, et
-`quick-terminal-key` accepte toute autre combinaison comportant au moins une touche de modification. Ou bien la touche est
-une que Corta ne peut pas associer à une position de touche (`é`, une écriture en deux caractères) : la ligne est
-conservée telle quelle dans le fichier de configuration et la valeur par défaut s’applique. Présentation ▸ Terminal
-rapide et l’action Raccourcis *Afficher/masquer le terminal rapide* ouvrent le panneau dans tous les cas.
-
 ### Le badge d’un volet distant indique « Distant : hôte inconnu », ou un `tmux` local « Distant ? »
 
 Le badge tire le nom de l’hôte du rapport `OSC 7` du shell distant lui-même, ou — pour une connexion ouverte depuis la

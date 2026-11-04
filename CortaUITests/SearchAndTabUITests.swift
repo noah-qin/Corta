@@ -17,7 +17,7 @@
 import XCTest
 
 /// Search and tabs, against the live app: ⌘F opens the search bar and Esc
-/// closes it; ⌘T adds a native tab (a second window in the tab group).
+/// closes it; ⌘T adds a tab to the window's own strip (D30).
 final class SearchAndTabUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -88,30 +88,23 @@ final class SearchAndTabUITests: XCTestCase {
 
         app.typeKey("t", modifierFlags: .command)
 
-        // A native tab group exposes its tabs as radio buttons; the window
-        // count stays 1 because the new session is a tab, not a window.
-        // A native tab group exposes its tabs as `.tab`-type children whose
-        // accessible label reports the count ("Tab bar, 2 tabs.").
-        let tabGroup = window.tabGroups.firstMatch
-        XCTAssertTrue(tabGroup.waitForExistence(timeout: 5), "⌘T must open a tab bar")
-        let twoTabs = NSPredicate(format: "label CONTAINS '2 tabs'")
-        expectation(for: twoTabs, evaluatedWith: tabGroup)
+        // The strip lists its tabs as radio buttons; the window count stays
+        // 1 because the new session is a tab, not a window.
+        let strip = window.tabGroups["tab-strip"]
+        XCTAssertTrue(strip.waitForExistence(timeout: 5), "the strip is in the titlebar row")
+        expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: strip.radioButtons)
         waitForExpectations(timeout: 5)
+        XCTAssertEqual(app.windows.count, 1)
 
-        // One "+", the toolbar's: the tab bar must not add a second.
+        // One "+", the toolbar's: the strip has none of its own.
         let plus = window.buttons.matching(
             NSPredicate(format: "label ==[c] 'New Tab' OR title ==[c] 'New Tab'"))
         XCTAssertEqual(plus.count, 1, "toolbar and tab bar both show a +: \(plus.debugDescription)")
     }
 
-    /// A ⌘T must not take a chrome height off the shared window frame —
-    /// four tabs would collapse a 451pt window to the 49pt minimum. The
-    /// risk is real because inserting `.fullSizeContentView` re-derives the
-    /// frame from the content size, and a tab, unlike a standalone window,
-    /// never overwrites the frame afterwards.
-    ///
-    /// The tab bar appearing does grow the frame once, by its own height, so
-    /// that the panes keep their row count; after that the frame is fixed.
+    /// A ⌘T never changes the window's frame: the strip is in the titlebar
+    /// row from the window's birth (D30), so no bar appears and no chrome
+    /// height is taken from, or added to, the frame.
     @MainActor
     func testTabsDoNotShrinkTheWindow() throws {
         let app = UIFixtures.app(stage: try UIFixtures.stage("measurement"), runner: Self.self, usingTestTarget: true)
@@ -125,12 +118,7 @@ final class SearchAndTabUITests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(1))
         let beforeAnyTab = window.frame
 
-        app.typeKey("t", modifierFlags: .command)
-        RunLoop.current.run(until: Date().addingTimeInterval(1.5))
-        let withTabBar = app.windows.firstMatch.frame
-        XCTAssertGreaterThanOrEqual(
-            withTabBar.height, beforeAnyTab.height,
-            "the tab bar must not eat into the window's height")
+        let withTabBar = beforeAnyTab
 
         for tab in 2...4 {
             app.typeKey("t", modifierFlags: .command)
@@ -203,16 +191,20 @@ final class SearchAndTabUITests: XCTestCase {
     @MainActor
     private func exerciseTabs(in app: XCUIApplication) throws {
         app.typeKey("t", modifierFlags: .command)
-        XCTAssertTrue(app.windows.firstMatch.tabGroups.firstMatch.waitForExistence(timeout: 5))
+        let strip = app.windows.firstMatch.tabGroups["tab-strip"]
+        XCTAssertTrue(strip.waitForExistence(timeout: 5))
+        func tab(_ name: String) -> XCUIElement {
+            strip.radioButtons.matching(NSPredicate(format: "label == %@", name)).firstMatch
+        }
         let file = app.menuBars.firstMatch.menuBarItems["File"]
         file.click()
         file.menuItems["Rename Tab…"].click()
         let title = app.textFields.matching(identifier: "tab-title-editor").firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 3))
-        let editingTab = app.windows.firstMatch.tabGroups.firstMatch.descendants(matching: .tab)
-            .allElementsBoundByIndex.first { $0.isSelected }
+        // The editor sits in the selected tab, where its name was.
+        let editingTab = strip.radioButtons.allElementsBoundByIndex.first { ($0.value as? Int) == 1 }
         if let editingTab {
-            XCTAssertEqual(title.frame.midX, editingTab.frame.midX, accuracy: 4)
+            XCTAssertTrue(editingTab.frame.insetBy(dx: -2, dy: -2).contains(title.frame))
         }
         keep(app.windows.firstMatch.screenshot(), named: "feedback-inline-rename")
         title.typeText("TableFixture")
@@ -222,8 +214,7 @@ final class SearchAndTabUITests: XCTestCase {
         XCTAssertFalse(app.windows["TableFixture"].exists)
         app.typeKey("]", modifierFlags: [.command, .shift])
         XCTAssertTrue(app.windows["TableFixture"].exists)
-        let namedTab = app.windows.firstMatch.tabGroups.firstMatch.descendants(matching: .tab)
-            .matching(identifier: "TableFixture").firstMatch
+        let namedTab = tab("TableFixture")
         XCTAssertTrue(namedTab.exists)
         namedTab.doubleClick()
         XCTAssertTrue(app.textFields["tab-title-editor"].waitForExistence(timeout: 3))
@@ -240,13 +231,14 @@ final class SearchAndTabUITests: XCTestCase {
         namedTab.click()
         XCTAssertTrue(app.windows["TableFixture"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.textFields["tab-title-editor"].exists)
-        XCTAssertTrue(app.windows.firstMatch.tabGroups.firstMatch.descendants(matching: .tab)
-            .matching(identifier: "Pending").firstMatch.exists)
+        XCTAssertTrue(tab("Pending").exists)
         namedTab.rightClick()
         let newTab = try XCTUnwrap(app.menuItems.matching(identifier: "New Tab")
-            .allElementsBoundByIndex.first(where: { $0.isHittable }))
+            .allElementsBoundByIndex.first(where: { $0.isHittable })
+            ?? app.menuItems["New Tab"])
         newTab.click()
-        XCTAssertTrue(app.windows.firstMatch.tabGroups.firstMatch.label.contains("3 tabs"))
+        expectation(for: NSPredicate(format: "count == 3"), evaluatedWith: strip.radioButtons)
+        waitForExpectations(timeout: 5)
         app.typeKey("[", modifierFlags: [.command, .shift])
     }
 
@@ -289,7 +281,7 @@ final class SearchAndTabUITests: XCTestCase {
         app.typeKey(",", modifierFlags: .command)
         let keyboardSettings = app.windows["Corta.Settings"]
         XCTAssertTrue(keyboardSettings.waitForExistence(timeout: 5))
-        keyboardSettings.outlines.firstMatch.staticTexts["Keyboard & Mouse"].click()
+        keyboardSettings.settingsCategory("Keyboard & Mouse").click()
         let indicatorMode = keyboardSettings.popUpButtons["input-source-indicator-mode"]
         indicatorMode.click()
         indicatorMode.menuItems["Always in focused pane"].click()
@@ -300,15 +292,15 @@ final class SearchAndTabUITests: XCTestCase {
         app.typeKey(",", modifierFlags: .command)
         let settings = app.windows["Corta.Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        settings.outlines.firstMatch.staticTexts["Appearance"].click()
-        let theme = settings.popUpButtons["appearance-theme"]
-        XCTAssertTrue(theme.waitForExistence(timeout: 3))
-        theme.click()
-        XCTAssertTrue(theme.menuItems["Corta"].exists)
-        XCTAssertTrue(theme.menuItems["Mono"].exists)
-        theme.menuItems["Solarized"].click()
+        settings.settingsCategory("Appearance").click()
+        settings.settingsCategory("Themes").click()
+        XCTAssertTrue(settings.buttons["theme-choice-corta"].waitForExistence(timeout: 3))
+        XCTAssertTrue(settings.buttons["theme-choice-mono"].exists)
+        settings.buttons["theme-choice-solarized"].click()
         let config = try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
-        XCTAssertTrue(config.contains("theme = solarized"))
+        // The light-mode card: dark mode keeps its own theme.
+        XCTAssertTrue(config.contains("theme = light:solarized,dark:corta"))
+        settings.settingsCategory("Appearance").click()
         let preview = settings.descendants(matching: .any).matching(identifier: "appearance-preview").firstMatch
         XCTAssertEqual(preview.value as? String, "light")
         keep(settings.screenshot(), named: "feedback-settings")

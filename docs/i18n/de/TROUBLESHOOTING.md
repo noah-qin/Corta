@@ -242,15 +242,6 @@ den du später einfügst. `allow-clipboard-write = true` schaltet es ein, und ge
 
 In diesem Fenster läuft noch ein Vordergrundjob. `confirm-close = false` schaltet die Frage überall ab.
 
-### Der Hotkey des Schnellterminals tut nichts
-
-Drei Möglichkeiten, in dieser Reihenfolge. `quick-terminal` ist `false` (Standard): Keine Taste wird belegt, bis du es auf
-`true` setzt. Eine andere App hält die Taste bereits: Einstellungen ▸ Schnellterminal sagt das, und `quick-terminal-key`
-nimmt jede andere Kombination mit mindestens einer Sondertaste an. Oder die Taste ist eine, die Corta keiner
-Tastenposition zuordnen kann (`é`, eine Schreibweise aus zwei Zeichen): Die Zeile bleibt unverändert in der
-Konfigurationsdatei, und der Standard gilt. Darstellung ▸ Schnellterminal und die Kurzbefehle-Aktion
-*Schnellterminal ein-/ausblenden* öffnen das Panel in jedem Fall.
-
 ### Das Kennzeichen eines entfernten Bereichs zeigt „Entfernt: Host unbekannt“ oder ein lokales `tmux` „Entfernt?“
 
 Das Kennzeichen nennt einen Host aus der eigenen `OSC 7`-Meldung der entfernten Shell oder – bei einer Verbindung, die

@@ -68,17 +68,18 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         // Resolve stable pane identity before a captured Window Server
         // number, including across native tab regrouping/backing changes.
         // A closed pane still leaves its window worth bringing forward.
-        let paneWindow = click.paneID.flatMap { paneID in
-            AgentDirectory.panes.first { $0.taskNotifier.paneID.uuidString == paneID }?.view.window
+        let paneSplit = click.paneID.flatMap { paneID in
+            AgentDirectory.panes.first { $0.taskNotifier.paneID.uuidString == paneID }?.splitController
         }
-        let window = paneWindow ?? click.windowNumber.flatMap { NSApp.window(withWindowNumber: $0) }
+        let window = paneSplit?.view.window
+            ?? click.windowNumber.flatMap { NSApp.window(withWindowNumber: $0) }
         guard let window else { return }
-        // Selecting a native tab is separate from activating its app.
-        // Explicit selection also works when Notification Center was key.
-        window.tabGroup?.selectedWindow = window
+        // The pane's tab comes to the front (D30); selecting it is separate
+        // from activating the app, and works when Notification Center was key.
+        if let tab = paneSplit?.tab { tab.controller?.selectTab(tab) }
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
-        guard let split = window.contentViewController as? SplitViewController else { return }
+        guard let split = paneSplit ?? window.terminalSplit else { return }
         let panes = split.panes
         guard
             let target = Self.notificationTarget(

@@ -28,7 +28,6 @@ sauf Rechercher le suivant et Rechercher le précédent peuvent être modifiés 
 - [Travail à distance : SSH et SFTP](#remote-work-ssh-and-sftp)
 - [Images dans le terminal](#images-in-the-terminal)
 - [La palette de commandes](#the-command-palette)
-- [Le Terminal rapide](#the-quick-terminal)
 - [Intégration à macOS](#macos-integration)
 - [Vitesse et batterie](#speed-and-battery)
 - [Réglages et fichier de configuration](#settings-and-the-config-file)
@@ -74,7 +73,6 @@ donne les valeurs de chacune et quand elle s’applique).
 | :--- | :--- |
 | ⌥ comme Meta / Alt (*Left Option key: Esc+* dans iTerm2, `macos-option-as-alt` dans Ghostty) | `option-as-meta = true`. Désactivé par défaut, pour que ⌥ tape `é`, `ø` et `–` comme le fait macOS. |
 | Copier à la sélection | `copy-on-select`, **activé** par défaut. Mettez `false` pour ⌘C uniquement. |
-| Une fenêtre à raccourci global ou un terminal rapide | `quick-terminal = true` ; la touche est `quick-terminal-key` (⌥Espace par défaut). Désactivé par défaut : un raccourci global est réservé dans toutes les applications. [Le Terminal rapide](#the-quick-terminal). |
 | Des programmes qui copient dans le presse-papiers via `ssh` ou depuis `tmux` (OSC 52) | `allow-clipboard-write = true`. Désactivé par défaut ; lire le presse-papiers est impossible quel que soit le réglage. |
 | Une confirmation avant de fermer une fenêtre occupée | `confirm-close`, activé par défaut. |
 | Des fenêtres qui rouvrent là où vous les aviez laissées | `restore-windows`, activé par défaut. Dispositions, onglets et répertoires de travail reviennent ; les processus et le texte du terminal, non. |
@@ -92,7 +90,7 @@ possible ; les deux peuvent émettre des marques d’invite. Voir [Intégration 
 **`TERM`.** Corta s’annonce comme `xterm-256color` (D08). Un hôte distant qui fonctionne déjà avec iTerm2 ou Terminal.app
 n’a besoin de rien de nouveau ; un hôte configuré pour `xterm-ghostty` ou `xterm-kitty` reçoit à la place la valeur courante.
 
-Les comportements qui diffèrent plus légèrement — copie, fermeture, raccourci du Terminal rapide, badges distants — sont
+Les comportements qui diffèrent plus légèrement — copie, fermeture, badges distants — sont
 rassemblés dans
 [Dépannage → Comportements différents des autres terminaux](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals).
 
@@ -100,10 +98,24 @@ rassemblés dans
 
 ## Fenêtres, onglets et volets
 
+Les onglets se trouvent dans la rangée de la barre de titre, à côté des boutons de fermeture, de réduction et de zoom de la
+fenêtre. Chacun montre le programme que son volet actif exécute — une tuile d’invite sombre pour un shell, les couleurs du
+programme sinon —, puis son nom et son dossier, alignés à gauche. Un programme ne prend son icône qu’une fois le terminal pris en
+main — une REPL, un éditeur, un agent, un `ssh` connecté ; une commande qui se contente de s’exécuter et d’afficher,
+comme `java -version` ou `git status`, garde la tuile d’invite. Un onglet aux volets scindés empile les icônes des autres
+volets derrière celle du premier plan, légèrement tournées ; cliquer sur un volet fait passer son programme devant. Survolez
+un onglet pour son bouton de fermeture, faites-le glisser pour le déplacer, double-cliquez pour le renommer, et cliquez avec
+le bouton droit pour Nouvel onglet, Renommer l’onglet…, Fermer l’onglet et Fermer les autres onglets. Quand il y a plus
+d’onglets que de place, la rangée défile latéralement — balayez dessus, ou tournez la molette de la souris au-dessus — et
+suit l’onglet que vous sélectionnez.
+
+![Les onglets dans la rangée de la barre de titre, avec leurs icônes de programme](../../brand/native-tab-icon.png)
+
 | Pour… | Utilisez |
 | --- | --- |
 | Ouvrir une fenêtre / un onglet | ⌘N / ⌘T |
-| Onglet précédent / suivant | ⇧⌘[ / ⇧⌘] |
+| Onglet précédent / suivant | ⇧⌘[ / ⇧⌘], ou ⇧⌃Tab / ⌃Tab |
+| Afficher l’onglet 1 à 8 / le dernier | ⌘1–⌘8 / ⌘9 |
 | Renommer l’onglet courant | Double-clic sur le titre de l’onglet, ou clic droit ▸ Renommer l’onglet… |
 | Diviser le volet à droite / vers le bas | ⌘D / ⇧⌘D |
 | Déplacer le focus entre les volets | ⌥⌘ + touche fléchée |
@@ -116,15 +128,18 @@ rassemblés dans
 - Renommez un onglet directement dans son titre : double-cliquez, ou choisissez Renommer l’onglet… dans son menu
   contextuel. Retour enregistre, Échap annule, et un nom vide rétablit le titre automatique. Les noms personnalisés
   survivent à la sortie du shell et à la restauration des sessions. Les menus contextuels de l’onglet et du terminal
-  proposent aussi Nouvel onglet, et le bouton **+** de la barre d’outils en ouvre un, que la barre d’onglets soit
-  affichée ou non ; la barre d’onglets n’a pas de **+** à elle.
+  proposent aussi Nouvel onglet, et le bouton **+** de la barre d’outils en ouvre un aussi ; la
+  rangée d’onglets n’a pas de **+** à elle.
+- **Les onglets entre fenêtres.** Faites glisser un onglet hors de la rangée, vers le bas, et relâchez : il a sa propre
+  fenêtre ; sur la rangée d’une autre fenêtre, il y passe. Ses volets continuent de tourner. **Fenêtre ▸ Déplacer l’onglet
+  vers une nouvelle fenêtre** et le menu de l’onglet font le premier, **Fenêtre ▸ Fusionner toutes les fenêtres** réunit
+  tous les onglets dans la fenêtre de devant. Un onglet tiré au bout d’une rangée qui défile entraîne la rangée.
 - **Agrandir le volet** est temporaire : rien n’est fermé et aucun processus n’est dérangé.
 - **Rouvrir le volet fermé** rétablit la place, la taille et le répertoire de travail du volet — pas le programme qui y tournait.
 - Fermer un volet où une commande tourne encore demande d’abord confirmation (`confirm-close`).
 - **Restauration des fenêtres.** Quittez et relancez : chaque fenêtre revient avec ses onglets, ses divisions, la position
   de ses séparateurs et le répertoire de travail de chaque volet (`restore-windows`, activé par défaut). Chaque volet
-  démarre un nouveau processus ; le texte du terminal et les tâches en cours ne sont pas restaurés. Le Terminal rapide
-  est exclu.
+  démarre un nouveau processus ; le texte du terminal et les tâches en cours ne sont pas restaurés.
 - **Préréglages.** Un préréglage est un shell, un dossier et un environnement nommés, définis dans le fichier de
   configuration. **Shell ▸ Nouveau volet avec préréglage** en ouvre un ; maintenez ⌥ pour l’ouvrir dans une fenêtre à
   part ([Presets](../../CONFIGURATION.md#4a-presets)).
@@ -167,7 +182,9 @@ rassemblés dans
   déplacent ni ne redimensionnent jamais la fenêtre : les lignes et colonnes visibles s’y réajustent, et ce qui reste
   d’une cellule apparaît en fond sous la dernière ligne.
 - **Thème.** Trois thèmes intégrés, `corta`, `solarized` et `mono`, chacun en variante claire et sombre ;
-  `appearance = auto` suit macOS quand il bascule. Vous pouvez définir votre propre thème via
+  `appearance = auto` suit macOS quand il bascule. Les modes clair et sombre choisissent leur thème séparément dans
+  Réglages → Thèmes — un Solarized clair à côté d’un Corta sombre s’écrit `theme = light:solarized,dark:corta`. Un
+  changement fond la fenêtre vers ses nouvelles couleurs. Vous pouvez définir votre propre thème via
   **Présentation ▸ Éditeur de thème…** ou dans le fichier de configuration, ou hériter d’un thème et changer quelques
   couleurs ([Themes](../../CONFIGURATION.md#4-themes)).
 - **Unicode.** Le texte chinois, japonais et coréen occupe deux colonnes et s’aligne avec le reste ; emoji, signes
@@ -210,8 +227,8 @@ Réglages ▸ Clavier et souris ▸ Indicateur de source de saisie propose **Aut
 **Toujours dans le volet actif** ou **Désactivé**. Par défaut, l’indicateur n’apparaît que chez les utilisateurs ayant
 activé une disposition de clavier non latine ou un IME ; les configurations uniquement latines restent épurées. Revenir à
 une disposition latine laisse un `A` discret sur un fond pâle — gris dans la barre d’outils, dans la couleur de texte du
-thème à côté de l’invite. Les dispositions non latines et les modes d’IME intégrés utilisent une teinte indigo douce ; les
-modes d’IME inconnus, du gris. À côté de l’invite, les couleurs suivent la luminosité du thème du terminal plutôt que
+thème à côté de l’invite. À côté de l’invite, les dispositions non latines et les modes d’IME intégrés utilisent une teinte
+indigo douce ; dans la barre d’outils, toute source est grise, le glyphe seul les distinguant. À côté de l’invite, les couleurs suivent la luminosité du thème du terminal plutôt que
 celle de macOS. Dans la barre d’outils, le badge reste pendant qu’un programme tourne — Claude Code, un éditeur —, car il
 ne masque aucune sortie. Au bord droit de la ligne de commande, l’intégration du shell le masque pendant l’exécution des
 commandes en mode **Automatique**. **Toujours** peut le garder pendant la sortie des commandes. Les deux modes d’invite le
@@ -232,7 +249,7 @@ style discret par défaut.
 
 ### État du système local (facultatif)
 
-Ouvrez Réglages (⌘,) → Terminal, activez la barre d’état inférieure, puis choisissez les indicateurs à afficher :
+Ouvrez Réglages (⌘,) → Terminal, activez Afficher l’état du système sous Barre d’état inférieure, puis choisissez les indicateurs à afficher :
 utilisation du CPU, charge du système, utilisation de la mémoire, débits réseau, espace disque libre et état thermique.
 Elle est désactivée par défaut ; chaque indicateur a son propre interrupteur. Cliquez sur la barre pour voir le nom de
 l’hôte local, la version de macOS, la puce, le nombre de cœurs et la mémoire totale. La barre indique Local même dans un
@@ -250,7 +267,8 @@ et la précision se trouvent dans son infobulle, sa valeur d’accessibilité et
 
 ### Créer et modifier des thèmes
 
-Réglages → Apparence → Créer un thème ouvre un éditeur graphique. Nommez votre copie, basculez entre les variantes sombre
+Réglages → Thèmes → Nouveau, à côté de Mode clair ou Mode sombre, ouvre un éditeur graphique ; ce que vous enregistrez
+devient le thème de ce mode. Nommez votre copie, basculez entre les variantes sombre
 et claire, et changez les couleurs avec des sélecteurs ou des valeurs HEX. L’aperçu se met à jour sans modifier les
 fenêtres du terminal. Enregistrer le thème l’active et le conserve ; Annuler garde votre thème précédent. Les thèmes
 personnalisés proposent Modifier le thème. Restaurer les couleurs source réinitialise la variante courante. Vous pouvez
@@ -313,7 +331,9 @@ ou, pour une connexion, **Reconnecter** ; le texte d’erreur du système est so
   tant que le curseur ou le résultat courant se trouverait dessous ; dans une division étroite, elle se rétrécit plutôt
   que de couvrir le volet. Chaque volet a sa propre barre.
 - **Sélection.** Faites glisser pour sélectionner, double-cliquez pour un mot, triple-cliquez pour une ligne. Une
-  sélection terminée est copiée aussitôt (`copy-on-select`) ; ⌘C copie aussi. Dans un programme qui utilise la souris —
+  sélection terminée est copiée aussitôt (`copy-on-select`) ; ⌘C copie aussi. Une copie est confirmée par une bande de lumière qui
+  glisse une fois le long du texte copié (un seul flash doux avec Réduire les animations), ou par un message si le texte est
+  hors de vue. Dans un programme qui utilise la souris —
   `vim`, `htop` —, maintenez ⌥ en commençant à faire glisser pour sélectionner du texte malgré tout
   (`mouse-override-modifier`).
 - **Coller.** ⌘V. Le texte collé est marqué comme collage (bracketed paste), si bien qu’un shell qui le prend en charge —
@@ -602,28 +622,12 @@ Tapez quelques lettres et appuyez sur Retour. Les lettres correspondent dans l�
 trouve aussi. Les commandes récemment exécutées apparaissent en premier. Cliquer sur une autre fenêtre ferme la palette et
 laisse cette fenêtre au premier plan. C’est le moyen le plus rapide d’atteindre les commandes sans raccourci par défaut.
 
-<a id="the-quick-terminal"></a>
-
-## Le Terminal rapide
-
-Un terminal qui descend par-dessus ce que vous êtes en train de faire. Ouvrez-le depuis
-**Présentation ▸ Terminal rapide**, depuis la palette de commandes, ou avec un raccourci global une fois activé :
-
-```ini
-quick-terminal = true
-quick-terminal-key = alt+space
-quick-terminal-position = top      # top, bottom ou center
-```
-
-Le raccourci est désactivé par défaut, car une touche globale est retirée à toutes les autres applications.
-
 <a id="macos-integration"></a>
 
 ## Intégration à macOS
 
-- **Raccourcis.** Trois actions : **Ouvrir une fenêtre Corta** (éventuellement dans un dossier),
-  **Mettre une fenêtre Corta au premier plan** et **Afficher/masquer le terminal rapide**. Aucune n’exécute de commande
-  dans un shell.
+- **Raccourcis.** Deux actions : **Ouvrir une fenêtre Corta** (éventuellement dans un dossier) et **Mettre une fenêtre Corta au premier plan**.
+  Aucune n’exécute de commande dans un shell.
 - **Services.** Le texte sélectionné dans le terminal est proposé au menu **Services**.
 - **Saisie clavier sécurisée.** **Shell ▸ Saisie clavier sécurisée** empêche les autres applications de lire vos frappes
   tant que Corta est au premier plan — pour taper des mots de passe. Un cadenas dans la barre de titre indique quand elle
@@ -686,7 +690,6 @@ Les Réglages se présentent comme une barre latérale de catégories, à la man
   sélectionne du texte quand un programme a la souris, la copie à la sélection, et les modes et couleurs de l’indicateur
   de source de saisie.
 - **Raccourcis** — la touche de chaque commande ; une flèche de réinitialisation apparaît à côté de celles que vous avez modifiées.
-- **Terminal rapide** — le raccourci global, la position et l’écran.
 - **Connexions** — Se connecter à un hôte et préréglages enregistrés.
 - **Confidentialité et sécurité** — l’écriture dans le presse-papiers par les programmes (OSC 52), la Saisie clavier
   sécurisée, l’historique des dossiers et les hôtes récents.
@@ -782,7 +785,7 @@ d’adaptateur dédié dans Corta. Les protocoles génériques de notification e
 la détection de processus n’est pas une intégration complète d’agent. Voir le
 [périmètre de compatibilité et les limites de vérification](../../CONFORMANCE.md#cli-signal-compatibility) (anglais).
 
-Par défaut, les volets d’agents distinguent sur leur onglet natif En cours (couleur d’accent), Attend votre intervention
+Par défaut, les volets d’agents distinguent sur leur onglet En cours (couleur d’accent), Attend votre intervention
 (orange), Terminé (vert), Échec (rouge), Inactif (gris) et État inconnu (un point gris creux). Inactif signifie qu’aucun tour
 actif n’est signalé, y compris avant le début ou après l’arrêt du travail ; seul un `done` explicite signifie l’achèvement. Un
 anneau de progression suit les rapports OSC 7501 ou OSC 9;4. Le Dock compte les volets en attente et affiche la progression

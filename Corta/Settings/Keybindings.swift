@@ -167,6 +167,15 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case previousTab = "previous-tab"
     case nextTab = "next-tab"
     case renameTab = "rename-tab"
+    case selectTab1 = "select-tab-1"
+    case selectTab2 = "select-tab-2"
+    case selectTab3 = "select-tab-3"
+    case selectTab4 = "select-tab-4"
+    case selectTab5 = "select-tab-5"
+    case selectTab6 = "select-tab-6"
+    case selectTab7 = "select-tab-7"
+    case selectTab8 = "select-tab-8"
+    case selectLastTab = "select-last-tab"
     case close
     case splitRight = "split-right"
     case splitDown = "split-down"
@@ -213,7 +222,6 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case resetTerminal = "reset-terminal"
     case reconnectRemote = "reconnect-remote"
     case browseRemoteFiles = "browse-remote-files"
-    case quickTerminal = "quick-terminal"
     case secureKeyboardEntry = "secure-keyboard-entry"
     case settings
     case commandPalette = "command-palette"
@@ -226,6 +234,10 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .previousTab: return L10n.text("command.previousTab")
         case .nextTab: return L10n.text("command.nextTab")
         case .renameTab: return L10n.text("command.renameTab")
+        case .selectTab1, .selectTab2, .selectTab3, .selectTab4, .selectTab5, .selectTab6,
+            .selectTab7, .selectTab8:
+            return L10n.format("command.selectTab", tabNumber ?? 0)
+        case .selectLastTab: return L10n.text("command.selectLastTab")
         case .close: return L10n.text("command.close")
         case .splitRight: return L10n.text("command.splitRight")
         case .splitDown: return L10n.text("command.splitDown")
@@ -277,7 +289,6 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .resetTerminal: return L10n.text("command.resetTerminal")
         case .reconnectRemote: return L10n.text("command.reconnectRemote")
         case .browseRemoteFiles: return L10n.text("command.browseRemoteFiles")
-        case .quickTerminal: return L10n.text("command.quickTerminal")
         case .secureKeyboardEntry: return L10n.text("command.secureKeyboardEntry")
         case .settings: return L10n.text("command.settings")
         case .commandPalette: return L10n.text("command.commandPalette")
@@ -295,6 +306,15 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .previousTab: return #selector(SplitViewController.selectPreviousCortaTab(_:))
         case .nextTab: return #selector(SplitViewController.selectNextCortaTab(_:))
         case .renameTab: return #selector(SplitViewController.renameCurrentTab(_:))
+        case .selectTab1: return #selector(SplitViewController.selectCortaTab1(_:))
+        case .selectTab2: return #selector(SplitViewController.selectCortaTab2(_:))
+        case .selectTab3: return #selector(SplitViewController.selectCortaTab3(_:))
+        case .selectTab4: return #selector(SplitViewController.selectCortaTab4(_:))
+        case .selectTab5: return #selector(SplitViewController.selectCortaTab5(_:))
+        case .selectTab6: return #selector(SplitViewController.selectCortaTab6(_:))
+        case .selectTab7: return #selector(SplitViewController.selectCortaTab7(_:))
+        case .selectTab8: return #selector(SplitViewController.selectCortaTab8(_:))
+        case .selectLastTab: return #selector(SplitViewController.selectLastCortaTab(_:))
         case .close: return #selector(SplitViewController.performClose(_:))
         case .splitRight: return #selector(SplitViewController.splitRight(_:))
         case .splitDown: return #selector(SplitViewController.splitDown(_:))
@@ -354,7 +374,6 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .resetTerminal: return #selector(PaneCommands.resetTerminal(_:))
         case .reconnectRemote: return #selector(PaneRemote.reconnectRemote(_:))
         case .browseRemoteFiles: return #selector(PaneRemote.browseRemoteFiles(_:))
-        case .quickTerminal: return #selector(AppDelegate.toggleQuickTerminal(_:))
         case .secureKeyboardEntry: return #selector(AppDelegate.toggleSecureKeyboardEntry(_:))
         case .settings: return #selector(AppDelegate.showSettings(_:))
         case .commandPalette: return #selector(AppDelegate.showCommandPalette(_:))
@@ -363,6 +382,29 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
 
     /// The config-file key this command's binding is written under.
     var configurationKey: String { "bind.\(rawValue)" }
+
+    /// The tab a "select tab" command shows, counted from 1; the last tab's
+    /// command is 9, as ⌘9 is in a browser.
+    var tabNumber: Int? {
+        switch self {
+        case .selectTab1: return 1
+        case .selectTab2: return 2
+        case .selectTab3: return 3
+        case .selectTab4: return 4
+        case .selectTab5: return 5
+        case .selectTab6: return 6
+        case .selectTab7: return 7
+        case .selectTab8: return 8
+        case .selectLastTab: return 9
+        default: return nil
+        }
+    }
+
+    /// The commands that select a tab by its place, in order.
+    static let tabSelection: [TerminalCommand] = [
+        .selectTab1, .selectTab2, .selectTab3, .selectTab4, .selectTab5, .selectTab6,
+        .selectTab7, .selectTab8, .selectLastTab,
+    ]
 
     /// The menu item tag that tells this command apart from others sharing
     /// its action. Only the Find family needs one: four menu items send

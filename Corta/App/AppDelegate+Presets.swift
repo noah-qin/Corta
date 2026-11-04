@@ -143,7 +143,7 @@ extension AppDelegate {
 
     func launchPreset(_ preset: Preset, inNewWindow: Bool) {
         if !inNewWindow,
-            let split = NSApp.keyWindow?.contentViewController as? SplitViewController
+            let split = NSApp.keyWindow?.terminalSplit
         {
             split.splitFocusedPane(orientation: .columns, preset: preset)
             return

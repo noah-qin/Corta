@@ -24,7 +24,6 @@ and Find Previous can be changed ([Keyboard shortcuts](#keyboard-shortcuts)).
 - [Remote work: SSH and SFTP](#remote-work-ssh-and-sftp)
 - [Images in the terminal](#images-in-the-terminal)
 - [The command palette](#the-command-palette)
-- [The Quick Terminal](#the-quick-terminal)
 - [macOS integration](#macos-integration)
 - [Speed and battery](#speed-and-battery)
 - [Settings and the config file](#settings-and-the-config-file)
@@ -68,7 +67,6 @@ values and when it applies).
 | :--- | :--- |
 | ⌥ as Meta / Alt (iTerm2's *Left Option key: Esc+*, Ghostty's `macos-option-as-alt`) | `option-as-meta = true`. Off by default, so ⌥ types `é`, `ø` and `–` as macOS does. |
 | Copy on select | `copy-on-select`, **on** by default. Set `false` for ⌘C only. |
-| A hotkey window or quick terminal | `quick-terminal = true`; the key is `quick-terminal-key` (default ⌥Space). Off by default: a global hotkey is claimed in every application. [The Quick Terminal](#the-quick-terminal). |
 | Programs copying to the clipboard over `ssh` or from `tmux` (OSC 52) | `allow-clipboard-write = true`. Off by default; reading the clipboard is not possible under any setting. |
 | Being asked before closing a busy window | `confirm-close`, on by default. |
 | Windows reopening where you left them | `restore-windows`, on by default. Layouts, tabs and working directories come back; processes and terminal text do not. |
@@ -89,16 +87,30 @@ says it may conflict; the two can both emit prompt marks. See
 already works with iTerm2 or Terminal.app needs nothing new; one set up for
 `xterm-ghostty` or `xterm-kitty` gets the common value instead.
 
-Behaviour that differs in smaller ways — copying, closing, the Quick
-Terminal hotkey, remote badges — is collected in
+Behaviour that differs in smaller ways — copying, closing, remote badges — is collected in
 [Troubleshooting → Behaviour that differs](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals).
 
 ## Windows, tabs and panes
 
+Tabs sit in the titlebar row, beside the window's close, minimise and zoom
+buttons. Each shows the program its focused pane runs — a dark prompt tile for
+a shell, the program's own colours otherwise — then its name and directory,
+left-aligned. A program gets its icon once it takes the terminal — a REPL, an
+editor, an agent, a connected `ssh`; a command that only runs and prints, such
+as `java -version` or `git status`, keeps the prompt tile. A tab with split panes stacks the other panes' icons behind the
+front one, turned away; clicking a pane brings its program to the front. Hover
+a tab for its close button, drag it to reorder, double-click it to rename, and
+right-click it for New Tab, Rename Tab…, Close Tab and Close Other Tabs. When
+there are more tabs than fit, the row scrolls sideways — swipe on it, or turn
+the mouse wheel over it — and follows the tab you select.
+
+![Tabs in the titlebar row with their program icons](brand/native-tab-icon.png)
+
 | To… | Use |
 | --- | --- |
 | Open a window / a tab | ⌘N / ⌘T |
-| Previous / next tab | ⇧⌘[ / ⇧⌘] |
+| Previous / next tab | ⇧⌘[ / ⇧⌘], or ⇧⌃Tab / ⌃Tab |
+| Show tab 1–8 / the last tab | ⌘1–⌘8 / ⌘9 |
 | Rename the current tab | Double-click the tab title, or right-click ▸ Rename Tab… |
 | Split the pane to the right / downwards | ⌘D / ⇧⌘D |
 | Move focus between panes | ⌥⌘ + arrow key |
@@ -112,8 +124,13 @@ Terminal hotkey, remote badges — is collected in
   from its right-click menu. Return saves, Esc cancels, and an empty name
   restores the automatic title. Custom names survive shell output and session
   restoration. The tab and terminal right-click menus also offer New Tab, and
-  the toolbar's **+** button opens one whether or not the tab bar shows; the
-  tab bar has no **+** of its own.
+  the toolbar's **+** button opens one; the strip has no **+** of its own.
+- **Tabs between windows.** Drag a tab down off the strip and let go to give
+  it a window of its own, or onto another window's strip to move it there;
+  its panes keep running. **Window ▸ Move Tab to New Window** and the tab's
+  right-click menu do the first, **Window ▸ Merge All Windows** gathers every
+  window's tabs into the front one. Dragging a tab to either end of a strip
+  that scrolls carries the row along with it.
 - **Zoom Pane** is temporary: nothing closes and no process is disturbed.
 - **Reopen Closed Pane** restores the pane's place, size and working
   directory — not the program that was running in it.
@@ -122,7 +139,7 @@ Terminal hotkey, remote badges — is collected in
 - **Restoring windows.** Quit and relaunch, and every window comes back
   with its tabs, splits, divider positions and each pane's working directory
   (`restore-windows`, on by default). Each pane starts a fresh process;
-  terminal text and running jobs are not restored. The Quick Terminal is excluded.
+  terminal text and running jobs are not restored.
 - **Presets.** A preset is a named shell, directory and environment,
   defined in the config file. **Shell ▸ New Pane with Preset** opens one;
   hold ⌥ to open it in a window of its own
@@ -151,7 +168,7 @@ Terminal hotkey, remote badges — is collected in
   Apple SD Gothic Neo by your system language, kana from Hiragino Sans and
   Hangul from Apple SD Gothic Neo whatever the language. To draw them in
   a font of your own — Menlo for letters and Sarasa Gothic or LXGW WenKai
-  for Chinese, say — choose it under **CJK Font** (`font-family-cjk`). Any
+  for Chinese, say — choose it under **CJK font** (`font-family-cjk`). Any
   installed font with Chinese, Japanese or Korean characters is listed,
   monospaced or not: it draws only those characters, centred in their two
   cells, and the main font keeps the cell size. Emoji come from
@@ -173,7 +190,10 @@ Terminal hotkey, remote badges — is collected in
   changes the config file. Font changes never move or resize the window: the visible rows and
   columns refit to it, and what is left of a cell shows as background under the last row.
 - **Theme.** Three built-in themes, `corta`, `solarized` and `mono`, each with light and dark variants;
-  `appearance = auto` follows macOS as it switches. You can define your
+  `appearance = auto` follows macOS as it switches. Light and dark mode
+  choose their themes separately in Settings → Themes — a light Solarized
+  beside a dark Corta is `theme = light:solarized,dark:corta`. A switch
+  blends the window into its new colours. You can define your
   own theme through **View ▸ Theme editor…** or in the config file, or inherit
   from one and change a few
   colours ([Themes](CONFIGURATION.md#4-themes)).
@@ -217,8 +237,9 @@ Settings ▸ Keyboard & Mouse ▸ Input Source Indicator chooses **Automatically
 enables the indicator for users with an enabled non-Latin keyboard layout or
 an IME; Latin-only keyboard setups remain uncluttered. Switching back to a Latin
 layout keeps a quiet `A` on a faint background — gray in the toolbar, the
-theme's own text colour beside the prompt. Non-Latin layouts and built-in IME
-modes use a soft indigo tint; unknown IME modes use gray. Beside the prompt,
+theme's own text colour beside the prompt. Beside the prompt, non-Latin
+layouts and built-in IME modes use a soft indigo tint; in the toolbar every
+source is gray, the glyph itself telling them apart. Beside the prompt,
 colours follow the terminal theme's darkness rather than macOS's. In the
 toolbar the badge stays while a program runs — Claude Code, an editor — since
 it covers no output. At the right edge of the command line, shell integration
@@ -240,7 +261,7 @@ Direct-input and IME colors accept hex values; clear a field for the subtle defa
 
 ### Optional local system status
 
-Open Settings (⌘,) → Terminal, enable Bottom status bar, then select the
+Open Settings (⌘,) → Terminal, enable Show system status under Bottom Status Bar, then select the
 metrics you want to see: CPU usage, system load,
 memory usage, network rates, disk free space and thermal state. It is off
 by default; each metric has its own toggle. Click the bar to see the local
@@ -259,7 +280,8 @@ value and the host-details popover.
 
 ### Creating and editing themes
 
-Settings → Appearance → Create theme opens a graphical editor. Name your
+Settings → Themes → New, beside Light Mode or Dark Mode, opens a graphical
+editor; what you save becomes that mode's theme. Name your
 copy, switch between dark and light variants, and change colors using color
 pickers or HEX values. The preview updates without changing terminal windows.
 Save theme activates and persists it; Cancel keeps your previous theme.
@@ -325,7 +347,9 @@ own error text is under **Details**.
   pane. Each pane has its own bar.
 - **Selecting.** Drag to select, double-click for a word, triple-click for
   a line. A finished selection is copied at once (`copy-on-select`); ⌘C
-  copies too. Inside a program that uses the mouse — `vim`, `htop` — hold
+  copies too. A copy is confirmed by a band of light sweeping once along the
+  copied text (a single soft flash with Reduce Motion), or a toast when the
+  text is scrolled out of view. Inside a program that uses the mouse — `vim`, `htop` — hold
   ⌥ while you start dragging to select text anyway
   (`mouse-override-modifier`).
 - **Paste.** ⌘V. Pasted text is marked as a paste (bracketed paste), so a
@@ -661,26 +685,10 @@ Right); a group's name (`panes`) or a command's configuration name
 Clicking another window closes the palette and leaves that window in front.
 It is the quickest way to reach the commands that have no default shortcut.
 
-## The Quick Terminal
-
-A terminal that drops down over whatever you are doing. Open it from
-**View ▸ Quick Terminal**, from the command palette, or with a system-wide
-hotkey once you turn one on:
-
-```ini
-quick-terminal = true
-quick-terminal-key = alt+space
-quick-terminal-position = top      # top, bottom or center
-```
-
-The hotkey is off by default, because a system-wide key is taken from
-every other application.
-
 ## macOS integration
 
-- **Shortcuts.** Three actions: **Open Corta Window** (optionally in a
-  folder), **Focus Corta Window** and **Toggle Quick Terminal**. None of
-  them runs a command in a shell.
+- **Shortcuts.** Two actions: **Open Corta Window** (optionally in a
+  folder) and **Focus Corta Window**. Neither runs a command in a shell.
 - **Services.** Selected terminal text is offered to the **Services** menu.
 - **Secure Keyboard Entry.** **Shell ▸ Secure Keyboard Entry** stops other
   applications from reading your keystrokes while Corta is in front — for
@@ -753,7 +761,6 @@ Settings is a sidebar of categories, the way System Settings is laid out:
   indicator modes/colors.
 - **Shortcuts** — every command's key; a reset arrow appears beside one you
   have changed.
-- **Quick Terminal** — the system-wide hotkey, position and screen.
 - **Connections** — Connect to Host, and saved presets.
 - **Privacy & Security** — clipboard writes from programs (OSC 52), Secure
   Keyboard Entry, the directory history and recent hosts.
@@ -852,7 +859,7 @@ to any program; process detection is not a full agent integration. See the
 
 By default, agent panes distinguish Working (accent colour), Waiting for you (orange),
 Done (green), Failed (red), Idle (grey), and State unknown (a hollow grey dot)
-on their native tab. Idle means no active turn is reported, including before
+on their tab. Idle means no active turn is reported, including before
 work starts or after it stops; only an explicit `done` means completion.
 A progress ring follows OSC 7501 or OSC 9;4 reports. The Dock counts waiting
 panes and shows aggregate progress. Open the command palette or Window →

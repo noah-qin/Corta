@@ -95,6 +95,12 @@ extension AppDelegate {
         for command in [TerminalCommand.previousTab, .nextTab, .renameTab] {
             menu.addItem(item(for: command))
         }
+        // ⌘1–⌘9 in a submenu of their own: nine rows would bury the menu.
+        let tabs = NSMenu(title: L10n.text("menu.showTab"))
+        for command in TerminalCommand.tabSelection { tabs.addItem(item(for: command)) }
+        let showTab = NSMenuItem(title: tabs.title, action: nil, keyEquivalent: "")
+        showTab.submenu = tabs
+        menu.addItem(showTab)
         return menu
     }
 
@@ -187,9 +193,6 @@ extension AppDelegate {
         }
         view.addItem(.separator())
         view.addItem(item(for: .commandPalette))
-        // No key equivalent: the system-wide hotkey is `quick-terminal-key`,
-        // held by `GlobalHotKey`.
-        view.addItem(item(for: .quickTerminal))
         view.addItem(.separator())
 
         view.addSubmenu(makeThemeMenu())
@@ -204,6 +207,12 @@ extension AppDelegate {
         menu.addItem(
             withTitle: L10n.text("menu.minimize"), action: #selector(NSWindow.performMiniaturize(_:)), key: "m")
         menu.addItem(withTitle: L10n.text("menu.zoom"), action: #selector(NSWindow.performZoom(_:)))
+        menu.addItem(.separator())
+        // Answered by the key window's controller (D30, between windows).
+        menu.addItem(withTitle: L10n.text("menu.moveTabToNewWindow"),
+                     action: #selector(TerminalWindowController.moveTabToNewWindow(_:)))
+        menu.addItem(withTitle: L10n.text("menu.mergeAllWindows"),
+                     action: #selector(TerminalWindowController.mergeAllWindows(_:)))
         menu.addItem(.separator())
         let agents = NSMenuItem(title: L10n.text("agent.list"), action: nil, keyEquivalent: "")
         agents.submenu = AgentDirectory.menu()

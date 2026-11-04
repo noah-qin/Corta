@@ -28,7 +28,6 @@ und alle außer „Nächsten suchen“ und „Vorherigen suchen“ lassen sich �
 - [Arbeiten aus der Ferne: SSH und SFTP](#remote-work-ssh-and-sftp)
 - [Bilder im Terminal](#images-in-the-terminal)
 - [Die Befehlspalette](#the-command-palette)
-- [Das Schnellterminal](#the-quick-terminal)
 - [macOS-Integration](#macos-integration)
 - [Geschwindigkeit und Akku](#speed-and-battery)
 - [Einstellungen und die Konfigurationsdatei](#settings-and-the-config-file)
@@ -74,7 +73,6 @@ hat die Werte und wann sie gelten).
 | :--- | :--- |
 | ⌥ als Meta / Alt (iTerm2: *Left Option key: Esc+*, Ghostty: `macos-option-as-alt`) | `option-as-meta = true`. Standardmäßig aus, damit ⌥ wie unter macOS `é`, `ø` und `–` tippt. |
 | Kopieren beim Auswählen | `copy-on-select`, standardmäßig **an**. Setze `false`, um nur mit ⌘C zu kopieren. |
-| Ein Hotkey-Fenster oder Schnellterminal | `quick-terminal = true`; die Taste ist `quick-terminal-key` (Standard ⌥Leertaste). Standardmäßig aus: Ein globaler Hotkey wird in jeder App belegt. [Das Schnellterminal](#the-quick-terminal). |
 | Programme, die über `ssh` oder aus `tmux` in die Zwischenablage kopieren (OSC 52) | `allow-clipboard-write = true`. Standardmäßig aus; Lesen der Zwischenablage ist mit keiner Einstellung möglich. |
 | Nachfrage vor dem Schließen eines beschäftigten Fensters | `confirm-close`, standardmäßig an. |
 | Fenster, die dort wieder aufgehen, wo du sie verlassen hast | `restore-windows`, standardmäßig an. Layouts, Tabs und Arbeitsverzeichnisse kommen zurück; Prozesse und Terminaltext nicht. |
@@ -93,7 +91,7 @@ beide können Prompt-Markierungen ausgeben. Siehe [Shell-Integration](#shell-int
 funktioniert, braucht nichts Neues; einer, der für `xterm-ghostty` oder `xterm-kitty` eingerichtet ist, bekommt
 stattdessen den gängigen Wert.
 
-Kleinere Unterschiede im Verhalten – Kopieren, Schließen, der Hotkey des Schnellterminals, Remote-Kennzeichen – sind unter
+Kleinere Unterschiede im Verhalten – Kopieren, Schließen, Remote-Kennzeichen – sind unter
 [Fehlerbehebung → Verhalten, das sich von anderen Terminals unterscheidet](TROUBLESHOOTING.md#behaviour-that-differs-from-other-terminals)
 gesammelt.
 
@@ -101,10 +99,23 @@ gesammelt.
 
 ## Fenster, Tabs und Bereiche
 
+Tabs sitzen in der Titelleistenzeile, neben den Tasten zum Schließen, Minimieren und Zoomen des Fensters. Jeder zeigt das
+Programm, das sein fokussierter Bereich ausführt – eine dunkle Prompt-Kachel für eine Shell, sonst die eigenen Farben des
+Programms –, dann Namen und Verzeichnis, linksbündig. Sein Symbol bekommt ein Programm erst, wenn es das Terminal
+übernimmt – eine REPL, ein Editor, ein Agent, ein verbundenes `ssh`; ein Befehl, der nur läuft und ausgibt, wie
+`java -version` oder `git status`, behält die Prompt-Kachel. Ein Tab mit geteilten Bereichen stapelt die Symbole der anderen Bereiche
+hinter dem vorderen, leicht weggedreht; ein Klick auf einen Bereich holt dessen Programm nach vorn. Zeig auf einen Tab für
+seine Schließtaste, zieh ihn zum Umsortieren, doppelklicke ihn zum Umbenennen und öffne mit Rechtsklick Neuer Tab,
+Tab umbenennen…, Tab schließen und Andere Tabs schließen. Passen nicht alle Tabs hinein, scrollt die Zeile seitwärts –
+wische darauf oder dreh das Mausrad darüber – und folgt dem Tab, den du auswählst.
+
+![Tabs in der Titelleistenzeile mit ihren Programmsymbolen](../../brand/native-tab-icon.png)
+
 | Um … | Verwende |
 | --- | --- |
 | Ein Fenster / einen Tab öffnen | ⌘N / ⌘T |
-| Vorheriger / nächster Tab | ⇧⌘[ / ⇧⌘] |
+| Vorheriger / nächster Tab | ⇧⌘[ / ⇧⌘] oder ⇧⌃Tab / ⌃Tab |
+| Tab 1–8 / letzten Tab zeigen | ⌘1–⌘8 / ⌘9 |
 | Den aktuellen Tab umbenennen | Doppelklick auf den Tabtitel oder Rechtsklick ▸ Tab umbenennen… |
 | Den Bereich nach rechts / unten teilen | ⌘D / ⇧⌘D |
 | Den Fokus zwischen Bereichen bewegen | ⌥⌘ + Pfeiltaste |
@@ -117,8 +128,12 @@ gesammelt.
 - Benenne einen Tab direkt in seinem Titel um: per Doppelklick oder mit „Tab umbenennen…“ aus seinem Kontextmenü.
   Return speichert, Esc bricht ab, und ein leerer Name stellt den automatischen Titel wieder her. Eigene Namen
   überstehen Shell-Ausgaben und das Wiederherstellen von Sitzungen. Die Kontextmenüs von Tab und Terminal bieten auch
-  „Neuer Tab“, und die Taste **+** in der Symbolleiste öffnet einen Tab, ob die Tableiste sichtbar ist oder nicht;
-  die Tableiste hat kein eigenes **+**.
+  „Neuer Tab“, und die Taste **+** in der Symbolleiste öffnet ebenfalls einen;
+  die Tabzeile selbst hat kein eigenes **+**.
+- **Tabs zwischen Fenstern.** Zieh einen Tab nach unten aus der Zeile und lass los, und er bekommt ein eigenes Fenster;
+  auf die Tabzeile eines anderen Fensters gezogen, wandert er dorthin. Seine Bereiche laufen weiter. **Fenster ▸ Tab in
+  neues Fenster bewegen** und das Kontextmenü des Tabs tun das Erste, **Fenster ▸ Alle Fenster zusammenführen** sammelt alle
+  Tabs im vordersten Fenster. Ein Tab, der an ein Ende einer scrollenden Zeile gezogen wird, nimmt die Zeile mit.
 - **Bereich vergrößern** ist vorübergehend: Nichts wird geschlossen, kein Prozess gestört.
 - **Geschlossenen Bereich wieder öffnen** stellt Position, Größe und Arbeitsverzeichnis des Bereichs wieder her – nicht
   das Programm, das darin lief.
@@ -126,7 +141,6 @@ gesammelt.
 - **Fenster wiederherstellen.** Beende Corta und starte es neu, und jedes Fenster kommt mit seinen Tabs, Teilungen,
   Trennlinienpositionen und dem Arbeitsverzeichnis jedes Bereichs zurück (`restore-windows`, standardmäßig an).
   Jeder Bereich startet einen neuen Prozess; Terminaltext und laufende Jobs werden nicht wiederhergestellt.
-  Das Schnellterminal ist ausgenommen.
 - **Voreinstellungen.** Eine Voreinstellung ist eine benannte Kombination aus Shell, Verzeichnis und Umgebung, definiert
   in der Konfigurationsdatei. **Shell ▸ Neuer Bereich mit Voreinstellung** öffnet eine; halte ⌥ gedrückt, um sie in
   einem eigenen Fenster zu öffnen ([Presets](../../CONFIGURATION.md#4a-presets)).
@@ -169,7 +183,9 @@ gesammelt.
   ändern nie seine Größe: Die sichtbaren Zeilen und Spalten passen sich ihm an, und was von einer Zelle übrig bleibt,
   erscheint als Hintergrund unter der letzten Zeile.
 - **Thema.** Drei eingebaute Themen, `corta`, `solarized` und `mono`, jeweils mit heller und dunkler Variante;
-  `appearance = auto` folgt macOS beim Umschalten. Über **Darstellung ▸ Themeneditor…** oder in der
+  `appearance = auto` folgt macOS beim Umschalten. Heller und dunkler Modus wählen ihr Thema getrennt unter
+  Einstellungen → Themen – ein helles Solarized neben einem dunklen Corta ist `theme = light:solarized,dark:corta`.
+  Ein Wechsel blendet das Fenster sanft in seine neuen Farben über. Über **Darstellung ▸ Themeneditor…** oder in der
   Konfigurationsdatei kannst du ein eigenes Thema definieren oder von einem erben und ein paar Farben ändern
   ([Themes](../../CONFIGURATION.md#4-themes)).
 - **Unicode.** Chinesischer, japanischer und koreanischer Text belegt zwei Spalten und richtet sich mit allem anderen aus;
@@ -212,7 +228,8 @@ Einstellungen ▸ Tastatur & Maus ▸ Eingabequellenanzeige wählt **Automatisch
 oder **Aus**. Der Standard zeigt die Anzeige nur bei Nutzern mit einer aktivierten nicht-lateinischen Tastaturbelegung
 oder einem IME; rein lateinische Setups bleiben aufgeräumt. Beim Zurückschalten auf eine lateinische Belegung bleibt ein
 dezentes `A` auf blassem Hintergrund – grau in der Symbolleiste, in der eigenen Textfarbe des Themas neben dem Prompt.
-Nicht-lateinische Belegungen und eingebaute IME-Modi verwenden einen sanften Indigoton; unbekannte IME-Modi grau. Neben
+Neben dem Prompt verwenden nicht-lateinische Belegungen und eingebaute IME-Modi einen sanften Indigoton; in der
+Symbolleiste ist jede Eingabequelle grau, das Zeichen selbst unterscheidet sie. Neben
 dem Prompt folgen die Farben der Helligkeit des Terminalthemas statt der von macOS. In der Symbolleiste bleibt das
 Kennzeichen, während ein Programm läuft – Claude Code, ein Editor –, da es keine Ausgabe verdeckt. Am rechten Rand der
 Befehlszeile blendet die Shell-Integration es im Modus **Automatisch** während der Befehlsausführung aus. **Immer** kann
@@ -233,7 +250,7 @@ Kindprogramm scrollen. Farben für direkte Eingabe und IME akzeptieren Hex-Werte
 
 ### Optionaler lokaler Systemstatus
 
-Öffne Einstellungen (⌘,) → Terminal, aktiviere die untere Statusleiste und wähle die Messwerte, die du sehen willst:
+Öffne Einstellungen (⌘,) → Terminal, aktiviere unter Untere Statusleiste die Option Systemstatus anzeigen und wähle die Messwerte, die du sehen willst:
 CPU-Auslastung, Systemlast, Speichernutzung, Netzwerkraten, freier Speicherplatz und Wärmezustand. Sie ist standardmäßig
 aus; jeder Messwert hat einen eigenen Schalter. Klicke auf die Leiste, um Namen, macOS-Version, Chip, Kernanzahl und
 Gesamtspeicher des lokalen Hosts zu sehen. Die Leiste zeigt auch in einem SSH-Bereich „Lokal“; sie überwacht keinen
@@ -251,7 +268,8 @@ Namen und Genauigkeit stehen im Tooltip, im Bedienungshilfen-Wert und im Popover
 
 ### Themen erstellen und bearbeiten
 
-Einstellungen → Erscheinungsbild → Thema erstellen öffnet einen grafischen Editor. Benenne deine Kopie, wechsle zwischen
+Einstellungen → Themen → Neu, neben Heller Modus oder Dunkler Modus, öffnet einen grafischen Editor; was du sicherst,
+wird das Thema dieses Modus. Benenne deine Kopie, wechsle zwischen
 dunkler und heller Variante und ändere Farben mit Farbwählern oder HEX-Werten. Die Vorschau aktualisiert sich, ohne die
 Terminalfenster zu ändern. „Thema speichern“ aktiviert es und speichert es dauerhaft; „Abbrechen“ behält dein bisheriges
 Thema. Eigene Themen bieten „Thema bearbeiten“. „Quellfarben wiederherstellen“ setzt die aktuelle Variante zurück. Du kannst
@@ -313,7 +331,9 @@ oder, bei einer Verbindung, **Neu verbinden**; der Fehlertext des Systems steht 
   unten, solange der Cursor oder der aktuelle Treffer darunter läge; in einer schmalen Teilung wird sie schmaler, statt
   den Bereich zu verdecken. Jeder Bereich hat seine eigene Leiste.
 - **Auswählen.** Ziehen zum Auswählen, Doppelklick für ein Wort, Dreifachklick für eine Zeile. Eine fertige Auswahl wird
-  sofort kopiert (`copy-on-select`); ⌘C kopiert ebenfalls. In einem Programm, das die Maus verwendet – `vim`, `htop` –,
+  sofort kopiert (`copy-on-select`); ⌘C kopiert ebenfalls. Eine Kopie bestätigt ein Lichtband, das einmal
+  über den kopierten Text gleitet (ein einzelnes sanftes Aufleuchten bei Bewegung reduzieren), oder ein Hinweis, wenn der Text
+  aus dem Blick gescrollt ist. In einem Programm, das die Maus verwendet – `vim`, `htop` –,
   halte ⌥ beim Beginn des Ziehens gedrückt, um trotzdem Text auszuwählen (`mouse-override-modifier`).
 - **Einfügen.** ⌘V. Eingefügter Text wird als Einfügung markiert (Bracketed Paste), sodass eine Shell, die das unterstützt –
   zsh, fish, bash 5.1 oder neuer –, einen eingefügten Befehl einsetzt, ohne ihn auszuführen, bis du Return drückst. Hat
@@ -598,27 +618,12 @@ Tippe ein paar Buchstaben und drücke Return. Buchstaben passen in ihrer Reihenf
 (`new-tab`) findet ihn. Kürzlich ausgeführte Befehle stehen oben. Ein Klick auf ein anderes Fenster schließt die Palette
 und lässt dieses Fenster vorne. Sie ist der schnellste Weg zu den Befehlen ohne Standard-Kurzbefehl.
 
-<a id="the-quick-terminal"></a>
-
-## Das Schnellterminal
-
-Ein Terminal, das über das herunterfährt, woran du gerade arbeitest. Öffne es über **Darstellung ▸ Schnellterminal**,
-über die Befehlspalette oder mit einem systemweiten Hotkey, sobald du einen einschaltest:
-
-```ini
-quick-terminal = true
-quick-terminal-key = alt+space
-quick-terminal-position = top      # top, bottom oder center
-```
-
-Der Hotkey ist standardmäßig aus, weil eine systemweite Taste jeder anderen App weggenommen wird.
-
 <a id="macos-integration"></a>
 
 ## macOS-Integration
 
-- **Kurzbefehle.** Drei Aktionen: **Corta-Fenster öffnen** (optional in einem Ordner), **Corta-Fenster in den Vordergrund**
-  und **Schnellterminal ein-/ausblenden**. Keine davon führt einen Befehl in einer Shell aus.
+- **Kurzbefehle.** Zwei Aktionen: **Corta-Fenster öffnen** (optional in einem Ordner) und **Corta-Fenster in den Vordergrund**.
+  Keine davon führt einen Befehl in einer Shell aus.
 - **Dienste.** Ausgewählter Terminaltext wird dem Menü **Dienste** angeboten.
 - **Sichere Tastatureingabe.** **Shell ▸ Sichere Tastatureingabe** hindert andere Apps daran, deine Tastenanschläge zu
   lesen, während Corta vorne ist – zum Eintippen von Passwörtern. Ein Schloss in der Titelleiste zeigt, wann sie
@@ -679,7 +684,6 @@ Die Einstellungen sind eine Seitenleiste mit Kategorien, aufgebaut wie die Syste
 - **Tastatur & Maus** – Wahltaste als Meta, wie Links sich öffnen, die Sondertaste, die Text auswählt, während ein
   Programm die Maus belegt, Kopieren beim Auswählen sowie Modi und Farben der Eingabequellenanzeige.
 - **Tastaturkurzbefehle** – die Taste jedes Befehls; neben einer geänderten erscheint ein Pfeil zum Zurücksetzen.
-- **Schnellterminal** – der systemweite Hotkey, Position und Bildschirm.
 - **Verbindungen** – Mit Host verbinden und gespeicherte Vorgaben.
 - **Datenschutz & Sicherheit** – Schreiben in die Zwischenablage durch Programme (OSC 52), Sichere Tastatureingabe, der
   Verzeichnisverlauf und zuletzt verbundene Hosts.
@@ -775,7 +779,7 @@ haben in Corta keinen eigenen Adapter für den Aufgabenstatus. Allgemeine Protok
 stehen jedem Programm offen; eine Prozesserkennung ist keine vollständige Agent-Integration. Siehe
 [Umfang der Kompatibilität und Grenzen der Prüfung](../../CONFORMANCE.md#cli-signal-compatibility) (Englisch).
 
-Standardmäßig unterscheiden Agent-Bereiche auf ihrem nativen Tab In Arbeit (Akzentfarbe), Wartet auf dich (orange), Fertig
+Standardmäßig unterscheiden Agent-Bereiche auf ihrem Tab In Arbeit (Akzentfarbe), Wartet auf dich (orange), Fertig
 (grün), Fehlgeschlagen (rot), Untätig (grau) und Status unbekannt (hohler grauer Punkt). Untätig heißt, dass kein laufender
 Durchgang gemeldet ist – auch vor Beginn oder nach dem Ende der Arbeit; nur ein ausdrückliches `done` bedeutet Abschluss. Ein
 Fortschrittsring folgt Meldungen über OSC 7501 oder OSC 9;4. Das Dock zählt wartende Bereiche und zeigt den Gesamtfortschritt.

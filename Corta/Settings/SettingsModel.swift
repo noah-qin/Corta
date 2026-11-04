@@ -82,8 +82,6 @@ final class SettingsModel {
     var directoryHistoryStatus = RowStatus()
     var recentHostsStatus = RowStatus()
     var notificationPermissionNotice = RowStatus()
-    /// Which key summons the Quick Terminal, or why none does.
-    var quickTerminalStatus = RowStatus()
 
     private var clearTask: Task<Void, Never>?
     private var notificationObservers: [NSObjectProtocol] = []
@@ -120,11 +118,6 @@ final class SettingsModel {
             forName: TaskNotifier.permissionDidChange, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in self?.refreshNotificationPermissionNotice() }
-        })
-        notificationObservers.append(NotificationCenter.default.addObserver(
-            forName: QuickTerminalController.hotKeyStatusDidChange, object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.refreshQuickTerminalStatus() }
         })
         notificationObservers.append(NotificationCenter.default.addObserver(
             forName: NSFont.fontSetChangedNotification, object: nil, queue: .main
@@ -164,13 +157,12 @@ final class SettingsModel {
         let configuration = ConfigurationStore.shared.configuration
         self.configuration = configuration
         listedThemes = Theme.all(in: configuration)
-        previewTheme = Theme.named(configuration.theme, in: configuration) ?? .corta
+        previewTheme = Theme.selected(in: configuration)
         if previewedFont?.size != configuration.fontSize || previewedFont?.style != FontStyle(configuration) {
             refreshPreviewFont()
         }
         if configuration.fontFamily != resolvedFontFamily { refreshFontStatus() }
         refreshCJKFontNotice()
-        refreshQuickTerminalStatus()
         refreshNotificationPermissionNotice()
     }
 
@@ -303,43 +295,19 @@ final class SettingsModel {
 // MARK: - System entry points
 
 extension SettingsModel {
-
-    /// The hotkey line under the Quick Terminal toggle. The key itself is
-    /// edited in the config file (`quick-terminal-key`), like every `bind.*`
-    /// shortcut: a key-capture control would be a second editor for one
-    /// value. What the page adds is the fact the file cannot show — whether
-    /// the system actually granted the key.
-    private func refreshQuickTerminalStatus() {
-        guard configuration.quickTerminal else {
-            quickTerminalStatus = RowStatus(
-                kind: .none, message: L10n.text("settings.status.quickTerminalOff"))
-            return
-        }
-        guard let key = configuration.quickTerminalKey else {
-            quickTerminalStatus = RowStatus(
-                kind: .adjusted, message: L10n.text("settings.status.quickTerminalNoKey"))
-            return
-        }
-        if QuickTerminalController.shared.hotKeyRegistrationFailed {
-            quickTerminalStatus = RowStatus(
-                kind: .failed,
-                message: L10n.format("settings.status.quickTerminalKeyTaken", key.displayText))
-        } else {
-            quickTerminalStatus = RowStatus(
-                kind: .saved,
-                message: L10n.format("settings.status.quickTerminalKey", key.displayText))
-        }
-    }
-
     func setNotificationThreshold(_ value: Double) {
-        set(
-            \.notificationThreshold, value, clampedTo: Configuration.notificationThresholdRange,
+        set(\.notificationThreshold, value, clampedTo: Configuration.notificationThresholdRange,
             label: L10n.text("settings.label.longerThan"))
     }
 
     /// A field written as given.
     func set<Value>(_ path: WritableKeyPath<Configuration, Value>, _ value: Value) {
         commit { $0[keyPath: path] = value; return nil }
+    }
+
+    /// One appearance's theme; the other keeps its own.
+    func setTheme(_ name: String, dark: Bool) {
+        commit { $0.setTheme(name, dark: dark); return nil }
     }
 
     /// A numeric field the file clamps: the nearest value in `range` is
@@ -518,16 +486,6 @@ extension SettingsModel {
             label: L10n.text("ui.history.commands"))
     }
 
-    func setQuickTerminalKey(_ value: Shortcut?) {
-        commit { configuration in
-            // The rule the hotkey registration and the config parser apply.
-            guard value.map(GlobalHotKey.isRegistrable) ?? true else {
-                return L10n.text("ui.shortcut.modifierRequired")
-            }
-            configuration.quickTerminalKey = value
-            return nil
-        }
-    }
     func setShortcut(_ value: Shortcut?, for command: TerminalCommand) {
         commit { configuration in
             if let value,

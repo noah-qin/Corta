@@ -234,14 +234,6 @@ precisam. A direção de *leitura* não existe em nenhum ajuste.
 
 Algo naquela janela ainda tem uma tarefa em primeiro plano. `confirm-close = false` desliga a pergunta em todo lugar.
 
-### O atalho do Terminal rápido não faz nada
-
-Três possibilidades, nesta ordem. `quick-terminal` está `false` (o padrão): nenhuma tecla é reservada até você definir
-`true`. Outro aplicativo já está com a tecla: Ajustes ▸ Terminal rápido diz isso, e `quick-terminal-key` aceita qualquer
-outra combinação com pelo menos um modificador. Ou a tecla é uma que o Corta não consegue associar a uma posição de tecla
-(`é`, uma grafia de dois caracteres): a linha é mantida sem alteração no arquivo de configuração e vale o padrão.
-Visualização ▸ Terminal rápido e a ação do Atalhos *Mostrar ou ocultar o terminal rápido* abrem o painel de qualquer forma.
-
 ### A insígnia de um painel remoto diz "Remoto: host desconhecido", ou um `tmux` local diz "Remoto?"
 
 A insígnia tira o nome do host do relatório `OSC 7` do próprio shell remoto ou — numa conexão aberta pela folha de conexão

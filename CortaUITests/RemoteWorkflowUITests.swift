@@ -72,6 +72,9 @@ final class RemoteWorkflowUITests: XCTestCase {
 
     @MainActor
     func testPresetBadgeBrowseEditUploadAndReconnect() throws {
+        // Typed commands must not go through a Pinyin or Kana input method.
+        let previous = LatinInputSource.select()
+        addTeardownBlock { LatinInputSource.restore(previous) }
         let stage = Self.stage
         let app = try launchOnStage(stage)
         let window = app.windows.firstMatch

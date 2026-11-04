@@ -73,7 +73,7 @@ Instalar. Se uma integração instalada estiver desatualizada, escolha Atualizar
 
 | | |
 | :--- | :--- |
-| **Entrada nativa do Mac** | Entrada CJK e composição com IME, fontes de substituição do Core Text, VoiceOver, Entrada de teclado segura, Serviços, o Terminal rápido e ações do Atalhos — por meio do AppKit, não contornando-o. |
+| **Entrada nativa do Mac** | Entrada CJK e composição com IME, fontes de substituição do Core Text, VoiceOver, Entrada de teclado segura, Serviços e ações do Atalhos — por meio do AppKit, não contornando-o. |
 | **Rápido, com provas** | 2,3 vezes a vazão do núcleo da 1.1, um quadro a menos de latência de entrada em tela cheia e 11 MiB em vez de 185 MiB para 100.000 linhas de histórico. Cada número é publicado com seu método e suas lacunas (abaixo). |
 | **Trabalho remoto embutido** | O OpenSSH do sistema com o seu `~/.ssh/config`, um navegador SFTP no estilo do Finder com arrastar e soltar, e arquivos remotos abertos no seu editor local com verificação de conflito antes do envio. |
 | **Um só arquivo de ajustes** | A janela de Ajustes nativa e `~/.config/corta/config` editam o mesmo armazenamento; verificações automáticas mantêm as chaves e atalhos documentados alinhados com o código. |

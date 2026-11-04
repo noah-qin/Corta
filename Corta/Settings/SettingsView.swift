@@ -16,35 +16,16 @@
 
 import SwiftUI
 
-/// The settings page, in SwiftUI.
-///
-/// **Shape.** A sidebar of categories beside one grouped form, the way
-/// System Settings is built on macOS 26: the sidebar is the Liquid Glass
-/// layer, the form is content. Three tabs had grown to eight sections under
-/// General alone; a sidebar holds as many categories as the settings need
-/// without a tab bar outgrowing the window. `Form`/`LabeledContent` give
-/// correct label-control accessibility pairing and localization-aware
-/// wrapping natively.
-///
-/// **Form style.** Grouped, the System Settings look. A row is as tall as
-/// its control plus the style's own inset; an empty `TextField` title
-/// still lays out as a blank second line, 11pt taller, which is why
-/// `numberField` hides it.
-///
-/// Every control writes through `SettingsModel`'s setters, which write the
-/// config file and re-read it. Nothing here holds state of its own — the
-/// model re-populates from the store on `ConfigurationStore.didChange`, so
-/// an edit made in `$EDITOR` while this window is open moves the controls,
-/// and the two directions cannot disagree. The one exception is the
-/// open-file command's draft (`OpenFileCommandField`), which is validated
-/// on commit rather than per keystroke.
+/// Settings share a sidebar, page header and grouped content surfaces. Every
+/// control still writes through SettingsModel, including external config reloads.
 struct SettingsView: View {
-    @State private var themeEditor: ThemeEditorModel?
+    @State var shortcutSearch = ""
+    @State var themeEditor: ThemeEditorModel?
     @Bindable var model: SettingsModel
     let navigation: SettingsNavigation
 
     enum Category: String, CaseIterable, Identifiable {
-        case general, appearance, terminal, keyboardMouse, shortcuts, quickTerminal
+        case general, appearance, themes, terminal, keyboardMouse, shortcuts
         case connections, privacy
         var id: String { rawValue }
 
@@ -52,10 +33,10 @@ struct SettingsView: View {
             switch self {
             case .general: L10n.text("settings.tab.general")
             case .appearance: L10n.text("settings.tab.appearance")
+            case .themes: L10n.text("settings.tab.themes")
             case .terminal: L10n.text("settings.tab.terminal")
             case .keyboardMouse: L10n.text("settings.tab.keyboardMouse")
             case .shortcuts: L10n.text("settings.tab.shortcuts")
-            case .quickTerminal: L10n.text("settings.section.quickTerminal")
             case .connections: L10n.text("ui.category.connections")
             case .privacy: L10n.text("settings.tab.privacy")
             }
@@ -65,11 +46,11 @@ struct SettingsView: View {
         var tileColor: Color {
             switch self {
             case .general: .gray
-            case .appearance: .indigo
+            case .appearance: .blue
+            case .themes: .purple
             case .terminal: Color(white: 0.25)
             case .keyboardMouse: .blue
             case .shortcuts: .orange
-            case .quickTerminal: .teal
             case .connections: .green
             case .privacy: .blue
             }
@@ -79,11 +60,11 @@ struct SettingsView: View {
         var symbol: String {
             switch self {
             case .general: "gearshape.fill"
-            case .appearance: "paintpalette.fill"
+            case .appearance: "macwindow"
+            case .themes: "paintpalette.fill"
             case .terminal: "terminal.fill"
             case .keyboardMouse: "keyboard.fill"
             case .shortcuts: "command"
-            case .quickTerminal: "rectangle.topthird.inset.filled"
             case .connections: "network"
             case .privacy: "hand.raised.fill"
             }
@@ -95,15 +76,24 @@ struct SettingsView: View {
         // A new identity per category, so each one opens at its top: a kept
         // page kept its scroll position too.
         page(category)
-            .formStyle(.grouped)
             .id(category)
-            .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
-            .frame(minWidth: 460, minHeight: 400)
-            .onChange(of: navigation.themeEditorRequest) { _, _ in
-                themeEditor = ThemeEditorModel(source: model.previewTheme, editing: false)
+            .safeAreaInset(edge: .top, spacing: 0) { saveBanner }
+            .buttonBorderShape(.capsule)
+            .frame(minWidth: 480, minHeight: 400)
+            .sheet(item: $themeEditor) { editor in
+                ThemeEditorView(editor: editor, previewFont: model.previewFont)
             }
-            .sheet(isPresented: Binding(
-                get: { navigation.showHostDetails }, set: { navigation.showHostDetails = $0 })
+            .onChange(of: navigation.themeEditorRequest) { _, _ in
+                let dark = model.previewIsDark
+                let source = Theme.named(model.configuration.themeName(dark: dark), in: model.configuration) ?? .corta
+                let editor = ThemeEditorModel(source: source, editing: false)
+                editor.isDark = dark
+                editor.selectsForDark = dark
+                themeEditor = editor
+            }
+            .sheet(
+                isPresented: Binding(
+                    get: { navigation.showHostDetails }, set: { navigation.showHostDetails = $0 })
             ) {
                 VStack {
                     SystemStatusDetails(metrics: SystemMetricsStore.shared.snapshot, showMetrics: false)
@@ -118,179 +108,66 @@ struct SettingsView: View {
         switch category {
         case .general: generalPage
         case .appearance: appearancePage
+        case .themes: themesPage
         case .terminal: terminalPage
         case .keyboardMouse: keyboardMousePage
         case .shortcuts: shortcutsPage
-        case .quickTerminal: Form { quickTerminalSection }
         case .connections: PresetSettingsView(model: model)
         case .privacy: privacyPage
         }
     }
 
-    /// Under every page: a failed write, said where it will be seen, and
-    /// where the settings live.
-    private var bottomBar: some View {
-        VStack(spacing: 0) {
-            if model.saveStatus.kind != .none {
-                StatusRowView(
-                    status: model.saveStatus,
-                    action: Self.action(if: model.saveStatus.kind == .failed) { model.retryWrite() }
-                )
-                .padding(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-            }
-            Divider()
-            footer
+    @ViewBuilder
+    private var saveBanner: some View {
+        if model.saveStatus.kind == .failed || model.saveStatus.kind == .adjusted {
+            StatusRowView(
+                status: model.saveStatus,
+                action: Self.action(if: model.saveStatus.kind == .failed) { model.retryWrite() }
+            )
+            .padding(.horizontal, 24).padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.bar)
         }
-        .background(.bar)
     }
-
 }
 
 // MARK: - Appearance
 
 extension SettingsView {
 
-    private var appearancePage: some View {
-        Form {
-            if model.listedThemes.count >= 2 {
-                Picker(L10n.text("settings.label.theme"), selection: bind(\.theme)) {
-                    ForEach(model.listedThemes, id: \.name) { theme in
-                        Text(theme.displayName).tag(theme.name)
-                    }
-                }
-                .accessibilityIdentifier("appearance-theme")
-            }
-            HStack {
-                Button(L10n.text("theme.create")) {
-                    themeEditor = ThemeEditorModel(source: model.previewTheme, editing: false)
-                }.accessibilityIdentifier("theme-create")
-                if ConfigurationStore.shared.configuration.customThemes.contains(where: { $0.name == model.theme }) {
-                    Button(L10n.text("theme.edit")) {
-                        themeEditor = ThemeEditorModel(source: model.previewTheme, editing: true)
-                    }.accessibilityIdentifier("theme-edit")
-                }
-            }
-            Picker(L10n.text("settings.label.lightOrDark"), selection: bind(\.appearance)) {
-                ForEach(Configuration.Appearance.allCases, id: \.self) { appearance in
-                    Text(
-                        appearance == .auto
-                            ? L10n.text("settings.appearance.followSystem")
-                            : L10n.text("settings.appearance.\(appearance.rawValue)")
-                    ).tag(appearance)
-                }
-            }
-            .accessibilityIdentifier("appearance-mode")
-
-            FontFamilyPicker(
-                title: L10n.text("settings.label.font"), selection: bind(model.fontFamily, model.setFontFamily),
-                defaultTag: Configuration.systemFontFamily,
-                defaultLabel: L10n.text("settings.font.systemMonospaced"), entries: model.availableFonts)
-            .accessibilityIdentifier("font-family")
-            .help(L10n.text("settings.help.font"))
-            .task { await model.loadFonts() }
-            if !model.fontDetail.isEmpty {
-                Text(model.fontDetail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("font-detail")
-            }
-            if model.fontStatus.kind != .none {
-                LabeledContent(L10n.text("settings.label.fontStatus")) {
-                    StatusRowView(
-                        status: model.fontStatus,
-                        action: Self.action(if: model.fontStatus.kind == .failed) {
-                            model.retryFontResolution()
-                        })
-                }
-            }
-            FontFamilyPicker(
-                title: L10n.text("settings.label.cjkFont"),
-                selection: bind(model.cjkFontFamily, model.setCJKFontFamily),
-                defaultTag: Configuration.automaticCJKFontFamily,
-                defaultLabel: L10n.text("settings.font.cjkAutomatic"), entries: model.availableCJKFonts)
-            .accessibilityIdentifier("font-family-cjk")
-            .help(L10n.text("settings.help.cjkFont"))
-            // Fallback off draws only the font: the CJK font would never be used.
-            .disabled(!model.fontFallback)
-            if !model.cjkFontNotice.isEmpty {
-                Text(model.cjkFontNotice)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("cjk-font-notice")
-            }
-            LabeledContent(L10n.text("settings.label.size")) {
-                Stepper(value: bind(model.fontSize, model.setFontSize), in: Configuration.fontSizeRange) {
-                    Text(model.fontSize, format: .number)
-                }
-            }
-            Picker(L10n.text("settings.label.fontWeight"), selection: bind(\.fontWeight)) {
-                ForEach(Configuration.FontWeight.allCases, id: \.self) { weight in
-                    Text(L10n.text("settings.fontWeight.\(weight.rawValue)")).tag(weight)
-                }
-            }
-            .accessibilityIdentifier("font-weight")
-            .help(L10n.text("settings.help.fontWeight"))
-            LabeledContent(L10n.text("settings.label.lineSpacing")) {
-                Stepper(
-                    value: bind(model.lineSpacing, model.setLineSpacing), in: Configuration.lineSpacingRange,
-                    step: Configuration.lineSpacingStep
-                ) {
-                    Text(model.lineSpacing, format: .number.precision(.fractionLength(2)))
-                }
-            }
-            .accessibilityIdentifier("line-spacing")
-            Toggle(L10n.text("settings.label.fontFallback"), isOn: bind(\.fontFallback))
-                .accessibilityIdentifier("font-fallback")
-            Picker(L10n.text("settings.label.emojiRendering"), selection: bind(\.emojiRendering)) {
-                ForEach(Configuration.EmojiRendering.allCases, id: \.self) { mode in
-                    Text(L10n.text("settings.emojiRendering.\(mode.rawValue)")).tag(mode)
-                }
-            }
-            .accessibilityIdentifier("emoji-rendering")
-            Section(L10n.text("settings.section.cursor")) {
-                Picker(L10n.text("settings.label.cursorShape"), selection: bind(\.cursorShape)) {
-                    ForEach(Configuration.CursorShape.allCases, id: \.self) { shape in
-                        Text(L10n.text("settings.cursor.\(shape.rawValue)")).tag(shape)
-                    }
-                }
-                .accessibilityIdentifier("cursor-shape")
-                Toggle(L10n.text("settings.label.cursorBlink"), isOn: bind(\.cursorBlink))
-                    .accessibilityIdentifier("cursor-blink")
-                    .help(L10n.text("settings.help.cursor"))
-                LabeledContent(L10n.text("settings.label.preview")) {
-                    FontPreviewSwiftUIView(
-                        theme: model.previewTheme, font: model.previewFont, isDark: model.previewIsDark,
-                        cursorStyle: model.cursorShape.style(blinking: model.cursorBlink))
-                        .accessibilityIdentifier("appearance-preview")
-                        .accessibilityValue(model.previewIsDark ? "dark" : "light")
-                }
-            }
-        }
-        .sheet(item: $themeEditor) { editor in
-            ThemeEditorView(editor: editor, previewFont: model.previewFont)
-        }
-    }
-
     // MARK: - Terminal
 
     private var terminalPage: some View {
-        Form {
-            Section(L10n.text("status.settings")) {
-                Button(L10n.text("status.details")) { navigation.showHostDetails = true }
-                    .accessibilityIdentifier("host-details")
+        SettingsPage {
+            SettingsSection(L10n.text("status.settings")) {
                 Toggle(L10n.text("status.enable"), isOn: bind(\.statusBar))
                     .accessibilityIdentifier("status-bar-enable")
-                ForEach(SystemMetrics.Item.allCases, id: \.self) { item in
-                    Toggle(L10n.text("status.item.\(item.rawValue)"), isOn: Binding(
-                        get: { model.statusItems.contains(item) },
-                        set: { model.setStatusItem(item, enabled: $0) }))
-                        .disabled(!model.statusBar)
-                        .accessibilityIdentifier("status-item-\(item.rawValue)")
+                Button {
+                    navigation.showHostDetails = true
+                } label: {
+                    HStack {
+                        Text(L10n.text("status.details"))
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                    }.contentShape(.rect)
                 }
-                StatusNetworkInterfaceField(model: model).disabled(!model.statusBar)
-                Text(L10n.text("status.settings.help")).font(.caption).foregroundStyle(.secondary)
+                .buttonStyle(.plain).accessibilityIdentifier("host-details")
             }
-            Section(L10n.text("settings.section.output")) {
+            SettingsSection(L10n.text("settings.status.items"), summary: L10n.text("status.settings.help")) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 28), count: 2), spacing: 20) {
+                    ForEach(SystemMetrics.Item.allCases, id: \.self) { item in
+                        Toggle(
+                            L10n.text("status.item.\(item.rawValue)"),
+                            isOn: Binding(
+                                get: { model.statusItems.contains(item) },
+                                set: { model.setStatusItem(item, enabled: $0) })
+                        )
+                        .accessibilityIdentifier("status-item-\(item.rawValue)")
+                    }
+                }.padding(.vertical, 4)
+                StatusNetworkInterfaceField(model: model)
+            }.disabled(!model.statusBar)
+            SettingsSection(L10n.text("settings.section.output")) {
                 LabeledContent(L10n.text("settings.label.scrollback")) {
                     numberField(bind(model.scrollbackLines, model.setScrollbackLines), width: 92)
                 }
@@ -312,18 +189,18 @@ extension SettingsView {
                     }
                 }
             }
-            Section(L10n.text("ui.section.search")) {
+            SettingsSection(L10n.text("ui.section.search")) {
                 Toggle(L10n.text("ui.search.case"), isOn: bind(\.searchCaseSensitive))
                 Toggle(L10n.text("ui.search.regex"), isOn: bind(\.searchRegex))
             }
-            Section(L10n.text("settings.section.shell")) {
+            SettingsSection(L10n.text("settings.section.shell")) {
                 Toggle(L10n.text("settings.label.historySuggestions"), isOn: bind(\.historySuggestions))
                     .help(L10n.text("settings.help.historySuggestions"))
                 Toggle(L10n.text("settings.label.directoryCompletion"), isOn: bind(\.directoryCompletion))
                     .help(L10n.text("settings.help.directoryCompletion"))
                 Toggle(L10n.text("settings.label.commandStatusMarks"), isOn: bind(\.commandStatusMarks))
                 LabeledContent(L10n.text("settings.label.openFileCommand")) {
-                    OpenFileCommandField(model: model)
+                    OpenFileCommandField(model: model).frame(maxWidth: 240)
                 }
                 .help(L10n.text("settings.help.openFileCommand"))
                 LabeledContent(L10n.text("settings.label.shellIntegration")) {
@@ -339,8 +216,8 @@ extension SettingsView {
     // MARK: - Keyboard & Mouse
 
     private var keyboardMousePage: some View {
-        Form {
-            Section(L10n.text("inputSource.settings.title")) {
+        SettingsPage {
+            SettingsSection(L10n.text("inputSource.settings.title")) {
                 Picker(L10n.text("inputSource.settings.display"), selection: bind(\.inputSourceIndicator)) {
                     ForEach(Configuration.InputSourceIndicatorMode.allCases, id: \.self) { mode in
                         Text(L10n.text("inputSource.mode.\(mode.rawValue)")).tag(mode)
@@ -348,7 +225,10 @@ extension SettingsView {
                 }
                 .accessibilityIdentifier("input-source-indicator-mode")
                 .help(L10n.text("inputSource.settings.help"))
-                Picker(L10n.text("inputSource.settings.position"), selection: bind(\.inputSourceIndicatorPosition)) {
+                Picker(
+                    L10n.text("inputSource.settings.position"),
+                    selection: bind(\.inputSourceIndicatorPosition)
+                ) {
                     ForEach(Configuration.InputSourceIndicatorPosition.allCases, id: \.self) { position in
                         Text(L10n.text("inputSource.position.\(position.rawValue)")).tag(position)
                     }
@@ -357,14 +237,14 @@ extension SettingsView {
                 InputSourceColorField(value: model.inputSourceDirectColor, direct: true, model: model)
                 InputSourceColorField(value: model.inputSourceIMEColor, direct: false, model: model)
             }
-            Section(L10n.text("settings.section.keyboard")) {
+            SettingsSection(L10n.text("settings.section.keyboard")) {
                 Toggle(
                     L10n.text("settings.label.optionAsMeta"),
                     isOn: bind(\.optionAsMeta)
                 )
                 .help(L10n.text("settings.help.optionAsMeta"))
             }
-            Section(L10n.text("settings.section.mouse")) {
+            SettingsSection(L10n.text("settings.section.mouse")) {
                 Picker(
                     L10n.text("settings.label.openLinksWith"), selection: bind(\.linkActivation)
                 ) {
@@ -375,8 +255,10 @@ extension SettingsView {
                 }
                 Picker(L10n.text("ui.mouse.override"), selection: bind(\.mouseOverrideModifier)) {
                     ForEach(Configuration.MouseOverrideModifier.allCases, id: \.self) { value in
-                        Text(verbatim: value == .option ? "⌥ Option" : value == .shift ? "⇧ Shift" : "⌃ Control")
-                            .tag(value)
+                        Text(
+                            verbatim: value == .option ? "⌥ Option" : value == .shift ? "⇧ Shift" : "⌃ Control"
+                        )
+                        .tag(value)
                     }
                 }
                 Toggle(
@@ -391,15 +273,19 @@ extension SettingsView {
     /// What can reach beyond the terminal: the clipboard, other apps'
     /// view of the keyboard, and what Corta remembers on disk.
     private var privacyPage: some View {
-        Form {
-            Section(L10n.text("settings.section.clipboard")) {
+        SettingsPage {
+            SettingsSection(
+                L10n.text("settings.section.clipboard"), summary: L10n.text("settings.help.allowClipboardCopy")
+            ) {
                 Toggle(
                     L10n.text("settings.label.allowClipboardCopy"),
                     isOn: bind(\.allowClipboardWrite)
                 )
                 .help(L10n.text("settings.help.allowClipboardCopy"))
             }
-            Section(L10n.text("settings.section.keyboard")) {
+            SettingsSection(
+                L10n.text("settings.section.keyboard"), summary: L10n.text("settings.help.secureKeyboardEntry")
+            ) {
                 Toggle(
                     L10n.text("command.secureKeyboardEntry"),
                     isOn: bind(\.secureKeyboardEntry)
@@ -413,9 +299,9 @@ extension SettingsView {
     // MARK: - General
 
     private var generalPage: some View {
-        Form {
+        SettingsPage {
             windowSection
-            Section(L10n.text("settings.section.closing")) {
+            SettingsSection(L10n.text("settings.section.closing")) {
                 Toggle(
                     L10n.text("settings.label.confirmClose"),
                     isOn: bind(\.confirmClose)
@@ -424,11 +310,12 @@ extension SettingsView {
             }
             notificationsSection
             if UpdateController.isAvailable {
-                Section(L10n.text("ui.section.updates")) {
+                SettingsSection(L10n.text("ui.section.updates")) {
                     Toggle(L10n.text("ui.update.auto"), isOn: bind(\.updateAutoCheck))
                     Toggle(L10n.text("ui.update.applications"), isOn: bind(\.suggestApplicationsFolder))
                 }
             }
+            configurationSection
         }
     }
 
@@ -482,24 +369,15 @@ extension SettingsView {
         condition ? closure : nil
     }
 
-    // MARK: - Footer
-
-    /// One line under a hairline: where the settings live, and a way to get
-    /// there.
-    private var footer: some View {
-        HStack(spacing: 8) {
-            Text(model.pathLabel)
-                .font(.system(size: NSFont.smallSystemFontSize))
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(L10n.text("settings.footer.tooltip"))
-                .accessibilityLabel(L10n.text("settings.footer.pathLabel"))
-            Spacer()
-            Button(L10n.text("settings.footer.reveal")) { model.revealConfigFile() }
-                .buttonStyle(.accessoryBarAction)
-                .controlSize(.small)
+    var configurationSection: some View {
+        SettingsSection(L10n.text("settings.config.title")) {
+            HStack(spacing: 16) {
+                Text(model.pathLabel).font(.callout).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle).help(model.pathLabel)
+                    .accessibilityLabel(L10n.text("settings.footer.pathLabel"))
+                Spacer(minLength: 12)
+                Button(L10n.text("settings.footer.reveal")) { model.revealConfigFile() }
+            }
         }
-        .padding(EdgeInsets(top: 8, leading: 16, bottom: 11, trailing: 16))
     }
 }
