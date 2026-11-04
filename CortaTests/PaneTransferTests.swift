@@ -125,6 +125,9 @@ struct PaneTransferTests {
         split.isVertical = true
         split.addArrangedSubview(NSView())
         split.addArrangedSubview(NSView())
+        // Laid out first: on a runner nothing lays a windowless split out, and
+        // a divider set on zero-width halves went nowhere.
+        split.adjustSubviews()
         let transition = SplitTransition()
         var completed = 0
         transition.start(node: split, from: 650, to: 400) { completed += 1 }

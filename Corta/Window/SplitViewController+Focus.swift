@@ -23,10 +23,12 @@ extension SplitViewController {
     /// becomes the tab's focused pane without taking first responder, which
     /// would route the selected tab's typing to a hidden pane.
     func takeFocus(_ pane: ViewController) {
-        if isSelectedTab {
-            view.window?.makeFirstResponder(pane.terminalView)
-        } else {
-            noteFocus(pane)
+        // Noted first: a pane whose renderer failed has no terminal view to
+        // become first responder, and a header button then acted on the
+        // pane focused before it.
+        noteFocus(pane)
+        if isSelectedTab, let terminalView = pane.terminalView {
+            view.window?.makeFirstResponder(terminalView)
         }
     }
 
