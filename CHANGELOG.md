@@ -10,6 +10,12 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- Corta has a website, https://corta.noahqin.dev, with the user guide,
+  the documentation and the changelog in all nine languages the
+  repository is translated into.
+
 ### Removed
 
 - macOS's own window tabs: Show Tab Bar and the tab overview are gone with
