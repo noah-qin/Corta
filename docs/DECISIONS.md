@@ -879,10 +879,11 @@ though none of them reaches the app: the Xcode project never sees
 D28 hold for everything outside `website/`. The site's TypeScript and
 scripts are not CodeQL-scanned — there is no server code to scan — and its
 dependencies are watched by Dependency review and Dependabot instead. A
-website-only change runs none of the macOS checks
-(`scripts/ci-docs-only.py`), and a document change also rebuilds the site,
-so a heading the homepage reads cannot be renamed without the build saying
-so.
+website-only change builds and tests nothing on macOS
+(`scripts/ci-docs-only.py`): the core job still starts there, for the
+repository's license check alone. A document change also rebuilds the
+site, so a heading the homepage reads cannot be renamed without the build
+saying so.
 
 **Consequence.** Reopen if the site needs a server, takes user input, or
 starts to share code with the app.

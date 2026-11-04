@@ -49,8 +49,8 @@ updates:
     commit-message:
       prefix: "build"
 
-  # The website's Bun dependencies (D31). A website-only PR runs no macOS
-  # check, but the site has many small packages: weekly, grouped, with
+  # The website's Bun dependencies (D31). A website-only PR builds and tests
+  # nothing on macOS, but the site has many small packages: weekly, grouped, with
   # security updates apart so a fix never waits on a routine bump.
   - package-ecosystem: bun
     directory: "/website"

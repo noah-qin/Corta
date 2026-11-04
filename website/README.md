@@ -64,7 +64,7 @@ Other added build dependencies: `unified`, `remark-parse`, `remark-stringify` fo
 
 The site is published at **https://corta.noahqin.dev** by GitHub Pages, from `.github/workflows/website.yml` (D31):
 
-- **A pull request** that touches README, CHANGELOG, `docs/**`, `website/**` or the workflow builds, typechecks, tests and verifies the site for `https://corta.noahqin.dev`, and deploys nothing. It runs on Linux; a website-only change runs none of the app's macOS checks (`scripts/ci-docs-only.py`).
+- **A pull request** that touches README, CHANGELOG, `docs/**`, `website/**` or the workflow builds, typechecks, tests and verifies the site for `https://corta.noahqin.dev`, and deploys nothing. It runs on Linux. A website-only change builds and tests nothing on macOS (`scripts/ci-docs-only.py`); CI's core job still starts there for the repository's license check, which the site's new files have to pass.
 - **A push to main** with the same paths, or a manual run on main, reads the origin and base path from the Pages configuration, repeats those checks, uploads only `website/out` and deploys through the `github-pages` environment, which admits main only. It never touches the app's signing or release workflow.
 
 | Setting | Local | Pages, custom domain (current) | Pages, project path |

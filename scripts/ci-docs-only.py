@@ -87,6 +87,7 @@ def scope_for_paths(paths):
             languages.add("python")
         elif path.startswith("website/"):
             continue  # The static site builds and checks itself (website.yml); no app input.
+            # The core job still runs the license check on every pull request.
         elif path == ".github/workflows/website.yml":
             languages.add("actions")
         elif path in ("scripts/ci-docs-only.py", "scripts/codeql-extract.py"):
