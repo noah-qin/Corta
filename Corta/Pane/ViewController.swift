@@ -243,25 +243,6 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight + PaneHeader.height)
     }
 
-    /// How a split predicts the new pane's winsize before layout settles it.
-    /// Also the grid `resizeSessionToFitView` sends, so a prediction and the
-    /// session never disagree. Half a point of slack: a window fitted to
-    /// whole cells can land a rounding step short of the last one, and the
-    /// right and bottom insets absorb the overhang.
-    func gridSize(fitting size: CGSize) -> TerminalSize {
-        let metrics = cellMetrics
-        let usable = usableSize(fitting: size)
-        return TerminalSize(
-            rows: Self.cellCount((usable.height + Self.fitSlack) / metrics.cellHeight),
-            columns: Self.cellCount((usable.width + Self.fitSlack) / metrics.cellWidth))
-    }
-
-    /// The area of a pane `size` large that the grid may use: the size less
-    /// the insets.
-    func usableSize(fitting size: CGSize) -> CGSize {
-        CGSize(width: size.width - TerminalLayout.insetWidth, height: size.height - verticalInsets)
-    }
-
     nonisolated static let fitSlack: CGFloat = 0.5
 
     /// Clamped before converting: a zero metric makes the quotient infinite,
@@ -436,6 +417,29 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
             if view.inLiveResize { windowTitle.noteTransientSizeChange() } else { windowTitle.endTransientSize() }
             windowTitle.apply()
         }
+    }
+}
+
+// MARK: - Sizes in cells
+
+extension ViewController {
+    /// How a split predicts the new pane's winsize before layout settles it.
+    /// Also the grid `resizeSessionToFitView` sends, so a prediction and the
+    /// session never disagree. Half a point of slack: a window fitted to
+    /// whole cells can land a rounding step short of the last one, and the
+    /// right and bottom insets absorb the overhang.
+    func gridSize(fitting size: CGSize) -> TerminalSize {
+        let metrics = cellMetrics
+        let usable = usableSize(fitting: size)
+        return TerminalSize(
+            rows: Self.cellCount((usable.height + Self.fitSlack) / metrics.cellHeight),
+            columns: Self.cellCount((usable.width + Self.fitSlack) / metrics.cellWidth))
+    }
+
+    /// The area of a pane `size` large that the grid may use: the size less
+    /// the insets.
+    func usableSize(fitting size: CGSize) -> CGSize {
+        CGSize(width: size.width - TerminalLayout.insetWidth, height: size.height - verticalInsets)
     }
 }
 

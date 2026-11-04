@@ -68,7 +68,14 @@ final class AppearanceController: NSObject {
 
     /// The variant the windows are headed for, so a change can blend to the next.
     private var appliedVariant: Theme.Variant?
-    private var blend: (from: Theme.Variant, to: Theme.Variant, start: CFTimeInterval)?
+    /// A palette transition under way: from where the canvas is, to where
+    /// it is headed, since when.
+    private struct Blend {
+        var from: Theme.Variant
+        var to: Theme.Variant
+        var start: CFTimeInterval
+    }
+    private var blend: Blend?
     private var blendTimer: Timer?
     static let blendDuration: CFTimeInterval = 0.2
 
@@ -115,7 +122,7 @@ final class AppearanceController: NSObject {
     /// Steps the palette from what is on screen to `target`: a jump would
     /// land the canvas a frame apart from the chrome.
     private func beginBlend(to target: Theme.Variant) {
-        blend = (TerminalColorPalette.activeVariant, target, CACurrentMediaTime())
+        blend = Blend(from: TerminalColorPalette.activeVariant, to: target, start: CACurrentMediaTime())
         guard blendTimer == nil else { return }
         let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.stepBlend() }

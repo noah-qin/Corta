@@ -295,6 +295,11 @@ struct WindowTabsTests {
         #expect(controller.selectedTab === keep)
     }
 
+}
+
+// MARK: - Overflow, renaming and menus
+
+extension WindowTabsTests {
     /// Too many tabs to fit: each keeps its minimum width, name and close
     /// button, and the row scrolls to the selected one.
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))

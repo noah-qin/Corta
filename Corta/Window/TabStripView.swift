@@ -55,10 +55,12 @@ final class TabStripView: NSView {
     weak var delegate: TabStripDelegate?
     private(set) var items: [TabStripItem] = []
     private(set) var selectedIndex = 0
-    private var views: [TabItemView] = []
+    /// The tab views in strip order; the drag (`TabStripView+Dragging`)
+    /// reorders them as it goes.
+    var views: [TabItemView] = []
     /// A tab under the pointer: where the press began, and whether it has
     /// moved far enough to be a drag rather than a click.
-    private struct Drag {
+    struct Drag {
         var index: Int
         var start: NSPoint
         var moved = false
@@ -69,11 +71,11 @@ final class TabStripView: NSView {
         /// scroll to re-place the tab as the row moves under it.
         var point: NSPoint = .zero
     }
-    private var drag: Drag?
+    var drag: Drag?
     /// The row scrolls while a dragged tab is held at either faded edge.
-    private var edgeScroll: Timer?
+    var edgeScroll: Timer?
     /// The torn-off tab's picture under the pointer.
-    private var dragPreview: NSWindow?
+    var dragPreview: NSWindow?
     /// The capsule behind two or more tabs, and the hairlines between
     /// unselected neighbours: views, so they move with the tabs' animations.
     private let track = NSView()
@@ -86,7 +88,7 @@ final class TabStripView: NSView {
     /// How far the row is scrolled when its tabs, at their minimum width,
     /// are wider than the strip. Tabs scroll; they never shrink to a card
     /// without a name or a close button.
-    private var offset: CGFloat = 0
+    var offset: CGFloat = 0
     /// The selected tab is brought into view at the next layout.
     private var revealsSelection = false
 
@@ -132,29 +134,7 @@ final class TabStripView: NSView {
         // The first tab, and a restored window's tabs, are simply there.
         let animates = !views.isEmpty && window?.isVisible == true
             && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        // A view stays with its tab, by identity: closing the third tab takes
-        // the third view away, rather than the last one with every name after
-        // the third shifting along.
-        var byID: [String: TabItemView] = [:]
-        for view in views { if let id = view.itemID { byID[id] = view } }
-        var next: [TabItemView] = []
-        for item in items {
-            if let view = byID.removeValue(forKey: item.id) {
-                next.append(view)
-            } else {
-                let view = TabItemView(strip: self)
-                addSubview(view)
-                next.append(view)
-                if animates { arriving.append(view) }
-            }
-        }
-        for view in byID.values {
-            arriving.removeAll { $0 === view }
-            view.cancelRename()
-            if animates { leave(view) } else { view.removeFromSuperview() }
-        }
-        if animates, next.count != views.count { reflowsNextLayout = true }
-        views = next
+        reconcileViews(with: items, animates: animates)
         for (index, view) in views.enumerated() {
             view.index = index
             view.configure(items[index], selected: index == selectedIndex)
@@ -164,6 +144,32 @@ final class TabStripView: NSView {
         setAccessibilityChildren(views)
     }
 
+    /// A view stays with its tab, by identity: closing the third tab takes
+    /// the third view away, rather than the last one with every name after
+    /// the third shifting along.
+    private func reconcileViews(with items: [TabStripItem], animates: Bool) {
+        var byID: [String: TabItemView] = [:]
+        for view in views { if let id = view.itemID { byID[id] = view } }
+        var next: [TabItemView] = []
+        for item in items {
+            if let view = byID.removeValue(forKey: item.id) {
+                next.append(view)
+                continue
+            }
+            let view = TabItemView(strip: self)
+            addSubview(view)
+            next.append(view)
+            if animates { arriving.append(view) }
+        }
+        for view in byID.values {
+            arriving.removeAll { $0 === view }
+            view.cancelRename()
+            if animates { leave(view) } else { view.removeFromSuperview() }
+        }
+        if animates, next.count != views.count { reflowsNextLayout = true }
+        views = next
+    }
+
     /// A lone tab is a pill on its own, no wider than a title needs; the
     /// track appears once there is a second tab to sit beside it.
     static let tabWidth: CGFloat = 196
@@ -171,7 +177,7 @@ final class TabStripView: NSView {
     /// Tabs keep their own width and sit at the leading edge; they share the
     /// row only once there are more than fit. The track spans the tabs, not
     /// the row.
-    private var slotWidth: CGFloat {
+    var slotWidth: CGFloat {
         guard !views.isEmpty else { return 0 }
         return min(Self.tabWidth, max(Self.minimumTabWidth, bounds.width / CGFloat(views.count)))
     }
@@ -179,10 +185,10 @@ final class TabStripView: NSView {
     /// Room for the program's card, a few letters and the close button.
     static let minimumTabWidth: CGFloat = 112
     /// The width of the soft edge where tabs scroll out of view.
-    private static let fadeWidth: CGFloat = 20
+    static let fadeWidth: CGFloat = 20
 
     private var contentWidth: CGFloat { slotWidth * CGFloat(views.count) }
-    private var maximumOffset: CGFloat { max(0, contentWidth - bounds.width) }
+    var maximumOffset: CGFloat { max(0, contentWidth - bounds.width) }
 
     /// The offset that shows the selected tab whole, clear of the fades.
     private func offsetRevealingSelection(from offset: CGFloat) -> CGFloat {
@@ -263,6 +269,11 @@ final class TabStripView: NSView {
         updateFadeMask()
     }
 
+}
+
+// MARK: - Track, animations and menus
+
+extension TabStripView {
     /// The capsule spans the tabs, not the row; a lone tab is a pill on its
     /// own and the track appears with the second. Hairlines part two
     /// unselected neighbours, as a segmented control's do.
@@ -382,163 +393,6 @@ final class TabStripView: NSView {
     }
 
     // MARK: - Interaction, routed from the tab views
-
-    func itemMouseDown(_ index: Int, event: NSEvent) {
-        if event.clickCount == 2 {
-            views[index].beginRename()
-            return
-        }
-        delegate?.tabStrip(self, select: index)
-        drag = Drag(index: index, start: convert(event.locationInWindow, from: nil))
-    }
-
-    /// How far off the strip, up or down, a tab is pulled before it tears
-    /// off for another window.
-    private static let tearDistance: CGFloat = 24
-
-    func itemMouseDragged(_ event: NSEvent) {
-        guard var current = drag, views.indices.contains(current.index) else { return }
-        let point = convert(event.locationInWindow, from: nil)
-        if !current.moved, abs(point.x - current.start.x) < 4, abs(point.y - current.start.y) < 4 { return }
-        current.moved = true
-        current.point = point
-        let off = point.y < -Self.tearDistance || point.y > bounds.height + Self.tearDistance
-        if off != current.tornOff {
-            current.tornOff = off
-            if off { showDragPreview(of: views[current.index]) } else { hideDragPreview() }
-            needsLayout = true
-        }
-        drag = current
-        if current.tornOff {
-            stopEdgeScroll()
-            moveDragPreview(to: NSEvent.mouseLocation)
-            return
-        }
-        placeDraggedTab()
-        updateEdgeScroll(at: point)
-    }
-
-    /// The dragged tab under the pointer, swapping with the neighbour its
-    /// centre has crossed into. In the row's own coordinates, scrolled by
-    /// `offset`.
-    private func placeDraggedTab() {
-        guard var current = drag, views.indices.contains(current.index) else { return }
-        let view = views[current.index]
-        let width = slotWidth
-        var frame = view.frame
-        frame.origin.x = min(max(0, current.point.x + offset - width / 2), width * CGFloat(views.count - 1)) - offset
-        view.frame = frame
-        addSubview(view, positioned: .above, relativeTo: nil)
-        let target = max(0, min(views.count - 1, Int((frame.midX + offset) / width)))
-        if target != current.index {
-            let moving = views.remove(at: current.index)
-            views.insert(moving, at: target)
-            delegate?.tabStrip(self, move: current.index, to: target)
-            current.index = target
-            drag = current
-        }
-        needsLayout = true
-    }
-
-    /// Held at a faded edge of an overflowing row, the dragged tab scrolls
-    /// it, so a tab can be carried to a place that was out of view.
-    private func updateEdgeScroll(at point: NSPoint) {
-        let direction: CGFloat = point.x < Self.fadeWidth ? -1 : point.x > bounds.width - Self.fadeWidth ? 1 : 0
-        guard direction != 0, maximumOffset > 0 else {
-            stopEdgeScroll()
-            return
-        }
-        guard edgeScroll == nil else { return }
-        edgeScroll = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, let current = self.drag, !current.tornOff else {
-                    self?.stopEdgeScroll()
-                    return
-                }
-                let edge: CGFloat = current.point.x < Self.fadeWidth ? -1
-                    : current.point.x > self.bounds.width - Self.fadeWidth ? 1 : 0
-                let next = min(max(0, self.offset + edge * 6), self.maximumOffset)
-                guard edge != 0, next != self.offset else {
-                    self.stopEdgeScroll()
-                    return
-                }
-                self.offset = next
-                self.placeDraggedTab()
-                self.layoutSubtreeIfNeeded()
-            }
-        }
-    }
-
-    private func stopEdgeScroll() {
-        edgeScroll?.invalidate()
-        edgeScroll = nil
-    }
-
-    func itemMouseUp(_ event: NSEvent) {
-        let ended = drag
-        drag = nil
-        stopEdgeScroll()
-        hideDragPreview()
-        if let ended, ended.tornOff, items.indices.contains(ended.index) {
-            delegate?.tabStrip(self, drop: ended.index, atScreenPoint: NSEvent.mouseLocation)
-        }
-        needsLayout = true
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.15
-            context.allowsImplicitAnimation = true
-            layoutSubtreeIfNeeded()
-        }
-    }
-
-    /// Where a tab dropped at `point`, in screen coordinates, would go
-    /// among this strip's tabs; nil when the point is not over the strip.
-    func insertionIndex(atScreenPoint point: NSPoint) -> Int? {
-        guard let window, !isHiddenOrHasHiddenAncestor else { return nil }
-        let local = convert(window.convertPoint(fromScreen: point), from: nil)
-        let bounds = self.bounds.insetBy(dx: 0, dy: -Self.tearDistance)
-        guard bounds.contains(local) else { return nil }
-        let width = max(slotWidth, 1)
-        return max(0, min(views.count, Int(((local.x + offset) / width).rounded())))
-    }
-
-    private func showDragPreview(of view: TabItemView) {
-        guard dragPreview == nil, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
-        view.cacheDisplay(in: view.bounds, to: rep)
-        let image = NSImage(size: view.bounds.size)
-        image.addRepresentation(rep)
-        let preview = NSWindow(contentRect: NSRect(origin: .zero, size: view.bounds.size),
-                               styleMask: .borderless, backing: .buffered, defer: false)
-        preview.isOpaque = false
-        preview.backgroundColor = .clear
-        preview.hasShadow = true
-        preview.level = .floating
-        preview.ignoresMouseEvents = true
-        preview.isReleasedWhenClosed = false
-        preview.alphaValue = 0.92
-        let picture = NSImageView(image: image)
-        picture.wantsLayer = true
-        picture.layer?.cornerRadius = view.bounds.height / 2
-        picture.layer?.masksToBounds = true
-        picture.layer?.backgroundColor = selectedFill.cgColor
-        preview.contentView = picture
-        dragPreview = preview
-        moveDragPreview(to: NSEvent.mouseLocation)
-        preview.orderFront(nil)
-        view.alphaValue = 0.35
-    }
-
-    private func moveDragPreview(to point: NSPoint) {
-        guard let preview = dragPreview else { return }
-        let size = preview.frame.size
-        preview.setFrameOrigin(NSPoint(x: point.x - size.width / 2, y: point.y - size.height / 2))
-    }
-
-    private func hideDragPreview() {
-        dragPreview?.orderOut(nil)
-        dragPreview = nil
-        for view in views where view.alphaValue < 1 { view.alphaValue = 1 }
-    }
-
     func close(_ index: Int) { delegate?.tabStrip(self, close: index) }
 
     /// The tab's index now, or nil once it has closed.

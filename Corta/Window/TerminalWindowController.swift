@@ -102,7 +102,20 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
 
     private var splitController: SplitViewController? { selectedTab?.split }
 
-    // MARK: - Tabs
+    /// A titlebar lock while Secure Keyboard Entry is engaged — the effect is
+    /// invisible otherwise. Follows `SecureInput.engaged`, not the setting.
+    private var secureInputIndicator: NSTitlebarAccessoryViewController?
+    private var secureInputObserver: NSObjectProtocol?
+
+    isolated deinit {
+        if let secureInputObserver { NotificationCenter.default.removeObserver(secureInputObserver) }
+    }
+
+}
+
+// MARK: - Tabs
+
+extension TerminalWindowController {
 
     private func makeTab(setup: SplitViewController.Setup, hidden: Bool) -> TerminalTab {
         let split = SplitViewController(setup: setup)
@@ -338,15 +351,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none
         refreshTabStrip()
-    }
-
-    /// A titlebar lock while Secure Keyboard Entry is engaged — the effect is
-    /// invisible otherwise. Follows `SecureInput.engaged`, not the setting.
-    private var secureInputIndicator: NSTitlebarAccessoryViewController?
-    private var secureInputObserver: NSObjectProtocol?
-
-    isolated deinit {
-        if let secureInputObserver { NotificationCenter.default.removeObserver(secureInputObserver) }
     }
 
     private func installSecureInputIndicator() {
