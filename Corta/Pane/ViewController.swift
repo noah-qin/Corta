@@ -122,6 +122,11 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
 
     /// The fact a person scrolled up to wait for.
     var sawOutputWhileScrolled = false
+    /// A frame has drawn the child's output: a new tab can show this pane
+    /// without an empty canvas (`TabContainerViewController.show(_:holding:)`).
+    private(set) var drewFirstOutput = false
+    /// Runs once, as the first frame with output is prepared.
+    var onFirstOutputFrame: (() -> Void)?
     var selection: TerminalSelection?
     /// Non-nil exactly when `isOperable` is false.
     var failureView: PaneFailureView?
@@ -796,6 +801,12 @@ extension ViewController {
     /// focus.
     private func noteOutputBatch() {
         guard let session else { return }
+        if !drewFirstOutput {
+            drewFirstOutput = true
+            let first = onFirstOutputFrame
+            onFirstOutputFrame = nil
+            first?()
+        }
         paneHeader.refresh()
         if isFocusedPane {
             windowTitle.apply()

@@ -106,16 +106,31 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     func addTab(setup: SplitViewController.Setup = .init(), select: Bool = true) -> TerminalTab {
         let tab = makeTab(setup: setup, hidden: true)
         if let window { tab.split.joinWindow(window) }
-        if select { selectTab(tab) } else { refreshTabStrip() }
+        if select {
+            // The tab in front stays drawn until the new shell's first output
+            // is on the canvas, so the switch never shows an empty one.
+            let previous = window?.isVisible == true ? selectedTab?.split : nil
+            if let previous, let pane = tab.split.focusedPane, !pane.drewFirstOutput {
+                pane.onFirstOutputFrame = { [weak container] in
+                    // The frame being prepared presents within a vsync or so.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.034) { container?.releaseHeld() }
+                }
+                selectTab(tab, holding: previous)
+            } else {
+                selectTab(tab)
+            }
+        } else {
+            refreshTabStrip()
+        }
         (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
         return tab
     }
 
-    func selectTab(_ tab: TerminalTab) {
+    func selectTab(_ tab: TerminalTab, holding previous: SplitViewController? = nil) {
         guard let window, tabs.contains(where: { $0 === tab }) else { return }
         let changed = selectedTab !== tab
         selectedTab = tab
-        container.show(tab.split)
+        container.show(tab.split, holding: previous)
         tab.split.didBecomeSelectedTab()
         if window.isKeyWindow || !window.isVisible || changed {
             window.makeFirstResponder(tab.split.focusedPane?.terminalView)

@@ -73,11 +73,40 @@ final class TabContainerViewController: NSViewController {
         split.removeFromParent()
     }
 
-    func show(_ split: SplitViewController) {
+    private weak var shown: SplitViewController?
+    /// The tab that stays drawn over a new one until the new one has drawn
+    /// its shell's first output.
+    private weak var held: SplitViewController?
+
+    /// Shows `split`. With `previous`, that tab stays on top until
+    /// `releaseHeld()` or a short timeout, so a new tab never flashes an
+    /// empty canvas before its prompt arrives. `split` draws beneath it
+    /// meanwhile and already has the keyboard.
+    func show(_ split: SplitViewController, holding previous: SplitViewController? = nil) {
+        releaseHeld()
+        shown = split
+        let holding = previous.flatMap { $0 !== split && $0.parent === self ? $0 : nil }
         for case let child as SplitViewController in children {
-            child.view.isHidden = child !== split
+            child.view.isHidden = child !== split && child !== holding
         }
         split.view.frame = view.bounds
+        guard let holding else { return }
+        held = holding
+        view.addSubview(split.view, positioned: .below, relativeTo: holding.view)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.holdLimit) { [weak self, weak holding] in
+            guard let self, let holding, self.held === holding else { return }
+            self.releaseHeld()
+        }
+    }
+
+    /// Long enough for a usual shell start, short enough not to feel slow.
+    static let holdLimit: TimeInterval = 0.3
+
+    /// The held tab goes, unless it has been shown again since.
+    func releaseHeld() {
+        guard let held else { return }
+        self.held = nil
+        held.view.isHidden = held !== shown
     }
 }
 
