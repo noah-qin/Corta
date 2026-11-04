@@ -49,15 +49,31 @@ The fixed homepage reads semantic AST selectors: the unique strong introduction 
 
 Other added build dependencies: `unified`, `remark-parse`, `remark-stringify` for AST extraction/link conversion; `github-slugger` and `rehype-slug` for consistent TOCs/anchors; `rehype-raw` for existing HTML; `@tailwindcss/postcss` for Tailwind on webpack. There is no `react-markdown` or additional i18n framework. Starter server-only caching/prefetch configuration is removed. Webpack is selected explicitly for the MDX pipeline.
 
-## Deployment configuration
+## What `verify` checks
 
-| Setting | Local | GitHub project Pages | Custom domain |
+`bun run verify` reads the exported `out/` as raw HTML, before a browser could repair anything, and fails on:
+
+- an internal link or `#` anchor that resolves to nothing, and a nested link (a heading's source link and its `#` permalink are siblings for this reason);
+- an image or asset reference with no file behind it, and a responsive WebP whose real width or format differs from the one its `srcSet` claims;
+- a page without its canonical URL, its own description, or `hreflang` entries for exactly the translations that exist;
+- a sitemap that lists an English fallback page, misses a canonical page, or carries a `lastmod` not taken from Git.
+
+`bun run test` covers the origin/basePath validation, the source-date rules and the prose extraction that writes descriptions. A translation removed from `docs/i18n/` drops out of the sitemap and its pages fall back to English with an English canonical; the development preview shows this without a restart.
+
+## Deployment
+
+The site is published at **https://corta.noahqin.dev** by GitHub Pages, from `.github/workflows/website.yml` (D31):
+
+- **A pull request** that touches README, CHANGELOG, `docs/**`, `website/**` or the workflow builds, typechecks, tests and verifies the site for `https://corta.noahqin.dev`, and deploys nothing. It runs on Linux; a website-only change runs none of the app's macOS checks (`scripts/ci-docs-only.py`).
+- **A push to main** with the same paths, or a manual run on main, reads the origin and base path from the Pages configuration, repeats those checks, uploads only `website/out` and deploys through the `github-pages` environment, which admits main only. It never touches the app's signing or release workflow.
+
+| Setting | Local | Pages, custom domain (current) | Pages, project path |
 | --- | --- | --- | --- |
 | `CORTA_CONTENT_DIR` | `..` (default) | `..` | `..` |
-| `NEXT_PUBLIC_BASE_PATH` | empty | `/Corta`, from Pages configuration | empty, from Pages configuration |
-| `SITE_URL` | `http://localhost:3000` default | `https://noah-qin.github.io`, from Pages configuration | your HTTPS origin, from Pages configuration |
+| `NEXT_PUBLIC_BASE_PATH` | empty | empty, from Pages configuration | `/Corta`, from Pages configuration |
+| `SITE_URL` | `http://localhost:3000` default | `https://corta.noahqin.dev`, from Pages configuration | `https://noah-qin.github.io`, from Pages configuration |
 
-`SITE_URL` has no project subpath. `NEXT_PUBLIC_BASE_PATH` is a build-time setting; trailing-slash routes export directory indexes. Example subpath verification:
+`SITE_URL` is an origin with no path. `NEXT_PUBLIC_BASE_PATH` is a build-time setting; trailing-slash routes export directory indexes. The domain is a DNS-only `CNAME` from `corta` to `noah-qin.github.io`, and `noahqin.dev` is a verified Pages domain of the `noah-qin` account so no other repository can claim the name; its `_github-pages-challenge-noah-qin` TXT record stays. On a project path instead, crawlers read the domain root's robots file, not `/Corta/robots.txt`, so the sitemap has to be submitted to Search Console directly. Example project-path check:
 
 ```sh
 CI=true SITE_URL=https://noah-qin.github.io NEXT_PUBLIC_BASE_PATH=/Corta bun run build
@@ -66,8 +82,4 @@ NEXT_PUBLIC_BASE_PATH=/Corta bun run start
 # http://localhost:3001/Corta/zh-CN/
 ```
 
-The workflow is now installed at the Corta root `.github/workflows/website.yml`. Local builds/commits do not execute it. When ready for online publishing, choose **GitHub Actions** in repository Settings → Pages and configure any custom domain there. A future matching push to main or manual dispatch reads Pages origin/basePath, installs the frozen Bun lockfile, builds/typechecks/tests/verifies, uploads only `website/out`, and deploys via the `github-pages` environment. It does not invoke Corta's application-signing/release workflow.
-
-Push filters cover README, CHANGELOG, all `docs/**`, `website/**` and the workflow itself, including added, modified and deleted Markdown, translations, images and website source. Fresh checkout plus output pruning prevents retired content from surviving. Publishing a new document still requires the explicit manifest. No Sites-hosted project or GitHub deployment has been created or triggered during this work.
-
-**Unpushed changes affect only local preview. Online updates require a pushed commit and a successful Pages workflow.**
+A fresh checkout and output pruning keep retired content from surviving a deployment. Publishing a new document still needs an entry in the manifest. Unpushed changes affect only the local preview; the site changes when a commit reaches main and the workflow succeeds.
