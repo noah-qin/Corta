@@ -59,6 +59,9 @@ final class TabStripView: NSView {
         var moved = false
     }
     private var drag: Drag?
+    /// Tabs added to a strip already on screen: they spring in at the next
+    /// layout, once they have their frame.
+    private var arriving: [TabItemView] = []
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -95,13 +98,18 @@ final class TabStripView: NSView {
         if items.count != self.items.count { drag = nil }
         self.items = items
         self.selectedIndex = selectedIndex
+        // The first tab, and a restored window's tabs, are simply there.
+        let springs = !views.isEmpty && window?.isVisible == true
+            && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         while views.count < items.count {
             let view = TabItemView(strip: self)
             views.append(view)
             addSubview(view)
+            if springs { arriving.append(view) }
         }
         while views.count > items.count {
             let view = views.removeLast()
+            arriving.removeAll { $0 === view }
             view.cancelRename()
             view.removeFromSuperview()
         }
@@ -149,10 +157,47 @@ final class TabStripView: NSView {
         guard !views.isEmpty else { return }
         // Flush with the track: the selected pill is the track's own edge.
         let width = slotWidth
+        // When a tab arrives, the others narrow to make room, not jump.
+        let reflow = !arriving.isEmpty
         for (index, view) in views.enumerated() where !(drag?.moved == true && drag?.index == index) {
-            view.frame = NSRect(x: CGFloat(index) * width, y: 0, width: width, height: bounds.height).integral
+            let frame = NSRect(x: CGFloat(index) * width, y: 0, width: width, height: bounds.height).integral
+            if reflow, !arriving.contains(where: { $0 === view }), view.frame != frame {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.2
+                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    view.animator().frame = frame
+                }
+            } else {
+                view.frame = frame
+            }
         }
+        for view in arriving where view.superview === self { springIn(view) }
+        arriving.removeAll()
         needsDisplay = true
+    }
+
+    /// A new tab grows from its centre with a little overshoot. The
+    /// animation is presentation only: the layer's own transform stays
+    /// identity, so nothing AppKit sets later fights it.
+    private func springIn(_ view: TabItemView) {
+        guard let layer = view.layer else { return }
+        let (midX, midY) = (view.bounds.midX, view.bounds.midY)
+        var start = CATransform3DMakeTranslation(midX, midY, 0)
+        start = CATransform3DScale(start, 0.6, 0.6, 1)
+        start = CATransform3DTranslate(start, -midX, -midY, 0)
+        let spring = CASpringAnimation(keyPath: "transform")
+        spring.fromValue = NSValue(caTransform3D: start)
+        spring.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        spring.mass = 1
+        spring.stiffness = 320
+        spring.damping = 17
+        spring.duration = spring.settlingDuration
+        layer.add(spring, forKey: "arrive")
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0
+        fade.toValue = 1
+        fade.duration = 0.12
+        layer.add(fade, forKey: "arrive.fade")
     }
 
     /// Hairlines between two unselected neighbours, as a segmented track.
