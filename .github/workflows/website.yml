@@ -63,9 +63,21 @@ jobs:
         with:
           fetch-depth: 0 # Accurate per-source lastmod dates.
           persist-credentials: false
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.4.4
+      # The repository admits GitHub-owned actions only, so Bun comes from
+      # its own release, checked against the digest its SHASUMS256.txt
+      # publishes. Keep the version in step with `packageManager` in
+      # website/package.json.
+      - name: Install Bun
+        working-directory: ${{ runner.temp }}
+        env:
+          BUN_VERSION: 1.4.4
+          BUN_SHA256: bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c
+        run: |
+          curl -fsSL --retry 3 -o bun.zip \
+            "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip"
+          echo "${BUN_SHA256}  bun.zip" | sha256sum --check --strict
+          unzip -q bun.zip
+          echo "$PWD/bun-linux-x64" >> "$GITHUB_PATH"
       - name: Read Pages URL configuration
         id: pages
         if: github.event_name != 'pull_request'
