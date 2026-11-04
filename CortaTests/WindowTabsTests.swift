@@ -418,6 +418,24 @@ struct TabsBetweenWindowsTests {
         #expect(TerminalView.tabCycleStep(for: try event([.control, .option])) == nil)
     }
 
+    /// AppKit takes ⌃Tab for the key-view loop before `keyDown`; the
+    /// terminal claims it as a key equivalent.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func controlTabReachesTheTabsAsAKeyEquivalent() throws {
+        let controller = makeWindow()
+        defer { close(controller) }
+        let first = try #require(controller.selectedTab)
+        controller.addTab()
+        let view = try #require(controller.selectedTab?.split.focusedPane?.terminalView)
+        controller.window?.makeFirstResponder(view)
+        let event = try #require(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [.control], timestamp: 0,
+            windowNumber: controller.window?.windowNumber ?? 0, context: nil, characters: "\t",
+            charactersIgnoringModifiers: "\t", isARepeat: false, keyCode: 48))
+        #expect(view.performKeyEquivalent(with: event))
+        #expect(controller.selectedTab === first, "wrapped round to the first tab")
+    }
+
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func aMovedTabKeepsItsRunningPanes() throws {
         let source = makeWindow()
@@ -431,6 +449,9 @@ struct TabsBetweenWindowsTests {
         #expect(moving.controller === target)
         #expect(moving.split.focusedPane?.session === session, "its shell runs on")
         #expect(moving.split.view.window === target.window)
+        // Dressed as a window born with its tab: no title text over the strip.
+        #expect(target.window?.titleVisibility == .hidden)
+        #expect(target.window?.titlebarAppearsTransparent == true)
         #expect(source.release(first) == false, "a window keeps its last tab")
     }
 

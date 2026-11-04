@@ -26,6 +26,15 @@ import CortaTerminal
 /// `doCommand(by:)` and is encoded from the key event itself.
 /// `interpretKeyEvents:` is never called: it swallows control keys.
 extension TerminalView {
+    /// ⌃Tab never reaches `keyDown`: AppKit takes it for the key-view loop
+    /// first. Claimed here, while this view has the keyboard.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if window?.firstResponder === self, let step = Self.tabCycleStep(for: event), onCycleTab?(step) == true {
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
     override func keyDown(with event: NSEvent) {
         // From the bindings, never a literal: a literal fired exactly when the
         // menu stopped claiming the key, i.e. after a rebind or unbind.

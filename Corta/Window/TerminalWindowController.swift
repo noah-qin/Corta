@@ -58,6 +58,8 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         let window = Self.makeWindow()
         self.init(window: window)
         dressWindow()
+        // `prepareWindow` does this for a window born with its tab.
+        applyCanvasAppearance()
         window.setFrame(frame, display: false)
         adopt(tab)
         container.add(tab.split, hidden: false)
