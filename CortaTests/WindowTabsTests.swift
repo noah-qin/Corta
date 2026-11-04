@@ -65,6 +65,12 @@ struct WindowTabsTests {
         let third = controller.addTab()
         #expect(controller.tabs.map(\.id) == [first, second, third].map(\.id))
         #expect(controller.selectedTab === third, "a new tab comes to the front")
+        // The tab that was in front stays drawn over the new one until its
+        // shell has drawn output, then goes.
+        if controller.window?.isVisible == true, !(third.split.focusedPane?.drewFirstOutput ?? true) {
+            #expect(!second.split.view.isHidden, "held over the new tab")
+        }
+        controller.container.releaseHeld()
         #expect(controller.tabs.filter { !$0.split.view.isHidden }.map(\.id) == [third.id])
         #expect(controller.tabStrip.items.count == 3)
         #expect(controller.tabStrip.selectedIndex == 2)
@@ -216,6 +222,29 @@ struct WindowTabsTests {
         #expect(second.customTitle == nil, "the name typed for a closed tab lands nowhere")
     }
 
+    /// A rename left open while another tab is clicked commits to the tab
+    /// it began on, rather than being dropped with the switch.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func clickingAnotherTabCommitsAnOpenRename() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        let first = try #require(controller.selectedTab)
+        let second = controller.addTab()
+        controller.selectTab(first)
+        controller.beginTabRename()
+        let view = try #require(controller.tabStrip.tabView(at: 0))
+        let field = try #require(editor(in: view) as? NSTextField)
+        // Uncommitted input-method text counts: a Pinyin user may click
+        // away before choosing a candidate.
+        let text = try #require(field.currentEditor() as? NSTextView)
+        text.setMarkedText("Pending", selectedRange: NSRange(location: 7, length: 0),
+                           replacementRange: NSRange(location: NSNotFound, length: 0))
+        controller.tabStrip(controller.tabStrip, select: 1)
+        #expect(controller.selectedTab === second)
+        #expect(editor(in: view) == nil)
+        #expect(first.customTitle == "Pending")
+    }
+
     private func editor(in view: NSView) -> NSView? {
         view.subviews.first { $0.accessibilityIdentifier() == "tab-title-editor" }
     }
@@ -246,9 +275,10 @@ struct WindowTabsTests {
         #expect(controller.selectedTab === keep)
     }
 
-    /// Too many tabs to fit: each keeps one card, inside its own slot.
+    /// Too many tabs to fit: each keeps its minimum width, name and close
+    /// button, and the row scrolls to the selected one.
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
-    func aNarrowTabKeepsItsIconInsideItsSlot() throws {
+    func tooManyTabsScrollRatherThanShrink() throws {
         let controller = try makeWindow()
         defer { close(controller) }
         let split = try #require(controller.selectedTab?.split)
@@ -260,8 +290,13 @@ struct WindowTabsTests {
         let tab = try #require(strip.tabView(at: 0))
         tab.layoutSubtreeIfNeeded()
         let icon = try #require(tab.subviews.first { $0 is NSImageView })
-        #expect(tab.frame.width == 37)
+        #expect(tab.frame.width == TabStripView.minimumTabWidth)
+        #expect(tab.frame.minX == 0, "the first tab is selected and in view")
         #expect(icon.frame.minX >= 0 && icon.frame.maxX <= tab.bounds.width)
+        controller.selectTab(controller.tabs[7])
+        strip.layout()
+        let last = try #require(strip.tabView(at: 7))
+        #expect(last.frame.minX >= 0 && last.frame.maxX <= strip.bounds.width, "scrolled to the selected tab")
     }
 
     /// ⇧⌘D pressed again while the last split still springs open measured a

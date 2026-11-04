@@ -98,7 +98,9 @@ a shell, the program's own colours otherwise — then its name and directory,
 left-aligned. A tab with split panes stacks the other panes' icons behind the
 front one, turned away; clicking a pane brings its program to the front. Hover
 a tab for its close button, drag it to reorder, double-click it to rename, and
-right-click it for New Tab, Rename Tab…, Close Tab and Close Other Tabs.
+right-click it for New Tab, Rename Tab…, Close Tab and Close Other Tabs. When
+there are more tabs than fit, the row scrolls sideways — swipe on it, or turn
+the mouse wheel over it — and follows the tab you select.
 
 ![Tabs in the titlebar row with their program icons](brand/native-tab-icon.png)
 

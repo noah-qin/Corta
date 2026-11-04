@@ -62,6 +62,12 @@ final class TabStripView: NSView {
     /// Tabs added to a strip already on screen: they spring in at the next
     /// layout, once they have their frame.
     private var arriving: [TabItemView] = []
+    /// How far the row is scrolled when its tabs, at their minimum width,
+    /// are wider than the strip. Tabs scroll; they never shrink to a card
+    /// without a name or a close button.
+    private var offset: CGFloat = 0
+    /// The selected tab is brought into view at the next layout.
+    private var revealsSelection = false
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -93,6 +99,7 @@ final class TabStripView: NSView {
         let name: NSAppearance.Name = isLightCanvas ? .aqua : .darkAqua
         if appearance?.name != name { appearance = NSAppearance(named: name) }
         let changed = items != self.items || selectedIndex != self.selectedIndex
+        if selectedIndex != self.selectedIndex || items.count != self.items.count { revealsSelection = true }
         // A tab closed under a drag: the dragged view no longer means the
         // same index. Drop the drag; the tabs settle where they are.
         if items.count != self.items.count { drag = nil }
@@ -131,7 +138,28 @@ final class TabStripView: NSView {
     /// the row.
     private var slotWidth: CGFloat {
         guard !views.isEmpty else { return 0 }
-        return min(Self.tabWidth, bounds.width / CGFloat(views.count))
+        return min(Self.tabWidth, max(Self.minimumTabWidth, bounds.width / CGFloat(views.count)))
+    }
+
+    /// Room for the program's card, a few letters and the close button.
+    static let minimumTabWidth: CGFloat = 112
+    /// The width of the soft edge where tabs scroll out of view.
+    private static let fadeWidth: CGFloat = 20
+
+    private var contentWidth: CGFloat { slotWidth * CGFloat(views.count) }
+    private var maximumOffset: CGFloat { max(0, contentWidth - bounds.width) }
+
+    /// The offset that shows the selected tab whole, clear of the fades.
+    private func offsetRevealingSelection(from offset: CGFloat) -> CGFloat {
+        guard views.indices.contains(selectedIndex), maximumOffset > 0 else { return 0 }
+        let width = slotWidth
+        let minX = CGFloat(selectedIndex) * width
+        var offset = offset
+        if minX - offset < Self.fadeWidth { offset = minX - Self.fadeWidth }
+        if minX + width - offset > bounds.width - Self.fadeWidth {
+            offset = minX + width - bounds.width + Self.fadeWidth
+        }
+        return min(max(0, offset), maximumOffset)
     }
 
     private func updateTrack() {
@@ -157,10 +185,15 @@ final class TabStripView: NSView {
         guard !views.isEmpty else { return }
         // Flush with the track: the selected pill is the track's own edge.
         let width = slotWidth
-        // When a tab arrives, the others narrow to make room, not jump.
-        let reflow = !arriving.isEmpty
+        let target = revealsSelection ? offsetRevealingSelection(from: offset) : min(max(0, offset), maximumOffset)
+        let scrolled = target != offset && window?.isVisible == true
+        offset = target
+        revealsSelection = false
+        // When a tab arrives, the others narrow to make room, not jump; a
+        // scroll to the selected tab glides.
+        let reflow = !arriving.isEmpty || scrolled
         for (index, view) in views.enumerated() where !(drag?.moved == true && drag?.index == index) {
-            let frame = NSRect(x: CGFloat(index) * width, y: 0, width: width, height: bounds.height).integral
+            let frame = NSRect(x: CGFloat(index) * width - offset, y: 0, width: width, height: bounds.height).integral
             if reflow, !arriving.contains(where: { $0 === view }), view.frame != frame {
                 NSAnimationContext.runAnimationGroup { context in
                     context.duration = 0.2
@@ -173,7 +206,47 @@ final class TabStripView: NSView {
         }
         for view in arriving where view.superview === self { springIn(view) }
         arriving.removeAll()
+        updateFadeMask()
         needsDisplay = true
+    }
+
+    /// Soft edges on the sides where tabs run out of view. The mask reaches
+    /// past the strip's top and bottom, so the selected tab's shadow stays.
+    private func updateFadeMask() {
+        guard let layer else { return }
+        let fadesLeading = offset > 0.5
+        let fadesTrailing = offset < maximumOffset - 0.5
+        guard fadesLeading || fadesTrailing, bounds.width > Self.fadeWidth * 2 else {
+            layer.mask = nil
+            return
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        let mask = (layer.mask as? CAGradientLayer) ?? CAGradientLayer()
+        mask.frame = bounds.insetBy(dx: 0, dy: -8)
+        mask.startPoint = CGPoint(x: 0, y: 0.5)
+        mask.endPoint = CGPoint(x: 1, y: 0.5)
+        let edge = Double(Self.fadeWidth / bounds.width)
+        let clear = NSColor.clear.cgColor, opaque = NSColor.black.cgColor
+        mask.colors = [fadesLeading ? clear : opaque, opaque, opaque, fadesTrailing ? clear : opaque]
+        mask.locations = [0, NSNumber(value: edge), NSNumber(value: 1 - edge), 1]
+        layer.mask = mask
+    }
+
+    /// A trackpad's sideways swipe, or a mouse wheel, scrolls an overflowing row.
+    override func scrollWheel(with event: NSEvent) {
+        guard maximumOffset > 0 else {
+            super.scrollWheel(with: event)
+            return
+        }
+        let dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
+        var delta = abs(dx) >= abs(dy) ? -dx : -dy
+        if !event.hasPreciseScrollingDeltas { delta *= 10 }
+        let next = min(max(0, offset + delta), maximumOffset)
+        guard next != offset else { return }
+        offset = next
+        needsLayout = true
     }
 
     /// A new tab grows from its centre with a little overshoot. The
@@ -204,7 +277,7 @@ final class TabStripView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard views.count > 1 else { return }
         // A lone tab is a pill on its own; the track appears with the second.
-        let track = NSRect(x: 0, y: 0, width: slotWidth * CGFloat(views.count), height: bounds.height)
+        let track = NSRect(x: -offset, y: 0, width: contentWidth, height: bounds.height)
         trackColor.setFill()
         NSBezierPath(roundedRect: track, xRadius: bounds.height / 2, yRadius: bounds.height / 2).fill()
         NSColor.separatorColor.setFill()
@@ -233,11 +306,12 @@ final class TabStripView: NSView {
         let view = views[current.index]
         let width = view.frame.width
         var frame = view.frame
-        frame.origin.x = min(max(0, point.x - width / 2), width * CGFloat(views.count - 1))
+        // In the row's own coordinates, scrolled by `offset`.
+        frame.origin.x = min(max(0, point.x + offset - width / 2), width * CGFloat(views.count - 1)) - offset
         view.frame = frame
         addSubview(view, positioned: .above, relativeTo: nil)
         // Swap with the neighbour the dragged tab's centre has crossed into.
-        let target = max(0, min(views.count - 1, Int(frame.midX / width)))
+        let target = max(0, min(views.count - 1, Int((frame.midX + offset) / width)))
         if target != current.index {
             let moving = views.remove(at: current.index)
             views.insert(moving, at: target)
