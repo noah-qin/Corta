@@ -23,6 +23,9 @@ protocol PaneFocusHost: AnyObject {
     var session: TerminalSession! { get }
     var splitController: SplitViewController? { get }
     var isFocusedPane: Bool { get }
+    /// The focused pane of the tab in front (D30): tabs share a window, so
+    /// every tab has a focused pane, but only one holds the keyboard.
+    var holdsWindowFocus: Bool { get }
     var scrollOffset: Int { get }
     var didTeardown: Bool { get }
     var inputSourceIndicator: PaneInputSourceIndicator { get }
@@ -345,9 +348,11 @@ final class PaneFocus: NSObject {
 
 extension PaneFocus {
     /// Focused means this pane holds the keyboard and its window is key.
+    /// A background tab's focused pane does not: the window is the front
+    /// tab's (D30).
     var hasUserFocus: Bool {
         guard let host else { return false }
-        return host.isFocusedPane && (host.view.window?.isKeyWindow ?? false)
+        return host.holdsWindowFocus && (host.view.window?.isKeyWindow ?? false)
     }
 
     /// Reports only real changes; AppKit's key and responder churn would

@@ -150,10 +150,11 @@ extension TerminalWindowController {
             // is on the canvas, so the switch never shows an empty one.
             let previous = window?.isVisible == true ? selectedTab?.split : nil
             if let previous, let pane = tab.split.focusedPane, !pane.drewFirstOutput {
-                pane.onFirstOutputFrame = { [weak container] in
+                pane.onFirstOutputFrame = { [weak container, weak previous] in
                     // The frame being prepared presents within a vsync or so.
                     DispatchQueue.main.asyncAfter(deadline: .now() + TabContainerViewController.firstFrameDelay) {
-                        container?.releaseHeld()
+                        // Only the hold it was for: a second ⌘T holds another.
+                        container?.releaseHeld(ifHolding: previous)
                     }
                 }
                 selectTab(tab, holding: previous)
@@ -170,6 +171,7 @@ extension TerminalWindowController {
     func selectTab(_ tab: TerminalTab, holding previous: SplitViewController? = nil) {
         guard let window, tabs.contains(where: { $0 === tab }) else { return }
         let changed = selectedTab !== tab
+        let leaving = selectedTab
         selectedTab = tab
         container.show(tab.split, holding: previous)
         tab.split.didBecomeSelectedTab()
@@ -178,7 +180,12 @@ extension TerminalWindowController {
         }
         tab.split.applyWindowTitle()
         refreshTabStrip()
-        if changed { (NSApp.delegate as? AppDelegate)?.noteLayoutChanged() }
+        if changed {
+            // Focus reports (?1004) for the tab left and the tab shown: a
+            // program in a hidden tab is not focused, whatever its split says.
+            for pane in (leaving?.split.panes ?? []) + tab.split.panes { pane.focus.reportIfNeeded() }
+            (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
+        }
     }
 
     func selectAdjacentTab(offset: Int) {

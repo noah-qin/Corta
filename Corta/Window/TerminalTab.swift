@@ -102,6 +102,13 @@ final class TabContainerViewController: NSViewController {
     /// Long enough for a usual shell start, short enough not to feel slow.
     static let holdLimit: TimeInterval = 0.3
 
+    /// Releases the hold only if `split` is the tab held, so a new tab's
+    /// first output cannot lift a later hold over another new tab.
+    func releaseHeld(ifHolding split: SplitViewController?) {
+        guard let split, held === split else { return }
+        releaseHeld()
+    }
+
     /// The held tab fades away, unless it has been shown again since: the
     /// switch is seen, as a short cross-fade rather than an empty frame.
     func releaseHeld(animated: Bool = true) {

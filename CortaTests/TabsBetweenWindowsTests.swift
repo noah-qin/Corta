@@ -66,6 +66,19 @@ struct TabsBetweenWindowsTests {
         #expect(controller.selectedTab === first, "wrapped round to the first tab")
     }
 
+    /// Tabs share a window: only the front tab's focused pane is focused
+    /// for focus reports (?1004) and notifications.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func onlyTheFrontTabsPaneHoldsTheWindowsFocus() throws {
+        let controller = makeWindow()
+        defer { close(controller) }
+        let first = try #require(controller.selectedTab?.split.focusedPane)
+        let second = try #require(controller.addTab().split.focusedPane)
+        #expect(first.isFocusedPane, "still its own tab's focused pane")
+        #expect(!first.holdsWindowFocus)
+        #expect(second.holdsWindowFocus)
+    }
+
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func aMovedTabKeepsItsRunningPanes() throws {
         let source = makeWindow()
