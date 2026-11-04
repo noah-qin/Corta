@@ -45,6 +45,8 @@ Status of every entry below is **accepted** unless it says otherwise.
 | [D27](#d27--sftp-asks-through-opensshs-own-askpass-answered-by-corta) | SFTP asks through OpenSSH's `SSH_ASKPASS`; nothing is stored | Accepted |
 | [D28](#d28--local-tools-are-swift-ci-only-glue-may-be-python) | Local tools are Swift; CI-only glue may be Python | Accepted |
 | [D29](#d29--no-homebrew-cask-until-homebrewcask-accepts-one) | No Homebrew cask until `homebrew/cask` accepts one | Accepted |
+| [D30](#d30--tabs-are-cortas-own-drawn-in-the-titlebar-row) | Tabs are Corta's own, drawn in the titlebar row | Accepted |
+| [D31](#d31--the-website-is-a-static-site-in-website-built-with-bun) | The website is a static site in `website/`, built with Bun | Accepted |
 
 ---
 
@@ -852,3 +854,36 @@ regrouping windows.
 **Consequence.** Reopen if macOS gains public API to place or restyle the
 native tab bar, or if keeping parity with native tab behaviour costs more
 than the look is worth.
+
+## D31 — The website is a static site in `website/`, built with Bun
+
+**Decision.** Corta's website, https://corta.noahqin.dev, is a Next.js
+site exported to static HTML, with its source in `website/` and built with
+Bun from a frozen lockfile. Its content is the repository's own Markdown —
+README, CHANGELOG, `docs/` and the translations in `docs/i18n/` — read at
+build time; the site keeps no copy of a document. GitHub Pages serves it,
+from `.github/workflows/website.yml`: a pull request builds and verifies it,
+and only main deploys.
+
+**Why.** The documents are the source of truth for users already; a site
+that renders them cannot drift from them, and the translations, the
+changelog and the screenshots reach a reader who would not browse a
+repository. A static export needs no server, holds no user data and runs
+nothing at request time, so it adds no execution boundary to
+`docs/SECURITY.md`. Next.js and Bun are the maintainer's choice for the
+site; they are confined to it.
+
+**What it costs.** A second toolchain and a few hundred npm packages,
+though none of them reaches the app: the Xcode project never sees
+`website/`, the app still has one runtime dependency (D23), and D02 and
+D28 hold for everything outside `website/`. The site's TypeScript and
+scripts are not CodeQL-scanned — there is no server code to scan — and its
+dependencies are watched by Dependency review and Dependabot instead. A
+website-only change builds and tests nothing on macOS
+(`scripts/ci-docs-only.py`): the core job still starts there, for the
+repository's license check alone. A document change also rebuilds the
+site, so a heading the homepage reads cannot be renamed without the build
+saying so.
+
+**Consequence.** Reopen if the site needs a server, takes user input, or
+starts to share code with the app.

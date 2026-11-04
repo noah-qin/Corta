@@ -19,6 +19,7 @@ Metal 4 rendering · Native CJK / IME · SSH, SFTP and remote editing
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=flat-square&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/noah-qin)
 
 **[↓ Download](https://github.com/noah-qin/Corta/releases/latest)** ·
+**[Website](https://corta.noahqin.dev)** ·
 **[User guide](docs/USER-GUIDE.md)** ·
 [Documentation](docs/README.md) ·
 [Contribute](CONTRIBUTING.md) ·

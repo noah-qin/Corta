@@ -171,6 +171,18 @@ class ScopeTests(unittest.TestCase):
         self.assertFalse(feed["app"])
         self.assertFalse(feed["core"])
 
+    def test_website_runs_no_macos_check(self):
+        site = ci.scope_for_paths(["website/src/app/[lang]/page.tsx", "website/bun.lock"])
+        self.assertFalse(any(site[name] for name in ci.CHECKS))
+        self.assertEqual(site["languages"], [])
+        workflow = ci.scope_for_paths([".github/workflows/website.yml"])
+        self.assertFalse(any(workflow[name] for name in ci.CHECKS))
+        self.assertEqual(workflow["languages"], ["actions"])
+        mixed = ci.scope_for_paths(["website/package.json", "Corta/WindowController.swift"])
+        self.assertTrue(mixed["app"])
+        self.assertEqual(mixed["languages"], ["swift"])
+        self.assertFalse(ci.is_documentation("website/README.md"))
+
     def test_mixed_changes_are_the_union(self):
         scope = ci.scope_for_paths(["README.md", "Corta/WindowController.swift", "scripts/prepare-release.py"])
         self.assertTrue(scope["app"])

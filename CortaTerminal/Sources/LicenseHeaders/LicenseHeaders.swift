@@ -37,7 +37,7 @@ public enum LicenseHeaders {
     }
 
     public enum CommentStyle: Equatable, Sendable {
-        /// `//` — Swift and Metal.
+        /// `//` — Swift, Metal, and the website's TypeScript and JavaScript.
         case slashes
         /// `#` — shell, Python, YAML, TOML and the dotfiles.
         case hash
@@ -86,17 +86,27 @@ public enum LicenseHeaders {
         ("**/*.md", .reuse),
         ("docs/program-icons-sources.json", .reuse),
         ("NOTICE", .reuse),
+        // The website's manifests, lockfile and stylesheet: JSON holds no
+        // comment, Bun rewrites its lockfile, and CSS has no line comment
+        // for the header to use.
+        ("website/*.json", .reuse),
+        ("website/bun.lock", .reuse),
+        ("website/src/**/*.css", .reuse),
 
         // Source. The sole C file is the D02 system varargs ABI bridge.
         ("Corta/SharedMemory.c", .header(.slashes)),
         ("**/*.swift", .header(.slashes)),
         ("**/*.metal", .header(.slashes)),
+        ("website/**/*.ts", .header(.slashes)),
+        ("website/**/*.tsx", .header(.slashes)),
+        ("website/**/*.mjs", .header(.slashes)),
         ("**/*.sh", .header(.hash)),
         ("**/*.py", .header(.hash)),
         ("**/*.yml", .header(.hash)),
         ("**/*.yaml", .header(.hash)),
         ("**/*.toml", .header(.hash)),
-        (".gitignore", .header(.hash)),
+        ("**/.gitignore", .header(.hash)),
+        ("website/.env.example", .header(.hash)),
         (".github/CODEOWNERS", .header(.hash)),
     ]
 

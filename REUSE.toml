@@ -44,6 +44,9 @@ path = [
   ".xcode-version",
   "scripts/disk-image/background.tiff",
   "scripts/disk-image/DS_Store",
+  "website/*.json",
+  "website/bun.lock",
+  "website/src/**/*.css",
 ]
 SPDX-FileCopyrightText = "2026 Noah Qin"
 SPDX-License-Identifier = "Apache-2.0"

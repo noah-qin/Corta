@@ -1,0 +1,117 @@
+# Copyright 2026 Noah Qin
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# The website: website/ holds the source; Markdown and images are read from
+# the repository root (D31). A pull request builds and verifies the site and
+# deploys nothing; a push to main builds it for the configured Pages domain
+# and deploys it. The `github-pages` environment admits main only.
+name: Corta website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - README.md
+      - CHANGELOG.md
+      - docs/**
+      - website/**
+      - .github/workflows/website.yml
+  pull_request:
+    paths:
+      - README.md
+      - CHANGELOG.md
+      - docs/**
+      - website/**
+      - .github/workflows/website.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A pull request's newer push supersedes its older build; a deployment is
+  # never cut off part-way.
+  group: corta-website-${{ github.event_name == 'pull_request' && github.ref || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Website
+    permissions:
+      contents: read
+      pages: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # Accurate per-source lastmod dates.
+          persist-credentials: false
+      # The repository admits GitHub-owned actions only, so Bun comes from
+      # its own release, checked against the digest its SHASUMS256.txt
+      # publishes. Keep the version in step with `packageManager` in
+      # website/package.json.
+      - name: Install Bun
+        working-directory: ${{ runner.temp }}
+        env:
+          BUN_VERSION: 1.4.4
+          BUN_SHA256: bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c
+        run: |
+          curl -fsSL --retry 3 -o bun.zip \
+            "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip"
+          echo "${BUN_SHA256}  bun.zip" | sha256sum --check --strict
+          unzip -q bun.zip
+          echo "$PWD/bun-linux-x64" >> "$GITHUB_PATH"
+      - name: Read Pages URL configuration
+        id: pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - run: bun install --frozen-lockfile
+      - name: Build and verify static export
+        run: |
+          bun run build
+          bun run check
+          bun run test
+          bun run verify
+        env:
+          WEBSITE_DEPLOYMENT: "1"
+          CORTA_CONTENT_DIR: ..
+          # A pull request has no Pages context; it builds for the public domain.
+          NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          SITE_URL: ${{ steps.pages.outputs.origin || 'https://corta.noahqin.dev' }}
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: website/out
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy static artifact
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
