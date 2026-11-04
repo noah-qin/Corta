@@ -89,7 +89,9 @@ line each:
   **D29** No Homebrew cask until `homebrew/cask` accepts one; no tap of
   our own.
   **D30** Tabs are Corta's own, drawn in the titlebar row; `NSWindow`
-  tabbing is off, public API only.
+  tabbing is off, public API only. **D31** The website is a static site
+  in `website/`, built with Bun, rendered from the repository's own
+  Markdown; Pages deploys it from main only.
 
 ## Working Rules
 
@@ -288,6 +290,10 @@ Layout:
   and `Release` (`-configuration Benchmark`: the D17 measurement, and
   `MeasurementUITests` for the app-level numbers)
 - `docs/` — user and design documentation
+- `website/` — the website (https://corta.noahqin.dev), a static Next.js
+  export built with Bun that renders README, CHANGELOG and `docs/` (D31);
+  `website/README.md` has its commands, `.github/workflows/website.yml`
+  checks and deploys it
 
 Deployment target is macOS 26.0, Swift 6, app sandbox disabled
 (intentionally — `docs/SECURITY.md` §4.1).

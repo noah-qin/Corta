@@ -48,10 +48,11 @@ first so contributors do not duplicate effort.
 | `CortaTerminal/Sources/corta-*` | `corta-exec` and `corta-image-decoder`, the helpers the app embeds, and the repository's tools: `corta-release-check` (the one packaging check), `corta-license`, `corta-fuzz`, `corta-bench`, `corta-dump` |
 | `CortaTests/`, `CortaUITests/`, `CortaPerformanceTests/` | App-hosted tests, interactive UI tests, and the Release measurements |
 | `docs/` | User guides, configuration, architecture, decisions and the numbers that measure them; dated evidence goes in pull requests |
+| `website/` | The website, https://corta.noahqin.dev: a static Next.js export built with Bun that renders the documents above (D31) |
 | `TestPlans/` | `Unit` (the default), `UI` (interactive sessions only) and `Release` (the Release measurements) |
 | `scripts/` | Every helper: `build-and-run.sh`, the Metal capability and update-feed checks, the isolated-sshd fixture, release preparation, `disk-image/` and `brand/`, and the Python CI glue with its tests (D28) |
 | `.xcode-version` | The one Xcode version every workflow selects, through `.github/actions/select-xcode` |
-| `.github/` | Issue and discussion forms, community files, Dependabot, the `select-xcode` action and seven workflows: `ci.yml`, `codeql.yml`, `nightly.yml`, `render.yml`, `release.yml`, `appcast.yml`, `pr-title.yml` |
+| `.github/` | Issue and discussion forms, community files, Dependabot, the `select-xcode` action and eight workflows: `ci.yml`, `codeql.yml`, `nightly.yml`, `render.yml`, `release.yml`, `appcast.yml`, `pr-title.yml`, `website.yml` |
 
 ## Tests and documentation
 

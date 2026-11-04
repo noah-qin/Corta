@@ -37,6 +37,7 @@ for cursor defaults, the optional system bar, host details and graphical themes.
 | [Conformance](CONFORMANCE.md) | Feature priorities (P0/P1/P2), the daily-driver checklist, the test strategy — esctest, the fuzz harness, and the launched-app check every app-layer change gets. |
 | [Performance](PERFORMANCE.md) | Targets, the hot-path rules, how each number is measured, and the numbers. |
 | [Security](SECURITY.md) | The threat model, escape-sequence injection, resource caps, process safety and the four trust boundaries. A change's security reasoning lives in its pull request; the earlier S-series log is linked from §8. |
+| [Website](../website/README.md) | The website at https://corta.noahqin.dev: how it renders these documents, its checks, and how Pages deploys it (D31). |
 | [Releasing](RELEASING.md) | The maintainer's one-click release pipeline: one manual run on main versions, tests, signs, notarises, publishes and updates the signed feed. |
 | [Licensing](LICENSING.md) | The license header every source file carries, which files are covered by `REUSE.toml` instead, and the tool that checks and adds headers. |
 
