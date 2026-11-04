@@ -85,6 +85,10 @@ def scope_for_paths(paths):
         elif path == "scripts/verify-ssh-integration.py":
             scope.update(core=True, ssh=True)
             languages.add("python")
+        elif path.startswith("website/"):
+            continue  # The static site builds and checks itself (website.yml); no app input.
+        elif path == ".github/workflows/website.yml":
+            languages.add("actions")
         elif path in ("scripts/ci-docs-only.py", "scripts/codeql-extract.py"):
             return full_scope()  # Changes to routing/extraction validate every lane.
         elif path.startswith("scripts/") and path.endswith(".py"):
