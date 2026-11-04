@@ -62,7 +62,7 @@ final class CompatibilityUITests: XCTestCase {
         menu.menuItems["Settings…"].click()
         let settings = app.windows["Corta.Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        settings.outlines.firstMatch.staticTexts["Appearance"].click()
+        settings.settingsCategory("Appearance").click()
         let reports = stage.appendingPathComponent("reports.txt")
         for (choice, expected) in [("Light", "1b5b3f3939373b326e"), ("Dark", "1b5b3f3939373b316e")] {
             settings.buttons["appearance-" + choice.lowercased()].click()

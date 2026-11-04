@@ -27,7 +27,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         XCTAssertFalse(app.buttons["system-status-bar"].exists)
         openSettings(app)
         let settings = app.windows["Corta.Settings"]
-        settings.outlines.firstMatch.staticTexts["Terminal"].click()
+        settings.settingsCategory("Terminal").click()
         let enable = settings.switches["status-bar-enable"]
         XCTAssertTrue(enable.waitForExistence(timeout: 3))
         enable.click()
@@ -55,7 +55,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         app.typeKey("+", modifierFlags: .command)
         XCTAssertTrue(bar.exists)
         openSettings(app)
-        settings.outlines.firstMatch.staticTexts["Terminal"].click()
+        settings.settingsCategory("Terminal").click()
         settings.switches["status-bar-enable"].click()
         settings.buttons[XCUIIdentifierCloseWindow].click()
         XCTAssertFalse(bar.exists)
@@ -75,7 +75,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
         openSettings(app)
         let settings = app.windows["Corta.Settings"]
-        settings.outlines.firstMatch.staticTexts["Themes"].click()
+        settings.settingsCategory("Themes").click()
         settings.buttons["theme-create-dark"].click()
         let name = app.textFields["theme-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 3))
@@ -99,7 +99,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
         openSettings(app)
-        settings.outlines.firstMatch.staticTexts["Themes"].click()
+        settings.settingsCategory("Themes").click()
         XCTAssertTrue(settings.buttons["theme-edit"].waitForExistence(timeout: 3))
     }
 
@@ -116,7 +116,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         XCTAssertTrue(app.textFields["theme-name"].waitForExistence(timeout: 3))
         app.buttons["Cancel"].click()
         let settings = app.windows["Corta.Settings"]
-        settings.outlines.firstMatch.staticTexts["Appearance"].click()
+        settings.settingsCategory("Appearance").click()
         XCTAssertTrue(settings.popUpButtons["font-family"].exists)
         let preview = settings.descendants(matching: .any).matching(identifier: "appearance-preview").firstMatch
         settings.buttons["appearance-dark"].click()
@@ -132,7 +132,8 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         let chip = app.descendants(matching: .any).matching(identifier: "status.chip").firstMatch
         XCTAssertTrue(chip.exists)
         XCTAssertTrue((chip.label + " " + String(describing: chip.value)).contains("Apple"))
-        app.buttons["Close"].click()
+        // The sheet's Close: each pane header has a Close button of its own.
+        settings.sheets.firstMatch.buttons["Close"].click()
         XCTAssertTrue(settings.buttons["host-details"].exists)
     }
 

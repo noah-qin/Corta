@@ -281,7 +281,7 @@ final class SearchAndTabUITests: XCTestCase {
         app.typeKey(",", modifierFlags: .command)
         let keyboardSettings = app.windows["Corta.Settings"]
         XCTAssertTrue(keyboardSettings.waitForExistence(timeout: 5))
-        keyboardSettings.outlines.firstMatch.staticTexts["Keyboard & Mouse"].click()
+        keyboardSettings.settingsCategory("Keyboard & Mouse").click()
         let indicatorMode = keyboardSettings.popUpButtons["input-source-indicator-mode"]
         indicatorMode.click()
         indicatorMode.menuItems["Always in focused pane"].click()
@@ -292,14 +292,15 @@ final class SearchAndTabUITests: XCTestCase {
         app.typeKey(",", modifierFlags: .command)
         let settings = app.windows["Corta.Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        settings.outlines.firstMatch.staticTexts["Appearance"].click()
-        settings.outlines.firstMatch.staticTexts["Themes"].click()
+        settings.settingsCategory("Appearance").click()
+        settings.settingsCategory("Themes").click()
         XCTAssertTrue(settings.buttons["theme-choice-corta"].waitForExistence(timeout: 3))
         XCTAssertTrue(settings.buttons["theme-choice-mono"].exists)
         settings.buttons["theme-choice-solarized"].click()
         let config = try String(contentsOf: stage.appendingPathComponent("config"), encoding: .utf8)
-        XCTAssertTrue(config.contains("theme = solarized"))
-        settings.outlines.firstMatch.staticTexts["Appearance"].click()
+        // The light-mode card: dark mode keeps its own theme.
+        XCTAssertTrue(config.contains("theme = light:solarized,dark:corta"))
+        settings.settingsCategory("Appearance").click()
         let preview = settings.descendants(matching: .any).matching(identifier: "appearance-preview").firstMatch
         XCTAssertEqual(preview.value as? String, "light")
         keep(settings.screenshot(), named: "feedback-settings")

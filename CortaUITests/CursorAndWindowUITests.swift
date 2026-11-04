@@ -48,7 +48,7 @@ final class CursorAndWindowUITests: XCTestCase {
         appMenu.menuItems["Settings…"].click()
         let settings = app.windows["Corta.Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        settings.outlines.firstMatch.staticTexts["Appearance"].click()
+        settings.settingsCategory("Appearance").click()
         let shape = settings.buttons["cursor-shape-underline"]
         XCTAssertTrue(shape.waitForExistence(timeout: 5), settings.debugDescription)
         shape.click()
