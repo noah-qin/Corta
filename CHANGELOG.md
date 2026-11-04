@@ -70,7 +70,10 @@ Versioning for compatibility changes.
 
 - Gemini's tab tile showed only a dot, and Java's orange tile read as Claude's
   while `java` started: Gemini's star is drawn whole, and Java shows a cup on
-  Java's blue.
+  Java's blue. A program's icon now appears only once it takes the terminal
+  (a REPL, an editor, an agent); a command that only runs and prints keeps
+  the prompt tile. Kimi, Copilot, Goose and SQLite tiles take their brands'
+  colours.
 
 - After a theme or appearance switch the selected tab kept the old
   theme's fill — a white pill on a dark titlebar — and the pane header

@@ -58,6 +58,11 @@ final class PaneWindowTitle {
 
     private var cachedProcessName: String?
     private var cachedEntryPoint: String?
+    /// The foreground program has taken the terminal (no `ICANON`, no
+    /// `ECHO`): a REPL, an editor, an agent, a connected `ssh`. Only then
+    /// does a tab wear its icon — `java -version` or `git status` run and
+    /// are gone, and their icon flashed by and read as some other program's.
+    private var cachedIsInteractive = false
     private var cachedDirectory: String?
     /// `cachedDirectory` if it was a directory when it last changed: the
     /// title bar's proxy icon.
@@ -137,7 +142,8 @@ final class PaneWindowTitle {
     var tabLabel: ProgramTabLabel {
         if let session { refreshProcessFactsIfStale(session, scheduleTrailing: false) }
         let process = Self.sanitizedTitleComponent(cachedProcessName) ?? "Corta"
-        let icon = ProgramIcon.identify(process, entryPoint: cachedEntryPoint)
+        let program = ProgramIcon.identify(process, entryPoint: cachedEntryPoint)
+        let icon = cachedIsInteractive ? program : .terminal
         let directory = Self.sanitizedTitleComponent(cachedDirectory.map(Self.abbreviated)) ?? ""
         let remote = Self.sanitizedTitleComponent(cachedRemoteState.titleComponent)
         return ProgramTabLabel(icon: icon, name: icon.displayName ?? process,
@@ -267,6 +273,7 @@ final class PaneWindowTitle {
         lastProcessFactsRefresh = now
         cachedProcessName = session.activeProcessName
         cachedEntryPoint = session.activeProcessEntryPoint
+        cachedIsInteractive = session.pty.isInRawMode
         let directory = session.currentDirectory
         if directory != cachedDirectory {
             cachedDirectory = directory

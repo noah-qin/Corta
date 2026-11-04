@@ -95,7 +95,9 @@ Behaviour that differs in smaller ways — copying, closing, remote badges — i
 Tabs sit in the titlebar row, beside the window's close, minimise and zoom
 buttons. Each shows the program its focused pane runs — a dark prompt tile for
 a shell, the program's own colours otherwise — then its name and directory,
-left-aligned. A tab with split panes stacks the other panes' icons behind the
+left-aligned. A program gets its icon once it takes the terminal — a REPL, an
+editor, an agent, a connected `ssh`; a command that only runs and prints, such
+as `java -version` or `git status`, keeps the prompt tile. A tab with split panes stacks the other panes' icons behind the
 front one, turned away; clicking a pane brings its program to the front. Hover
 a tab for its close button, drag it to reorder, double-click it to rename, and
 right-click it for New Tab, Rename Tab…, Close Tab and Close Other Tabs. When

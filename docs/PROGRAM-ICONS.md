@@ -54,6 +54,8 @@ Tabs and pane headers distinguish common foreground programs. Tabs use coloured 
 
 Versioned Python, Node, Ruby, PHP and Lua process names are recognised when their suffix consists of version digits and dots.
 
+An icon is shown only while the program has taken the terminal — the line discipline has neither `ICANON` nor `ECHO`, as a REPL, an editor, a pager, an agent or a connected `ssh` sets it. A command that runs and prints in the ordinary line mode (`java -version`, `git status`, `npm install`, a script) keeps the shell's tile and shows its process name: its icon would only flash by, and read as some other program's.
+
 ## Interpreter-hosted tools
 
 The process name and directory use the existing output-driven, throttled title cache. For Node, Bun, Deno and Python, a bounded kernel query can identify the script or Python module. Recognised agent entry points and selected npm package paths then select the agent icon. Inline `-e`/`-c` code, unknown options, unreadable processes and unknown scripts fall back to the interpreter's icon. Environment entries are not parsed; arguments and paths are never logged or persisted.

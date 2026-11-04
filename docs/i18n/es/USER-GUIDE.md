@@ -100,7 +100,9 @@ remotas — están reunidos en
 
 Las pestañas están en la fila de la barra de título, junto a los botones de cerrar, minimizar y zoom de la ventana. Cada una
 muestra el programa que ejecuta su panel activo — un mosaico oscuro de prompt para un shell, los colores propios del programa
-en otro caso — y luego su nombre y directorio, alineados a la izquierda. Una pestaña con paneles divididos apila los iconos de
+en otro caso — y luego su nombre y directorio, alineados a la izquierda. Un programa muestra su icono solo cuando toma el
+terminal — una REPL, un editor, un agente, un `ssh` conectado —; un comando que solo se ejecuta e imprime, como
+`java -version` o `git status`, conserva el mosaico del prompt. Una pestaña con paneles divididos apila los iconos de
 los demás paneles detrás del de delante, algo girados; al hacer clic en un panel, su programa pasa al frente. Pasa el puntero
 por una pestaña para ver su botón de cerrar, arrástrala para reordenarla, haz doble clic para renombrarla y clic derecho para
 Nueva pestaña, Renombrar pestaña…, Cerrar pestaña y Cerrar las demás pestañas. Cuando hay más pestañas de las que caben, la

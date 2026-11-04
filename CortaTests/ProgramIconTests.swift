@@ -127,4 +127,37 @@ struct ProgramIconTests {
         #expect(title.tabLabel.name == "cat")
         #expect(title.tabLabel.context == "usr")
     }
+
+    /// A program wears its icon once it takes the terminal, not while it
+    /// runs and prints like `java -version`: that one flashed by and read as
+    /// another program's.
+    @Test func onlyAProgramThatTakesTheTerminalWearsItsIcon() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let script = folder.appendingPathComponent("repl.py")
+        try "import time, tty\ntime.sleep(1)\ntty.setraw(0)\ntime.sleep(30)\n"
+            .write(to: script, atomically: true, encoding: .utf8)
+        let session = try TerminalSession(
+            executable: "/usr/bin/python3", arguments: [script.path], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 24, columns: 80), workingDirectory: folder.path)
+        defer { session.stop() }
+        let title = PaneWindowTitle()
+        title.reset(session: session)
+        defer { title.stop() }
+        session.start()
+        func label(until done: (ProgramTabLabel) -> Bool) async throws -> ProgramTabLabel {
+            let deadline = SuspendingClock.now + .seconds(3)
+            while true {
+                title.invalidateProcessFacts()
+                let label = title.tabLabel
+                if done(label) || SuspendingClock.now >= deadline { return label }
+                try await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        let running = try await label { $0.name.lowercased().hasPrefix("python") }
+        #expect(running.icon == .terminal, "still in canonical mode: no icon")
+        let interactive = try await label { $0.icon != .terminal }
+        #expect(interactive.icon == .python)
+    }
 }

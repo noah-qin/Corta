@@ -100,7 +100,9 @@ reunidos em
 
 As abas ficam na fileira da barra de título, ao lado dos botões de fechar, minimizar e zoom da janela. Cada uma mostra o
 programa que o painel em foco executa — um bloco escuro de prompt para um shell, as cores do próprio programa nos demais
-casos — e depois o nome e o diretório, alinhados à esquerda. Uma aba com painéis divididos empilha os ícones dos outros
+casos — e depois o nome e o diretório, alinhados à esquerda. Um programa só mostra seu ícone quando assume o terminal
+— um REPL, um editor, um agente, um `ssh` conectado; um comando que só executa e imprime, como `java -version` ou
+`git status`, mantém o bloco de prompt. Uma aba com painéis divididos empilha os ícones dos outros
 painéis atrás do da frente, levemente girados; clicar em um painel traz o programa dele para a frente. Passe o ponteiro
 sobre uma aba para ver o botão de fechar, arraste-a para reordenar, clique duas vezes para renomear e use o clique direito
 para Nova aba, Renomear aba…, Fechar aba e Fechar outras abas. Quando há mais abas do que cabem, a fileira rola para o

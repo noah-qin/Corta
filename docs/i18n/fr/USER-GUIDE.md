@@ -100,7 +100,9 @@ rassemblés dans
 
 Les onglets se trouvent dans la rangée de la barre de titre, à côté des boutons de fermeture, de réduction et de zoom de la
 fenêtre. Chacun montre le programme que son volet actif exécute — une tuile d’invite sombre pour un shell, les couleurs du
-programme sinon —, puis son nom et son dossier, alignés à gauche. Un onglet aux volets scindés empile les icônes des autres
+programme sinon —, puis son nom et son dossier, alignés à gauche. Un programme ne prend son icône qu’une fois le terminal pris en
+main — une REPL, un éditeur, un agent, un `ssh` connecté ; une commande qui se contente de s’exécuter et d’afficher,
+comme `java -version` ou `git status`, garde la tuile d’invite. Un onglet aux volets scindés empile les icônes des autres
 volets derrière celle du premier plan, légèrement tournées ; cliquer sur un volet fait passer son programme devant. Survolez
 un onglet pour son bouton de fermeture, faites-le glisser pour le déplacer, double-cliquez pour le renommer, et cliquez avec
 le bouton droit pour Nouvel onglet, Renommer l’onglet…, Fermer l’onglet et Fermer les autres onglets. Quand il y a plus

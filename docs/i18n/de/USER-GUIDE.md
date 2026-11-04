@@ -101,7 +101,9 @@ gesammelt.
 
 Tabs sitzen in der Titelleistenzeile, neben den Tasten zum Schließen, Minimieren und Zoomen des Fensters. Jeder zeigt das
 Programm, das sein fokussierter Bereich ausführt – eine dunkle Prompt-Kachel für eine Shell, sonst die eigenen Farben des
-Programms –, dann Namen und Verzeichnis, linksbündig. Ein Tab mit geteilten Bereichen stapelt die Symbole der anderen Bereiche
+Programms –, dann Namen und Verzeichnis, linksbündig. Sein Symbol bekommt ein Programm erst, wenn es das Terminal
+übernimmt – eine REPL, ein Editor, ein Agent, ein verbundenes `ssh`; ein Befehl, der nur läuft und ausgibt, wie
+`java -version` oder `git status`, behält die Prompt-Kachel. Ein Tab mit geteilten Bereichen stapelt die Symbole der anderen Bereiche
 hinter dem vorderen, leicht weggedreht; ein Klick auf einen Bereich holt dessen Programm nach vorn. Zeig auf einen Tab für
 seine Schließtaste, zieh ihn zum Umsortieren, doppelklicke ihn zum Umbenennen und öffne mit Rechtsklick Neuer Tab,
 Tab umbenennen…, Tab schließen und Andere Tabs schließen. Passen nicht alle Tabs hinein, scrollt die Zeile seitwärts –
