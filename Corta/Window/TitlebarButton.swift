@@ -62,7 +62,12 @@ final class TitlebarButton: NSButton {
         let alpha: CGFloat = isHighlighted ? 0.12 : hovering ? 0.07 : 0
         if alpha > 0 {
             NSColor.labelColor.withAlphaComponent(alpha).setFill()
-            NSBezierPath(ovalIn: bounds).fill()
+            // The toolbar may give the view more than its constraints ask;
+            // the ground stays a circle the tabs' height, centred.
+            let side = min(Self.side, bounds.width, bounds.height)
+            let circle = NSRect(x: ((bounds.width - side) / 2).rounded(), y: ((bounds.height - side) / 2).rounded(),
+                                width: side, height: side)
+            NSBezierPath(ovalIn: circle).fill()
         }
         super.draw(dirtyRect)
     }
