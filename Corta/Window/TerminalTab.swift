@@ -83,7 +83,7 @@ final class TabContainerViewController: NSViewController {
     /// empty canvas before its prompt arrives. `split` draws beneath it
     /// meanwhile and already has the keyboard.
     func show(_ split: SplitViewController, holding previous: SplitViewController? = nil) {
-        releaseHeld()
+        releaseHeld(animated: false)
         shown = split
         let holding = previous.flatMap { $0 !== split && $0.parent === self ? $0 : nil }
         for case let child as SplitViewController in children {
@@ -102,11 +102,58 @@ final class TabContainerViewController: NSViewController {
     /// Long enough for a usual shell start, short enough not to feel slow.
     static let holdLimit: TimeInterval = 0.3
 
-    /// The held tab goes, unless it has been shown again since.
-    func releaseHeld() {
+    /// The held tab fades away, unless it has been shown again since: the
+    /// switch is seen, as a short cross-fade rather than an empty frame.
+    func releaseHeld(animated: Bool = true) {
         guard let held else { return }
         self.held = nil
-        held.view.isHidden = held !== shown
+        guard held !== shown else { return }
+        guard animated, view.window?.isVisible == true else {
+            held.view.isHidden = true
+            return
+        }
+        Self.fadeOut(held.view) { [weak self, weak held] in
+            guard let self, let held else { return }
+            held.view.isHidden = held !== self.shown
+        }
+    }
+
+    /// A closing tab that was in front: it leaves the container now, but its
+    /// last frame stays on top until the tab behind it has drawn, then fades.
+    /// Hidden tabs do not draw, so showing one at once flashed an empty canvas.
+    func retire(_ split: SplitViewController) {
+        let content = split.view
+        split.removeFromParent()
+        guard view.window?.isVisible == true, content.superview === view else {
+            content.removeFromSuperview()
+            return
+        }
+        content.isHidden = false
+        view.addSubview(content, positioned: .above, relativeTo: nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.firstFrameDelay) {
+            Self.fadeOut(content) { content.removeFromSuperview() }
+        }
+    }
+
+    /// About two frames: the newly shown tab's first one is presented.
+    static let firstFrameDelay: TimeInterval = 0.034
+    static let fadeDuration: TimeInterval = 0.15
+
+    private static func fadeOut(_ content: NSView, completion: @escaping @MainActor () -> Void) {
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            completion()
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = fadeDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            content.animator().alphaValue = 0
+        } completionHandler: {
+            MainActor.assumeIsolated {
+                content.alphaValue = 1
+                completion()
+            }
+        }
     }
 }
 

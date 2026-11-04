@@ -34,8 +34,9 @@ Versioning for compatibility changes.
   double-clicks like the rest of the titlebar. Tabs keep a fixed width at the leading edge and
   share the row only once they no longer fit; past that the row scrolls
   sideways, fading at its edges, and keeps the selected tab in view, so every
-  tab keeps its name and close button. A new tab springs in, and the tab in
-  front stays drawn until its shell's prompt is there. A lone tab is a single pill,
+  tab keeps its name and close button. A new tab springs in. Opening or closing a
+  tab cross-fades the canvas: the old one stays until the new one has drawn
+  — a new shell's prompt included — so no empty frame flashes between them. A lone tab is a single pill,
   and the track appears with the second tab. Codex's tile is white. The titlebar band and the
   gaps between panes share a ground colour a step darker than the panes,
   and the tab track a step darker again. The default light theme's background is

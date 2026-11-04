@@ -113,7 +113,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
             if let previous, let pane = tab.split.focusedPane, !pane.drewFirstOutput {
                 pane.onFirstOutputFrame = { [weak container] in
                     // The frame being prepared presents within a vsync or so.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.034) { container?.releaseHeld() }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + TabContainerViewController.firstFrameDelay) {
+                        container?.releaseHeld()
+                    }
                 }
                 selectTab(tab, holding: previous)
             } else {
@@ -200,7 +202,11 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         }
         tab.split.teardown()
         tabs.remove(at: index)
-        container.remove(tab.split)
+        if selectedTab === tab {
+            container.retire(tab.split)
+        } else {
+            container.remove(tab.split)
+        }
         if selectedTab === tab || selectedTab == nil {
             selectTab(tabs[min(index, tabs.count - 1)])
         } else {

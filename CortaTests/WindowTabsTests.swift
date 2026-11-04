@@ -70,7 +70,7 @@ struct WindowTabsTests {
         if controller.window?.isVisible == true, !(third.split.focusedPane?.drewFirstOutput ?? true) {
             #expect(!second.split.view.isHidden, "held over the new tab")
         }
-        controller.container.releaseHeld()
+        controller.container.releaseHeld(animated: false)
         #expect(controller.tabs.filter { !$0.split.view.isHidden }.map(\.id) == [third.id])
         #expect(controller.tabStrip.items.count == 3)
         #expect(controller.tabStrip.selectedIndex == 2)
