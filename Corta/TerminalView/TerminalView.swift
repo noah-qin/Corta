@@ -91,6 +91,10 @@ final class TerminalView: NSView, CALayerDelegate {
     /// job (`SECURITY.md` §2.3).
     var onPaste: (() -> Void)?
 
+    /// ⌃Tab / ⇧⌃Tab: the next or previous tab, as every Mac tabbed window
+    /// moves. True when a window took it; false sends the key on as bytes.
+    var onCycleTab: ((Int) -> Bool)?
+
     /// Search shortcuts, offered first in `keyDown`: while the bar is open Esc
     /// must dismiss it rather than reach the child. Returns whether the event
     /// was handled. ⌘G / ⇧⌘G are fixed menu items with no `bind.` key.

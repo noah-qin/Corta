@@ -30,6 +30,11 @@ extension PaneCommands {
         view.onPaste = { [weak self] in
             self?.pasteFromClipboard()
         }
+        view.onCycleTab = { [weak view] step in
+            guard let controller = view?.window?.windowController as? TerminalWindowController else { return false }
+            controller.selectAdjacentTab(offset: step)
+            return true
+        }
         view.onDropPaths = { [weak self] paths in
             self?.insertDroppedPaths(paths)
         }

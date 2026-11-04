@@ -42,6 +42,7 @@ extension TerminalView {
             onPaste?()
             return
         }
+        if let step = Self.tabCycleStep(for: event), onCycleTab?(step) == true { return }
         // A consumed event ends here; the IME answers via `insertText`, or
         // `doCommand(by:)` while this event is the one it is handling.
         if Self.routesEventThroughIME(event, optionAsMeta: optionAsMeta?() ?? false),
@@ -122,6 +123,19 @@ extension TerminalView {
     /// bindings, so an unbind really hands ⌘V to the child.
     static func isPasteShortcut(_ event: NSEvent, bindings: Keybindings) -> Bool {
         bindings[.paste]?.matches(event) ?? false
+    }
+
+    /// ⌃Tab is +1, ⇧⌃Tab −1; any other modifier leaves the key to the
+    /// program. Native window tabs gave these for free; Corta's own (D30)
+    /// take them here.
+    static func tabCycleStep(for event: NSEvent) -> Int? {
+        guard event.keyCode == 48 else { return nil }
+        let flags = event.modifierFlags.intersection([.control, .shift, .option, .command])
+        switch flags {
+        case [.control]: return 1
+        case [.control, .shift]: return -1
+        default: return nil
+        }
     }
 
     // periphery:ignore - reached through the responder chain by selector
