@@ -128,11 +128,13 @@ export async function generate() {
       throw Error(`Unsafe content URL: ${file}: ${url}`);
     const match = fileRoutes.get(target);
     if (match) {
-      // Links explicitly back to an English original from a translation must stay English.
+      // Links explicitly back to an English original from a translation must
+      // stay English, and so must an English page's link to itself when it
+      // stands in for a missing translation (its language row's "English").
       const explicitEnglish =
-        file.startsWith("docs/i18n/") &&
         match.lang === "en" &&
-        match.translated;
+        ((file.startsWith("docs/i18n/") && match.translated) ||
+          (target === file && lang !== "en"));
       return (
         route(
           explicitEnglish ? "en" : match.lang === "en" ? lang : match.lang,
