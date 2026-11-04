@@ -113,7 +113,7 @@ lado — deslize sobre ela ou gire a roda do mouse em cima — e acompanha a aba
 | Para… | Use |
 | --- | --- |
 | Abrir uma janela / uma aba | ⌘N / ⌘T |
-| Aba anterior / próxima | ⇧⌘[ / ⇧⌘] |
+| Aba anterior / próxima | ⇧⌘[ / ⇧⌘], ou ⇧⌃Tab / ⌃Tab |
 | Mostrar a aba 1–8 / a última | ⌘1–⌘8 / ⌘9 |
 | Renomear a aba atual | Clique duas vezes no título da aba, ou clique com o botão direito ▸ Renomear aba… |
 | Dividir o painel à direita / para baixo | ⌘D / ⇧⌘D |
@@ -128,8 +128,10 @@ lado — deslize sobre ela ou gire a roda do mouse em cima — e acompanha a aba
   Esc cancela, e um nome vazio restaura o título automático. Nomes personalizados sobrevivem à saída do shell e à
   restauração de sessões. Os menus de contexto da aba e do terminal também oferecem Nova aba, e o botão **+** da barra de
   ferramentas também abre uma; a fileira de abas não tem **+** próprio.
-- As abas pertencem à sua janela: não há Mostrar barra de abas, Juntar todas as janelas nem Mover aba para nova janela,
-  e uma aba ainda não pode ser arrastada para fora como janela própria (#451).
+- **Abas entre janelas.** Arraste uma aba para baixo, para fora da fileira, e solte para dar a ela uma janela própria,
+  ou sobre a fileira de outra janela para levá-la até lá; os painéis continuam rodando. **Janela ▸ Mover aba para nova
+  janela** e o menu da aba fazem o primeiro, **Janela ▸ Juntar todas as janelas** reúne todas as abas na janela da
+  frente. Uma aba levada à ponta de uma fileira que rola leva a fileira junto.
 - **Ampliar painel** é temporário: nada é fechado e nenhum processo é perturbado.
 - **Reabrir painel fechado** restaura o lugar, o tamanho e o diretório de trabalho do painel — não o programa que rodava nele.
 - Fechar um painel com um comando ainda em execução pergunta antes (`confirm-close`).

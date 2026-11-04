@@ -192,6 +192,20 @@ final class SplitViewController: NSViewController {
         applyWindowTitle()
     }
 
+    /// A running tab moved into `window` from another (D30, between
+    /// windows): it takes the new window's cell increments and minimum,
+    /// and each pane refits its grid to the space it now has.
+    func rejoinWindow(_ window: NSWindow) {
+        didSetUpWindow = true
+        if let metrics = focusedPane?.terminalRenderer?.pointMetrics {
+            window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        }
+        view.frame = view.superview?.bounds ?? view.frame
+        view.layoutSubtreeIfNeeded()
+        for pane in panes { pane.resizeSessionToFitView() }
+        applyWindowTitle()
+    }
+
     /// The tab came to the front: its panes draw again and its focused pane
     /// takes the toolbar's input-source slot.
     func didBecomeSelectedTab() {

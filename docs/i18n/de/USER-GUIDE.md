@@ -114,7 +114,7 @@ wische darauf oder dreh das Mausrad darüber – und folgt dem Tab, den du ausw�
 | Um … | Verwende |
 | --- | --- |
 | Ein Fenster / einen Tab öffnen | ⌘N / ⌘T |
-| Vorheriger / nächster Tab | ⇧⌘[ / ⇧⌘] |
+| Vorheriger / nächster Tab | ⇧⌘[ / ⇧⌘] oder ⇧⌃Tab / ⌃Tab |
 | Tab 1–8 / letzten Tab zeigen | ⌘1–⌘8 / ⌘9 |
 | Den aktuellen Tab umbenennen | Doppelklick auf den Tabtitel oder Rechtsklick ▸ Tab umbenennen… |
 | Den Bereich nach rechts / unten teilen | ⌘D / ⇧⌘D |
@@ -130,8 +130,10 @@ wische darauf oder dreh das Mausrad darüber – und folgt dem Tab, den du ausw�
   überstehen Shell-Ausgaben und das Wiederherstellen von Sitzungen. Die Kontextmenüs von Tab und Terminal bieten auch
   „Neuer Tab“, und die Taste **+** in der Symbolleiste öffnet ebenfalls einen;
   die Tabzeile selbst hat kein eigenes **+**.
-- Tabs gehören zu ihrem Fenster: Es gibt kein Tableiste einblenden, Alle Fenster zusammenführen oder Tab in neues Fenster
-  bewegen, und ein Tab lässt sich noch nicht in ein eigenes Fenster herausziehen (#451).
+- **Tabs zwischen Fenstern.** Zieh einen Tab nach unten aus der Zeile und lass los, und er bekommt ein eigenes Fenster;
+  auf die Tabzeile eines anderen Fensters gezogen, wandert er dorthin. Seine Bereiche laufen weiter. **Fenster ▸ Tab in
+  neues Fenster bewegen** und das Kontextmenü des Tabs tun das Erste, **Fenster ▸ Alle Fenster zusammenführen** sammelt alle
+  Tabs im vordersten Fenster. Ein Tab, der an ein Ende einer scrollenden Zeile gezogen wird, nimmt die Zeile mit.
 - **Bereich vergrößern** ist vorübergehend: Nichts wird geschlossen, kein Prozess gestört.
 - **Geschlossenen Bereich wieder öffnen** stellt Position, Größe und Arbeitsverzeichnis des Bereichs wieder her – nicht
   das Programm, das darin lief.

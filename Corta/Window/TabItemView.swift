@@ -38,6 +38,9 @@ final class TabItemView: NSView, NSTextFieldDelegate {
     }
     private var selected = false
     private var item: TabStripItem?
+    /// The tab this view shows, by identity: the strip keeps a view with
+    /// its tab as tabs around it open, close and move.
+    var itemID: String? { item?.id }
 
     init(strip: TabStripView) {
         self.strip = strip
@@ -223,7 +226,7 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         strip.itemMouseDown(index, event: event)
     }
     override func mouseDragged(with event: NSEvent) { strip.itemMouseDragged(event) }
-    override func mouseUp(with event: NSEvent) { strip.itemMouseUp() }
+    override func mouseUp(with event: NSEvent) { strip.itemMouseUp(event) }
     override func otherMouseUp(with event: NSEvent) {
         if event.buttonNumber == 2 { strip.close(index) }
     }

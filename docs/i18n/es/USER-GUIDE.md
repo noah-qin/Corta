@@ -113,7 +113,7 @@ fila se desplaza de lado — desliza sobre ella o gira la rueda del ratón encim
 | Para… | Usa |
 | --- | --- |
 | Abrir una ventana / una pestaña | ⌘N / ⌘T |
-| Pestaña anterior / siguiente | ⇧⌘[ / ⇧⌘] |
+| Pestaña anterior / siguiente | ⇧⌘[ / ⇧⌘], o ⇧⌃Tab / ⌃Tab |
 | Mostrar la pestaña 1–8 / la última | ⌘1–⌘8 / ⌘9 |
 | Renombrar la pestaña actual | Doble clic en el título de la pestaña, o clic derecho ▸ Renombrar pestaña… |
 | Dividir el panel a la derecha / hacia abajo | ⌘D / ⇧⌘D |
@@ -129,8 +129,10 @@ fila se desplaza de lado — desliza sobre ella o gira la rueda del ratón encim
   salida del shell y a la restauración de sesiones. Los menús contextuales de la pestaña y del terminal también ofrecen
   Nueva pestaña, y el botón **+** de la barra de herramientas también abre una; la fila
   de pestañas no tiene **+** propio.
-- Las pestañas pertenecen a su ventana: no hay Mostrar barra de pestañas, Combinar todas las ventanas ni Mover pestaña a
-  una nueva ventana, y una pestaña todavía no se puede arrastrar fuera a una ventana propia (#451).
+- **Pestañas entre ventanas.** Arrastra una pestaña hacia abajo fuera de la fila y suéltala para darle su propia ventana,
+  o sobre la fila de otra ventana para pasarla allí; sus paneles siguen en marcha. **Ventana ▸ Mover pestaña a una nueva
+  ventana** y el menú de la pestaña hacen lo primero, **Ventana ▸ Combinar todas las ventanas** reúne todas las pestañas en
+  la ventana de delante. Una pestaña llevada al extremo de una fila que se desplaza arrastra la fila consigo.
 - **Ampliar panel** es temporal: no se cierra nada ni se molesta a ningún proceso.
 - **Reabrir el panel cerrado** restaura el lugar, el tamaño y el directorio de trabajo del panel — no el programa que se
   ejecutaba en él.

@@ -42,26 +42,50 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// its first grid before anything shows it. Unrestored windows are
     /// centred on the main screen; the caller cascades or places them after.
     convenience init(setup: SplitViewController.Setup) {
+        self.init(window: Self.makeWindow())
+        dressWindow()
+        // Loads the split's view, which spawns the root pane from `setup`.
+        let tab = makeTab(setup: setup, hidden: false)
+        selectedTab = tab
+        tab.split.prepareWindow(window!)
+        refreshTabStrip()
+    }
+
+    /// A window for a tab that is already running, taken from another
+    /// window (D30, between windows): its panes keep their sessions, and
+    /// the window takes `frame` rather than a size from the grid.
+    convenience init(adopting tab: TerminalTab, frame: NSRect) {
+        let window = Self.makeWindow()
+        self.init(window: window)
+        dressWindow()
+        window.setFrame(frame, display: false)
+        adopt(tab)
+        container.add(tab.split, hidden: false)
+        tab.split.rejoinWindow(window)
+        selectedTab = tab
+        refreshTabStrip()
+    }
+
+    private static func makeWindow() -> NSWindow {
         let placeholder = NSRect(x: 0, y: 0, width: 480, height: 270)
         let window = NSWindow(
-            contentRect: placeholder, styleMask: Self.styleMask, backing: .buffered, defer: false)
+            contentRect: placeholder, styleMask: styleMask, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         // Corta draws its own tabs (D30); AppKit's would add a second bar.
         window.tabbingMode = .disallowed
         // Link and tab tooltips only while Corta is active, as the storyboard
         // window had it.
         window.allowsToolTipsWhenApplicationIsInactive = false
-        self.init(window: window)
+        return window
+    }
+
+    private func dressWindow() {
+        guard let window else { return }
         window.delegate = self
         tabStrip.delegate = self
         installToolbar(on: window)
         installSecureInputIndicator()
         window.contentViewController = container
-        // Loads the split's view, which spawns the root pane from `setup`.
-        let tab = makeTab(setup: setup, hidden: false)
-        selectedTab = tab
-        tab.split.prepareWindow(window)
-        refreshTabStrip()
     }
 
     /// The App Intent identity of the selected tab (`TerminalWindowEntity`).
@@ -191,6 +215,45 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
             guard confirmed, let self, let tab else { return }
             self.closeTab(tab)
         }
+    }
+
+    /// Takes `tab` out of this window with its panes still running, for
+    /// another window to receive. Never the last tab: that is the window.
+    @discardableResult
+    func release(_ tab: TerminalTab) -> Bool {
+        guard tabs.count > 1, let index = tabs.firstIndex(where: { $0 === tab }) else { return false }
+        tabs.remove(at: index)
+        container.remove(tab.split)
+        if selectedTab === tab {
+            selectTab(tabs[min(index, tabs.count - 1)])
+        } else {
+            refreshTabStrip()
+        }
+        (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
+        return true
+    }
+
+    /// Every tab, still running, out of this window, which is left empty
+    /// for the caller to close: a closing window tears down only the tabs
+    /// it still holds (`AppDelegate.windowWillClose`).
+    func releaseAllTabs() -> [TerminalTab] {
+        let released = tabs
+        for tab in released { container.remove(tab.split) }
+        tabs.removeAll()
+        selectedTab = nil
+        return released
+    }
+
+    /// A running tab from another window, at `index` (after the last by
+    /// default), brought to the front.
+    func receive(_ tab: TerminalTab, at index: Int? = nil) {
+        guard let window, !tabs.contains(where: { $0 === tab }) else { return }
+        tab.controller = self
+        tabs.insert(tab, at: min(max(0, index ?? tabs.count), tabs.count))
+        container.add(tab.split, hidden: true)
+        tab.split.rejoinWindow(window)
+        selectTab(tab)
+        (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
     }
 
     /// Closes `tab` without asking; the last tab closes the window.
@@ -420,5 +483,15 @@ extension TerminalWindowController: TabStripDelegate {
 
     func tabStripNewTab(_ strip: TabStripView) {
         (NSApp.delegate as? AppDelegate)?.newTab(beside: window, sender: nil)
+    }
+
+    func tabStrip(_ strip: TabStripView, drop index: Int, atScreenPoint point: NSPoint) {
+        guard tabs.indices.contains(index) else { return }
+        drop(tabs[index], atScreenPoint: point)
+    }
+
+    func tabStrip(_ strip: TabStripView, moveToNewWindow index: Int) {
+        guard tabs.indices.contains(index) else { return }
+        moveToNewWindow(tabs[index])
     }
 }

@@ -208,6 +208,12 @@ extension AppDelegate {
             withTitle: L10n.text("menu.minimize"), action: #selector(NSWindow.performMiniaturize(_:)), key: "m")
         menu.addItem(withTitle: L10n.text("menu.zoom"), action: #selector(NSWindow.performZoom(_:)))
         menu.addItem(.separator())
+        // Answered by the key window's controller (D30, between windows).
+        menu.addItem(withTitle: L10n.text("menu.moveTabToNewWindow"),
+                     action: #selector(TerminalWindowController.moveTabToNewWindow(_:)))
+        menu.addItem(withTitle: L10n.text("menu.mergeAllWindows"),
+                     action: #selector(TerminalWindowController.mergeAllWindows(_:)))
+        menu.addItem(.separator())
         let agents = NSMenuItem(title: L10n.text("agent.list"), action: nil, keyEquivalent: "")
         agents.submenu = AgentDirectory.menu()
         menu.addItem(agents)

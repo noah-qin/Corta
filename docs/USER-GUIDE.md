@@ -109,7 +109,7 @@ the mouse wheel over it — and follows the tab you select.
 | To… | Use |
 | --- | --- |
 | Open a window / a tab | ⌘N / ⌘T |
-| Previous / next tab | ⇧⌘[ / ⇧⌘] |
+| Previous / next tab | ⇧⌘[ / ⇧⌘], or ⇧⌃Tab / ⌃Tab |
 | Show tab 1–8 / the last tab | ⌘1–⌘8 / ⌘9 |
 | Rename the current tab | Double-click the tab title, or right-click ▸ Rename Tab… |
 | Split the pane to the right / downwards | ⌘D / ⇧⌘D |
@@ -125,9 +125,12 @@ the mouse wheel over it — and follows the tab you select.
   restores the automatic title. Custom names survive shell output and session
   restoration. The tab and terminal right-click menus also offer New Tab, and
   the toolbar's **+** button opens one; the strip has no **+** of its own.
-- Tabs belong to their window: there is no Show Tab Bar, Merge All Windows
-  or Move Tab to New Window, and a tab cannot yet be dragged out into a
-  window of its own (#451).
+- **Tabs between windows.** Drag a tab down off the strip and let go to give
+  it a window of its own, or onto another window's strip to move it there;
+  its panes keep running. **Window ▸ Move Tab to New Window** and the tab's
+  right-click menu do the first, **Window ▸ Merge All Windows** gathers every
+  window's tabs into the front one. Dragging a tab to either end of a strip
+  that scrolls carries the row along with it.
 - **Zoom Pane** is temporary: nothing closes and no process is disturbed.
 - **Reopen Closed Pane** restores the pane's place, size and working
   directory — not the program that was running in it.

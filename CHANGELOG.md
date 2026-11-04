@@ -12,10 +12,8 @@ Versioning for compatibility changes.
 
 ### Removed
 
-- macOS's own window tabs: Show Tab Bar, Merge All Windows, Move Tab to New
-  Window and the tab overview are gone with them, and a tab cannot be
-  dragged out into a new window until #451's second part lands. Restored
-  windows bring their tabs back as before.
+- macOS's own window tabs: Show Tab Bar and the tab overview are gone with
+  them. Restored windows bring their tabs back as before.
 - Removed Quick Terminal, its settings page, global hotkey and Shortcuts action.
   Existing configuration entries are retired on the next config save.
 
@@ -44,6 +42,12 @@ Versioning for compatibility changes.
   tabs, and their corners are concentric with the window's. A tab's background panes stop drawing while it is
   hidden and keep running. A narrow tab keeps the start of its name, fading
   out, and the Connect and New Tab buttons answer the pointer as the tabs do.
+- Tabs move between windows with their panes still running: drag one off
+  the strip into a window of its own or onto another window's strip, or use
+  Window ▸ Move Tab to New Window (also in the tab's menu) and Merge All
+  Windows. ⌃Tab and ⇧⌃Tab step through the tabs, as before; a closing tab
+  shrinks out while the others and the track close the gap, and a dragged
+  tab held at a scrolling strip's end carries the row along.
 - ⌘1–⌘8 show that tab and ⌘9 the last, from File ▸ Show Tab; each is a
   command of its own (`select-tab-1` … `select-tab-8`, `select-last-tab`)
   that `bind.` can move or clear.

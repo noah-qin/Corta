@@ -114,7 +114,7 @@ suit l’onglet que vous sélectionnez.
 | Pour… | Utilisez |
 | --- | --- |
 | Ouvrir une fenêtre / un onglet | ⌘N / ⌘T |
-| Onglet précédent / suivant | ⇧⌘[ / ⇧⌘] |
+| Onglet précédent / suivant | ⇧⌘[ / ⇧⌘], ou ⇧⌃Tab / ⌃Tab |
 | Afficher l’onglet 1 à 8 / le dernier | ⌘1–⌘8 / ⌘9 |
 | Renommer l’onglet courant | Double-clic sur le titre de l’onglet, ou clic droit ▸ Renommer l’onglet… |
 | Diviser le volet à droite / vers le bas | ⌘D / ⇧⌘D |
@@ -130,8 +130,10 @@ suit l’onglet que vous sélectionnez.
   survivent à la sortie du shell et à la restauration des sessions. Les menus contextuels de l’onglet et du terminal
   proposent aussi Nouvel onglet, et le bouton **+** de la barre d’outils en ouvre un aussi ; la
   rangée d’onglets n’a pas de **+** à elle.
-- Les onglets appartiennent à leur fenêtre : il n’y a ni Afficher la barre d’onglets, ni Fusionner toutes les fenêtres, ni
-  Déplacer l’onglet vers une nouvelle fenêtre, et un onglet ne se détache pas encore en fenêtre à part (#451).
+- **Les onglets entre fenêtres.** Faites glisser un onglet hors de la rangée, vers le bas, et relâchez : il a sa propre
+  fenêtre ; sur la rangée d’une autre fenêtre, il y passe. Ses volets continuent de tourner. **Fenêtre ▸ Déplacer l’onglet
+  vers une nouvelle fenêtre** et le menu de l’onglet font le premier, **Fenêtre ▸ Fusionner toutes les fenêtres** réunit
+  tous les onglets dans la fenêtre de devant. Un onglet tiré au bout d’une rangée qui défile entraîne la rangée.
 - **Agrandir le volet** est temporaire : rien n’est fermé et aucun processus n’est dérangé.
 - **Rouvrir le volet fermé** rétablit la place, la taille et le répertoire de travail du volet — pas le programme qui y tournait.
 - Fermer un volet où une commande tourne encore demande d’abord confirmation (`confirm-close`).
