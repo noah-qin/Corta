@@ -69,6 +69,45 @@ struct ProgramIconTests {
         #expect(AcknowledgementsView.programIconLicenses.contains("CC0 1.0 Universal"))
     }
 
+    /// Gemini's SVG once drew a dot: Xcode's reader stopped at run-together
+    /// arc flags. Every mark must cover a real part of its tile.
+    @Test(arguments: ProgramIcon.allCases)
+    func everyMarkFillsItsTile(_ program: ProgramIcon) throws {
+        let tile = try #require(program.tabImage)
+        let side = 48
+        let rep = try #require(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: side * 4 / 3, pixelsHigh: side, bitsPerSample: 8,
+            samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+            bytesPerRow: 0, bitsPerPixel: 0))
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        tile.draw(in: NSRect(x: 0, y: 0, width: rep.pixelsWide, height: rep.pixelsHigh))
+        NSGraphicsContext.restoreGraphicsState()
+        let ground = try #require(rep.colorAt(x: 1, y: 1))
+        var differing = 0
+        for y in 0..<rep.pixelsHigh {
+            for x in 0..<rep.pixelsWide {
+                guard let color = rep.colorAt(x: x, y: y) else { continue }
+                let distance = abs(color.redComponent - ground.redComponent)
+                    + abs(color.greenComponent - ground.greenComponent)
+                    + abs(color.blueComponent - ground.blueComponent)
+                if distance > 0.3 { differing += 1 }
+            }
+        }
+        // The 12 pt mark sits on a 24 × 18 tile: a fair mark covers well
+        // over 4% of it; Gemini's dot covered under 1%.
+        #expect(Double(differing) / Double(rep.pixelsWide * rep.pixelsHigh) > 0.04, "\(program)")
+    }
+
+    /// Java's tile read as Claude's: orange on orange at tab size.
+    @Test func javaDoesNotWearClaudesColour() throws {
+        let java = try #require(ProgramIcon.java.tabImage?.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let claude = try #require(ProgramIcon.claude.tabImage?.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let javaGround = try #require(NSBitmapImageRep(cgImage: java).colorAt(x: 1, y: 1)?.usingColorSpace(.sRGB))
+        let claudeGround = try #require(NSBitmapImageRep(cgImage: claude).colorAt(x: 1, y: 1)?.usingColorSpace(.sRGB))
+        #expect(abs(javaGround.hueComponent - claudeGround.hueComponent) > 0.25)
+    }
+
     @Test func brandDoesNotComeFromAProgramSuppliedWindowTitle() async throws {
         let session = try TerminalSession(
             executable: "/bin/cat", arguments: [], environment: ChildEnvironment.default(),

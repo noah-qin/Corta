@@ -68,6 +68,10 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Gemini's tab tile showed only a dot, and Java's orange tile read as Claude's
+  while `java` started: Gemini's star is drawn whole, and Java shows a cup on
+  Java's blue.
+
 - After a theme or appearance switch the selected tab kept the old
   theme's fill — a white pill on a dark titlebar — and the pane header
   kept its old text colour until the next output.

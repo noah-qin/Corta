@@ -9,7 +9,9 @@
     "name": "Gemini",
     "library": "lobe",
     "url": "https://unpkg.com/@lobehub/icons-static-svg@1.102.0/icons/gemini.svg",
-    "sha256": "87d5b3c4be75a66f54c1936482a263df68185545b741129badd1b7c2449c18d3"
+    "sha256": "87d5b3c4be75a66f54c1936482a263df68185545b741129badd1b7c2449c18d3",
+    "note": "Arc flags written out (`0 0 1` for `01`): Xcode's SVG reader stopped at the run-together form and drew a dot. The shape is unchanged; sha256 is the downloaded file's.",
+    "shippedSha256": "dd1c612362a901bfc4c9d580987a5e6874e8c03cabd5265de2466a445f6f0c83"
   },
   {
     "name": "Qwen",
@@ -76,12 +78,6 @@
     "library": "simple",
     "url": "https://unpkg.com/simple-icons@16.36.0/icons/rust.svg",
     "sha256": "95a291d8887610d103704adcc5c5f2cbfa4c80a96f8e72b00531d5691beb67a8"
-  },
-  {
-    "name": "Java",
-    "library": "simple",
-    "url": "https://unpkg.com/simple-icons@16.36.0/icons/openjdk.svg",
-    "sha256": "31c94bd8f864b018d9733c251df186f36e9a0036e43f78d0656895108d438bb3"
   },
   {
     "name": "Php",

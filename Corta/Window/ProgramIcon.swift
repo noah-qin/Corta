@@ -57,7 +57,9 @@ enum ProgramIcon: String, CaseIterable {
         .ruby: Style(name: "Ruby", artwork: "ProgramRuby", color: 0xB73532, aliases: ["ruby", "irb"]),
         .go: Style(name: "Go", artwork: "ProgramGo", color: 0x007D9C, aliases: ["go", "gofmt"]),
         .rust: Style(name: "Rust", artwork: "ProgramRust", color: 0xA85B39, aliases: ["rustc", "cargo", "rustup"]),
-        .java: Style(name: "Java", artwork: "ProgramJava", color: 0xAB5239, aliases: ["java", "javac", "jshell"]),
+        // The cup on Java's own blue: its orange read as Claude's at a glance.
+        .java: Style(name: "Java", artwork: "sf:cup.and.saucer.fill", color: 0x5382A1,
+            aliases: ["java", "javac", "jshell"]),
         .php: Style(name: "PHP", artwork: "ProgramPhp", color: 0x686DA0, aliases: ["php"]),
         .lua: Style(name: "Lua", artwork: "ProgramLua", color: 0x30309A, aliases: ["lua", "luajit"]),
         .swift: Style(name: "Swift", artwork: "ProgramSwift", color: 0xD9693B, aliases: ["swift", "swiftc"]),
