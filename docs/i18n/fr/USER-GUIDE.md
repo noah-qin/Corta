@@ -98,10 +98,22 @@ rassemblés dans
 
 ## Fenêtres, onglets et volets
 
+Les onglets se trouvent dans la rangée de la barre de titre, à côté des boutons de fermeture, de réduction et de zoom de la
+fenêtre. Chacun montre le programme que son volet actif exécute — une tuile d’invite sombre pour un shell, les couleurs du
+programme sinon —, puis son nom et son dossier, alignés à gauche. Un onglet aux volets scindés empile les icônes des autres
+volets derrière celle du premier plan, légèrement tournées ; cliquer sur un volet fait passer son programme devant. Survolez
+un onglet pour son bouton de fermeture, faites-le glisser pour le déplacer, double-cliquez pour le renommer, et cliquez avec
+le bouton droit pour Nouvel onglet, Renommer l’onglet…, Fermer l’onglet et Fermer les autres onglets. Quand il y a plus
+d’onglets que de place, la rangée défile latéralement — balayez dessus, ou tournez la molette de la souris au-dessus — et
+suit l’onglet que vous sélectionnez.
+
+![Les onglets dans la rangée de la barre de titre, avec leurs icônes de programme](../../brand/native-tab-icon.png)
+
 | Pour… | Utilisez |
 | --- | --- |
 | Ouvrir une fenêtre / un onglet | ⌘N / ⌘T |
 | Onglet précédent / suivant | ⇧⌘[ / ⇧⌘] |
+| Afficher l’onglet 1 à 8 / le dernier | ⌘1–⌘8 / ⌘9 |
 | Renommer l’onglet courant | Double-clic sur le titre de l’onglet, ou clic droit ▸ Renommer l’onglet… |
 | Diviser le volet à droite / vers le bas | ⌘D / ⇧⌘D |
 | Déplacer le focus entre les volets | ⌥⌘ + touche fléchée |
@@ -114,8 +126,10 @@ rassemblés dans
 - Renommez un onglet directement dans son titre : double-cliquez, ou choisissez Renommer l’onglet… dans son menu
   contextuel. Retour enregistre, Échap annule, et un nom vide rétablit le titre automatique. Les noms personnalisés
   survivent à la sortie du shell et à la restauration des sessions. Les menus contextuels de l’onglet et du terminal
-  proposent aussi Nouvel onglet, et le bouton **+** de la barre d’outils en ouvre un, que la barre d’onglets soit
-  affichée ou non ; la barre d’onglets n’a pas de **+** à elle.
+  proposent aussi Nouvel onglet, et le bouton **+** de la barre d’outils en ouvre un aussi ; la
+  rangée d’onglets n’a pas de **+** à elle.
+- Les onglets appartiennent à leur fenêtre : il n’y a ni Afficher la barre d’onglets, ni Fusionner toutes les fenêtres, ni
+  Déplacer l’onglet vers une nouvelle fenêtre, et un onglet ne se détache pas encore en fenêtre à part (#451).
 - **Agrandir le volet** est temporaire : rien n’est fermé et aucun processus n’est dérangé.
 - **Rouvrir le volet fermé** rétablit la place, la taille et le répertoire de travail du volet — pas le programme qui y tournait.
 - Fermer un volet où une commande tourne encore demande d’abord confirmation (`confirm-close`).
@@ -164,7 +178,9 @@ rassemblés dans
   déplacent ni ne redimensionnent jamais la fenêtre : les lignes et colonnes visibles s’y réajustent, et ce qui reste
   d’une cellule apparaît en fond sous la dernière ligne.
 - **Thème.** Trois thèmes intégrés, `corta`, `solarized` et `mono`, chacun en variante claire et sombre ;
-  `appearance = auto` suit macOS quand il bascule. Vous pouvez définir votre propre thème via
+  `appearance = auto` suit macOS quand il bascule. Les modes clair et sombre choisissent leur thème séparément dans
+  Réglages → Thèmes — un Solarized clair à côté d’un Corta sombre s’écrit `theme = light:solarized,dark:corta`. Un
+  changement fond la fenêtre vers ses nouvelles couleurs. Vous pouvez définir votre propre thème via
   **Présentation ▸ Éditeur de thème…** ou dans le fichier de configuration, ou hériter d’un thème et changer quelques
   couleurs ([Themes](../../CONFIGURATION.md#4-themes)).
 - **Unicode.** Le texte chinois, japonais et coréen occupe deux colonnes et s’aligne avec le reste ; emoji, signes
@@ -207,8 +223,8 @@ Réglages ▸ Clavier et souris ▸ Indicateur de source de saisie propose **Aut
 **Toujours dans le volet actif** ou **Désactivé**. Par défaut, l’indicateur n’apparaît que chez les utilisateurs ayant
 activé une disposition de clavier non latine ou un IME ; les configurations uniquement latines restent épurées. Revenir à
 une disposition latine laisse un `A` discret sur un fond pâle — gris dans la barre d’outils, dans la couleur de texte du
-thème à côté de l’invite. Les dispositions non latines et les modes d’IME intégrés utilisent une teinte indigo douce ; les
-modes d’IME inconnus, du gris. À côté de l’invite, les couleurs suivent la luminosité du thème du terminal plutôt que
+thème à côté de l’invite. À côté de l’invite, les dispositions non latines et les modes d’IME intégrés utilisent une teinte
+indigo douce ; dans la barre d’outils, toute source est grise, le glyphe seul les distinguant. À côté de l’invite, les couleurs suivent la luminosité du thème du terminal plutôt que
 celle de macOS. Dans la barre d’outils, le badge reste pendant qu’un programme tourne — Claude Code, un éditeur —, car il
 ne masque aucune sortie. Au bord droit de la ligne de commande, l’intégration du shell le masque pendant l’exécution des
 commandes en mode **Automatique**. **Toujours** peut le garder pendant la sortie des commandes. Les deux modes d’invite le
@@ -229,7 +245,7 @@ style discret par défaut.
 
 ### État du système local (facultatif)
 
-Ouvrez Réglages (⌘,) → Terminal, activez la barre d’état inférieure, puis choisissez les indicateurs à afficher :
+Ouvrez Réglages (⌘,) → Terminal, activez Afficher l’état du système sous Barre d’état inférieure, puis choisissez les indicateurs à afficher :
 utilisation du CPU, charge du système, utilisation de la mémoire, débits réseau, espace disque libre et état thermique.
 Elle est désactivée par défaut ; chaque indicateur a son propre interrupteur. Cliquez sur la barre pour voir le nom de
 l’hôte local, la version de macOS, la puce, le nombre de cœurs et la mémoire totale. La barre indique Local même dans un
@@ -247,7 +263,8 @@ et la précision se trouvent dans son infobulle, sa valeur d’accessibilité et
 
 ### Créer et modifier des thèmes
 
-Réglages → Apparence → Créer un thème ouvre un éditeur graphique. Nommez votre copie, basculez entre les variantes sombre
+Réglages → Thèmes → Nouveau, à côté de Mode clair ou Mode sombre, ouvre un éditeur graphique ; ce que vous enregistrez
+devient le thème de ce mode. Nommez votre copie, basculez entre les variantes sombre
 et claire, et changez les couleurs avec des sélecteurs ou des valeurs HEX. L’aperçu se met à jour sans modifier les
 fenêtres du terminal. Enregistrer le thème l’active et le conserve ; Annuler garde votre thème précédent. Les thèmes
 personnalisés proposent Modifier le thème. Restaurer les couleurs source réinitialise la variante courante. Vous pouvez
@@ -310,7 +327,9 @@ ou, pour une connexion, **Reconnecter** ; le texte d’erreur du système est so
   tant que le curseur ou le résultat courant se trouverait dessous ; dans une division étroite, elle se rétrécit plutôt
   que de couvrir le volet. Chaque volet a sa propre barre.
 - **Sélection.** Faites glisser pour sélectionner, double-cliquez pour un mot, triple-cliquez pour une ligne. Une
-  sélection terminée est copiée aussitôt (`copy-on-select`) ; ⌘C copie aussi. Dans un programme qui utilise la souris —
+  sélection terminée est copiée aussitôt (`copy-on-select`) ; ⌘C copie aussi. Une copie est confirmée par une bande de lumière qui
+  glisse une fois le long du texte copié (un seul flash doux avec Réduire les animations), ou par un message si le texte est
+  hors de vue. Dans un programme qui utilise la souris —
   `vim`, `htop` —, maintenez ⌥ en commençant à faire glisser pour sélectionner du texte malgré tout
   (`mouse-override-modifier`).
 - **Coller.** ⌘V. Le texte collé est marqué comme collage (bracketed paste), si bien qu’un shell qui le prend en charge —
@@ -762,7 +781,7 @@ d’adaptateur dédié dans Corta. Les protocoles génériques de notification e
 la détection de processus n’est pas une intégration complète d’agent. Voir le
 [périmètre de compatibilité et les limites de vérification](../../CONFORMANCE.md#cli-signal-compatibility) (anglais).
 
-Par défaut, les volets d’agents distinguent sur leur onglet natif En cours (couleur d’accent), Attend votre intervention
+Par défaut, les volets d’agents distinguent sur leur onglet En cours (couleur d’accent), Attend votre intervention
 (orange), Terminé (vert), Échec (rouge), Inactif (gris) et État inconnu (un point gris creux). Inactif signifie qu’aucun tour
 actif n’est signalé, y compris avant le début ou après l’arrêt du travail ; seul un `done` explicite signifie l’achèvement. Un
 anneau de progression suit les rapports OSC 7501 ou OSC 9;4. Le Dock compte les volets en attente et affiche la progression

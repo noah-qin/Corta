@@ -99,10 +99,21 @@ gesammelt.
 
 ## Fenster, Tabs und Bereiche
 
+Tabs sitzen in der Titelleistenzeile, neben den Tasten zum Schließen, Minimieren und Zoomen des Fensters. Jeder zeigt das
+Programm, das sein fokussierter Bereich ausführt – eine dunkle Prompt-Kachel für eine Shell, sonst die eigenen Farben des
+Programms –, dann Namen und Verzeichnis, linksbündig. Ein Tab mit geteilten Bereichen stapelt die Symbole der anderen Bereiche
+hinter dem vorderen, leicht weggedreht; ein Klick auf einen Bereich holt dessen Programm nach vorn. Zeig auf einen Tab für
+seine Schließtaste, zieh ihn zum Umsortieren, doppelklicke ihn zum Umbenennen und öffne mit Rechtsklick Neuer Tab,
+Tab umbenennen…, Tab schließen und Andere Tabs schließen. Passen nicht alle Tabs hinein, scrollt die Zeile seitwärts –
+wische darauf oder dreh das Mausrad darüber – und folgt dem Tab, den du auswählst.
+
+![Tabs in der Titelleistenzeile mit ihren Programmsymbolen](../../brand/native-tab-icon.png)
+
 | Um … | Verwende |
 | --- | --- |
 | Ein Fenster / einen Tab öffnen | ⌘N / ⌘T |
 | Vorheriger / nächster Tab | ⇧⌘[ / ⇧⌘] |
+| Tab 1–8 / letzten Tab zeigen | ⌘1–⌘8 / ⌘9 |
 | Den aktuellen Tab umbenennen | Doppelklick auf den Tabtitel oder Rechtsklick ▸ Tab umbenennen… |
 | Den Bereich nach rechts / unten teilen | ⌘D / ⇧⌘D |
 | Den Fokus zwischen Bereichen bewegen | ⌥⌘ + Pfeiltaste |
@@ -115,8 +126,10 @@ gesammelt.
 - Benenne einen Tab direkt in seinem Titel um: per Doppelklick oder mit „Tab umbenennen…“ aus seinem Kontextmenü.
   Return speichert, Esc bricht ab, und ein leerer Name stellt den automatischen Titel wieder her. Eigene Namen
   überstehen Shell-Ausgaben und das Wiederherstellen von Sitzungen. Die Kontextmenüs von Tab und Terminal bieten auch
-  „Neuer Tab“, und die Taste **+** in der Symbolleiste öffnet einen Tab, ob die Tableiste sichtbar ist oder nicht;
-  die Tableiste hat kein eigenes **+**.
+  „Neuer Tab“, und die Taste **+** in der Symbolleiste öffnet ebenfalls einen;
+  die Tabzeile selbst hat kein eigenes **+**.
+- Tabs gehören zu ihrem Fenster: Es gibt kein Tableiste einblenden, Alle Fenster zusammenführen oder Tab in neues Fenster
+  bewegen, und ein Tab lässt sich noch nicht in ein eigenes Fenster herausziehen (#451).
 - **Bereich vergrößern** ist vorübergehend: Nichts wird geschlossen, kein Prozess gestört.
 - **Geschlossenen Bereich wieder öffnen** stellt Position, Größe und Arbeitsverzeichnis des Bereichs wieder her – nicht
   das Programm, das darin lief.
@@ -166,7 +179,9 @@ gesammelt.
   ändern nie seine Größe: Die sichtbaren Zeilen und Spalten passen sich ihm an, und was von einer Zelle übrig bleibt,
   erscheint als Hintergrund unter der letzten Zeile.
 - **Thema.** Drei eingebaute Themen, `corta`, `solarized` und `mono`, jeweils mit heller und dunkler Variante;
-  `appearance = auto` folgt macOS beim Umschalten. Über **Darstellung ▸ Themeneditor…** oder in der
+  `appearance = auto` folgt macOS beim Umschalten. Heller und dunkler Modus wählen ihr Thema getrennt unter
+  Einstellungen → Themen – ein helles Solarized neben einem dunklen Corta ist `theme = light:solarized,dark:corta`.
+  Ein Wechsel blendet das Fenster sanft in seine neuen Farben über. Über **Darstellung ▸ Themeneditor…** oder in der
   Konfigurationsdatei kannst du ein eigenes Thema definieren oder von einem erben und ein paar Farben ändern
   ([Themes](../../CONFIGURATION.md#4-themes)).
 - **Unicode.** Chinesischer, japanischer und koreanischer Text belegt zwei Spalten und richtet sich mit allem anderen aus;
@@ -209,7 +224,8 @@ Einstellungen ▸ Tastatur & Maus ▸ Eingabequellenanzeige wählt **Automatisch
 oder **Aus**. Der Standard zeigt die Anzeige nur bei Nutzern mit einer aktivierten nicht-lateinischen Tastaturbelegung
 oder einem IME; rein lateinische Setups bleiben aufgeräumt. Beim Zurückschalten auf eine lateinische Belegung bleibt ein
 dezentes `A` auf blassem Hintergrund – grau in der Symbolleiste, in der eigenen Textfarbe des Themas neben dem Prompt.
-Nicht-lateinische Belegungen und eingebaute IME-Modi verwenden einen sanften Indigoton; unbekannte IME-Modi grau. Neben
+Neben dem Prompt verwenden nicht-lateinische Belegungen und eingebaute IME-Modi einen sanften Indigoton; in der
+Symbolleiste ist jede Eingabequelle grau, das Zeichen selbst unterscheidet sie. Neben
 dem Prompt folgen die Farben der Helligkeit des Terminalthemas statt der von macOS. In der Symbolleiste bleibt das
 Kennzeichen, während ein Programm läuft – Claude Code, ein Editor –, da es keine Ausgabe verdeckt. Am rechten Rand der
 Befehlszeile blendet die Shell-Integration es im Modus **Automatisch** während der Befehlsausführung aus. **Immer** kann
@@ -230,7 +246,7 @@ Kindprogramm scrollen. Farben für direkte Eingabe und IME akzeptieren Hex-Werte
 
 ### Optionaler lokaler Systemstatus
 
-Öffne Einstellungen (⌘,) → Terminal, aktiviere die untere Statusleiste und wähle die Messwerte, die du sehen willst:
+Öffne Einstellungen (⌘,) → Terminal, aktiviere unter Untere Statusleiste die Option Systemstatus anzeigen und wähle die Messwerte, die du sehen willst:
 CPU-Auslastung, Systemlast, Speichernutzung, Netzwerkraten, freier Speicherplatz und Wärmezustand. Sie ist standardmäßig
 aus; jeder Messwert hat einen eigenen Schalter. Klicke auf die Leiste, um Namen, macOS-Version, Chip, Kernanzahl und
 Gesamtspeicher des lokalen Hosts zu sehen. Die Leiste zeigt auch in einem SSH-Bereich „Lokal“; sie überwacht keinen
@@ -248,7 +264,8 @@ Namen und Genauigkeit stehen im Tooltip, im Bedienungshilfen-Wert und im Popover
 
 ### Themen erstellen und bearbeiten
 
-Einstellungen → Erscheinungsbild → Thema erstellen öffnet einen grafischen Editor. Benenne deine Kopie, wechsle zwischen
+Einstellungen → Themen → Neu, neben Heller Modus oder Dunkler Modus, öffnet einen grafischen Editor; was du sicherst,
+wird das Thema dieses Modus. Benenne deine Kopie, wechsle zwischen
 dunkler und heller Variante und ändere Farben mit Farbwählern oder HEX-Werten. Die Vorschau aktualisiert sich, ohne die
 Terminalfenster zu ändern. „Thema speichern“ aktiviert es und speichert es dauerhaft; „Abbrechen“ behält dein bisheriges
 Thema. Eigene Themen bieten „Thema bearbeiten“. „Quellfarben wiederherstellen“ setzt die aktuelle Variante zurück. Du kannst
@@ -310,7 +327,9 @@ oder, bei einer Verbindung, **Neu verbinden**; der Fehlertext des Systems steht 
   unten, solange der Cursor oder der aktuelle Treffer darunter läge; in einer schmalen Teilung wird sie schmaler, statt
   den Bereich zu verdecken. Jeder Bereich hat seine eigene Leiste.
 - **Auswählen.** Ziehen zum Auswählen, Doppelklick für ein Wort, Dreifachklick für eine Zeile. Eine fertige Auswahl wird
-  sofort kopiert (`copy-on-select`); ⌘C kopiert ebenfalls. In einem Programm, das die Maus verwendet – `vim`, `htop` –,
+  sofort kopiert (`copy-on-select`); ⌘C kopiert ebenfalls. Eine Kopie bestätigt ein Lichtband, das einmal
+  über den kopierten Text gleitet (ein einzelnes sanftes Aufleuchten bei Bewegung reduzieren), oder ein Hinweis, wenn der Text
+  aus dem Blick gescrollt ist. In einem Programm, das die Maus verwendet – `vim`, `htop` –,
   halte ⌥ beim Beginn des Ziehens gedrückt, um trotzdem Text auszuwählen (`mouse-override-modifier`).
 - **Einfügen.** ⌘V. Eingefügter Text wird als Einfügung markiert (Bracketed Paste), sodass eine Shell, die das unterstützt –
   zsh, fish, bash 5.1 oder neuer –, einen eingefügten Befehl einsetzt, ohne ihn auszuführen, bis du Return drückst. Hat
@@ -756,7 +775,7 @@ haben in Corta keinen eigenen Adapter für den Aufgabenstatus. Allgemeine Protok
 stehen jedem Programm offen; eine Prozesserkennung ist keine vollständige Agent-Integration. Siehe
 [Umfang der Kompatibilität und Grenzen der Prüfung](../../CONFORMANCE.md#cli-signal-compatibility) (Englisch).
 
-Standardmäßig unterscheiden Agent-Bereiche auf ihrem nativen Tab In Arbeit (Akzentfarbe), Wartet auf dich (orange), Fertig
+Standardmäßig unterscheiden Agent-Bereiche auf ihrem Tab In Arbeit (Akzentfarbe), Wartet auf dich (orange), Fertig
 (grün), Fehlgeschlagen (rot), Untätig (grau) und Status unbekannt (hohler grauer Punkt). Untätig heißt, dass kein laufender
 Durchgang gemeldet ist – auch vor Beginn oder nach dem Ende der Arbeit; nur ein ausdrückliches `done` bedeutet Abschluss. Ein
 Fortschrittsring folgt Meldungen über OSC 7501 oder OSC 9;4. Das Dock zählt wartende Bereiche und zeigt den Gesamtfortschritt.

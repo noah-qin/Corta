@@ -98,10 +98,21 @@ reunidos em
 
 ## Janelas, abas e painéis
 
+As abas ficam na fileira da barra de título, ao lado dos botões de fechar, minimizar e zoom da janela. Cada uma mostra o
+programa que o painel em foco executa — um bloco escuro de prompt para um shell, as cores do próprio programa nos demais
+casos — e depois o nome e o diretório, alinhados à esquerda. Uma aba com painéis divididos empilha os ícones dos outros
+painéis atrás do da frente, levemente girados; clicar em um painel traz o programa dele para a frente. Passe o ponteiro
+sobre uma aba para ver o botão de fechar, arraste-a para reordenar, clique duas vezes para renomear e use o clique direito
+para Nova aba, Renomear aba…, Fechar aba e Fechar outras abas. Quando há mais abas do que cabem, a fileira rola para o
+lado — deslize sobre ela ou gire a roda do mouse em cima — e acompanha a aba que você seleciona.
+
+![Abas na fileira da barra de título com seus ícones de programa](../../brand/native-tab-icon.png)
+
 | Para… | Use |
 | --- | --- |
 | Abrir uma janela / uma aba | ⌘N / ⌘T |
 | Aba anterior / próxima | ⇧⌘[ / ⇧⌘] |
+| Mostrar a aba 1–8 / a última | ⌘1–⌘8 / ⌘9 |
 | Renomear a aba atual | Clique duas vezes no título da aba, ou clique com o botão direito ▸ Renomear aba… |
 | Dividir o painel à direita / para baixo | ⌘D / ⇧⌘D |
 | Mover o foco entre painéis | ⌥⌘ + tecla de seta |
@@ -114,7 +125,9 @@ reunidos em
 - Renomeie uma aba direto no título: clique duas vezes, ou escolha Renomear aba… no menu de contexto dela. Return salva,
   Esc cancela, e um nome vazio restaura o título automático. Nomes personalizados sobrevivem à saída do shell e à
   restauração de sessões. Os menus de contexto da aba e do terminal também oferecem Nova aba, e o botão **+** da barra de
-  ferramentas abre uma, com ou sem a barra de abas visível; a barra de abas não tem **+** próprio.
+  ferramentas também abre uma; a fileira de abas não tem **+** próprio.
+- As abas pertencem à sua janela: não há Mostrar barra de abas, Juntar todas as janelas nem Mover aba para nova janela,
+  e uma aba ainda não pode ser arrastada para fora como janela própria (#451).
 - **Ampliar painel** é temporário: nada é fechado e nenhum processo é perturbado.
 - **Reabrir painel fechado** restaura o lugar, o tamanho e o diretório de trabalho do painel — não o programa que rodava nele.
 - Fechar um painel com um comando ainda em execução pergunta antes (`confirm-close`).
@@ -159,7 +172,9 @@ reunidos em
   atual. O zoom nunca altera o arquivo de configuração. Mudanças de fonte nunca movem nem redimensionam a janela: as linhas
   e colunas visíveis se reajustam a ela, e o que sobra de uma célula aparece como fundo abaixo da última linha.
 - **Tema.** Três temas embutidos, `corta`, `solarized` e `mono`, cada um com variante clara e escura; `appearance = auto`
-  acompanha o macOS quando ele muda. Você pode definir seu próprio tema por **Visualização ▸ Editor de temas…** ou no
+  acompanha o macOS quando ele muda. Os modos claro e escuro escolhem seu tema separadamente em Ajustes → Temas — um
+  Solarized claro ao lado de um Corta escuro é `theme = light:solarized,dark:corta`. Uma troca funde a janela nas novas
+  cores. Você pode definir seu próprio tema por **Visualização ▸ Editor de temas…** ou no
   arquivo de configuração, ou herdar de um e mudar algumas cores ([Themes](../../CONFIGURATION.md#4-themes)).
 - **Unicode.** Texto chinês, japonês e coreano ocupa duas colunas e se alinha com todo o resto; emoji, marcas combinantes,
   bandeiras e sequências de emoji são um agrupamento cada. Caracteres que faltam na fonte vêm das fontes de substituição do
@@ -199,8 +214,8 @@ modo a partir do texto digitado e nunca muda a fonte de entrada.
 Ajustes ▸ Teclado e mouse ▸ Indicador de fonte de entrada escolhe **Automático** (padrão), **Sempre no painel ativo** ou
 **Desativado**. O padrão só ativa o indicador para quem tem um layout de teclado não latino ou um IME ativados;
 configurações só latinas continuam limpas. Voltar para um layout latino deixa um `A` discreto num fundo esmaecido — cinza
-na barra de ferramentas, na cor de texto do próprio tema ao lado do prompt. Layouts não latinos e modos de IME embutidos
-usam um tom índigo suave; modos de IME desconhecidos, cinza. Ao lado do prompt, as cores seguem o claro ou escuro do tema
+na barra de ferramentas, na cor de texto do próprio tema ao lado do prompt. Ao lado do prompt, layouts não latinos e modos
+de IME embutidos usam um tom índigo suave; na barra de ferramentas toda fonte é cinza, e o próprio glifo as distingue. Ao lado do prompt, as cores seguem o claro ou escuro do tema
 do terminal em vez do macOS. Na barra de ferramentas, a insígnia fica enquanto um programa roda — Claude Code, um editor —,
 já que não cobre nenhuma saída. Na borda direita da linha de comando, a integração com o shell a esconde durante a execução
 de comandos no modo **Automático**. **Sempre** pode mantê-la durante a saída dos comandos. Os dois modos de prompt a
@@ -220,7 +235,7 @@ filho rolar. As cores de entrada direta e de IME aceitam valores hexadecimais; e
 
 ### Status do sistema local (opcional)
 
-Abra Ajustes (⌘,) → Terminal, ative a barra de status inferior e escolha as métricas que quer ver: uso de CPU, carga do
+Abra Ajustes (⌘,) → Terminal, ative Mostrar estado do sistema em Barra de status inferior e escolha as métricas que quer ver: uso de CPU, carga do
 sistema, uso de memória, taxas de rede, espaço livre em disco e estado térmico. Ela vem desativada; cada métrica tem seu
 próprio botão. Clique na barra para ver o nome do host local, a versão do macOS, o chip, o número de núcleos e a memória
 total. A barra diz Local mesmo num painel SSH; ela não monitora um servidor remoto. Em janelas estreitas, clique para ver
@@ -237,7 +252,8 @@ na dica, no valor de acessibilidade e no popover de detalhes do host.
 
 ### Criar e editar temas
 
-Ajustes → Aparência → Criar tema abre um editor gráfico. Dê um nome à sua cópia, alterne entre as variantes escura e clara
+Ajustes → Temas → Novo, ao lado de Modo claro ou Modo escuro, abre um editor gráfico; o que você salvar vira o tema
+desse modo. Dê um nome à sua cópia, alterne entre as variantes escura e clara
 e mude as cores com seletores de cor ou valores HEX. A pré-visualização se atualiza sem mudar as janelas do terminal.
 Salvar tema o ativa e o guarda; Cancelar mantém o tema anterior. Temas personalizados oferecem Editar tema. Restaurar cores
 de origem redefine a variante atual. Você ainda pode editar o mesmo arquivo de configuração à mão. Se esse tema
@@ -297,7 +313,9 @@ ou, para uma conexão, **Reconectar**; o texto de erro do sistema fica em **Deta
   o cursor ou a ocorrência atual ficariam embaixo dela; numa divisão estreita, ela se estreita em vez de cobrir o painel.
   Cada painel tem sua própria barra.
 - **Seleção.** Arraste para selecionar, clique duas vezes para uma palavra, três vezes para uma linha. Uma seleção
-  concluída é copiada na hora (`copy-on-select`); ⌘C também copia. Dentro de um programa que usa o mouse — `vim`, `htop` —,
+  concluída é copiada na hora (`copy-on-select`); ⌘C também copia. Uma cópia é confirmada por uma faixa de luz que
+  percorre uma vez o texto copiado (um único brilho suave com Reduzir movimento), ou por um aviso se o texto saiu da
+  vista. Dentro de um programa que usa o mouse — `vim`, `htop` —,
   segure ⌥ ao começar a arrastar para selecionar texto mesmo assim (`mouse-override-modifier`).
 - **Colar.** ⌘V. O texto colado é marcado como colagem (bracketed paste), então um shell que entende isso — zsh, fish,
   bash 5.1 ou posterior — insere um comando colado sem executá-lo até você pressionar Return. Quando o programa não ativou o
@@ -727,7 +745,7 @@ no Corta. Os protocolos genéricos de notificação e progresso continuam dispon
 processo não é uma integração completa de agente. Veja o
 [escopo de compatibilidade e os limites da verificação](../../CONFORMANCE.md#cli-signal-compatibility) (inglês).
 
-Por padrão, os painéis de agentes distinguem na aba nativa Trabalhando (cor de destaque), Aguardando sua resposta (laranja),
+Por padrão, os painéis de agentes distinguem na aba Trabalhando (cor de destaque), Aguardando sua resposta (laranja),
 Concluído (verde), Falhou (vermelho), Ocioso (cinza) e Estado desconhecido (um ponto cinza vazado). Ocioso quer dizer que
 nenhuma rodada ativa foi informada, inclusive antes de o trabalho começar ou depois que ele para; só um `done` explícito quer
 dizer conclusão. Um anel de progresso segue os relatórios OSC 7501 ou OSC 9;4. O Dock conta os painéis aguardando e mostra o
