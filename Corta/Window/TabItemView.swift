@@ -291,7 +291,12 @@ final class TabItemView: NSView, NSTextFieldDelegate {
             strip.rename(tab: id, to: value.isEmpty ? nil : String(value.prefix(200)))
         }
         // Typing goes back to the terminal, unless a click put it elsewhere.
-        if let window, window.firstResponder == nil || window.firstResponder === window {
+        // After the turn: Escape ends the edit inside `makeFirstResponder(nil)`,
+        // while the field editor is still first responder, and the window
+        // takes it only afterwards — checked then, the keyboard was lost
+        // and ⇧⌘[ and Rename Tab… found no target.
+        DispatchQueue.main.async { [weak window] in
+            guard let window, window.firstResponder == nil || window.firstResponder === window else { return }
             window.makeFirstResponder(window.terminalSplit?.focusedPane?.terminalView)
         }
     }

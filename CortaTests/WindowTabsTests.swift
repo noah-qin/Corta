@@ -245,6 +245,26 @@ struct WindowTabsTests {
         #expect(first.customTitle == "Pending")
     }
 
+    /// Escape ends the edit inside `makeFirstResponder(nil)`; the keyboard
+    /// must still come back to the terminal, or ⇧⌘[ and Rename Tab… go nowhere.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func escapingARenameGivesTheKeyboardBackToTheTerminal() async throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        let window = try #require(controller.window)
+        controller.beginTabRename()
+        let view = try #require(controller.tabStrip.tabView(at: 0))
+        let field = try #require(editor(in: view) as? NSTextField)
+        let text = try #require(field.currentEditor() as? NSTextView)
+        _ = (view as? NSTextFieldDelegate)?.control?(field, textView: text,
+                                                     doCommandBy: #selector(NSResponder.cancelOperation(_:)))
+        #expect(editor(in: view) == nil)
+        // The hand-back runs after the turn, from the main queue.
+        try await Task.sleep(for: .milliseconds(50))
+        let terminal = controller.selectedTab?.split.focusedPane?.terminalView
+        #expect(terminal != nil && window.firstResponder === terminal)
+    }
+
     private func editor(in view: NSView) -> NSView? {
         view.subviews.first { $0.accessibilityIdentifier() == "tab-title-editor" }
     }
