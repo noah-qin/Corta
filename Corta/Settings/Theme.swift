@@ -70,6 +70,11 @@ nonisolated extension Theme.Variant {
 }
 
 nonisolated extension Theme.Variant {
+    /// A dark background, by its luminance.
+    var isDarkBackground: Bool {
+        0.2126 * background.x + 0.7152 * background.y + 0.0722 * background.z < 0.5
+    }
+
     /// Part of the way to `other`, channel by channel: a theme switch blends
     /// through these rather than jumping.
     func mixed(with other: Theme.Variant, by amount: Float) -> Theme.Variant {

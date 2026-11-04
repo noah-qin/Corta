@@ -361,14 +361,21 @@ extension AppDelegate {
     /// Saved states as windows, each its tabs in saved order (D30): one
     /// window per tab group, in the order its first tab was saved; a state
     /// with no group is a window of its own.
+    ///
+    /// A group is its identity and its frame together. Arrangements saved
+    /// with macOS's own tabs gave every group the same identity — the
+    /// windows' shared `tabbingIdentifier` — and only the frame, which
+    /// every tab of one window shares, tells two of those windows apart.
     static func restoredWindows(_ states: [WindowState]) -> [[WindowState]] {
         var windows: [[WindowState]] = []
         var groupIndex: [String: Int] = [:]
         for state in states {
-            if let group = state.tabGroupID, let index = groupIndex[group] {
+            let frame = state.frame
+            let key = state.tabGroupID.map { "\($0)|\(frame.x),\(frame.y),\(frame.width),\(frame.height)" }
+            if let key, let index = groupIndex[key] {
                 windows[index].append(state)
             } else {
-                if let group = state.tabGroupID { groupIndex[group] = windows.count }
+                if let key { groupIndex[key] = windows.count }
                 windows.append([state])
             }
         }

@@ -260,6 +260,8 @@ final class CommandHistoryModel {
     func find(id: Int) {
         guard let pane, pane.shell.focusCommand(id: id) else { return }
         onDismiss?()
+        // Its tab first (D30): the keyboard must not go to a hidden pane.
+        if let tab = pane.splitController?.tab { tab.controller?.selectTab(tab) }
         pane.view.window?.makeKeyAndOrderFront(nil)
         pane.view.window?.makeFirstResponder(pane.terminalView)
     }

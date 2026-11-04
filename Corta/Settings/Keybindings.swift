@@ -383,10 +383,6 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     /// The config-file key this command's binding is written under.
     var configurationKey: String { "bind.\(rawValue)" }
 
-    /// The menu item tag that tells this command apart from others sharing
-    /// its action. Only the Find family needs one: four menu items send
-    /// `performFindPanelAction:` and are distinguished by tag, so rebinding
-    /// "Find…" must not also rebind "Find Next".
     /// The tab a "select tab" command shows, counted from 1; the last tab's
     /// command is 9, as ⌘9 is in a browser.
     var tabNumber: Int? {
@@ -410,6 +406,10 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         .selectTab7, .selectTab8, .selectLastTab,
     ]
 
+    /// The menu item tag that tells this command apart from others sharing
+    /// its action. Only the Find family needs one: four menu items send
+    /// `performFindPanelAction:` and are distinguished by tag, so rebinding
+    /// "Find…" must not also rebind "Find Next".
     var menuTag: Int? {
         switch self {
         case .find: return 1

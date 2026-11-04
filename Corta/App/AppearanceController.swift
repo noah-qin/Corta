@@ -62,8 +62,9 @@ final class AppearanceController: NSObject {
         }
     }
 
-    /// Posted for each step of a palette transition: colours only, so
-    /// panes redraw without re-telling their sessions about the theme.
+    /// Posted for each step of a palette transition. Panes hand the step's
+    /// default colours to their sessions, which draw the canvas with them;
+    /// light or dark (`sessionIsDark`) holds until the blend lands.
     static let paletteDidStep = Notification.Name("dev.noahqin.Corta.paletteDidStep")
 
     /// The variant the windows are headed for, so a change can blend to the next.
@@ -77,6 +78,11 @@ final class AppearanceController: NSObject {
     }
     private var blend: Blend?
     private var blendTimer: Timer?
+    /// Light or dark as the sessions are told it (the mode 2031 report).
+    /// It turns once the canvas has arrived, not as a blend starts: a
+    /// program that re-reads the background (OSC 11) on the report then
+    /// reads the new theme's, not the first step of the blend.
+    private(set) var sessionIsDark: Bool?
     static let blendDuration: CFTimeInterval = 0.2
 
     func apply() {
@@ -94,10 +100,12 @@ final class AppearanceController: NSObject {
         if let previous, previous != variant, NSApp.windows.contains(where: \.isVisible) {
             // Before the appearance flips, so the fade starts from the old chrome.
             crossfadeWindows()
+            if sessionIsDark == nil { sessionIsDark = previous.isDarkBackground }
             beginBlend(to: variant)
         } else if previous != variant || blend == nil {
             endBlend()
             TerminalColorPalette.apply(variant)
+            sessionIsDark = isDark
         }
         if NSApp.appearance != forced { NSApp.appearance = forced }
         NotificationCenter.default.post(name: Self.didChange, object: nil)
@@ -137,6 +145,7 @@ final class AppearanceController: NSObject {
         guard progress < 1 else {
             endBlend()
             TerminalColorPalette.apply(blend.to)
+            sessionIsDark = isDark
             NotificationCenter.default.post(name: Self.didChange, object: nil)
             return
         }

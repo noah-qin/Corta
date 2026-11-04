@@ -201,6 +201,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     var splitController: SplitViewController? { parent as? SplitViewController }
     /// Only the focused pane draws a cursor — part of the focus indicator.
     var isFocusedPane: Bool { splitController?.focusedPane === self }
+    /// The focused pane of the tab in front: the one whose own UI may take
+    /// the keyboard. A background tab's focused pane must not (D30).
+    var holdsWindowFocus: Bool { isFocusedPane && splitController?.tab?.isSelected ?? true }
 
     /// False when `setUpPane` failed: everything the window and split tree call
     /// must survive that rather than trap on an implicitly unwrapped nil.
@@ -590,6 +593,7 @@ extension ViewController {
             guard let self else { return }
             self.agents.readOutput()
             if !self.agents.visible, self.session?.takeBell() == true { self.handleBell() }
+            self.windowTitle.noteOutput()
         }
         taskNotifier.programCanDeliver = { [weak self] notice in
             guard let self, !self.didTeardown, self.frameLoop.isCurrent(generation) else { return false }
@@ -638,7 +642,7 @@ extension ViewController {
             showsSettings: false, backdrop: .dim,
             symbol: reconnect ? "bolt.horizontal.circle" : "exclamationmark.triangle",
             tint: reconnect ? .systemRed : .systemOrange,
-            takesFocus: isFocusedPane)
+            takesFocus: holdsWindowFocus)
     }
 
     private func installTerminalCallbacks(on view: TerminalView) {
@@ -771,7 +775,7 @@ extension ViewController {
                 canRetry: !reconnect, canReconnect: reconnect,
                 details: "\(error)",
                 note: L10n.text(reconnect ? "session.ended.connection.note" : "failure.retryHint"),
-                showsSettings: false, takesFocus: self.isFocusedPane)
+                showsSettings: false, takesFocus: self.holdsWindowFocus)
         }
         loop.cursorHandoffSignal = focus.handoffSignal
         loop.onPresented = { [weak self] in

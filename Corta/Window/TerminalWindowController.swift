@@ -323,9 +323,13 @@ extension TerminalWindowController {
 
     /// Redraws the strip from every tab's focused program and title, and the
     /// window title from the selected tab.
-    func refreshTabStrip() {
+    /// Output from any pane asks for this, many times a second while a
+    /// program streams: the strip's views are touched only when an item or
+    /// the selection changed, or `force` says the colours did.
+    func refreshTabStrip(force: Bool = false) {
         let items = tabs.map(TabIcon.item(for:))
         let selected = tabs.firstIndex { $0 === selectedTab } ?? 0
+        guard force || items != tabStrip.items || selected != tabStrip.selectedIndex else { return }
         tabStrip.update(items: items, selectedIndex: selected)
     }
 
@@ -352,7 +356,8 @@ extension TerminalWindowController {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.titlebarSeparatorStyle = .none
-        refreshTabStrip()
+        // The theme moved: same items, new colours.
+        refreshTabStrip(force: true)
     }
 
     private func installSecureInputIndicator() {

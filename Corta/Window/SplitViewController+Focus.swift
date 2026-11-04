@@ -126,8 +126,11 @@ extension SplitViewController {
 
     /// The tree's minimum plus the chrome; the divider constraints keep drags
     /// from crushing a pane first.
+    /// Only the tab in front sets it: the window is shared (D30), and a
+    /// background tab's tree recomputes it when it comes to the front
+    /// (`didBecomeSelectedTab`).
     func updateWindowMinSize() {
-        guard let window = view.window, let pane = panes.first else { return }
+        guard let window = view.window, let pane = panes.first, tab?.isSelected ?? true else { return }
         let treeMinimum = tree.minimumSize(
             of: tree.root, leafSize: leafMinimumSize, dividerThickness: PaneSurfaceView.gap)
         let minimum = NSSize(

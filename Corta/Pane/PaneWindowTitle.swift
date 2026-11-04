@@ -76,6 +76,9 @@ final class PaneWindowTitle {
     /// A title rebuild waiting out `processFactsInterval`; at most one, and
     /// cancelled by `stop`.
     private var trailingTitleRefresh: DispatchWorkItem?
+    /// The trailing refresh is running: what it redraws reads the facts it
+    /// just took, and must not schedule another (a 0.4 s loop per pane).
+    private var isRunningTrailingRefresh = false
     private var isShowingTransientSize = false
     private var transientSizeReset: DispatchWorkItem?
     private var isStopped = false
@@ -140,6 +143,9 @@ final class PaneWindowTitle {
     /// Compact chrome uses the same bounded process/directory cache as the
     /// full title. The complete OSC title remains in the window and tooltip.
     var tabLabel: ProgramTabLabel {
+        // No trailing refresh from here: the strip reads every label, and the
+        // pass a trailing refresh redraws would schedule the next, pane after
+        // pane. Output schedules it instead (`noteOutput`).
         if let session { refreshProcessFactsIfStale(session, scheduleTrailing: false) }
         let process = Self.sanitizedTitleComponent(cachedProcessName) ?? "Corta"
         let program = ProgramIcon.identify(process, entryPoint: cachedEntryPoint)
@@ -287,15 +293,27 @@ final class PaneWindowTitle {
     /// back the prompt within the interval is followed by nothing: without
     /// this, `kitten icat` left "— kitten" in the title until the next output.
     private func scheduleTrailingTitleRefresh(after delay: CFTimeInterval) {
-        guard trailingTitleRefresh == nil, !isStopped else { return }
+        guard trailingTitleRefresh == nil, !isStopped, !isRunningTrailingRefresh else { return }
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             trailingTitleRefresh = nil
             guard !isStopped else { return }
-            if canApplyDeferred() { apply() } else { refreshBackgroundPresentation() }
+            isRunningTrailingRefresh = true
+            defer { isRunningTrailingRefresh = false }
+            // The header and the strip as well as the window title: `apply`
+            // alone left the focused pane's header on the old program.
+            if canApplyDeferred() { apply() }
+            refreshBackgroundPresentation()
         }
         trailingTitleRefresh = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    /// Output arrived, from any pane, shown or not: one rebuild follows once
+    /// the interval has passed, so a program that quits inside it does not
+    /// leave its icon and name on a background tab or an unfocused pane.
+    func noteOutput() {
+        scheduleTrailingTitleRefresh(after: Self.processFactsInterval)
     }
 
     /// On focus and command boundaries, where waiting out the interval would

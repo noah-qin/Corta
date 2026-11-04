@@ -102,6 +102,13 @@ import Testing
         #expect(half.ansi.count == 16)
     }
 
+    /// What programs were told before a switch lands (mode 2031).
+    @Test(arguments: [Theme.corta, Theme.mono, Theme.solarized])
+    func variantsKnowTheirDarkness(_ theme: Theme) {
+        #expect(theme.dark.isDarkBackground)
+        #expect(!theme.light.isDarkBackground)
+    }
+
     /// Every built-in hue reads on its background; Solarized is kept as
     /// published, so it is not held to this.
     @Test(arguments: [Theme.corta, Theme.mono])

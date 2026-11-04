@@ -227,9 +227,11 @@ struct WindowSetupStagingTests {
 /// (D30). The grouping is a function of the saved states alone.
 @MainActor
 struct RestoredTabOrderTests {
-    private func state(_ group: String?, index: Int?, selected: Bool = false, id: String) -> WindowState {
+    private func state(
+        _ group: String?, index: Int?, selected: Bool = false, id: String, x: CGFloat = 0
+    ) -> WindowState {
         var state = WindowState(
-            frame: WindowState.Frame(NSRect(x: 0, y: 0, width: 400, height: 300)),
+            frame: WindowState.Frame(NSRect(x: x, y: 0, width: 400, height: 300)),
             layout: .pane(directory: nil), tabGroupID: group, tabIndex: index,
             isSelectedTab: selected)
         state.id = id
@@ -246,6 +248,19 @@ struct RestoredTabOrderTests {
         ])
         #expect(windows.map { $0.map(\.id) } == [["a", "b", "c"], ["alone"]])
         #expect(windows.first?.firstIndex(where: \.isSelectedTab) == 2)
+    }
+
+    /// Saved with macOS's own tabs, every group had the windows' shared
+    /// tabbing identifier; two tabbed windows must not come back as one.
+    @Test("two windows saved under one shared identity come back as two")
+    func legacyGroupsSplitByFrame() {
+        let windows = AppDelegate.restoredWindows([
+            state("Corta", index: 0, id: "a1", x: 0),
+            state("Corta", index: 0, id: "b1", x: 40),
+            state("Corta", index: 1, id: "a2", x: 0),
+            state("Corta", index: 1, selected: true, id: "b2", x: 40),
+        ])
+        #expect(windows.map { $0.map(\.id) } == [["a1", "a2"], ["b1", "b2"]])
     }
 }
 

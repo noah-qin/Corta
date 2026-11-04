@@ -28,6 +28,9 @@ extension SplitViewController {
     /// layout is never refused; its dividers are clamped instead.
     private func userSplit(_ orientation: SplitOrientation) {
         splitTransition.finish()
+        // Measured unzoomed: the split unzooms first, and a zoomed pane's
+        // full-window size passed panes that then came out crushed.
+        unzoomPane()
         view.layoutSubtreeIfNeeded()
         guard let focusedPane else { return }
         let bounds = focusedPane.view.bounds

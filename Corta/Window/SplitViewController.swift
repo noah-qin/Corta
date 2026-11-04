@@ -209,6 +209,11 @@ final class SplitViewController: NSViewController {
     /// The tab came to the front: its panes draw again and its focused pane
     /// takes the toolbar's input-source slot.
     func didBecomeSelectedTab() {
+        // The window's chrome as it is now: a change while this tab was in
+        // the background was absorbed by the tab in front, not owed again.
+        if let window = view.window, didSetUpWindow {
+            lastChromeHeight = window.frame.height - window.contentLayoutRect.height
+        }
         updateWindowMinSize()
         view.layoutSubtreeIfNeeded()
         for pane in panes {

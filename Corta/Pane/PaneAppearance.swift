@@ -130,12 +130,13 @@ final class PaneAppearance: NSObject {
 
     /// Also each step of a switch's blend. The session's defaults draw the
     /// canvas, so they follow the palette on screen, not the theme it is
-    /// headed for.
+    /// headed for; light or dark, which programs are told, turns only once
+    /// the blend has landed (`AppearanceController.sessionIsDark`).
     @objc func paletteStepped() {
         guard let host else { return }
         let variant = TerminalColorPalette.activeVariant
-        // OSC 10/11/12 answers follow the live variant.
-        session?.updateTheme(colors: variant.dynamicColors, isDark: AppearanceController.shared.isDark)
+        let controller = AppearanceController.shared
+        session?.updateTheme(colors: variant.dynamicColors, isDark: controller.sessionIsDark ?? controller.isDark)
         // Only the defaults: an OSC 4'd index is terminal state, and a
         // get-then-set would race the reader thread.
         session?.updateIndexedPaletteDefaults(to: variant.indexedPaletteDefaults.defaults)
