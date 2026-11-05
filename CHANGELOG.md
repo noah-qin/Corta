@@ -99,6 +99,14 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- A new shell prompt now ends a pane's reported Working and Waiting states, also in
+  the Agents list, the Dock count and ⌥⌘J's queue, even when the shell sent no
+  command-finished mark. Done and Failed stay.
+- OSC 7501 follows the Program Status Protocol in more cases: an unknown `kind` no
+  longer drops the report, paths such as `task/1` are accepted and `clear` removes
+  everything beneath them, a new subtask past the limit replaces the stalest instead
+  of being refused, and spaces around fields are ignored. The differences that remain
+  are listed in `docs/CONFORMANCE.md`.
 - File drops on terminal panes and SFTP listings negotiate by type without
   triggering lazy downloads while hovering. Promised files are received
   asynchronously, with a deadline and visible failures. Pane drops are bound
