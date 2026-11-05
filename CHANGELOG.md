@@ -16,6 +16,17 @@ Versioning for compatibility changes.
   the documentation and the changelog in all nine languages the
   repository is translated into.
 
+### Fixed
+
+- Hovering a drag over a pane or an SFTP listing no longer asks its source for
+  the file, which could download it and hang the app. Files only another app can
+  write, such as from Photos, Mail or an undownloaded iCloud item, can now be
+  dropped: they are received after you let go, with a 120-second limit, and if
+  the pane has closed or changed program by then Corta shows their paths instead
+  of inserting them. Copies live in `$TMPDIR/Corta-Dropped`, removed by a later
+  launch or as soon as an SFTP upload of them succeeds. Dragging a row out of the
+  SFTP browser no longer needs the main thread to answer.
+
 ### Removed
 
 - macOS's own window tabs: Show Tab Bar and the tab overview are gone with

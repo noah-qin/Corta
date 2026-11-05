@@ -251,6 +251,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private var stallTimer: Timer?
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        DispatchQueue.global(qos: .utility).async { FileDropStorage.removeStale() }
         if let stall = DiagnosticsEnvironment.mainStall() {
             let timer = Timer(timeInterval: stall.periodMilliseconds / 1000, repeats: true) { _ in
                 Thread.sleep(forTimeInterval: stall.milliseconds / 1000)

@@ -99,6 +99,27 @@ names an Intel one.
 
 ---
 
+## File drops
+
+### A drop waits, reports failure, or inserts no paths
+
+Corta only checks types while you hover. Letting go requests the files; cloud
+files and promises from apps such as Photos or Mail may take time. After 120
+seconds Corta stops waiting and warns you, and only the files that arrived are
+used. Drop the missing ones again. No drop presses Return for you.
+
+If the pane closed or its foreground program changed while the files were on
+their way, Corta inserts nothing and shows their paths, with Show in Finder.
+Corta's own SFTP rows are deliberately refused by panes; download a file to
+Finder first.
+
+### Where received copies are
+
+Promised files are copied to `Corta-Dropped` in your temporary folder
+(`$TMPDIR`). A later launch removes the ones whose Corta has quit, and an SFTP
+upload removes its copy once it succeeds. Keep a file somewhere else if you need
+it after that.
+
 ## Starting
 
 ### The window opens blank, or opens and closes

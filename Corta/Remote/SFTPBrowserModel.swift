@@ -287,6 +287,13 @@ final class SFTPBrowserModel {
         onTitleChange?(title)
     }
 
+    var fileDropRequests: [UUID: FileDropRequest] = [:]
+    var receivedDropDirectories: [URL: Set<URL>] = [:]
+    /// Why a drop uploaded fewer files than were dragged. Not `listingError`:
+    /// the reload after that upload clears those before anyone reads them. It
+    /// lasts until the next drop, another directory or the connection's end.
+    var receptionNotice: String?
+
     // MARK: - Drags to Finder
 
     /// Staging folders made for drags to Finder; the controller removes

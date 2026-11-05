@@ -37,8 +37,8 @@ extension PaneCommands {
             controller.selectAdjacentTab(offset: step)
             return true
         }
-        view.onDropPaths = { [weak self] paths in
-            self?.insertDroppedPaths(paths)
+        view.onFileDrop = { [weak self] pasteboard in
+            self?.receiveFileDrop(pasteboard) ?? false
         }
         view.onLookUp = { [weak self] point in
             self?.wordForLookUp(at: point)
@@ -51,12 +51,58 @@ extension PaneCommands {
         }
     }
 
-    /// Dropped paths arrive at the prompt shell-quoted, as if typed.
-    private func insertDroppedPaths(_ paths: [String]) {
-        let text = Self.quotedDropText(paths)
-        guard !text.isEmpty else { return }
-        // No trailing space: the user may keep typing the path.
-        insertAsPaste(text)
+    /// Bound to the pane's input target as the drop lands. The files may take
+    /// a long time to arrive; if the target is gone by then, the paths go to the
+    /// user, never to whatever now reads this terminal's input.
+    private func receiveFileDrop(_ pasteboard: NSPasteboard) -> Bool {
+        guard let context = dropInputContext else {
+            host?.terminalView?.showToast(L10n.text("drop.failed"), kind: .warning)
+            return false
+        }
+        let request = FileDropRequest.start(pasteboard) { [weak self] result in
+            guard let self else {
+                FileDropUndelivered.present(result, in: nil)
+                return
+            }
+            self.completeFileDrop(result, context: context)
+        }
+        guard request != nil else {
+            host?.terminalView?.showToast(L10n.text("drop.failed"), kind: .warning)
+            return false
+        }
+        return true
+    }
+
+    func completeFileDrop(_ result: FileDropRequest.Result, context: FileDropInputContext) {
+        let window = host?.view.window
+        guard context == dropInputContext else {
+            FileDropUndelivered.present(result, in: window)
+            return
+        }
+        if let notice = result.notice { host?.terminalView?.showToast(notice, kind: .warning) }
+        let text = Self.quotedDropText(result.urls.map(\.path))
+        guard !text.isEmpty else {
+            FileDropStorage.remove(result.directory)
+            return
+        }
+        insertAsPaste(text, validate: { [weak self] in
+            context == self?.dropInputContext
+        }, onDiscard: { [weak self] in
+            // Still the same target: the paste warning was declined, so nothing
+            // named these copies. Otherwise the target left during the sheet.
+            if context == self?.dropInputContext {
+                FileDropStorage.remove(result.directory)
+            } else {
+                FileDropUndelivered.present(result, in: window)
+            }
+        })
+    }
+
+    var dropInputContext: FileDropInputContext? {
+        guard host?.didTeardown == false, let session = host?.session,
+            let group = session.pty.foregroundProcessGroup
+        else { return nil }
+        return FileDropInputContext(session: ObjectIdentifier(session), foregroundGroup: group)
     }
 
     /// One space-separated, quoted run. Each path is sanitised first (a name
@@ -101,10 +147,10 @@ extension PaneCommands {
     /// Drops and Services go down the ⌘V path (`SECURITY.md` §2.3): C0
     /// stripped, bracketed paste when asked, and the configured risk warning
     /// — service text and filenames can hold newlines or concealed scalars.
-    func insertAsPaste(_ text: String) {
-        guard let host, host.session != nil else { return }
+    func insertAsPaste(_ text: String, validate: (() -> Bool)? = nil, onDiscard: (() -> Void)? = nil) {
+        guard validate?() != false, let host, host.session != nil else { onDiscard?(); return }
         let sanitized = Paste.sanitized(text)
-        guard !sanitized.isEmpty else { return }
+        guard !sanitized.isEmpty else { onDiscard?(); return }
         guard !suppressPasteWarnings else { pasteNow(sanitized); return }
         let risks = Paste.warningRisks(
             in: text, bracketedPasteEnabled: bracketedPasteEnabled(),
@@ -124,7 +170,8 @@ extension PaneCommands {
         alert.addButton(withTitle: L10n.text("common.cancel"))
         alert.present(for: host.view.window) { [weak self] response in
             // The pane may have closed while the sheet was up.
-            guard response == .alertFirstButtonReturn, self?.host?.session != nil else { return }
+            guard response == .alertFirstButtonReturn, self?.host?.session != nil, validate?() != false
+            else { onDiscard?(); return }
             if alert.suppressionButton?.state == .on { self?.suppressPasteWarnings = true }
             self?.pasteNow(sanitized)
         }
@@ -249,4 +296,11 @@ extension PaneCommands {
     func bracketedPasteEnabled() -> Bool {
         host?.session?.isBracketedPasteEnabled ?? false
     }
+}
+
+/// A kernel foreground-group sample and object identity, never a process name.
+/// Missing samples fail closed; an unrelated new session cannot inherit a drop.
+nonisolated struct FileDropInputContext: Equatable {
+    let session: ObjectIdentifier
+    let foregroundGroup: Int32
 }

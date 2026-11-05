@@ -132,6 +132,14 @@ the mouse wheel over it — and follows the tab you select.
   window's tabs into the front one. Dragging a tab to either end of a strip
   that scrolls carries the row along with it.
 - **Zoom Pane** is temporary: nothing closes and no process is disturbed.
+- **Dropping files on a pane** inserts their quoted paths through the paste
+  channel, without pressing Return. Files another app must first write — Photos,
+  Mail, an iCloud file not yet downloaded — are asked for only when you let go,
+  and arrive as private copies in `$TMPDIR/Corta-Dropped`, removed by a later
+  launch. Corta stops waiting after 120 seconds. If the pane has closed, or
+  another program has taken it over by the time they arrive, nothing is inserted
+  and an alert lists their paths. Rows from Corta's own SFTP browser are not
+  accepted by panes.
 - **Reopen Closed Pane** restores the pane's place, size and working
   directory — not the program that was running in it.
 - Closing a pane with a command still running asks first
@@ -611,9 +619,10 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   the enclosing folder, ⌘R refreshes, ⇧⌘G (or a click on the path) types a
   path, ⇧⌘N makes a folder and ⇧⌘. shows hidden files. Click a column title
   to sort. Right-click a row for its actions; double-click a folder to open
-  it. Drop files from Finder on the listing — or on a folder row — to upload
-  them; while you drag, the listing (or the row) is outlined and says where
-  the files will go. Drag a file out to Finder to download it. Transfers are under
+  it. Drop files, or files promised by another app such as Photos or Mail, on the
+  listing — or on a folder row — to upload them; while you drag, the listing (or
+  the row) is outlined and says where the files will go. Drag a file out to
+  Finder to download it. Transfers are under
   the toolbar's arrows button, with speed, time left and Show in Finder.
 - **Editing a remote file.** **Edit** in the browser — or ⌘-clicking a
   `path:line` in a remote pane — downloads a copy and opens it in your

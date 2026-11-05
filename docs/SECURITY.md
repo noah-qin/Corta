@@ -160,6 +160,41 @@ record's row between the list's once-a-second refreshes and the click.
 Anything else is filled, to be read at the prompt and run by the user's
 Return.
 
+**File drops.** Hover negotiation inspects advertised types only, never file
+URLs or contents, so hovering asks no source to write anything. A drop starts
+exactly one representation per item (promise before file URL), through the
+public `NSFilePromiseReceiver`, with URL reads and promise readers off the main
+thread. A promise's reader runs only after its provider has written the file, so
+a reception waits for one reader per name AppKit reports once receiving has
+begun; that count is an estimate, and an absolute 120-second `SuspendingClock`
+deadline ends a reception whose provider never finishes, reports what arrived,
+and keeps late callbacks from inserting more paths. Corta's own drags, SFTP rows
+included, are refused by panes; the SFTP listing accepts only drags from outside
+Corta.
+
+As a drop lands a pane captures its session's identity and kernel foreground
+process group. Both must still match before the paths are inserted, and again
+after any paste-warning sheet; a missing sample fails closed. If the pane has
+closed or either differs, nothing is inserted and an alert lists the paths,
+cleaned of controls, with Show in Finder: a late file must not become input to
+whatever now reads the terminal. This detects a changed target; it cannot see an
+`exec` inside the same process group, or close the ordinary race between a check
+and a write to the PTY. Drops never append Return.
+
+**Retention of dropped files.** A promised file is copied to
+`$TMPDIR/Corta-Dropped/<pid>-<uuid>/files/`. The root and each directory are
+0700 with extended ACLs cleared, and received regular files 0600. Symlinks, hard
+links, special files and paths outside the directory are refused: a hard link
+shares its mode with an original elsewhere. An original file URL is never changed
+or deleted. A copy whose path went to a pane, or to the alert above, stays until a
+later launch: at launch Corta removes the directories whose owning process has
+gone, never one a running Corta owns, since the development build and the
+installed app share `$TMPDIR` (D22). A reused pid keeps a directory until a later
+launch, and the system may purge the folder sooner. An SFTP upload deletes its
+own copy once it has succeeded; a failed one stays for Retry until the browser
+closes, which removes the rest. A declined paste warning or an empty reception
+removes its directory at once.
+
 ### 2.5 Bidirectional and invisible characters
 
 Corta does not implement RTL/bidi (`DESIGN.md` §6), which removes the

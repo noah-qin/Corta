@@ -44774,6 +44774,360 @@
           }
         }
       }
+    },
+    "drop.connectionChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Verbindung hat sich beim Empfangen der Dateien geändert. Es wurde nichts hochgeladen. Lege sie erneut hier ab."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The connection changed while receiving files. Nothing was uploaded. Drop them again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La conexión cambió mientras se recibían los archivos. No se subió nada. Vuelve a soltarlos."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connexion a changé pendant la réception des fichiers. Rien n'a été envoyé. Déposez-les à nouveau."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイルの受信中に接続が変わりました。何もアップロードされていません。もう一度ドロップしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일을 받는 동안 연결이 변경되었습니다. 아무것도 업로드되지 않았습니다. 다시 놓으세요."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A conexão mudou enquanto os arquivos eram recebidos. Nada foi enviado. Solte-os novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接收文件时连接已变化，未上传任何内容。请重新拖入。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接收檔案時連線已變更，未上傳任何內容。請重新拖入。"
+          }
+        }
+      }
+    },
+    "drop.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No files were received. Try dropping them again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未能接收文件。请重新拖放。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未能接收檔案。請重新拖放。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ファイルを受信できませんでした。もう一度ドロップしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "파일을 받지 못했습니다. 다시 드롭해 주세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Es wurden keine Dateien empfangen. Bitte erneut ablegen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Aucun fichier reçu. Réessayez de les déposer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se recibieron archivos. Vuelve a soltarlos."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nenhum arquivo foi recebido. Tente soltá-los novamente."
+          }
+        }
+      }
+    },
+    "drop.partial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some files could not be received. Only the received paths were used."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "部分文件未能接收，仅使用已接收文件的路径。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "部分檔案未能接收，僅使用已接收檔案的路徑。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "一部のファイルを受信できませんでした。受信済みのパスのみ使用しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "일부 파일을 받지 못했습니다. 받은 파일의 경로만 사용했습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Einige Dateien konnten nicht empfangen werden. Nur empfangene Pfade wurden verwendet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Certains fichiers n’ont pas pu être reçus. Seuls les chemins reçus ont été utilisés."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudieron recibir algunos archivos. Solo se usaron las rutas recibidas."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Alguns arquivos não puderam ser recebidos. Apenas os caminhos recebidos foram usados."
+          }
+        }
+      }
+    },
+    "drop.timeout": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Receiving files timed out after 120 seconds. Only completed files were used; late files will not be inserted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接收文件在 120 秒后超时。仅使用已完成的文件；不会填入之后到达的文件。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接收檔案在 120 秒後逾時。僅使用已完成的檔案；不會填入之後到達的檔案。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ファイルの受信が120秒でタイムアウトしました。完了したファイルのみ使用し、後から届くファイルは挿入しません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "파일 수신이 120초 후 시간 초과되었습니다. 완료된 파일만 사용하며 늦게 도착한 파일은 삽입하지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Der Dateiempfang wurde nach 120 Sekunden abgebrochen. Nur fertige Dateien wurden verwendet; später eintreffende werden nicht eingefügt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La réception a expiré après 120 secondes. Seuls les fichiers terminés ont été utilisés ; les fichiers tardifs ne seront pas insérés."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La recepción agotó el plazo de 120 segundos. Solo se usaron los archivos completos; los tardíos no se insertarán."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O recebimento excedeu 120 segundos. Apenas arquivos concluídos foram usados; os atrasados não serão inseridos."
+          }
+        }
+      }
+    },
+    "drop.undelivered.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These files arrived after the pane closed or its program changed. Their paths were not inserted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这些文件在窗格关闭或其程序改变后才到达，路径未插入。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "這些檔案在窗格關閉或其程式改變後才抵達，路徑未插入。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "これらのファイルはペインが閉じたかプログラムが変わった後に届きました。パスは挿入されていません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 파일들은 페인이 닫히거나 프로그램이 바뀐 뒤에 도착했습니다. 경로는 삽입되지 않았습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Diese Dateien kamen an, nachdem der Bereich geschlossen wurde oder sein Programm wechselte. Ihre Pfade wurden nicht eingesetzt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ces fichiers sont arrivés après la fermeture du volet ou le changement de son programme. Leurs chemins n’ont pas été insérés."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Estos archivos llegaron después de cerrarse el panel o cambiar su programa. Sus rutas no se insertaron."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Estes arquivos chegaram depois que o painel foi fechado ou seu programa mudou. Os caminhos não foram inseridos."
+          }
+        }
+      }
+    },
+    "drop.undelivered.more": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "and %lld more"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "以及另外 %lld 个"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "以及另外 %lld 個"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ほか %lld 件"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "외 %lld개"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "und %lld weitere"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "et %lld de plus"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "y %lld más"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "e mais %lld"
+          }
+        }
+      }
     }
   }
 }
