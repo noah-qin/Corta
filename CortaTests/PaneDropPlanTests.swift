@@ -230,6 +230,26 @@ struct PaneDragTests {
     }
 
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func thePreviewShowsWhatTheDropWouldReallyDo() throws {
+        let controller = makeWindow()
+        defer { close(controller) }
+        let split = try #require(controller.selectedTab?.split)
+        let (pane, other) = (split.panes[0], split.panes[1])
+        split.noteFocus(pane)
+        let session = try #require(PaneDragSession(pane: pane, controller: controller))
+        session.begin()
+        defer { session.cancel() }
+        session.update(atWindowPoint: point(in: other.view, 0.02, 0.5))
+        #expect(session.over == .nothing, "already on that side")
+        #expect(session.previewFrame == nil)
+        session.update(atWindowPoint: point(in: other.view, 0.5, 0.02))
+        let content = try #require(controller.window?.contentView)
+        let whole = try #require(pane.view.superview).convert(try #require(pane.view.superview).bounds, to: content)
+        let shown = try #require(session.previewFrame)
+        #expect(abs(shown.width - (whole.width - 4)) <= 1, "both panes' width: the other pane grows as this one leaves")
+    }
+
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func aZoomedPaneInAnotherTabCanOnlySwap() throws {
         let controller = makeWindow(panes: 1)
         defer { close(controller) }

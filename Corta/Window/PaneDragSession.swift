@@ -144,6 +144,12 @@ final class PaneDragSession {
         // would mean unzooming, which a cancel could not take back. It can only swap.
         var plan = planned
         if controller.selectedTab?.split.zoomedPane != nil, case .edge(let id, _) = planned { plan = .center(id) }
+        // Already on that side of it: letting go there would do nothing.
+        if case .edge(let id, let direction) = plan, let other = paneShowing(id),
+            let split = pane.splitController, other.splitController === split,
+            split.tree.isBeside(pane.view, other.view, direction: direction) {
+            plan = .none
+        }
         over = plan == .none ? .nothing : .pane(plan)
         switch plan {
         case .none:
@@ -151,9 +157,24 @@ final class PaneDragSession {
         case .center(let id):
             show(panes.first { $0.id == id }?.frame)
         case .edge(let id, let direction):
-            show(panes.first { $0.id == id }.map { PaneDropPlan.previewFrame(of: $0.frame, direction: direction) })
+            show(landingArea(of: id, among: panes).map { PaneDropPlan.previewFrame(of: $0, direction: direction) })
         }
     }
+
+    /// What the drop divides: the pane, or if the dragged pane is the other half
+    /// of its split, the whole split, which that pane grows into as this one leaves.
+    private func landingArea(
+        of id: ObjectIdentifier, among panes: [(id: ObjectIdentifier, frame: CGRect)]
+    ) -> CGRect? {
+        if let other = paneShowing(id), let parent = other.view.superview as? NSSplitView,
+            pane.view.superview === parent, let content = window.contentView {
+            return parent.convert(parent.bounds, to: content)
+        }
+        return panes.first { $0.id == id }?.frame
+    }
+
+    /// Where the preview stands now, nil when it does not show.
+    var previewFrame: NSRect? { preview.isHidden ? nil : preview.frame }
 
     private func show(_ frame: NSRect?) {
         guard let frame else { return }
