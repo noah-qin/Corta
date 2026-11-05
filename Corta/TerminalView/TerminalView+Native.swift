@@ -22,37 +22,24 @@ extension TerminalView {
     // MARK: - Dragging a file or folder in
 
     func registerForFileDrags() {
-        registerForDraggedTypes([.fileURL])
+        registerForDraggedTypes(FileDropPolicy.registeredTypes)
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        droppedPaths(from: sender).isEmpty ? [] : .copy
+        acceptsFileDrop(sender) ? .copy : []
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        droppedPaths(from: sender).isEmpty ? [] : .copy
+        acceptsFileDrop(sender) ? .copy : []
     }
 
-    /// Inserts the paths as quoted text at the prompt, as if typed; the shell
-    /// decides what they mean.
+    private func acceptsFileDrop(_ sender: any NSDraggingInfo) -> Bool {
+        FileDropPolicy.accepts(types: sender.draggingPasteboard.types ?? [], isLocal: sender.draggingSource != nil)
+    }
+
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
-        let paths = droppedPaths(from: sender)
-        guard !paths.isEmpty else { return false }
-        onDropPaths?(paths)
-        return true
-    }
-
-    private func droppedPaths(from sender: any NSDraggingInfo) -> [String] {
-        Self.droppedPaths(from: sender.draggingPasteboard)
-    }
-
-    /// Apart from `NSDraggingInfo`, so tests need no synthetic Finder drag.
-    static func droppedPaths(from pasteboard: NSPasteboard) -> [String] {
-        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        let urls =
-            pasteboard.readObjects(forClasses: [NSURL.self], options: options)
-            as? [URL] ?? []
-        return urls.map(\.path)
+        guard acceptsFileDrop(sender) else { return false }
+        return onFileDrop?(sender.draggingPasteboard) ?? false
     }
 
     // MARK: - Look Up (force touch, three-finger tap)

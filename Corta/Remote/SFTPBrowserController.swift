@@ -243,6 +243,7 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         refusalObserver = nil
         model.disconnect()
         model.removeDragStaging()
+        model.removeReceivedDrops()
         Self.unconnected.removeValue(forKey: ObjectIdentifier(self))
         if let host = model.host, Self.byHost[host] === self {
             Self.byHost.removeValue(forKey: host)

@@ -83,9 +83,13 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
 
     /// The pane closed: a build in flight must not land.
     func stop() {
+        fileDropRequest?.cancel()
+        fileDropRequest = nil
         largeTextTask?.cancel()
         largeTextTask = nil
     }
+
+    var fileDropRequest: FileDropRequest?
 
     var suppressPasteWarnings = false
 

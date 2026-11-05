@@ -367,6 +367,16 @@ own error text is under **Details**.
   parser or a guarantee that other text is safe. A large
   paste the shell is still working through can be cancelled with ⌃C: the
   part not yet sent is dropped and the interrupt goes straight through.
+- **Dropping files.** Drop files or promised files from another app on a pane
+  to fill their quoted paths through the paste channel, without pressing Return.
+  Hovering never starts a download. Receiving happens asynchronously and stops
+  waiting after 120 seconds; failures are shown in the pane. If the session or
+  foreground process group changes while receiving, Corta discards the drop;
+  try again at the intended prompt. Dragging a row from Corta's SFTP browser
+  onto a pane is not supported. Promised copies live in
+  `~/Library/Application Support/Corta/DroppedFiles/`; keep them until the
+  program using their paths has finished, then remove their reception folders
+  in Finder. They do not expire automatically.
 - **Right-click.** The clicked pane offers Find… and Copy Command Output
   for the completed command whose output contains the clicked row; the copy
   item is disabled on prompts, on the alternate screen (full-screen programs)
@@ -611,9 +621,13 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   the enclosing folder, ⌘R refreshes, ⇧⌘G (or a click on the path) types a
   path, ⇧⌘N makes a folder and ⇧⌘. shows hidden files. Click a column title
   to sort. Right-click a row for its actions; double-click a folder to open
-  it. Drop files from Finder on the listing — or on a folder row — to upload
-  them; while you drag, the listing (or the row) is outlined and says where
-  the files will go. Drag a file out to Finder to download it. Transfers are under
+  it. Drop files or promised files from another app on the listing — or on a
+  folder row — to upload them; while you drag, the listing (or the row) is
+  outlined and says where
+  the files will go. Incoming promises are received before upload; failed
+  receptions are reported in the listing. Corta removes its private incoming
+  copies after successful uploads; failed copies remain for Retry until the
+  browser closes. Drag a file out to Finder to download it. Transfers are under
   the toolbar's arrows button, with speed, time left and Show in Finder.
 - **Editing a remote file.** **Edit** in the browser — or ⌘-clicking a
   `path:line` in a remote pane — downloads a copy and opens it in your
@@ -848,13 +862,24 @@ or ask in `#help` on the [Discord](https://discord.gg/QNdWfdwr7j).
 
 ## Coding-agent state and program notifications
 
-**Claude Code is currently the only CLI with a dedicated task-state
-integration.** It was developed and acceptance-tested with the installed
-**Claude Code 2.1.310** on macOS arm64; this is not a compatibility guarantee
-for all Claude versions. Codex, Gemini CLI, pi,
-Kimi, Grok Build, Qwen Code, OpenCode and Aider have no dedicated task-state
-adapter in Corta. Generic notification/progress protocols remain available
-to any program; process detection is not a full agent integration. See the
+**Claude Code is the CLI Corta's task-state support was developed against.**
+It was acceptance-tested with the installed **Claude Code 2.1.310** on macOS
+arm64; this is not a compatibility guarantee for all Claude versions.
+
+**Codex 0.166.0 was checked reporting its own task state, through the same
+general parser.** Corta has no Codex-specific state handling; Codex appears
+only in the built-in process-name and icon lists. Checked on 2026-11-05, hooks
+turned off: Codex sends OSC 7501 by itself, labelled `app=codex`, and does not
+wait for a probe. Corta recorded idle, working and done, and Waiting for you
+(kind `permission`) at an approval prompt; the tab showed the Codex icon and the
+matching status dots. That is one version and those states, not a guarantee for
+other Codex versions. The Agents list, the Dock count and notifications have
+not been checked against Codex.
+
+Gemini CLI, pi, Kimi, Grok Build, Qwen Code, OpenCode and Aider have no
+dedicated task-state adapter in Corta. Generic notification/progress protocols
+remain available to any program; process detection is not a full agent
+integration. See the
 [compatibility scope and verification limits](CONFORMANCE.md#cli-signal-compatibility).
 
 By default, agent panes distinguish Working (accent colour), Waiting for you (orange),

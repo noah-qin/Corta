@@ -145,6 +145,36 @@ the same for an rc file it cannot read: it reports it and leaves it alone.
 
 ---
 
+## File drops
+
+### A drop waits, reports failure, or fills no paths
+
+Corta only checks types while you hover. Releasing the drop requests the files;
+cloud files and promises from apps such as Photos or Mail may take time. A
+120-second deadline stops waiting and shows a warning. A partial reception uses
+only completed files; late results never fill additional paths. Retry missing
+files separately. No drop presses Return for you.
+
+If the session or foreground process group changed during reception, Corta
+refuses to fill any paths. Wait for the intended prompt and drop again. Corta's
+own SFTP rows are deliberately refused by panes; download a file to Finder
+first. The SFTP upload target accepts only drags from outside Corta.
+
+### Received copies take disk space
+
+Promised files dropped on a pane are kept under
+`~/Library/Application Support/Corta/DroppedFiles/` in private reception folders.
+Their paths may still be used by a program after the pane or app closes, so
+Corta does not expire them automatically. Once the programs using those paths
+have finished, use Finder's Go to Folder to open this directory and remove the
+reception folders you no longer need. Development builds use
+`~/Library/Application Support/Corta Dev/ApplicationSupport/DroppedFiles/`;
+a launch with `CORTA_STAGE_DIR` uses `<stage>/ApplicationSupport/DroppedFiles/`.
+
+SFTP upload copies are removed after successful upload. Failed ones stay for
+Retry until the browser closes, then are removed. Interrupted unpublished
+receptions left by a crash are eligible for cleanup on the next promise drop.
+
 ## Typing and rendering
 
 ### Clear Screen leaves only a cursor, without a prompt

@@ -689,10 +689,14 @@ same terms; the tree carries no dated records.
 
 ## Program status and desktop notifications
 
-Claude Code is currently the only CLI with a dedicated task-state
-integration. General protocol parsing and process-name detection do not
-constitute task-state integration for other CLIs. No Codex, Gemini, pi,
-Kimi, Grok Build, Qwen, OpenCode or Aider state adapter is shipped.
+Claude Code is the CLI the task-state support was developed and
+acceptance-tested against. Codex 0.166.0 has been observed reporting OSC 7501
+by itself ([below](#cli-signal-compatibility)); Corta has no Codex-specific
+state handling (Codex appears only in the process-name and icon lists), so that
+is the general parser, for that version and those flows. General
+protocol parsing and process-name detection do not by themselves constitute
+task-state integration for any other CLI. No Gemini, pi, Kimi, Grok Build,
+Qwen, OpenCode or Aider state adapter is shipped.
 
 OSC 7501 replies to probes with the constant `OSC 7501 ; ? ST` and accepts
 working/blocked/done/idle/error and clear, per optional bounded id (one main slot plus 32 subtask slots). `done`
@@ -763,7 +767,8 @@ permission, completion or Notification Center checks above.
 ### CLI signal compatibility
 
 **Development and acceptance version: Claude Code `2.1.310 (Claude Code)`,
-native macOS arm64. Dedicated task-state integration: Claude Code only.**
+native macOS arm64. The other CLI observed reporting task state: Codex 0.166.0,
+through the same general parser.**
 The adapter was developed against this installed version and exercised with
 real interactive sessions identifying the terminal as `Corta`
 (`TERM=xterm-256color`). The checked-in capture records the executable's
@@ -775,9 +780,10 @@ promise of compatibility with every Claude Code release.
 | Dedicated Claude task state | OSC 7501 working, blocked, done, idle, error and clear; permission/question/auth reasons; one main slot and 32 subtask slots | Only explicitly reported state; output, silence, BEL and notification prose do not establish an outcome. |
 | Verified real 2.1.310 flows | Probe, normal completion, permission waiting/cancellation, invalid-model failure, isolated invalid-token auth waiting, Agent child id/clear and abrupt exit to an integrated shell | These concrete flows do not cover every failure cause or auth recovery. Question kind and capacity limits also have parser/policy coverage. |
 | Verified native notifications | Default auto plus fixed 7501 attention; explicit iterm2/ghostty/kitty text, notification clicks and waiting/completed Dock badge screenshots | Auto does not select a Claude text channel for Corta; OS authorization and delivery policy still apply. |
+| Observed Codex 0.166.0 state, generic parser | With Codex hooks off (2026-11-05, Corta `3d23a2c7`): Codex's own OSC 7501 with `app=codex`, no hook and no 7501 probe; `idle → working → done`; `blocked` with kind `permission` at an approval; Codex tab icon and blue, orange and green status dots | Corta has no Codex-specific state handling. Not checked in Corta: the return to `working` after an approval (seen only under another terminal, Rex), the Agents list, the Dock, notifications, failure, cancellation and sign-in. Other Codex versions are not covered. |
 | Generic protocols only | OSC 9/777/99 notifications, OSC 9;4 progress and OSC 21337 metadata | Claude 2.1.310 does not enable native progress for Corta's normal identity; its OSC 21337 sender is disabled. Generic support is not evidence of Claude emission. |
-| Not implemented | Other CLIs' dedicated state adapters; OSC 99 activation/close/alive reports, icons and buttons; ConEmu execution commands | Other recognised tools have process detection and generic protocols only. No hooks or tool configuration are installed. |
-| Not guaranteed | Other Claude versions; 7501 through tmux, Claude background sessions or disabled terminal-title reporting | The upstream minimum 2.1.295 is not a Corta-tested version range. Live regroup/restart click permutations and auth recovery need separate acceptance; routing policy has unit coverage. |
+| Not implemented | CLI-specific state adapters beyond the probe reply; OSC 99 activation/close/alive reports, icons and buttons; ConEmu execution commands | Other recognised tools have process detection and generic protocols only, unless they send OSC 7501 themselves as Codex 0.166.0 does. No hooks or tool configuration are installed. |
+| Not guaranteed | Other Claude or Codex versions; 7501 through tmux, Claude background sessions or disabled terminal-title reporting | The upstream minimum 2.1.295 is not a Corta-tested version range. Live regroup/restart click permutations and auth recovery need separate acceptance; routing policy has unit coverage. |
 
 The native OSC 7501 vocabulary above was checked against that
 installed version, including a captured `idle → working → done` turn.
@@ -844,7 +850,7 @@ lifecycles remain separate checks, not implied by a background unit pass.
 | Tool / reference | Signals in the checked interface | Current Corta integration scope |
 | :--- | :--- | :--- |
 | Claude Code 2.1.310 | OSC 7501 `working`, `blocked`, `done`, `idle`, `error`, `clear`; blocked kind `question`, `permission`, `auth` | Explicit task state; `clear` removes state |
-| [Codex terminal backend](https://github.com/openai/codex/blob/main/codex-rs/tui/src/notifications/mod.rs) | OSC 9 message or BEL; neither has a typed task state | Attention only; no completion/permission inference |
+| [Codex terminal backend](https://github.com/openai/codex/blob/main/codex-rs/tui/src/notifications/mod.rs) | Checked interface: OSC 9 message or BEL, neither typed. Observed separately on 0.166.0: OSC 7501 with `app=codex` | The observed OSC 7501 is explicit state through the general parser (table above); OSC 9 and BEL are attention only, with no completion/permission inference |
 | [Gemini terminal notifications](https://github.com/google-gemini/gemini-cli/blob/main/packages/cli/src/utils/terminalNotifications.ts) | OSC 9/777 text or BEL for attention/session-complete events | Attention only; the event type is not retained in the text protocol |
 | [pi extensions](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md) | `agent_start`, `agent_end`, `agent_before_settle`, `agent_settled` | Extension events need explicit bridging; `agent_end` may be followed by retries/queued work, so notification-only work belongs at `agent_settled` |
 | [Kimi hooks](https://moonshotai.github.io/kimi-cli/en/customization/hooks.html) | `UserPromptSubmit`, `Stop`, `StopFailure`, `Notification` | Hook events need explicit bridging; a stop hook can cause continuation |
