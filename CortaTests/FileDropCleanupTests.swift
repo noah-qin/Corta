@@ -149,7 +149,8 @@ struct FileDropCleanupTests {
         defer { FileDropStorage.remove(root) }
         let mine = try FileDropStorage.makeDirectory(in: root)
         let sibling = try directory("sibling", in: root, owner: "\(getppid()) other-launch")
-        FileDropStorage.removeThisRun(in: [root])
+        // The wait covers every removal in the process, including other suites'.
+        FileDropStorage.removeThisRun(in: [root], timeout: 30 * Double(testTimeoutScale))
         #expect(!exists(mine))
         #expect(exists(sibling))
         #expect((try FileManager.default.contentsOfDirectory(atPath: root.path)) == [sibling.lastPathComponent],

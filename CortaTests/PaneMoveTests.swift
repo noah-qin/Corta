@@ -468,7 +468,7 @@ extension PaneMoveTests {
         #expect(FileManager.default.fileExists(atPath: directory.path))
         #expect(pane.commands.dropInputContext == context, "a move is not a changed drop target")
 
-        try #require(controller.selectedTab?.split.panes.contains(pane))
+        #expect(controller.selectedTab?.split.panes.contains(pane) == true)
         pane.teardown()
         #expect(!FileManager.default.fileExists(atPath: directory.path))
     }
