@@ -81,7 +81,7 @@ final class SFTPDropTargetView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        registerForDraggedTypes([.fileURL])
+        registerForDraggedTypes(FileDropPolicy.registeredTypes)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -115,9 +115,9 @@ final class SFTPDropTargetView: NSView {
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         defer { clear() }
         guard let model, let destination else { return false }
-        let urls = Self.fileURLs(sender.draggingPasteboard)
-        guard !urls.isEmpty else { return false }
-        return model.upload(urls, into: destination.path)
+        guard FileDropPolicy.accepts(types: sender.draggingPasteboard.types ?? [],
+            isLocal: sender.draggingSource != nil) else { return false }
+        return model.receiveFileDrop(sender.draggingPasteboard, into: destination.path)
     }
 
     /// Only files from outside Corta, onto a connected listing. A row
@@ -128,19 +128,19 @@ final class SFTPDropTargetView: NSView {
             clear()
             return []
         }
-        let urls = Self.fileURLs(sender.draggingPasteboard)
-        guard !urls.isEmpty else {
+        guard FileDropPolicy.accepts(types: sender.draggingPasteboard.types ?? [], isLocal: false) else {
             clear()
             return []
         }
+        let count = sender.draggingPasteboard.pasteboardItems?.count ?? 1
         let row = tableRow(at: sender.draggingLocation)
         let resolved = SFTPDropDestination.resolve(
             row: row, entries: model.entries, currentPath: model.currentPath)
         let rowShown: Int? = if case .folder = resolved { row } else { nil }
-        if resolved != destination || rowShown != highlightedRow || urls.count != itemCount {
+        if resolved != destination || rowShown != highlightedRow || count != itemCount {
             destination = resolved
             highlightedRow = rowShown
-            itemCount = urls.count
+            itemCount = count
             needsDisplay = true
         }
         return .copy
@@ -152,11 +152,6 @@ final class SFTPDropTargetView: NSView {
         highlightedRow = nil
         itemCount = 0
         needsDisplay = true
-    }
-
-    static func fileURLs(_ pasteboard: NSPasteboard) -> [URL] {
-        (pasteboard.readObjects(
-            forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
     }
 
     // MARK: - The table under the overlay

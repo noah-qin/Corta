@@ -71,7 +71,10 @@ extension SFTPBrowserModel {
         self.client = client
         transferQueue.client = client
         transferQueue.host = name
-        transferQueue.onUploadFinished = { [weak self] in self?.refresh() }
+        transferQueue.onUploadFinished = { [weak self] in
+            self?.cleanUploadedDropCopies()
+            self?.refresh()
+        }
         transferQueue.onListingError = { [weak self] in self?.listingError = $0 }
         connectionGeneration += 1
         let generation = connectionGeneration

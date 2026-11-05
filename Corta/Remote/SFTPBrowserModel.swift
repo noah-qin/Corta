@@ -287,6 +287,9 @@ final class SFTPBrowserModel {
         onTitleChange?(title)
     }
 
+    var fileDropRequests: [UUID: FileDropRequest] = [:]
+    var receivedDropDirectories: [URL: Set<URL>] = [:]
+
     // MARK: - Drags to Finder
 
     /// Staging folders made for drags to Finder; the controller removes

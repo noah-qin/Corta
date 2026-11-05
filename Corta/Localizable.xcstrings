@@ -2,6 +2,242 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "drop.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No files were received. Try dropping them again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未能接收文件。请重新拖放。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未能接收檔案。請重新拖放。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ファイルを受信できませんでした。もう一度ドロップしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "파일을 받지 못했습니다. 다시 드롭해 주세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Es wurden keine Dateien empfangen. Bitte erneut ablegen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Aucun fichier reçu. Réessayez de les déposer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se recibieron archivos. Vuelve a soltarlos."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nenhum arquivo foi recebido. Tente soltá-los novamente."
+          }
+        }
+      }
+    },
+    "drop.partial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some files could not be received. Only the received paths were used."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "部分文件未能接收，仅使用已接收文件的路径。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "部分檔案未能接收，僅使用已接收檔案的路徑。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "一部のファイルを受信できませんでした。受信済みのパスのみ使用しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "일부 파일을 받지 못했습니다. 받은 파일의 경로만 사용했습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Einige Dateien konnten nicht empfangen werden. Nur empfangene Pfade wurden verwendet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Certains fichiers n’ont pas pu être reçus. Seuls les chemins reçus ont été utilisés."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudieron recibir algunos archivos. Solo se usaron las rutas recibidas."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Alguns arquivos não puderam ser recebidos. Apenas os caminhos recebidos foram usados."
+          }
+        }
+      }
+    },
+    "drop.timeout": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Receiving files timed out after 120 seconds. Only completed files were used; late files will not be inserted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接收文件在 120 秒后超时。仅使用已完成的文件；不会填入之后到达的文件。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接收檔案在 120 秒後逾時。僅使用已完成的檔案；不會填入之後到達的檔案。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ファイルの受信が120秒でタイムアウトしました。完了したファイルのみ使用し、後から届くファイルは挿入しません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "파일 수신이 120초 후 시간 초과되었습니다. 완료된 파일만 사용하며 늦게 도착한 파일은 삽입하지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Der Dateiempfang wurde nach 120 Sekunden abgebrochen. Nur fertige Dateien wurden verwendet; später eintreffende werden nicht eingefügt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La réception a expiré après 120 secondes. Seuls les fichiers terminés ont été utilisés ; les fichiers tardifs ne seront pas insérés."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La recepción agotó el plazo de 120 segundos. Solo se usaron los archivos completos; los tardíos no se insertarán."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O recebimento excedeu 120 segundos. Apenas arquivos concluídos foram usados; os atrasados não serão inseridos."
+          }
+        }
+      }
+    },
+    "drop.targetChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The session or foreground program changed while receiving files. No paths were inserted. Drop again at the intended prompt."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接收文件时会话或前台程序已变化。未填入任何路径，请在目标提示符处重新拖放。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接收檔案時工作階段或前景程式已變更。未填入任何路徑，請在目標提示字元處重新拖放。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "受信中にセッションまたは前面のプログラムが変わりました。パスは挿入していません。目的のプロンプトにもう一度ドロップしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "파일을 받는 동안 세션 또는 포그라운드 프로그램이 변경되었습니다. 경로를 삽입하지 않았습니다. 원하는 프롬프트에 다시 드롭해 주세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sitzung oder Vordergrundprogramm hat sich während des Empfangs geändert. Es wurden keine Pfade eingefügt. Bitte am gewünschten Prompt erneut ablegen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La session ou le programme au premier plan a changé pendant la réception. Aucun chemin inséré. Déposez à nouveau à l’invite voulue."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La sesión o el programa en primer plano cambió durante la recepción. No se insertaron rutas. Suelta de nuevo en el indicador deseado."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A sessão ou o programa em primeiro plano mudou durante o recebimento. Nenhum caminho foi inserido. Solte novamente no prompt desejado."
+          }
+        }
+      }
+    },
     "menu.closePane": {
       "extractionState": "manual",
       "localizations": {

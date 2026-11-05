@@ -78,6 +78,12 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- File drops on terminal panes and SFTP listings negotiate by type without
+  triggering lazy downloads while hovering. Promised files are received
+  asynchronously, with a deadline and visible failures. Pane drops are bound
+  to the session and foreground process group at release; Corta's own SFTP
+  rows are refused by panes.
+
 - A long task or a program's notice in a tab behind the one you are looking
   at reaches you: tabs share a window, and being in the key window counted
   as being watched. A shell's report of a command ending no longer waits for
