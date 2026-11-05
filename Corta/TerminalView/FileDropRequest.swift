@@ -99,11 +99,15 @@ final class FileDropRequest {
         return request
     }
 
+    /// AppKit calls the reader once per file, each only after the provider has
+    /// written it: long after this returns, so the queue's drain says nothing
+    /// about promises. The call itself asks the provider for names, which makes
+    /// `fileNames` the reader count from here on; it is empty before the call.
     func receive(_ receiver: NSFilePromiseReceiver, at directory: URL, index: Int) {
         let collection = collection
         receiver.receivePromisedFiles(
             atDestination: directory, options: [:], operationQueue: queue
-        ) { @Sendable url, error in
+        ) { @Sendable [weak self] url, error in
             do {
                 guard error == nil else { throw CocoaError(.fileReadUnknown) }
                 try FileDropStorage.secureReceived(url, in: directory)
@@ -111,7 +115,10 @@ final class FileDropRequest {
             } catch {
                 collection.record(nil, index: index)
             }
+            collection.readerFinished()
+            Task { @MainActor [weak self] in self?.finishIfComplete() }
         }
+        collection.expectReaders(max(1, receiver.fileNames.count))
     }
 
     private func readURL(_ item: FileDropURLItem, index: Int) {
@@ -119,13 +126,20 @@ final class FileDropRequest {
         queue.addOperation { collection.record(item.read(), index: index) }
     }
 
-    /// The queue's drain is the boundary, not fileTypes/fileNames counts or
-    /// a quiet-period heuristic. A receiver may schedule multiple readers.
+    /// No more work will be added. The barrier ends the direct URL reads;
+    /// a reception finishes once they and every expected reader are done, or
+    /// at the deadline when a provider never answers.
     func seal() {
+        let collection = collection
         queue.addBarrierBlock { [weak self] in
-            Task { @MainActor [weak self] in self?.finish(timedOut: false) }
+            collection.queueDrained()
+            Task { @MainActor [weak self] in self?.finishIfComplete() }
         }
         queue.isSuspended = false
+    }
+
+    private func finishIfComplete() {
+        if collection.isComplete { finish(timedOut: false) }
     }
 
     private func finish(timedOut: Bool) {
@@ -168,6 +182,8 @@ nonisolated final class FileDropCollection: Sendable {
         var failed = false
         var finished = false
         var published = false
+        var outstandingReaders = 0
+        var drained = false
     }
     private let state: Mutex<State>
     let directory: URL?
@@ -176,6 +192,11 @@ nonisolated final class FileDropCollection: Sendable {
         state = Mutex(State(urls: Array(repeating: [], count: count)))
         self.directory = directory
     }
+
+    func expectReaders(_ count: Int) { state.withLock { $0.outstandingReaders += count } }
+    func readerFinished() { state.withLock { $0.outstandingReaders -= 1 } }
+    func queueDrained() { state.withLock { $0.drained = true } }
+    var isComplete: Bool { state.withLock { $0.drained && $0.outstandingReaders <= 0 } }
 
     func record(_ url: URL?, index: Int) {
         let remove = state.withLock { state in

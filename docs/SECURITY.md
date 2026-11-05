@@ -152,9 +152,10 @@ Parent Directory and Go to Project Root uses the same quoting.
 
 Drop hover negotiation inspects advertised types only, never file URLs or
 contents. A drop starts exactly one representation per item (promise before
-file URL), with URL reads and promise readers off the main thread. The
-receiver drains its operation queue rather than counting `fileTypes` or
-`fileNames`; one receiver can produce multiple reader callbacks. An absolute
+file URL), with URL reads and promise readers off the main thread. A promise's
+reader runs only after its provider has written the file, so a reception waits
+for one reader per name AppKit reports once receiving has begun, at least one
+per receiver; one receiver can produce several. An absolute
 120-second `SuspendingClock` deadline ends a stalled reception, reports it,
 and prevents late callbacks from inserting more paths. Successful paths keep
 the pasteboard's item order. Partial failures report that only received paths

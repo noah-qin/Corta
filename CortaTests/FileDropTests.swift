@@ -87,7 +87,7 @@ struct FileDropTests {
         withExtendedLifetime(request) {}
     }
 
-    @Test("multiple callbacks from one receiver are drained without consulting file count metadata")
+    @Test("callbacks already queued beyond the reported file names are still collected")
     func multiplePromiseCallbacks() async throws {
         let directory = try FileDropStorage.makeDirectory(in: scratchRoot())
         defer { FileDropStorage.remove(directory.deletingLastPathComponent()) }
@@ -101,9 +101,53 @@ struct FileDropTests {
         await waitUntil("all promise readers drained") { result != nil }
         #expect(result?.urls.map(\.lastPathComponent) == ["first", "second", "last"])
         #expect(result?.failed == false)
-        #expect(first.metadataReads.withLock { $0 } == 0)
         #expect(first.receives.withLock { $0 } == 1)
         #expect(last.receives.withLock { $0 } == 1)
+        withExtendedLifetime(request) {}
+    }
+
+    /// The order a real drag produced: names appear during the receive call,
+    /// the queue drains at once, and each reader follows its provider's write.
+    @Test("a reception waits for readers that arrive after the queue has drained")
+    func readersArriveAfterDrain() async throws {
+        let directory = try FileDropStorage.makeDirectory(in: scratchRoot())
+        defer { FileDropStorage.remove(directory.deletingLastPathComponent()) }
+        var result: FileDropRequest.Result?
+        let request = FileDropRequest(count: 2, directory: directory) { result = $0 }
+        let legacy = LatePromiseReceiver(names: ["a", "b", "c"])
+        let single = LatePromiseReceiver(names: ["d"])
+        let destination = FileDropStorage.destination(in: directory)
+        request.receive(legacy, at: destination, index: 0)
+        request.receive(single, at: destination, index: 1)
+        request.seal()
+        // Readers land out of order across receivers; none has arrived yet.
+        try await Task.sleep(for: .milliseconds(100), clock: .suspending)
+        #expect(result == nil)
+        single.deliverAll()
+        legacy.deliver("a")
+        legacy.deliver("b")
+        try await Task.sleep(for: .milliseconds(100), clock: .suspending)
+        #expect(result == nil)
+        legacy.deliver("c")
+        await waitUntil("every reader arrived") { result != nil }
+        #expect(result?.urls.map(\.lastPathComponent) == ["a", "b", "c", "d"])
+        #expect(result?.failed == false)
+        withExtendedLifetime(request) {}
+    }
+
+    @Test("a provider that never finishes ends at the deadline with what arrived")
+    func missingReaderTimesOut() async throws {
+        let directory = try FileDropStorage.makeDirectory(in: scratchRoot())
+        defer { FileDropStorage.remove(directory.deletingLastPathComponent()) }
+        var result: FileDropRequest.Result?
+        let request = FileDropRequest(count: 1, directory: directory, timeout: .milliseconds(200)) { result = $0 }
+        let receiver = LatePromiseReceiver(names: ["ready", "never"])
+        request.receive(receiver, at: FileDropStorage.destination(in: directory), index: 0)
+        request.seal()
+        receiver.deliver("ready")
+        await waitUntil("the deadline passed") { result != nil }
+        #expect(result?.urls.map(\.lastPathComponent) == ["ready"])
+        #expect(result?.timedOut == true)
         withExtendedLifetime(request) {}
     }
 
@@ -126,7 +170,6 @@ struct FileDropTests {
         #expect(received.urls.map(\.lastPathComponent) == [".owner", ".published"])
         #expect(try received.urls.map { try String(contentsOf: $0, encoding: .utf8) } == [".owner", ".published"])
         #expect(receiver.receives.withLock { $0 } == 1)
-        #expect(receiver.metadataReads.withLock { $0 } == 0)
         #expect(provider.reads.withLock { $0 } == 0)
         withExtendedLifetime(request) {}
     }
@@ -262,13 +305,12 @@ struct FileDropTests {
 nonisolated private final class TestPromiseReceiver: NSFilePromiseReceiver {
     let names: [String]
     let receives = Mutex(0)
-    let metadataReads = Mutex(0)
     init(names: [String]) { self.names = names; super.init() }
     required init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) {
         return nil
     }
-    override var fileTypes: [String] { metadataReads.withLock { $0 += 1 }; return ["public.data"] }
-    override var fileNames: [String] { metadataReads.withLock { $0 += 1 }; return [] }
+    override var fileTypes: [String] { ["public.data"] }
+    override var fileNames: [String] { [] }
     override func receivePromisedFiles(
         atDestination directory: URL, options: [AnyHashable: Any] = [:],
         operationQueue: OperationQueue, reader: @escaping (URL, (any Error)?) -> Void
@@ -285,6 +327,43 @@ nonisolated private final class TestPromiseReceiver: NSFilePromiseReceiver {
                     callback.read(url, nil)
                 } catch { callback.read(url, error) }
             }
+        }
+    }
+}
+
+/// AppKit's real order: `fileNames` fills during the receive call, and a
+/// reader reaches the queue only when the test says its file has been written.
+nonisolated private final class LatePromiseReceiver: NSFilePromiseReceiver, @unchecked Sendable {
+    private struct Pending {
+        var names: [String] = []
+        var directory: URL?
+        var queue: OperationQueue?
+        var reader: DropTestReader?
+    }
+    private let promised: [String]
+    private let pending = Mutex(Pending())
+    init(names: [String]) { promised = names; super.init() }
+    required init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) {
+        return nil
+    }
+    override var fileNames: [String] { pending.withLock { $0.names } }
+    override func receivePromisedFiles(
+        atDestination directory: URL, options: [AnyHashable: Any] = [:],
+        operationQueue: OperationQueue, reader: @escaping (URL, (any Error)?) -> Void
+    ) {
+        let callback = DropTestReader(reader)
+        pending.withLock {
+            $0 = Pending(names: promised, directory: directory, queue: operationQueue, reader: callback)
+        }
+    }
+    func deliverAll() { promised.forEach(deliver) }
+    func deliver(_ name: String) {
+        let (directory, queue, reader) = pending.withLock { ($0.directory, $0.queue, $0.reader) }
+        guard let directory, let queue, let reader else { return }
+        let url = directory.appendingPathComponent(name)
+        queue.addOperation {
+            try? Data(name.utf8).write(to: url)
+            reader.read(url, nil)
         }
     }
 }
