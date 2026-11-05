@@ -43,7 +43,7 @@ enum TabIcon {
             .map { $0.windowTitle.tabLabel.icon }
             .sorted { $0 != .terminal && $1 == .terminal }
         let programs = Array(([label.icon] + others).prefix(3))
-        let full = focused?.windowTitle.composed ?? name
+        let full = focused?.windowTitle.displayedTitle ?? name
         return TabStripItem(
             id: tab.id, programs: programs, name: name, context: context,
             toolTip: full, status: tab.agentStatus, progress: tab.agentProgress)

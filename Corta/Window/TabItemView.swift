@@ -15,12 +15,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 
 /// One tab: program icons, name and context leading-aligned, a close button
 /// on hover, and an agent badge when a pane reports one.
 final class TabItemView: NSView, NSTextFieldDelegate {
     unowned let strip: TabStripView
     var index = 0
+    /// Its tab has closed and it is fading out. Its index is stale by then:
+    /// a double-click on the × closed the tab that had taken its place.
+    var isLeaving = false
+    private var middleButtonPressed = false
     private let icon = NSImageView()
     private let title = NSTextField(labelWithString: "")
     private let closeButton = NSButton()
@@ -72,8 +77,8 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         // The × shows only under the pointer; VoiceOver closes by action.
         setAccessibilityCustomActions([
             NSAccessibilityCustomAction(name: L10n.text("tabs.close")) { [weak self] in
-                guard let self else { return false }
-                self.strip.close(self.index)
+                guard let self, let index = self.liveIndex else { return false }
+                self.strip.close(index)
                 return true
             },
         ])
@@ -85,6 +90,7 @@ final class TabItemView: NSView, NSTextFieldDelegate {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
     override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
     override var mouseDownCanMoveWindow: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
@@ -116,7 +122,11 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         badge.progress = item.progress
         badge.isHidden = item.status == nil && item.progress == nil
         badge.needsDisplay = true
-        setAccessibilityLabel(item.name)
+        let badgeLabel = Self.badgeLabel(status: item.status, progress: item.progress)
+        badge.toolTip = badgeLabel
+        badge.setAccessibilityLabel(badgeLabel)
+        // The tab is the element VoiceOver reads; the dot alone says nothing.
+        setAccessibilityLabel(badgeLabel.map { "\(item.name), \($0)" } ?? item.name)
         setAccessibilityValue(selected)
         needsLayout = true
     }
@@ -142,7 +152,7 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         layer?.shadowOffset = CGSize(width: 0, height: -0.5)
         layer?.masksToBounds = false
         // Only under the pointer: a row of × marks is clutter.
-        closeButton.isHidden = !hovering || editor != nil || bounds.width < Self.iconOnlyWidth
+        closeButton.isHidden = !hovering || editor != nil
     }
 
     private var isPointerInside: Bool {
@@ -151,32 +161,16 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         return bounds.contains(point)
     }
 
-    /// Below this width a tab shows its front card only; below the second,
-    /// the card alone, centred, without a name.
-    private static let singleCardWidth: CGFloat = 110
-    private static let iconOnlyWidth: CGFloat = 44
-
     override func layout() {
         super.layout()
         let height = bounds.height
-        let iconOnly = bounds.width < Self.iconOnlyWidth
-        let programs = item?.programs ?? []
-        let single = bounds.width < Self.singleCardWidth
-        let image = TabIcon.image(for: single ? Array(programs.prefix(1)) : programs)
+        let image = TabIcon.image(for: item?.programs ?? [])
         if icon.image !== image { icon.image = image }
         let size = image?.size ?? .zero
         // The image carries a margin for the turned cards; the front tile
         // sits 12 in. Whole points, so its edges fall on device pixels.
-        let iconX = iconOnly ? ((bounds.width - size.width) / 2).rounded(.down) : single ? 5 : 8
-        icon.frame = NSRect(x: iconX, y: ((height - size.height) / 2).rounded(),
+        icon.frame = NSRect(x: 8, y: ((height - size.height) / 2).rounded(),
                             width: size.width, height: size.height)
-        if iconOnly {
-            title.isHidden = true
-            closeButton.isHidden = true
-            badge.frame = .zero
-            editor?.frame = bounds.insetBy(dx: 2, dy: 4)
-            return
-        }
         let closeSide: CGFloat = 16
         closeButton.frame = NSRect(x: bounds.width - closeSide - 8, y: (height - closeSide) / 2,
                                    width: closeSide, height: closeSide)
@@ -227,15 +221,22 @@ final class TabItemView: NSView, NSTextFieldDelegate {
     }
     override func mouseDragged(with event: NSEvent) { strip.itemMouseDragged(event) }
     override func mouseUp(with event: NSEvent) { strip.itemMouseUp(event) }
+    override func otherMouseDown(with event: NSEvent) { middleButtonPressed = event.buttonNumber == 2 }
     override func otherMouseUp(with event: NSEvent) {
-        if event.buttonNumber == 2 { strip.close(index) }
+        // A press that began here: a button released over the strip after a
+        // press elsewhere is not a request to close.
+        if event.buttonNumber == 2, middleButtonPressed, let liveIndex { strip.close(liveIndex) }
+        middleButtonPressed = false
     }
     override func menu(for event: NSEvent) -> NSMenu? { strip.menu(forTab: index) }
 
-    @objc private func closeTab() { strip.close(index) }
+    @objc private func closeTab() {
+        if let liveIndex { strip.close(liveIndex) }
+    }
 
     override func accessibilityPerformPress() -> Bool {
-        strip.delegate?.tabStrip(strip, select: index)
+        guard let liveIndex else { return false }
+        strip.delegate?.tabStrip(strip, select: liveIndex)
         return true
     }
 
@@ -320,5 +321,23 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         let save = !cancelling
         cancelling = false
         endRename(save: save)
+    }
+}
+
+extension TabItemView {
+    /// What the badge's dot means, in words.
+    static func badgeLabel(status: ProgramStatus?, progress: ProgramProgress?) -> String? {
+        guard status != nil || progress != nil else { return nil }
+        var label = status.map { L10n.text("agent.state." + $0.state.rawValue) } ?? L10n.text("agent.progress")
+        if let value = progress?.value { label += " · \(value)%" }
+        return label
+    }
+
+    /// Where this view's tab is now, found by identity; nil once it has gone.
+    /// A press under way when the tab closes still ends here, and `index` by
+    /// then names whichever tab took its place.
+    var liveIndex: Int? {
+        guard !isLeaving, let itemID else { return nil }
+        return strip.index(ofTab: itemID)
     }
 }

@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { dictionary, languages } from "@/lib/i18n";
-import { asset, href, download, repository } from "@/lib/site";
+import { asset, download, href, repository } from "@/lib/site";
 export function Header({ lang, slug = "" }: { lang: string; slug?: string }) {
   const d = dictionary(lang);
   return (

@@ -14,9 +14,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { asset } from "@/lib/site";
 import { notFound } from "next/navigation";
 import { languages } from "@/lib/i18n";
+import { asset } from "@/lib/site";
 import "../globals.css";
 export function generateStaticParams() {
   return languages.map((l) => ({ lang: l.code }));

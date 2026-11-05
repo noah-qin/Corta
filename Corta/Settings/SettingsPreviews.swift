@@ -16,7 +16,6 @@
 
 import SwiftUI
 
-// The compact native previews come from 1.6old's settings components.
 struct SettingsIconTile: View {
     let color: Color
     let symbol: String
@@ -103,27 +102,6 @@ struct CursorThumbnail: View {
                 }
             }
             .foregroundStyle(.white)
-        }
-    }
-}
-
-/// One symbol per bell mode.
-struct BellThumbnail: View {
-    let mode: BellMode
-
-    var body: some View {
-        SettingsThumbnail {
-            Image(systemName: symbol)
-                .font(.system(size: 28, weight: .regular))
-                .foregroundStyle(.white)
-        }
-    }
-
-    private var symbol: String {
-        switch mode {
-        case .visual: "eye"
-        case .audible: "speaker.wave.2"
-        case .muted: "speaker.slash"
         }
     }
 }

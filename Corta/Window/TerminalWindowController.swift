@@ -75,6 +75,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         // Corta draws its own tabs (D30); AppKit's would add a second bar.
         window.tabbingMode = .disallowed
+        // A live process, not a document; every window, however it was born.
+        // Left restorable, AppKit re-applied a stale saved frame after sizing.
+        window.isRestorable = false
         // Link and tab tooltips only while Corta is active, as the storyboard
         // window had it.
         window.allowsToolTipsWhenApplicationIsInactive = false
@@ -108,6 +111,7 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// invisible otherwise. Follows `SecureInput.engaged`, not the setting.
     private var secureInputIndicator: NSTitlebarAccessoryViewController?
     private var secureInputObserver: NSObjectProtocol?
+    private var isStripRefreshPending = false
 
     isolated deinit {
         if let secureInputObserver { NotificationCenter.default.removeObserver(secureInputObserver) }
@@ -339,6 +343,20 @@ extension TerminalWindowController {
         guard force || items != tabStrip.items || selected != tabStrip.selectedIndex else { return }
         tabStrip.update(items: items, selectedIndex: selected)
     }
+
+    /// For output, which asks once a frame while a program streams: building
+    /// an item per tab that often is work nobody can see. A tenth of a second
+    /// is well inside what reads as the moment the program changed.
+    func refreshTabStripSoon() {
+        guard !isStripRefreshPending else { return }
+        isStripRefreshPending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.stripRefreshInterval) { [weak self] in
+            self?.isStripRefreshPending = false
+            self?.refreshTabStrip()
+        }
+    }
+
+    static let stripRefreshInterval: TimeInterval = 0.1
 
     /// Kept for the panes and splits that report a title change.
     func refreshTabTitle() { refreshTabStrip() }

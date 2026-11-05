@@ -25,7 +25,8 @@ import UserNotifications
 /// ends after `idleGrace` of silence — a mid-run pause notifies early,
 /// which is why the feature is off by default.
 ///
-/// Nothing is posted below the threshold or while the window is key, and
+/// Nothing is posted below the threshold or while its tab is in front of the
+/// key window, and
 /// never the command text: the grid holds tokens and mistyped passwords
 /// (`SECURITY.md` §5).
 @MainActor
@@ -52,6 +53,8 @@ final class TaskNotifier {
     private var lastCommandID: Int?
     /// Checked for key status.
     private weak var window: NSWindow?
+    /// Whether the pane's tab is the one its window shows.
+    var tabInFront: () -> Bool = { true }
     /// The notice's title, set by the pane: what Corta knows of it, never
     /// the window title, which an OSC 0/2 sequence sets
     /// (`PaneWindowTitle.notificationTitle`).
@@ -143,7 +146,7 @@ final class TaskNotifier {
     /// - Parameter commandID: the finished command, for the click; nil on a
     ///   start.
     /// - Parameter window: the pane's window: nothing is posted while it is
-    ///   key.
+    ///   key and shows this pane's tab.
     func noteCommandRunning(
         _ running: Bool, exitStatus: Int?, commandID: Int?, in window: NSWindow?
     ) {
@@ -165,6 +168,9 @@ final class TaskNotifier {
         }
         wasCommandRunning = running
     }
+
+    /// Whether the shell last reported a command running.
+    var isCommandRunningNoted: Bool { wasCommandRunning }
 
     /// Return pressed: a task starts, unless the shell reports boundaries.
     func noteCommandSubmitted(in window: NSWindow?) {
@@ -225,7 +231,7 @@ final class TaskNotifier {
         // The grace is idle time, not work.
         let elapsed = Date().timeIntervalSince(startedAt) - Self.idleGrace
         guard elapsed >= configuration.notificationThreshold else { return }
-        guard window?.isKeyWindow != true else { return }
+        guard !isWatched else { return }
         post(elapsed: elapsed, title: title())
     }
 
@@ -237,9 +243,15 @@ final class TaskNotifier {
         guard configuration.notifyOnLongTask else { return }
         let elapsed = Date().timeIntervalSince(startedAt)
         guard elapsed >= configuration.notificationThreshold else { return }
-        guard window?.isKeyWindow != true else { return }
+        guard !isWatched else { return }
         post(elapsed: elapsed, title: title())
     }
+
+    /// The window is key and this pane's tab is the one it shows. Tabs share
+    /// a window (D30): a finish in the tab behind is news.
+    private var isWatched: Bool { Self.isWatched(windowIsKey: window?.isKeyWindow == true, tabInFront: tabInFront()) }
+
+    nonisolated static func isWatched(windowIsKey: Bool, tabInFront: Bool) -> Bool { windowIsKey && tabInFront }
 
     private func post(elapsed: TimeInterval, title: String) {
         let content = UNMutableNotificationContent()

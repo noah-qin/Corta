@@ -14,9 +14,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import http from "node:http";
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
+
 const root = path.resolve("out");
 const base = (process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, "");
 const port = Number(process.env.PORT || 3001);
@@ -48,12 +49,12 @@ http
       res.writeHead(400).end();
       return;
     }
-    if (base && url !== base && !url.startsWith(base + "/")) {
+    if (base && url !== base && !url.startsWith(`${base}/`)) {
       res.writeHead(404).end();
       return;
     }
     url = url.slice(base.length) || "/";
-    let file = path.resolve(root, "." + url);
+    let file = path.resolve(root, `.${url}`);
     if (!file.startsWith(root + path.sep) && file !== root) {
       res.writeHead(403).end();
       return;

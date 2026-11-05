@@ -347,7 +347,7 @@ window passed through is no longer needed.
 
 ### What replaced D15 and D16
 
-A terminal window is created by `TerminalWindowController(setup:asPanel:)`
+A terminal window is created by `TerminalWindowController(setup:)`
 with its final style mask (`.fullSizeContentView` included) and its root
 pane's setup as an initializer argument. `SplitViewController.prepareWindow`
 dresses and sizes it from the root pane's cell metrics *before it is

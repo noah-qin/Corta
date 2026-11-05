@@ -78,6 +78,30 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- A long task or a program's notice in a tab behind the one you are looking
+  at reaches you: tabs share a window, and being in the key window counted
+  as being watched. A shell's report of a command ending no longer waits for
+  the tab to be drawn.
+- Moving a tab while it fades out after ⌘T no longer leaves it blank in its
+  new window, and a click during that fade reaches the new tab, not the old
+  one.
+- With two or more tabs open, Corta no longer keeps waking to read process
+  details after output has stopped.
+- A double-click on a tab's × closes that tab, not the one that took its
+  place. A tab whose agent reports a status says so in its tooltip and to
+  VoiceOver again.
+- A tab dropped over a window now lands in the frontmost one under the
+  pointer, never in a covered window or one on another Space; a window asking
+  something in a sheet keeps its tabs through Merge All Windows.
+- A background tab's reader drops to background priority as soon as the tab
+  is left, and the window resizes by the cells of the tab in front.
+- Move Tab to New Window's windows no longer come back at a stale saved size.
+- ⌃Tab leaves the key alone when you have bound it to a command, and when
+  there is only one tab.
+- Settings' sidebar answers the arrow keys after a click, and its search
+  finds what the Appearance and Themes pages now show.
+- The website has its own "Page not found" page, a language switcher that
+  fits a small phone in German, and selected code that stays readable.
 - Gemini's tab tile showed only a dot, and Java's orange tile read as Claude's
   while `java` started: Gemini's star is drawn whole, and Java shows a cup on
   Java's blue. A program's icon now appears only once it takes the terminal

@@ -138,7 +138,7 @@ responder by default; `SplitViewController.viewWillAppear` calls
 targeting First Responder (⌘V, ⌘=, …) silently dead-end — keep that
 call intact.
 
-**A window is born sized.** `TerminalWindowController(setup:asPanel:)`
+**A window is born sized.** `TerminalWindowController(setup:)`
 creates the window with its final style mask and passes the root pane's
 setup — a restore, a preset, a working directory — to
 `SplitViewController(setup:)` by initializer, because the root pane spawns
@@ -156,9 +156,8 @@ grid to text, diff against a checked-in expectation. Record the `esctest`
 pass rate and benchmark numbers at each release — `CONFORMANCE.md` §4.2
 has the exact esctest invocation, and §4.3 the fuzz harness (`corta-fuzz`;
 libFuzzer does not link on macOS with the current Xcode, so a seeded
-mutation driver runs instead). A test never registers a real global
-hotkey or flips the machine's secure-input mode; `GlobalHotKey` is tested
-at its key-code mapping and `SecureInput` through an injected `System`.
+mutation driver runs instead). A test never flips the machine's
+secure-input mode; `SecureInput` is tested through an injected `System`.
 The unit-test host gets a throwaway stage of its own
 (`$TMPDIR/Corta-Tests-<pid>`, D22 amended), so the suite never reads or
 writes the `Corta Dev/config` a developer runs with; a test that seems to

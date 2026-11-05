@@ -61,12 +61,13 @@ final class SplitPaneUITests: XCTestCase {
         let right = window.buttons.matching(identifier: "pane.splitRight").firstMatch
         XCTAssertTrue(right.waitForExistence(timeout: 3))
         right.click()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-        XCTAssertEqual(window.buttons.matching(identifier: "pane.splitRight").count, 2)
+        let rights = window.buttons.matching(identifier: "pane.splitRight")
+        expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: rights)
+        waitForExpectations(timeout: 5)
         // The first pane is unfocused. Its action must still operate on itself.
         window.buttons.matching(identifier: "pane.splitDown").firstMatch.click()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-        XCTAssertEqual(window.buttons.matching(identifier: "pane.splitRight").count, 3)
+        expectation(for: NSPredicate(format: "count == 3"), evaluatedWith: rights)
+        waitForExpectations(timeout: 5)
         let attachment = XCTAttachment(screenshot: window.screenshot())
         attachment.name = "pane-controls-preview"
         attachment.lifetime = .keepAlways

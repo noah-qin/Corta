@@ -76,6 +76,7 @@ final class PaneWindowTitle {
     /// A title rebuild waiting out `processFactsInterval`; at most one, and
     /// cancelled by `stop`.
     private var trailingTitleRefresh: DispatchWorkItem?
+    var hasTrailingRefresh: Bool { trailingTitleRefresh != nil }
     /// The trailing refresh is running: what it redraws reads the facts it
     /// just took, and must not schedule another (a 0.4 s loop per pane).
     private var isRunningTrailingRefresh = false
@@ -103,9 +104,18 @@ final class PaneWindowTitle {
     /// Every part but the size is child input: capped and stripped of
     /// controls (`SECURITY.md` §2). The host badge leads — it answers which
     /// computer the rest is on — and an OSC 0/2 title beats the directory.
-    var composed: String {
+    var composed: String { compose(scheduleTrailing: true) }
+
+    /// The same text for chrome that only shows it: the strip, a pane's
+    /// header, a tooltip. Reading it schedules nothing. Each strip pass reads
+    /// every tab, so a trailing refresh here armed the next tab's, whose pass
+    /// armed this one's, for as long as two tabs were open. Output schedules
+    /// the refresh instead (`noteOutput`).
+    var displayedTitle: String { compose(scheduleTrailing: false) }
+
+    private func compose(scheduleTrailing: Bool) -> String {
         guard let session else { return "Corta" }
-        refreshProcessFactsIfStale(session)
+        refreshProcessFactsIfStale(session, scheduleTrailing: scheduleTrailing)
         var parts: [String] = []
         // The badge's host and directory are the remote shell's own OSC 7
         // text, percent-decoded — as hostile as any other child-supplied
@@ -178,16 +188,17 @@ final class PaneWindowTitle {
     /// `session.currentDirectory`, which a remote `OSC 7` report never
     /// reaches (it lands in `remoteContext`), so there is no remote
     /// path here to offer a drag of.
-    func apply() {
+    func apply(fromOutput: Bool = false) {
         guard let window = window() else { return }
         let tab = tab()
+        let controller = window.windowController as? TerminalWindowController
         if let tab, !tab.isSelected {
-            tab.controller?.refreshTabStrip()
+            if fromOutput { controller?.refreshTabStripSoon() } else { tab.controller?.refreshTabStrip() }
             return
         }
         let title = tab?.customTitle ?? composed
         if window.title != title { window.title = title }
-        (window.windowController as? TerminalWindowController)?.refreshTabTitle()
+        if fromOutput { controller?.refreshTabStripSoon() } else { controller?.refreshTabTitle() }
 
         if window.representedURL != representedDirectory {
             window.representedURL = representedDirectory

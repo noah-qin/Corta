@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { languages } from "@/lib/i18n";
-import { href, asset, manifest, chooserMetadata } from "@/lib/site";
+import { asset, chooserMetadata, href, manifest } from "@/lib/site";
 export const metadata = chooserMetadata();
 export default function Entry() {
   return (

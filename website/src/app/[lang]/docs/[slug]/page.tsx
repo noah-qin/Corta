@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Document } from "@/components/document";
-import { manifest, metadata as makeMetadata } from "@/lib/site";
+import { metadata as makeMetadata, manifest } from "@/lib/site";
 export function generateStaticParams() {
   return manifest.documents
     .filter((d) => d.slug !== "changelog")

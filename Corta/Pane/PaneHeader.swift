@@ -25,6 +25,7 @@ final class PaneHeader: NSView {
     private let title = NSTextField(labelWithString: "")
     private let icon = NSImageView()
     private var displayedProgram: ProgramIcon?
+    private var displayedZoom: Bool?
     private var buttons: [NSButton] = []
 
     private struct Command {
@@ -115,18 +116,23 @@ final class PaneHeader: NSView {
         let dark = color.x * 0.2126 + color.y * 0.7152 + color.z * 0.0722 < 0.5
         let name: NSAppearance.Name = dark ? .darkAqua : .aqua
         if appearance?.name != name { appearance = NSAppearance(named: name) }
-        let fullTitle = pane.windowTitle.composed
+        let fullTitle = pane.windowTitle.displayedTitle
         let tabLabel = pane.windowTitle.tabLabel
         if displayedProgram != tabLabel.icon {
             icon.image = tabLabel.icon == .terminal
                 ? NSImage(systemSymbolName: "terminal", accessibilityDescription: nil) : tabLabel.icon.symbol
             displayedProgram = tabLabel.icon
         }
-        title.stringValue = tabLabel.text
-        title.toolTip = fullTitle
-        title.textColor = pane.isFocusedPane ? .labelColor : .secondaryLabelColor
-        buttons[2].isEnabled = split.hasMultiplePanes
+        // On every output batch while a program streams: touch a view only
+        // when its value changed.
+        if title.stringValue != tabLabel.text { title.stringValue = tabLabel.text }
+        if title.toolTip != fullTitle { title.toolTip = fullTitle }
+        let textColor: NSColor = pane.isFocusedPane ? .labelColor : .secondaryLabelColor
+        if title.textColor != textColor { title.textColor = textColor }
+        if buttons[2].isEnabled != split.hasMultiplePanes { buttons[2].isEnabled = split.hasMultiplePanes }
         let zoomed = split.zoomedPane === pane
+        guard displayedZoom != zoomed else { return }
+        displayedZoom = zoomed
         let label = L10n.text(zoomed ? "command.unzoomPane" : "command.zoomPane")
         buttons[2].image = NSImage(systemSymbolName: zoomed
             ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",

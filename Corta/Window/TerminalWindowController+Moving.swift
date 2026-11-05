@@ -34,9 +34,17 @@ extension TerminalWindowController {
 
     /// `others`' tabs join this window, after its own, in order; the
     /// emptied windows close. This window's tab stays in front.
+    /// A window asking something in a sheet stays as it is: its question is
+    /// about the tabs it holds, and closing it would leave the answer nowhere.
     func merge(_ others: [TerminalWindowController]) {
+        guard window?.attachedSheet == nil else {
+            NSSound.beep()
+            return
+        }
         let front = selectedTab
-        for other in others where other !== self {
+        let asking = others.filter { $0 !== self && $0.window?.attachedSheet != nil }
+        if !asking.isEmpty { NSSound.beep() }
+        for other in others where other !== self && !asking.contains(where: { $0 === other }) {
             for tab in other.releaseAllTabs() { receive(tab) }
             other.window?.close()
         }
@@ -69,6 +77,10 @@ extension TerminalWindowController {
     /// giving up its last tab goes with it.
     func take(_ tab: TerminalTab, from source: TerminalWindowController, at index: Int) {
         guard source !== self else { return }
+        guard window?.attachedSheet == nil, source.window?.attachedSheet == nil else {
+            NSSound.beep()
+            return
+        }
         if source.tabs.count == 1 {
             _ = source.releaseAllTabs()
             source.window?.close()
@@ -84,13 +96,20 @@ extension TerminalWindowController {
     /// on no strip takes its window there instead.
     func drop(_ tab: TerminalTab, atScreenPoint point: NSPoint) {
         guard let window, let delegate = NSApp.delegate as? AppDelegate else { return }
-        let targets = NSApp.orderedWindows.compactMap { $0.windowController as? TerminalWindowController }
-            .filter { delegate.terminalWindowControllers.contains($0) && $0.window?.isVisible == true }
-        for target in targets {
-            guard let index = target.tabStrip.insertionIndex(atScreenPoint: point) else { continue }
-            if target === self { return }
-            target.take(tab, from: self, at: index)
-            return
+        // Front to back, this Space only. `isVisible` is true of a window on
+        // another Space too. Every window counts as cover, Settings as much as
+        // a terminal, or a strip under it would catch the tab; the drag's own
+        // preview takes no mouse events and does not.
+        let windows = NSApp.orderedWindows.filter { $0.isVisible && $0.isOnActiveSpace && !$0.ignoresMouseEvents }
+        for candidate in windows {
+            if let target = candidate.windowController as? TerminalWindowController,
+                delegate.terminalWindowControllers.contains(target),
+                let index = target.tabStrip.insertionIndex(atScreenPoint: point) {
+                if target === self { return }
+                target.take(tab, from: self, at: index)
+                return
+            }
+            if candidate.frame.contains(point) { break }
         }
         // The strip's top-left sits under the pointer, about where the tab
         // was held.

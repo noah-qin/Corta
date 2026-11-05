@@ -434,7 +434,7 @@ prompt did not load. Their shared launcher also isolates `HOME` and
 ### Running app suites without a window
 
 For the pure-policy and offscreen Metal suites, a test host built with
-`CORTA_HEADLESS_TESTS` starts no window, shell, menus, hotkeys or
+`CORTA_HEADLESS_TESTS` starts no window, shell, menus or
 secure-input monitoring and never activates. It is a compile-time flag,
 never set for a shipping build:
 

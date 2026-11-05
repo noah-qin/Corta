@@ -67,11 +67,11 @@ The site is published at **https://corta.noahqin.dev** by GitHub Pages, from `.g
 - **A pull request** that touches README, CHANGELOG, `docs/**`, `website/**` or the workflow builds, typechecks, tests and verifies the site for `https://corta.noahqin.dev`, and deploys nothing. It runs on Linux. A website-only change builds and tests nothing on macOS (`scripts/ci-docs-only.py`); CI's core job still starts there for the repository's license check, which the site's new files have to pass.
 - **A push to main** with the same paths, or a manual run on main, reads the origin and base path from the Pages configuration, repeats those checks, uploads only `website/out` and deploys through the `github-pages` environment, which admits main only. It never touches the app's signing or release workflow.
 
-| Setting | Local | Pages, custom domain (current) | Pages, project path |
-| --- | --- | --- | --- |
-| `CORTA_CONTENT_DIR` | `..` (default) | `..` | `..` |
-| `NEXT_PUBLIC_BASE_PATH` | empty | empty, from Pages configuration | `/Corta`, from Pages configuration |
-| `SITE_URL` | `http://localhost:3000` default | `https://corta.noahqin.dev`, from Pages configuration | `https://noah-qin.github.io`, from Pages configuration |
+| Setting                 | Local                           | Pages, custom domain (current)                        | Pages, project path                                    |
+| ----------------------- | ------------------------------- | ----------------------------------------------------- | ------------------------------------------------------ |
+| `CORTA_CONTENT_DIR`     | `..` (default)                  | `..`                                                  | `..`                                                   |
+| `NEXT_PUBLIC_BASE_PATH` | empty                           | empty, from Pages configuration                       | `/Corta`, from Pages configuration                     |
+| `SITE_URL`              | `http://localhost:3000` default | `https://corta.noahqin.dev`, from Pages configuration | `https://noah-qin.github.io`, from Pages configuration |
 
 `SITE_URL` is an origin with no path. `NEXT_PUBLIC_BASE_PATH` is a build-time setting; trailing-slash routes export directory indexes. The domain is a DNS-only `CNAME` from `corta` to `noah-qin.github.io`, and `noahqin.dev` is a verified Pages domain of the `noah-qin` account so no other repository can claim the name; its `_github-pages-challenge-noah-qin` TXT record stays. On a project path instead, crawlers read the domain root's robots file, not `/Corta/robots.txt`, so the sitemap has to be submitted to Search Console directly. Example project-path check:
 

@@ -68,9 +68,26 @@ final class TabContainerViewController: NSViewController {
         view.addSubview(content)
     }
 
+    /// `split` leaves this window, or closes. A hold or a fade under way was
+    /// this window's: it must not reach the view once another window has it.
     func remove(_ split: SplitViewController) {
+        if held === split { held = nil }
+        if shown === split { shown = nil }
+        contentView?.inert.remove(split.view)
+        split.view.layer?.removeAllAnimations()
+        split.view.alphaValue = 1
         split.view.removeFromSuperview()
         split.removeFromParent()
+    }
+
+    private var contentView: WindowContentView? { viewIfLoaded as? WindowContentView }
+
+    private func setHidden(_ hidden: Bool, _ split: SplitViewController) {
+        guard split.view.isHidden != hidden else { return }
+        split.view.isHidden = hidden
+        // A tab going behind has no window event to say so; its reader's
+        // priority follows here. One coming forward gets it from its redraw.
+        if hidden { for pane in split.panes { pane.updateReaderPriority() } }
     }
 
     private weak var shown: SplitViewController?
@@ -87,11 +104,15 @@ final class TabContainerViewController: NSViewController {
         shown = split
         let holding = previous.flatMap { $0 !== split && $0.parent === self ? $0 : nil }
         for case let child as SplitViewController in children {
-            child.view.isHidden = child !== split && child !== holding
+            setHidden(child !== split && child !== holding, child)
         }
+        contentView?.inert.remove(split.view)
         split.view.frame = view.bounds
         guard let holding else { return }
         held = holding
+        // Still drawn, but no longer the tab: a click belongs to the one
+        // that already has the keyboard.
+        contentView?.inert.add(holding.view)
         view.addSubview(split.view, positioned: .below, relativeTo: holding.view)
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.holdLimit) { [weak self, weak holding] in
             guard let self, let holding, self.held === holding else { return }
@@ -114,14 +135,21 @@ final class TabContainerViewController: NSViewController {
     func releaseHeld(animated: Bool = true) {
         guard let held else { return }
         self.held = nil
-        guard held !== shown else { return }
+        guard held !== shown else {
+            contentView?.inert.remove(held.view)
+            return
+        }
         guard animated, view.window?.isVisible == true else {
-            held.view.isHidden = true
+            setHidden(true, held)
+            contentView?.inert.remove(held.view)
             return
         }
         Self.fadeOut(held.view) { [weak self, weak held] in
-            guard let self, let held else { return }
-            held.view.isHidden = held !== self.shown
+            // Only while it is still this window's: a tab moved away during
+            // the fade is another window's to show or hide.
+            guard let self, let held, held.parent === self else { return }
+            self.contentView?.inert.remove(held.view)
+            self.setHidden(held !== self.shown, held)
         }
     }
 
@@ -137,6 +165,7 @@ final class TabContainerViewController: NSViewController {
         }
         content.isHidden = false
         view.addSubview(content, positioned: .above, relativeTo: nil)
+        contentView?.inert.add(content)
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.firstFrameDelay) {
             Self.fadeOut(content) { content.removeFromSuperview() }
         }

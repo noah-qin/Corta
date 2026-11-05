@@ -14,27 +14,28 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { createHash } from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import GithubSlugger from "github-slugger";
+import gfm from "remark-gfm";
+import parse from "remark-parse";
+import stringify from "remark-stringify";
 import sharp from "sharp";
+import { unified } from "unified";
+import {
+  basePath,
+  documents,
+  languages,
+  repository,
+  route,
+} from "./content.config.mjs";
 import {
   descriptionFromIntroduction,
   sourceDates,
 } from "./content-metadata.mjs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
-import { unified } from "unified";
-import parse from "remark-parse";
-import gfm from "remark-gfm";
-import stringify from "remark-stringify";
-import GithubSlugger from "github-slugger";
-import {
-  languages,
-  documents,
-  repository,
-  route,
-  basePath,
-} from "./content.config.mjs";
+
 const website = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -57,7 +58,7 @@ function source(lang, doc) {
 }
 function walk(node, fn) {
   fn(node);
-  node.children?.forEach((n) => walk(n, fn));
+  for (const n of node.children ?? []) walk(n, fn);
 }
 function writeChanged(file, data) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -322,10 +323,10 @@ export async function generate() {
     variants,
     src: (variants.find((v) => v.width >= 1200) || variants.at(-1)).file,
   };
-  writeChanged(cacheFile, JSON.stringify({ digest }) + "\n");
+  writeChanged(cacheFile, `${JSON.stringify({ digest })}\n`);
   writeChanged(
     path.join(output, "manifest.json"),
-    JSON.stringify(metadata, null, 2) + "\n",
+    `${JSON.stringify(metadata, null, 2)}\n`,
   );
   writeChanged(
     path.join(output, "registry.ts"),

@@ -16,11 +16,11 @@
 
 import type { MetadataRoute } from "next";
 import {
+  chooserUrl,
+  href,
+  languageAlternates,
   manifest,
   siteOrigin,
-  href,
-  chooserUrl,
-  languageAlternates,
 } from "@/lib/site";
 export const dynamic = "force-static";
 export default function sitemap(): MetadataRoute.Sitemap {

@@ -58,9 +58,9 @@ struct ProcessEntryPointTests {
             size: TerminalSize(rows: 24, columns: 80), workingDirectory: folder.path)
         defer { session.stop() }
         session.start()
-        let deadline = ContinuousClock.now + .seconds(3)
+        let deadline = SuspendingClock.now + .seconds(3) * testTimeoutScale
         var entry: String?
-        while entry == nil, ContinuousClock.now < deadline {
+        while entry == nil, SuspendingClock.now < deadline {
             entry = session.activeProcessEntryPoint
             if entry == nil { try await Task.sleep(for: .milliseconds(20)) }
         }
