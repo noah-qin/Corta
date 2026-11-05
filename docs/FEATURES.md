@@ -97,7 +97,8 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 - Task state was developed against Claude Code. Development and real
   acceptance used Claude Code 2.1.310; other versions need independent
   verification. Its OSC 7501 reports distinguish working, waiting, done, idle
-  and failure on tabs, the Dock and the Agents list.
+  and failure on tabs, the Dock and the Agents list, which leads with the panes
+  waiting for you.
 - Codex 0.166.0 sends OSC 7501 by itself, with no hook, and Corta's general
   parser shows its idle, working, done and permission-waiting states on the tab
   (checked 2026-11-05). Corta has no Codex-specific state handling; Codex

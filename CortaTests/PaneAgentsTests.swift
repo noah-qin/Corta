@@ -54,6 +54,46 @@ struct PaneAgentsTests {
     }
     private func osc(_ payload: String) -> String { "\u{1B}]" + payload + "\u{1B}\\" }
 
+    @Test func agentsListLeadsWithWaitingPanesInArrivalOrderThenUrgency() async throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.agentStatus = true }
+        let idle = try pane(), done = try pane(), failed = try pane()
+        let firstWaiter = try pane(), working = try pane(), secondWaiter = try pane()
+        // In window order, none of them already where the list must put it.
+        let panes = [idle, secondWaiter, done, working, failed, firstWaiter]
+        defer {
+            for pane in panes { pane.agents.reset(); pane.session.stop() }
+            ConfigurationStore.shared.update { $0 = original }
+        }
+        try await send(osc("7501;state=idle"), to: idle)
+        try await send(osc("7501;state=done"), to: done)
+        try await send(osc("7501;state=error"), to: failed)
+        try await send(osc("7501;state=working"), to: working)
+        // A self-reported kind buys no place: the first to wait stays first.
+        try await send(osc("7501;state=blocked:kind=question"), to: firstWaiter)
+        try await send(osc("7501;state=blocked:kind=auth"), to: secondWaiter)
+        let expected = [firstWaiter, secondWaiter, failed, working, done, idle].map(\.taskNotifier.paneID)
+        #expect(AgentDirectory.entries(of: panes).map(\.id) == expected)
+
+        // Left waiting: it falls back to its urgency. Back again: last in line.
+        try await send(osc("7501;state=working"), to: firstWaiter)
+        try await send(osc("7501;state=blocked:kind=permission"), to: firstWaiter)
+        #expect(AgentDirectory.entries(of: panes).prefix(2).map(\.id)
+            == [secondWaiter, firstWaiter].map(\.taskNotifier.paneID))
+
+        ConfigurationStore.shared.update { $0.agentStatus = false }
+        #expect(AgentDirectory.entries(of: panes).isEmpty)
+    }
+
+    @Test func equalAgentsKeepTheirWindowOrder() {
+        let ids = (0..<3).map { _ in UUID() }
+        let listed = ids.map { (entry: AgentDirectory.Entry(id: $0, title: "pane"), urgency: 1) }
+        #expect(AgentDirectory.ordered(listed, waiting: []).map(\.id) == ids)
+        // A waiter no longer listed, and a listed pane not queued, change nothing else.
+        #expect(AgentDirectory.ordered(listed, waiting: [UUID(), ids[2]]).map(\.id)
+            == [ids[2], ids[0], ids[1]])
+    }
+
     @Test func notificationsAndBellCannotRewriteReportedTaskState() async throws {
         let original = ConfigurationStore.shared.configuration
         ConfigurationStore.shared.update { $0.agentStatus = true }
