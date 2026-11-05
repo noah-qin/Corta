@@ -211,6 +211,19 @@ struct SplitTweaksTests {
         }
     }
 
+    @Test func aRecentBestFitLeavesThePaletteWithItsKey() throws {
+        let model = CommandPaletteModel(agents: { [] })
+        try with(\.bestFitSplit) {
+            model.query = TerminalCommand.splitBestFit.title
+            #expect(model.selectedCommand == .splitBestFit)
+            model.runSelected()
+            model.query = ""
+            #expect(model.rows.compactMap(\.command).contains(.splitBestFit))
+        }
+        model.rebuildRows()
+        #expect(!model.rows.compactMap(\.command).contains(.splitBestFit))
+    }
+
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func theBestFitCommandIsOffUntilItsKeyIsOn() throws {
         let item = NSMenuItem(title: "", action: TerminalCommand.splitBestFit.action, keyEquivalent: "")
