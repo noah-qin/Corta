@@ -133,6 +133,18 @@ final class SplitTree {
         return sibling
     }
 
+    /// `other` takes `leaf`'s place in this tree, and `leaf` is out of it.
+    /// The container installs a new root.
+    func replace(leaf: NSView, with other: NSView) {
+        other.frame = leaf.frame
+        other.translatesAutoresizingMaskIntoConstraints = true
+        if leaf === root {
+            root = other
+        } else if let parent = leaf.superview as? NSSplitView {
+            parent.replaceSubview(leaf, with: other)
+        }
+    }
+
     /// The nearest leaf in `direction`, measured in `container`'s
     /// coordinate space: a candidate must lie strictly past the current
     /// leaf's center along the axis, and the winner minimizes axial distance

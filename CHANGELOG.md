@@ -16,6 +16,9 @@ Versioning for compatibility changes.
   through blocked panes across tabs and windows in waiting arrival order.
 - The Agents list, in Window and the command palette, leads with the panes
   waiting for you, in the order they began waiting; the rest follow by urgency.
+- Drag a pane's header to rearrange panes: an edge of another pane puts it on that
+  side, the middle swaps them, and holding over a tab shows that tab. A preview shows
+  where it lands, Esc cancels, and the programs notice nothing until the drop.
 - Panes move with their programs still running: ⇧⌥⌘ and an arrow key moves the
   focused pane, Swap Pane exchanges it with a neighbour, and Move Pane to New
   Tab, to the previous or next tab, or to a tab by name takes it out of the tab.

@@ -155,5 +155,11 @@ final class PaneHeader: NSView {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    override func mouseDown(with event: NSEvent) { perform { _ in } }
+    /// Focuses the pane; held and dragged, rearranges it. A button here tracks
+    /// its own click and never reaches this.
+    override func mouseDown(with event: NSEvent) {
+        perform { _ in }
+        guard let pane, !pane.didTeardown, let controller = pane.splitController?.tab?.controller else { return }
+        PaneDragSession(pane: pane, controller: controller)?.track(from: event)
+    }
 }

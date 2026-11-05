@@ -120,6 +120,7 @@ the mouse wheel over it — and follows the tab you select.
 | Move the focused pane | ⇧⌥⌘ + arrow key |
 | Swap with the neighbouring pane | Swap Pane Left, Right, Up, Down (command palette) |
 | Move the pane to a new or existing tab | **Shell ▸ Move Pane**, **Shell ▸ Move Pane to Tab** |
+| Rearrange panes with the mouse | Drag a pane's header |
 | Close the pane, tab or window | ⌘W |
 | Put back the pane you just closed | ⇧⌘T |
 
@@ -144,6 +145,15 @@ the mouse wheel over it — and follows the tab you select.
   shows that tab; the last pane moved out of a tab closes the tab. A zoomed pane
   unzooms first. A pane whose width in columns changes loses its selection, as
   it does in any resize that rewraps the text.
+- **Dragging a pane.** Drag a pane by its header, the row with its name, anywhere
+  but its buttons. Over another pane, a highlight shows where it would land: an edge
+  puts it on that side, the middle changes places with that pane. Hold it over
+  another tab for a moment to show that tab and do the same there, or drop it on the
+  tab to move it in. Esc, or letting go anywhere else, puts everything back: nothing
+  moves until you let go, so the programs in the panes notice nothing. The keyboard
+  stays with the pane you dragged. In a zoomed tab there is no other pane to land on,
+  only other tabs. Between windows, drag the tab instead. A pane whose width in
+  columns changes loses its selection, as in any resize that rewraps the text.
 - **Optional split behaviours**, all off by default. In **Settings ▸ General ▸
   Panes**: *Keep panes equal in size* shares the room equally as panes open and
   close, except where you have placed a divider; Equalize Panes makes it forget

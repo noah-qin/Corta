@@ -48,6 +48,26 @@ extension SplitTree {
         second.frame = firstFrame
     }
 
+    /// Whether `leaf` already stands on that side of `target`, so that placing
+    /// it there would change nothing but its size.
+    func isBeside(_ leaf: NSView, _ target: NSView, direction: SplitMoveDirection) -> Bool {
+        guard let parent = leaf.superview as? NSSplitView, target.superview === parent,
+            parent.isVertical == direction.orientation.isVertical
+        else { return false }
+        return parent.subviews[direction.towardFirst ? 0 : 1] === leaf
+    }
+
+    /// `leaf` leaves its place and stands on `direction`'s side of `target`.
+    func place(_ leaf: NSView, beside target: NSView, direction: SplitMoveDirection) {
+        // A target the removal grows takes over the whole of what they shared.
+        let frame = leaf.superview === target.superview ? (target.superview?.frame ?? target.frame) : target.frame
+        close(leaf: leaf)
+        split(
+            leaf: target, orientation: direction.orientation, newLeaf: leaf,
+            newLeafFirst: direction.towardFirst
+        ).frame = frame
+    }
+
     /// Moves `leaf` one step in `direction`, reading the same-axis splits along
     /// its path as one row. Returns false when it is already as far as it
     /// goes, and changes nothing. In order, the rule:
