@@ -195,11 +195,11 @@ files, remote connections and child-process input.
   load, memory, network rates, home-volume free space and four thermal levels.
   Click for host, macOS version, chip, core count and total memory. Windows
   share one sampler; hidden bars stop polling. SSH panes still show local data.
-- A graphical theme editor in Appearance settings, with separate light/dark
+- A graphical theme editor in Themes settings, with separate light/dark
   previews, color pickers and HEX fields, save/cancel and source-color reset.
   It saves through the existing configuration file; manual editing remains
   supported. Built-ins are copied, while custom themes can be edited.
-- View → Local host details and Terminal settings expose host configuration
+- View → Local host details and Appearance settings expose host configuration
   even with the bar disabled. View → Theme editor opens color editing directly.
 - System Monospaced is the default font; Settings ▸ Appearance also lists
   every installed monospaced family whose four faces keep one width (D12),
