@@ -267,6 +267,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         #endif
         // Off the main thread: a listing of the temporary directory.
         DispatchQueue.global(qos: .utility).async { ZshBootstrap.removeStaleFolders() }
+        DispatchQueue.global(qos: .utility).async { FileDropStorage.cleanUpAtLaunch() }
         // The saved arrangement, or one window; restored windows are born in
         // their saved directories, so no first window is opened to replace.
         if !restoreWindowsIfConfigured() { openWindow(workingDirectory: nil) }
@@ -470,6 +471,8 @@ extension AppDelegate {
         for controller in windowControllers {
             for split in controller.window?.terminalSplits ?? [] { split.teardown() }
         }
+        // Not left to the panes' background removals: the process is ending.
+        FileDropStorage.removeThisRun()
     }
 
     /// AppKit restoration is off: a live process isn't a document.

@@ -396,10 +396,18 @@ own error text is under **Details**.
   waiting after 120 seconds; failures are shown in the pane. If the session or
   foreground process group changes while receiving, Corta discards the drop;
   try again at the intended prompt. Dragging a row from Corta's SFTP browser
-  onto a pane is not supported. Promised copies live in
-  `~/Library/Application Support/Corta/DroppedFiles/`; keep them until the
-  program using their paths has finished, then remove their reception folders
-  in Finder. They do not expire automatically.
+  onto a pane is not supported.
+
+  **A file from Finder is used where it is, and Corta never removes it. A file
+  only another app can supply, such as a Photos or Mail attachment, arrives as a
+  temporary copy:** save it elsewhere if you want to keep it. The copy goes when
+  its pane closes, with its tab or window, or when Corta quits, so a program still
+  running after that can no longer read it, and neither can anything you copied
+  the path to. Old paths in the scrollback and in your shell history stop working
+  too, and ⇧⌘T brings a pane back without its copies. Moving the pane to another
+  tab or window keeps them. Another program holding a file open, or a system
+  snapshot, can keep the space in use for a while after. **Settings ▸ Privacy &
+  Security ▸ Local Data** shows the space and offers **Clean Now…**.
 - **Right-click.** The clicked pane offers Find… and Copy Command Output
   for the completed command whose output contains the clicked row; the copy
   item is disabled on prompts, on the alternate screen (full-screen programs)
@@ -804,7 +812,8 @@ Settings is a sidebar of categories, the way System Settings is laid out:
   have changed.
 - **Connections** — Connect to Host, and saved presets.
 - **Privacy & Security** — clipboard writes from programs (OSC 52), Secure
-  Keyboard Entry, the directory history and recent hosts.
+  Keyboard Entry, the directory history, recent hosts and the space dropped-file
+  copies take.
 
 These controls edit the same config file. Custom theme colors can be edited
 graphically or through the file.

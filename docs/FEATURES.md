@@ -169,6 +169,10 @@ and [verification limits](CONFORMANCE.md#cli-signal-compatibility).
   through OpenSSH's `SSH_ASKPASS` and never saved; cancelling a password
   ends the connection attempt, cancelling a key's passphrase skips the key. A failed connection says why in a sentence,
   ssh's diagnostics under Details.
+- Temporary copies of files dropped from other apps, removed with their pane or at
+  quit, and at the next launch after a crash, with their size and Clean Now in
+  Settings ▸ Privacy & Security ▸ Local Data. Files dropped from Finder are used
+  where they are.
 - Optional OSC 52 clipboard writes, disabled by default. Clipboard reads from
   terminal output are not implemented.
 
