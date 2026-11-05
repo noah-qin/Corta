@@ -15,8 +15,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
-import CortaPOSIX
-import CortaSFTP
 import CortaTerminal
 import Darwin
 import Testing
@@ -248,7 +246,7 @@ struct FileDropCleanupTests {
 // MARK: - A pane's copies
 
 extension FileDropCleanupTests {
-    private func host(rootedAt root: URL) throws -> (CommandsTestHost, TerminalSession) {
+    private func host() throws -> (CommandsTestHost, TerminalSession) {
         let host = CommandsTestHost()
         host.terminalView = TerminalView(frame: .zero)
         let session = try TerminalSession(executable: "/bin/cat", arguments: [],
@@ -263,8 +261,8 @@ extension FileDropCleanupTests {
     func closingAPane() throws {
         let root = try scratchRoot()
         defer { FileDropStorage.remove(root) }
-        let (first, firstSession) = try host(rootedAt: root)
-        let (second, secondSession) = try host(rootedAt: root)
+        let (first, firstSession) = try host()
+        let (second, secondSession) = try host()
         defer { firstSession.stop(); secondSession.stop() }
         func drop(on host: CommandsTestHost) throws -> URL {
             let directory = try FileDropStorage.makeDirectory(in: root)
@@ -299,7 +297,7 @@ extension FileDropCleanupTests {
         defer { FileDropStorage.remove(root) }
         let original = root.appendingPathComponent("original")
         try Data("mine".utf8).write(to: original)
-        let (host, session) = try host(rootedAt: root)
+        let (host, session) = try host()
         defer { session.stop() }
         host.commands.completeFileDrop(.init(urls: [original], directory: nil, failed: false, timedOut: false),
             context: try #require(host.commands.dropInputContext))
