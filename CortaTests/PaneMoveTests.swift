@@ -323,3 +323,51 @@ struct PaneMoveTests {
         #expect(moved == "tab-1")
     }
 }
+
+/// Moves to another tab that cannot happen.
+extension PaneMoveTests {
+    /// The newcomer takes the target's font, so the target's minimum decides.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aPaneThatWouldNotFitAtTheTargetsFontStaysPut() throws {
+        let controller = makeWindow(panes: 1)
+        defer { close(controller) }
+        let source = try #require(controller.selectedTab)
+        let target = controller.addTab(select: false)
+        let pane = try #require(source.split.focusedPane)
+        let anchor = try #require(target.split.focusedPane)
+        anchor.setFontSize(24)
+        pane.setFontSize(10)
+        let minimum = anchor.minimumContentSize
+        #expect(pane.minimumContentSize.height < minimum.height * 0.7)
+        controller.window?.setContentSize(NSSize(width: minimum.width * 1.5, height: minimum.height * 1.5))
+
+        source.split.movePaneToNextTab(nil)
+
+        #expect(pane.parent === source.split)
+        #expect(controller.tabs.count == 2)
+        #expect(target.split.panes.count == 1)
+    }
+
+    /// A move that cannot happen leaves the target zoomed and the keyboard here.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aRefusedMoveKeepsTheTargetsZoom() throws {
+        let controller = makeWindow(panes: 1)
+        defer { close(controller) }
+        let source = try #require(controller.selectedTab)
+        let target = controller.addTab(select: false)
+        target.split.splitFocusedPane(orientation: .columns)
+        target.split.splitTransition.finish()
+        let anchor = try #require(target.split.focusedPane)
+        target.split.zoomFocusedPane()
+        #expect(target.split.zoomedPane === anchor)
+        let pane = try #require(source.split.focusedPane)
+        controller.window?.setContentSize(anchor.minimumContentSize)
+
+        source.split.movePaneToNextTab(nil)
+
+        #expect(pane.parent === source.split)
+        #expect(target.split.zoomedPane === anchor)
+        #expect(controller.selectedTab === source)
+        #expect(controller.window?.firstResponder === pane.terminalView)
+    }
+}

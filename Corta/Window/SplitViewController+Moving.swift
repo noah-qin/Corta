@@ -183,9 +183,14 @@ extension SplitViewController {
 
     private func moveFocusedPane(to target: TerminalTab) {
         guard let pane = focusedPane, let source = tab, target !== source,
-            let controller = tab?.controller, view.window?.attachedSheet == nil,
-            let orientation = target.split.orientationFitting(pane)
+            let controller = tab?.controller, view.window?.attachedSheet == nil
         else {
+            NSSound.beep()
+            return
+        }
+        guard let orientation = target.split.orientationFitting() else {
+            // Measuring unzoomed gave the target's pane the keyboard.
+            takeFocus(pane)
             NSSound.beep()
             return
         }
@@ -230,18 +235,21 @@ extension SplitViewController {
         }
     }
 
-    /// Which way this tab's focused pane can split to take `pane`: side by side
-    /// if both halves fit, else stacked; nil, changing nothing, if neither does.
-    private func orientationFitting(_ pane: ViewController) -> SplitOrientation? {
+    /// Which way this tab's focused pane can split to take another: side by side
+    /// if both halves fit, else stacked; nil if neither does, zoomed again if it
+    /// was. Its own minimum, since `receive` gives the newcomer its font.
+    private func orientationFitting() -> SplitOrientation? {
         splitTransition.finish()
+        let wasZoomed = zoomedPane != nil
         unzoomPane()
         view.frame = view.superview?.bounds ?? view.frame
         view.layoutSubtreeIfNeeded()
         guard let anchor = focusedPane else { return nil }
         let bounds = anchor.view.bounds
-        let minimum = pane.minimumContentSize
+        let minimum = anchor.minimumContentSize
         if (bounds.width - PaneSurfaceView.gap) / 2 >= minimum.width { return .columns }
         if (bounds.height - PaneSurfaceView.gap) / 2 >= minimum.height { return .rows }
+        if wasZoomed { zoomFocusedPane() }
         return nil
     }
 
