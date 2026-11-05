@@ -67,7 +67,8 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   not the terminated process.
 - Moving and swapping a running pane within its tab, and moving it to a new or
   existing tab of the same window, from the keyboard, the Shell menu and the
-  command palette. Dragging panes to rearrange them is not offered.
+  command palette. Dragging a pane's header does the same, with a
+  preview of where it lands, including onto another tab; not to another window.
 - Optional, off by default: equal pane sizes that keep dividers you placed,
   focus that follows the mouse, and a split along the pane's longer side.
 - A full-screen window with one pane is presented directly to the display,

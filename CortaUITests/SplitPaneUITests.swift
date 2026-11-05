@@ -51,6 +51,42 @@ final class SplitPaneUITests: XCTestCase {
         waitForExpectations(timeout: 5)
     }
 
+    /// A real press and drag on a pane's header. The drop on the other pane's
+    /// bottom edge stacks them; Esc would leave them. `PaneDragTests` holds the
+    /// rest; only this reaches the gesture through the event system.
+    @MainActor
+    func testDraggingAPaneHeaderStacksThePanes() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        app.typeKey("d", modifierFlags: .command)
+        let closes = window.buttons.matching(identifier: "pane.close")
+        XCTAssertTrue(closes.element(boundBy: 1).waitForExistence(timeout: 5))
+        let (first, second) = (closes.element(boundBy: 0).frame, closes.element(boundBy: 1).frame)
+        XCTAssertEqual(first.minY, second.minY, accuracy: 1, "side by side to begin with")
+        let origin = window.coordinate(withNormalizedOffset: .zero)
+        let header = origin.withOffset(CGVector(
+            dx: first.minX - 150 - window.frame.minX, dy: first.midY - window.frame.minY))
+        let edge = origin.withOffset(CGVector(
+            dx: second.minX - 120 - window.frame.minX, dy: window.frame.height - 12))
+        header.press(forDuration: 0.3, thenDragTo: edge)
+        XCTAssertTrue(waitUntil(timeout: 5) {
+            abs(closes.element(boundBy: 0).frame.minY - closes.element(boundBy: 1).frame.minY) > 50
+        }, "one pane now stands below the other")
+    }
+
+    private func waitUntil(timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        return condition()
+    }
+
     @MainActor
     func testPaneHeaderActions() throws {
         let app = XCUIApplication()

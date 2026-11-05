@@ -282,6 +282,14 @@ Without a ready prompt the main screen retains erase-and-home behavior;
 alternate-screen programs and editors with a prompt already in history are
 left intact. Clear History and Reset Terminal remain independent operations.
 
+Dragging a pane's header (`PaneDragSession`) rearranges nothing until the
+drop: only a preview view and, after a dwell on a tab, which tab shows. So a
+cancel owes no child a winsize. `PaneDropPlan` decides the landing, from frames
+and a point alone. The drop goes through the same surgery the keyboard commands
+use (`rearrangeFocusedPane`, `detach`, `receive`). `TerminalWindowController`
+keeps tab and window drags, `PaneSplitView` its dividers; the header's press never
+reaches the terminal view, so selection and mouse reporting do not see it.
+
 ## 5. Milestones
 
 The original M1–M10 plan and its measurements are preserved in

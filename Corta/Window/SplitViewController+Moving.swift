@@ -68,6 +68,93 @@ extension SplitViewController {
         moveFocusedPane(to: tabs[(index + offset + tabs.count) % tabs.count])
     }
 
+    // MARK: - By dragging (`PaneDragSession`)
+
+    /// The focused pane stands on `direction`'s side of `anchor`, in this tab or
+    /// another of the window. Already there, nothing changes, without a beep.
+    func moveFocusedPane(beside anchor: ViewController, direction: SplitMoveDirection) {
+        guard let pane = focusedPane, pane !== anchor, let destination = anchor.splitController else { return }
+        if destination === self {
+            guard !tree.isBeside(pane.view, anchor.view, direction: direction) else { return }
+            rearrangeFocusedPane {
+                self.tree.place($0, beside: anchor.view, direction: direction)
+                return true
+            }
+            return
+        }
+        guard let source = tab, let target = destination.tab, let controller = source.controller,
+            view.window?.attachedSheet == nil
+        else { return }
+        let keepsSearchFocus = searchHoldsKeyboard(pane)
+        let wasLastPane = !hasMultiplePanes
+        detach(pane)
+        destination.receive(pane, beside: anchor, direction: direction)
+        controller.selectTab(target)
+        if wasLastPane { controller.closeTab(source) }
+        finishMove(of: pane, keepsSearchFocus: keepsSearchFocus)
+    }
+
+    /// The focused pane and `other` change places, each keeping the other's
+    /// size, whichever tab of the window `other` is in.
+    func swapFocusedPane(with other: ViewController) {
+        guard let pane = focusedPane, pane !== other, let destination = other.splitController else { return }
+        if destination === self {
+            rearrangeFocusedPane { self.tree.swap($0, other.view); return true }
+            return
+        }
+        guard let target = destination.tab, let controller = tab?.controller,
+            view.window?.attachedSheet == nil
+        else { return }
+        let keepsSearchFocus = searchHoldsKeyboard(pane)
+        for split in [self, destination] {
+            split.splitTransition.finish()
+            split.unzoomPane()
+            split.view.layoutSubtreeIfNeeded()
+        }
+        if lastClosedPane?.sibling === pane { lastClosedPane = nil }
+        if destination.lastClosedPane?.sibling === other { destination.lastClosedPane = nil }
+        let ownFractions = tree.dividerFractions()
+        let otherFractions = destination.tree.dividerFractions()
+        isRearrangingPanes = true
+        destination.isRearrangingPanes = true
+        let placeholder = NSView(frame: pane.view.frame)
+        tree.replace(leaf: pane.view, with: placeholder)
+        destination.tree.replace(leaf: other.view, with: pane.view)
+        tree.replace(leaf: placeholder, with: other.view)
+        pane.removeFromParent()
+        other.removeFromParent()
+        addChild(other)
+        destination.addChild(pane)
+        adoptFont(of: destination, for: other, from: pane)
+        settleTree(fractions: ownFractions)
+        destination.settleTree(fractions: otherFractions)
+        noteFocus(other)
+        destination.noteFocus(pane)
+        controller.selectTab(target)
+        // Both flags down first: a size delivered during surgery is dropped, and
+        // the pane now in this tab is laid out for its new place from here on,
+        // hidden or not.
+        isRearrangingPanes = false
+        destination.isRearrangingPanes = false
+        balancePanesIfConfigured()
+        deliverSizesAfterMove()
+        for remaining in panes { remaining.paneHeader.refresh() }
+        finishMove(of: pane, keepsSearchFocus: keepsSearchFocus)
+    }
+
+    /// A tab has one font size (`setFontSizeForAllPanes`): each of a swapped
+    /// pair takes the size of the tab it arrives in.
+    private func adoptFont(
+        of destination: SplitViewController, for arriving: ViewController, from leaving: ViewController
+    ) {
+        let (hereZoomed, hereSize) = (leaving.isFontSizeZoomed, leaving.fontSize)
+        let (thereZoomed, thereSize) = (arriving.isFontSizeZoomed, arriving.fontSize)
+        arriving.isFontSizeZoomed = hereZoomed
+        if thereSize != hereSize { arriving.setFontSize(hereSize) }
+        leaving.isFontSizeZoomed = thereZoomed
+        if thereSize != hereSize { leaving.setFontSize(thereSize) }
+    }
+
     // MARK: - Within the tab
 
     private func moveLeaf(_ leaf: NSView, _ direction: SplitMoveDirection) -> Bool {
@@ -183,7 +270,7 @@ extension SplitViewController {
 
     // MARK: - Between tabs
 
-    private func moveFocusedPane(to target: TerminalTab) {
+    func moveFocusedPane(to target: TerminalTab) {
         guard let pane = focusedPane, let source = tab, target !== source,
             let controller = tab?.controller, view.window?.attachedSheet == nil
         else {
@@ -264,6 +351,21 @@ extension SplitViewController {
     /// at this tab's font size (`setFontSizeForAllPanes`: a tab has one).
     private func receive(_ pane: ViewController, orientation: SplitOrientation) {
         guard let anchor = focusedPane else { return }
+        receive(pane, beside: anchor, orientation: orientation, first: false)
+    }
+
+    /// The same, on `direction`'s side of `anchor`.
+    private func receive(_ pane: ViewController, beside anchor: ViewController, direction: SplitMoveDirection) {
+        splitTransition.finish()
+        unzoomPane()
+        view.frame = view.superview?.bounds ?? view.frame
+        view.layoutSubtreeIfNeeded()
+        receive(pane, beside: anchor, orientation: direction.orientation, first: direction.towardFirst)
+    }
+
+    private func receive(
+        _ pane: ViewController, beside anchor: ViewController, orientation: SplitOrientation, first: Bool
+    ) {
         let fractions = tree.dividerFractions()
         let frame = anchor.view.frame
         isRearrangingPanes = true
@@ -271,7 +373,7 @@ extension SplitViewController {
         addChild(pane)
         pane.isFontSizeZoomed = anchor.isFontSizeZoomed
         if pane.fontSize != anchor.fontSize { pane.setFontSize(anchor.fontSize) }
-        tree.split(leaf: anchor.view, orientation: orientation, newLeaf: pane.view).frame = frame
+        tree.split(leaf: anchor.view, orientation: orientation, newLeaf: pane.view, newLeafFirst: first).frame = frame
         settleTree(fractions: fractions)
         noteFocus(pane)
     }

@@ -453,6 +453,20 @@ extension TabStripView {
 
     func tabView(at index: Int) -> NSView? { views[safe: index] }
 
+    /// The tab under a point in the window's coordinates, or nil.
+    func tabIndex(atWindowPoint point: NSPoint) -> Int? {
+        views.firstIndex { !$0.isHidden && $0.bounds.contains($0.convert(point, from: nil)) }
+    }
+
+    /// Marks the tab a dragged pane would land in. One at most.
+    func highlightDropTarget(_ index: Int?) {
+        for (position, view) in views.enumerated() {
+            view.wantsLayer = true
+            view.layer?.borderWidth = position == index ? 2 : 0
+            view.layer?.borderColor = NSColor.controlAccentColor.cgColor
+        }
+    }
+
     func beginRename(at index: Int) { views[safe: index]?.beginRename() }
 }
 
