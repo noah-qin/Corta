@@ -227,6 +227,7 @@ final class SplitViewController: NSViewController {
     /// The tab came to the front: its panes draw again and its focused pane
     /// takes the toolbar's input-source slot.
     func didBecomeSelectedTab() {
+        notePanesRearranged()
         // The window's chrome as it is now: a change while this tab was in
         // the background was absorbed by the tab in front, not owed again.
         if let window = view.window, didSetUpWindow {
@@ -406,6 +407,7 @@ final class SplitViewController: NSViewController {
     /// Marks the saved arrangement stale; `AppDelegate` debounces the write.
     /// Divider drags arrive through the window's resize notification.
     func noteLayoutChanged() {
+        notePanesRearranged()
         (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
     }
 }
@@ -433,6 +435,7 @@ extension SplitViewController {
             let superview = pane.view.superview,
             let index = superview.subviews.firstIndex(of: pane.view)
         else { return }
+        notePanesRearranged()
         zoomedPane = pane
         zoomOrigin = (superview, index)
         layoutBeforeZoom = windowState(frame: view.window?.frame ?? view.frame)?.layout
@@ -450,6 +453,7 @@ extension SplitViewController {
     func unzoomPane() {
         splitTransition.finish()
         guard let pane = zoomedPane else { return }
+        notePanesRearranged()
         zoomedPane = nil
         // Back into its own slot: the split lost this child on zoom, and
         // re-adding only the root would orphan it.

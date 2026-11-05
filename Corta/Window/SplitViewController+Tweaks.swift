@@ -118,5 +118,10 @@ extension SplitViewController {
         Self.lastPointerLocation = NSEvent.mouseLocation
     }
 
+    /// Panes changed places, so the entry that may follow is not the pointer's
+    /// doing: from here on, only leaving this point counts as moving. The pointer
+    /// can be resting on a divider or a header, where no pane sees it move.
+    func notePanesRearranged() { Self.lastPointerLocation = NSEvent.mouseLocation }
+
     private static var lastPointerLocation: NSPoint?
 }
