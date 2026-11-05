@@ -93,6 +93,13 @@ struct ProgramStatusConformanceTests {
             try await feed(session, mark("A") + mark("B") + mark("C") + report("state=blocked"))
             try await feed(session, mark("A") + mark("D;0"))
             #expect(session.programStatuses[""]?.state == .idle)
+            // The same with a finished child beside it, in either hook order.
+            for finish in [mark("A") + mark("D;0"), mark("D;0") + mark("A")] {
+                try await feed(session, mark("A") + mark("B") + mark("C")
+                    + report("state=done:id=child") + report("state=working"))
+                try await feed(session, finish)
+                #expect(session.programStatuses[""]?.state == .idle)
+            }
         }
     }
 

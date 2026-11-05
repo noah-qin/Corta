@@ -131,7 +131,8 @@ struct ProgramSignals: Sendable {
     /// A shell boundary ends the program's lifetime even when it could not
     /// send clear (SIGKILL, crash). A clean exit alone never proves completion.
     mutating func endCommand(exitStatus: Int?) {
-        let result = statuses.values.max { $0.urgency < $1.urgency } ?? heldForFinish
+        // What a prompt ahead of this finish dropped counts as if it were still here.
+        let result = (Array(statuses.values) + [heldForFinish].compactMap { $0 }).max { $0.urgency < $1.urgency }
         beginCommand()
         guard var result else { return }
         if exitStatus == 130 {
