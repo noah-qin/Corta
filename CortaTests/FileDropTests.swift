@@ -87,6 +87,27 @@ struct FileDropTests {
         withExtendedLifetime(request) {}
     }
 
+    /// What a file reference on the pasteboard reads as: the path, not its id.
+    @Test("a file reference resolves to the file's path")
+    func fileReferenceResolves() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("corta-\(UUID().uuidString)")
+        try Data("x".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        var info = stat()
+        #expect(stat(file.path, &info) == 0)
+        let item = NSPasteboardItem()
+        // 6571367 is the stable volume key the system's reference URLs use.
+        item.setString("file:///.file/id=6571367.\(info.st_ino)", forType: .fileURL)
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.writeObjects([item])
+        var result: FileDropRequest.Result?
+        let request = try #require(FileDropRequest.start(pasteboard) { result = $0 })
+        await waitUntil("reference received") { result != nil }
+        #expect(result?.urls.map { $0.resolvingSymlinksInPath().path } == [file.resolvingSymlinksInPath().path])
+        withExtendedLifetime(request) {}
+    }
+
     @Test("callbacks already queued beyond the reported file names are still collected")
     func multiplePromiseCallbacks() async throws {
         let directory = try FileDropStorage.makeDirectory(in: scratchRoot())

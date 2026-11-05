@@ -193,6 +193,20 @@ extension FileDropTests {
         #expect(FileManager.default.fileExists(atPath: foreign.path))
     }
 
+    @Test("startup cleanup finishes a removal a quit cut short")
+    func staleCleanupFinishesAnInterruptedRemoval() throws {
+        let root = scratchRoot()
+        defer { FileDropStorage.remove(root) }
+        let interrupted = root.appendingPathComponent(".removing-\(UUID().uuidString)")
+        let foreign = root.appendingPathComponent(".removing-notauuid")
+        for directory in [interrupted, foreign] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        FileDropStorage.removeStale(in: root)
+        #expect(!FileManager.default.fileExists(atPath: interrupted.path))
+        #expect(FileManager.default.fileExists(atPath: foreign.path), "a name this code did not write stays")
+    }
+
     @Test("startup cleanup does not follow a root that is a symlink")
     func staleCleanupRefusesASymlinkedRoot() throws {
         let scratch = scratchRoot()

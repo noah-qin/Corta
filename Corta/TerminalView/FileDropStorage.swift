@@ -55,17 +55,28 @@ nonisolated enum FileDropStorage {
 
     /// At launch, off the main thread: every reception whose owner has gone.
     /// A live owner keeps its copies, and a reused pid keeps them until a later
-    /// launch. A name this code did not write is left alone.
+    /// launch. A name this code did not write is left alone. A `.removing-`
+    /// name is a removal a quit cut short, and it names nothing anyone holds.
     static func removeStale(in root: URL = root) {
         var info = stat()
         guard lstat(root.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR, info.st_uid == getuid()
         else { return }
         let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
         for name in names {
+            if isInterruptedRemoval(name) {
+                try? FileManager.default.removeItem(at: root.appendingPathComponent(name))
+                continue
+            }
             guard let pid = ownerPID(ofDirectoryNamed: name), kill(pid, 0) != 0, errno == ESRCH else { continue }
             try? FileManager.default.removeItem(at: root.appendingPathComponent(name))
         }
     }
+
+    static func isInterruptedRemoval(_ name: String) -> Bool {
+        name.hasPrefix(removingPrefix) && UUID(uuidString: String(name.dropFirst(removingPrefix.count))) != nil
+    }
+
+    private static let removingPrefix = ".removing-"
 
     /// The pid in `<pid>-<uuid>`, or nil for any other name.
     static func ownerPID(ofDirectoryNamed name: String) -> pid_t? {
@@ -123,7 +134,7 @@ nonisolated enum FileDropStorage {
     static func remove(_ url: URL?) {
         guard let url else { return }
         let doomed = url.deletingLastPathComponent()
-            .appendingPathComponent(".removing-" + UUID().uuidString)
+            .appendingPathComponent(removingPrefix + UUID().uuidString)
         let target: URL
         if rename(url.path, doomed.path) == 0 {
             target = doomed
