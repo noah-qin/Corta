@@ -37,6 +37,8 @@ struct ProgramSignals: Sendable {
     static let chunkLimit = 4096
     var statuses: [String: ProgramStatus] = [:]
     var subtaskOrder: [String] = []
+    /// The most urgent record a prompt dropped while its command still ran.
+    var heldForFinish: ProgramStatus?
     var tabMetadata: ProgramStatus?
     var progress: ProgramProgress?
     var notification: DesktopNotification?
@@ -114,9 +116,13 @@ struct ProgramSignals: Sendable {
     /// A new prompt says whatever was working or waiting has stopped, however
     /// it ended. `done` and `error` are results still to be seen, and stay;
     /// `idle` stays too, being true. Applies only to main-screen marks.
-    mutating func promptStarted() {
+    ///
+    /// Another hook can send the prompt before the finish, while the command
+    /// still runs: what it drops is kept aside for that finish to report on.
+    mutating func promptStarted(commandRunning: Bool) {
         guard !statuses.isEmpty else { return }
         for (id, status) in statuses where status.state == .working || status.state == .blocked {
+            if commandRunning, status.urgency > heldForFinish?.urgency ?? -1 { heldForFinish = status }
             removeStatus(id)
             subtaskOrder.removeAll { $0 == id }
         }
@@ -125,7 +131,7 @@ struct ProgramSignals: Sendable {
     /// A shell boundary ends the program's lifetime even when it could not
     /// send clear (SIGKILL, crash). A clean exit alone never proves completion.
     mutating func endCommand(exitStatus: Int?) {
-        let result = statuses.values.max { $0.urgency < $1.urgency }
+        let result = statuses.values.max { $0.urgency < $1.urgency } ?? heldForFinish
         beginCommand()
         guard var result else { return }
         if exitStatus == 130 {
@@ -140,7 +146,7 @@ struct ProgramSignals: Sendable {
     }
 
     mutating func beginCommand() {
-        statuses.removeAll(); subtaskOrder.removeAll(); progress = nil; tabMetadata = nil
+        statuses.removeAll(); subtaskOrder.removeAll(); heldForFinish = nil; progress = nil; tabMetadata = nil
         blocked = nil; blockedID = nil
     }
 

@@ -81,6 +81,21 @@ struct ProgramStatusConformanceTests {
         }
     }
 
+    /// Another precmd hook can run first, so the prompt arrives before the finish.
+    @Test("a prompt before the finish still lets a failing exit read as failed")
+    func promptBeforeFinish() async throws {
+        try await withSession { session in
+            try await feed(session, mark("A") + mark("B") + mark("C") + report("state=working"))
+            try await feed(session, mark("A"))
+            #expect(session.programStatuses.isEmpty)
+            try await feed(session, mark("D;1"))
+            #expect(session.programStatuses[""]?.state == .error)
+            try await feed(session, mark("A") + mark("B") + mark("C") + report("state=blocked"))
+            try await feed(session, mark("A") + mark("D;0"))
+            #expect(session.programStatuses[""]?.state == .idle)
+        }
+    }
+
     @Test("OSC 9;4 never changes a reported state")
     func progressLeavesStateAlone() async throws {
         try await withSession { session in
