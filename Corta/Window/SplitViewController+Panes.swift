@@ -67,6 +67,9 @@ extension SplitViewController {
         }
         equalize(view.subviews.first)
         deliverPaneSizes()
+        // Halving is not equal shares in a row of three: with its marks gone, the
+        // setting's own layout is what Equalize means.
+        balancePanesIfConfigured()
     }
 
     private func equalize(_ subtree: NSView?) {

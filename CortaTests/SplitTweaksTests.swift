@@ -190,6 +190,9 @@ struct SplitTweaksTests {
 
             split.equalizePanes(nil)
             #expect(!root.isUserPositioned)
+            split.view.layoutSubtreeIfNeeded()
+            let widths = split.tree.leaves.map(\.frame.width)
+            #expect(abs(widths[0] - widths[1]) < 2, "\(widths)")
             _ = window
         }
     }
