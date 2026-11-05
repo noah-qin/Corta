@@ -117,8 +117,6 @@ struct SettingsModelTests {
         #expect(model.saveStatus.kind == .adjusted)
     }
 
-    /// Settings applies the registration's own rule: a Shift-only key the
-    /// config parser and the hotkey would refuse is never written.
     @Test("a font size outside 10...24 is clamped")
     func fontSizeIsClamped() {
         let model = SettingsModel()

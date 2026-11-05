@@ -260,8 +260,11 @@ struct WindowTabsTests {
                                                      doCommandBy: #selector(NSResponder.cancelOperation(_:)))
         #expect(editor(in: view) == nil)
         // The hand-back runs after the turn, from the main queue.
-        try await Task.sleep(for: .milliseconds(50))
         let terminal = controller.selectedTab?.split.focusedPane?.terminalView
+        let deadline = SuspendingClock.now + .seconds(3) * testTimeoutScale
+        while window.firstResponder !== terminal, SuspendingClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         #expect(terminal != nil && window.firstResponder === terminal)
     }
 

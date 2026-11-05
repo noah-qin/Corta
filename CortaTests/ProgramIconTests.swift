@@ -118,8 +118,8 @@ struct ProgramIconTests {
         defer { title.stop() }
         session.start()
         session.write(Array("\u{1B}]2;Claude\u{07}\n".utf8))
-        let deadline = ContinuousClock.now + .seconds(3)
-        while session.windowTitle == nil, ContinuousClock.now < deadline {
+        let deadline = SuspendingClock.now + .seconds(3) * testTimeoutScale
+        while session.windowTitle == nil, SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(session.windowTitle == "Claude")
@@ -136,7 +136,9 @@ struct ProgramIconTests {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let script = folder.appendingPathComponent("repl.py")
-        try "import time, tty\ntime.sleep(1)\ntty.setraw(0)\ntime.sleep(30)\n"
+        // Takes the terminal only when told to: a fixed pause lost the race
+        // whenever Python took longer than it to start.
+        try "import sys, time, tty\nsys.stdin.buffer.read(1)\ntty.setraw(0)\ntime.sleep(30)\n"
             .write(to: script, atomically: true, encoding: .utf8)
         let session = try TerminalSession(
             executable: "/usr/bin/python3", arguments: [script.path], environment: ChildEnvironment.default(),
@@ -147,7 +149,7 @@ struct ProgramIconTests {
         defer { title.stop() }
         session.start()
         func label(until done: (ProgramTabLabel) -> Bool) async throws -> ProgramTabLabel {
-            let deadline = SuspendingClock.now + .seconds(3)
+            let deadline = SuspendingClock.now + .seconds(3) * testTimeoutScale
             while true {
                 title.invalidateProcessFacts()
                 let label = title.tabLabel
@@ -157,6 +159,7 @@ struct ProgramIconTests {
         }
         let running = try await label { $0.name.lowercased().hasPrefix("python") }
         #expect(running.icon == .terminal, "still in canonical mode: no icon")
+        _ = session.write(Array("\n".utf8))
         let interactive = try await label { $0.icon != .terminal }
         #expect(interactive.icon == .python)
     }
