@@ -71,7 +71,6 @@ extension SFTPBrowserModel {
         guard let client else { return }
         isLoading = true
         listingError = nil
-        if path != currentPath { receptionNotice = nil }
         directoryGeneration += 1
         let generation = directoryGeneration
         Task {
@@ -81,6 +80,7 @@ extension SFTPBrowserModel {
                 await applyEntries(listing) {
                     let destination = Self.normalized(path: path)
                     if destination != currentPath {
+                        receptionNotice = nil
                         switch history {
                         case .visit:
                             backStack.append(currentPath)

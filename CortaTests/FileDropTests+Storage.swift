@@ -156,6 +156,22 @@ extension FileDropTests {
         #expect(model.receptionNotice == nil)
     }
 
+    @Test("a reception's notice stays through a failed navigation and ends on arriving elsewhere")
+    func receptionNoticeFollowsTheListing() async throws {
+        let fake = FakeSFTPClient()
+        fake.listingErrors["/missing"] = .transport(.closed)
+        fake.listings["/elsewhere"] = []
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect() }
+        model.receptionNotice = L10n.text("drop.partial")
+        model.navigate(to: "/missing")
+        await waitUntil("the navigation failed") { model.listingError != nil }
+        #expect(model.receptionNotice == L10n.text("drop.partial"))
+        model.navigate(to: "/elsewhere")
+        await waitUntil("the listing moved") { model.currentPath == "/elsewhere" }
+        #expect(model.receptionNotice == nil)
+    }
+
     @Test("a stage with a symlinked parent receives into a canonical private directory")
     func stagedParentAlias() throws {
         let fixture = scratchRoot()
