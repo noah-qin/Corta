@@ -29,7 +29,7 @@ extension TerminalView {
     /// ⌃Tab never reaches `keyDown`: AppKit takes it for the key-view loop
     /// first. Claimed here, while this view has the keyboard.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if window?.firstResponder === self, let step = Self.tabCycleStep(for: event), onCycleTab?(step) == true {
+        if window?.firstResponder === self, let step = tabCycleStep(for: event), onCycleTab?(step) == true {
             return true
         }
         return super.performKeyEquivalent(with: event)
@@ -51,7 +51,7 @@ extension TerminalView {
             onPaste?()
             return
         }
-        if let step = Self.tabCycleStep(for: event), onCycleTab?(step) == true { return }
+        if let step = tabCycleStep(for: event), onCycleTab?(step) == true { return }
         // A consumed event ends here; the IME answers via `insertText`, or
         // `doCommand(by:)` while this event is the one it is handling.
         if Self.routesEventThroughIME(event, optionAsMeta: optionAsMeta?() ?? false),
@@ -132,6 +132,17 @@ extension TerminalView {
     /// bindings, so an unbind really hands ⌘V to the child.
     static func isPasteShortcut(_ event: NSEvent, bindings: Keybindings) -> Bool {
         bindings[.paste]?.matches(event) ?? false
+    }
+
+    /// The step, unless the user bound this key to a command: a view's key
+    /// equivalent runs before the menu's, and would take it from them.
+    private func tabCycleStep(for event: NSEvent) -> Int? {
+        guard let step = Self.tabCycleStep(for: event) else { return nil }
+        let bindings = keybindings?() ?? Keybindings()
+        let taken = TerminalCommand.allCases.contains { command in
+            command != .nextTab && command != .previousTab && bindings[command]?.matches(event) == true
+        }
+        return taken ? nil : step
     }
 
     /// ⌃Tab is +1, ⇧⌃Tab −1; any other modifier leaves the key to the

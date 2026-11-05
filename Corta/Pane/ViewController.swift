@@ -594,14 +594,18 @@ extension ViewController {
             self.agents.readOutput()
             if !self.agents.visible, self.session?.takeBell() == true { self.handleBell() }
             self.windowTitle.noteOutput()
+            // A hidden tab draws no frame, and a long task's end must not
+            // wait for it to be shown.
+            self.noteCommandBoundaries()
         }
+        taskNotifier.tabInFront = { [weak self] in self?.splitController?.tab?.isSelected ?? true }
         taskNotifier.programCanDeliver = { [weak self] notice in
             guard let self, !self.didTeardown, self.frameLoop.isCurrent(generation) else { return false }
             switch notice.occasion {
             case .always: return true
             case .invisible: return !self.agents.visible
             case .unfocused:
-                return !(NSApp.isActive && self.view.window?.isKeyWindow == true && self.isFocusedPane)
+                return !(NSApp.isActive && self.view.window?.isKeyWindow == true && self.holdsWindowFocus)
             }
         }
         taskNotifier.sessionGeneration = generation
@@ -808,7 +812,7 @@ extension ViewController {
     /// and tab title current without a timer; an unfocused pane's applies on
     /// focus.
     private func noteOutputBatch() {
-        guard let session else { return }
+        guard session != nil else { return }
         if !drewFirstOutput {
             drewFirstOutput = true
             let first = onFirstOutputFrame
@@ -817,11 +821,11 @@ extension ViewController {
         }
         paneHeader.refresh()
         if isFocusedPane {
-            windowTitle.apply()
+            windowTitle.apply(fromOutput: true)
         } else {
             // A background pane may change the program behind a stacked tab
             // icon without taking keyboard focus. TabIcon caches the artwork.
-            (view.window?.windowController as? TerminalWindowController)?.refreshTabTitle()
+            (view.window?.windowController as? TerminalWindowController)?.refreshTabStripSoon()
         }
         if scrollOffset > 0, !sawOutputWhileScrolled {
             // Nothing else says so: no scroll bar, and the live screen is off view.
@@ -837,6 +841,13 @@ extension ViewController {
         // Rate-limited and gated on VoiceOver inside the call.
         terminalView?.noteAccessibilityValueChanged()
         shell.drainClipboardRequests()
+        noteCommandBoundaries()
+    }
+
+    /// What the shell reported of its commands since the last look; from a
+    /// frame or, in a tab that draws none, from the output signal.
+    private func noteCommandBoundaries() {
+        guard let session else { return }
         let finished = session.takeFinishedCommand()
         // The prompt's return is the moment the program left: the title
         // names the shell again now, not an interval later.

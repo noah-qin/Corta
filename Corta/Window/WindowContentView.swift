@@ -20,6 +20,11 @@ import AppKit
 /// covers the titlebar band and wins hit-testing there; passing the
 /// chrome band back to the frame restores titlebar drag and double-click.
 final class WindowContentView: NSView {
+    /// Subviews still drawn but no longer the tab (`TabContainerViewController`):
+    /// a tab held over a new one, a closed one fading. A click passes through
+    /// them, or it would focus a pane about to be hidden.
+    let inert = NSHashTable<NSView>.weakObjects()
+
     override func draw(_ dirtyRect: NSRect) {
         PaneSurfaceView.gutterColor.setFill()
         dirtyRect.fill()
@@ -36,6 +41,12 @@ final class WindowContentView: NSView {
                 return nil
             }
         }
-        return super.hitTest(point)
+        guard inert.count > 0 else { return super.hitTest(point) }
+        guard !isHidden, frame.contains(point) else { return nil }
+        let local = convert(point, from: superview)
+        for child in subviews.reversed() where !inert.contains(child) {
+            if let hit = child.hitTest(local) { return hit }
+        }
+        return self
     }
 }

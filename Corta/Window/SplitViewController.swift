@@ -214,6 +214,10 @@ final class SplitViewController: NSViewController {
         if let window = view.window, didSetUpWindow {
             lastChromeHeight = window.frame.height - window.contentLayoutRect.height
         }
+        // The window is shared, and this tab's font may be another size.
+        if let window = view.window, let metrics = focusedPane?.terminalRenderer?.pointMetrics {
+            window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        }
         updateWindowMinSize()
         view.layoutSubtreeIfNeeded()
         for pane in panes {

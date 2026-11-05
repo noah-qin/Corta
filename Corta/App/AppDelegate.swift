@@ -233,7 +233,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationWillFinishLaunching(_ notification: Notification) {
         #if CORTA_HEADLESS_TESTS
         // Command-line CPU/Metal tests must not activate a window, start a
-        // shell, register a hotkey or alter secure input on the user's desktop.
+        // shell or alter secure input on the user's desktop.
         NSApp.setActivationPolicy(.prohibited)
         return
         #endif
@@ -241,8 +241,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         _ = ConfigurationStore.shared
         _ = UpdateController.shared
         AppearanceController.shared.start()
-        // Before any window: the hotkey must be held from launch, and Secure
-        // Keyboard Entry must see the first window become key.
+        // Before any window: Secure Keyboard Entry must see the first window
+        // become key.
         SecureInput.shared.start()
         installMenus()
         // Before any window, so a move-and-relaunch never spawns a shell first.

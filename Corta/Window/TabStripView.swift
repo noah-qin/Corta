@@ -114,6 +114,12 @@ final class TabStripView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    /// The press that started a drag has nowhere to end once the window goes.
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        if newWindow == nil { cancelDrag() }
+    }
+
     /// Light or dark follows the terminal canvas, whose colour the
     /// titlebar band shows (D24, amended), not the system's appearance.
     private var isLightCanvas: Bool {
@@ -128,7 +134,7 @@ final class TabStripView: NSView {
         if selectedIndex != self.selectedIndex || items.count != self.items.count { revealsSelection = true }
         // A tab closed under a drag: the dragged view no longer means the
         // same index. Drop the drag; the tabs settle where they are.
-        if items.count != self.items.count { drag = nil }
+        if items.count != self.items.count { cancelDrag() }
         self.items = items
         self.selectedIndex = selectedIndex
         // The first tab, and a restored window's tabs, are simply there.
@@ -301,6 +307,7 @@ extension TabStripView {
     /// A closing tab shrinks and fades where it stood while the others close
     /// the gap; it leaves the strip once the animation is done.
     private func leave(_ view: TabItemView) {
+        view.isLeaving = true
         guard let layer = view.layer else {
             view.removeFromSuperview()
             return

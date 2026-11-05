@@ -78,7 +78,7 @@ final class PaneAgents {
         }
         if let notice {
             host.taskNotifier.noteProgramNotification(notice, visible: visible,
-                focused: NSApp.isActive && host.view.window?.isKeyWindow == true && host.isFocusedPane,
+                focused: NSApp.isActive && host.view.window?.isKeyWindow == true && host.holdsWindowFocus,
                 in: host.view.window)
         }
         if oldStatus != status || oldProgress != progress { AgentDirectory.refresh() }

@@ -52,7 +52,7 @@ struct TerminalWindowEntity: AppEntity {
     @MainActor
     init(tab: TerminalTab) {
         id = tab.id
-        let title = tab.customTitle ?? tab.split.focusedPane?.windowTitle.composed ?? ""
+        let title = tab.customTitle ?? tab.split.focusedPane?.windowTitle.displayedTitle ?? ""
         self.title = title.isEmpty ? "Corta" : title
     }
 }

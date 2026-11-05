@@ -31,7 +31,9 @@ extension PaneCommands {
             self?.pasteFromClipboard()
         }
         view.onCycleTab = { [weak view] step in
-            guard let controller = view?.window?.windowController as? TerminalWindowController else { return false }
+            guard let controller = view?.window?.windowController as? TerminalWindowController,
+                controller.tabs.count > 1
+            else { return false }
             controller.selectAdjacentTab(offset: step)
             return true
         }

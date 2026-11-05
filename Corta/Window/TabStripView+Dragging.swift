@@ -20,7 +20,16 @@ import AppKit
 
 extension TabStripView {
 
+    /// Lets go of a drag whose tab closed or whose window went: no mouse-up
+    /// will come here, so nothing else would take the preview off the screen.
+    func cancelDrag() {
+        drag = nil
+        stopEdgeScroll()
+        hideDragPreview()
+    }
+
     func itemMouseDown(_ index: Int, event: NSEvent) {
+        guard views.indices.contains(index) else { return }
         if event.clickCount == 2 {
             views[index].beginRename()
             return
@@ -106,7 +115,7 @@ extension TabStripView {
         }
     }
 
-    private func stopEdgeScroll() {
+    func stopEdgeScroll() {
         edgeScroll?.invalidate()
         edgeScroll = nil
     }
@@ -170,7 +179,7 @@ extension TabStripView {
         preview.setFrameOrigin(NSPoint(x: point.x - size.width / 2, y: point.y - size.height / 2))
     }
 
-    private func hideDragPreview() {
+    func hideDragPreview() {
         dragPreview?.orderOut(nil)
         dragPreview = nil
         for view in views where view.alphaValue < 1 { view.alphaValue = 1 }

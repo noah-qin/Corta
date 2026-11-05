@@ -133,3 +133,24 @@ struct PaneWindowTitleTests {
         title.stop()
     }
 }
+
+extension PaneWindowTitleTests {
+    /// Reading the title for a strip or a header must not schedule anything:
+    /// two tabs' strip passes kept re-arming each other's refresh for as long
+    /// as the tabs were open, with no output at all.
+    @Test("showing a title schedules no refresh; applying it does")
+    func displayedTitleSchedulesNothing() throws {
+        let session = try TerminalSession(
+            executable: "/bin/cat", arguments: [], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 24, columns: 80), workingDirectory: "/")
+        defer { session.stop() }
+        let title = PaneWindowTitle()
+        defer { title.stop() }
+        title.reset(session: session)
+        _ = title.tabLabel
+        _ = title.displayedTitle
+        #expect(!title.hasTrailingRefresh)
+        _ = title.composed
+        #expect(title.hasTrailingRefresh)
+    }
+}
