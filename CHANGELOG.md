@@ -89,7 +89,7 @@ Versioning for compatibility changes.
   asynchronously, with a deadline and visible failures. Pane drops are bound
   to the session and foreground process group at release; Corta's own SFTP
   rows are refused by panes.
-||||||| parent of c6a46471 (feat(ui): cycle through waiting panes safely)
+
 - Agent navigation and notification clicks reveal panes hidden by another
   pane's zoom and select the target pane in hidden tabs and other windows.
 - Agents menu and palette entries show Corta-owned names and fixed labels,
