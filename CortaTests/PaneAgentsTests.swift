@@ -94,6 +94,25 @@ struct PaneAgentsTests {
             == [ids[2], ids[0], ids[1]])
     }
 
+    @Test func aNewPromptEndsAWaitForTheQueueAndTheListKeepsAResult() async throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.agentStatus = true }
+        let waiting = try pane(), finished = try pane()
+        defer {
+            for pane in [waiting, finished] { pane.agents.reset(); pane.session.stop() }
+            ConfigurationStore.shared.update { $0 = original }
+        }
+        try await send(osc("7501;state=blocked:kind=question"), to: waiting)
+        try await send(osc("7501;state=done"), to: finished)
+        #expect(AgentDirectory.shared.waiting.paneIDs.contains(waiting.taskNotifier.paneID))
+        try await send(osc("133;A"), to: waiting)
+        try await send(osc("133;A"), to: finished)
+        #expect(!AgentDirectory.shared.waiting.paneIDs.contains(waiting.taskNotifier.paneID),
+            "the jump walks this queue")
+        #expect(waiting.agents.status == nil)
+        #expect(finished.agents.status?.state == .done)
+    }
+
     @Test func notificationsAndBellCannotRewriteReportedTaskState() async throws {
         let original = ConfigurationStore.shared.configuration
         ConfigurationStore.shared.update { $0.agentStatus = true }

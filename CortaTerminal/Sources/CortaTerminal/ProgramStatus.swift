@@ -77,11 +77,18 @@ public struct ProgramProgress: Sendable, Equatable {
 
 /// Shared bounds for all program-supplied chrome. Lengths are UTF-8 bytes.
 public enum ProgramText {
-    public static func validID(_ id: String) -> Bool {
+    public static func validID(_ id: some StringProtocol) -> Bool {
         (1...32).contains(id.utf8.count) && id.utf8.allSatisfy {
             (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0)
                 || [43, 45, 46, 95].contains($0)
         }
+    }
+    /// An OSC 7501 record's id: segments of `validID` joined by `/`, at most
+    /// eight of them and 128 bytes in all.
+    static func validPath(_ id: String) -> Bool {
+        guard id.utf8.count <= 128 else { return false }
+        let segments = id.split(separator: "/", omittingEmptySubsequences: false)
+        return segments.count <= 8 && segments.allSatisfy { validID($0) }
     }
     public static func clean(_ text: String, limit: Int) -> String {
         var result = ""

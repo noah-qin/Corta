@@ -67,6 +67,7 @@ extension Performer {
     /// `A` — prompt start.
     private mutating func promptStarted() {
         state.directoryCompletion = nil
+        state.programSignals.promptStarted(commandRunning: state.isCommandRunning)
         let row = grid.absoluteRow(ofScreenRow: grid.cursor.row)
         // Nothing ran at the last prompt — no `C`, no `D` — so this is that
         // prompt again: redrawn after an empty line, or fish 4's own mark

@@ -77,13 +77,13 @@ struct ProgramSignalsTests {
     @Test func validationAndBounds() {
         var terminal = Terminal()
         for payload in [
-            "state=unknown", "state=working:kind=unknown", "state=working:id=bad id",
+            "state=unknown", "state=working:id=bad id",
             "state=working:id=" + String(repeating: "a", count: 33),
         ] {
             terminal.feed(osc("7501;" + payload))
         }
         #expect(terminal.programStatuses.isEmpty)
-        terminal.feed(osc("7501;state=idle:progress=-1:title=!!!:msg=YQ==garbage"))
+        terminal.feed(osc("7501;state=working:progress=-1:title=!!!:msg=YQ==garbage"))
         #expect(terminal.programStatuses[""]?.title == "")
         #expect(terminal.programStatuses[""]?.message == "")
         #expect(terminal.programStatuses[""]?.progress == 0)
@@ -248,10 +248,11 @@ extension ProgramSignalsTests {
             if !mainFirst { terminal.feed(osc("7501;state=done:app=claude-code")) }
             terminal.feed(osc("7501;state=working:id=overflow"))
             #expect(terminal.programStatuses.count == ProgramStatus.maximumEntries)
-            #expect(terminal.programStatuses["overflow"] == nil)
-            for id in 0..<31 { terminal.feed(osc("7501;state=clear:id=c\(id)")) }
-            #expect(terminal.programStatuses["c31"]?.state == .working)
-            terminal.feed(osc("7501;state=clear:id=c31"))
+            #expect(terminal.programStatuses["overflow"] != nil)
+            #expect(terminal.programStatuses["c0"] == nil, "the stalest subtask made way")
+            for id in 1..<32 { terminal.feed(osc("7501;state=clear:id=c\(id)")) }
+            #expect(terminal.programStatuses["overflow"]?.state == .working)
+            terminal.feed(osc("7501;state=clear:id=overflow"))
             #expect(terminal.programStatuses[""]?.state == .done)
         }
     }

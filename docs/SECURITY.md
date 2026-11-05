@@ -706,10 +706,11 @@ failure, cancellation, replacement and owner teardown. Test both rejection
 and recovery, including work finishing after cancellation.
 
 Program status has a per-session cap of one main slot plus 32 subtask slots,
-matching Claude Code 2.1.310's maximum emitted set; OSC 21337 has one separate
-metadata slot and cannot evict typed state. Each status retains at most
-80 bytes of app name, 192 of title, 2,048 of message, 32 per colour field
-and a bounded id. Kitty
+matching Claude Code 2.1.310's maximum emitted set; past it the least recently
+updated subtask makes way, so a stale one cannot hide a new wait; OSC 21337 has
+one separate metadata slot and cannot evict typed state. Each status retains at
+most 80 bytes of app name, 192 of title, 2,048 of message, 32 per colour field
+and an id of 128 bytes, in at most eight segments of 32. Kitty
 retains at most eight incomplete messages of 4,096 encoded bytes each; a
 ninth replaces the oldest, so abandoned messages cannot shut out later ones,
 and an oversized transmission is discarded through its final chunk. Close

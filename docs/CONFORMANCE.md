@@ -701,6 +701,11 @@ Qwen, OpenCode or Aider state adapter is shipped.
 OSC 7501 replies to probes with the constant `OSC 7501 ; ? ST` and accepts
 working/blocked/done/idle/error and clear, per optional bounded id (one main slot plus 32 subtask slots). `done`
 is a completed turn; `idle` is a separate state (including startup and stop).
+A new prompt (`OSC 133 ; A`) drops working and blocked records and keeps the rest.
+The
+[Program Status Protocol](https://www.superlogical.com/rex/docs/build/program-status.md)
+is the published description of this sequence; [below](#osc-7501-against-the-program-status-protocol)
+says where Corta differs from it.
 Prompt redraws and ordinary notifications do not change reported task state.
 Corta's internal `unknown` is used for process-only detection and OSC 21337
 metadata, which do not establish an agent's task state. It is not an extra
@@ -763,6 +768,28 @@ checks that Claude accepts the constant probe reply. It submits no model
 prompt. It isolates file configuration and removes inherited API/OAuth tokens;
 it is not an assertion about the CLI's internal keychain access. It does not replace the
 permission, completion or Notification Center checks above.
+
+### OSC 7501 against the Program Status Protocol
+
+Checked against revision 0.4 (2026-10-10), through a real PTY, in
+`ProgramStatusConformanceTests`. **Corta does not fully conform.** It follows the
+protocol where a difference would cost a user something, and differs on purpose
+where following it would loosen a limit or hide a wait.
+
+| Protocol | Corta | Why it stays |
+| :--- | :--- | :--- |
+| Working and blocked dropped at process exit and at a new prompt; done and error survive | Same. A process exit needs the session to end: a foreground program under a shell without OSC 133 cannot be seen leaving | — |
+| Done and error last until replaced or cleared; the terminal decides when to stop showing them | They stop at the next command's `OSC 133 ; C`. At a shell boundary, a nonzero exit turns a reported `done` into failed, and all records fold into one | The tab summarises one command's outcome |
+| At least 64 records, up to 256 | **1 main record and 32 children** (`SECURITY.md` §7) | A deliberate bound, matching the largest set Claude Code 2.1.310 emits. The protocol's "MAY choose lower limits" stops at its own minimum, so this is a difference, not an allowance. Past the cap the least recently updated child goes, as the protocol says; the main record never does |
+| A report with a control character, undecodable base64 or an oversize field is discarded whole | **The state applies.** Controls and concealing scalars are removed from the text; text that does not decode or does not fit is left out | Losing a wait costs more than a stripped newline. The text is still never markup and never reaches stdin |
+| `id` to 128 bytes, 8 levels, 32 per segment; `clear` removes the record and everything beneath it | Same | — |
+| Unknown kind treated as absent; unknown state ignored; unknown keys ignored; whitespace trimmed; last repeated key wins; a report replaces its record | Same | — |
+| Progress: an integer 0 to 100, anything else indeterminate | Out-of-range is clamped; progress is kept only with working and blocked | Harmless |
+| `app` to 32 bytes of a fixed set; a child inherits its ancestor's | Cleaned to 80 bytes; not inherited | `app` is not shown; it grants nothing (§2.9) |
+| Grammar: pairs outside the value character set are skipped; whole sequence to 4096 bytes | Values are not checked against the set, except `id`; the 4096-byte OSC cap applies | Each field has its own check |
+| RIS removes every record; DECSTR none; the alternate screen is no boundary | Same. A mark sent on the alternate screen is inert (see above) | — |
+| OSC 9;4 may map to the root record; a terminal should stop once it has seen a 7501 report | Never mapped: it is a separate ring that cannot touch a record's state, kind or text. It still shows after a 7501 report, and ahead of a record's own progress | A program sending both gets one ring |
+| Probe: `?`, optionally with `states` and `kinds` | The constant `?` | A reply without them means the standard set; no reply carries anything from a report (`SECURITY.md` §2.1) |
 
 ### CLI signal compatibility
 
