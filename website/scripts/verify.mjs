@@ -14,12 +14,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import assert from "node:assert/strict";
 // End-to-end static-export integrity check, including translated and fallback routes.
 import fs from "node:fs";
 import path from "node:path";
-import assert from "node:assert/strict";
 import sharp from "sharp";
 import { basePath as configuredBase, getSiteOrigin } from "./site-config.mjs";
+
 const root = path.resolve("out");
 const base = configuredBase;
 const origin = getSiteOrigin();
@@ -47,6 +48,17 @@ const cache = new Map(
     ];
   }),
 );
+// GitHub Pages serves this file for an unmatched URL. It must exist, be ours,
+// lead back to every language and stay out of search results.
+const notFound = cache.get(path.join(root, "404.html"))?.html ?? "";
+assert.ok(notFound, "out/404.html is missing");
+assert.match(notFound, /class="not-found/, "404.html is not the site's own");
+assert.match(notFound, /name="robots" content="noindex"/);
+for (const { code } of manifest.languages)
+  assert.ok(
+    notFound.includes(`href="${base}/${code}/"`),
+    `404.html has no link to ${code}`,
+  );
 let links = 0,
   images = 0;
 const issues = [];
@@ -68,16 +80,15 @@ for (const [file, { html }] of cache) {
     const [_, attr, encoded] = m;
     const url = encoded.replaceAll("&amp;", "&");
     if (/^(?:[a-z][\w+.-]*:|\/\/)/i.test(url) || !url || url === "#") continue;
-    const current =
-      base + "/" + path.relative(root, file).replace(/index\.html$/, "");
-    const parsed = new URL(url, "http://local" + current);
-    if (!parsed.pathname.startsWith(base + "/") && base) {
+    const current = `${base}/${path.relative(root, file).replace(/index\.html$/, "")}`;
+    const parsed = new URL(url, `http://local${current}`);
+    if (!parsed.pathname.startsWith(`${base}/`) && base) {
       issues.push(`${file}: missing base path ${url}`);
       continue;
     }
     let target = path.resolve(
       root,
-      "." + decodeURIComponent(parsed.pathname.slice(base.length)),
+      `.${decodeURIComponent(parsed.pathname.slice(base.length))}`,
     );
     if (fs.existsSync(target) && fs.statSync(target).isDirectory())
       target = path.join(target, "index.html");
@@ -141,7 +152,7 @@ const expectedLanguages = (slug) =>
       )
       .map((l) => [l.code, origin + pagePath(l.code, slug)]),
   );
-for (const [file, { html }] of cache) {
+for (const { html } of cache.values()) {
   for (const set of html.matchAll(/\bsrcSet="([^"]+)"/gi))
     for (const candidate of decode(set[1]).split(",")) {
       const [url, width] = candidate.trim().split(/\s+/);

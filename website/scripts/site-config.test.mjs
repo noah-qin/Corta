@@ -16,16 +16,17 @@
 
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { spawnSync, execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import {
-  sourceDates,
-  descriptionFromIntroduction,
-} from "./content-metadata.mjs";
-import { unified } from "unified";
 import parse from "remark-parse";
+import { unified } from "unified";
+import {
+  descriptionFromIntroduction,
+  sourceDates,
+} from "./content-metadata.mjs";
+
 function config(env) {
   return spawnSync(
     process.execPath,

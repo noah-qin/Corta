@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { MetadataRoute } from "next";
-import { siteOrigin, basePath } from "@/lib/site";
+import { basePath, siteOrigin } from "@/lib/site";
 export const dynamic = "force-static";
 export default function robots(): MetadataRoute.Robots {
   return {

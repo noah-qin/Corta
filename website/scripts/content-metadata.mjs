@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { execFileSync } from "node:child_process";
+
 const text = (node) => node.value ?? node.children?.map(text).join("") ?? "";
 // Navigation paragraphs are mostly links. Select substantive prose in the H1
 // introduction, excluding translation-provenance blockquotes and later sections.
@@ -40,7 +41,7 @@ export function descriptionFromIntroduction(tree, file) {
     throw new Error(`No substantive introduction for SEO description: ${file}`);
   const result = text(paragraph).replace(/\s+/g, " ").trim();
   return Array.from(result).length > 200
-    ? Array.from(result).slice(0, 197).join("") + "…"
+    ? `${Array.from(result).slice(0, 197).join("")}…`
     : result;
 }
 export function sourceDates(root) {

@@ -44,6 +44,8 @@ a:hover {
 }
 ::selection {
   background: #c8e6ca;
+  /* Named: a light code block's own text colour on this ground was unreadable. */
+  color: #202b28;
 }
 img {
   max-width: 100%;
@@ -179,6 +181,9 @@ img {
 }
 .skip:focus {
   top: 8px;
+}
+.skip:hover {
+  color: white;
 }
 .hero {
   display: grid;
@@ -318,18 +323,18 @@ figcaption a {
   columns: 2;
   column-gap: 42px;
 }
-.feature-copy h3 {
+.prose.feature-copy h3 {
   break-after: avoid;
   border-top: 1px solid var(--line);
   padding-top: 24px;
-  margin-top: 0 !important;
-  font-size: 17px !important;
+  margin-top: 0;
+  font-size: 17px;
 }
-.feature-copy p {
+.prose.feature-copy p {
   break-inside: avoid;
   font-size: 14px;
   line-height: 1.8;
-  margin-bottom: 38px !important;
+  margin-bottom: 38px;
   color: var(--muted);
 }
 .feature-copy h3 a span {
@@ -527,7 +532,7 @@ figcaption a {
   gap: 15px;
   flex-wrap: wrap;
   align-items: center;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   margin: 22px 0 12px;
 }
@@ -729,7 +734,7 @@ figcaption a {
   text-align: right;
 }
 .page-pagination small {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   margin-bottom: 6px;
 }
@@ -741,20 +746,23 @@ figcaption a {
   font: 70px var(--serif);
   margin: 0;
 }
-.language-entry nav {
+.language-entry nav,
+.language-entry-links {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 35px;
 }
-.language-entry a {
+.language-entry a,
+.language-entry-links a {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 5px;
   display: flex;
   justify-content: space-between;
 }
-.language-entry a:hover {
+.language-entry a:hover,
+.language-entry-links a:hover {
   background: #e5eddf;
 }
 @media (min-width: 1500px) {
@@ -807,7 +815,9 @@ figcaption a {
     order: 3;
     width: 100%;
     margin: 0;
-    gap: 25px;
+    /* German's "Änderungsprotokoll" is wider than a small phone's row. */
+    flex-wrap: wrap;
+    gap: 4px 25px;
     padding-top: 4px;
   }
   .header-inner > .button {
@@ -857,14 +867,14 @@ figcaption a {
     max-width: 110%;
   }
   .hero .eyebrow {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.07em;
   }
   .product-shot {
     margin-top: 12px;
   }
   .product-shot figcaption {
-    font-size: 9px;
+    font-size: 10px;
     padding-block: 12px;
     flex-wrap: wrap;
   }
@@ -903,12 +913,12 @@ figcaption a {
     gap: 22px;
     padding-top: 25px;
   }
-  .sidebar a {
-    font-size: 12px !important;
-    padding: 8px !important;
+  .sidebar nav a {
+    font-size: 12px;
+    padding: 8px;
   }
   .sidebar > .eyebrow {
-    font-size: 9px;
+    font-size: 10px;
   }
   .prose h1 {
     font-size: 29px;
@@ -943,11 +953,12 @@ figcaption a {
   .hero-description {
     max-width: 330px;
     font-size: 23px;
+    padding-right: 12px;
   }
   .mascot-stage {
     width: 185px;
     position: absolute;
-    right: -18px;
+    right: 0;
     top: 8px;
     opacity: 0.24;
     z-index: 0;
@@ -968,8 +979,8 @@ figcaption a {
   .feature-copy {
     columns: 1;
   }
-  .feature-copy p {
-    margin-bottom: 30px !important;
+  .prose.feature-copy p {
+    margin-bottom: 30px;
   }
   .features {
     padding-bottom: 25px;
@@ -997,7 +1008,7 @@ figcaption a {
   .sidebar nav a {
     white-space: nowrap;
     border: 1px solid var(--line);
-    padding: 6px 10px !important;
+    padding: 6px 10px;
   }
   .sidebar nav a span {
     display: none;
@@ -1020,7 +1031,8 @@ figcaption a {
   .language-entry {
     padding-top: 35px;
   }
-  .language-entry nav {
+  .language-entry nav,
+  .language-entry-links {
     grid-template-columns: 1fr;
   }
   .footer {
@@ -1035,9 +1047,6 @@ figcaption a {
   .home-notice {
     font-size: 11px;
   }
-  .hero-description {
-    padding-right: 12px;
-  }
   .reading-links a {
     padding-block: 18px;
   }
@@ -1049,7 +1058,9 @@ figcaption a {
   *,
   *:before,
   *:after {
+    /* biome-ignore lint/complexity/noImportantStyles: a preference that must beat every rule. */
     transition: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: a preference that must beat every rule. */
     animation: none !important;
   }
 }
@@ -1095,9 +1106,6 @@ figcaption a {
   }
 }
 @media (max-width: 560px) {
-  .mascot-stage {
-    right: 0;
-  }
   .mascot {
     max-width: 100%;
     width: 100%;
@@ -1111,4 +1119,31 @@ figcaption a {
 }
 .homepage-provenance blockquote {
   background: transparent;
+}
+
+/* Negative tracking is for Latin display type; it crowds CJK glyphs, which
+   already fill their em box. Hangul breaks between words, not inside them. */
+:is(:lang(zh), :lang(ja), :lang(ko)) .hero-description,
+:is(:lang(zh), :lang(ja), :lang(ko)) .section-title h2,
+:is(:lang(zh), :lang(ja), :lang(ko)) .download-panel h2,
+:is(:lang(zh), :lang(ja), :lang(ko)) .prose :is(h1, h2) {
+  letter-spacing: 0;
+}
+:lang(ko) .prose,
+:lang(ko) .hero-description {
+  word-break: keep-all;
+}
+
+.not-found {
+  max-width: 720px;
+  padding-block: 70px;
+}
+.not-found h1 {
+  font: 400 clamp(32px, 5vw, 48px) / 1.2 var(--serif);
+  letter-spacing: -0.03em;
+  margin: 25px 0 12px;
+}
+.not-found p {
+  color: var(--muted);
+  margin: 0 0 30px;
 }

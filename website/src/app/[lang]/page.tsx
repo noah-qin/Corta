@@ -14,16 +14,16 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { Header, Footer } from "@/components/chrome";
+import { Footer, Header } from "@/components/chrome";
+import { content } from "@/generated/registry";
 import { dictionary } from "@/lib/i18n";
 import {
-  manifest,
   asset,
-  href,
   download,
+  href,
   metadata as makeMetadata,
+  manifest,
 } from "@/lib/site";
-import { content } from "@/generated/registry";
 export async function generateMetadata({
   params,
 }: {
@@ -101,7 +101,9 @@ export default async function Home({
           <figcaption>
             <span className="dot" />
             {d.screenshot}
-            <a href={href(lang, "overview")}>{d.source} ↗</a>
+            <a href={href(lang, "overview")}>
+              {d.overview} <span aria-hidden="true">→</span>
+            </a>
           </figcaption>
         </figure>
         <aside className="wrap notice feature-status">

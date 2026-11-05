@@ -137,7 +137,7 @@ lado — deslize sobre ela ou gire a roda do mouse em cima — e acompanha a aba
 - Fechar um painel com um comando ainda em execução pergunta antes (`confirm-close`).
 - **Restaurar janelas.** Encerre e abra de novo, e cada janela volta com suas abas, divisões, posições dos divisores e o
   diretório de trabalho de cada painel (`restore-windows`, ativado por padrão). Cada painel inicia um processo novo; texto
-  do terminal e tarefas em execução não são restaurados. O Terminal rápido fica de fora.
+  do terminal e tarefas em execução não são restaurados.
 - **Predefinições.** Uma predefinição é um shell, um diretório e um ambiente com nome, definidos no arquivo de
   configuração. **Shell ▸ Novo painel com predefinição** abre uma; segure ⌥ para abri-la numa janela própria
   ([Presets](../../CONFIGURATION.md#4a-presets)).

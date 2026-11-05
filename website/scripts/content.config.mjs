@@ -49,6 +49,7 @@ export const documents = [
 ];
 export const repository = "https://github.com/noah-qin/Corta";
 export { basePath } from "./site-config.mjs";
+
 import { basePath } from "./site-config.mjs";
 export function route(lang, slug) {
   return `${basePath}/${lang}/${slug === "changelog" ? "changelog/" : `docs/${slug}/`}`;

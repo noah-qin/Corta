@@ -16,6 +16,7 @@
 
 import type { MDXComponents } from "mdx/types";
 import type { HTMLAttributes } from "react";
+
 function heading(Tag: "h1" | "h2" | "h3" | "h4") {
   return function Heading({
     id,
@@ -27,7 +28,7 @@ function heading(Tag: "h1" | "h2" | "h3" | "h4") {
         {children}
         {id && (
           <a className="heading-link" href={`#${id}`} aria-label={`#${id}`}>
-            <span aria-hidden="true">#</span>
+            <span>#</span>
           </a>
         )}
       </Tag>
@@ -41,6 +42,7 @@ export function useMDXComponents(): MDXComponents {
     h3: heading("h3"),
     h4: heading("h4"),
     table: (props) => (
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region must take keyboard focus to scroll.
       <div className="table-scroll" tabIndex={0}>
         <table {...props} />
       </div>

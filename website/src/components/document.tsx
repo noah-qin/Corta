@@ -15,10 +15,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { notFound } from "next/navigation";
-import { Header, Footer } from "@/components/chrome";
-import { dictionary, label } from "@/lib/i18n";
-import { manifest, href, repository, pageInfo } from "@/lib/site";
+import { Footer, Header } from "@/components/chrome";
 import { content } from "@/generated/registry";
+import { dictionary, label } from "@/lib/i18n";
+import { href, manifest, pageInfo, repository } from "@/lib/site";
 export function Document({ lang, slug }: { lang: string; slug: string }) {
   const info = pageInfo(lang, slug);
   const Content = content[`${lang}/${slug}`];

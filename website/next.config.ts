@@ -14,15 +14,19 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { NextConfig } from "next";
 import createMDX from "@next/mdx";
+import type { NextConfig } from "next";
 import { basePath, getSiteOrigin } from "./scripts/site-config.mjs";
+
 getSiteOrigin();
 const config: NextConfig = {
   output: "export",
   trailingSlash: true,
   basePath,
   images: { unoptimized: true },
+  // Two root layouts, one under a dynamic segment: no layout can hold a 404
+  // for every unmatched URL, so it is its own document.
+  experimental: { globalNotFound: true },
   pageExtensions: ["ts", "tsx", "js", "jsx", "md", "mdx"],
   // Cache Components and partial prefetching require a server; this site exports HTML.
   turbopack: {
