@@ -167,18 +167,14 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case previousTab = "previous-tab"
     case nextTab = "next-tab"
     case renameTab = "rename-tab"
-    case selectTab1 = "select-tab-1"
-    case selectTab2 = "select-tab-2"
-    case selectTab3 = "select-tab-3"
-    case selectTab4 = "select-tab-4"
-    case selectTab5 = "select-tab-5"
-    case selectTab6 = "select-tab-6"
-    case selectTab7 = "select-tab-7"
-    case selectTab8 = "select-tab-8"
+    case selectTab1 = "select-tab-1", selectTab2 = "select-tab-2", selectTab3 = "select-tab-3"
+    case selectTab4 = "select-tab-4", selectTab5 = "select-tab-5", selectTab6 = "select-tab-6"
+    case selectTab7 = "select-tab-7", selectTab8 = "select-tab-8"
     case selectLastTab = "select-last-tab"
     case close
     case splitRight = "split-right"
     case splitDown = "split-down"
+    case splitBestFit = "best-fit-split"
     case focusLeft = "focus-left"
     case focusRight = "focus-right"
     case focusUp = "focus-up"
@@ -248,6 +244,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .close: return L10n.text("command.close")
         case .splitRight: return L10n.text("command.splitRight")
         case .splitDown: return L10n.text("command.splitDown")
+        case .splitBestFit: return L10n.text("command.splitBestFit")
         case .focusLeft: return L10n.text("command.focusLeft")
         case .focusRight: return L10n.text("command.focusRight")
         case .focusUp: return L10n.text("command.focusUp")
@@ -329,6 +326,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .close: return #selector(SplitViewController.performClose(_:))
         case .splitRight: return #selector(SplitViewController.splitRight(_:))
         case .splitDown: return #selector(SplitViewController.splitDown(_:))
+        case .splitBestFit: return #selector(SplitViewController.splitBestFit(_:))
         case .focusLeft: return #selector(SplitViewController.moveFocusLeft(_:))
         case .focusRight: return #selector(SplitViewController.moveFocusRight(_:))
         case .focusUp: return #selector(SplitViewController.moveFocusUp(_:))

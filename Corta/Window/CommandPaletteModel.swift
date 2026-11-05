@@ -183,14 +183,14 @@ final class CommandPaletteModel {
     /// gets shorter with use rather than longer.
     private func browsingRows(row: (TerminalCommand, Bool) -> Row) -> [Row] {
         var rows: [Row] = []
-        let recents = recentCommands.prefix(Self.recentLimit)
+        let recents = recentCommands.filter(\.isOfferedInPalette).prefix(Self.recentLimit)
         if !recents.isEmpty {
             rows.append(.header(L10n.text("commandPalette.category.recent")))
             rows.append(contentsOf: recents.map { row($0, true) })
         }
         for category in CommandCategory.allCases {
             let commands = TerminalCommand.allCases
-                .filter { $0.category == category }
+                .filter { $0.category == category && $0.isOfferedInPalette }
                 .sorted { $0.paletteRank < $1.paletteRank }
             guard !commands.isEmpty else { continue }
             rows.append(.header(category.title))
@@ -215,7 +215,7 @@ final class CommandPaletteModel {
             var onTitle: Bool
             var score: Int
         }
-        return TerminalCommand.allCases
+        return TerminalCommand.allCases.filter(\.isOfferedInPalette)
             .compactMap { command -> Match? in
                 let onTitle = Self.score(command.title.lowercased(), query: query)
                 // Only when the title missed: most keystrokes need none of it.

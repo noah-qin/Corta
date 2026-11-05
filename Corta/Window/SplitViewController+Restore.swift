@@ -65,10 +65,13 @@ extension SplitViewController {
     func restore(layout: PaneLayout) {
         guard let root = focusedPane else { return }
         var focusTarget: ViewController?
+        isRestoringLayout = true
         rebuild(layout, at: root, focusTarget: &focusTarget)
+        isRestoringLayout = false
         view.layoutSubtreeIfNeeded()
         applyDividerPositions(layout, subtree: view.subviews.first)
         view.layoutSubtreeIfNeeded()
+        noteRestoredDividers()
         for pane in panes {
             pane.resizeSessionToFitView()
             pane.endLiveResize()

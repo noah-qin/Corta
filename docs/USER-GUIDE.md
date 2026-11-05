@@ -144,6 +144,15 @@ the mouse wheel over it — and follows the tab you select.
   shows that tab; the last pane moved out of a tab closes the tab. A zoomed pane
   unzooms first. A pane whose width in columns changes loses its selection, as
   it does in any resize that rewraps the text.
+- **Optional split behaviours**, all off by default. In **Settings ▸ General ▸
+  Panes**: *Keep panes equal in size* shares the room equally as panes open and
+  close, except where you have placed a divider; Equalize Panes makes it forget
+  those. *Split along the longer side* turns on **Split Pane Along Longer Side**,
+  in **Shell ▸ Pane Layout** and the command palette; ⌘D and ⇧⌘D stay as they
+  are. In **Settings ▸ Keyboard & Mouse**: *Focus follows the mouse* focuses a
+  pane when the pointer enters it, but not during a drag, in an inactive window,
+  with a menu or dialog open, while a search field holds the keyboard or while
+  an input method is composing.
 - **Reopen Closed Pane** restores the pane's place, size and working
   directory — not the program that was running in it.
 - Closing a pane with a command still running asks first

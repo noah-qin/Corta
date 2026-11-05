@@ -235,6 +235,12 @@ nonisolated struct Configuration: Equatable, Sendable {
     var restoreWindows: Bool = true
     /// Ask before closing a pane with a running child process.
     var confirmClose: Bool = true
+    /// Share the room equally as panes open and close, keeping placed dividers.
+    var autoBalancePanes: Bool = false
+    /// The pointer entering a pane focuses it.
+    var focusFollowsMouse: Bool = false
+    /// Offer Split Pane Along Longer Side; ⌘D and ⇧⌘D never change.
+    var bestFitSplit: Bool = false
     /// Sparkle's background check (`SUScheduledCheckInterval`); Check for
     /// Updates… works either way.
     var updateAutoCheck: Bool = true

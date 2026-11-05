@@ -54,13 +54,22 @@ extension SplitViewController {
         let position = vertical ? first.width : first.height
         let direction: CGFloat = index == 0 ? 1 : -1
         split.setPosition(position + direction * steps * step, ofDividerAt: 0)
+        (split as? PaneSplitView)?.isUserPositioned = true
         deliverPaneSizes()
     }
 
     /// Halves every node, back to a fresh split's layout.
     @objc func equalizePanes(_: Any?) {
+        // Zoomed, nothing is equalized, and unzooming puts the dividers back:
+        // they stay the user's.
+        if zoomedPane == nil {
+            for node in tree.nodes { (node as? PaneSplitView)?.isUserPositioned = false }
+        }
         equalize(view.subviews.first)
         deliverPaneSizes()
+        // Halving is not equal shares in a row of three: with its marks gone, the
+        // setting's own layout is what Equalize means.
+        balancePanesIfConfigured()
     }
 
     private func equalize(_ subtree: NSView?) {
@@ -72,6 +81,7 @@ extension SplitViewController {
 
     /// Deliver now, not after the debounce, or the grid lags each press.
     private func deliverPaneSizes() {
+        notePanesRearranged()
         view.layoutSubtreeIfNeeded()
         for pane in panes {
             pane.resizeSessionToFitView()

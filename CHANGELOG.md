@@ -18,6 +18,10 @@ Versioning for compatibility changes.
   focused pane, Swap Pane exchanges it with a neighbour, and Move Pane to New
   Tab, to the previous or next tab, or to a tab by name takes it out of the tab.
   In the Shell menu and the command palette, and rebindable with `bind.`.
+- Three optional split behaviours, all off by default: `auto-balance-panes`
+  shares the room equally as panes open and close and keeps dividers you placed,
+  `focus-follows-mouse` focuses the pane the pointer enters, and `best-fit-split`
+  adds Split Pane Along Longer Side. In Settings; ⌘D and ⇧⌘D do not change.
 - Corta has a website, https://corta.noahqin.dev, with the user guide,
   the documentation and the changelog in all nine languages the
   repository is translated into.

@@ -45954,6 +45954,478 @@
           }
         }
       }
+    },
+    "command.splitBestFit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Split Pane Along Longer Side"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "沿较长边拆分窗格"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "沿較長邊分割窗格"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ペインを長辺に沿って分割"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "긴 쪽으로 페인 분할"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bereich an der längeren Seite teilen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Scinder le volet sur le côté le plus long"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dividir panel por el lado más largo"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dividir painel pelo lado mais longo"
+          }
+        }
+      }
+    },
+    "settings.section.panes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "窗格"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "窗格"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ペイン"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "페인"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bereiche"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Volets"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Paneles"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Painéis"
+          }
+        }
+      }
+    },
+    "settings.label.autoBalancePanes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep panes equal in size"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "保持窗格大小相等"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "保持窗格大小相等"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ペインのサイズを均等に保つ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "페인 크기를 같게 유지"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bereiche gleich groß halten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Garder des volets de même taille"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Mantener paneles del mismo tamaño"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Manter painéis do mesmo tamanho"
+          }
+        }
+      }
+    },
+    "settings.help.autoBalancePanes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shares the room equally as panes open and close. A divider you placed stays until Equalize Panes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在打开和关闭窗格时平均分配空间。你调整过的分隔线会保持不动，直到执行“均分窗格”。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在開啟和關閉窗格時平均分配空間。你調整過的分隔線會保持不動，直到執行「平均分配窗格」。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ペインの開閉時にスペースを均等に分けます。自分で動かした区切りは「ペインを均等にする」まで維持されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "페인을 열고 닫을 때 공간을 같게 나눕니다. 직접 옮긴 구분선은 페인 균등 분할 전까지 유지됩니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Teilt den Platz gleichmäßig, wenn Bereiche geöffnet und geschlossen werden. Selbst gesetzte Trennlinien bleiben bis „Bereiche gleichmäßig aufteilen“."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Répartit l’espace à parts égales à l’ouverture et à la fermeture des volets. Un séparateur placé par vous reste jusqu’à « Égaliser les volets »."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Reparte el espacio por igual al abrir y cerrar paneles. Un divisor que hayas colocado se mantiene hasta Igualar paneles."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Divide o espaço por igual ao abrir e fechar painéis. Um divisor colocado por você permanece até Equalizar painéis."
+          }
+        }
+      }
+    },
+    "settings.label.bestFitSplit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Split along the longer side"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "沿较长边拆分"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "沿較長邊分割"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "長辺に沿って分割"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "긴 쪽으로 분할"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "An der längeren Seite teilen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Scinder sur le côté le plus long"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dividir por el lado más largo"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dividir pelo lado mais longo"
+          }
+        }
+      }
+    },
+    "settings.help.bestFitSplit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turns on the Split Pane Along Longer Side command. ⌘D and ⇧⌘D do not change."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "启用“沿较长边拆分窗格”命令。⌘D 和 ⇧⌘D 不变。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "啟用「沿較長邊分割窗格」命令。⌘D 和 ⇧⌘D 不變。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「ペインを長辺に沿って分割」コマンドを有効にします。⌘D と ⇧⌘D は変わりません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "긴 쪽으로 페인 분할 명령을 켭니다. ⌘D와 ⇧⌘D는 바뀌지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Aktiviert den Befehl „Bereich an der längeren Seite teilen“. ⌘D und ⇧⌘D ändern sich nicht."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Active la commande « Scinder le volet sur le côté le plus long ». ⌘D et ⇧⌘D ne changent pas."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Activa el comando Dividir panel por el lado más largo. ⌘D y ⇧⌘D no cambian."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ativa o comando Dividir painel pelo lado mais longo. ⌘D e ⇧⌘D não mudam."
+          }
+        }
+      }
+    },
+    "settings.label.focusFollowsMouse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Focus follows the mouse"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "焦点跟随鼠标"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "焦點跟隨滑鼠"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "フォーカスをマウスに追従"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "포커스가 마우스를 따라감"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fokus folgt der Maus"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le focus suit la souris"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El foco sigue al ratón"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O foco segue o mouse"
+          }
+        }
+      }
+    },
+    "settings.help.focusFollowsMouse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Focuses a pane when the pointer enters it, but not during a drag, with a menu or dialog open, or while an input method is composing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "指针进入窗格时使其获得焦点；拖动时、菜单或对话框打开时、输入法组合输入时除外。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "指標進入窗格時使其取得焦點；拖曳時、選單或對話框開啟時、輸入法組字時除外。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ポインタが入るとペインにフォーカスします。ドラッグ中、メニューやダイアログの表示中、入力メソッドの変換中を除きます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "포인터가 들어오면 페인에 포커스를 줍니다. 드래그 중, 메뉴나 대화상자가 열린 동안, 입력기 조합 중에는 제외됩니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Fokussiert einen Bereich, wenn der Zeiger ihn betritt, außer beim Ziehen, bei geöffnetem Menü oder Dialog und während der Eingabemethode."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Donne le focus à un volet quand le pointeur y entre, sauf pendant un glissement, avec un menu ou une boîte de dialogue ouverts, ou pendant une saisie par méthode d’entrée."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Enfoca un panel cuando el puntero entra en él, salvo al arrastrar, con un menú o diálogo abiertos o durante la composición del método de entrada."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Foca um painel quando o ponteiro entra nele, exceto ao arrastar, com menu ou diálogo aberto ou durante a composição do método de entrada."
+          }
+        }
+      }
     }
   }
 }

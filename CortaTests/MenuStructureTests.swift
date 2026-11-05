@@ -45,7 +45,7 @@ struct MenuStructureTests {
                 .changeDirectoryToParent, .changeDirectoryToProjectRoot,
                 .openParentDirectoryInNewPane, .openProjectRootInNewPane, .browseRemoteFiles]),
             ("menu.paneLayout", [.zoomPane, .growPaneHorizontally, .shrinkPaneHorizontally,
-                .growPaneVertically, .shrinkPaneVertically, .equalizePanes]),
+                .growPaneVertically, .shrinkPaneVertically, .equalizePanes, .splitBestFit]),
             ("menu.terminalState", [.clearHistory, .resetTerminal, .reconnectRemote]),
         ]
         for (key, commands) in groups {

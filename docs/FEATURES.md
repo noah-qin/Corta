@@ -68,6 +68,8 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 - Moving and swapping a running pane within its tab, and moving it to a new or
   existing tab of the same window, from the keyboard, the Shell menu and the
   command palette. Dragging panes to rearrange them is not offered.
+- Optional, off by default: equal pane sizes that keep dividers you placed,
+  focus that follows the mouse, and a split along the pane's longer side.
 - A full-screen window with one pane is presented directly to the display,
   not through the window server's compositor: about a frame less from
   keypress to glass. A split, or anything AppKit draws over the text, brings

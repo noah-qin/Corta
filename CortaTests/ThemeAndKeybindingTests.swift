@@ -322,7 +322,7 @@ extension ThemeAndKeybindingTests {
         #expect(model.rows.first?.command == .newTab)
         model.query = CommandCategory.panes.title
         let found = Set(model.rows.compactMap(\.command))
-        let panes = TerminalCommand.allCases.filter { $0.category == .panes }
+        let panes = TerminalCommand.allCases.filter { $0.category == .panes && $0.isOfferedInPalette }
         #expect(!panes.isEmpty)
         #expect(Set(panes).isSubset(of: found))
         // The selection follows the query onto a row that exists.

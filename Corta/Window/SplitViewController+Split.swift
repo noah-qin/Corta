@@ -85,7 +85,12 @@ extension SplitViewController {
         focusedPane.endLiveResize()
         pane.endLiveResize()
         takeFocus(pane)
-        animateSplit(node, newPane: pane)
+        if ConfigurationStore.shared.configuration.autoBalancePanes {
+            // A spring to the half would fight the balanced shares.
+            balancePanesIfConfigured()
+        } else {
+            animateSplit(node, newPane: pane)
+        }
         for child in panes { child.paneHeader.refresh() }
     }
 

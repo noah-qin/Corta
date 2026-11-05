@@ -137,7 +137,7 @@ extension AppDelegate {
         ])
         group("menu.paneLayout", [
             .zoomPane, .growPaneHorizontally, .shrinkPaneHorizontally,
-            .growPaneVertically, .shrinkPaneVertically, .equalizePanes,
+            .growPaneVertically, .shrinkPaneVertically, .equalizePanes, .splitBestFit,
         ])
         shell.addItem(.separator())
         shell.addItem(item(for: .clearScreen))
