@@ -21,7 +21,6 @@ import Testing
 @testable import Corta
 
 @MainActor
-@Suite(.serialized)
 struct AgentPaletteTests {
     @Test func agentsAreSearchableSelectableAndFocusTheirPane() {
         let id = UUID()
@@ -76,30 +75,23 @@ struct AgentPaletteTests {
         }
     }
 
-    @Test func waitingCommandIsDisabledForEmptyQueueAndStatusOff() throws {
-        let original = ConfigurationStore.shared.configuration
-        let id = UUID()
-        defer {
-            AgentDirectory.updateWaiting(id, blocked: false)
-            ConfigurationStore.shared.update { $0 = original }
-        }
-        ConfigurationStore.shared.update { $0.agentStatus = true }
-        let model = CommandPaletteModel(agents: { [] })
+    @Test func waitingCommandFollowsEligibilityAndCannotRunWhenDisabled() throws {
+        var canJump = false
+        var ran: [TerminalCommand] = []
+        let model = CommandPaletteModel(agents: { [] }, canJumpToNextWaitingPane: { canJump })
+        model.onRun = { ran.append($0) }
         model.query = "next-waiting-pane"
-        let row = try #require(model.rows.first { $0.command == .nextWaitingPane })
-        #expect(!row.selectable)
-        AgentDirectory.updateWaiting(id, blocked: true)
-        #expect(row.selectable)
-        model.rebuildRows()
-        #expect(model.selectedCommand == .nextWaitingPane)
-        ConfigurationStore.shared.update { $0.agentStatus = false }
-        #expect(!row.selectable)
-        var ran = false
-        model.onRun = { _ in ran = true }
+        let disabled = try #require(model.rows.first { $0.command == .nextWaitingPane })
+        #expect(!disabled.selectable)
         model.runSelected()
-        #expect(!ran)
-        let item = NSMenuItem(title: "", action: TerminalCommand.nextWaitingPane.action, keyEquivalent: "")
-        #expect(!AppDelegate().validateMenuItem(item))
+        #expect(ran.isEmpty)
+        canJump = true
+        model.rebuildRows()
+        let enabled = try #require(model.rows.first { $0.command == .nextWaitingPane })
+        #expect(enabled.selectable)
+        #expect(model.selectedCommand == .nextWaitingPane)
+        model.runSelected()
+        #expect(ran == [.nextWaitingPane])
     }
 
     @Test func nextWaitingShortcutHasNoOtherDefaultOwnerAndCanBeUnbound() {

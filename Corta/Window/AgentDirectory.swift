@@ -75,7 +75,10 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     }
 
     static func jumpToNextWaitingPane() {
-        let current = NSApp.keyWindow?.terminalSplit?.focusedPane?.taskNotifier.paneID
+        // A panel over a terminal window (the command palette) is key without
+        // being main: the pane to advance from is still the one beneath it.
+        let split = NSApp.keyWindow?.terminalSplit ?? NSApp.mainWindow?.terminalSplit
+        let current = split?.focusedPane?.taskNotifier.paneID
         if let id = shared.waiting.next(after: current,
             agentStatus: ConfigurationStore.shared.configuration.agentStatus) {
             focus(id)

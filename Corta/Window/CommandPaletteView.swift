@@ -171,7 +171,7 @@ private struct CommandPaletteRowView: View {
                 .accessibilityLabel(entry.title)
                 .accessibilityIdentifier("agent-row-" + entry.id.uuidString)
                 .accessibilityAddTraits(.isButton)
-        case .command(let command, _, let shortcut):
+        case .command(let command, _, let shortcut, _):
             HStack {
                 Text(command.title).font(.system(size: 13))
                 Spacer()
