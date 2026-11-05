@@ -27,7 +27,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         XCTAssertFalse(app.buttons["system-status-bar"].exists)
         openSettings(app)
         let settings = app.windows["Corta.Settings"]
-        settings.settingsCategory("Terminal").click()
+        settings.settingsCategory("Appearance").click()
         let enable = settings.switches["status-bar-enable"]
         XCTAssertTrue(enable.waitForExistence(timeout: 3))
         enable.click()
@@ -55,7 +55,7 @@ final class SystemStatusAndThemeEditorUITests: XCTestCase {
         app.typeKey("+", modifierFlags: .command)
         XCTAssertTrue(bar.exists)
         openSettings(app)
-        settings.settingsCategory("Terminal").click()
+        settings.settingsCategory("Appearance").click()
         settings.switches["status-bar-enable"].click()
         settings.buttons[XCUIIdentifierCloseWindow].click()
         XCTAssertFalse(bar.exists)

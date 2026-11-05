@@ -174,7 +174,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     }
 
     func showHostDetails(_ sender: Any?) {
-        open(.terminal)
+        open(.appearance)
         navigation.showHostDetails = true
     }
 

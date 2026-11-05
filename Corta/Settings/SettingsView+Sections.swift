@@ -95,7 +95,7 @@ extension SettingsView {
     }
 
     var notificationsSection: some View {
-        SettingsSection(L10n.text("settings.section.notifications")) {
+        SettingsSection(L10n.text("settings.section.notificationsAndAgents")) {
             Toggle(
                 L10n.text("settings.label.notifyOnLongTasks"),
                 isOn: bind(\.notifyOnLongTask)
@@ -115,6 +115,17 @@ extension SettingsView {
                 }
             }
             .disabled(!model.notifyOnLongTask)
+            Toggle(L10n.text("settings.label.notifyFromPrograms"), isOn: bind(\.notifyFromPrograms))
+                .accessibilityIdentifier("notify-from-programs")
+                .help(L10n.text("settings.help.notifyFromPrograms"))
+            Toggle(L10n.text("settings.label.agentStatus"), isOn: bind(\.agentStatus))
+                .accessibilityIdentifier("agent-status")
+                .help(L10n.text("settings.help.agentStatus"))
+            LabeledContent(L10n.text("settings.label.agentProcesses")) {
+                AgentProcessesField(model: model).frame(maxWidth: 240)
+            }
+            .help(L10n.text("settings.help.agentProcesses"))
+            .disabled(!model.configuration.agentStatus)
         }
     }
 

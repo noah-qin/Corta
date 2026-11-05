@@ -250,12 +250,8 @@ nonisolated extension Configuration {
             .flag("notify-from-programs", \.notifyFromPrograms),
             .flag("agent-status", \.agentStatus),
             ConfigurationKey(name: "agent-processes", read: { configuration, value in
-                let names = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                guard names.count <= 32, names.allSatisfy({ name in
-                    !name.isEmpty && name.utf8.count <= 80 && !name.contains("/")
-                        && !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
-                }) else { return false }
-                configuration.agentProcesses = names.joined(separator: ",")
+                guard let names = Configuration.normalizedAgentProcesses(value) else { return false }
+                configuration.agentProcesses = names
                 return true
             }, write: { $0.agentProcesses }),
             .flag("notify-on-long-task", \.notifyOnLongTask),
@@ -271,5 +267,18 @@ nonisolated extension ClosedRange {
     /// `value`, or the bound nearest it when it falls outside.
     func clamped(_ value: Bound) -> Bound {
         Swift.min(upperBound, Swift.max(lowerBound, value))
+    }
+}
+
+nonisolated extension Configuration {
+    /// `agent-processes` in its stored spelling, or nil if it breaks the rule:
+    /// at most 32 names of 80 bytes, none empty, no path, no control characters.
+    static func normalizedAgentProcesses(_ value: String) -> String? {
+        let names = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        guard names.count <= 32, names.allSatisfy({ name in
+            !name.isEmpty && name.utf8.count <= 80 && !name.contains("/")
+                && !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+        }) else { return nil }
+        return names.joined(separator: ",")
     }
 }

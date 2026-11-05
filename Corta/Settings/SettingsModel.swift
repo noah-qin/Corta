@@ -292,6 +292,19 @@ final class SettingsModel {
     }
 }
 
+extension SettingsModel {
+    /// Written only if the file itself would accept it (`agent-processes`).
+    func setAgentProcesses(_ value: String) {
+        commit { configuration in
+            guard let names = Configuration.normalizedAgentProcesses(value) else {
+                return L10n.text("settings.status.agentProcesses")
+            }
+            configuration.agentProcesses = names
+            return nil
+        }
+    }
+}
+
 // MARK: - System entry points
 
 extension SettingsModel {
