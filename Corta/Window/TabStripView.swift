@@ -464,7 +464,6 @@ extension TabStripView {
             view.wantsLayer = true
             view.layer?.borderWidth = position == index ? 2 : 0
             view.layer?.borderColor = NSColor.controlAccentColor.cgColor
-            view.layer?.cornerRadius = position == index ? 8 : view.layer?.cornerRadius ?? 0
         }
     }
 

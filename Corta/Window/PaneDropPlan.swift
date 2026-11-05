@@ -13,6 +13,7 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
+
 import CoreGraphics
 
 /// Where a dragged pane would land. Pure: frames in one coordinate space, y

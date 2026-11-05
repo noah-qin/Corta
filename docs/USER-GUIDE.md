@@ -151,8 +151,8 @@ the mouse wheel over it — and follows the tab you select.
   another tab for a moment to show that tab and do the same there, or drop it on the
   tab to move it in. Esc, or letting go anywhere else, puts everything back: nothing
   moves until you let go, so the programs in the panes notice nothing. The keyboard
-  stays with the pane you dragged. In a zoomed tab there is no other pane to land on,
-  only other tabs. Between windows, drag the tab instead. A pane whose width in
+  stays with the pane you dragged. A zoomed pane's own tab offers no other pane to land
+  on, only other tabs, and a zoomed pane in another tab can only be swapped with. Between windows, drag the tab instead. A pane whose width in
   columns changes loses its selection, as in any resize that rewraps the text.
 - **Optional split behaviours**, all off by default. In **Settings ▸ General ▸
   Panes**: *Keep panes equal in size* shares the room equally as panes open and

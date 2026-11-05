@@ -13,6 +13,7 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
+
 import AppKit
 import CoreGraphics
 import Testing
@@ -226,6 +227,26 @@ struct PaneDragTests {
         #expect(source.split.panes.map(\.view.frame) == frames)
         #expect(controller.window?.firstResponder === pane.terminalView)
         #expect(pane.view.window?.contentView?.subviews.contains { $0 is PaneDropPreviewView } == false)
+    }
+
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aZoomedPaneInAnotherTabCanOnlySwap() throws {
+        let controller = makeWindow(panes: 1)
+        defer { close(controller) }
+        let source = try #require(controller.selectedTab)
+        let pane = try #require(source.split.panes.first)
+        controller.addTab(setup: .init())
+        let target = try #require(controller.selectedTab)
+        target.split.splitFocusedPane(orientation: .columns)
+        target.split.splitTransition.finish()
+        target.split.toggleZoomPane(nil)
+        let zoomed = try #require(target.split.zoomedPane)
+        let session = try #require(PaneDragSession(pane: pane, controller: controller))
+        session.begin()
+        session.update(atWindowPoint: point(in: zoomed.view, 0.98, 0.5))
+        #expect(session.over == .pane(.center(ObjectIdentifier(zoomed))))
+        #expect(target.split.zoomedPane === zoomed, "nothing unzooms before a drop")
+        session.cancel()
     }
 
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))

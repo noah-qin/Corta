@@ -13,6 +13,7 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
+
 import AppKit
 
 /// One drag of a pane's header. Nothing moves until the drop: until then only a
@@ -136,9 +137,13 @@ final class PaneDragSession {
         controller.tabStrip.highlightDropTarget(nil)
         let local = content.convert(point, from: nil)
         let panes = visiblePanes.map { (id: ObjectIdentifier($0), frame: $0.view.convert($0.view.bounds, to: content)) }
-        let plan = PaneDropPlan.target(
+        let planned = PaneDropPlan.target(
             at: local, panes: panes, dragged: ObjectIdentifier(pane), minimum: pane.minimumContentSize,
             gap: PaneSurfaceView.gap)
+        // A zoomed pane's real place is smaller than what shows, and measuring it
+        // would mean unzooming, which a cancel could not take back. It can only swap.
+        var plan = planned
+        if controller.selectedTab?.split.zoomedPane != nil, case .edge(let id, _) = planned { plan = .center(id) }
         over = plan == .none ? .nothing : .pane(plan)
         switch plan {
         case .none:

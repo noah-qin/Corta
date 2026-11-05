@@ -117,10 +117,6 @@ extension SplitViewController {
         let otherFractions = destination.tree.dividerFractions()
         isRearrangingPanes = true
         destination.isRearrangingPanes = true
-        defer {
-            isRearrangingPanes = false
-            destination.isRearrangingPanes = false
-        }
         let placeholder = NSView(frame: pane.view.frame)
         tree.replace(leaf: pane.view, with: placeholder)
         destination.tree.replace(leaf: other.view, with: pane.view)
@@ -135,10 +131,14 @@ extension SplitViewController {
         noteFocus(other)
         destination.noteFocus(pane)
         controller.selectTab(target)
+        // Both flags down first: a size delivered during surgery is dropped, and
+        // the pane now in this tab is laid out for its new place from here on,
+        // hidden or not.
+        isRearrangingPanes = false
+        destination.isRearrangingPanes = false
         balancePanesIfConfigured()
         deliverSizesAfterMove()
         for remaining in panes { remaining.paneHeader.refresh() }
-        destination.isRearrangingPanes = false
         finishMove(of: pane, keepsSearchFocus: keepsSearchFocus)
     }
 
