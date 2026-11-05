@@ -119,7 +119,7 @@ color pickers and separate light/dark previews. **Settings ▸ Appearance ▸
 Cursor** selects block, bar or underline and an independent blink switch; the
 default is a nonblinking block. System Monospaced is the only supported
 primary font, with adjustable size and system fallback for missing characters.
-**Settings ▸ Terminal ▸ Bottom status bar** enables selectable local metrics
+**Settings ▸ Appearance ▸ Bottom status bar** enables selectable local metrics
 (default off); click it for host details, or use **View ▸ Local host details…**.
 See the [personalization tutorial](docs/USER-GUIDE.md#personalizing-the-terminal)
 for the steps, network-interface selection and thermal-state limitations.

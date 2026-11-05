@@ -36,8 +36,9 @@ extension SettingsView.Category {
                 "settings.section.window", "settings.label.newWindow", "settings.label.restoreWindows",
                 "settings.label.confirmClose", "settings.section.panes",
                 "settings.label.autoBalancePanes", "settings.label.bestFitSplit",
-                "settings.section.notifications",
-                "settings.label.notifyOnLongTasks",
+                "settings.section.notificationsAndAgents",
+                "settings.label.notifyOnLongTasks", "settings.label.notifyFromPrograms",
+                "settings.label.agentStatus", "settings.label.agentProcesses",
                 "settings.label.longerThan", "ui.section.updates", "ui.update.auto",
                 "ui.update.applications",
             ]
@@ -49,7 +50,9 @@ extension SettingsView.Category {
                 "settings.label.fontWeight", "settings.label.lineSpacing", "settings.label.fontFallback",
                 "settings.label.emojiRendering", "settings.section.cursor", "settings.cursor.block",
                 "settings.cursor.bar", "settings.cursor.underline", "settings.label.cursorBlink",
-            ]
+                "status.settings", "status.details", "status.enable", "status.interface",
+                "settings.status.items",
+            ] + SystemMetrics.Item.allCases.map { "status.item.\($0.rawValue)" }
         case .themes:
             [
                 "settings.label.theme", "settings.theme.lightMode", "settings.theme.darkMode",
@@ -59,7 +62,6 @@ extension SettingsView.Category {
             ]
         case .terminal:
             [
-                "status.settings", "status.details", "status.enable", "status.interface",
                 "settings.label.scrollback",
                 "ui.history.commands", "settings.label.ambiguousWidth", "settings.label.bell",
                 "ui.section.search",
@@ -68,12 +70,13 @@ extension SettingsView.Category {
                 "settings.label.directoryCompletion", "settings.label.commandStatusMarks",
                 "settings.label.openFileCommand",
                 "settings.label.shellIntegration",
-            ] + SystemMetrics.Item.allCases.map { "status.item.\($0.rawValue)" }
+            ]
         case .keyboardMouse:
             [
                 "inputSource.settings.title", "inputSource.settings.display",
                 "inputSource.settings.position",
                 "inputSource.color.direct", "inputSource.color.ime", "settings.label.optionAsMeta",
+                "settings.label.pasteWarning",
                 "settings.label.openLinksWith", "ui.mouse.override", "settings.label.copyOnSelect",
                 "settings.label.focusFollowsMouse",
             ]

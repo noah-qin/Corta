@@ -400,7 +400,7 @@ itself with DECSCUSR; Reset Terminal returns to the configured style.
 
 Rates need two samples, so allow a few seconds after enabling the bar.
 `auto` measures one primary interface; when a VPN or several adapters make
-that the wrong one, enter the interface name in Settings ▸ Terminal. An
+that the wrong one, enter the interface name in Settings ▸ Appearance. An
 explicit interface that does not exist shows no rate. The bar always
 reports the local Mac, also in an SSH pane, and thermal levels are macOS's
 classifications, not degrees. A narrow window may truncate the bar; click

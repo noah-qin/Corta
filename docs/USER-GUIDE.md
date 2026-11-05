@@ -282,7 +282,7 @@ Direct-input and IME colors accept hex values; clear a field for the subtle defa
 
 ### Optional local system status
 
-Open Settings (⌘,) → Terminal, enable Show system status under Bottom Status Bar, then select the
+Open Settings (⌘,) → Appearance, enable Show system status under Bottom Status Bar, then select the
 metrics you want to see: CPU usage, system load,
 memory usage, network rates, disk free space and thermal state. It is off
 by default; each metric has its own toggle. Click the bar to see the local
@@ -312,7 +312,7 @@ changes outside the editor, reopen the editor before saving.
 
 View → Theme editor opens graphical color editing directly. View → Local host details
 shows host configuration without requiring the optional status bar. The same
-host-details button is available in Settings → Terminal. Appearance previews
+host-details button is available in Settings → Appearance. Appearance previews
 follow explicit mode changes immediately and show the selected cursor shape
 and blink state. Terminal programs can still temporarily override cursor style.
 
@@ -383,8 +383,10 @@ own error text is under **Details**.
   paste enabled. Review the risk sentences and text preview before choosing
   **Paste** or **Cancel**; hidden characters appear as `⟦U+202E⟧` codes.
   **Don’t warn again for this pane** lasts until that pane closes.
-  Set `paste-warning = always` to warn on every multiline paste, or `off`
-  to disable these dialogs. These are conservative patterns, not a shell
+  **Settings ▸ Keyboard & Mouse ▸ Paste warning**, or
+  `paste-warning = always`, warns on every multiline paste; `off`/Never disables
+  these dialogs.
+  These are conservative patterns, not a shell
   parser or a guarantee that other text is safe. A large
   paste the shell is still working through can be cancelled with ⌃C: the
   part not yet sent is dropped and the interrupt goes straight through.
@@ -974,6 +976,8 @@ silent crash from output alone.
 
 `agent-status = false` hides state indicators and the list.
 `notify-from-programs = false` disables program and agent-attention notices.
+All three of these keys, `agent-processes` included, are in **Settings ▸ General
+▸ Notifications & Agents**.
 Program messages are labelled as pane messages under Corta's pane name,
 limited and cleaned, and coalesced to at most one delivery per five seconds
 per pane. While a pane remains in a reported blocked state, a delayed program

@@ -65,6 +65,45 @@ struct OpenFileCommandField: View {
     }
 }
 
+/// `agent-processes`, validated when the edit is finished, for the reason
+/// `OpenFileCommandField` gives: a name half typed is not a name.
+struct AgentProcessesField: View {
+    let model: SettingsModel
+    @State private var draft: String
+    @State private var synced: String
+    @FocusState private var isEditing: Bool
+
+    init(model: SettingsModel) {
+        self.model = model
+        _draft = State(initialValue: model.configuration.agentProcesses)
+        _synced = State(initialValue: model.configuration.agentProcesses)
+    }
+
+    var body: some View {
+        TextField("", text: $draft, prompt: Text(verbatim: "my-agent, another-agent"))
+            .labelsHidden()
+            .focused($isEditing)
+            .accessibilityIdentifier("agent-processes")
+            .onSubmit(commit)
+            .onChange(of: isEditing) { _, editing in
+                if !editing { commit() }
+            }
+            .onChange(of: model.configuration.agentProcesses) { _, value in
+                if draft == synced { draft = value }
+                synced = value
+            }
+            .onDisappear(perform: commit)
+    }
+
+    private func commit() {
+        guard draft != synced else { return }
+        model.setAgentProcesses(draft)
+        // A refused value reads back as what the file holds.
+        synced = model.configuration.agentProcesses
+        draft = synced
+    }
+}
+
 /// A draft commits only on Return or blur, so partial hex values never reach the file.
 struct InputSourceColorField: View {
     let value: String

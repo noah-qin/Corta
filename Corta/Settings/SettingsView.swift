@@ -139,34 +139,6 @@ extension SettingsView {
 
     private var terminalPage: some View {
         SettingsPage {
-            SettingsSection(L10n.text("status.settings")) {
-                Toggle(L10n.text("status.enable"), isOn: bind(\.statusBar))
-                    .accessibilityIdentifier("status-bar-enable")
-                Button {
-                    navigation.showHostDetails = true
-                } label: {
-                    HStack {
-                        Text(L10n.text("status.details"))
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
-                    }.contentShape(.rect)
-                }
-                .buttonStyle(.plain).accessibilityIdentifier("host-details")
-            }
-            SettingsSection(L10n.text("settings.status.items"), summary: L10n.text("status.settings.help")) {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 28), count: 2), spacing: 20) {
-                    ForEach(SystemMetrics.Item.allCases, id: \.self) { item in
-                        Toggle(
-                            L10n.text("status.item.\(item.rawValue)"),
-                            isOn: Binding(
-                                get: { model.statusItems.contains(item) },
-                                set: { model.setStatusItem(item, enabled: $0) })
-                        )
-                        .accessibilityIdentifier("status-item-\(item.rawValue)")
-                    }
-                }.padding(.vertical, 4)
-                StatusNetworkInterfaceField(model: model)
-            }.disabled(!model.statusBar)
             SettingsSection(L10n.text("settings.section.output")) {
                 LabeledContent(L10n.text("settings.label.scrollback")) {
                     numberField(bind(model.scrollbackLines, model.setScrollbackLines), width: 92)
@@ -243,6 +215,13 @@ extension SettingsView {
                     isOn: bind(\.optionAsMeta)
                 )
                 .help(L10n.text("settings.help.optionAsMeta"))
+                Picker(L10n.text("settings.label.pasteWarning"), selection: bind(\.pasteWarning)) {
+                    ForEach(Configuration.PasteWarning.allCases, id: \.self) { mode in
+                        Text(L10n.text("settings.pasteWarning.\(mode.rawValue)")).tag(mode)
+                    }
+                }
+                .accessibilityIdentifier("paste-warning")
+                .help(L10n.text("settings.help.pasteWarning"))
             }
             SettingsSection(L10n.text("settings.section.mouse")) {
                 Picker(

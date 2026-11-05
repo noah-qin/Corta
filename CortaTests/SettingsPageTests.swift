@@ -55,6 +55,75 @@ struct SettingsPageTests {
         #expect(model.notificationPermissionNotice.kind == .none)
     }
 
+    // MARK: - Agents and paste
+
+    @Test("agent programs follow the file's own rule, and a refused value changes nothing")
+    func agentProcessesKeepTheFileRule() {
+        let model = SettingsModel()
+        let original = model.configuration.agentProcesses
+        defer { model.setAgentProcesses(original) }
+
+        model.setAgentProcesses("one, two")
+        #expect(model.configuration.agentProcesses == "one,two")
+        for refused in [
+            "/bin/agent", String(repeating: "x", count: 81),
+            (0..<33).map(String.init).joined(separator: ","), "bad\u{7}name",
+        ] {
+            model.setAgentProcesses(refused)
+            #expect(model.configuration.agentProcesses == "one,two", "\(refused)")
+            #expect(Configuration.normalizedAgentProcesses(refused) == nil)
+        }
+        #expect(Configuration.normalizedAgentProcesses((0..<32).map(String.init).joined(separator: ",")) != nil)
+    }
+
+    @Test("the file reads agent-processes by the same rule")
+    func theFileAndTheFieldAgree() {
+        #expect(Configuration.parse("agent-processes = one, two").configuration.agentProcesses == "one,two")
+        #expect(Configuration.parse("agent-processes = /bin/agent").configuration.agentProcesses.isEmpty)
+    }
+
+    @Test("settings write through to the configuration, with no second store")
+    func newControlsWriteTheConfiguration() {
+        let model = SettingsModel()
+        let original = model.configuration
+        defer {
+            model.set(\.agentStatus, original.agentStatus)
+            model.set(\.notifyFromPrograms, original.notifyFromPrograms)
+            model.set(\.pasteWarning, original.pasteWarning)
+            model.setAgentProcesses(original.agentProcesses)
+        }
+        model.set(\.agentStatus, false)
+        model.set(\.notifyFromPrograms, false)
+        model.set(\.pasteWarning, .always)
+        let store = ConfigurationStore.shared.configuration
+        #expect(!store.agentStatus)
+        #expect(!store.notifyFromPrograms)
+        #expect(store.pasteWarning == .always)
+        model.setAgentProcesses("agent-one")
+        let file = (try? String(contentsOf: AppPaths.configFileURL, encoding: .utf8)) ?? ""
+        for line in ["agent-status = false", "notify-from-programs = false", "paste-warning = always",
+            "agent-processes = agent-one"]
+        {
+            #expect(file.contains(line), "\(line) reaches the config file")
+        }
+    }
+
+    @Test("search finds new and moved settings on their new page")
+    func searchFollowsTheLayout() {
+        func pages(_ key: String) -> [SettingsView.Category] {
+            SettingsView.Category.allCases.filter { $0 != .shortcuts && $0.matches(L10n.text(key)) }
+        }
+        let moved = ["settings.label.notifyFromPrograms", "settings.label.agentStatus", "settings.label.agentProcesses"]
+        for key in moved {
+            #expect(pages(key).contains(.general), "\(key)")
+        }
+        #expect(pages("settings.label.pasteWarning").contains(.keyboardMouse))
+        #expect(SettingsView.Category.keyboardMouse.matches("paste"), "the word a person would search for")
+        #expect(pages("status.enable").contains(.appearance))
+        #expect(!pages("status.enable").contains(.terminal))
+        #expect(pages("status.item.cpu").contains(.appearance))
+    }
+
     // MARK: - UI01
 
     /// The column every label wraps in, and the two-line cap the old page's
@@ -76,6 +145,8 @@ struct SettingsPageTests {
             "settings.label.restoreWindows", "settings.label.confirmClose",
             "settings.label.notifyOnLongTasks", "settings.label.longerThan",
             "settings.label.directoryHistory", "settings.label.directoryHistoryClear",
+            "settings.label.notifyFromPrograms", "settings.label.agentStatus",
+            "settings.label.agentProcesses", "settings.label.pasteWarning",
         ]
         for key in keys {
             try Self.assertFitsEveryLocalization(key: key)

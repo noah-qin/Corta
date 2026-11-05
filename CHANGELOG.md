@@ -38,6 +38,10 @@ Versioning for compatibility changes.
 - The documentation no longer says Claude Code is the only CLI whose task
   state Corta shows: Codex 0.166.0 reports its own, through the same general
   parser. What was and was not checked is in the user guide.
+- Settings gains controls for `agent-status`, `notify-from-programs` and
+  `agent-processes`, in General's section now called Notifications & Agents, and
+  for `paste-warning`, in Keyboard & Mouse. The bottom status bar's settings move
+  from Terminal to Appearance.
 - A copy is confirmed by a band of light sweeping along the copied text
   instead of a "Copied" toast in the corner; with Reduce Motion it is a
   single soft flash, and a copy scrolled out of view keeps the toast.
