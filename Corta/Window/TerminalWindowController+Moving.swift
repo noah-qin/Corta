@@ -97,20 +97,19 @@ extension TerminalWindowController {
     func drop(_ tab: TerminalTab, atScreenPoint point: NSPoint) {
         guard let window, let delegate = NSApp.delegate as? AppDelegate else { return }
         // Front to back, this Space only. `isVisible` is true of a window on
-        // another Space too; the first window under the pointer ends the
-        // search, or a strip it covers would catch the tab.
-        let targets = NSApp.orderedWindows.compactMap { $0.windowController as? TerminalWindowController }
-            .filter {
-                delegate.terminalWindowControllers.contains($0) && $0.window?.isVisible == true
-                    && $0.window?.isOnActiveSpace == true
-            }
-        for target in targets {
-            if let index = target.tabStrip.insertionIndex(atScreenPoint: point) {
+        // another Space too. Every window counts as cover, Settings as much as
+        // a terminal, or a strip under it would catch the tab; the drag's own
+        // preview takes no mouse events and does not.
+        let windows = NSApp.orderedWindows.filter { $0.isVisible && $0.isOnActiveSpace && !$0.ignoresMouseEvents }
+        for candidate in windows {
+            if let target = candidate.windowController as? TerminalWindowController,
+                delegate.terminalWindowControllers.contains(target),
+                let index = target.tabStrip.insertionIndex(atScreenPoint: point) {
                 if target === self { return }
                 target.take(tab, from: self, at: index)
                 return
             }
-            if target.window?.frame.contains(point) == true { break }
+            if candidate.frame.contains(point) { break }
         }
         // The strip's top-left sits under the pointer, about where the tab
         // was held.

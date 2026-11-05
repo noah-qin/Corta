@@ -134,14 +134,13 @@ extension TerminalView {
         bindings[.paste]?.matches(event) ?? false
     }
 
-    /// The step, unless the user bound this key to a command: a view's key
-    /// equivalent runs before the menu's, and would take it from them.
+    /// The step, unless this key is bound to a command, the tab commands
+    /// included: a view's key equivalent runs before the menu's, and a fixed
+    /// direction would override `bind.previous-tab = ctrl+tab`.
     private func tabCycleStep(for event: NSEvent) -> Int? {
         guard let step = Self.tabCycleStep(for: event) else { return nil }
         let bindings = keybindings?() ?? Keybindings()
-        let taken = TerminalCommand.allCases.contains { command in
-            command != .nextTab && command != .previousTab && bindings[command]?.matches(event) == true
-        }
+        let taken = TerminalCommand.allCases.contains { bindings[$0]?.matches(event) == true }
         return taken ? nil : step
     }
 

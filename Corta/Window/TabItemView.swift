@@ -77,8 +77,8 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         // The × shows only under the pointer; VoiceOver closes by action.
         setAccessibilityCustomActions([
             NSAccessibilityCustomAction(name: L10n.text("tabs.close")) { [weak self] in
-                guard let self else { return false }
-                self.strip.close(self.index)
+                guard let self, let index = self.liveIndex else { return false }
+                self.strip.close(index)
                 return true
             },
         ])
@@ -129,14 +129,6 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         setAccessibilityLabel(badgeLabel.map { "\(item.name), \($0)" } ?? item.name)
         setAccessibilityValue(selected)
         needsLayout = true
-    }
-
-    /// What the badge's dot means, in words.
-    static func badgeLabel(status: ProgramStatus?, progress: ProgramProgress?) -> String? {
-        guard status != nil || progress != nil else { return nil }
-        var label = status.map { L10n.text("agent.state." + $0.state.rawValue) } ?? L10n.text("agent.progress")
-        if let value = progress?.value { label += " · \(value)%" }
-        return label
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -233,15 +225,18 @@ final class TabItemView: NSView, NSTextFieldDelegate {
     override func otherMouseUp(with event: NSEvent) {
         // A press that began here: a button released over the strip after a
         // press elsewhere is not a request to close.
-        if event.buttonNumber == 2, middleButtonPressed { strip.close(index) }
+        if event.buttonNumber == 2, middleButtonPressed, let liveIndex { strip.close(liveIndex) }
         middleButtonPressed = false
     }
     override func menu(for event: NSEvent) -> NSMenu? { strip.menu(forTab: index) }
 
-    @objc private func closeTab() { strip.close(index) }
+    @objc private func closeTab() {
+        if let liveIndex { strip.close(liveIndex) }
+    }
 
     override func accessibilityPerformPress() -> Bool {
-        strip.delegate?.tabStrip(strip, select: index)
+        guard let liveIndex else { return false }
+        strip.delegate?.tabStrip(strip, select: liveIndex)
         return true
     }
 
@@ -326,5 +321,23 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         let save = !cancelling
         cancelling = false
         endRename(save: save)
+    }
+}
+
+extension TabItemView {
+    /// What the badge's dot means, in words.
+    static func badgeLabel(status: ProgramStatus?, progress: ProgramProgress?) -> String? {
+        guard status != nil || progress != nil else { return nil }
+        var label = status.map { L10n.text("agent.state." + $0.state.rawValue) } ?? L10n.text("agent.progress")
+        if let value = progress?.value { label += " · \(value)%" }
+        return label
+    }
+
+    /// Where this view's tab is now, found by identity; nil once it has gone.
+    /// A press under way when the tab closes still ends here, and `index` by
+    /// then names whichever tab took its place.
+    var liveIndex: Int? {
+        guard !isLeaving, let itemID else { return nil }
+        return strip.index(ofTab: itemID)
     }
 }

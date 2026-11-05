@@ -284,7 +284,37 @@ struct TabLifecycleTests {
         view.keybindings = { bindings }
         #expect(!view.performKeyEquivalent(with: event), "the user's binding, for the menu")
         #expect(controller.selectedTab === first)
+        // A tab command's own binding too: the menu knows its direction.
+        bindings = Keybindings()
+        bindings[.previousTab] = Shortcut("\t", [.control])
+        #expect(!view.performKeyEquivalent(with: event), "bound to previous-tab, not cycled forward")
+        #expect(controller.selectedTab === first)
         _ = second
+    }
+
+    /// Settings over another window's strip is cover like any window: the
+    /// tab must not land in the terminal it hides.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aDropOverACoveringWindowDoesNotReachTheStripBeneath() throws {
+        let source = makeWindow()
+        let moving = source.addTab()
+        let beneath = makeWindow()
+        defer { close(source, beneath, moving.controller) }
+        source.window?.setFrame(NSRect(x: 40, y: 40, width: 500, height: 400), display: true)
+        beneath.window?.setFrame(NSRect(x: 620, y: 40, width: 500, height: 400), display: true)
+        let window = try #require(beneath.window)
+        let strip = beneath.tabStrip
+        strip.layoutSubtreeIfNeeded()
+        let local = strip.convert(NSPoint(x: strip.bounds.midX, y: strip.bounds.midY), to: nil)
+        let point = window.convertPoint(toScreen: local)
+        try #require(strip.insertionIndex(atScreenPoint: point) != nil)
+        let cover = NSWindow(contentRect: window.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        cover.isReleasedWhenClosed = false
+        defer { cover.close() }
+        cover.orderFront(nil)
+        source.drop(moving, atScreenPoint: point)
+        #expect(!beneath.tabs.contains { $0 === moving })
+        #expect(moving.controller !== source, "a window of its own instead")
     }
 }
 
@@ -326,6 +356,15 @@ struct TabStripPartsTests {
             context: nil, eventNumber: 0, clickCount: 2, pressure: 1))
         strip.itemMouseDown(5, event: event)
         #expect(strip.drag == nil)
+    }
+
+    @Test func aPressEndingAfterItsTabClosedFindsNoTab() throws {
+        let strip = TabStripView(frame: NSRect(x: 0, y: 0, width: 400, height: TabStripView.height))
+        strip.update(items: [item("a"), item("b")], selectedIndex: 0)
+        let view = try #require(strip.tabView(at: 1) as? TabItemView)
+        #expect(view.liveIndex == 1)
+        strip.update(items: [item("a"), item("c")], selectedIndex: 0)
+        #expect(view.liveIndex == nil, "gone, though index 1 now names another tab")
     }
 
     @Test func theBadgeSaysWhatItsDotMeans() {
