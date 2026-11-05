@@ -81,6 +81,7 @@ extension SplitViewController {
 
     /// Deliver now, not after the debounce, or the grid lags each press.
     private func deliverPaneSizes() {
+        notePanesRearranged()
         view.layoutSubtreeIfNeeded()
         for pane in panes {
             pane.resizeSessionToFitView()

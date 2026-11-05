@@ -28,6 +28,7 @@ extension SplitViewController {
     /// layout is the user's arrangement, and a zoomed tree is not on screen.
     func balancePanesIfConfigured() {
         guard configuration.autoBalancePanes, !isRestoringLayout, zoomedPane == nil else { return }
+        notePanesRearranged()
         view.layoutSubtreeIfNeeded()
         balance(tree.root)
         view.layoutSubtreeIfNeeded()
