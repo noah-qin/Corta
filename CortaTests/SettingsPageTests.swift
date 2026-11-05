@@ -90,6 +90,7 @@ struct SettingsPageTests {
             model.set(\.agentStatus, original.agentStatus)
             model.set(\.notifyFromPrograms, original.notifyFromPrograms)
             model.set(\.pasteWarning, original.pasteWarning)
+            model.setAgentProcesses(original.agentProcesses)
         }
         model.set(\.agentStatus, false)
         model.set(\.notifyFromPrograms, false)
@@ -98,6 +99,13 @@ struct SettingsPageTests {
         #expect(!store.agentStatus)
         #expect(!store.notifyFromPrograms)
         #expect(store.pasteWarning == .always)
+        model.setAgentProcesses("agent-one")
+        let file = (try? String(contentsOf: AppPaths.configFileURL, encoding: .utf8)) ?? ""
+        for line in ["agent-status = false", "notify-from-programs = false", "paste-warning = always",
+            "agent-processes = agent-one"]
+        {
+            #expect(file.contains(line), "\(line) reaches the config file")
+        }
     }
 
     @Test("search finds new and moved settings on their new page")
