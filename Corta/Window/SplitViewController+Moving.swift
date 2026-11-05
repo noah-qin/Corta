@@ -125,7 +125,7 @@ extension SplitViewController {
         other.removeFromParent()
         addChild(other)
         destination.addChild(pane)
-        adoptFont(of: destination, for: other, from: pane)
+        adoptFont(for: other, from: pane)
         settleTree(fractions: ownFractions)
         destination.settleTree(fractions: otherFractions)
         noteFocus(other)
@@ -144,9 +144,7 @@ extension SplitViewController {
 
     /// A tab has one font size (`setFontSizeForAllPanes`): each of a swapped
     /// pair takes the size of the tab it arrives in.
-    private func adoptFont(
-        of destination: SplitViewController, for arriving: ViewController, from leaving: ViewController
-    ) {
+    private func adoptFont(for arriving: ViewController, from leaving: ViewController) {
         let (hereZoomed, hereSize) = (leaving.isFontSizeZoomed, leaving.fontSize)
         let (thereZoomed, thereSize) = (arriving.isFontSizeZoomed, arriving.fontSize)
         arriving.isFontSizeZoomed = hereZoomed
