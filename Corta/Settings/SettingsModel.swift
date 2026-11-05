@@ -81,6 +81,8 @@ final class SettingsModel {
     var shellIntegrationStatus = RowStatus()
     var directoryHistoryStatus = RowStatus()
     var recentHostsStatus = RowStatus()
+    var droppedCopiesStatus = RowStatus()
+    var droppedCopiesGeneration = 0
     var notificationPermissionNotice = RowStatus()
 
     private var clearTask: Task<Void, Never>?
@@ -179,6 +181,7 @@ final class SettingsModel {
         refreshShellIntegrationStatus()
         refreshDirectoryHistoryStatus()
         refreshRecentHostsStatus()
+        refreshDroppedCopiesStatus()
     }
 
     // MARK: - Derived display

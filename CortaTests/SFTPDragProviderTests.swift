@@ -140,6 +140,62 @@ struct SFTPDragProviderTests {
         #expect(failed.withLock { $0 } == true)
     }
 
+    @Test("a drag's folder goes after a failure, a cancel and a delivery, and when the browser closes")
+    func stagingDoesNotOutliveItsTransfer() async throws {
+        func model(_ transfer: @escaping @Sendable (FakeSFTPClient.TransferCall) async throws -> Void)
+            async throws -> (SFTPBrowserModel, SFTPDragItem) {
+            let fake = FakeSFTPClient()
+            fake.listings["/srv/app"] = [makeEntry("notes.txt")]
+            fake.onTransfer = { call, _ in try await transfer(call) }
+            let model = await connectedModel(fake: fake)
+            return (model, model.dragItem(for: try #require(model.entries.first)))
+        }
+        let write: @Sendable (FakeSFTPClient.TransferCall) throws -> Void = { call in
+            try Data("remote".utf8).write(to: URL(fileURLWithPath: call.localPath))
+        }
+
+        let (failing, failed) = try await model { _ in throw SFTPError.transport(.closed) }
+        defer { failing.disconnect() }
+        await #expect(throws: (any Error).self) { try await failed.export() }
+        #expect(failing.dragStagingDirectories.isEmpty)
+
+        let (cancelling, cancelled) = try await model { _ in try await Task.sleep(for: .seconds(60)) }
+        defer { cancelling.disconnect() }
+        let running = Task { try await cancelled.export() }
+        await waitUntil("the download started") { !cancelling.transfers.isEmpty }
+        let folder = try #require(cancelling.dragStagingDirectories.first)
+        #expect(FileManager.default.fileExists(atPath: folder.path))
+        cancelling.cancelTransfer(try #require(cancelling.transfers.first).id)
+        await #expect(throws: (any Error).self) { try await running.value }
+        #expect(!FileManager.default.fileExists(atPath: folder.path))
+
+        let (delivering, delivered) = try await model { try write($0) }
+        defer { delivering.disconnect() }
+        delivering.dragCopyLifetime = .milliseconds(150)
+        let url = try await delivered.export()
+        #expect(FileManager.default.fileExists(atPath: url.path), "the system has yet to copy it")
+        await waitUntil("removed a while after delivery") { !FileManager.default.fileExists(atPath: url.path) }
+        #expect(delivering.dragStagingDirectories.isEmpty)
+
+        let (closing, closed) = try await model { try write($0) }
+        defer { closing.disconnect() }
+        let kept = try await closed.export()
+        closing.removeDragStaging()
+        #expect(!FileManager.default.fileExists(atPath: kept.path))
+    }
+
+    @Test("a drag's folder is under this build's own storage, not the shared temporary folder")
+    func stagingBelongsToThisBuild() async throws {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = [makeEntry("notes.txt")]
+        fake.onTransfer = { call, _ in try Data().write(to: URL(fileURLWithPath: call.localPath)) }
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect(); model.removeDragStaging() }
+        let url = try await model.dragItem(for: try #require(model.entries.first)).export()
+        #expect(url.resolvingSymlinksInPath().path.hasPrefix(
+            FileDropStorage.dragRoot.resolvingSymlinksInPath().path + "/"))
+    }
+
     @Test("a drag picked up on a connection that has ended downloads nothing")
     func endedConnectionDownloadsNothing() async throws {
         let fake = FakeSFTPClient()

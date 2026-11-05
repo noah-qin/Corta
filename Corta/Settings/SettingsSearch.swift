@@ -95,6 +95,7 @@ extension SettingsView.Category {
                 "settings.section.history", "settings.label.directoryHistory",
                 "settings.label.directoryHistoryClear",
                 "settings.label.recentHosts",
+                "settings.section.localData", "settings.label.droppedCopies",
             ]
         }
     }

@@ -79,20 +79,19 @@ extension PaneCommands {
         let text = Self.quotedDropText(result.urls.map(\.path))
         guard !text.isEmpty else { FileDropStorage.remove(result.directory); return }
         if let directory = result.directory {
-            do { try FileDropStorage.markPublished(directory) } catch {
-                FileDropStorage.remove(directory)
-                host?.terminalView?.showToast(L10n.text("drop.failed"), kind: .warning)
-                return
-            }
+            FileDropStorage.release(directory)
+            droppedCopies.insert(directory)
         }
         insertAsPaste(text, validate: { [weak self] in
             guard context == self?.dropInputContext else {
-                FileDropStorage.remove(result.directory)
                 self?.host?.terminalView?.showToast(L10n.text("drop.targetChanged"), kind: .warning)
                 return false
             }
             return true
-        }, onDiscard: { FileDropStorage.remove(result.directory) })
+        }, onDiscard: { [weak self] in
+            if let directory = result.directory { self?.droppedCopies.remove(directory) }
+            FileDropStorage.remove(result.directory)
+        })
     }
 
     var dropInputContext: FileDropInputContext? {

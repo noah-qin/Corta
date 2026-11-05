@@ -85,11 +85,17 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     func stop() {
         fileDropRequest?.cancel()
         fileDropRequest = nil
+        // The copies dropped here go with the pane: a move keeps the pane, and
+        // with it this list, while a close comes through here.
+        for directory in droppedCopies { FileDropStorage.remove(directory) }
+        droppedCopies.removeAll()
         largeTextTask?.cancel()
         largeTextTask = nil
     }
 
     var fileDropRequest: FileDropRequest?
+    /// Copies handed to this pane's shell, removed when the pane closes.
+    var droppedCopies: Set<URL> = []
 
     var suppressPasteWarnings = false
 
