@@ -212,6 +212,15 @@ extension SFTPBrowserView {
     private var browser: some View {
         VStack(spacing: 0) {
             listing
+            if let notice = model.receptionNotice {
+                Divider()
+                Label(notice, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .textSelection(.enabled)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             if let listingError = model.listingError {
                 Divider()
                 Label(listingError, systemImage: "exclamationmark.triangle.fill")

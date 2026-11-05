@@ -150,6 +150,26 @@ grapheme cluster that compares unequal to `"'"`; matched by `Character`, the
 quote was written raw and closed the quoted run. The app-typed `cd` of Go to
 Parent Directory and Go to Project Root uses the same quoting.
 
+Drop hover negotiation inspects advertised types only, never file URLs or
+contents. A drop starts exactly one representation per item (promise before
+file URL), with URL reads and promise readers off the main thread. A promise's
+reader runs only after its provider has written the file, so a reception waits
+for one reader per name AppKit reports once receiving has begun, at least one
+per receiver; one receiver can produce several. An absolute
+120-second `SuspendingClock` deadline ends a stalled reception, reports it,
+and prevents late callbacks from inserting more paths. Successful paths keep
+the pasteboard's item order. Partial failures report that only received paths
+were used; total failure reports that nothing was received.
+
+At release, a pane captures its session object identity and kernel foreground
+process group. Both must still match before filling paths, and again after any
+paste-warning sheet. Missing process-group samples fail closed. This detects
+a changed input target; it does not identify an `exec` inside the same process
+group or remove the normal race between checking a process and writing a PTY.
+Drops never append Return. Corta's own drags, including SFTP rows, are refused
+by panes; remote paths are not exported as terminal input. The SFTP listing
+retains its external-source-only gate to avoid uploading its own download drag.
+
 Command History's **Fill** and **Run** send a command read back from the
 grid, between OSC 133 marks that any output can forge. Fill only types it;
 Run also sends Return, so it does so only for text the user saw whole: one
@@ -568,6 +588,30 @@ a later run. Opening a remote copy awaits that maintenance asynchronously. A ⌘
 symlink. Download files and managed directories/files have inherited ACLs
 cleared before use. This does not exclude administrators or backups; parent
 storage policy and intentionally shared export destinations still matter.
+
+**Incoming file promises create private local copies.** Each reception uses a
+fresh directory under Application Support/DroppedFiles (the development stage
+when staged). The root and directories are 0700 with extended ACLs cleared;
+received regular files are tightened to 0600 and have their ACLs cleared before
+use. Symlinks, hard links, special files and callback paths outside that
+directory are refused: a hard link shares its mode and ACLs with an original
+elsewhere. Original file-URL sources are never chmod'd or deleted.
+
+Empty, cancelled or target-mismatched receptions are removed. Pending reception
+directories record an owner PID; the next promise reception checks at most 32
+entries and removes unpublished ones whose owner no longer exists. PID reuse
+conservatively keeps a copy. Before handing paths to a pane, a private marker
+records publication. Published pane copies have **no automatic expiry**: a
+program can defer opening a path or outlive Corta, so age, session exit and app
+exit cannot prove it is safe to delete. The user removes these directories
+explicitly when their programs are finished; they can consume disk space until
+then. This retention includes copies awaiting a paste-warning decision; cancelling
+that decision removes them.
+
+The SFTP browser owns its incoming promise copies separately. Each successful
+upload, including a successful retry, deletes its own source. Failed copies stay
+available for Retry until the browser closes, which cancels receptions and
+removes its remaining copies. No original user file is removed.
 
 An upload writes a partial and renames it over the destination, so the
 partial's mode is the file's from then on. A replaced regular file keeps its

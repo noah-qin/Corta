@@ -134,8 +134,8 @@ final class TerminalView: NSView, CALayerDelegate {
     /// scrollback jumps) match against it, never a literal.
     var keybindings: (() -> Keybindings)?
 
-    /// Dropped file paths; the controller sanitises, quotes and sends them.
-    var onDropPaths: (([String]) -> Void)?
+    /// Starts an asynchronous drop bound to the pane's current input target.
+    var onFileDrop: ((NSPasteboard) -> Bool)?
     /// The word under a force touch and the popover anchor.
     var onLookUp: ((CGPoint) -> (String, CGPoint)?)?
     /// The selection as text for the Services menu.

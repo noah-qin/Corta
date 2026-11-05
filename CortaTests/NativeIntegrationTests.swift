@@ -41,18 +41,23 @@ struct NativeIntegrationTests {
     }
 
     @Test("file pasteboards expose only file URL paths")
-    func droppedFilePaths() {
+    func droppedFilePaths() async throws {
         let pasteboard = NSPasteboard.withUniqueName()
         pasteboard.clearContents()
         _ = pasteboard.writeObjects([
             NSURL(fileURLWithPath: "/tmp/one file"),
             NSURL(fileURLWithPath: "/tmp/two"),
         ])
-        #expect(TerminalView.droppedPaths(from: pasteboard) == ["/tmp/one file", "/tmp/two"])
+        var result: FileDropRequest.Result?
+        let request = try #require(FileDropRequest.start(pasteboard) { result = $0 })
+        await waitUntil("drop URLs resolved") { result != nil }
+        #expect(result?.urls.map(\.path) == ["/tmp/one file", "/tmp/two"])
+        withExtendedLifetime(request) {}
 
         pasteboard.clearContents()
         pasteboard.setString("https://example.com", forType: .string)
-        #expect(TerminalView.droppedPaths(from: pasteboard).isEmpty)
+        #expect(FileDropRequest.start(pasteboard) { _ in } == nil)
+        pasteboard.releaseGlobally()
     }
 
     @Test("Services exports and imports selected text")

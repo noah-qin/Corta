@@ -80,6 +80,7 @@ extension SFTPBrowserModel {
                 await applyEntries(listing) {
                     let destination = Self.normalized(path: path)
                     if destination != currentPath {
+                        receptionNotice = nil
                         switch history {
                         case .visit:
                             backStack.append(currentPath)
