@@ -327,7 +327,7 @@ struct SFTPDragExportTests {
         }
         let model = await connected(fake)
         let file = try #require(model.entries.first { $0.name == "notes.txt" })
-        let url = try await model.exportForDrag(file)
+        let url = try await model.dragItem(for: file).export()
         #expect(url.lastPathComponent == "notes.txt")
         #expect(try String(contentsOf: url, encoding: .utf8) == "remote")
         let folder = url.deletingLastPathComponent()
@@ -336,7 +336,7 @@ struct SFTPDragExportTests {
         #expect(model.transfers.count == 1, "the drag has a progress row like any download")
 
         let directory = try #require(model.entries.first { $0.name == "logs" })
-        await #expect(throws: (any Error).self) { try await model.exportForDrag(directory) }
+        await #expect(throws: (any Error).self) { try await model.dragItem(for: directory).export() }
 
         model.removeDragStaging()
         #expect(!FileManager.default.fileExists(atPath: folder.path))
