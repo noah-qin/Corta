@@ -21,6 +21,7 @@ import SwiftUI
 struct SettingsView: View {
     @State var shortcutSearch = ""
     @State var themeEditor: ThemeEditorModel?
+    @State var confirmingCleanDroppedCopies = false
     @Bindable var model: SettingsModel
     let navigation: SettingsNavigation
 
@@ -275,7 +276,9 @@ extension SettingsView {
                 .help(L10n.text("settings.help.secureKeyboardEntry"))
             }
             historySection
+            localDataSection
         }
+        .onAppear { model.refreshDroppedCopiesStatus() }
     }
 
     // MARK: - General

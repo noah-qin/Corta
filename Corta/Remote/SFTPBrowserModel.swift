@@ -296,9 +296,11 @@ final class SFTPBrowserModel {
 
     // MARK: - Drags to Finder
 
-    /// Staging folders made for drags to Finder; the controller removes
-    /// them when the window closes.
+    /// Staging folders made for drags to Finder. Each goes after its transfer
+    /// fails, or a while after it lands; the controller removes the rest when
+    /// the window closes.
     private(set) var dragStagingDirectories: [URL] = []
+    var dragCopyLifetime: Duration = .seconds(120)
 
     /// `entry` as a drag, with the folder and connection it was picked up in:
     /// the browser may have moved on by the time something asks for the file.
@@ -321,40 +323,45 @@ final class SFTPBrowserModel {
         guard connectionState == .connected, connection == connectionGeneration, entry.kind == .file,
             Self.isPlainEntryName(entry.name)
         else { throw SFTPTransferQueue.TransferFailure(message: L10n.text("sftp.drag.unavailable")) }
-        let staging = try Self.makeDragStagingDirectory()
+        let staging = try FileDropStorage.makeDirectory(in: FileDropStorage.dragRoot)
         dragStagingDirectories.append(staging)
         let remotePath = Self.joinPath(directory, entry.name)
-        let local = staging.appendingPathComponent(Self.localFileName(entry.name))
+        let local = FileDropStorage.destination(in: staging).appendingPathComponent(Self.localFileName(entry.name))
         return try await withCheckedThrowingContinuation { continuation in
             transferQueue.enqueue(
                 SFTPTransferQueue.Plan(
                     isUpload: false, remotePath: remotePath, localURL: local,
                     sourceSize: entry.size, sourceModified: entry.modified)
-            ) { result in
+            ) { [weak self] result in
+                switch result {
+                case .success: self?.removeDragCopyAfterDelivery(staging)
+                case .failure: self?.removeDragCopy(staging)
+                }
                 continuation.resume(with: result.mapError { $0 as any Error })
             }
         }
     }
 
-    /// A new folder only this user can enter, under the temporary directory.
-    nonisolated static func makeDragStagingDirectory() throws -> URL {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Corta-SFTP-Drag", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: root, withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700])
-        let folder = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: folder, withIntermediateDirectories: false,
-            attributes: [.posixPermissions: 0o700])
-        return folder
+    /// The system copies the file some time after the provider answers, and
+    /// says nothing when it has: a reader that has opened it survives the
+    /// removal, one that has not needs the file a while yet.
+    private func removeDragCopyAfterDelivery(_ staging: URL) {
+        let delay = dragCopyLifetime
+        Task { [weak self] in
+            try? await Task.sleep(for: delay, clock: .suspending)
+            self?.removeDragCopy(staging)
+        }
+    }
+
+    private func removeDragCopy(_ staging: URL) {
+        guard let index = dragStagingDirectories.firstIndex(of: staging) else { return }
+        dragStagingDirectories.remove(at: index)
+        FileDropStorage.remove(staging)
     }
 
     /// Removes the drag staging folders; the window is closing.
     func removeDragStaging() {
-        for folder in dragStagingDirectories {
-            try? FileManager.default.removeItem(at: folder)
-        }
+        for folder in dragStagingDirectories { FileDropStorage.remove(folder) }
         dragStagingDirectories.removeAll()
     }
 }

@@ -37,6 +37,13 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Dropped-file copies clean themselves up instead of staying until removed by
+  hand: a copy goes when its pane closes or Corta quits, and what a crash left goes
+  at the next launch. **The first launch after updating removes every copy older
+  versions kept**, so save anything you still need from
+  `Application Support/Corta/DroppedFiles` before updating. Their size and
+  Clean Now are in Settings ▸ Privacy & Security ▸ Local Data. A file dropped from
+  Finder is used where it is and is never removed.
 - The documentation no longer says Claude Code is the only CLI whose task
   state Corta shows: Codex 0.166.0 reports its own, through the same general
   parser. What was and was not checked is in the user guide.
@@ -107,6 +114,8 @@ Versioning for compatibility changes.
   everything beneath them, a new subtask past the limit replaces the stalest instead
   of being refused, and spaces around fields are ignored. The differences that remain
   are listed in `docs/CONFORMANCE.md`.
+- ⌘Q no longer hangs after an SFTP row has been dragged. On the way out the app
+  waited for a file promise nobody could keep.
 - Holding an SFTP row over Finder no longer freezes Finder. Merely hovering
   started the download, twice, and Finder waited on it, sometimes until Corta
   quit, and the drop could deliver nothing. The download now starts once, when

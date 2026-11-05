@@ -817,6 +817,7 @@ managed remote-edit copies. Their contents are not configuration keys.
 | `SessionRestore` | `state.json` | Window frames and split arrangement, restored on the next launch | **Window/session state** — describes *this run's* windows, not a preference about future ones |
 | `DirectoryHistoryStore` | `directory-history.json` | Ranked recent directories | **Temporary interaction history** — gated by `directory-history`; clear it in Privacy & Security ▸ History |
 | `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent hosts |
+| `FileDropStorage` | `DroppedFiles/` and `SFTPDragStaging/` | Temporary copies of files dropped from other apps and of SFTP rows being dragged out | **Temporary copies** — no setting; removed with their pane or at quit, and shown with **Clean Now…** in Privacy & Security ▸ Local Data |
 | `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — preserve undecided edits before deleting app data; used copies are pruned after 30 days unless edits are pending |
 
 Why separate stores: `Configuration` is line-oriented text

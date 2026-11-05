@@ -596,24 +596,33 @@ symlink. Download files and managed directories/files have inherited ACLs
 cleared before use. This does not exclude administrators or backups; parent
 storage policy and intentionally shared export destinations still matter.
 
-**Incoming file promises create private local copies.** Each reception uses a
-fresh directory under Application Support/DroppedFiles (the development stage
-when staged). The root and directories are 0700 with extended ACLs cleared;
-received regular files are tightened to 0600 and have their ACLs cleared before
-use. Symlinks, hard links, special files and callback paths outside that
-directory are refused: a hard link shares its mode and ACLs with an original
-elsewhere. Original file-URL sources are never chmod'd or deleted.
+**Incoming file promises create private local copies, and those copies are
+temporary.** Each reception uses a fresh directory under Application
+Support/DroppedFiles (the development stage when staged), excluded from backups.
+The root and directories are 0700 with extended ACLs cleared; received regular
+files are tightened to 0600 and have their ACLs cleared before use. Symlinks, hard
+links, special files and callback paths outside that directory are refused: a hard
+link shares its mode and ACLs with an original elsewhere. Original file-URL sources
+are used where they are and are never chmod'd or deleted.
 
-Empty, cancelled or target-mismatched receptions are removed. Pending reception
-directories record an owner PID; the next promise reception checks at most 32
-entries and removes unpublished ones whose owner no longer exists. PID reuse
-conservatively keeps a copy. Before handing paths to a pane, a private marker
-records publication. Published pane copies have **no automatic expiry**: a
-program can defer opening a path or outlive Corta, so age, session exit and app
-exit cannot prove it is safe to delete. The user removes these directories
-explicitly when their programs are finished; they can consume disk space until
-then. This retention includes copies awaiting a paste-warning decision; cancelling
-that decision removes them.
+Every directory records its owner, a process ID and a per-launch identifier. A pane
+owns the copies handed to it: they follow it to another tab or window and go when it
+closes, in the background. A pane closed mid-reception fills nothing and removes
+what arrives late. A quit removes this run's copies synchronously, for at most 1.5
+seconds. A launch removes whatever earlier runs left, including a crash's, a
+force-quit's and an older version's, and skips directories whose owner is still
+alive. A reused process ID conservatively keeps a copy until a later launch.
+Empty, cancelled or target-mismatched receptions are removed at once. **Clean Now**
+in Settings removes everything but what is being received or uploaded and a live
+sibling's copies, after saying that paths in use stop working.
+
+Removal never follows a link: a directory is renamed aside and deleted with links
+removed as links, the owner record is opened without following one, and a root that
+is itself a symlink is refused. This trades a program's convenience for bounded
+disk use: a path pasted into a long-running program stops working when its pane
+closes or Corta quits, and an open file's space returns only when the last reader
+closes it. Local snapshots can hold the space longer. Nothing is overwritten
+before it is unlinked, so this is cleanup, not secure erasure.
 
 The SFTP browser owns its incoming promise copies separately. Each successful
 upload, including a successful retry, deletes its own source. Failed copies stay

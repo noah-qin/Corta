@@ -129,6 +129,28 @@ extension SettingsView {
         }
     }
 
+    /// Not a setting: disk Corta uses, and a way to give it back.
+    var localDataSection: some View {
+        SettingsSection(L10n.text("settings.section.localData"), summary: L10n.text("settings.help.droppedCopies")) {
+            LabeledContent(L10n.text("settings.label.droppedCopies")) {
+                StatusRowView(
+                    status: model.droppedCopiesStatus,
+                    action: Self.action(if: model.droppedCopiesStatus.actionTitle != nil) {
+                        confirmingCleanDroppedCopies = true
+                    })
+            }
+            .accessibilityIdentifier("dropped-copies")
+            .alert(L10n.text("settings.droppedCopies.confirmTitle"), isPresented: $confirmingCleanDroppedCopies) {
+                Button(L10n.text("settings.droppedCopies.confirmAction"), role: .destructive) {
+                    model.cleanDroppedCopies()
+                }
+                Button(L10n.text("common.cancel"), role: .cancel) {}
+            } message: {
+                Text(L10n.text("settings.droppedCopies.confirmMessage"))
+            }
+        }
+    }
+
     var historySection: some View {
         SettingsSection(L10n.text("settings.section.history")) {
             Toggle(

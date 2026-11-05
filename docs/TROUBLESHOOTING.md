@@ -160,20 +160,32 @@ refuses to fill any paths. Wait for the intended prompt and drop again. Corta's
 own SFTP rows are deliberately refused by panes; download a file to Finder
 first. The SFTP upload target accepts only drags from outside Corta.
 
-### Received copies take disk space
+### A path I dropped earlier no longer exists
 
-Promised files dropped on a pane are kept under
-`~/Library/Application Support/Corta/DroppedFiles/` in private reception folders.
-Their paths may still be used by a program after the pane or app closes, so
-Corta does not expire them automatically. Once the programs using those paths
-have finished, use Finder's Go to Folder to open this directory and remove the
-reception folders you no longer need. Development builds use
-`~/Library/Application Support/Corta Dev/ApplicationSupport/DroppedFiles/`;
-a launch with `CORTA_STAGE_DIR` uses `<stage>/ApplicationSupport/DroppedFiles/`.
+Files only another app can supply, such as a Photos or Mail attachment, arrive as
+temporary copies. A copy goes when its pane closes, with its tab or window, or when
+Corta quits, and the first launch after an update removes copies older versions
+kept. Its path then stops working everywhere: in a program still running, wherever
+you copied the path, in the scrollback and in your shell history. ⇧⌘T brings a pane
+back without its copies. To keep such a file, copy it elsewhere first. A file
+dropped from Finder is used where it is and is never removed.
 
-SFTP upload copies are removed after successful upload. Failed ones stay for
-Retry until the browser closes, then are removed. Interrupted unpublished
-receptions left by a crash are eligible for cleanup on the next promise drop.
+### Dropped-file copies take disk space
+
+**Settings ▸ Privacy & Security ▸ Local Data** shows the space and offers **Clean
+Now…**, which keeps only what is being received or uploaded. Space may not come
+back at once while another program has a file open or a system snapshot holds it.
+
+If Corta crashed or was uninstalled and will not be opened again, nothing will
+clean up, and these folders can be deleted by hand once Corta has quit:
+`~/Library/Application Support/Corta/DroppedFiles/` and
+`~/Library/Application Support/Corta/SFTPDragStaging/`. Development builds use
+`~/Library/Application Support/Corta Dev/ApplicationSupport/` in place of the
+`Corta` folder, and a launch with `CORTA_STAGE_DIR` uses
+`<stage>/ApplicationSupport/`.
+
+SFTP upload copies are removed after a successful upload. Failed ones stay for
+Retry until the browser closes, then are removed.
 
 ## Typing and rendering
 

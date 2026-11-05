@@ -215,6 +215,29 @@ struct FileDropTests {
         request.cancel()
     }
 
+    @Test("a pane that closes mid-reception removes what arrives late and fills nothing")
+    func closedPaneDropsLateArrival() async throws {
+        let root = scratchRoot()
+        defer { FileDropStorage.remove(root) }
+        let directory = try FileDropStorage.makeDirectory(in: root)
+        let host = CommandsTestHost()
+        var completed = false
+        let request = FileDropRequest(count: 1, directory: directory) { _ in completed = true }
+        host.commands.fileDropRequest = request
+        let receiver = LatePromiseReceiver(names: ["late"])
+        let destination = FileDropStorage.destination(in: directory)
+        request.receive(receiver, at: destination, index: 0)
+        request.seal()
+        host.commands.stop()
+        #expect(!FileManager.default.fileExists(atPath: directory.path))
+        // The provider finishes anyway, into a folder made again for it.
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        receiver.deliverAll()
+        await waitUntil("the late copy is gone") { !FileManager.default.fileExists(atPath: directory.path) }
+        #expect(!completed)
+        #expect(host.commands.droppedCopies.isEmpty)
+    }
+
     @Test("completed pane copies survive maintenance; discarded copies are removed")
     func retainedAndDiscardedCopies() throws {
         let root = scratchRoot()

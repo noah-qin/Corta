@@ -450,3 +450,26 @@ extension PaneMoveTests {
         #expect(controller.window?.firstResponder === pane.terminalView)
     }
 }
+
+extension PaneMoveTests {
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func droppedCopiesFollowTheirPaneAndGoWhenItCloses() throws {
+        let controller = makeWindow()
+        defer { close(controller) }
+        let source = try #require(controller.selectedTab)
+        let pane = try #require(source.split.focusedPane)
+        let context = pane.commands.dropInputContext
+        let directory = try FileDropStorage.makeDirectory()
+        defer { FileDropStorage.remove(directory) }
+        pane.commands.droppedCopies.insert(directory)
+
+        source.split.movePaneToNewTab(nil)
+        #expect(pane.commands.droppedCopies == [directory])
+        #expect(FileManager.default.fileExists(atPath: directory.path))
+        #expect(pane.commands.dropInputContext == context, "a move is not a changed drop target")
+
+        #expect(controller.selectedTab?.split.panes.contains(pane) == true)
+        pane.teardown()
+        #expect(!FileManager.default.fileExists(atPath: directory.path))
+    }
+}
