@@ -852,8 +852,9 @@ or ask in `#help` on the [Discord](https://discord.gg/QNdWfdwr7j).
 It was acceptance-tested with the installed **Claude Code 2.1.310** on macOS
 arm64; this is not a compatibility guarantee for all Claude versions.
 
-**Codex reports its task state too, and it reaches Corta without any
-Codex-specific code.** Checked on 2026-11-05 with **Codex 0.166.0**, hooks
+**Codex 0.166.0 was checked reporting its own task state, through the same
+general parser.** Corta has no Codex-specific state handling; Codex appears
+only in the built-in process-name and icon lists. Checked on 2026-11-05, hooks
 turned off: Codex sends OSC 7501 by itself, labelled `app=codex`, and does not
 wait for a probe. Corta recorded idle, working and done, and Waiting for you
 (kind `permission`) at an approval prompt; the tab showed the Codex icon and the

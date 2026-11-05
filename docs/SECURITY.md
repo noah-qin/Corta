@@ -264,8 +264,8 @@ a typed host does (`SSHDestination`), and picking one only fills the field.
 ### 2.9 Program status and notification text
 
 Task state was developed against Claude Code, and Codex 0.166.0 has been
-observed sending OSC 7501 by itself; Corta has no Codex-specific code, and
-neither program is treated differently. Generic protocol acceptance does not
+observed sending OSC 7501 by itself; Corta has no Codex-specific state
+handling, and neither program's reports are treated differently. Generic protocol acceptance does not
 imply integration with other coding agents.
 OSC 7501/21337 state and OSC 9/777/99 notices are self-reported metadata,
 including `app`; none grants trust or runs anything. ConEmu GuiMacro and

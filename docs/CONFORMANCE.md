@@ -692,7 +692,8 @@ same terms; the tree carries no dated records.
 Claude Code is the CLI the task-state support was developed and
 acceptance-tested against. Codex 0.166.0 has been observed reporting OSC 7501
 by itself ([below](#cli-signal-compatibility)); Corta has no Codex-specific
-code, so that is the general parser, for that version and those flows. General
+state handling (Codex appears only in the process-name and icon lists), so that
+is the general parser, for that version and those flows. General
 protocol parsing and process-name detection do not by themselves constitute
 task-state integration for any other CLI. No Gemini, pi, Kimi, Grok Build,
 Qwen, OpenCode or Aider state adapter is shipped.
@@ -779,7 +780,7 @@ promise of compatibility with every Claude Code release.
 | Dedicated Claude task state | OSC 7501 working, blocked, done, idle, error and clear; permission/question/auth reasons; one main slot and 32 subtask slots | Only explicitly reported state; output, silence, BEL and notification prose do not establish an outcome. |
 | Verified real 2.1.310 flows | Probe, normal completion, permission waiting/cancellation, invalid-model failure, isolated invalid-token auth waiting, Agent child id/clear and abrupt exit to an integrated shell | These concrete flows do not cover every failure cause or auth recovery. Question kind and capacity limits also have parser/policy coverage. |
 | Verified native notifications | Default auto plus fixed 7501 attention; explicit iterm2/ghostty/kitty text, notification clicks and waiting/completed Dock badge screenshots | Auto does not select a Claude text channel for Corta; OS authorization and delivery policy still apply. |
-| Observed Codex 0.166.0 state, generic parser | With Codex hooks off (2026-11-05, Corta `3d23a2c7`): Codex's own OSC 7501 with `app=codex`, no hook and no 7501 probe; `idle → working → done`; `blocked` with kind `permission` at an approval; Codex tab icon and blue, orange and green status dots | Corta has no Codex-specific code. Not checked in Corta: the return to `working` after an approval (seen only under another terminal, Rex), the Agents list, the Dock, notifications, failure, cancellation and sign-in. Other Codex versions are not covered. |
+| Observed Codex 0.166.0 state, generic parser | With Codex hooks off (2026-11-05, Corta `3d23a2c7`): Codex's own OSC 7501 with `app=codex`, no hook and no 7501 probe; `idle → working → done`; `blocked` with kind `permission` at an approval; Codex tab icon and blue, orange and green status dots | Corta has no Codex-specific state handling. Not checked in Corta: the return to `working` after an approval (seen only under another terminal, Rex), the Agents list, the Dock, notifications, failure, cancellation and sign-in. Other Codex versions are not covered. |
 | Generic protocols only | OSC 9/777/99 notifications, OSC 9;4 progress and OSC 21337 metadata | Claude 2.1.310 does not enable native progress for Corta's normal identity; its OSC 21337 sender is disabled. Generic support is not evidence of Claude emission. |
 | Not implemented | CLI-specific state adapters beyond the probe reply; OSC 99 activation/close/alive reports, icons and buttons; ConEmu execution commands | Other recognised tools have process detection and generic protocols only, unless they send OSC 7501 themselves as Codex 0.166.0 does. No hooks or tool configuration are installed. |
 | Not guaranteed | Other Claude or Codex versions; 7501 through tmux, Claude background sessions or disabled terminal-title reporting | The upstream minimum 2.1.295 is not a Corta-tested version range. Live regroup/restart click permutations and auth recovery need separate acceptance; routing policy has unit coverage. |

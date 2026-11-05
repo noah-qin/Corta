@@ -95,7 +95,8 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   and failure on tabs, the Dock and the Agents list.
 - Codex 0.166.0 sends OSC 7501 by itself, with no hook, and Corta's general
   parser shows its idle, working, done and permission-waiting states on the tab
-  (checked 2026-11-05). Corta has no Codex-specific code. The Agents list, the
+  (checked 2026-11-05). Corta has no Codex-specific state handling; Codex
+  appears only in the built-in process-name and icon lists. The Agents list, the
   Dock and notifications have not been checked against Codex, nor have other
   Codex versions.
 - Generic OSC 9/777/99 notifications and OSC 9;4 progress are available to
