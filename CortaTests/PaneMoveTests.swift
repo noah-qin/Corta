@@ -326,6 +326,24 @@ struct PaneMoveTests {
 
 /// Moves to another tab that cannot happen.
 extension PaneMoveTests {
+    /// However the submenu is built, each row has an action: that is what
+    /// validation disables, and a row without one looks available.
+    @Test func everyMoveToTabRowHasAnAction() throws {
+        let menu = try #require(NSApp.mainMenu)
+        func find(_ menu: NSMenu) -> NSMenu? {
+            for item in menu.items {
+                guard let submenu = item.submenu else { continue }
+                if submenu.title == L10n.text("menu.movePaneToTab") { return submenu }
+                if let found = find(submenu) { return found }
+            }
+            return nil
+        }
+        let submenu = try #require(find(menu))
+        submenu.delegate?.menuNeedsUpdate?(submenu)
+        #expect(!submenu.items.isEmpty)
+        #expect(submenu.items.allSatisfy { $0.action != nil })
+    }
+
     /// The newcomer takes the target's font, so the target's minimum decides.
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func aPaneThatWouldNotFitAtTheTargetsFontStaysPut() throws {

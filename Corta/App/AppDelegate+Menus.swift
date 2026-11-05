@@ -165,9 +165,11 @@ extension AppDelegate {
             menu.addItem(item)
         }
         if menu.items.isEmpty {
-            let empty = NSMenuItem(title: L10n.text("menu.movePaneToTab.none"), action: nil, keyEquivalent: "")
-            empty.isEnabled = false
-            menu.addItem(empty)
+            // Names no tab, so it does nothing, and validation disables it with
+            // the window's only tab; an actionless row looks available.
+            menu.addItem(NSMenuItem(
+                title: L10n.text("menu.movePaneToTab.none"),
+                action: #selector(SplitViewController.movePaneToTabNamedByItem(_:)), keyEquivalent: ""))
         }
     }
 
