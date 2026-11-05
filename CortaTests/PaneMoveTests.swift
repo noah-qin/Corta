@@ -348,6 +348,26 @@ extension PaneMoveTests {
         #expect(target.split.panes.count == 1)
     }
 
+    /// A refused move with nothing to measure leaves a search field its keyboard.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aRefusedMoveLeavesTheSearchFieldItsKeyboard() throws {
+        let controller = makeWindow(panes: 1)
+        defer { close(controller) }
+        let source = try #require(controller.selectedTab)
+        let target = controller.addTab(select: false)
+        let pane = try #require(source.split.focusedPane)
+        let anchor = try #require(target.split.focusedPane)
+        controller.window?.setContentSize(anchor.minimumContentSize)
+        pane.search.show()
+        let field = try #require(pane.search.field)
+
+        source.split.movePaneToNextTab(nil)
+
+        #expect(pane.parent === source.split)
+        let editor = controller.window?.firstResponder as? NSText
+        #expect(editor?.delegate === field)
+    }
+
     /// A move that cannot happen leaves the target zoomed and the keyboard here.
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func aRefusedMoveKeepsTheTargetsZoom() throws {

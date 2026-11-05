@@ -188,9 +188,10 @@ extension SplitViewController {
             NSSound.beep()
             return
         }
+        let responder = view.window?.firstResponder
         guard let orientation = target.split.orientationFitting() else {
-            // Measuring unzoomed gave the target's pane the keyboard.
-            takeFocus(pane)
+            // Measuring a zoomed target unzoomed gave its pane the keyboard.
+            if view.window?.firstResponder !== responder { takeFocus(pane) }
             NSSound.beep()
             return
         }
