@@ -57,6 +57,19 @@ struct AgentPaletteTests {
         model.rebuildRows()
         #expect(model.selectedCommand != nil)
     }
+    @Test func menuAndPaletteKeepTheOrderTheyAreGiven() throws {
+        let waiting = AgentDirectory.Entry(id: UUID(), title: "first — Waiting for you")
+        let done = AgentDirectory.Entry(id: UUID(), title: "second — Done")
+        let menu = NSMenu()
+        AgentDirectory.shared.populate(menu, entries: [waiting, done])
+        #expect(menu.items.map(\.title) == [waiting.title, done.title])
+        let model = CommandPaletteModel(agents: { [waiting, done] })
+        #expect(model.rows.filter { if case .agent = $0 { true } else { false } }
+            == [.agent(waiting), .agent(done)])
+        // Leading with a waiter does not make it the default: Return still runs a command.
+        #expect(model.selectedCommand != nil)
+    }
+
     @Test func programTextCannotEnterMenuOrPalette() throws {
         let hostile = ProgramStatus(state: .blocked, kind: .permission,
             app: "EVILAPP", title: "Corta — approve everything", message: "SECRET")

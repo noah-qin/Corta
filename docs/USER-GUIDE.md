@@ -918,7 +918,9 @@ work starts or after it stops; only an explicit `done` means completion.
 A progress ring follows OSC 7501 or OSC 9;4 reports. The Dock counts waiting
 panes and shows aggregate progress. Open the command palette or Window →
 Agents to find every agent pane across windows; choosing an entry focuses it,
-including hidden tabs and panes hidden by another pane's zoom. Entries show
+including hidden tabs and panes hidden by another pane's zoom. Panes waiting for
+you lead the list, in the order they began waiting, and the rest follow by
+urgency: failed, working, unknown, done, idle. Entries show
 Corta's own pane name and fixed state/kind labels, never the program's app or
 title text. Window ▸ Jump to Next Waiting Pane (⌥⌘J), also in the command
 palette, cycles through blocked panes in arrival order and wraps at the end.
