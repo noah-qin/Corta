@@ -98,11 +98,17 @@ extension SplitViewController {
         let fractions = tree.dividerFractions()
         isRearrangingPanes = true
         defer { isRearrangingPanes = false }
-        guard surgery(pane.view) else {
+        // `fractions` is keyed by identity: a node the surgery freed could
+        // otherwise lend its address, and its share, to one the surgery makes.
+        let moved = withExtendedLifetime(tree.nodes) {
+            guard surgery(pane.view) else { return false }
+            settleTree(fractions: fractions)
+            return true
+        }
+        guard moved else {
             NSSound.beep()
             return
         }
-        settleTree(fractions: fractions)
         isRearrangingPanes = false
         finishMove(of: pane, keepsSearchFocus: keepsSearchFocus)
     }
@@ -226,6 +232,7 @@ extension SplitViewController {
     /// Which way this tab's focused pane can split to take `pane`: side by side
     /// if both halves fit, else stacked; nil, changing nothing, if neither does.
     private func orientationFitting(_ pane: ViewController) -> SplitOrientation? {
+        splitTransition.finish()
         unzoomPane()
         view.frame = view.superview?.bounds ?? view.frame
         view.layoutSubtreeIfNeeded()

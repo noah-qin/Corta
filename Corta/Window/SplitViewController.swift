@@ -83,7 +83,9 @@ final class SplitViewController: NSViewController {
         var adopting: ViewController?
     }
     let splitTransition = SplitTransition()
-    private let setup: Setup
+    /// `adopting` is emptied once the view has taken the pane: a tab outlives
+    /// a pane that moves on or closes, and must not keep it alive.
+    private(set) var setup: Setup
 
     /// The layout being restored: taken in `viewDidLoad` (the root pane needs
     /// its directory at spawn), its frame in `prepareWindow`, its splits in
@@ -121,6 +123,7 @@ final class SplitViewController: NSViewController {
         if let adopted = setup.adopting {
             addChild(adopted)
             pane = adopted
+            setup.adopting = nil
         } else {
             pane = makePane(
                 workingDirectory: pendingRestore?.layout.firstDirectory ?? setup.workingDirectory,

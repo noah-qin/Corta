@@ -283,6 +283,22 @@ struct PaneMoveTests {
         #expect(editor?.delegate === field, "the field keeps the keyboard")
     }
 
+    /// The tab can outlive the pane it was made for: the setup must not keep
+    /// a pane that has moved on or closed, with its scrollback, alive.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aNewTabDoesNotHoldOnToThePaneItAdopted() throws {
+        let controller = makeWindow()
+        defer { close(controller) }
+        let split = try #require(controller.selectedTab?.split)
+        let pane = try #require(split.focusedPane)
+
+        split.movePaneToNewTab(nil)
+
+        let adopter = try #require(pane.splitController)
+        #expect(adopter !== split)
+        #expect(adopter.setup.adopting == nil)
+    }
+
     /// Nodes made by a move answer divider drags like a split's.
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func nodesMadeByAMoveAreWired() throws {
