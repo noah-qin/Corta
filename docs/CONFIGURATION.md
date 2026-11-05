@@ -438,7 +438,7 @@ theme.midnight.dark.ansi1 = #ff5f56
 
 ### Graphical theme editing
 
-View → Theme editor opens the editor directly. Settings → Appearance → Create theme copies the selected theme into an
+View → Theme editor opens the editor directly. Settings → Themes → New copies the selected theme into an
 unsaved draft. Edit dark and light variants using color pickers or HEX input;
 the preview is local to the editor. Save theme writes a new custom theme and
 selects it. Edit theme is offered for custom themes; built-ins are copied rather
@@ -858,4 +858,4 @@ with up to one decimal digit to fit more selected metrics. Hover or open details
 for full labels and precision; accessibility also receives the full text.
 Numbers follow the current locale, and labels follow the app's selected language.
 Host details are also available from View → Local host details or Settings →
-Terminal → Local host details, even with the status bar disabled.
+Appearance → Local host details, even with the status bar disabled.
