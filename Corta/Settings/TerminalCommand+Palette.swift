@@ -81,17 +81,17 @@ nonisolated extension TerminalCommand {
         case .shrinkPaneHorizontally: return 10
         case .growPaneVertically: return 11
         case .shrinkPaneVertically: return 12
-        case .movePaneLeft: return 13
-        case .movePaneRight: return 14
-        case .movePaneUp: return 15
-        case .movePaneDown: return 16
-        case .swapPaneLeft: return 17
-        case .swapPaneRight: return 18
-        case .swapPaneUp: return 19
-        case .swapPaneDown: return 20
-        case .movePaneToNewTab: return 21
-        case .movePaneToPreviousTab: return 22
-        case .movePaneToNextTab: return 23
+        case .movePaneLeft: return 14
+        case .movePaneRight: return 15
+        case .movePaneUp: return 16
+        case .movePaneDown: return 17
+        case .swapPaneLeft: return 18
+        case .swapPaneRight: return 19
+        case .swapPaneUp: return 20
+        case .swapPaneDown: return 21
+        case .movePaneToNewTab: return 22
+        case .movePaneToPreviousTab: return 23
+        case .movePaneToNextTab: return 24
         case .increaseFontSize: return 0
         case .decreaseFontSize: return 1
         case .resetFontSize: return 2

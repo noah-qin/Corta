@@ -57,7 +57,7 @@ final class CommandPaletteModel {
         var selectable: Bool {
             switch self {
             case .header: false
-            case .agent: true
+            case .agent, .paneMoveTarget: true
             case .command(_, _, _, let enabled): enabled
             }
         }
