@@ -77,7 +77,9 @@ nonisolated struct AttentionQueue: Equatable, Sendable {
         if let current, order.first == current {
             guard order.count > 1 else { return nil }
             markJumped(current)
-            order = ordered
+            // That mark can end the round, which puts a top kind back at the
+            // head: `current` is where the user already is, so it is never next.
+            order = ordered.filter { $0 != current }
         }
         guard let head = order.first else { return nil }
         markJumped(head)

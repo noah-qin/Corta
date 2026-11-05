@@ -139,6 +139,22 @@ struct AgentJumpTests {
         #expect(split.focusedPane === focused, "done is not waiting")
     }
 
+    @Test func aRecentJumpLeavesThePaletteWithAgentStatus() {
+        let store = ConfigurationStore.shared
+        let original = store.configuration.agentStatus
+        defer { _ = store.update { $0.agentStatus = original } }
+        _ = store.update { $0.agentStatus = true }
+        let model = CommandPaletteModel(agents: { [] })
+        model.query = TerminalCommand.nextWaitingPane.title
+        #expect(model.selectedCommand == .nextWaitingPane)
+        model.runSelected()
+        model.query = ""
+        #expect(model.rows.compactMap(\.command).contains(.nextWaitingPane))
+        _ = store.update { $0.agentStatus = false }
+        model.rebuildRows()
+        #expect(!model.rows.compactMap(\.command).contains(.nextWaitingPane))
+    }
+
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func agentStatusOffDisablesTheCommandAndEmptiesTheList() async throws {
         let store = ConfigurationStore.shared

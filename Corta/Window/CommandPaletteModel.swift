@@ -147,7 +147,7 @@ final class CommandPaletteModel {
     /// gets shorter with use rather than longer.
     private func browsingRows(row: (TerminalCommand, Bool) -> Row) -> [Row] {
         var rows: [Row] = []
-        let recents = recentCommands.prefix(Self.recentLimit)
+        let recents = recentCommands.filter(\.isOfferedInPalette).prefix(Self.recentLimit)
         if !recents.isEmpty {
             rows.append(.header(L10n.text("commandPalette.category.recent")))
             rows.append(contentsOf: recents.map { row($0, true) })

@@ -118,6 +118,16 @@ struct AttentionQueueTests {
         #expect(queue.next(from: nil) == auth)
     }
 
+    /// Focused on a new sign-in with the only other pane already visited: marking
+    /// it ends the round and puts it back at the head, and the jump must still move.
+    @Test func aFocusedHeadThatEndsTheRoundStillMoves() {
+        var queue = AttentionQueue()
+        queue.sync(waiting: [.init(id: permission, kind: .permission), .init(id: question, kind: .question)])
+        #expect(queue.next(from: nil) == permission)
+        queue.sync(waiting: [.init(id: permission, kind: .permission), .init(id: auth, kind: .auth)])
+        #expect(queue.next(from: auth) == permission)
+    }
+
     /// A focused pane that is not waiting goes straight to the head.
     @Test func aFocusedPaneOutsideTheQueueStartsAtTheHead() {
         var queue = AttentionQueue()
