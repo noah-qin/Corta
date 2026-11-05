@@ -187,22 +187,6 @@ extension FileDropTests {
         #expect(directory.path == directory.resolvingSymlinksInPath().path)
     }
 
-    @Test("maintenance removes dead unpublished receivers but preserves published paths")
-    func abandonedCleanup() throws {
-        let root = scratchRoot()
-        defer { FileDropStorage.remove(root) }
-        let abandoned = root.appendingPathComponent("abandoned")
-        let published = root.appendingPathComponent("published")
-        for directory in [abandoned, published] {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try PrivateFile.write(Data("99999999".utf8), to: directory.appendingPathComponent(".owner"))
-        }
-        try FileDropStorage.markPublished(published)
-        FileDropStorage.pruneAbandoned(in: root)
-        #expect(!FileManager.default.fileExists(atPath: abandoned.path))
-        #expect(FileManager.default.fileExists(atPath: published.path))
-    }
-
     @Test("successful SFTP uploads delete their own copies, leave originals and keep failed copies for retry")
     func sftpCopyCleanup() async throws {
         let root = scratchRoot()

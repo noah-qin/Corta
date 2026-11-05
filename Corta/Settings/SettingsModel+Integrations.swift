@@ -90,6 +90,40 @@ extension SettingsModel {
         refreshShellIntegrationStatus()
     }
 
+    // MARK: - Dropped copies
+
+    /// The disk the copies of dropped files take, measured off the main actor:
+    /// a copy can hold any number of files. The newest request wins.
+    func refreshDroppedCopiesStatus() {
+        droppedCopiesGeneration += 1
+        let generation = droppedCopiesGeneration
+        droppedCopiesStatus = RowStatus(kind: .none, message: L10n.text("settings.status.droppedCopiesMeasuring"))
+        Task.detached(priority: .utility) { [weak self] in
+            let bytes = FileDropStorage.usage()
+            await self?.showDroppedCopies(bytes: bytes, generation: generation)
+        }
+    }
+
+    private func showDroppedCopies(bytes: Int64, generation: Int) {
+        guard generation == droppedCopiesGeneration else { return }
+        droppedCopiesStatus = bytes > 0
+            ? RowStatus(kind: .adjusted, message: ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file),
+                actionTitle: L10n.text("settings.action.cleanNow"))
+            : RowStatus(kind: .none, message: L10n.text("settings.status.droppedCopiesNone"))
+    }
+
+    /// After the confirmation the page asks for.
+    func cleanDroppedCopies() {
+        droppedCopiesGeneration += 1
+        let generation = droppedCopiesGeneration
+        droppedCopiesStatus = RowStatus(kind: .none, message: L10n.text("settings.status.droppedCopiesMeasuring"))
+        Task.detached(priority: .utility) { [weak self] in
+            FileDropStorage.removeUnpinned()
+            let bytes = FileDropStorage.usage()
+            await self?.showDroppedCopies(bytes: bytes, generation: generation)
+        }
+    }
+
     // MARK: - Directory history
 
     /// How many directories `DirectoryHistoryStore` currently
