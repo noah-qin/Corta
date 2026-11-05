@@ -79,6 +79,13 @@ final class SettingsUITests: XCTestCase {
         sidebar.buttons["Keyboard & Mouse"].click()
         XCTAssertTrue(settings.popUpButtons.firstMatch.waitForExistence(timeout: 3))
         XCTAssertGreaterThanOrEqual(settings.popUpButtons.count, 2)
+
+        // A clicked row leaves the arrow keys walking the list.
+        sidebar.buttons["General"].click()
+        XCTAssertEqual(settings.title, "General")
+        settings.typeKey(.downArrow, modifierFlags: [])
+        let moved = NSPredicate(format: "title == %@", "Appearance")
+        wait(for: [expectation(for: moved, evaluatedWith: settings)], timeout: 3)
     }
 
     /// The theme and appearance choices live under View — where "what the

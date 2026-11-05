@@ -41,16 +41,19 @@ extension SettingsView.Category {
             ]
         case .appearance:
             [
-                "settings.label.lightOrDark", "settings.label.font", "settings.label.cjkFont",
-                "settings.label.size",
+                "settings.section.colorScheme", "settings.appearance.followSystem",
+                "settings.appearance.light", "settings.appearance.dark", "settings.section.font",
+                "settings.label.font", "settings.label.cjkFont", "settings.label.size",
                 "settings.label.fontWeight", "settings.label.lineSpacing", "settings.label.fontFallback",
-                "settings.label.emojiRendering", "settings.section.cursor", "settings.label.cursorShape",
-                "settings.label.cursorBlink",
+                "settings.label.emojiRendering", "settings.section.cursor", "settings.cursor.block",
+                "settings.cursor.bar", "settings.cursor.underline", "settings.label.cursorBlink",
             ]
         case .themes:
             [
-                "settings.label.theme", "theme.create", "theme.edit", "theme.editor", "theme.color.0",
-                "theme.color.1",
+                "settings.label.theme", "settings.theme.lightMode", "settings.theme.darkMode",
+                "settings.theme.default", "settings.theme.builtIn", "settings.theme.custom",
+                "theme.create", "theme.edit", "theme.editor", "settings.themes.baseColors",
+                "settings.themes.ansiColors",
             ]
         case .terminal:
             [

@@ -56,6 +56,9 @@ struct SettingsSidebar: View {
     @Bindable var navigation: SettingsNavigation
 
     @State private var search = ""
+    /// Rows are buttons, which take no focus: the list holds it for the arrow
+    /// keys once a row is clicked.
+    @FocusState private var listFocused: Bool
     @Environment(\.colorScheme) private var colorScheme
 
     private var categories: [SettingsView.Category] {
@@ -96,6 +99,9 @@ struct SettingsSidebar: View {
             }
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
+            .focusable()
+            .focused($listFocused)
+            .focusEffectDisabled()
             .onMoveCommand { direction in
                 guard let index = categories.firstIndex(of: navigation.selection) else { return }
                 switch direction {
@@ -119,6 +125,7 @@ struct SettingsSidebar: View {
     private func row(_ category: SettingsView.Category) -> some View {
         Button {
             navigation.go(to: category)
+            listFocused = true
         } label: {
             SettingsSidebarRow(category: category)
                 .frame(maxWidth: .infinity, alignment: .leading)
