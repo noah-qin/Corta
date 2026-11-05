@@ -71,6 +71,7 @@ extension SFTPBrowserModel {
         guard let client else { return }
         isLoading = true
         listingError = nil
+        if path != currentPath { receptionNotice = nil }
         directoryGeneration += 1
         let generation = directoryGeneration
         Task {

@@ -140,7 +140,19 @@ extension FileDropTests {
             return false
         }
         await waitUntil("the reload settled") { !model.isLoading }
-        #expect(model.listingError == L10n.text("drop.partial"))
+        #expect(model.listingError == nil)
+        #expect(model.receptionNotice == L10n.text("drop.partial"))
+        // An unrelated upload cannot bring it back once it has gone.
+        model.removeReceivedDrops()
+        #expect(model.receptionNotice == nil)
+        #expect(model.upload([file]))
+        await waitUntil("the second upload finished") {
+            model.transfers.count == 2 && model.transfers.allSatisfy {
+                if case .done = $0.state { return true }
+                return false
+            }
+        }
+        await waitUntil("the second reload settled") { !model.isLoading }
         #expect(model.receptionNotice == nil)
     }
 

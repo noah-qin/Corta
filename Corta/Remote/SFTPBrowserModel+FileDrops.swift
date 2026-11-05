@@ -41,6 +41,7 @@ extension SFTPBrowserModel {
                 $0.path.hasPrefix(directory.path + "/")
             })
         }
+        receptionNotice = nil
         guard !result.urls.isEmpty, upload(result.urls, into: destination) else {
             FileDropStorage.remove(result.directory)
             if let directory = result.directory { receivedDropDirectories[directory] = nil }
@@ -48,23 +49,6 @@ extension SFTPBrowserModel {
             return
         }
         receptionNotice = result.notice
-        listingError = result.notice
-    }
-
-    /// A finished upload reloads the listing, which clears `listingError`: a
-    /// small upload would wipe a partial reception's warning before it was
-    /// read. It stays through the uploads that drop started.
-    func restoreReceptionNotice() {
-        guard let receptionNotice else { return }
-        listingError = receptionNotice
-        let pending = transferQueue.transfers.contains { transfer in
-            guard transfer.isUpload else { return false }
-            switch transfer.state {
-            case .queued, .active, .cancelling: return true
-            default: return false
-            }
-        }
-        if !pending { self.receptionNotice = nil }
     }
 
     /// Successful uploads, including retries, release only Corta-owned
@@ -91,6 +75,7 @@ extension SFTPBrowserModel {
         fileDropRequests.removeAll()
         for directory in receivedDropDirectories.keys { FileDropStorage.remove(directory) }
         receivedDropDirectories.removeAll()
+        receptionNotice = nil
     }
 
 }

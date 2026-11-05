@@ -74,7 +74,6 @@ extension SFTPBrowserModel {
         transferQueue.onUploadFinished = { [weak self] in
             self?.cleanUploadedDropCopies()
             self?.refresh()
-            self?.restoreReceptionNotice()
         }
         transferQueue.onListingError = { [weak self] in self?.listingError = $0 }
         connectionGeneration += 1
@@ -128,6 +127,7 @@ extension SFTPBrowserModel {
     /// controller when the window closes.
     func disconnect() {
         connectionGeneration += 1
+        receptionNotice = nil
         directoryGeneration += 1
         isLoading = false
         entryPreparation?.cancel()
