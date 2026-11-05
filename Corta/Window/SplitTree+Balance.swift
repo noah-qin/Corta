@@ -76,6 +76,12 @@ struct FocusFollowsMouse {
     /// The pane entered is usable and not already focused.
     var targetCanTakeFocus: Bool
 
+    /// With nothing seen yet there is no evidence of movement: a pane appearing
+    /// under a pointer that has rested since launch must not take the keyboard.
+    static func pointerMoved(from last: NSPoint?, to location: NSPoint) -> Bool {
+        last.map { $0 != location } ?? false
+    }
+
     var shouldFocus: Bool {
         enabled && pointerMoved && windowHasKeyboard && !buttonPressed && !trackingMenu
             && !modalShowing && terminalHasKeyboard && !composing && targetCanTakeFocus

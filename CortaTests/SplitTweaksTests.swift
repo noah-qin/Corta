@@ -75,6 +75,13 @@ struct SplitTweaksTests {
         #expect(allowed.shouldFocus)
     }
 
+    @Test func aPointerNotYetSeenHasNotMoved() {
+        let here = NSPoint(x: 10, y: 10)
+        #expect(!FocusFollowsMouse.pointerMoved(from: nil, to: here))
+        #expect(!FocusFollowsMouse.pointerMoved(from: here, to: here))
+        #expect(FocusFollowsMouse.pointerMoved(from: NSPoint(x: 11, y: 10), to: here))
+    }
+
     @Test func eachRequirementStopsItWhenFalse() {
         let required: [WritableKeyPath<FocusFollowsMouse, Bool>] = [
             \.enabled, \.pointerMoved, \.windowHasKeyboard, \.terminalHasKeyboard, \.targetCanTakeFocus,

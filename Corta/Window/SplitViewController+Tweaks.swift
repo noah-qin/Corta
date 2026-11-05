@@ -95,7 +95,7 @@ extension SplitViewController {
         let window = view.window
         let rule = FocusFollowsMouse(
             enabled: true,
-            pointerMoved: Self.lastPointerLocation != location,
+            pointerMoved: FocusFollowsMouse.pointerMoved(from: Self.lastPointerLocation, to: location),
             windowHasKeyboard: NSApp.isActive && window?.isKeyWindow == true && isSelectedTab,
             buttonPressed: NSEvent.pressedMouseButtons != 0,
             trackingMenu: RunLoop.current.currentMode == .eventTracking,
