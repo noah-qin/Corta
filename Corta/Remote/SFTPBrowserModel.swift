@@ -289,6 +289,7 @@ final class SFTPBrowserModel {
 
     var fileDropRequests: [UUID: FileDropRequest] = [:]
     var receivedDropDirectories: [URL: Set<URL>] = [:]
+    var receptionNotice: String?
 
     // MARK: - Drags to Finder
 

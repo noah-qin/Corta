@@ -591,8 +591,9 @@ storage policy and intentionally shared export destinations still matter.
 fresh directory under Application Support/DroppedFiles (the development stage
 when staged). The root and directories are 0700 with extended ACLs cleared;
 received regular files are tightened to 0600 and have their ACLs cleared before
-use. Symlinks, special files and callback paths outside that directory are
-refused. Original file-URL sources are never chmod'd or deleted.
+use. Symlinks, hard links, special files and callback paths outside that
+directory are refused: a hard link shares its mode and ACLs with an original
+elsewhere. Original file-URL sources are never chmod'd or deleted.
 
 Empty, cancelled or target-mismatched receptions are removed. Pending reception
 directories record an owner PID; the next promise reception checks at most 32

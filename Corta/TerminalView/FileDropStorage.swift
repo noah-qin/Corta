@@ -105,16 +105,33 @@ nonisolated enum FileDropStorage {
                 try secureTree(child)
             }
         case S_IFREG:
-            let descriptor = open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+            let descriptor = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
             guard descriptor >= 0 else { throw CocoaError(.fileReadNoPermission) }
             defer { close(descriptor) }
+            // Mode and ACLs belong to the inode: tightening a hard link would
+            // tighten the original it shares them with, wherever that lives.
+            var opened = stat()
+            guard fstat(descriptor, &opened) == 0, opened.st_mode & S_IFMT == S_IFREG, opened.st_nlink == 1
+            else { throw CocoaError(.fileReadNoPermission) }
             guard makeOwnerOnly(descriptor: descriptor) == 0 else { throw CocoaError(.fileWriteNoPermission) }
         default: throw CocoaError(.fileReadNoPermission)
         }
     }
 
-    static func remove(_ directory: URL?) {
-        guard let directory else { return }
-        try? FileManager.default.removeItem(at: directory)
+    /// Gone from its path at once, deleted off the caller's thread: this runs
+    /// on the main actor, and a promised folder can hold any number of files.
+    static func remove(_ url: URL?) {
+        guard let url else { return }
+        let doomed = url.deletingLastPathComponent()
+            .appendingPathComponent(".removing-" + UUID().uuidString)
+        let target: URL
+        if rename(url.path, doomed.path) == 0 {
+            target = doomed
+        } else if errno == ENOENT {
+            return
+        } else {
+            target = url
+        }
+        DispatchQueue.global(qos: .utility).async { try? FileManager.default.removeItem(at: target) }
     }
 }

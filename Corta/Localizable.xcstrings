@@ -2,6 +2,65 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "drop.connectionChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Verbindung hat sich beim Empfangen der Dateien geändert. Es wurde nichts hochgeladen. Lege sie erneut hier ab."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The connection changed while receiving files. Nothing was uploaded. Drop them again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La conexión cambió mientras se recibían los archivos. No se subió nada. Vuelve a soltarlos."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connexion a changé pendant la réception des fichiers. Rien n'a été envoyé. Déposez-les à nouveau."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイルの受信中に接続が変わりました。何もアップロードされていません。もう一度ドロップしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일을 받는 동안 연결이 변경되었습니다. 아무것도 업로드되지 않았습니다. 다시 놓으세요."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A conexão mudou enquanto os arquivos eram recebidos. Nada foi enviado. Solte-os novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接收文件时连接已变化，未上传任何内容。请重新拖入。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接收檔案時連線已變更，未上傳任何內容。請重新拖入。"
+          }
+        }
+      }
+    },
     "drop.failed": {
       "extractionState": "manual",
       "localizations": {

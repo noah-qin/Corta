@@ -74,6 +74,7 @@ extension SFTPBrowserModel {
         transferQueue.onUploadFinished = { [weak self] in
             self?.cleanUploadedDropCopies()
             self?.refresh()
+            self?.restoreReceptionNotice()
         }
         transferQueue.onListingError = { [weak self] in self?.listingError = $0 }
         connectionGeneration += 1

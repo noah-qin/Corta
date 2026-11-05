@@ -111,7 +111,7 @@ final class FileDropRequest {
             do {
                 guard error == nil else { throw CocoaError(.fileReadUnknown) }
                 try FileDropStorage.secureReceived(url, in: directory)
-                collection.record(url, index: index)
+                collection.record(url, index: index, owned: true)
             } catch {
                 collection.record(nil, index: index)
             }
@@ -198,26 +198,36 @@ nonisolated final class FileDropCollection: Sendable {
     func queueDrained() { state.withLock { $0.drained = true } }
     var isComplete: Bool { state.withLock { $0.drained && $0.outstandingReaders <= 0 } }
 
-    func record(_ url: URL?, index: Int) {
-        let remove = state.withLock { state in
-            guard !state.finished else { return !state.published }
+    /// `owned` marks a copy Corta received, never a user's original. A late
+    /// one in a directory already handed out goes alone: its neighbours are
+    /// in use, and no path will ever name it.
+    func record(_ url: URL?, index: Int, owned: Bool = false) {
+        let (removeDirectory, removeLate) = state.withLock { state -> (Bool, Bool) in
+            guard !state.finished else { return (!state.published, state.published && owned) }
             state.seen.insert(index)
             if let url { state.urls[index].append(url) } else { state.failed = true }
-            return false
+            return (false, false)
         }
-        if remove { FileDropStorage.remove(directory) }
+        if removeDirectory { FileDropStorage.remove(directory) }
+        if removeLate { FileDropStorage.remove(url) }
     }
 
     @MainActor func finish(timedOut: Bool) -> FileDropRequest.Result {
         state.withLock { state in
             state.finished = true
             let urls = state.urls.flatMap { $0 }
-            state.published = !urls.isEmpty
-            let result = FileDropRequest.Result(urls: urls, directory: directory,
+            // A plain file URL can succeed while every promise fails: nothing
+            // handed out names the directory then, so it must not outlive this.
+            let used = directory.map { directory in
+                let prefix = directory.standardizedFileURL.path + "/"
+                return urls.contains { $0.standardizedFileURL.path.hasPrefix(prefix) }
+            } ?? false
+            state.published = used
+            let result = FileDropRequest.Result(urls: urls, directory: used ? directory : nil,
                 failed: state.failed || state.seen.count != state.urls.count, timedOut: timedOut)
             state.urls.removeAll()
             state.seen.removeAll()
-            if urls.isEmpty { FileDropStorage.remove(directory) }
+            if !used { FileDropStorage.remove(directory) }
             return result
         }
     }

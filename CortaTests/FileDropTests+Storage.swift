@@ -54,6 +54,96 @@ extension FileDropTests {
         }
     }
 
+    @Test("a hard link to a file elsewhere is refused and the original keeps its mode")
+    func hardLinkLeavesOriginalAlone() throws {
+        let root = scratchRoot()
+        defer { FileDropStorage.remove(root) }
+        let directory = try FileDropStorage.makeDirectory(in: root)
+        let original = root.appendingPathComponent("original")
+        try Data("mine".utf8).write(to: original)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: original.path)
+        let link = directory.appendingPathComponent("link")
+        try FileManager.default.linkItem(at: original, to: link)
+        #expect(throws: (any Error).self) { try FileDropStorage.secureReceived(link, in: directory) }
+        #expect(try FileManager.default.attributesOfItem(atPath: original.path)[.posixPermissions] as? Int == 0o644)
+    }
+
+    @Test("removal leaves the path at once and finishes off the caller's thread")
+    func removalIsImmediateAtThePath() async throws {
+        let root = scratchRoot()
+        defer { FileDropStorage.remove(root) }
+        let folder = root.appendingPathComponent("folder")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data().write(to: folder.appendingPathComponent("file"))
+        FileDropStorage.remove(folder)
+        #expect(!FileManager.default.fileExists(atPath: folder.path))
+        await waitUntil("the renamed folder was deleted") {
+            ((try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? ["left"]).isEmpty
+        }
+        FileDropStorage.remove(folder)
+    }
+
+    @Test("a late promised file is removed alone once its neighbours were handed out")
+    func lateCopyRemovedAlone() throws {
+        let root = scratchRoot()
+        defer { FileDropStorage.remove(root) }
+        let directory = try FileDropStorage.makeDirectory(in: root)
+        let ready = directory.appendingPathComponent("ready")
+        let late = directory.appendingPathComponent("late")
+        let original = root.appendingPathComponent("original")
+        for file in [ready, late, original] { try Data().write(to: file) }
+        let collection = FileDropCollection(count: 2, directory: directory)
+        collection.record(ready, index: 0, owned: true)
+        _ = collection.finish(timedOut: true)
+        collection.record(original, index: 1)
+        collection.record(late, index: 1, owned: true)
+        #expect(!FileManager.default.fileExists(atPath: late.path))
+        #expect(FileManager.default.fileExists(atPath: ready.path))
+        #expect(FileManager.default.fileExists(atPath: original.path))
+    }
+
+    @Test("a plain URL that succeeds alongside failed promises does not keep their directory")
+    func mixedDropDropsUnusedDirectory() throws {
+        let root = scratchRoot()
+        defer { FileDropStorage.remove(root) }
+        let directory = try FileDropStorage.makeDirectory(in: root)
+        let collection = FileDropCollection(count: 2, directory: directory)
+        collection.record(URL(fileURLWithPath: "/tmp/original"), index: 0)
+        collection.record(nil, index: 1)
+        let result = collection.finish(timedOut: false)
+        #expect(result.urls.map(\.path) == ["/tmp/original"])
+        #expect(result.directory == nil)
+        #expect(result.failed)
+        #expect(!FileManager.default.fileExists(atPath: directory.path))
+    }
+
+    @Test("a reception's notice survives an empty result and the reload after its upload")
+    func receptionNotices() async throws {
+        let root = scratchRoot()
+        defer { FileDropStorage.remove(root) }
+        let model = await connectedModel(fake: FakeSFTPClient())
+        defer { model.disconnect(); model.removeReceivedDrops() }
+        let generation = model.connectionGeneration
+        model.finishReception(.init(urls: [], directory: nil, failed: true, timedOut: true),
+            into: "/", generation: generation)
+        #expect(model.listingError == L10n.text("drop.timeout"))
+        model.finishReception(.init(urls: [], directory: nil, failed: true, timedOut: false),
+            into: "/", generation: generation + 1)
+        #expect(model.listingError == L10n.text("drop.connectionChanged"))
+        let file = root.appendingPathComponent("ready")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data().write(to: file)
+        model.finishReception(.init(urls: [file], directory: nil, failed: true, timedOut: false),
+            into: "/", generation: generation)
+        await waitUntil("the upload finished") {
+            if case .done = model.transfers.first?.state { return true }
+            return false
+        }
+        await waitUntil("the reload settled") { !model.isLoading }
+        #expect(model.listingError == L10n.text("drop.partial"))
+        #expect(model.receptionNotice == nil)
+    }
+
     @Test("a stage with a symlinked parent receives into a canonical private directory")
     func stagedParentAlias() throws {
         let fixture = scratchRoot()

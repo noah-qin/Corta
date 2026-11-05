@@ -23,26 +23,48 @@ extension SFTPBrowserModel {
         let request = FileDropRequest.start(pasteboard) { [weak self] result in
             guard let self else { FileDropStorage.remove(result.directory); return }
             self.fileDropRequests[id] = nil
-            guard self.connectionGeneration == generation, self.connectionState == .connected else {
-                FileDropStorage.remove(result.directory)
-                self.listingError = L10n.text("drop.targetChanged")
-                return
-            }
-            if let notice = result.notice { self.listingError = notice }
-            if let directory = result.directory {
-                self.receivedDropDirectories[directory] = Set(result.urls.filter {
-                    $0.path.hasPrefix(directory.path + "/")
-                })
-            }
-            if !self.upload(result.urls, into: destination) {
-                FileDropStorage.remove(result.directory)
-                if let directory = result.directory { self.receivedDropDirectories[directory] = nil }
-                self.listingError = L10n.text("drop.failed")
-            }
+            self.finishReception(result, into: destination, generation: generation)
         }
         guard let request else { listingError = L10n.text("drop.failed"); return false }
         fileDropRequests[id] = request
         return true
+    }
+
+    func finishReception(_ result: FileDropRequest.Result, into destination: String, generation: Int) {
+        guard connectionGeneration == generation, connectionState == .connected else {
+            FileDropStorage.remove(result.directory)
+            listingError = L10n.text("drop.connectionChanged")
+            return
+        }
+        if let directory = result.directory {
+            receivedDropDirectories[directory] = Set(result.urls.filter {
+                $0.path.hasPrefix(directory.path + "/")
+            })
+        }
+        guard !result.urls.isEmpty, upload(result.urls, into: destination) else {
+            FileDropStorage.remove(result.directory)
+            if let directory = result.directory { receivedDropDirectories[directory] = nil }
+            listingError = result.notice ?? L10n.text("drop.failed")
+            return
+        }
+        receptionNotice = result.notice
+        listingError = result.notice
+    }
+
+    /// A finished upload reloads the listing, which clears `listingError`: a
+    /// small upload would wipe a partial reception's warning before it was
+    /// read. It stays through the uploads that drop started.
+    func restoreReceptionNotice() {
+        guard let receptionNotice else { return }
+        listingError = receptionNotice
+        let pending = transferQueue.transfers.contains { transfer in
+            guard transfer.isUpload else { return false }
+            switch transfer.state {
+            case .queued, .active, .cancelling: return true
+            default: return false
+            }
+        }
+        if !pending { self.receptionNotice = nil }
     }
 
     /// Successful uploads, including retries, release only Corta-owned
