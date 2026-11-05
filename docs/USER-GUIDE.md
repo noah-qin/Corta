@@ -787,15 +787,19 @@ as supported:
 Settings is a sidebar of categories, the way System Settings is laid out:
 
 - **General** — the new-window size, restoring windows, confirming close,
-  long-task notifications and updates.
-- **Appearance** — light or dark, the system monospaced font, size, and a
-  live preview, cursor shape/blinking and graphical theme editing.
-- **Terminal** — scrollback, the command-history limit, the bell, search
-  defaults, the open-file command, shell integration, optional system status
-  and local host details.
-- **Keyboard & Mouse** — Option as Meta, how links open, the modifier that
-  selects text while a program owns the mouse, copy on select and input-source
-  indicator modes/colors.
+  panes (*Keep panes equal in size*, *Split along the longer side*),
+  notifications and agents (program notices, agent status, more agent
+  programs, long-task notifications) and updates.
+- **Appearance** — light or dark, the font, size and a live preview,
+  cursor shape and blinking, the optional bottom status bar and local host
+  details.
+- **Themes** — each mode's theme, and graphical theme editing.
+- **Terminal** — scrollback, the command-history limit, ambiguous-width
+  characters, the bell, search defaults, shell suggestions and marks, the
+  open-file command and shell integration.
+- **Keyboard & Mouse** — input-source indicator modes and colours, Option as
+  Meta, the paste warning, how links open, the modifier that selects text
+  while a program owns the mouse, copy on select and focus following the mouse.
 - **Shortcuts** — every command's key; a reset arrow appears beside one you
   have changed.
 - **Connections** — Connect to Host, and saved presets.

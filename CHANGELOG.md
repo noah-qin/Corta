@@ -44,6 +44,8 @@ Versioning for compatibility changes.
   `agent-processes`, in General's section now called Notifications & Agents, and
   for `paste-warning`, in Keyboard & Mouse. The bottom status bar's settings move
   from Terminal to Appearance.
+- The user guide, features page and configuration reference name the Settings
+  pages as they are since that move.
 - A copy is confirmed by a band of light sweeping along the copied text
   instead of a "Copied" toast in the corner; with Reduce Motion it is a
   single soft flash, and a copy scrolled out of view keeps the toast.
