@@ -383,7 +383,7 @@ own error text is under **Details**.
   paste enabled. Review the risk sentences and text preview before choosing
   **Paste** or **Cancel**; hidden characters appear as `⟦U+202E⟧` codes.
   **Don’t warn again for this pane** lasts until that pane closes.
-  **Settings ▸ Keyboard & Mouse ▸ Warn before pasting**, or
+  **Settings ▸ Keyboard & Mouse ▸ Paste warning**, or
   `paste-warning = always`, warns on every multiline paste; `off`/Never disables
   these dialogs.
   These are conservative patterns, not a shell

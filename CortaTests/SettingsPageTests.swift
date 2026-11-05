@@ -118,6 +118,7 @@ struct SettingsPageTests {
             #expect(pages(key).contains(.general), "\(key)")
         }
         #expect(pages("settings.label.pasteWarning").contains(.keyboardMouse))
+        #expect(SettingsView.Category.keyboardMouse.matches("paste"), "the word a person would search for")
         #expect(pages("status.enable").contains(.appearance))
         #expect(!pages("status.enable").contains(.terminal))
         #expect(pages("status.item.cpu").contains(.appearance))
