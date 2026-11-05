@@ -83,6 +83,8 @@ extension SplitViewController {
         {
             let axis = split.isVertical ? split.bounds.width : split.bounds.height
             if axis > 0 { split.setPosition(axis * CGFloat(record.position), ofDividerAt: 0) }
+            view.layoutSubtreeIfNeeded()
+            noteRestoredDivider(of: split)
         }
         view.layoutSubtreeIfNeeded()
         for pane in panes { pane.resizeSessionToFitView() }

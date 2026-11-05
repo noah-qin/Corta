@@ -51,13 +51,17 @@ extension SplitViewController {
     /// A restored divider away from its balanced place was put there by the
     /// user in an earlier run. The drag itself is not in the saved layout.
     func noteRestoredDividers() {
-        for node in tree.nodes {
-            guard let split = node as? PaneSplitView, let position = SplitTree.balancedPosition(of: split)
-            else { continue }
-            let axis = split.isVertical ? split.bounds.width : split.bounds.height
-            let extent = split.isVertical ? split.subviews[0].frame.width : split.subviews[0].frame.height
-            split.isUserPositioned = axis > 0 && abs(extent - position) / axis > Self.balancedTolerance
-        }
+        for node in tree.nodes { noteRestoredDivider(of: node) }
+    }
+
+    /// One node's share of that rule: also what a reopened pane's divider needs,
+    /// since closing the pane took the old node and its mark with it.
+    func noteRestoredDivider(of node: NSSplitView) {
+        guard let split = node as? PaneSplitView, let position = SplitTree.balancedPosition(of: split)
+        else { return }
+        let axis = split.isVertical ? split.bounds.width : split.bounds.height
+        let extent = split.isVertical ? split.subviews[0].frame.width : split.subviews[0].frame.height
+        split.isUserPositioned = axis > 0 && abs(extent - position) / axis > Self.balancedTolerance
     }
 
     /// A rounding step's worth: a restored layout lands within a cell of its
@@ -107,10 +111,10 @@ extension SplitViewController {
         if rule.shouldFocus { takeFocus(pane) }
     }
 
-    /// Kept on every move while the setting is on, so an entry can tell a
-    /// moving pointer from a pane that appeared under a still one.
+    /// Kept on every move, the setting aside: one turned on later must not read
+    /// a point from before it as movement. An entry can then tell a moving
+    /// pointer from a pane that appeared under a still one.
     func pointerMoved() {
-        guard configuration.focusFollowsMouse else { return }
         Self.lastPointerLocation = NSEvent.mouseLocation
     }
 

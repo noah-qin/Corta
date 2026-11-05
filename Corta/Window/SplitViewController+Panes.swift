@@ -60,7 +60,11 @@ extension SplitViewController {
 
     /// Halves every node, back to a fresh split's layout.
     @objc func equalizePanes(_: Any?) {
-        for node in tree.nodes { (node as? PaneSplitView)?.isUserPositioned = false }
+        // Zoomed, nothing is equalized, and unzooming puts the dividers back:
+        // they stay the user's.
+        if zoomedPane == nil {
+            for node in tree.nodes { (node as? PaneSplitView)?.isUserPositioned = false }
+        }
         equalize(view.subviews.first)
         deliverPaneSizes()
     }

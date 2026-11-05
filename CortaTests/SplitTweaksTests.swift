@@ -194,6 +194,39 @@ struct SplitTweaksTests {
         }
     }
 
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func equalizeWhileZoomedKeepsAPlacedDividerMarked() throws {
+        let (split, window) = makeWindow()
+        defer { split.teardown() }
+        split.splitFocusedPane(orientation: .columns)
+        split.splitTransition.finish()
+        let root = try #require(split.tree.root as? PaneSplitView)
+        root.isUserPositioned = true
+        split.zoomFocusedPane()
+        split.equalizePanes(nil)
+        #expect(root.isUserPositioned)
+        _ = window
+    }
+
+    /// Closing took the old node and its mark; the reopened divider earns it back.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aReopenedPlacedDividerCountsAsPlaced() throws {
+        let (split, window) = makeWindow()
+        defer { split.teardown() }
+        split.splitFocusedPane(orientation: .columns)
+        split.splitTransition.finish()
+        let root = try #require(split.tree.root as? PaneSplitView)
+        root.setPosition(root.bounds.width * 0.7, ofDividerAt: 0)
+        split.view.layoutSubtreeIfNeeded()
+        split.closePane(try #require(split.focusedPane))
+        split.view.layoutSubtreeIfNeeded()
+        split.reopenClosedPane(nil)
+        split.splitTransition.finish()
+        let reopened = try #require(split.tree.root as? PaneSplitView)
+        #expect(reopened.isUserPositioned)
+        _ = window
+    }
+
     /// A restored layout is rebuilt through `splitFocusedPane` and comes back
     /// as saved, with its uneven divider counted as placed.
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
