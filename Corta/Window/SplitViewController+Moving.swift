@@ -91,11 +91,12 @@ extension SplitViewController {
             NSSound.beep()
             return
         }
+        // Before unzooming, which gives the terminal the keyboard.
+        let keepsSearchFocus = searchHoldsKeyboard(pane)
         // Measured unzoomed, like a split: the tree is whole only then.
         splitTransition.finish()
         unzoomPane()
         view.layoutSubtreeIfNeeded()
-        let keepsSearchFocus = searchHoldsKeyboard(pane)
         let fractions = tree.dividerFractions()
         isRearrangingPanes = true
         defer { isRearrangingPanes = false }
@@ -188,14 +189,17 @@ extension SplitViewController {
             NSSound.beep()
             return
         }
+        // Before measuring: unzooming a zoomed target gives its pane the keyboard.
+        let keepsSearchFocus = searchHoldsKeyboard(pane)
         let responder = view.window?.firstResponder
         guard let orientation = target.split.orientationFitting() else {
-            // Measuring a zoomed target unzoomed gave its pane the keyboard.
-            if view.window?.firstResponder !== responder { takeFocus(pane) }
+            if view.window?.firstResponder !== responder {
+                takeFocus(pane)
+                if keepsSearchFocus { pane.search.show() }
+            }
             NSSound.beep()
             return
         }
-        let keepsSearchFocus = searchHoldsKeyboard(pane)
         let wasLastPane = !hasMultiplePanes
         detach(pane)
         target.split.receive(pane, orientation: orientation)

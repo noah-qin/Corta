@@ -386,6 +386,47 @@ extension PaneMoveTests {
         #expect(editor?.delegate === field)
     }
 
+    /// Unzooming gives the terminal the keyboard, so it is read before that.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aZoomedPanesSearchFieldKeepsTheKeyboardThroughAMove() throws {
+        let controller = makeWindow()
+        defer { close(controller) }
+        let split = try #require(controller.selectedTab?.split)
+        let pane = try #require(split.focusedPane)
+        split.zoomFocusedPane()
+        pane.search.show()
+        let field = try #require(pane.search.field)
+
+        split.movePaneLeft(nil)
+
+        #expect(split.zoomedPane == nil)
+        let editor = controller.window?.firstResponder as? NSText
+        #expect(editor?.delegate === field)
+    }
+
+    /// A refused move with a zoomed target gives the search field its keyboard back.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aRefusedMoveOverAZoomedTargetRestoresTheSearchField() throws {
+        let controller = makeWindow(panes: 1)
+        defer { close(controller) }
+        let source = try #require(controller.selectedTab)
+        let target = controller.addTab(select: false)
+        target.split.splitFocusedPane(orientation: .columns)
+        target.split.splitTransition.finish()
+        let anchor = try #require(target.split.focusedPane)
+        target.split.zoomFocusedPane()
+        let pane = try #require(source.split.focusedPane)
+        controller.window?.setContentSize(anchor.minimumContentSize)
+        pane.search.show()
+        let field = try #require(pane.search.field)
+
+        source.split.movePaneToNextTab(nil)
+
+        #expect(pane.parent === source.split)
+        let editor = controller.window?.firstResponder as? NSText
+        #expect(editor?.delegate === field)
+    }
+
     /// A move that cannot happen leaves the target zoomed and the keyboard here.
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func aRefusedMoveKeepsTheTargetsZoom() throws {
