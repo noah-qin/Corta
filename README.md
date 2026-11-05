@@ -88,9 +88,10 @@ requirements and limitations, and describes `main` — a published release
 may not have every item yet. How Corta compares with iTerm2 and Ghostty,
 and when to pick one of them instead, is in
 [Features → How Corta compares](docs/FEATURES.md#how-corta-compares).
-For coding-agent task state, the development tree currently integrates
-**Claude Code only**; other tools have generic protocol support and process
-detection, not dedicated state adapters ([scope and limits](docs/CONFORMANCE.md#cli-signal-compatibility)).
+Coding-agent task state was developed against **Claude Code**, and Codex
+0.166.0 was checked to report its own state through the same general parser;
+other tools have generic protocol support and process detection, not dedicated
+state adapters ([scope and limits](docs/CONFORMANCE.md#cli-signal-compatibility)).
 Developed and acceptance-tested with Claude Code 2.1.310: interactive OSC 7501 state, with
 explicit channel selection for Claude message text. tmux, Claude background
 sessions and disabled terminal-title reporting have separate restrictions;

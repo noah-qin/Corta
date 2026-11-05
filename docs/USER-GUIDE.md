@@ -848,13 +848,24 @@ or ask in `#help` on the [Discord](https://discord.gg/QNdWfdwr7j).
 
 ## Coding-agent state and program notifications
 
-**Claude Code is currently the only CLI with a dedicated task-state
-integration.** It was developed and acceptance-tested with the installed
-**Claude Code 2.1.310** on macOS arm64; this is not a compatibility guarantee
-for all Claude versions. Codex, Gemini CLI, pi,
-Kimi, Grok Build, Qwen Code, OpenCode and Aider have no dedicated task-state
-adapter in Corta. Generic notification/progress protocols remain available
-to any program; process detection is not a full agent integration. See the
+**Claude Code is the CLI Corta's task-state support was developed against.**
+It was acceptance-tested with the installed **Claude Code 2.1.310** on macOS
+arm64; this is not a compatibility guarantee for all Claude versions.
+
+**Codex 0.166.0 was checked reporting its own task state, through the same
+general parser.** Corta has no Codex-specific state handling; Codex appears
+only in the built-in process-name and icon lists. Checked on 2026-11-05, hooks
+turned off: Codex sends OSC 7501 by itself, labelled `app=codex`, and does not
+wait for a probe. Corta recorded idle, working and done, and Waiting for you
+(kind `permission`) at an approval prompt; the tab showed the Codex icon and the
+matching status dots. That is one version and those states, not a guarantee for
+other Codex versions. The Agents list, the Dock count and notifications have
+not been checked against Codex.
+
+Gemini CLI, pi, Kimi, Grok Build, Qwen Code, OpenCode and Aider have no
+dedicated task-state adapter in Corta. Generic notification/progress protocols
+remain available to any program; process detection is not a full agent
+integration. See the
 [compatibility scope and verification limits](CONFORMANCE.md#cli-signal-compatibility).
 
 By default, agent panes distinguish Working (accent colour), Waiting for you (orange),

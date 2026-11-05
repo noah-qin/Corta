@@ -25,6 +25,9 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- The documentation no longer says Claude Code is the only CLI whose task
+  state Corta shows: Codex 0.166.0 reports its own, through the same general
+  parser. What was and was not checked is in the user guide.
 - A copy is confirmed by a band of light sweeping along the copied text
   instead of a "Copied" toast in the corner; with Reduce Motion it is a
   single soft flash, and a copy scrolled out of view keeps the toast.
