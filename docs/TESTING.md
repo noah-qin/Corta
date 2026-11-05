@@ -335,6 +335,13 @@ Claude Code is the CLI task state was developed against (reference version
 use synthetic OSC fixtures. They do not establish real Claude lifecycle
 coverage or task-state compatibility with other CLIs.
 
+`AgentStatusUITests/testWaitingNavigationAcrossHiddenTabsWindowsAndZoom`
+uses the `waiting-navigation` stage for synthetic OSC 7501 waits, hidden-tab
+and cross-window cycling, zoom recovery, and fixed menu/palette text. It
+captures the normally launched development app's Dock icon for human review;
+a captured image alone is not a badge acceptance result. Ask before running
+this UI test, as for the rest of the UI plan.
+
 `AgentStatusUITests` uses the `agents` stage for background status, palette
 navigation, process-only unknown state and session exit. Its native notification click test is
 opt-in: add `TEST_RUNNER_CORTA_UI_NOTIFICATIONS=1` and select

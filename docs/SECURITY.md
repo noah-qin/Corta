@@ -293,8 +293,12 @@ process execution (OSC 9;6 and 9;7) are inert. Titles/messages remove all
 controls and concealing scalars. The program's title appears only inside a
 labelled pane message, beneath Corta's own `notificationTitle`; it never
 becomes the system notification title. Agent permission/question/sign-in
-notices use Corta's fixed localised text. `notify-from-programs = false`
-disables both notice paths; `agent-status = false` hides agent chrome.
+notices use Corta's fixed localised text. Agents menu and command-palette
+entries use only Corta's own pane name and fixed localised state/kind labels;
+program-provided `app`, `title` and `message` never appear in those entries.
+Kind is self-reported, not a priority: the waiting-pane queue orders only by
+entry into blocked, once per pane, and never moves focus on a status event.
+`notify-from-programs = false` disables both notice paths; `agent-status = false` hides agent chrome.
 
 ### 2.10 OSC ecosystem limits and refusals (#411)
 
@@ -711,6 +715,9 @@ authorization, and a stale submission completes/removes before a replacement
 may submit. Shell command boundaries release stale children, progress and
 metadata after a CLI crash. Aggregate memory scales with the number
 of live panes; there is no global notification-text history or unbounded queue.
+The waiting-pane navigation queue retains at most one UUID per live blocked
+pane, releases it on leaving blocked, session reset/exit or pane teardown,
+and is never persisted.
 
 The implementation has parser, title-stack, underline-colour, cluster, image, texture, SFTP frame,
 request/writer, directory-list and tree limits. New paths must name their

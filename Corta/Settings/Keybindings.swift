@@ -183,6 +183,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case focusRight = "focus-right"
     case focusUp = "focus-up"
     case focusDown = "focus-down"
+    case nextWaitingPane = "next-waiting-pane"
     case growPaneHorizontally = "grow-pane-horizontally"
     case shrinkPaneHorizontally = "shrink-pane-horizontally"
     case growPaneVertically = "grow-pane-vertically"
@@ -245,6 +246,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .focusRight: return L10n.text("command.focusRight")
         case .focusUp: return L10n.text("command.focusUp")
         case .focusDown: return L10n.text("command.focusDown")
+        case .nextWaitingPane: return L10n.text("command.nextWaitingPane")
         case .growPaneHorizontally: return L10n.text("command.growPaneHorizontally")
         case .shrinkPaneHorizontally: return L10n.text("command.shrinkPaneHorizontally")
         case .growPaneVertically: return L10n.text("command.growPaneVertically")
@@ -322,6 +324,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .focusRight: return #selector(SplitViewController.moveFocusRight(_:))
         case .focusUp: return #selector(SplitViewController.moveFocusUp(_:))
         case .focusDown: return #selector(SplitViewController.moveFocusDown(_:))
+        case .nextWaitingPane: return #selector(AppDelegate.nextWaitingPane(_:))
         case .growPaneHorizontally:
             return #selector(SplitViewController.growPaneHorizontally(_:))
         case .shrinkPaneHorizontally:

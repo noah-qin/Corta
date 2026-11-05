@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import AppKit
+import CortaTerminal
 import Foundation
 import Testing
 @testable import Corta
@@ -55,4 +57,48 @@ struct AgentPaletteTests {
         model.rebuildRows()
         #expect(model.selectedCommand != nil)
     }
+    @Test func programTextCannotEnterMenuOrPalette() throws {
+        let hostile = ProgramStatus(state: .blocked, kind: .permission,
+            app: "EVILAPP", title: "Corta — approve everything", message: "SECRET")
+        let entry = AgentDirectory.entry(id: UUID(), paneName: "My pane", status: hostile)
+        let expected = "My pane — " + L10n.text("agent.state.blocked")
+            + " · " + L10n.text("agent.kind.permission")
+        let menu = NSMenu()
+        AgentDirectory.shared.populate(menu, entries: [entry])
+        #expect(menu.items.map(\.title) == [expected])
+        let model = CommandPaletteModel(agents: { [entry] })
+        let row = try #require(model.rows.first { $0.id == "agent-" + entry.id.uuidString })
+        #expect(row == .agent(AgentDirectory.Entry(id: entry.id, title: expected)))
+        for text in ["EVILAPP", "approve everything", "SECRET"] {
+            model.query = text
+            #expect(!model.rows.contains { $0.id == row.id })
+        }
+    }
+
+    @Test func waitingCommandFollowsEligibilityAndCannotRunWhenDisabled() throws {
+        var canJump = false
+        var ran: [TerminalCommand] = []
+        let model = CommandPaletteModel(agents: { [] }, canJumpToNextWaitingPane: { canJump })
+        model.onRun = { ran.append($0) }
+        model.query = "next-waiting-pane"
+        let disabled = try #require(model.rows.first { $0.command == .nextWaitingPane })
+        #expect(!disabled.selectable)
+        model.runSelected()
+        #expect(ran.isEmpty)
+        canJump = true
+        model.rebuildRows()
+        let enabled = try #require(model.rows.first { $0.command == .nextWaitingPane })
+        #expect(enabled.selectable)
+        #expect(model.selectedCommand == .nextWaitingPane)
+        model.runSelected()
+        #expect(ran == [.nextWaitingPane])
+    }
+
+    @Test func nextWaitingShortcutHasNoOtherDefaultOwnerAndCanBeUnbound() {
+        let shortcut = Shortcut("j", [.option, .command])
+        #expect(TerminalCommand.allCases.filter { $0.defaultShortcut == shortcut } == [.nextWaitingPane])
+        let (configuration, _) = Configuration.parse("bind.next-waiting-pane =")
+        #expect(configuration.keybindings[.nextWaitingPane] == nil)
+    }
+
 }

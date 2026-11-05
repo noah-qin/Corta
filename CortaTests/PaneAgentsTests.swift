@@ -189,4 +189,44 @@ struct PaneAgentsTests {
         }
     }
 
+    @Test func equalUrgencyUsesSlotIdentityRegardlessOfDictionaryOrderOrKind() {
+        let main = ProgramStatus(state: .blocked, kind: .question, app: "main")
+        let child = ProgramStatus(state: .blocked, kind: .auth, app: "child")
+        for entries in [[("z", child), ("", main)], [("", main), ("z", child)]] {
+            #expect(PaneAgents.preferredStatus(Dictionary(uniqueKeysWithValues: entries)) == main)
+        }
+        #expect(PaneAgents.preferredStatus(["z": child, "a": main]) == main)
+        #expect(PaneAgents.preferredStatus(["": ProgramStatus(state: .done), "z": child]) == child)
+    }
+
+    @Test func blockedSubtasksShareOneQueuePlaceAndKindCannotJumpAhead() async throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.agentStatus = true }
+        let first = try pane(), second = try pane()
+        let firstID = first.taskNotifier.paneID, secondID = second.taskNotifier.paneID
+        defer {
+            for pane in [first, second] { pane.agents.reset(); pane.session.stop() }
+            ConfigurationStore.shared.update { $0 = original }
+        }
+        try await send(osc("7501;state=blocked:kind=question:id=a"), to: first)
+        try await send(osc("7501;state=blocked:kind=auth:id=a")
+            + osc("7501;state=blocked:kind=permission:id=b"), to: second)
+        try await send(osc("7501;state=blocked:kind=auth:id=b"), to: first)
+        func ours() -> [UUID] { AgentDirectory.shared.waiting.paneIDs.filter { [firstID, secondID].contains($0) } }
+        #expect(ours() == [firstID, secondID])
+        try await send(osc("7501;state=clear:id=a"), to: first)
+        #expect(ours() == [firstID, secondID], "another blocked subtask keeps the pane's position")
+        try await send(osc("7501;state=clear:id=b"), to: first)
+        #expect(ours() == [secondID])
+        try await send(osc("7501;state=blocked:kind=permission"), to: first)
+        #expect(ours() == [secondID, firstID])
+        try await send(osc("7501;state=clear:id=a") + osc("7501;state=clear:id=b")
+            + osc("7501;state=blocked:kind=auth"), to: second)
+        #expect(ours() == [firstID, secondID], "a coalesced leave/re-entry goes to the tail")
+        second.teardown()
+        #expect(ours() == [firstID])
+        first.agents.exited(.exited(code: 0))
+        #expect(ours().isEmpty)
+    }
+
 }

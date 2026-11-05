@@ -30,6 +30,7 @@ final class PaneAgents {
     private var fallbackProcess: String?
     private var lastProcessRead: TimeInterval = 0
     private var sawSignals = false
+    private var waitingEpisode: Int?
     private var sessionHasExited = false
     private var attentionRequest: Int?
     private var processRefresh: DispatchWorkItem?
@@ -46,13 +47,15 @@ final class PaneAgents {
         if let attentionRequest { NSApp.cancelUserAttentionRequest(attentionRequest) }
         attentionRequest = nil
         processRefresh?.cancel(); processRefresh = nil
+        if let host { AgentDirectory.updateWaiting(host.taskNotifier.paneID, blocked: false) }
+        waitingEpisode = nil
         status = nil; progress = nil; fallback = nil; fallbackProcess = nil
         lastProcessRead = 0; sawSignals = false; sessionHasExited = false
         AgentDirectory.refresh()
     }
 
     func readOutput() {
-        guard !sessionHasExited, let host, let session = host.session else { return }
+        guard !sessionHasExited, let host, !host.didTeardown, let session = host.session else { return }
         let configuration = ConfigurationStore.shared.configuration
         let signals = session.takeProgramSignals()
         let reported = signals.statuses
@@ -61,8 +64,14 @@ final class PaneAgents {
         let notice = signals.notification
         if let attention = signals.attention { requestAttention(attention) }
         host.pointer.refreshProgramPointer(shape: signals.pointerShape)
-        host.taskNotifier.setProgramBlocked(reported.values.contains { $0.state == .blocked },
-            episode: signals.blockedEpisode)
+        let isBlocked = reported.values.contains { $0.state == .blocked }
+        host.taskNotifier.setProgramBlocked(isBlocked, episode: signals.blockedEpisode)
+        // A leave/re-entry can happen between two coalesced UI reads.
+        if isBlocked, let waitingEpisode, waitingEpisode != signals.blockedEpisode {
+            AgentDirectory.updateWaiting(host.taskNotifier.paneID, blocked: false)
+        }
+        waitingEpisode = isBlocked ? signals.blockedEpisode : nil
+        let queueChanged = AgentDirectory.updateWaiting(host.taskNotifier.paneID, blocked: isBlocked)
         let oldStatus = status
         let oldProgress = progress
         if configuration.agentStatus {
@@ -81,7 +90,7 @@ final class PaneAgents {
                 focused: NSApp.isActive && host.view.window?.isKeyWindow == true && host.holdsWindowFocus,
                 in: host.view.window)
         }
-        if oldStatus != status || oldProgress != progress { AgentDirectory.refresh() }
+        if queueChanged || oldStatus != status || oldProgress != progress { AgentDirectory.refresh() }
     }
 
     /// Bounces the Dock icon as the program asked, replacing any earlier
@@ -102,8 +111,7 @@ final class PaneAgents {
     /// stands in when the program sent none.
     private func updateStatus(session: TerminalSession, signals: ProgramSignalSnapshot) {
         refreshFallback(session: session, signals: signals)
-        status = signals.statuses.values.max { $0.urgency < $1.urgency }
-            ?? (sawSignals ? nil : fallback)
+        status = Self.preferredStatus(signals.statuses) ?? (sawSignals ? nil : fallback)
         if let metadata = signals.tabMetadata {
             if status == nil {
                 status = metadata
@@ -117,6 +125,15 @@ final class PaneAgents {
         if progress == nil, let value = status?.progress {
             progress = ProgramProgress(state: .normal, value: value)
         }
+    }
+
+    /// Equal urgency prefers the smallest slot ID (main's empty ID first).
+    /// Neither arrival/dictionary order nor kind changes that tie-break.
+    nonisolated static func preferredStatus(_ statuses: [String: ProgramStatus]) -> ProgramStatus? {
+        statuses.min {
+            if $0.value.urgency != $1.value.urgency { return $0.value.urgency > $1.value.urgency }
+            return $0.key < $1.key
+        }?.value
     }
 
     private func refreshFallback(session: TerminalSession, signals: ProgramSignalSnapshot) {
@@ -169,6 +186,7 @@ final class PaneAgents {
         // Read it before sealing the session against late UI callbacks.
         readOutput()
         sessionHasExited = true
+        if let host { AgentDirectory.updateWaiting(host.taskNotifier.paneID, blocked: false) }
         host?.taskNotifier.setProgramBlocked(false)
         processRefresh?.cancel(); processRefresh = nil
         progress = nil

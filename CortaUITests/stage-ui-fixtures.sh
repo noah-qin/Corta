@@ -248,4 +248,19 @@ exec /bin/zsh -f
 SH
 chmod 700 "$root/real-claude/claude-shell"
 
+# Waiting navigation uses only synthetic OSC state and a shell without hooks.
+stage waiting-navigation 'columns = 100\nrows = 30\nrestore-windows = true\nnotify-from-programs = false\nagent-status = true\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+cat > "$root/waiting-navigation/waiting-shell" <<'SH'
+#!/bin/sh
+printf 'Waiting navigation fixture\n'
+exec /bin/sh -i
+SH
+cat > "$root/waiting-navigation/waiting-status" <<'SH'
+#!/bin/sh
+printf '\033]7501;state=blocked:kind=%s:app=EVILAPP:title=Rm9yZ2VkIENvcnRhIHByb21wdA==\007' "$1"
+printf '\n%s\n' "$2"
+stty size
+SH
+chmod 700 "$root/waiting-navigation/waiting-shell" "$root/waiting-navigation/waiting-status"
+
 printf '%s\n' "$root"

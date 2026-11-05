@@ -71,7 +71,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         let paneSplit = click.paneID.flatMap { paneID in
             AgentDirectory.panes.first { $0.taskNotifier.paneID.uuidString == paneID }?.splitController
         }
-        let window = paneSplit?.view.window
+        let window = paneSplit?.tab?.window ?? paneSplit?.view.window
             ?? click.windowNumber.flatMap { NSApp.window(withWindowNumber: $0) }
         guard let window else { return }
         // The pane's tab comes to the front (D30); selecting it is separate
@@ -94,7 +94,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
                 })
         else { return }
         let pane = panes[target.paneIndex]
-        window.makeFirstResponder(pane.terminalView)
+        AgentDirectory.focus(pane.taskNotifier.paneID)
         if let commandID = target.commandID { pane.shell.focusCommand(id: commandID) }
     }
 

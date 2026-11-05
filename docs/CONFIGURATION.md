@@ -559,6 +559,7 @@ the key against both rows, which is how you spot it.
 | `focus-right` | Move Focus Right | `alt+cmd+right` |
 | `focus-up` | Move Focus Up | `alt+cmd+up` |
 | `focus-down` | Move Focus Down | `alt+cmd+down` |
+| `next-waiting-pane` | Jump to Next Waiting Pane | `alt+cmd+j` |
 | `grow-pane-horizontally` | Grow Pane Horizontally | `ctrl+cmd+right` |
 | `shrink-pane-horizontally` | Shrink Pane Horizontally | `ctrl+cmd+left` |
 | `grow-pane-vertically` | Grow Pane Vertically | `ctrl+cmd+down` |
@@ -601,6 +602,15 @@ the key against both rows, which is how you spot it.
 | `secure-keyboard-entry` | Secure Keyboard Entry | *(none)* |
 | `settings` | Settings… | `cmd+,` |
 | `command-palette` | Command Palette… | `shift+cmd+p` |
+
+`next-waiting-pane` (Window menu and command palette) cycles through blocked
+panes across tabs and windows, in the order they entered waiting. Each pane
+counts once, including panes with multiple blocked subtasks. Leaving blocked
+or closing removes it; re-entering appends it. The queue is event-driven,
+in memory only, and never sorted by program-reported kind. A current waiter
+advances and wraps; any other pane starts at the head. A lone current waiter
+stays put. The command is disabled with an empty queue or `agent-status = false`.
+Only choosing the command moves focus; status changes never advance it.
 
 `previous-command`, `next-command`, the two failed-command jumps,
 `copy-last-command-output`, `snapshot-running-command-output`,

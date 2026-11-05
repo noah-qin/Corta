@@ -41,21 +41,27 @@ final class CommandPaletteModel {
     enum Row: Identifiable, Equatable {
         case header(String)
         case agent(AgentDirectory.Entry)
-        case command(TerminalCommand, recent: Bool, shortcut: String)
+        case command(TerminalCommand, recent: Bool, shortcut: String, enabled: Bool)
 
         var id: String {
             switch self {
             case .agent(let entry): "agent-" + entry.id.uuidString
             case .header(let title): "header-\(title)"
-            case .command(let command, let recent, _):
+            case .command(let command, let recent, _, _):
                 (recent ? "recent-" : "command-") + command.rawValue
             }
         }
 
-        var selectable: Bool { if case .header = self { false } else { true } }
+        var selectable: Bool {
+            switch self {
+            case .header: false
+            case .agent: true
+            case .command(_, _, _, let enabled): enabled
+            }
+        }
 
         var command: TerminalCommand? {
-            if case .command(let command, _, _) = self { command } else { nil }
+            if case .command(let command, _, _, _) = self { command } else { nil }
         }
     }
 
@@ -94,9 +100,12 @@ final class CommandPaletteModel {
 
     private static let recentLimit = 5
     private let agentEntries: () -> [AgentDirectory.Entry]
+    private let canJumpToNextWaitingPane: () -> Bool
 
-    init(agents: @escaping () -> [AgentDirectory.Entry] = { AgentDirectory.entries }) {
+    init(agents: @escaping () -> [AgentDirectory.Entry] = { AgentDirectory.entries },
+         canJumpToNextWaitingPane: @escaping () -> Bool = { AgentDirectory.canJumpToNextWaitingPane }) {
         agentEntries = agents
+        self.canJumpToNextWaitingPane = canJumpToNextWaitingPane
         rebuildRows()
     }
 
@@ -112,10 +121,10 @@ final class CommandPaletteModel {
     /// underneath it), lands on the first command row instead of leaving the
     /// selection on nothing, or on a row that no longer exists.
     func selectFirstIfNeeded() {
-        if let selectedRowID, rows.contains(where: { $0.id == selectedRowID }) { return }
+        if let selectedRowID, rows.contains(where: { $0.id == selectedRowID && $0.selectable }) { return }
         // A command, never an agent, by default: Enter keeps meaning "run",
         // not "jump to whichever pane happens to have an agent".
-        selectedRowID = (rows.first { $0.command != nil } ?? rows.first { $0.selectable })?.id
+        selectedRowID = (rows.first { $0.command != nil && $0.selectable } ?? rows.first { $0.selectable })?.id
     }
 
     /// Subsequence matching, which is what people mean by "fuzzy" here:
@@ -124,7 +133,8 @@ final class CommandPaletteModel {
     func rebuildRows() {
         let shortcuts = ConfigurationStore.shared.configuration.keybindings
         func row(_ command: TerminalCommand, recent: Bool = false) -> Row {
-            .command(command, recent: recent, shortcut: shortcuts[command]?.displayText ?? "")
+            .command(command, recent: recent, shortcut: shortcuts[command]?.displayText ?? "",
+                     enabled: command != .nextWaitingPane || canJumpToNextWaitingPane())
         }
         rows =
             query.isEmpty
@@ -255,6 +265,7 @@ final class CommandPaletteModel {
     }
 
     func runSelected() {
+        guard rows.contains(where: { $0.id == selectedRowID && $0.selectable }) else { return }
         if let row = rows.first(where: { $0.id == selectedRowID }), case .agent(let entry) = row {
             onAgent?(entry.id)
             return
