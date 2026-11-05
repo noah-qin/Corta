@@ -1,0 +1,255 @@
+// Copyright 2026 Noah Qin
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
+import AppKit
+import CortaTerminal
+
+/// Moving and swapping the focused pane: the running pane itself, in a new
+/// place. Nothing here spawns or tears down a session, so the process, its
+/// scrollback and its remote and search state go with it.
+extension SplitViewController {
+    @objc func movePaneLeft(_: Any?) { rearrangeFocusedPane { self.moveLeaf($0, .left) } }
+    @objc func movePaneRight(_: Any?) { rearrangeFocusedPane { self.moveLeaf($0, .right) } }
+    @objc func movePaneUp(_: Any?) { rearrangeFocusedPane { self.moveLeaf($0, .up) } }
+    @objc func movePaneDown(_: Any?) { rearrangeFocusedPane { self.moveLeaf($0, .down) } }
+    @objc func swapPaneLeft(_: Any?) { rearrangeFocusedPane { self.swapLeaf($0, .left) } }
+    @objc func swapPaneRight(_: Any?) { rearrangeFocusedPane { self.swapLeaf($0, .right) } }
+    @objc func swapPaneUp(_: Any?) { rearrangeFocusedPane { self.swapLeaf($0, .up) } }
+    @objc func swapPaneDown(_: Any?) { rearrangeFocusedPane { self.swapLeaf($0, .down) } }
+
+    @objc func movePaneToNewTab(_: Any?) {
+        guard hasMultiplePanes, let pane = focusedPane, let controller = tab?.controller,
+            view.window?.attachedSheet == nil
+        else {
+            NSSound.beep()
+            return
+        }
+        let keepsSearchFocus = searchHoldsKeyboard(pane)
+        detach(pane)
+        controller.addTab(setup: Setup(adopting: pane))
+        finishMove(of: pane, keepsSearchFocus: keepsSearchFocus)
+    }
+
+    @objc func movePaneToPreviousTab(_: Any?) { movePaneToAdjacentTab(offset: -1) }
+    @objc func movePaneToNextTab(_: Any?) { movePaneToAdjacentTab(offset: 1) }
+
+    /// A row of Move Pane to Tab, whose item names the tab by id: a title or
+    /// an index could name another tab by the time it is chosen.
+    @objc func movePaneToTabNamedByItem(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        movePane(toTabWithID: id)
+    }
+
+    func movePane(toTabWithID id: String) {
+        guard let target = tab?.controller?.tabs.first(where: { $0.id == id }) else { return }
+        moveFocusedPane(to: target)
+    }
+
+    private func movePaneToAdjacentTab(offset: Int) {
+        guard let tab, let tabs = tab.controller?.tabs, tabs.count > 1,
+            let index = tabs.firstIndex(where: { $0 === tab })
+        else {
+            NSSound.beep()
+            return
+        }
+        moveFocusedPane(to: tabs[(index + offset + tabs.count) % tabs.count])
+    }
+
+    // MARK: - Within the tab
+
+    private func moveLeaf(_ leaf: NSView, _ direction: SplitMoveDirection) -> Bool {
+        tree.move(leaf: leaf, direction: direction, inContainer: view)
+    }
+
+    private func swapLeaf(_ leaf: NSView, _ direction: SplitMoveDirection) -> Bool {
+        guard let neighbour = tree.leaf(from: leaf, direction: direction, inContainer: view) else {
+            return false
+        }
+        tree.swap(leaf, neighbour)
+        return true
+    }
+
+    /// Runs `surgery` on the focused pane's view, then settles the tree in one
+    /// step, so a pane whose size ends up unchanged sends its child nothing and
+    /// one whose size changed sends the final size once. Beeps, with nothing
+    /// changed, when `surgery` reports the pane can go no further.
+    private func rearrangeFocusedPane(_ surgery: (NSView) -> Bool) {
+        guard hasMultiplePanes, let pane = focusedPane, view.window?.attachedSheet == nil else {
+            NSSound.beep()
+            return
+        }
+        // Measured unzoomed, like a split: the tree is whole only then.
+        splitTransition.finish()
+        unzoomPane()
+        view.layoutSubtreeIfNeeded()
+        let keepsSearchFocus = searchHoldsKeyboard(pane)
+        let fractions = tree.dividerFractions()
+        isRearrangingPanes = true
+        defer { isRearrangingPanes = false }
+        guard surgery(pane.view) else {
+            NSSound.beep()
+            return
+        }
+        settleTree(fractions: fractions)
+        isRearrangingPanes = false
+        finishMove(of: pane, keepsSearchFocus: keepsSearchFocus)
+    }
+
+    /// Back on screen with every node wired and each surviving divider where
+    /// it was; new nodes halve.
+    private func settleTree(fractions: [ObjectIdentifier: Double]) {
+        wireNodes()
+        installRoot()
+        updateWindowMinSize()
+        view.layoutSubtreeIfNeeded()
+        applyDividerFractions(fractions, subtree: tree.root)
+        view.layoutSubtreeIfNeeded()
+    }
+
+    /// A node `SplitTree` made answers divider drags as a split's does.
+    private func wireNodes() {
+        for node in tree.nodes where node.delegate !== self {
+            wire(node)
+        }
+    }
+
+    /// Parent first, kept where both sides fit: `applyDividerPositions`' rule.
+    private func applyDividerFractions(_ fractions: [ObjectIdentifier: Double], subtree: NSView) {
+        guard let split = subtree as? NSSplitView, split.subviews.count == 2 else { return }
+        let axis = split.isVertical ? split.bounds.width : split.bounds.height
+        if axis > 0 {
+            let room = axis - split.dividerThickness
+            let low = minimumExtent(of: split.subviews[0], vertical: split.isVertical)
+            let high = room - minimumExtent(of: split.subviews[1], vertical: split.isVertical)
+            let wanted = fractions[ObjectIdentifier(split)].map { axis * CGFloat($0) } ?? room / 2
+            split.setPosition(low <= high ? min(max(wanted, low), high) : room / 2, ofDividerAt: 0)
+            split.layoutSubtreeIfNeeded()
+        }
+        for child in split.subviews { applyDividerFractions(fractions, subtree: child) }
+    }
+
+    /// The final sizes, focus, and everything that names the pane's place.
+    private func finishMove(of pane: ViewController, keepsSearchFocus: Bool) {
+        guard let destination = pane.splitController else { return }
+        destination.deliverSizesAfterMove()
+        destination.takeFocus(pane)
+        if keepsSearchFocus { pane.search.show() }
+        destination.updateDirectPresentation()
+        for other in destination.panes { other.paneHeader.refresh(); other.focus.applyAppearance() }
+        pane.updateReaderPriority()
+        destination.tab?.controller?.refreshTabStrip()
+        AgentDirectory.refresh()
+        destination.noteLayoutChanged()
+    }
+
+    private func deliverSizesAfterMove() {
+        view.layoutSubtreeIfNeeded()
+        for pane in panes {
+            pane.resizeSessionToFitView()
+            pane.endLiveResize()
+            pane.invalidateDisplay()
+        }
+    }
+
+    /// The search bar's field has the keyboard: it keeps it, rather than
+    /// sending further typing to the shell.
+    private func searchHoldsKeyboard(_ pane: ViewController) -> Bool {
+        guard let field = pane.search.field,
+            let editor = view.window?.firstResponder as? NSText
+        else { return false }
+        return editor.delegate === field
+    }
+
+    // MARK: - Between tabs
+
+    private func moveFocusedPane(to target: TerminalTab) {
+        guard let pane = focusedPane, let source = tab, target !== source,
+            let controller = tab?.controller, view.window?.attachedSheet == nil,
+            let orientation = target.split.orientationFitting(pane)
+        else {
+            NSSound.beep()
+            return
+        }
+        let keepsSearchFocus = searchHoldsKeyboard(pane)
+        let wasLastPane = !hasMultiplePanes
+        detach(pane)
+        target.split.receive(pane, orientation: orientation)
+        // Selected before the source closes, so its emptied view is never what
+        // the closing tab's fade shows.
+        controller.selectTab(target)
+        if wasLastPane { controller.closeTab(source) }
+        finishMove(of: pane, keepsSearchFocus: keepsSearchFocus)
+    }
+
+    /// Takes `pane` out of this tree and off this controller, still running.
+    /// No reopen record: nothing closed. A record whose position hung on this
+    /// pane no longer has one.
+    private func detach(_ pane: ViewController) {
+        splitTransition.finish()
+        unzoomPane()
+        if lastClosedPane?.sibling === pane { lastClosedPane = nil }
+        view.layoutSubtreeIfNeeded()
+        if hasMultiplePanes {
+            let fractions = tree.dividerFractions()
+            isRearrangingPanes = true
+            let survivor = tree.close(leaf: pane.view)
+            pane.removeFromParent()
+            settleTree(fractions: fractions)
+            isRearrangingPanes = false
+            deliverSizesAfterMove()
+            let next = survivor.flatMap { subtree in
+                panes.first { $0.view === subtree || $0.view.isDescendant(of: subtree) }
+            }
+            // The keyboard goes to the moved pane next, so only noted here.
+            if let next { noteFocus(next) }
+            for other in panes { other.paneHeader.refresh() }
+            applyWindowTitle()
+        } else {
+            pane.view.removeFromSuperview()
+            pane.removeFromParent()
+            focusedPane = nil
+        }
+    }
+
+    /// Which way this tab's focused pane can split to take `pane`: side by side
+    /// if both halves fit, else stacked; nil, changing nothing, if neither does.
+    private func orientationFitting(_ pane: ViewController) -> SplitOrientation? {
+        unzoomPane()
+        view.frame = view.superview?.bounds ?? view.frame
+        view.layoutSubtreeIfNeeded()
+        guard let anchor = focusedPane else { return nil }
+        let bounds = anchor.view.bounds
+        let minimum = pane.minimumContentSize
+        if (bounds.width - PaneSurfaceView.gap) / 2 >= minimum.width { return .columns }
+        if (bounds.height - PaneSurfaceView.gap) / 2 >= minimum.height { return .rows }
+        return nil
+    }
+
+    /// `pane`, from another tab, as this tab's focused pane's new neighbour,
+    /// at this tab's font size (`setFontSizeForAllPanes`: a tab has one).
+    private func receive(_ pane: ViewController, orientation: SplitOrientation) {
+        guard let anchor = focusedPane else { return }
+        let fractions = tree.dividerFractions()
+        let frame = anchor.view.frame
+        isRearrangingPanes = true
+        defer { isRearrangingPanes = false }
+        addChild(pane)
+        pane.isFontSizeZoomed = anchor.isFontSizeZoomed
+        if pane.fontSize != anchor.fontSize { pane.setFontSize(anchor.fontSize) }
+        tree.split(leaf: anchor.view, orientation: orientation, newLeaf: pane.view).frame = frame
+        settleTree(fractions: fractions)
+        noteFocus(pane)
+    }
+}

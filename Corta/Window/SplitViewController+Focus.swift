@@ -90,8 +90,17 @@ extension SplitViewController {
         case #selector(selectLastCortaTab(_:)):
             return tab?.controller != nil
         case #selector(moveFocusLeft(_:)), #selector(moveFocusRight(_:)),
-            #selector(moveFocusUp(_:)), #selector(moveFocusDown(_:)):
+            #selector(moveFocusUp(_:)), #selector(moveFocusDown(_:)),
+            #selector(movePaneLeft(_:)), #selector(movePaneRight(_:)),
+            #selector(movePaneUp(_:)), #selector(movePaneDown(_:)),
+            #selector(swapPaneLeft(_:)), #selector(swapPaneRight(_:)),
+            #selector(swapPaneUp(_:)), #selector(swapPaneDown(_:)):
             return tree != nil && tree.leafCount > 1
+        case #selector(movePaneToNewTab(_:)):
+            return tree != nil && tree.leafCount > 1 && tab != nil
+        case #selector(movePaneToPreviousTab(_:)), #selector(movePaneToNextTab(_:)),
+            #selector(movePaneToTabNamedByItem(_:)):
+            return (tab?.controller?.tabs.count ?? 0) > 1
         case #selector(reopenClosedPane(_:)):
             return canReopenClosedPane
         case #selector(toggleZoomPane(_:)):

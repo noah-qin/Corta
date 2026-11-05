@@ -28,6 +28,7 @@ extension AppDelegate {
     /// than by a localized title. Weak: the menu bar owns them.
     fileprivate static weak var editMenu: NSMenu?
     fileprivate static weak var themeMenu: NSMenu?
+    fileprivate static weak var moveToTabMenu: NSMenu?
 
     func installMenus() {
         let mainMenu = NSMenu(title: "Main Menu")
@@ -118,6 +119,12 @@ extension AppDelegate {
             shell.addSubmenu(submenu)
         }
         group("menu.focus", [.focusLeft, .focusRight, .focusUp, .focusDown])
+        group("menu.movePane", [
+            .movePaneLeft, .movePaneRight, .movePaneUp, .movePaneDown,
+            .swapPaneLeft, .swapPaneRight, .swapPaneUp, .swapPaneDown,
+            .movePaneToNewTab, .movePaneToPreviousTab, .movePaneToNextTab,
+        ])
+        installMovePaneToTabMenu(in: shell)
         group("menu.commandsAndOutput", [
             .previousCommand, .nextCommand, .previousFailedCommand, .nextFailedCommand,
             .copyLastCommandOutput, .snapshotRunningCommandOutput, .exportCommandOutput,
@@ -138,6 +145,39 @@ extension AppDelegate {
         shell.addItem(.separator())
         shell.addItem(item(for: .secureKeyboardEntry))
         return shell
+    }
+
+    /// The window's other tabs by name, rebuilt as the menu opens.
+    private func installMovePaneToTabMenu(in shell: NSMenu) {
+        let menu = NSMenu(title: L10n.text("menu.movePaneToTab"))
+        menu.delegate = self
+        AppDelegate.moveToTabMenu = menu
+        shell.addSubmenu(menu)
+    }
+
+    private func rebuildMovePaneToTabMenu(_ menu: NSMenu) {
+        menu.removeAllItems()
+        for target in AppDelegate.paneMoveTargets() {
+            let item = NSMenuItem(
+                title: target.title, action: #selector(SplitViewController.movePaneToTabNamedByItem(_:)),
+                keyEquivalent: "")
+            item.representedObject = target.id
+            menu.addItem(item)
+        }
+        if menu.items.isEmpty {
+            let empty = NSMenuItem(title: L10n.text("menu.movePaneToTab.none"), action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            menu.addItem(empty)
+        }
+    }
+
+    /// The tabs the main window's focused pane can move to. The main window,
+    /// since the palette is key while it asks.
+    static func paneMoveTargets() -> [CommandPaletteModel.PaneMoveTarget] {
+        guard let controller = NSApp.mainWindow?.windowController as? TerminalWindowController else { return [] }
+        return controller.tabs.filter { $0 !== controller.selectedTab }.map { tab in
+            CommandPaletteModel.PaneMoveTarget(id: tab.id, title: TabIcon.item(for: tab).name)
+        }
     }
 
     /// Only what a terminal can honour. The child owns every byte on screen,
@@ -371,6 +411,10 @@ extension AppDelegate: NSMenuDelegate {
     public func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === AppDelegate.editMenu {
             pruneInjectedEditItems(menu)
+            return
+        }
+        if menu === AppDelegate.moveToTabMenu {
+            rebuildMovePaneToTabMenu(menu)
             return
         }
         if menu === AppDelegate.presetMenu {

@@ -567,6 +567,17 @@ the key against both rows, which is how you spot it.
 | `zoom-pane` | Zoom Pane | `shift+cmd+return` |
 | `reopen-closed-pane` | Reopen Closed Pane | `shift+cmd+t` |
 | `equalize-panes` | Equalize Panes | *(none)* |
+| `move-pane-left` | Move Pane Left | `alt+shift+cmd+left` |
+| `move-pane-right` | Move Pane Right | `alt+shift+cmd+right` |
+| `move-pane-up` | Move Pane Up | `alt+shift+cmd+up` |
+| `move-pane-down` | Move Pane Down | `alt+shift+cmd+down` |
+| `swap-pane-left` | Swap Pane Left | *(none)* |
+| `swap-pane-right` | Swap Pane Right | *(none)* |
+| `swap-pane-up` | Swap Pane Up | *(none)* |
+| `swap-pane-down` | Swap Pane Down | *(none)* |
+| `move-pane-to-new-tab` | Move Pane to New Tab | *(none)* |
+| `move-pane-to-previous-tab` | Move Pane to Previous Tab | *(none)* |
+| `move-pane-to-next-tab` | Move Pane to Next Tab | *(none)* |
 | `increase-font-size` | Bigger | `cmd+=` |
 | `decrease-font-size` | Smaller | `cmd+-` |
 | `reset-font-size` | Actual Size | `cmd+0` |

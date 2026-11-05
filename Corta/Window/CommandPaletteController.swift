@@ -62,6 +62,13 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
             self?.close()
             AgentDirectory.focus(id)
         }
+        model.onMovePane = { [weak self] id in
+            self?.close()
+            // Once the terminal window is key again.
+            DispatchQueue.main.async {
+                NSApp.mainWindow?.terminalSplit?.movePane(toTabWithID: id)
+            }
+        }
         model.onDismiss = { [weak self] in self?.close() }
     }
 

@@ -32,7 +32,9 @@ nonisolated extension TerminalCommand {
             return .window
         case .splitRight, .splitDown, .focusLeft, .focusRight, .focusUp, .focusDown, .nextWaitingPane,
             .growPaneHorizontally, .shrinkPaneHorizontally, .growPaneVertically,
-            .shrinkPaneVertically, .equalizePanes, .zoomPane, .reopenClosedPane:
+            .shrinkPaneVertically, .equalizePanes, .zoomPane, .reopenClosedPane, .movePaneLeft,
+            .movePaneRight, .movePaneUp, .movePaneDown, .swapPaneLeft, .swapPaneRight, .swapPaneUp,
+            .swapPaneDown, .movePaneToNewTab, .movePaneToPreviousTab, .movePaneToNextTab:
             return .panes
         case .increaseFontSize, .decreaseFontSize, .resetFontSize, .scrollPageUp,
             .scrollPageDown, .scrollToTop, .scrollToBottom, .previousCommand, .nextCommand,
@@ -79,6 +81,17 @@ nonisolated extension TerminalCommand {
         case .shrinkPaneHorizontally: return 10
         case .growPaneVertically: return 11
         case .shrinkPaneVertically: return 12
+        case .movePaneLeft: return 13
+        case .movePaneRight: return 14
+        case .movePaneUp: return 15
+        case .movePaneDown: return 16
+        case .swapPaneLeft: return 17
+        case .swapPaneRight: return 18
+        case .swapPaneUp: return 19
+        case .swapPaneDown: return 20
+        case .movePaneToNewTab: return 21
+        case .movePaneToPreviousTab: return 22
+        case .movePaneToNextTab: return 23
         case .increaseFontSize: return 0
         case .decreaseFontSize: return 1
         case .resetFontSize: return 2

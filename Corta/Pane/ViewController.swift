@@ -389,7 +389,8 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
         // view at its placeholder size would strand blank rows under the
         // prompt. The session is born at the target size, so nothing is lost.
         guard didSizeWindow, session != nil, let terminalRenderer, view.window != nil,
-            splitController?.splitTransition.isRunning != true
+            splitController?.splitTransition.isRunning != true,
+            splitController?.isRearrangingPanes != true
         else { return }
         let grid = gridSize(fitting: view.bounds.size)
         let pixels = pixelSize(
