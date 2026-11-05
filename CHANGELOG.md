@@ -99,6 +99,10 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Holding an SFTP row over Finder no longer freezes Finder. Merely hovering
+  started the download, twice, and Finder waited on it, sometimes until Corta
+  quit, and the drop could deliver nothing. The download now starts once, when
+  you drop.
 - File drops on terminal panes and SFTP listings negotiate by type without
   triggering lazy downloads while hovering. Promised files are received
   asynchronously, with a deadline and visible failures. Pane drops are bound

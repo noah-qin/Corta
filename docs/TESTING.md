@@ -818,6 +818,21 @@ Never change global hotkeys, secure-input state, shell startup files or
 dependencies and per-process environments. Use temporary directories for
 fixtures and clean up the resources you create.
 
+### SFTP rows dragged to Finder
+
+`SFTPDragProviderTests` holds the row's provider and the table's published
+pasteboard to the rule: no file URL is advertised, a read during a hover
+downloads nothing, a file arrives asynchronously from the folder it was picked
+up in, and failures and cancellation complete the provider. The UI-plan case
+`RemoteWorkflowUITests/testFileRowHeldOverFinderDownloadsOnlyWhenDropped` holds
+a real drag over Finder with the real `sftp-server`. Only a real drag shows
+what a destination does: reading the pasteboard in a test cannot say which
+reads Finder makes, or that it waits. To measure it by hand, run a private
+`sshd` on loopback as `scripts/verify-ssh-integration.py` does, point
+`CORTA_SFTP_SSH` at a script running `ssh -F` with its configuration, add a
+rate-limiting `ProxyCommand` so a large file takes a while, hold a row over a
+scratch Finder folder, and time an AppleScript round trip to Finder meanwhile.
+
 ### The SFTP browser without a server
 
 Debug builds offer **Help ▸ SFTP Development Preview**, or launch with
