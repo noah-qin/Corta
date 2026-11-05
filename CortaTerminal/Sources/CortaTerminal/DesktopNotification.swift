@@ -36,6 +36,9 @@ public struct DesktopNotification: Sendable, Equatable {
 struct ProgramSignals: Sendable {
     static let chunkLimit = 4096
     var statuses: [String: ProgramStatus] = [:]
+    var subtaskOrder: [String] = []
+    /// The most urgent record a prompt dropped while its command still ran.
+    var heldForFinish: ProgramStatus?
     var tabMetadata: ProgramStatus?
     var progress: ProgramProgress?
     var notification: DesktopNotification?
@@ -52,22 +55,20 @@ struct ProgramSignals: Sendable {
     var chunkBytes: [String: Int] = [:]
 
     mutating func status(_ payload: String) {
-        let fields = Self.fields(payload)
-        if let id = fields["id"], !ProgramText.validID(id) { return }
+        let fields = Self.statusFields(payload)
+        if let id = fields["id"], !ProgramText.validPath(id) { return }
         let id = fields["id"] ?? ""
         if fields["state"] == "clear" {
-            if fields["id"] == nil { statuses.removeAll() } else { statuses[id] = nil }
-            if fields["id"] == nil || blockedID == id { blocked = nil; blockedID = nil }
+            clearStatus(fields["id"])
             return
         }
         // `unknown` is Corta's fallback when no task state was reported,
         // not a state in the OSC 7501 sender's vocabulary.
         guard let raw = fields["state"], let state = ProgramStatus.State(rawValue: raw),
               state != .unknown else { return }
-        if let kind = fields["kind"], ProgramStatus.Kind(rawValue: kind) == nil { return }
-        guard id.isEmpty || statuses[id] != nil
-            || statuses.keys.filter({ !$0.isEmpty }).count < ProgramStatus.maximumSubtasks else { return }
         let wasBlocked = statuses.values.contains { $0.state == .blocked }
+        if !id.isEmpty { touchSubtask(id) }
+        // A kind this version does not know is still a wait: it counts as absent.
         let kind = state == .blocked ? fields["kind"].flatMap(ProgramStatus.Kind.init(rawValue:)) : nil
         let title = fields["title"].flatMap { ProgramText.decoded($0, limit: 192) } ?? ""
         let message = fields["msg"].flatMap { ProgramText.decoded($0, limit: 2048) } ?? ""
@@ -78,15 +79,60 @@ struct ProgramSignals: Sendable {
             blocked = nil; blockedID = nil
         }
         if state == .blocked && !wasBlocked { blockedEpisode += 1 }
+        let reportsProgress = state == .working || state == .blocked
         statuses[id] = ProgramStatus(state: state, kind: kind,
             app: ProgramText.clean(fields["app"] ?? "", limit: 80), title: title, message: message,
-            progress: fields["progress"].flatMap(Int.init).map { min(100, max(0, $0)) })
+            progress: reportsProgress ? fields["progress"].flatMap(Int.init).map { min(100, max(0, $0)) } : nil)
+    }
+
+    /// Most recently updated last. Past the cap the stalest subtask makes way:
+    /// refusing the newest instead would hide a wait from a program that never
+    /// clears its finished subtasks. The main slot is not in the running.
+    private mutating func touchSubtask(_ id: String) {
+        subtaskOrder.removeAll { $0 == id }
+        if statuses[id] == nil, subtaskOrder.count >= ProgramStatus.maximumSubtasks {
+            removeStatus(subtaskOrder.removeFirst())
+        }
+        subtaskOrder.append(id)
+    }
+
+    private mutating func removeStatus(_ id: String) {
+        statuses[id] = nil
+        if blockedID == id { blocked = nil; blockedID = nil }
+    }
+
+    /// One record and everything beneath it, or with no id, every record.
+    private mutating func clearStatus(_ id: String?) {
+        guard let id else {
+            statuses.removeAll(); subtaskOrder.removeAll()
+            blocked = nil; blockedID = nil
+            return
+        }
+        let prefix = id + "/"
+        for key in statuses.keys where key == id || key.hasPrefix(prefix) { removeStatus(key) }
+        subtaskOrder.removeAll { $0 == id || $0.hasPrefix(prefix) }
+    }
+
+    /// A new prompt says whatever was working or waiting has stopped, however
+    /// it ended. `done` and `error` are results still to be seen, and stay;
+    /// `idle` stays too, being true. Applies only to main-screen marks.
+    ///
+    /// Another hook can send the prompt before the finish, while the command
+    /// still runs: what it drops is kept aside for that finish to report on.
+    mutating func promptStarted(commandRunning: Bool) {
+        guard !statuses.isEmpty else { return }
+        for (id, status) in statuses where status.state == .working || status.state == .blocked {
+            if commandRunning, status.urgency > heldForFinish?.urgency ?? -1 { heldForFinish = status }
+            removeStatus(id)
+            subtaskOrder.removeAll { $0 == id }
+        }
     }
 
     /// A shell boundary ends the program's lifetime even when it could not
     /// send clear (SIGKILL, crash). A clean exit alone never proves completion.
     mutating func endCommand(exitStatus: Int?) {
-        let result = statuses.values.max { $0.urgency < $1.urgency }
+        // What a prompt ahead of this finish dropped counts as if it were still here.
+        let result = (Array(statuses.values) + [heldForFinish].compactMap { $0 }).max { $0.urgency < $1.urgency }
         beginCommand()
         guard var result else { return }
         if exitStatus == 130 {
@@ -101,8 +147,20 @@ struct ProgramSignals: Sendable {
     }
 
     mutating func beginCommand() {
-        statuses.removeAll(); progress = nil; tabMetadata = nil
+        statuses.removeAll(); subtaskOrder.removeAll(); heldForFinish = nil; progress = nil; tabMetadata = nil
         blocked = nil; blockedID = nil
+    }
+
+    /// OSC 7501's pairs: whitespace around a key or a value is not part of it.
+    private static func statusFields(_ text: String) -> [String: String] {
+        var result: [String: String] = [:]
+        for field in text.split(separator: ":") {
+            let parts = field.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            if parts.count == 2 {
+                result[parts[0].trimmingCharacters(in: .whitespaces)] = parts[1].trimmingCharacters(in: .whitespaces)
+            }
+        }
+        return result
     }
 
     static func fields(_ text: String) -> [String: String] {

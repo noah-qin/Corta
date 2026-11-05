@@ -984,7 +984,8 @@ Done; a known failed exit is Failed. Notifications and BEL request attention
 without changing the task state. Silence alone does not mean completion.
 BEL's existing audible/visual/muted setting is unchanged. A reported shell
 command boundary also ends stale status and progress when a crashed CLI
-cannot send clear. Exit status 130 (or a directly launched session ended by SIGINT) means
+cannot send clear, and a new prompt alone ends Working and Waiting for you, while
+Done and Failed stay until the next command. Exit status 130 (or a directly launched session ended by SIGINT) means
 interrupted/Idle, not Done; other
 known nonzero exits mean Failed. A new reported command clears the old
 summary. Without a shell boundary or a session exit, Corta cannot detect a
