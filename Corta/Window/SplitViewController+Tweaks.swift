@@ -13,6 +13,7 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
+
 import AppKit
 
 /// The three optional split behaviours; each is off until its key says so

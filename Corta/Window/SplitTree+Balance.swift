@@ -13,6 +13,7 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
+
 import AppKit
 
 /// `auto-balance-panes`: every pane an equal share along each row, except where
