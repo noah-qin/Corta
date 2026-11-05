@@ -106,6 +106,8 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- ⌘Q no longer hangs after an SFTP row has been dragged. On the way out the app
+  waited for a file promise nobody could keep.
 - Holding an SFTP row over Finder no longer freezes Finder. Merely hovering
   started the download, twice, and Finder waited on it, sometimes until Corta
   quit, and the drop could deliver nothing. The download now starts once, when

@@ -428,6 +428,11 @@ extension AppDelegate {
     /// visible one), answered later; app-modal, answered now, when none is
     /// visible.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // On the way out AppKit resolves what this app still promises on any
+        // pasteboard, and a dragged SFTP row's file is a promise nobody can keep
+        // by then: that wait never ended, and the app never quit. Dropping the
+        // promise costs nothing if the quit is cancelled: its drag is over.
+        NSPasteboard(name: .drag).clearContents()
         let running = windowControllers.flatMap { $0.window?.terminalSplits ?? [] }
             .flatMap(\.panes).filter { $0.session?.hasForegroundJob == true }
         guard let split = windowControllers.first?.window?.terminalSplit,

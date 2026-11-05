@@ -281,6 +281,17 @@ extension FileDropCleanupTests {
         #expect(exists(theirs))
     }
 
+    /// AppKit resolves this app's pasteboard promises on the way out. A dragged
+    /// SFTP row's was one nobody could keep: ⌘Q never returned.
+    @Test("asking to quit lets go of a promise on the drag pasteboard")
+    func quitDropsDragPromises() {
+        let pasteboard = NSPasteboard(name: .drag)
+        pasteboard.clearContents()
+        pasteboard.setString("promise", forType: .string)
+        #expect(AppDelegate().applicationShouldTerminate(NSApplication.shared) == .terminateNow)
+        #expect(pasteboard.string(forType: .string) == nil)
+    }
+
     @Test("a user's own dropped file is used where it is and survives the pane")
     func originalsStay() throws {
         let root = try scratchRoot()
