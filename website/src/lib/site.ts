@@ -18,6 +18,7 @@ import type { Metadata } from "next";
 import generated from "@/generated/manifest.json";
 import { homepageTitles, label } from "@/lib/i18n";
 import { basePath, getSiteOrigin } from "../../scripts/site-config.mjs";
+
 export { basePath };
 export type PageInfo = {
   file: string;
