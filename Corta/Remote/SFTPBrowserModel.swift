@@ -302,7 +302,12 @@ final class SFTPBrowserModel {
         guard connectionState == .connected, entry.kind == .file,
             Self.isPlainEntryName(entry.name)
         else { throw SFTPTransferQueue.TransferFailure(message: L10n.text("sftp.drag.unavailable")) }
-        let staging = try Self.makeDragStagingDirectory()
+        // Off the main actor, which the transfer queue is about to need.
+        let staging = try await Task.detached { try Self.makeDragStagingDirectory() }.value
+        guard connectionState == .connected else {
+            try? FileManager.default.removeItem(at: staging)
+            throw SFTPTransferQueue.TransferFailure(message: L10n.text("sftp.drag.unavailable"))
+        }
         dragStagingDirectories.append(staging)
         let remotePath = Self.joinPath(currentPath, entry.name)
         let local = staging.appendingPathComponent(Self.localFileName(entry.name))

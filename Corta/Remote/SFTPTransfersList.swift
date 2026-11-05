@@ -209,14 +209,28 @@ private struct TransferRow: View {
 /// One remote file as a drag: Finder asks for the file when it is dropped,
 /// and the export downloads it (through the transfer queue, with a progress
 /// row) into a private staging folder the system then copies from.
-struct SFTPDragItem: Transferable {
+///
+/// The provider never hops to the main actor to answer: AppKit may ask while
+/// tracking a drag, on a thread the main actor is waiting for.
+nonisolated struct SFTPDragItem: Sendable {
     let name: String
     let export: @Sendable () async throws -> URL
 
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .data) { item in
-            SentTransferredFile(try await item.export(), allowAccessingOriginalFile: false)
+    func itemProvider() -> NSItemProvider {
+        let provider = NSItemProvider()
+        provider.suggestedName = name
+        provider.registerFileRepresentation(
+            forTypeIdentifier: UTType.data.identifier, fileOptions: [], visibility: .all
+        ) { completion in
+            Task.detached {
+                do {
+                    completion(try await export(), false, nil)
+                } catch {
+                    completion(nil, false, error)
+                }
+            }
+            return nil
         }
-        .suggestedFileName { $0.name }
+        return provider
     }
 }
