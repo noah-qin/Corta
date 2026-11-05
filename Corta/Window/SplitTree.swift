@@ -63,6 +63,18 @@ final class SplitTree {
 
     var leafCount: Int { leaves.count }
 
+    /// Every internal node, parents before their children.
+    var nodes: [NSSplitView] {
+        var result: [NSSplitView] = []
+        func walk(_ view: NSView) {
+            guard let split = view as? NSSplitView else { return }
+            result.append(split)
+            for child in split.subviews { walk(child) }
+        }
+        walk(root)
+        return result
+    }
+
     private func collectLeaves(of view: NSView, into leaves: inout [NSView]) {
         if let split = view as? NSSplitView {
             for child in split.subviews { collectLeaves(of: child, into: &leaves) }
@@ -192,11 +204,22 @@ final class SplitTree {
 /// The splitter is the gutter between independent rounded terminal cards.
 final class PaneSplitView: NSSplitView {
     var onDividerInteraction: (() -> Void)?
+    /// The user placed this divider, by dragging or from the keyboard;
+    /// `auto-balance-panes` leaves it where it is. Equalize Panes clears it.
+    var isUserPositioned = false
     override var dividerThickness: CGFloat { PaneSurfaceView.gap }
 
     override func mouseDown(with event: NSEvent) {
         onDividerInteraction?()
+        let before = firstExtent
+        // A divider drag tracks inside this call and returns when it ends.
         super.mouseDown(with: event)
+        if firstExtent != before { isUserPositioned = true }
+    }
+
+    private var firstExtent: CGFloat {
+        guard let first = subviews.first else { return 0 }
+        return isVertical ? first.frame.width : first.frame.height
     }
 
     override func drawDivider(in rect: NSRect) {

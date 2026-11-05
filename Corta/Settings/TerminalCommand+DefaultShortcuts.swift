@@ -59,6 +59,7 @@ nonisolated extension TerminalCommand {
         // a program or the system may want, and a swap is rarely repeated.
         case .swapPaneLeft, .swapPaneRight, .swapPaneUp, .swapPaneDown: return nil
         case .movePaneToNewTab, .movePaneToPreviousTab, .movePaneToNextTab: return nil
+        case .splitBestFit: return nil
         // ⇧⌘⏎ is tmux's `resize-pane -Z` habit written the Mac way, and no
         // menu item or system shortcut claims it.
         case .zoomPane: return Shortcut("\r", [.command, .shift])

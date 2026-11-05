@@ -179,6 +179,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case close
     case splitRight = "split-right"
     case splitDown = "split-down"
+    case splitBestFit = "best-fit-split"
     case focusLeft = "focus-left"
     case focusRight = "focus-right"
     case focusUp = "focus-up"
@@ -248,6 +249,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .close: return L10n.text("command.close")
         case .splitRight: return L10n.text("command.splitRight")
         case .splitDown: return L10n.text("command.splitDown")
+        case .splitBestFit: return L10n.text("command.splitBestFit")
         case .focusLeft: return L10n.text("command.focusLeft")
         case .focusRight: return L10n.text("command.focusRight")
         case .focusUp: return L10n.text("command.focusUp")
@@ -329,6 +331,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .close: return #selector(SplitViewController.performClose(_:))
         case .splitRight: return #selector(SplitViewController.splitRight(_:))
         case .splitDown: return #selector(SplitViewController.splitDown(_:))
+        case .splitBestFit: return #selector(SplitViewController.splitBestFit(_:))
         case .focusLeft: return #selector(SplitViewController.moveFocusLeft(_:))
         case .focusRight: return #selector(SplitViewController.moveFocusRight(_:))
         case .focusUp: return #selector(SplitViewController.moveFocusUp(_:))

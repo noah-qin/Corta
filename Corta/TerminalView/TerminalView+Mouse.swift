@@ -158,8 +158,15 @@ extension TerminalView {
 
     // MARK: - ⌘-hover link feedback
 
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        guard let controller = paneController else { return }
+        controller.splitController?.pointerEntered(controller)
+    }
+
     override func mouseMoved(with event: NSEvent) {
         reportMotion(event, button: nil)
+        paneController?.splitController?.pointerMoved()
         guard let controller = paneController else {
             super.mouseMoved(with: event)
             return

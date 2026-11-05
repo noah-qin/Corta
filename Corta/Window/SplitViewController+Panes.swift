@@ -54,11 +54,13 @@ extension SplitViewController {
         let position = vertical ? first.width : first.height
         let direction: CGFloat = index == 0 ? 1 : -1
         split.setPosition(position + direction * steps * step, ofDividerAt: 0)
+        (split as? PaneSplitView)?.isUserPositioned = true
         deliverPaneSizes()
     }
 
     /// Halves every node, back to a fresh split's layout.
     @objc func equalizePanes(_: Any?) {
+        for node in tree.nodes { (node as? PaneSplitView)?.isUserPositioned = false }
         equalize(view.subviews.first)
         deliverPaneSizes()
     }

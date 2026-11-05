@@ -77,7 +77,10 @@ extension SplitViewController {
             split.addSubview(reopened.view, positioned: .below, relativeTo: split.subviews[0])
         }
         view.layoutSubtreeIfNeeded()
-        if let split = reopened.view.superview as? NSSplitView {
+        // With balancing on, every pane's share is the balanced one.
+        if !ConfigurationStore.shared.configuration.autoBalancePanes,
+            let split = reopened.view.superview as? NSSplitView
+        {
             let axis = split.isVertical ? split.bounds.width : split.bounds.height
             if axis > 0 { split.setPosition(axis * CGFloat(record.position), ofDividerAt: 0) }
         }

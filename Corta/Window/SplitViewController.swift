@@ -53,6 +53,9 @@ final class SplitViewController: NSViewController {
     /// A move is rearranging the tree: panes wait for the settled sizes rather
     /// than resize to a step on the way (`SplitViewController+Moving.swift`).
     var isRearrangingPanes = false
+    /// A saved layout is being rebuilt through `splitFocusedPane`: its dividers
+    /// are the user's, not a new pane's to rebalance.
+    var isRestoringLayout = false
     /// The window is dressed and sized (`prepareWindow`); later split panes
     /// take `didSizeWindow` from this.
     private(set) var didSetUpWindow = false
@@ -530,6 +533,7 @@ extension SplitViewController {
         pane.removeFromParent()
         installRoot()
         updateWindowMinSize()
+        balancePanesIfConfigured()
         if let subtree = survivingSubtree, let target = panes.first(where: {
             $0.view === subtree || $0.view.isDescendant(of: subtree)
         }) {

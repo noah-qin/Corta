@@ -264,6 +264,9 @@ extension SettingsView {
                 Toggle(
                     L10n.text("settings.label.copyOnSelect"),
                     isOn: bind(\.copyOnSelect))
+                Toggle(L10n.text("settings.label.focusFollowsMouse"), isOn: bind(\.focusFollowsMouse))
+                    .accessibilityIdentifier("focus-follows-mouse")
+                    .help(L10n.text("settings.help.focusFollowsMouse"))
             }
         }
     }
@@ -307,6 +310,14 @@ extension SettingsView {
                     isOn: bind(\.confirmClose)
                 )
                 .help(L10n.text("settings.help.confirmClose"))
+            }
+            SettingsSection(L10n.text("settings.section.panes")) {
+                Toggle(L10n.text("settings.label.autoBalancePanes"), isOn: bind(\.autoBalancePanes))
+                    .accessibilityIdentifier("auto-balance-panes")
+                    .help(L10n.text("settings.help.autoBalancePanes"))
+                Toggle(L10n.text("settings.label.bestFitSplit"), isOn: bind(\.bestFitSplit))
+                    .accessibilityIdentifier("best-fit-split")
+                    .help(L10n.text("settings.help.bestFitSplit"))
             }
             notificationsSection
             if UpdateController.isAvailable {

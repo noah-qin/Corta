@@ -82,6 +82,9 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `rows` | 5–300 | `30` | As above. The window's size in pixels is this grid times the font's cell metrics plus the pane insets — so two terminals showing the same `columns × rows` are still different sizes on screen if their fonts differ. |
 | `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. |
 | `confirm-close` | boolean | `true` | Ask before closing a pane, window or the app while a shell still has a foreground job. |
+| `auto-balance-panes` | boolean | `false` | Share the room equally as panes open and close. A divider you dragged or moved from the keyboard stays where you put it until Equalize Panes; a restored divider away from its balanced place counts as yours. Off, a new pane halves the focused one and a closed pane's room goes to its neighbours, as ever. |
+| `focus-follows-mouse` | boolean | `false` | The pointer entering a pane focuses it. Not while the window is inactive, a button is held, a menu, sheet or modal window is up, a search field or tab rename holds the keyboard, or an input method is composing inline. An input method that composes only in its own panel cannot be seen, so a pointer entering a pane can still end that composition. |
+| `best-fit-split` | boolean | `false` | Turns on the Split Pane Along Longer Side command (`bind.best-fit-split`), which splits the focused pane across its longer side. ⌘D and ⇧⌘D do not change either way. |
 
 ### Terminal
 
@@ -327,6 +330,9 @@ columns = 120
 rows = 30
 restore-windows = true
 confirm-close = true
+auto-balance-panes = false
+focus-follows-mouse = false
+best-fit-split = false
 
 
 # Terminal
@@ -578,6 +584,7 @@ the key against both rows, which is how you spot it.
 | `move-pane-to-new-tab` | Move Pane to New Tab | *(none)* |
 | `move-pane-to-previous-tab` | Move Pane to Previous Tab | *(none)* |
 | `move-pane-to-next-tab` | Move Pane to Next Tab | *(none)* |
+| `best-fit-split` | Split Pane Along Longer Side | *(none)*; needs `best-fit-split = true` |
 | `increase-font-size` | Bigger | `cmd+=` |
 | `decrease-font-size` | Smaller | `cmd+-` |
 | `reset-font-size` | Actual Size | `cmd+0` |

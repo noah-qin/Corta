@@ -101,6 +101,8 @@ extension SplitViewController {
         case #selector(movePaneToPreviousTab(_:)), #selector(movePaneToNextTab(_:)),
             #selector(movePaneToTabNamedByItem(_:)):
             return (tab?.controller?.tabs.count ?? 0) > 1
+        case #selector(splitBestFit(_:)):
+            return ConfigurationStore.shared.configuration.bestFitSplit
         case #selector(reopenClosedPane(_:)):
             return canReopenClosedPane
         case #selector(toggleZoomPane(_:)):

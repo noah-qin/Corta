@@ -34,7 +34,9 @@ extension SettingsView.Category {
         case .general:
             [
                 "settings.section.window", "settings.label.newWindow", "settings.label.restoreWindows",
-                "settings.label.confirmClose", "settings.section.notifications",
+                "settings.label.confirmClose", "settings.section.panes",
+                "settings.label.autoBalancePanes", "settings.label.bestFitSplit",
+                "settings.section.notifications",
                 "settings.label.notifyOnLongTasks",
                 "settings.label.longerThan", "ui.section.updates", "ui.update.auto",
                 "ui.update.applications",
@@ -73,6 +75,7 @@ extension SettingsView.Category {
                 "inputSource.settings.position",
                 "inputSource.color.direct", "inputSource.color.ime", "settings.label.optionAsMeta",
                 "settings.label.openLinksWith", "ui.mouse.override", "settings.label.copyOnSelect",
+                "settings.label.focusFollowsMouse",
             ]
         case .shortcuts:
             ["settings.section.commands"]

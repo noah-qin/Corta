@@ -34,7 +34,7 @@ nonisolated extension TerminalCommand {
             .growPaneHorizontally, .shrinkPaneHorizontally, .growPaneVertically,
             .shrinkPaneVertically, .equalizePanes, .zoomPane, .reopenClosedPane, .movePaneLeft,
             .movePaneRight, .movePaneUp, .movePaneDown, .swapPaneLeft, .swapPaneRight, .swapPaneUp,
-            .swapPaneDown, .movePaneToNewTab, .movePaneToPreviousTab, .movePaneToNextTab:
+            .swapPaneDown, .movePaneToNewTab, .movePaneToPreviousTab, .movePaneToNextTab, .splitBestFit:
             return .panes
         case .increaseFontSize, .decreaseFontSize, .resetFontSize, .scrollPageUp,
             .scrollPageDown, .scrollToTop, .scrollToBottom, .previousCommand, .nextCommand,
@@ -50,6 +50,12 @@ nonisolated extension TerminalCommand {
         case .find, .copy, .paste, .selectAll, .exportText: return .edit
         case .settings, .commandPalette: return .app
         }
+    }
+
+    /// Whether the palette lists it: a command its setting has turned off would
+    /// only beep.
+    @MainActor var isOfferedInPalette: Bool {
+        self != .splitBestFit || ConfigurationStore.shared.configuration.bestFitSplit
     }
 
     /// Where the command sits inside its group before any search or recency
@@ -92,6 +98,7 @@ nonisolated extension TerminalCommand {
         case .movePaneToNewTab: return 22
         case .movePaneToPreviousTab: return 23
         case .movePaneToNextTab: return 24
+        case .splitBestFit: return 25
         case .increaseFontSize: return 0
         case .decreaseFontSize: return 1
         case .resetFontSize: return 2
