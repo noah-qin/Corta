@@ -151,6 +151,7 @@ extension SplitViewController {
     /// The final sizes, focus, and everything that names the pane's place.
     private func finishMove(of pane: ViewController, keepsSearchFocus: Bool) {
         guard let destination = pane.splitController else { return }
+        destination.balancePanesIfConfigured()
         destination.deliverSizesAfterMove()
         destination.takeFocus(pane)
         if keepsSearchFocus { pane.search.show() }
@@ -225,6 +226,7 @@ extension SplitViewController {
             pane.removeFromParent()
             settleTree(fractions: fractions)
             isRearrangingPanes = false
+            balancePanesIfConfigured()
             deliverSizesAfterMove()
             let next = survivor.flatMap { subtree in
                 panes.first { $0.view === subtree || $0.view.isDescendant(of: subtree) }

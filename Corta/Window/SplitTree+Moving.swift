@@ -21,18 +21,6 @@ import AppKit
 /// positions are the caller's to restore: AppKit re-halves a split that
 /// loses a subview, so they are read before and written after.
 extension SplitTree {
-    /// Every internal node, parents before their children.
-    var nodes: [NSSplitView] {
-        var result: [NSSplitView] = []
-        func walk(_ view: NSView) {
-            guard let split = view as? NSSplitView else { return }
-            result.append(split)
-            for child in split.subviews { walk(child) }
-        }
-        walk(root)
-        return result
-    }
-
     /// Each node's divider as a share of its axis, by node identity: a node
     /// that survives keeps its share, and a new one has none.
     func dividerFractions() -> [ObjectIdentifier: Double] {

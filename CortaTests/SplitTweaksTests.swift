@@ -194,6 +194,24 @@ struct SplitTweaksTests {
         }
     }
 
+    /// A move opens and closes places as a split and a close do.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aMoveRebalancesWhenBalancingIsOn() throws {
+        try with(\.autoBalancePanes) {
+            let (split, window) = makeWindow()
+            defer { split.teardown() }
+            split.splitFocusedPane(orientation: .columns)
+            split.splitFocusedPane(orientation: .rows)
+            split.view.layoutSubtreeIfNeeded()
+            split.movePaneLeft(nil)
+            split.view.layoutSubtreeIfNeeded()
+            let widths = split.tree.leaves.map(\.frame.width)
+            #expect(widths.count == 3)
+            #expect(abs(widths[0] - widths[1]) < 2 && abs(widths[1] - widths[2]) < 2, "\(widths)")
+            _ = window
+        }
+    }
+
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func equalizeWhileZoomedKeepsAPlacedDividerMarked() throws {
         let (split, window) = makeWindow()

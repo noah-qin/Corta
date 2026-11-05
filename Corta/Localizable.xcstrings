@@ -45951,6 +45951,10 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Nenhuma outra aba"
+          }
+        }
+      }
+    },
     "command.splitBestFit": {
       "extractionState": "manual",
       "localizations": {
