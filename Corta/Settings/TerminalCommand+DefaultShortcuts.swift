@@ -48,6 +48,17 @@ nonisolated extension TerminalCommand {
         case .shrinkPaneVertically:
             return Shortcut(Shortcut.parse("up")!.key, [.control, .command])
         case .equalizePanes: return nil
+        // Focus's arrows with Shift, the pane going where focus would: every
+        // other ⌘ arrow combination is taken (focus, resize, the command
+        // jumps), and nothing in the menus or the system claims these.
+        case .movePaneLeft: return Shortcut(Shortcut.parse("left")!.key, [.shift, .option, .command])
+        case .movePaneRight: return Shortcut(Shortcut.parse("right")!.key, [.shift, .option, .command])
+        case .movePaneUp: return Shortcut(Shortcut.parse("up")!.key, [.shift, .option, .command])
+        case .movePaneDown: return Shortcut(Shortcut.parse("down")!.key, [.shift, .option, .command])
+        // Unbound: no arrow combination is left that does not shadow something
+        // a program or the system may want, and a swap is rarely repeated.
+        case .swapPaneLeft, .swapPaneRight, .swapPaneUp, .swapPaneDown: return nil
+        case .movePaneToNewTab, .movePaneToPreviousTab, .movePaneToNextTab: return nil
         // ⇧⌘⏎ is tmux's `resize-pane -Z` habit written the Mac way, and no
         // menu item or system shortcut claims it.
         case .zoomPane: return Shortcut("\r", [.command, .shift])

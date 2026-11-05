@@ -36,7 +36,7 @@ enum SplitOrientation {
     /// Horizontal divider; the new pane appears below.
     case rows
 
-    fileprivate var isVertical: Bool { self == .columns }
+    var isVertical: Bool { self == .columns }
 }
 
 /// A direction for geometric focus movement (⌘⌥ arrows).
@@ -76,7 +76,9 @@ final class SplitTree {
     /// the caller can position the divider. The caller swaps the container's
     /// subview when the root changed (`splitReturningSubtree == root`).
     @discardableResult
-    func split(leaf: NSView, orientation: SplitOrientation, newLeaf: NSView) -> NSSplitView {
+    func split(
+        leaf: NSView, orientation: SplitOrientation, newLeaf: NSView, newLeafFirst: Bool = false
+    ) -> NSSplitView {
         let node = makeSplitView(orientation: orientation)
         // Arranged subviews of an NSSplitView are frame-managed by the
         // split view itself — Auto Layout masks fight it. The container
@@ -92,8 +94,8 @@ final class SplitTree {
             leaf.removeFromSuperview()
             parent.insertArrangedSubview(node, at: index)
         }
-        node.addArrangedSubview(leaf)
-        node.addArrangedSubview(newLeaf)
+        node.addArrangedSubview(newLeafFirst ? newLeaf : leaf)
+        node.addArrangedSubview(newLeafFirst ? leaf : newLeaf)
         return node
     }
 

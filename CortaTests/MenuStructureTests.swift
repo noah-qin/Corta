@@ -35,6 +35,9 @@ struct MenuStructureTests {
         }
         let groups: [(String, [TerminalCommand])] = [
             ("menu.focus", [.focusLeft, .focusRight, .focusUp, .focusDown]),
+            ("menu.movePane", [.movePaneLeft, .movePaneRight, .movePaneUp, .movePaneDown,
+                .swapPaneLeft, .swapPaneRight, .swapPaneUp, .swapPaneDown,
+                .movePaneToNewTab, .movePaneToPreviousTab, .movePaneToNextTab]),
             ("menu.commandsAndOutput", [.previousCommand, .nextCommand, .previousFailedCommand,
                 .nextFailedCommand, .copyLastCommandOutput, .snapshotRunningCommandOutput,
                 .exportCommandOutput, .openFileReferenceInCommand, .searchCommandHistory]),

@@ -70,10 +70,7 @@ extension SplitViewController {
         pane.isFontSizeZoomed = focusedPane.isFontSizeZoomed
         let node = tree.split(
             leaf: focusedPane.view, orientation: orientation, newLeaf: pane.view)
-        node.delegate = self
-        (node as? PaneSplitView)?.onDividerInteraction = { [weak self] in
-            self?.splitTransition.finish()
-        }
+        wire(node)
         if node === tree.root { installRoot() }
         node.frame = oldFrame
         let (firstFrame, secondFrame) = halvedFrames(of: oldFrame, orientation: orientation)
@@ -90,6 +87,14 @@ extension SplitViewController {
         takeFocus(pane)
         animateSplit(node, newPane: pane)
         for child in panes { child.paneHeader.refresh() }
+    }
+
+    /// Keeps divider drags inside the panes' minimums (`NSSplitViewDelegate`).
+    func wire(_ node: NSSplitView) {
+        node.delegate = self
+        (node as? PaneSplitView)?.onDividerInteraction = { [weak self] in
+            self?.splitTransition.finish()
+        }
     }
 
     /// The two halves of a frame, in the node's flipped coordinates.

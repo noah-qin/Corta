@@ -14,7 +14,10 @@ Versioning for compatibility changes.
 
 - Jump to Next Waiting Pane (⌥⌘J), in Window and the command palette, cycles
   through blocked panes across tabs and windows in waiting arrival order.
-
+- Panes move with their programs still running: ⇧⌥⌘ and an arrow key moves the
+  focused pane, Swap Pane exchanges it with a neighbour, and Move Pane to New
+  Tab, to the previous or next tab, or to a tab by name takes it out of the tab.
+  In the Shell menu and the command palette, and rebindable with `bind.`.
 - Corta has a website, https://corta.noahqin.dev, with the user guide,
   the documentation and the changelog in all nine languages the
   repository is translated into.

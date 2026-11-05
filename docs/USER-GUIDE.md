@@ -117,6 +117,9 @@ the mouse wheel over it — and follows the tab you select.
 | Resize the focused pane | ⌃⌘ + arrow key |
 | Fill the window with one pane, and back | ⇧⌘↩ (Zoom Pane) |
 | Make every pane the same size | Equalize Panes (command palette) |
+| Move the focused pane | ⇧⌥⌘ + arrow key |
+| Swap with the neighbouring pane | Swap Pane Left, Right, Up, Down (command palette) |
+| Move the pane to a new or existing tab | **Shell ▸ Move Pane**, **Shell ▸ Move Pane to Tab** |
 | Close the pane, tab or window | ⌘W |
 | Put back the pane you just closed | ⇧⌘T |
 
@@ -132,6 +135,15 @@ the mouse wheel over it — and follows the tab you select.
   window's tabs into the front one. Dragging a tab to either end of a strip
   that scrolls carries the row along with it.
 - **Zoom Pane** is temporary: nothing closes and no process is disturbed.
+- **Moving a pane** keeps it running: the same process, scrollback and search,
+  and the keyboard stays with it. Move Pane steps it one place: out of a stack
+  to stand beside it, past a neighbour, or to the tab's edge if nothing lies
+  that way; with nothing further to go, Corta beeps and nothing changes. Swap
+  Pane exchanges it with the neighbour that way, each keeping the other's size.
+  Moving it to another tab makes it a split of that tab's focused pane and
+  shows that tab; the last pane moved out of a tab closes the tab. A zoomed pane
+  unzooms first. A pane whose width in columns changes loses its selection, as
+  it does in any resize that rewraps the text.
 - **Reopen Closed Pane** restores the pane's place, size and working
   directory — not the program that was running in it.
 - Closing a pane with a command still running asks first
@@ -831,6 +843,7 @@ is the authoritative list:
 | Split Pane Right / Down | ⌘D / ⇧⌘D |
 | Move Focus | ⌥⌘ + arrow |
 | Resize Pane | ⌃⌘ + arrow |
+| Move Pane | ⇧⌥⌘ + arrow |
 | Zoom Pane | ⇧⌘↩ |
 | Reopen Closed Pane | ⇧⌘T |
 | Bigger / Smaller / Actual Size | ⌘= / ⌘− / ⌘0 |

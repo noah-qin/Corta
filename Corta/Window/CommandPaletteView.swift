@@ -171,6 +171,15 @@ private struct CommandPaletteRowView: View {
                 .accessibilityLabel(entry.title)
                 .accessibilityIdentifier("agent-row-" + entry.id.uuidString)
                 .accessibilityAddTraits(.isButton)
+        case .paneMoveTarget(let target):
+            Text(target.title).font(.system(size: 13))
+                .padding(.vertical, 7).padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Self.highlight(isSelected), in: Self.rowShape)
+                .contentShape(Rectangle())
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(L10n.text("menu.movePaneToTab") + ": " + target.title)
+                .accessibilityAddTraits(.isButton)
         case .command(let command, _, let shortcut, _):
             HStack {
                 Text(command.title).font(.system(size: 13))

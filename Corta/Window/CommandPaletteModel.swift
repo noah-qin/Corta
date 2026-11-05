@@ -41,11 +41,13 @@ final class CommandPaletteModel {
     enum Row: Identifiable, Equatable {
         case header(String)
         case agent(AgentDirectory.Entry)
+        case paneMoveTarget(PaneMoveTarget)
         case command(TerminalCommand, recent: Bool, shortcut: String, enabled: Bool)
 
         var id: String {
             switch self {
             case .agent(let entry): "agent-" + entry.id.uuidString
+            case .paneMoveTarget(let target): "move-pane-" + target.id
             case .header(let title): "header-\(title)"
             case .command(let command, let recent, _, _):
                 (recent ? "recent-" : "command-") + command.rawValue
@@ -55,7 +57,7 @@ final class CommandPaletteModel {
         var selectable: Bool {
             switch self {
             case .header: false
-            case .agent: true
+            case .agent, .paneMoveTarget: true
             case .command(_, _, _, let enabled): enabled
             }
         }
@@ -63,6 +65,13 @@ final class CommandPaletteModel {
         var command: TerminalCommand? {
             if case .command(let command, _, _, _) = self { command } else { nil }
         }
+    }
+
+    /// A tab Move Pane to Tab can name: by id, since the palette may outlive
+    /// the tab's place in the strip.
+    struct PaneMoveTarget: Equatable {
+        var id: String
+        var title: String
     }
 
     /// Rebuilds `rows`, once per change rather than once per read: the view,
@@ -83,6 +92,7 @@ final class CommandPaletteModel {
     private(set) var selectedRowID: String?
     var onRun: ((TerminalCommand) -> Void)?
     var onAgent: ((UUID) -> Void)?
+    var onMovePane: ((String) -> Void)?
     var onDismiss: (() -> Void)?
 
     var selectedCommand: TerminalCommand? {
@@ -101,11 +111,16 @@ final class CommandPaletteModel {
     private static let recentLimit = 5
     private let agentEntries: () -> [AgentDirectory.Entry]
     private let canJumpToNextWaitingPane: () -> Bool
+    private let paneMoveTargets: () -> [PaneMoveTarget]
 
-    init(agents: @escaping () -> [AgentDirectory.Entry] = { AgentDirectory.entries },
-         canJumpToNextWaitingPane: @escaping () -> Bool = { AgentDirectory.canJumpToNextWaitingPane }) {
+    init(
+        agents: @escaping () -> [AgentDirectory.Entry] = { AgentDirectory.entries },
+        canJumpToNextWaitingPane: @escaping () -> Bool = { AgentDirectory.canJumpToNextWaitingPane },
+        paneMoveTargets: @escaping () -> [PaneMoveTarget] = { AppDelegate.paneMoveTargets() }
+    ) {
         agentEntries = agents
         self.canJumpToNextWaitingPane = canJumpToNextWaitingPane
+        self.paneMoveTargets = paneMoveTargets
         rebuildRows()
     }
 
@@ -148,7 +163,18 @@ final class CommandPaletteModel {
             let section = [Row.header(L10n.text("agent.list"))] + agents.map { .agent($0) }
             rows = query.isEmpty ? section + rows : rows + section
         }
+        rows += paneMoveRows()
         selectFirstIfNeeded()
+    }
+
+    /// The other tabs, last, under Move Pane to Tab: choosing one is a command
+    /// with a tab in it, which the fixed table has no row for.
+    private func paneMoveRows() -> [Row] {
+        let heading = L10n.text("menu.movePaneToTab")
+        let targets = paneMoveTargets().filter {
+            query.isEmpty || Self.score((heading + " " + $0.title).lowercased(), query: query.lowercased()) != nil
+        }
+        return targets.isEmpty ? [] : [.header(heading)] + targets.map { .paneMoveTarget($0) }
     }
 
     /// With no query: what was used recently, then every command under its
@@ -268,6 +294,10 @@ final class CommandPaletteModel {
         guard rows.contains(where: { $0.id == selectedRowID && $0.selectable }) else { return }
         if let row = rows.first(where: { $0.id == selectedRowID }), case .agent(let entry) = row {
             onAgent?(entry.id)
+            return
+        }
+        if let row = rows.first(where: { $0.id == selectedRowID }), case .paneMoveTarget(let target) = row {
+            onMovePane?(target.id)
             return
         }
         guard let selectedCommand else { return }

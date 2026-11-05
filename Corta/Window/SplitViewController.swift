@@ -50,6 +50,9 @@ final class SplitViewController: NSViewController {
     /// through one place; `SplitViewController+Restore` sets it to rebuild a
     /// saved layout through the same split path as ⌘D.
     var focusedPane: ViewController?
+    /// A move is rearranging the tree: panes wait for the settled sizes rather
+    /// than resize to a step on the way (`SplitViewController+Moving.swift`).
+    var isRearrangingPanes = false
     /// The window is dressed and sized (`prepareWindow`); later split panes
     /// take `didSizeWindow` from this.
     private(set) var didSetUpWindow = false
@@ -75,9 +78,14 @@ final class SplitViewController: NSViewController {
         /// The directory an App Intent asked for; ignored when `restore` or
         /// `preset` names one.
         var workingDirectory: String?
+        /// A running pane from another tab, to be this tab's root in place of
+        /// a new one.
+        var adopting: ViewController?
     }
     let splitTransition = SplitTransition()
-    private let setup: Setup
+    /// `adopting` is emptied once the view has taken the pane: a tab outlives
+    /// a pane that moves on or closes, and must not keep it alive.
+    private(set) var setup: Setup
 
     /// The layout being restored: taken in `viewDidLoad` (the root pane needs
     /// its directory at spawn), its frame in `prepareWindow`, its splits in
@@ -111,9 +119,16 @@ final class SplitViewController: NSViewController {
         let restoredPreset = pendingRestore?.layout.firstPresetName.flatMap { name in
             ConfigurationStore.shared.configuration.presets.first { $0.name == name }
         }
-        let pane = makePane(
-            workingDirectory: pendingRestore?.layout.firstDirectory ?? setup.workingDirectory,
-            initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
+        let pane: ViewController
+        if let adopted = setup.adopting {
+            addChild(adopted)
+            pane = adopted
+            setup.adopting = nil
+        } else {
+            pane = makePane(
+                workingDirectory: pendingRestore?.layout.firstDirectory ?? setup.workingDirectory,
+                initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
+        }
         focusedPane = pane
         tree = SplitTree(root: pane.view)
         systemStatusBar.onVisibilityChange = { [weak self] in self?.updateStatusBarLayout() }

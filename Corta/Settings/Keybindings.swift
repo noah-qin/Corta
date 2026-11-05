@@ -189,6 +189,12 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case growPaneVertically = "grow-pane-vertically"
     case shrinkPaneVertically = "shrink-pane-vertically"
     case equalizePanes = "equalize-panes"
+    case movePaneLeft = "move-pane-left", movePaneRight = "move-pane-right"
+    case movePaneUp = "move-pane-up", movePaneDown = "move-pane-down"
+    case swapPaneLeft = "swap-pane-left", swapPaneRight = "swap-pane-right"
+    case swapPaneUp = "swap-pane-up", swapPaneDown = "swap-pane-down"
+    case movePaneToNewTab = "move-pane-to-new-tab", movePaneToPreviousTab = "move-pane-to-previous-tab"
+    case movePaneToNextTab = "move-pane-to-next-tab"
     case zoomPane = "zoom-pane"
     case reopenClosedPane = "reopen-closed-pane"
     case increaseFontSize = "increase-font-size"
@@ -252,6 +258,9 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .growPaneVertically: return L10n.text("command.growPaneVertically")
         case .shrinkPaneVertically: return L10n.text("command.shrinkPaneVertically")
         case .equalizePanes: return L10n.text("command.equalizePanes")
+        case .movePaneLeft, .movePaneRight, .movePaneUp, .movePaneDown, .swapPaneLeft, .swapPaneRight,
+            .swapPaneUp, .swapPaneDown, .movePaneToNewTab, .movePaneToPreviousTab, .movePaneToNextTab:
+            return paneMoveTitle
         case .zoomPane: return L10n.text("command.zoomPane")
         case .reopenClosedPane: return L10n.text("command.reopenClosedPane")
         case .increaseFontSize: return L10n.text("command.increaseFontSize")
@@ -333,6 +342,9 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .shrinkPaneVertically:
             return #selector(SplitViewController.shrinkPaneVertically(_:))
         case .equalizePanes: return #selector(SplitViewController.equalizePanes(_:))
+        case .movePaneLeft, .movePaneRight, .movePaneUp, .movePaneDown, .swapPaneLeft, .swapPaneRight,
+            .swapPaneUp, .swapPaneDown, .movePaneToNewTab, .movePaneToPreviousTab, .movePaneToNextTab:
+            return paneMoveAction
         case .zoomPane: return #selector(SplitViewController.toggleZoomPane(_:))
         case .reopenClosedPane: return #selector(SplitViewController.reopenClosedPane(_:))
         case .increaseFontSize: return #selector(PaneCommands.increaseFontSize(_:))
