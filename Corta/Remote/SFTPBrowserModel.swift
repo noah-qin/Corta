@@ -300,18 +300,30 @@ final class SFTPBrowserModel {
     /// them when the window closes.
     private(set) var dragStagingDirectories: [URL] = []
 
+    /// `entry` as a drag, with the folder and connection it was picked up in:
+    /// the browser may have moved on by the time something asks for the file.
+    func dragItem(for entry: Entry) -> SFTPDragItem {
+        let directory = currentPath
+        let connection = connectionGeneration
+        return SFTPDragItem(name: Self.localFileName(entry.name)) { [weak self] in
+            guard let self
+            else { throw SFTPTransferQueue.TransferFailure(message: L10n.text("sftp.drag.unavailable")) }
+            return try await self.exportForDrag(entry, from: directory, connection: connection)
+        }
+    }
+
     /// A drag to Finder: downloads `entry` through the queue — so it has a
     /// progress row like any download — into a fresh private folder, and
     /// answers the file once it has landed. The system then copies it to
     /// wherever it was dropped. Files only; a folder is downloaded with
     /// Download, where its destination is chosen.
-    func exportForDrag(_ entry: Entry) async throws -> URL {
-        guard connectionState == .connected, entry.kind == .file,
+    func exportForDrag(_ entry: Entry, from directory: String, connection: Int) async throws -> URL {
+        guard connectionState == .connected, connection == connectionGeneration, entry.kind == .file,
             Self.isPlainEntryName(entry.name)
         else { throw SFTPTransferQueue.TransferFailure(message: L10n.text("sftp.drag.unavailable")) }
         let staging = try Self.makeDragStagingDirectory()
         dragStagingDirectories.append(staging)
-        let remotePath = Self.joinPath(currentPath, entry.name)
+        let remotePath = Self.joinPath(directory, entry.name)
         let local = staging.appendingPathComponent(Self.localFileName(entry.name))
         return try await withCheckedThrowingContinuation { continuation in
             transferQueue.enqueue(

@@ -594,6 +594,16 @@ after close. Remote editing keeps a SHA-256 baseline of what it downloaded,
 validates the content before uploading, and sends the approved private
 snapshot rather than the live editor file (`SECURITY.md` §5).
 
+A row dragged out of the browser is an `NSItemProvider` with one file
+representation, not a `Transferable`. A `FileRepresentation` also advertises
+`public.file-url`, and that URL can only be answered by downloading the file;
+Finder reads file URLs on a timer while the pointer is over it, so merely
+hovering started the download, twice, and held Finder's main thread on Corta's
+answer. The provider advertises the file promise alone, its handler returns at
+once, and only a drop asks for the file. The folder and connection are captured
+as the drag starts: the browser may have moved on by the drop, and a promise
+from a connection that has ended fails rather than downloads.
+
 ### 7.10 The status bar and the theme editor
 
 `SystemMetrics` reads public Mach, `getloadavg`, `getifaddrs`, volume and
