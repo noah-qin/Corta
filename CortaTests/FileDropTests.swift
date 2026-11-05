@@ -231,7 +231,11 @@ struct FileDropTests {
         collection.discard()
         #expect(!FileManager.default.fileExists(atPath: directory.path))
     }
+}
 
+// MARK: - The drop's target
+
+extension FileDropTests {
     @Test("session identity and foreground group must both match; missing context fails closed")
     func contextBinding() {
         let session = NSObject()
