@@ -819,6 +819,7 @@ is the authoritative list:
 | Resize Pane | ⌃⌘ + arrow |
 | Zoom Pane | ⇧⌘↩ |
 | Reopen Closed Pane | ⇧⌘T |
+| Jump to Next Waiting Pane | ⌥⌘J |
 | Bigger / Smaller / Actual Size | ⌘= / ⌘− / ⌘0 |
 | Find… / Find Next / Find Previous | ⌘F / ⌘G / ⇧⌘G (Find Next and Previous are fixed) |
 | Copy / Paste / Select All | ⌘C / ⌘V / ⌘A |
@@ -875,9 +876,19 @@ work starts or after it stops; only an explicit `done` means completion.
 A progress ring follows OSC 7501 or OSC 9;4 reports. The Dock counts waiting
 panes and shows aggregate progress. Open the command palette or Window →
 Agents to find every agent pane across windows; choosing an entry focuses it.
+Waiting panes come first, sign-in before permission before a question, the
+longest wait first within each; the rest follow by how urgent their state is.
 In the palette the agents are listed first while browsing and after matching
 commands while searching, and Return still runs the highlighted command:
 move to an agent with the arrow keys to jump to it.
+
+**Jump to Next Waiting Pane** (⌥⌘J, in the Window menu and the palette) goes to
+the next pane in that order, across tabs and windows, unzooming if another pane
+covers it, and gives it the keyboard. A pane you jumped to that is still waiting
+goes behind the others, so one session cannot hold the jump; once each has had
+its turn the round starts over. Only a program's own `blocked` report counts as
+waiting, and the kind is whatever it reported. Focus moves only when you ask:
+with nothing waiting, nothing changes.
 Several agents in one pane are shown by their most urgent state. Status and
 application names are reported by the program, not verified identities.
 Generic OSC 21337 metadata can decorate the current state with an indicator
@@ -927,7 +938,8 @@ known nonzero exits mean Failed. A new reported command clears the old
 summary. Without a shell boundary or a session exit, Corta cannot detect a
 silent crash from output alone.
 
-`agent-status = false` hides state indicators and the list.
+`agent-status = false` hides state indicators and the list, and turns off Jump
+to Next Waiting Pane.
 `notify-from-programs = false` disables program and agent-attention notices.
 Program messages are labelled as pane messages under Corta's pane name,
 limited and cleaned, and coalesced to at most one delivery per five seconds

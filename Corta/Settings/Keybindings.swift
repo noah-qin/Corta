@@ -176,6 +176,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case selectTab7 = "select-tab-7"
     case selectTab8 = "select-tab-8"
     case selectLastTab = "select-last-tab"
+    case nextWaitingPane = "next-waiting-pane"
     case close
     case splitRight = "split-right"
     case splitDown = "split-down"
@@ -238,6 +239,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
             .selectTab7, .selectTab8:
             return L10n.format("command.selectTab", tabNumber ?? 0)
         case .selectLastTab: return L10n.text("command.selectLastTab")
+        case .nextWaitingPane: return L10n.text("command.nextWaitingPane")
         case .close: return L10n.text("command.close")
         case .splitRight: return L10n.text("command.splitRight")
         case .splitDown: return L10n.text("command.splitDown")
@@ -315,6 +317,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .selectTab7: return #selector(SplitViewController.selectCortaTab7(_:))
         case .selectTab8: return #selector(SplitViewController.selectCortaTab8(_:))
         case .selectLastTab: return #selector(SplitViewController.selectLastCortaTab(_:))
+        case .nextWaitingPane: return #selector(AppDelegate.jumpToNextWaitingPane(_:))
         case .close: return #selector(SplitViewController.performClose(_:))
         case .splitRight: return #selector(SplitViewController.splitRight(_:))
         case .splitDown: return #selector(SplitViewController.splitDown(_:))

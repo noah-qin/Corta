@@ -28,7 +28,7 @@ nonisolated extension TerminalCommand {
         switch self {
         case .newWindow, .newTab, .previousTab, .nextTab, .renameTab, .close, .selectTab1,
             .selectTab2, .selectTab3, .selectTab4, .selectTab5, .selectTab6, .selectTab7,
-            .selectTab8, .selectLastTab:
+            .selectTab8, .selectLastTab, .nextWaitingPane:
             return .window
         case .splitRight, .splitDown, .focusLeft, .focusRight, .focusUp, .focusDown,
             .growPaneHorizontally, .shrinkPaneHorizontally, .growPaneVertically,
@@ -50,6 +50,12 @@ nonisolated extension TerminalCommand {
         }
     }
 
+    /// Whether the palette lists it: the waiting-pane jump goes with the state it
+    /// follows (`agent-status`).
+    @MainActor var isOfferedInPalette: Bool {
+        self != .nextWaitingPane || ConfigurationStore.shared.configuration.agentStatus
+    }
+
     /// Where the command sits inside its group before any search or recency
     /// reordering: lower comes first. Ordered by how often a command is
     /// reached for, not alphabetically — an alphabetical list puts "Actual
@@ -62,6 +68,7 @@ nonisolated extension TerminalCommand {
         case .previousTab: return 4
         case .nextTab: return 5
         case .renameTab: return 6
+        case .nextWaitingPane: return 16
         case .selectTab1, .selectTab2, .selectTab3, .selectTab4, .selectTab5, .selectTab6,
             .selectTab7, .selectTab8, .selectLastTab:
             return 6 + (tabNumber ?? 9)

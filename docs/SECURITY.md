@@ -275,6 +275,12 @@ labelled pane message, beneath Corta's own `notificationTitle`; it never
 becomes the system notification title. Agent permission/question/sign-in
 notices use Corta's fixed localised text. `notify-from-programs = false`
 disables both notice paths; `agent-status = false` hides agent chrome.
+The waiting-pane order (`AttentionQueue`) trusts the reported kind only to rank
+panes: a program can place itself first by claiming a sign-in, and gains nothing
+more, since nothing moves until the user jumps and a pane jumped to goes behind
+the others. A report never moves focus. The Agents list adds no text beyond
+what it already showed: the pane's name, fixed state and kind labels, and the
+program's limited, cleaned title or app name (§7).
 
 ### 2.10 OSC ecosystem limits and refusals (#411)
 

@@ -552,6 +552,7 @@ the key against both rows, which is how you spot it.
 | `select-tab-7` | Show Tab 7 | `cmd+7` |
 | `select-tab-8` | Show Tab 8 | `cmd+8` |
 | `select-last-tab` | Show Last Tab | `cmd+9` |
+| `next-waiting-pane` | Jump to Next Waiting Pane | `alt+cmd+j` |
 | `close` | Close | `cmd+w` |
 | `split-right` | Split Pane Right | `cmd+d` |
 | `split-down` | Split Pane Down | `shift+cmd+d` |

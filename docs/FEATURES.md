@@ -99,6 +99,8 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   appears only in the built-in process-name and icon lists. The Agents list, the
   Dock and notifications have not been checked against Codex, nor have other
   Codex versions.
+- The Agents list puts waiting panes first, and Jump to Next Waiting Pane (⌥⌘J)
+  moves through them across tabs and windows when you ask.
 - Generic OSC 9/777/99 notifications and OSC 9;4 progress are available to
   any program. They do not establish completion or permission state.
   Claude's own message channels require explicit selection in Claude's

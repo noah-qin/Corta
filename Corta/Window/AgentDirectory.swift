@@ -27,6 +27,8 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     /// program streaming progress changes `status` on most output signals.
     private var drawnBadge: String?
     private var drawnDockPercent: Int?
+    /// Who is waiting and in what order; only a user's jump consults it.
+    private var queue = AttentionQueue()
     static let didChange = Notification.Name("dev.noahqin.Corta.agentsDidChange")
 
     struct Entry: Equatable {
@@ -37,9 +39,21 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     static var panes: [ViewController] {
         NSApp.windows.flatMap(\.terminalSplits).flatMap(\.panes)
     }
+    /// Waiting panes in queue order, then the rest by urgency: what `urgency`
+    /// ranks, with equals kept in pane order.
     static var entries: [Entry] {
         guard ConfigurationStore.shared.configuration.agentStatus else { return [] }
-        return panes.compactMap { pane in
+        syncQueue()
+        let waiting = shared.queue.ordered
+        let listed = panes.enumerated().sorted { left, right in
+            let leftWait = waiting.firstIndex(of: left.element.taskNotifier.paneID) ?? Int.max
+            let rightWait = waiting.firstIndex(of: right.element.taskNotifier.paneID) ?? Int.max
+            if leftWait != rightWait { return leftWait < rightWait }
+            let leftUrgency = left.element.agents.status?.urgency ?? 0
+            let rightUrgency = right.element.agents.status?.urgency ?? 0
+            return leftUrgency == rightUrgency ? left.offset < right.offset : leftUrgency > rightUrgency
+        }.map(\.element)
+        return listed.compactMap { pane in
             guard let status = pane.agents.status else { return nil }
             let details = [L10n.text("agent.state." + status.state.rawValue),
                 status.title.isEmpty ? status.app : status.title,
@@ -49,13 +63,43 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
                 title: pane.windowTitle.notificationTitle + " — " + details)
         }
     }
+    /// Brings `id`'s pane forward with the keyboard: its window, its tab, and
+    /// out from behind a zoomed sibling, which leaves it with no window of its
+    /// own. Only ever called for something the user chose.
     static func focus(_ id: UUID) {
         guard let pane = panes.first(where: { $0.taskNotifier.paneID == id }),
-              let window = pane.view.window else { return }
+              let split = pane.splitController, let window = split.view.window else { return }
         NSApp.activate()
-        if let tab = pane.splitController?.tab { tab.controller?.selectTab(tab) }
+        if let tab = split.tab { tab.controller?.selectTab(tab) }
+        if split.zoomedPane != nil, split.zoomedPane !== pane { split.unzoomPane() }
         window.makeKeyAndOrderFront(nil)
-        window.makeFirstResponder(pane.terminalView)
+        split.takeFocus(pane)
+    }
+
+    // MARK: - Waiting panes
+
+    /// `state=blocked`, as the program reported it. Nothing else waits: done,
+    /// failed, a notification and a silent program are not guessed at.
+    private static func syncQueue() {
+        let enabled = ConfigurationStore.shared.configuration.agentStatus
+        shared.queue.sync(waiting: !enabled ? [] : panes.compactMap { pane in
+            guard let status = pane.agents.status, status.state == .blocked else { return nil }
+            return AttentionQueue.Waiting(id: pane.taskNotifier.paneID, kind: status.kind)
+        })
+    }
+
+    static var hasWaitingPane: Bool {
+        syncQueue()
+        return !shared.queue.ordered.isEmpty
+    }
+
+    /// Window ▸ Jump to Next Waiting Pane. With nothing waiting, or with the one
+    /// waiting pane already focused, nothing changes.
+    static func jumpToNextWaiting() {
+        syncQueue()
+        let current = (NSApp.keyWindow ?? NSApp.mainWindow)?.terminalSplit?.focusedPane
+        guard let target = shared.queue.next(from: current?.taskNotifier.paneID) else { return }
+        focus(target)
     }
 
     static func refresh() {
@@ -71,6 +115,7 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
             }
         }
         let enabled = ConfigurationStore.shared.configuration.agentStatus
+        syncQueue()
         refreshTabs(enabled: enabled)
         refreshDock(enabled: enabled, directory: directory)
         NotificationCenter.default.post(name: didChange, object: nil)

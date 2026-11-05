@@ -12,6 +12,9 @@ Versioning for compatibility changes.
 
 ### Added
 
+- Jump to Next Waiting Pane (⌥⌘J, in the Window menu and the command palette)
+  goes to the next pane waiting on you, across tabs and windows, and the Agents
+  list puts waiting panes first.
 - Corta has a website, https://corta.noahqin.dev, with the user guide,
   the documentation and the changelog in all nine languages the
   repository is translated into.

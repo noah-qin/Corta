@@ -31,6 +31,8 @@ nonisolated extension TerminalCommand {
         case .selectTab1, .selectTab2, .selectTab3, .selectTab4, .selectTab5, .selectTab6,
             .selectTab7, .selectTab8, .selectLastTab:
             return Shortcut(String(tabNumber ?? 9), .command)
+        // ⌥⌘, as Move Focus is: another way of choosing which pane has the keys.
+        case .nextWaitingPane: return Shortcut("j", [.command, .option])
         case .close: return Shortcut("w", .command)
         case .splitRight: return Shortcut("d", .command)
         case .splitDown: return Shortcut("d", [.command, .shift])
