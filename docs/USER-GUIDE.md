@@ -658,7 +658,8 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   the files will go. Incoming promises are received before upload; failed
   receptions are reported in the listing. Corta removes its private incoming
   copies after successful uploads; failed copies remain for Retry until the
-  browser closes. Drag a file out to Finder to download it. Transfers are under
+  browser closes. Drag a file out to Finder to download it; the download starts
+  when you drop, not while you hover, with a row under Transfers. Transfers are under
   the toolbar's arrows button, with speed, time left and Show in Finder.
 - **Editing a remote file.** **Edit** in the browser — or ⌘-clicking a
   `path:line` in a remote pane — downloads a copy and opens it in your
