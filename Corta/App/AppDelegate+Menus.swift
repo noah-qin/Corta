@@ -217,6 +217,7 @@ extension AppDelegate {
         let agents = NSMenuItem(title: L10n.text("agent.list"), action: nil, keyEquivalent: "")
         agents.submenu = AgentDirectory.menu()
         menu.addItem(agents)
+        menu.addItem(item(for: .nextWaitingPane))
         menu.addItem(withTitle: L10n.text("menu.bringAllToFront"), action: #selector(NSApplication.arrangeInFront(_:)))
         return menu
     }

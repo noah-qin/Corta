@@ -150,7 +150,7 @@ final class AgentStatusUITests: XCTestCase {
         XCTAssertTrue(agents.waitForExistence(timeout: 3))
         agents.hover()
         let waiting = app.menuBars.menuItems.matching(NSPredicate(
-            format: "title CONTAINS %@ AND title CONTAINS %@", "Waiting for you", "Review changes")).firstMatch
+            format: "title CONTAINS %@ AND title CONTAINS %@", "Waiting for you", "Permission")).firstMatch
         XCTAssertTrue(waiting.waitForExistence(timeout: 3))
         let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         shot.name = "agent-background-waiting-menu-and-tab"; shot.lifetime = .keepAlways; add(shot)
@@ -163,10 +163,87 @@ final class AgentStatusUITests: XCTestCase {
         app.menuBars.menuBarItems["View"].click()
         app.menuBars.menuItems["Command Palette…"].click()
         let row = app.descendants(matching: .any).matching(NSPredicate(
-            format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "agent-row-", "Review changes")).firstMatch
+            format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "agent-row-", "Permission")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         row.click()
         app.typeKey("c", modifierFlags: .control)
+    }
+
+    /// Synthetic output only: no running agent is contacted or driven.
+    @MainActor
+    func testWaitingNavigationAcrossHiddenTabsWindowsAndZoom() throws {
+        let stage = try UIFixtures.stage("waiting-navigation")
+        let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
+        app.launchEnvironment["SHELL"] = stage.appendingPathComponent("waiting-shell").path
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout: 10))
+        renameTab(in: app, to: "Queue A")
+        app.typeText("\"$ZDOTDIR/waiting-status\" question ROOT_A\n")
+        let first = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "ROOT_A")).firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        app.typeKey("t", modifierFlags: .command)
+        renameTab(in: app, to: "Queue B")
+        app.typeText("\"$ZDOTDIR/waiting-status\" permission ROOT_B\n")
+        waitForWaitingEntry("Queue B — Waiting for you · Permission", in: app)
+        // The next command wraps from B to A in its hidden tab.
+        app.typeKey("j", modifierFlags: [.option, .command])
+        app.typeText("printf 'HIDDEN_TAB_OK\\n'\n")
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        expectation(for: NSPredicate(format: "value CONTAINS %@", "HIDDEN_TAB_OK"), evaluatedWith: first)
+        waitForExpectations(timeout: 5)
+        // Detach A's view by zooming its new sibling, then use Agents.
+        app.typeKey("d", modifierFlags: .command)
+        app.typeKey(.return, modifierFlags: [.command, .shift])
+        app.menuBars.menuBarItems["Window"].click()
+        app.menuBars.menuItems["Agents"].hover()
+        let waiting = app.menuBars.menuItems["Queue A — Waiting for you · Question"]
+        XCTAssertTrue(waiting.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.menuBars.menuItems.matching(
+            NSPredicate(format: "title CONTAINS %@", "EVILAPP")).firstMatch.exists)
+        waiting.click()
+        XCTAssertEqual(app.windows.firstMatch.textViews.count, 2)
+        app.typeText("printf 'UNZOOM_OK\\n'\n")
+        expectation(for: NSPredicate(format: "value CONTAINS %@", "UNZOOM_OK"), evaluatedWith: first)
+        waitForExpectations(timeout: 5)
+        // Move B to another window; navigating there must update pane focus.
+        app.typeKey("2", modifierFlags: .command)
+        app.menuBars.menuBarItems["Window"].click()
+        app.menuBars.menuItems["Move Tab to New Window"].click()
+        XCTAssertEqual(app.windows.count, 2)
+        app.typeKey("j", modifierFlags: [.option, .command])
+        app.typeText("printf 'CROSS_WINDOW_OK\\n'\n")
+        expectation(for: NSPredicate(format: "value CONTAINS %@", "CROSS_WINDOW_OK"), evaluatedWith: first)
+        waitForExpectations(timeout: 5)
+        checkWaitingPaletteAndDock(in: app)
+    }
+
+    @MainActor private func waitForWaitingEntry(_ title: String, in app: XCUIApplication) {
+        app.menuBars.menuBarItems["Window"].click()
+        app.menuBars.menuItems["Agents"].hover()
+        XCTAssertTrue(app.menuBars.menuItems[title].waitForExistence(timeout: 5))
+        app.typeKey(.escape, modifierFlags: [])
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
+    @MainActor private func checkWaitingPaletteAndDock(in app: XCUIApplication) {
+        app.typeKey("p", modifierFlags: [.command, .shift])
+        let row = app.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND label == %@", "agent-row-",
+            "Queue B — Waiting for you · Permission")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "EVILAPP")).firstMatch.exists)
+        row.click()
+        app.typeText("printf 'PALETTE_OK\\n'\n")
+        let second = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "ROOT_B")).firstMatch
+        expectation(for: NSPredicate(format: "value CONTAINS %@", "PALETTE_OK"), evaluatedWith: second)
+        waitForExpectations(timeout: 5)
+        keep(app.windows.firstMatch.screenshot(), named: "waiting-navigation-window")
+        let dock = XCUIApplication(bundleIdentifier: "com.apple.dock")
+        let icon = dock.descendants(matching: .any).matching(NSPredicate(
+            format: "title == %@", ProcessInfo.processInfo.environment["CORTA_UI_APP_NAME"] ?? "CortaDev")).firstMatch
+        XCTAssertTrue(icon.waitForExistence(timeout: 5))
+        keep(icon.screenshot(), named: "waiting-navigation-dock-human-review")
     }
 
     @MainActor

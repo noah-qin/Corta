@@ -38,6 +38,7 @@ nonisolated extension TerminalCommand {
         case .focusRight: return Shortcut(Shortcut.parse("right")!.key, [.command, .option])
         case .focusUp: return Shortcut(Shortcut.parse("up")!.key, [.command, .option])
         case .focusDown: return Shortcut(Shortcut.parse("down")!.key, [.command, .option])
+        case .nextWaitingPane: return Shortcut("j", [.command, .option])
         case .growPaneHorizontally:
             return Shortcut(Shortcut.parse("right")!.key, [.control, .command])
         case .shrinkPaneHorizontally:

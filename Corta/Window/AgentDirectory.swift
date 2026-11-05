@@ -21,6 +21,7 @@ import CortaTerminal
 @MainActor
 final class AgentDirectory: NSObject, NSMenuDelegate {
     static let shared = AgentDirectory()
+    private(set) var waiting = WaitingPaneQueue()
     private var configurationObserver: NSObjectProtocol?
     private var dockView: AgentDockView?
     /// What the Dock tile last drew: a redraw is a cross-process call, and a
@@ -41,21 +42,44 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         guard ConfigurationStore.shared.configuration.agentStatus else { return [] }
         return panes.compactMap { pane in
             guard let status = pane.agents.status else { return nil }
-            let details = [L10n.text("agent.state." + status.state.rawValue),
-                status.title.isEmpty ? status.app : status.title,
-                status.kind.map { L10n.text("agent.kind." + $0.rawValue) } ?? ""]
-                .filter { !$0.isEmpty }.joined(separator: " · ")
-            return Entry(id: pane.taskNotifier.paneID,
-                title: pane.windowTitle.notificationTitle + " — " + details)
+            return entry(id: pane.taskNotifier.paneID,
+                paneName: pane.windowTitle.notificationTitle, status: status)
         }
     }
+    /// Shared by menus and palette: no program-supplied display text.
+    static func entry(id: UUID, paneName: String, status: ProgramStatus) -> Entry {
+        let details = [L10n.text("agent.state." + status.state.rawValue),
+            status.kind.map { L10n.text("agent.kind." + $0.rawValue) } ?? ""]
+            .filter { !$0.isEmpty }.joined(separator: " · ")
+        return Entry(id: id, title: paneName + " — " + details)
+    }
+
     static func focus(_ id: UUID) {
         guard let pane = panes.first(where: { $0.taskNotifier.paneID == id }),
-              let window = pane.view.window else { return }
+              let split = pane.splitController,
+              let window = split.tab?.window ?? split.view.window else { return }
+        if let tab = split.tab { tab.controller?.selectTab(tab) }
+        if split.isPaneZoomed, split.zoomedPane !== pane { split.unzoomPane() }
         NSApp.activate()
-        if let tab = pane.splitController?.tab { tab.controller?.selectTab(tab) }
         window.makeKeyAndOrderFront(nil)
-        window.makeFirstResponder(pane.terminalView)
+        split.takeFocus(pane)
+    }
+
+    @discardableResult
+    static func updateWaiting(_ id: UUID, blocked: Bool) -> Bool {
+        shared.waiting.update(id, blocked: blocked)
+    }
+
+    static var canJumpToNextWaitingPane: Bool {
+        shared.waiting.isEnabled(agentStatus: ConfigurationStore.shared.configuration.agentStatus)
+    }
+
+    static func jumpToNextWaitingPane() {
+        let current = NSApp.keyWindow?.terminalSplit?.focusedPane?.taskNotifier.paneID
+        if let id = shared.waiting.next(after: current,
+            agentStatus: ConfigurationStore.shared.configuration.agentStatus) {
+            focus(id)
+        }
     }
 
     static func refresh() {
@@ -135,8 +159,11 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         return menu
     }
     func menuNeedsUpdate(_ menu: NSMenu) {
+        populate(menu, entries: Self.entries)
+    }
+    func populate(_ menu: NSMenu, entries: [Entry]) {
         menu.removeAllItems()
-        for entry in Self.entries {
+        for entry in entries {
             let item = NSMenuItem(title: entry.title, action: #selector(jump(_:)), keyEquivalent: "")
             item.target = self; item.representedObject = entry.id
             menu.addItem(item)

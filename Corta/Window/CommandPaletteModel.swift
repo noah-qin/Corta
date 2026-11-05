@@ -52,7 +52,11 @@ final class CommandPaletteModel {
             }
         }
 
-        var selectable: Bool { if case .header = self { false } else { true } }
+        var selectable: Bool {
+            if case .header = self { return false }
+            if command == .nextWaitingPane { return AgentDirectory.canJumpToNextWaitingPane }
+            return true
+        }
 
         var command: TerminalCommand? {
             if case .command(let command, _, _) = self { command } else { nil }
@@ -112,10 +116,10 @@ final class CommandPaletteModel {
     /// underneath it), lands on the first command row instead of leaving the
     /// selection on nothing, or on a row that no longer exists.
     func selectFirstIfNeeded() {
-        if let selectedRowID, rows.contains(where: { $0.id == selectedRowID }) { return }
+        if let selectedRowID, rows.contains(where: { $0.id == selectedRowID && $0.selectable }) { return }
         // A command, never an agent, by default: Enter keeps meaning "run",
         // not "jump to whichever pane happens to have an agent".
-        selectedRowID = (rows.first { $0.command != nil } ?? rows.first { $0.selectable })?.id
+        selectedRowID = (rows.first { $0.command != nil && $0.selectable } ?? rows.first { $0.selectable })?.id
     }
 
     /// Subsequence matching, which is what people mean by "fuzzy" here:
@@ -255,6 +259,7 @@ final class CommandPaletteModel {
     }
 
     func runSelected() {
+        guard rows.contains(where: { $0.id == selectedRowID && $0.selectable }) else { return }
         if let row = rows.first(where: { $0.id == selectedRowID }), case .agent(let entry) = row {
             onAgent?(entry.id)
             return

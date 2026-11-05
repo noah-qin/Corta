@@ -180,6 +180,8 @@ private struct CommandPaletteRowView: View {
                 // draws them in the system face.
                 Text(shortcut).font(.system(size: 12)).foregroundStyle(.secondary)
             }
+            .foregroundStyle(row.selectable ? .primary : .tertiary)
+            .disabled(!row.selectable)
             .padding(.vertical, 7)
             .padding(.horizontal, 10)
             .background(Self.highlight(isSelected), in: Self.rowShape)

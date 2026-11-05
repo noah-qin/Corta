@@ -278,7 +278,7 @@ extension ThemeAndKeybindingTests {
         #expect(Set(ids).count == ids.count, "every row has its own id")
         #expect(model.rows.filter { $0.command == recent }.count == 2)
 
-        let commandRows = model.rows.filter { $0.command != nil }
+        let commandRows = model.rows.filter { $0.command != nil && $0.selectable }
         var visited = [try #require(model.selectedRowID)]
         for _ in 1..<commandRows.count {
             model.moveSelection(by: 1)

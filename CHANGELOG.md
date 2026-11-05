@@ -12,6 +12,9 @@ Versioning for compatibility changes.
 
 ### Added
 
+- Jump to Next Waiting Pane (⌥⌘J), in Window and the command palette, cycles
+  through blocked panes across tabs and windows in waiting arrival order.
+
 - Corta has a website, https://corta.noahqin.dev, with the user guide,
   the documentation and the changelog in all nine languages the
   repository is translated into.
@@ -77,6 +80,12 @@ Versioning for compatibility changes.
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
 
 ### Fixed
+
+- Agent navigation and notification clicks reveal panes hidden by another
+  pane's zoom and select the target pane in hidden tabs and other windows.
+- Agents menu and palette entries show Corta-owned names and fixed labels,
+  excluding program-supplied app/title text. Equal-urgency task states use
+  a stable slot-ID tie-break.
 
 - A long task or a program's notice in a tab behind the one you are looking
   at reaches you: tabs share a window, and being in the key window counted

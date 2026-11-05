@@ -30,7 +30,7 @@ nonisolated extension TerminalCommand {
             .selectTab2, .selectTab3, .selectTab4, .selectTab5, .selectTab6, .selectTab7,
             .selectTab8, .selectLastTab:
             return .window
-        case .splitRight, .splitDown, .focusLeft, .focusRight, .focusUp, .focusDown,
+        case .splitRight, .splitDown, .focusLeft, .focusRight, .focusUp, .focusDown, .nextWaitingPane,
             .growPaneHorizontally, .shrinkPaneHorizontally, .growPaneVertically,
             .shrinkPaneVertically, .equalizePanes, .zoomPane, .reopenClosedPane:
             return .panes
@@ -71,6 +71,7 @@ nonisolated extension TerminalCommand {
         case .focusRight: return 3
         case .focusUp: return 4
         case .focusDown: return 5
+        case .nextWaitingPane: return 13
         case .zoomPane: return 6
         case .reopenClosedPane: return 7
         case .equalizePanes: return 8

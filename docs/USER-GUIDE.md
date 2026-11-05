@@ -863,7 +863,16 @@ on their tab. Idle means no active turn is reported, including before
 work starts or after it stops; only an explicit `done` means completion.
 A progress ring follows OSC 7501 or OSC 9;4 reports. The Dock counts waiting
 panes and shows aggregate progress. Open the command palette or Window →
-Agents to find every agent pane across windows; choosing an entry focuses it.
+Agents to find every agent pane across windows; choosing an entry focuses it,
+including hidden tabs and panes hidden by another pane's zoom. Entries show
+Corta's own pane name and fixed state/kind labels, never the program's app or
+title text. Window ▸ Jump to Next Waiting Pane (⌥⌘J), also in the command
+palette, cycles through blocked panes in arrival order and wraps at the end.
+A pane with several blocked subtasks counts once. Leaving blocked or closing
+removes it; entering again puts it last. If your pane is outside the queue,
+the command goes to its first pane; if yours is the only waiter, it stays put.
+An empty queue or `agent-status = false` disables the command. The queue lives
+only for this run, and status changes never move focus automatically.
 In the palette the agents are listed first while browsing and after matching
 commands while searching, and Return still runs the highlighted command:
 move to an agent with the arrow keys to jump to it.
