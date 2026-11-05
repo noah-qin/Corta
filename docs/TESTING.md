@@ -329,10 +329,11 @@ TEST_RUNNER_CORTA_FEEDBACK_STAGE="$FEEDBACK_STAGE" xcodebuild test \
   -project Corta.xcodeproj -scheme Corta -testPlan UI
 ```
 
-Claude Code is currently the only CLI with a dedicated task-state
-integration (reference version 2.1.310). Most `AgentStatusUITests` cases use
-synthetic OSC fixtures. They do not establish real Claude lifecycle coverage
-or task-state compatibility with other CLIs.
+Claude Code is the CLI task state was developed against (reference version
+2.1.310); Codex 0.166.0 was checked once by hand, with no test here
+(`CONFORMANCE.md`, CLI signal compatibility). Most `AgentStatusUITests` cases
+use synthetic OSC fixtures. They do not establish real Claude lifecycle
+coverage or task-state compatibility with other CLIs.
 
 `AgentStatusUITests` uses the `agents` stage for background status, palette
 navigation, process-only unknown state and session exit. Its native notification click test is

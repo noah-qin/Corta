@@ -218,7 +218,7 @@ of integration uses `TaskNotifier`'s typing-and-idle heuristic.
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
 | `notify-from-programs` | boolean | `true` | Allow bounded program notifications and agent attention notices. Notification Center may retain their message text. |
-| `agent-status` | boolean | `true` | Show state on tabs, the Dock and the Agents list. Dedicated task-state integration currently covers Claude Code only; process-only detections show State unknown. |
+| `agent-status` | boolean | `true` | Show state on tabs, the Dock and the Agents list. Any program's OSC 7501 report counts: developed against Claude Code, and observed from Codex 0.166.0 through the same parser. Process-only detections show State unknown. |
 | `agent-processes` | comma-separated names | *(empty)* | Additional foreground executable names, up to 32 names of 80 bytes each; macOS reports at most the first 32 bytes of a process name, so a longer name never matches. Built-ins: claude, claude-code, codex, gemini, aider, opencode. Names enable process detection only, not task-state integration or hook installation. No polling timer. |
 | `notify-on-long-task` | boolean | `false` | Post a notification when a long command finishes. |
 | `notification-threshold` | ≥ 1 | `30` | Seconds a command must run to be worth one. |

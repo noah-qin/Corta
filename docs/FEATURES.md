@@ -87,18 +87,24 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   root, open a pane there), shell/directory/environment presets, and local
   `path:line:column` references that can open in an editor.
 
-## Claude Code state and generic program notifications
+## Coding-agent state and generic program notifications
 
-- Claude Code is currently the only CLI with a dedicated task-state
-  integration. Development and real acceptance used Claude Code 2.1.310;
-  other versions need independent verification. Its OSC 7501 reports distinguish working, waiting,
-  done, idle and failure on tabs, the Dock and the Agents list.
+- Task state was developed against Claude Code. Development and real
+  acceptance used Claude Code 2.1.310; other versions need independent
+  verification. Its OSC 7501 reports distinguish working, waiting, done, idle
+  and failure on tabs, the Dock and the Agents list.
+- Codex 0.166.0 sends OSC 7501 by itself, with no hook, and Corta's general
+  parser shows its idle, working, done and permission-waiting states on the tab
+  (checked 2026-11-05). Corta has no Codex-specific code. The Agents list, the
+  Dock and notifications have not been checked against Codex, nor have other
+  Codex versions.
 - Generic OSC 9/777/99 notifications and OSC 9;4 progress are available to
   any program. They do not establish completion or permission state.
   Claude's own message channels require explicit selection in Claude's
   settings; Corta's default identity does not enable Claude's OSC 9;4 progress. OSC 21337 is
   generic metadata; Claude 2.1.310 leaves its sender disabled.
-- Other coding CLIs have no dedicated task-state adapter. A recognised
+- Other coding CLIs have no dedicated task-state adapter, and a CLI that does
+  not send OSC 7501 has no reported task state. A recognised
   foreground process can be listed as State unknown; process detection
   does not mean its turns, failures or permission requests are integrated.
   Corta does not install hooks or tool configuration automatically.
