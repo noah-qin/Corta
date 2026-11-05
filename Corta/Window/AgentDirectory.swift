@@ -38,14 +38,34 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     static var panes: [ViewController] {
         NSApp.windows.flatMap(\.terminalSplits).flatMap(\.panes)
     }
-    static var entries: [Entry] {
+    static var entries: [Entry] { entries(of: panes) }
+
+    /// Waiting panes lead, so the list answers "who needs me" first.
+    static func entries(of panes: [ViewController]) -> [Entry] {
         guard ConfigurationStore.shared.configuration.agentStatus else { return [] }
-        return panes.compactMap { pane in
+        let listed = panes.compactMap { pane -> (entry: Entry, urgency: Int)? in
             guard let status = pane.agents.status else { return nil }
-            return entry(id: pane.taskNotifier.paneID,
-                paneName: pane.windowTitle.notificationTitle, status: status)
+            return (entry(id: pane.taskNotifier.paneID,
+                paneName: pane.windowTitle.notificationTitle, status: status), status.urgency)
         }
+        return ordered(listed, waiting: shared.waiting.paneIDs)
     }
+
+    /// Queued panes first, in the order they began waiting: the order the jump
+    /// walks, and not by reported kind, which is the program's own claim
+    /// (`SECURITY.md` §2.9). Then the most urgent; a tie keeps the given order,
+    /// so equal rows do not trade places as the list is rebuilt.
+    static func ordered(_ listed: [(entry: Entry, urgency: Int)], waiting: [UUID]) -> [Entry] {
+        let arrival = Dictionary(uniqueKeysWithValues: waiting.enumerated().map { ($0.element, $0.offset) })
+        return listed.enumerated().sorted { left, right in
+            let leftArrival = arrival[left.element.entry.id] ?? .max
+            let rightArrival = arrival[right.element.entry.id] ?? .max
+            if leftArrival != rightArrival { return leftArrival < rightArrival }
+            if left.element.urgency != right.element.urgency { return left.element.urgency > right.element.urgency }
+            return left.offset < right.offset
+        }.map(\.element.entry)
+    }
+
     /// Shared by menus and palette: no program-supplied display text.
     static func entry(id: UUID, paneName: String, status: ProgramStatus) -> Entry {
         let details = [L10n.text("agent.state." + status.state.rawValue),

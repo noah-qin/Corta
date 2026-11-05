@@ -14,6 +14,8 @@ Versioning for compatibility changes.
 
 - Jump to Next Waiting Pane (⌥⌘J), in Window and the command palette, cycles
   through blocked panes across tabs and windows in waiting arrival order.
+- The Agents list, in Window and the command palette, leads with the panes
+  waiting for you, in the order they began waiting; the rest follow by urgency.
 - Panes move with their programs still running: ⇧⌥⌘ and an arrow key moves the
   focused pane, Swap Pane exchanges it with a neighbour, and Move Pane to New
   Tab, to the previous or next tab, or to a tab by name takes it out of the tab.

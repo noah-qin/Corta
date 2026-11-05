@@ -297,7 +297,10 @@ notices use Corta's fixed localised text. Agents menu and command-palette
 entries use only Corta's own pane name and fixed localised state/kind labels;
 program-provided `app`, `title` and `message` never appear in those entries.
 Kind is self-reported, not a priority: the waiting-pane queue orders only by
-entry into blocked, once per pane, and never moves focus on a status event.
+entry into blocked, once per pane, and never moves focus on a status event. The
+Agents list leads with that queue's order and then sorts by reported state, so a
+program can reach the top by saying it is blocked, as it can raise the Dock
+count, but cannot pass a pane already waiting.
 `notify-from-programs = false` disables both notice paths; `agent-status = false` hides agent chrome.
 
 ### 2.10 OSC ecosystem limits and refusals (#411)
