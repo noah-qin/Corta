@@ -53,6 +53,12 @@ public final class SFTPSession: @unchecked Sendable {
         /// growing metadata or recycling ids whose replies could still arrive.
         public var maxCancelledRequests = 1_024
 
+        /// Senders suspended behind the window. A stalled server answers
+        /// nothing, so without a cap every request anyone makes meanwhile
+        /// would add a suspended task; past it a request fails at once with
+        /// `.localIOFailed` and the session goes on.
+        public var maxWindowWaiters = 1_024
+
         public init() {}
     }
 
@@ -120,6 +126,8 @@ public final class SFTPSession: @unchecked Sendable {
     var unwrittenFrameCount: Int { state.withLock { $0.unwrittenFrames } }
 
     var retainedLateReplyCount: Int { state.withLock { $0.ids.retainedLateReplyCount } }
+
+    var windowWaiterCount: Int { state.withLock { $0.windowWaiters.count } }
 
     /// The server's capabilities, from its VERSION answer. `nil` until
     /// `connect()` completes.
@@ -291,6 +299,7 @@ extension SFTPSession {
         // removes the waiter from the queue first, under the lock, so a
         // continuation is never resumed twice and an admitted slot is
         // never stranded by a late cancellation.
+        let overflowed = Mutex(false)
         let admitted = await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
                 // Re-checked here: room may have opened since the fast path,
@@ -302,6 +311,10 @@ extension SFTPSession {
                         state.windowUsed += 1
                         state.unwrittenFrames += 1
                         return true
+                    }
+                    guard state.windowWaiters.count < max(1, configuration.maxWindowWaiters) else {
+                        overflowed.withLock { $0 = true }
+                        return false
                     }
                     state.windowWaiters.append((token: token, continuation: continuation))
                     return nil
@@ -317,6 +330,7 @@ extension SFTPSession {
         }
         guard admitted else {
             if let closed = state.withLock({ $0.closed }) { throw closed }
+            if overflowed.withLock({ $0 }) { throw .localIOFailed(operation: "wait for a free request slot", code: EAGAIN) }
             throw .cancelled
         }
         return state.withLock { $0.ids.allocate() }

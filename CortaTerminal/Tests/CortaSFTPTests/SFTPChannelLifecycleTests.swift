@@ -14,8 +14,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaPOSIX
+import Darwin
 import Dispatch
 import Foundation
+import Synchronization
 import Testing
 
 @testable import CortaSFTP
@@ -36,5 +39,30 @@ struct SFTPChannelLifecycleTests {
         }
         #expect(released == nil)
         #expect(source.isCancelled)
+    }
+
+    /// `close` runs on the main actor. A reap in progress used to be waited
+    /// out right there, one millisecond at a time, for as long as it took.
+    @Test func closeDoesNotWaitOutAReapInProgress() async throws {
+        let channel = try SFTPSubprocessChannel.spawn(
+            host: "unused", executable: "/bin/sleep", arguments: ["60"], environment: [:])
+        defer { channel.close() }
+        let holding = Mutex(false)
+        let release = DispatchSemaphore(value: 0)
+        let hold = Duration.seconds(1)
+        let holder = Thread {
+            channel.holdingReapForTesting {
+                holding.withLock { $0 = true }
+                _ = release.wait(timeout: .now() + 1)
+            }
+        }
+        holder.start()
+        while !holding.withLock({ $0 }) { try await Task.sleep(for: .milliseconds(1)) }
+        let elapsed = SuspendingClock().measure { channel.close() }
+        release.signal()
+        #expect(elapsed < hold / 2, "close took \(elapsed) behind a held reap")
+        // The kill still happens, once the reap has let go, and the child is reaped.
+        let exit = await channel.awaitExit(timeout: .seconds(testTimeoutInterval(5)))
+        #expect(exit == .signalled(signal: SIGKILL))
     }
 }

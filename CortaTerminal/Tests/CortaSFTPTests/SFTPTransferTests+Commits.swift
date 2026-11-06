@@ -194,6 +194,65 @@ extension SFTPTransferTests {
         #expect(SFTPDestinationLocks.normalizedRemotePath("rel/./x") == "rel/x")
     }
 
+    /// Whether a server's volume tells `/A` from `/a` is unknown, and on one
+    /// that does not these are one file: they take turns.
+    @Test("remote names that differ only in case claim one destination")
+    func remoteClaimFoldsCase() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        #expect(rig.engine.remoteClaim("/Srv/A.txt") == rig.engine.remoteClaim("/srv/a.TXT"))
+        #expect(rig.engine.remoteClaim("/srv/a.txt") != rig.engine.remoteClaim("/srv/b.txt"))
+    }
+
+    /// One of the two places a cancelled row could be said to stick.
+    @Test("cancelling a transfer waiting for its destination ends it at once")
+    func cancelWhileWaitingForDestination() async throws {
+        let rig = try await makeRig(configureEngine: { $0.destinationScope = "box-\(UUID().uuidString)" })
+        defer { teardown(rig) }
+        let source = try localFile(rig, "a", contents: [1, 2, 3])
+        let claim = rig.engine.remoteClaim("/target")
+        try await SFTPDestinationLocks.shared.acquire(claim)
+        defer { SFTPDestinationLocks.shared.release(claim) }
+        let task = Task { try await rig.engine.upload(from: source, to: "/target", policy: .overwrite) }
+        try await Task.sleep(for: .milliseconds(100))
+        task.cancel()
+        await #expect(throws: SFTPError.cancelled) { _ = try await task.value }
+        #expect(!rig.fileSystem.exists("/target"))
+    }
+
+    /// The other: between attempts, in a reconnect whose server says nothing.
+    /// The reconnect ends with the cancellation, and the row hears that —
+    /// not the failure it was recovering from, offered again as a retry.
+    @Test("cancelling a transfer during its reconnect ends it as cancelled")
+    func cancelDuringReconnect() async throws {
+        let silent = SFTPLoopbackConnection()
+        defer { silent.close() }
+        let reconnecting = Mutex(false)
+        let writes = Mutex(0)
+        let rig = try await makeRig(
+            reconnect: {
+                reconnecting.withLock { $0 = true }
+                let session = SFTPSession(transport: silent.clientTransport())
+                _ = try await session.connect()
+                return session
+            },
+            configureServer: { server in
+                server.interceptor = { message in
+                    guard case .write = message.payload else { return .proceed }
+                    return writes.withLock { count in
+                        count += 1
+                        return count == 1 ? .dropConnection : .proceed
+                    }
+                }
+            })
+        defer { teardown(rig) }
+        let source = try localFile(rig, "a", contents: [UInt8](repeating: 1, count: 2048))
+        let task = Task { try await rig.engine.upload(from: source, to: "/target", policy: .overwrite) }
+        #expect(try await waitForFlag(reconnecting))
+        task.cancel()
+        await #expect(throws: SFTPError.cancelled) { _ = try await task.value }
+    }
+
     @Test("a download whose source shrinks mid-transfer fails and keeps the destination")
     func shrunkDownloadSourceFails() async throws {
         let rig = try await makeRig()

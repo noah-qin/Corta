@@ -264,32 +264,48 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
         guard finished != nil else { throw .closed }
     }
 
-    /// Idempotent.
+    /// Idempotent, and never waits: `close` runs on the main actor. The parent's
+    /// ends close here; the kill and the reap run on `exitQueue`, where a reap
+    /// in progress can be waited out and a child slow to die can hold `waitpid`.
+    /// The block retains the channel, so its last release — and `deinit` — come
+    /// after the reap, off the main thread too.
     public func close() {
-        // The killed child is reaped on `exitQueue`, not here: `close` runs on
-        // the main actor, and a child slow to die must not hold it in
-        // `waitpid`. The block retains the channel, so its last release —
-        // and `deinit` — come after the reap, off the main thread too.
-        guard shutDown() else { return }
-        exitQueue.async { _ = self.reap(blocking: true) }
+        guard markClosed() else { return }
+        stdinWrite.close()
+        stdoutRead.close()
+        exitQueue.async {
+            if self.killUnreapedChild() { _ = self.reap(blocking: true) }
+        }
     }
 
-    /// Marks the channel closed, kills the child if it is unreaped and
-    /// closes the parent's ends. Whether it killed one, which then needs a
-    /// reap; false when already closed or already reaped.
-    private func shutDown() -> Bool {
-        let shouldClose = state.withLock { state -> Bool in
+    private func markClosed() -> Bool {
+        state.withLock { state -> Bool in
             if state.isClosed { return false }
             state.isClosed = true
             return true
         }
-        guard shouldClose else { return false }
-        // SIGKILL: this is cancellation, and a politely asked child may be stuck
-        // in a socket read. Only while unreaped, and decided under the lock
-        // `reap` claims: once `waitpid` has run the id is free for the system
-        // to give a stranger. A reap in progress is waited out rather than
-        // trusted — it may be `awaitExit`'s `WNOHANG` probe of a live child —
-        // and neither kind blocks: the exit source reaps only an exited child.
+    }
+
+    /// Marks the channel closed, kills the child if it is unreaped and closes
+    /// the parent's ends, right here. For `deinit`, when nothing can be
+    /// reaping: both kinds of reap hold the channel alive. Whether it killed
+    /// one, which then needs a reap; false when already closed or reaped.
+    private func shutDown() -> Bool {
+        guard markClosed() else { return false }
+        let killed = killUnreapedChild()
+        stdinWrite.close()
+        stdoutRead.close()
+        return killed
+    }
+
+    /// SIGKILL: this is cancellation, and a politely asked child may be stuck
+    /// in a socket read. Only while unreaped, and decided under the lock
+    /// `reap` claims: once `waitpid` has run the id is free for the system
+    /// to give a stranger. A reap in progress is waited out rather than
+    /// trusted — it may be `awaitExit`'s `WNOHANG` probe of a live child — and
+    /// neither kind blocks: the exit source reaps only an exited child. Never
+    /// on the main actor; `close` sends it to `exitQueue`.
+    private func killUnreapedChild() -> Bool {
         var killed = false
         while true {
             let reaping = state.withLock { state -> Bool in
@@ -299,12 +315,16 @@ public final class SFTPSubprocessChannel: SFTPChannelTransport, @unchecked Senda
                 killed = true
                 return false
             }
-            guard reaping else { break }
+            guard reaping else { return killed }
             Thread.sleep(forTimeInterval: 0.001)
         }
-        stdinWrite.close()
-        stdoutRead.close()
-        return killed
+    }
+
+    /// Tests hold a reap in progress open, as a slow one would.
+    func holdingReapForTesting(_ body: () -> Void) {
+        state.withLock { $0.isReaping = true }
+        body()
+        state.withLock { $0.isReaping = false }
     }
 
     /// Only one `waitpid` ever runs for this child, as in `PTY.reap`.
