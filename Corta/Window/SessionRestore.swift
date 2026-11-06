@@ -363,9 +363,9 @@ struct SessionRestore {
         case restore([WindowState])
     }
 
-    func decideRestore() -> RestoreDecision {
+    func decideRestore(loading load: (() -> [WindowState])? = nil) -> RestoreDecision {
         if previousRestoreFailed { return .skipAfterFailure }
-        let states = load()
+        let states = load?() ?? self.load()
         return states.isEmpty ? .nothingToRestore : .restore(states)
     }
 

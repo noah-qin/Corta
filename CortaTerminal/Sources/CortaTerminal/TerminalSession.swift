@@ -545,7 +545,7 @@ extension TerminalSession {
     /// signals.
     ///
     /// That delays `SIGWINCH` by one reflow (50–90 ms at 100k lines,
-    /// `PERFORMANCE.md` §5.4), so queued requests coalesce to the latest; the
+    /// `PERFORMANCE.md` §5.18), so queued requests coalesce to the latest; the
     /// work stays off the caller's thread. Frames meanwhile draw the old size.
     /// Bytes written before the signal may land at the new width — bounded by
     /// one batch, and repainted by the child. `onOutput` then wakes a redraw.

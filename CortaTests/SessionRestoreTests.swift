@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 import Foundation
 import Synchronization
 import Darwin
@@ -434,6 +435,26 @@ struct RestoreCrashRecoveryTests {
         #expect(done)
         #expect(answered.withLock { $0 } == ["/fast"], "what did not answer counts as absent")
         released.withLock { $0 = true }
+    }
+
+    /// A directory checked a moment ago is not waited on again: the spawn goes
+    /// straight to it, and only a real failure falls back.
+    @Test("a pane told its directory was checked spawns there without a second check")
+    @MainActor func checkedDirectoryIsNotCheckedAgain() throws {
+        let missing = "/nonexistent-\(UUID().uuidString)"
+        func start(checked: Bool) throws -> PaneSpawn.Started {
+            try PaneSpawn.start(
+                size: TerminalSize(rows: 10, columns: 40), directory: missing, directoryChecked: checked,
+                scrollbackLimit: 100, configuredShell: "/bin/sh",
+                directoryCompletion: false, historySuggestions: false)
+        }
+        let unchecked = try start(checked: false)
+        unchecked.session.stop()
+        // Its own check found nothing, so it never tried to go there.
+        #expect(unchecked.notice == nil)
+        let checked = try start(checked: true)
+        checked.session.stop()
+        #expect(checked.notice == L10n.text("failure.notice.fallbackDirectory"), "went there on the word it was given")
     }
 
     @Test("the restore marker and a state file's directory are owner-only")

@@ -310,7 +310,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             return
         }
         let store = SessionRestore.standard
-        if store.previousRestoreFailed {
+        let saved: [WindowState]
+        switch store.decideRestore(loading: store.loadUnchecked) {
+        case .skipAfterFailure:
             // The marker survives only a launch that died mid-restore; that layout
             // is the suspect, so drop it.
             store.clear()
@@ -318,12 +320,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             openWindow(workingDirectory: nil)
             finishOpeningInitialWindows()
             return
-        }
-        let saved = store.loadUnchecked()
-        guard !saved.isEmpty else {
+        case .nothingToRestore:
             openWindow(workingDirectory: nil)
             finishOpeningInitialWindows()
             return
+        case .restore(let states):
+            saved = states
         }
         // A Dock click in the wait must not open a window beside these.
         isWaitingForRestore = true
