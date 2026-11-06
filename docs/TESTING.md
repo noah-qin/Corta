@@ -313,6 +313,17 @@ changing only the feature toggle in its config; the default baseline shell
 remains `/bin/sh`. XCTest figures exclude the keyboard HID stage and do not
 replace the manual/Typometer check in `PERFORMANCE.md` §5.17.
 
+Running the `UI` plan may raise a system authentication dialog for Automation
+Mode. While it waits for an answer, **every** XCTest run hangs, the `Unit` plan
+included: the test host launches and idles. Answer it before blaming a test, and
+do not start this plan unattended.
+
+Two things that look like failures of the code. On macOS a coordinate's
+`press(forDuration:thenDragTo:)` reaches the app as no mouse event at all; use
+`click(forDuration:thenDragTo:)`. And after the command palette closes, XCUITest's
+`typeText` goes nowhere, though a real key press lands in the pane: ask
+`hasKeyboardFocus` instead.
+
 ### Stages for the UI plan
 
 The UI runner is sandboxed: it reads anywhere but writes only its own

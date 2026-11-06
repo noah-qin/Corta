@@ -921,7 +921,8 @@ turned off: Codex sends OSC 7501 by itself, labelled `app=codex`, and does not
 wait for a probe. Corta recorded idle, working and done, and Waiting for you
 (kind `permission`) at an approval prompt; the tab showed the Codex icon and the
 matching status dots. That is one version and those states, not a guarantee for
-other Codex versions. The Agents list, the Dock count and notifications have
+other Codex versions. Its permission wait also showed in the Agents list, and
+the jump to the next waiting pane worked. The Dock count and notifications have
 not been checked against Codex.
 
 Gemini CLI, pi, Kimi, Grok Build, Qwen Code, OpenCode and Aider have no

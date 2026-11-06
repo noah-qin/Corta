@@ -172,6 +172,9 @@ final class AgentStatusUITests: XCTestCase {
     /// Synthetic output only: no running agent is contacted or driven.
     @MainActor
     func testWaitingNavigationAcrossHiddenTabsWindowsAndZoom() throws {
+        // It types, and under a CJK input method typing times out.
+        let previousInputSource = LatinInputSource.select()
+        addTeardownBlock { LatinInputSource.restore(previousInputSource) }
         let stage = try UIFixtures.stage("waiting-navigation")
         let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
         app.launchEnvironment["SHELL"] = stage.appendingPathComponent("waiting-shell").path
@@ -216,34 +219,6 @@ final class AgentStatusUITests: XCTestCase {
         expectation(for: NSPredicate(format: "value CONTAINS %@", "CROSS_WINDOW_OK"), evaluatedWith: first)
         waitForExpectations(timeout: 5)
         checkWaitingPaletteAndDock(in: app)
-    }
-
-    @MainActor private func waitForWaitingEntry(_ title: String, in app: XCUIApplication) {
-        app.menuBars.menuBarItems["Window"].click()
-        app.menuBars.menuItems["Agents"].hover()
-        XCTAssertTrue(app.menuBars.menuItems[title].waitForExistence(timeout: 5))
-        app.typeKey(.escape, modifierFlags: [])
-        app.typeKey(.escape, modifierFlags: [])
-    }
-
-    @MainActor private func checkWaitingPaletteAndDock(in app: XCUIApplication) {
-        app.typeKey("p", modifierFlags: [.command, .shift])
-        let row = app.descendants(matching: .any).matching(NSPredicate(
-            format: "identifier BEGINSWITH %@ AND label == %@", "agent-row-",
-            "Queue B — Waiting for you · Permission")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "EVILAPP")).firstMatch.exists)
-        row.click()
-        app.typeText("printf 'PALETTE_OK\\n'\n")
-        let second = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "ROOT_B")).firstMatch
-        expectation(for: NSPredicate(format: "value CONTAINS %@", "PALETTE_OK"), evaluatedWith: second)
-        waitForExpectations(timeout: 5)
-        keep(app.windows.firstMatch.screenshot(), named: "waiting-navigation-window")
-        let dock = XCUIApplication(bundleIdentifier: "com.apple.dock")
-        let icon = dock.descendants(matching: .any).matching(NSPredicate(
-            format: "title == %@", ProcessInfo.processInfo.environment["CORTA_UI_APP_NAME"] ?? "CortaDev")).firstMatch
-        XCTAssertTrue(icon.waitForExistence(timeout: 5))
-        keep(icon.screenshot(), named: "waiting-navigation-dock-human-review")
     }
 
     @MainActor
@@ -468,5 +443,41 @@ extension AgentStatusUITests {
         expectation(
             for: NSPredicate(format: "value CONTAINS %@", "OK"), evaluatedWith: app.textViews.firstMatch)
         waitForExpectations(timeout: 10)
+    }
+}
+
+// MARK: - The waiting navigation test's steps
+
+extension AgentStatusUITests {
+    @MainActor private func waitForWaitingEntry(_ title: String, in app: XCUIApplication) {
+        app.menuBars.menuBarItems["Window"].click()
+        app.menuBars.menuItems["Agents"].hover()
+        XCTAssertTrue(app.menuBars.menuItems[title].waitForExistence(timeout: 5))
+        app.typeKey(.escape, modifierFlags: [])
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
+    @MainActor private func checkWaitingPaletteAndDock(in app: XCUIApplication) {
+        app.typeKey("p", modifierFlags: [.command, .shift])
+        let row = app.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND label == %@", "agent-row-",
+            "Queue B — Waiting for you · Permission")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "EVILAPP")).firstMatch.exists)
+        row.click()
+        XCTAssertTrue(row.waitForNonExistence(timeout: 5))
+        // XCUITest's typing goes nowhere after this panel, though a real key
+        // press lands in the pane (checked with HID events on 2026-11-06): so
+        // this asks the accessibility tree who has the keyboard instead.
+        let second = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "ROOT_B")).firstMatch
+        expectation(for: NSPredicate(format: "hasKeyboardFocus == true"), evaluatedWith: second)
+        waitForExpectations(timeout: 5)
+        XCTAssertEqual(app.windows.firstMatch.title, "Queue B")
+        keep(app.windows.firstMatch.screenshot(), named: "waiting-navigation-window")
+        let dock = XCUIApplication(bundleIdentifier: "com.apple.dock")
+        let icon = dock.descendants(matching: .any).matching(NSPredicate(
+            format: "title == %@", ProcessInfo.processInfo.environment["CORTA_UI_APP_NAME"] ?? "CortaDev")).firstMatch
+        XCTAssertTrue(icon.waitForExistence(timeout: 5))
+        keep(icon.screenshot(), named: "waiting-navigation-dock-human-review")
     }
 }

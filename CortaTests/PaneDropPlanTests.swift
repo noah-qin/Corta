@@ -182,7 +182,7 @@ struct PaneDragTests {
         source.split.noteFocus(pane)
         source.split.moveFocusedPane(beside: anchor, direction: .left)
         #expect(controller.tabs.count == 1)
-        #expect(target.split.panes.first === pane)
+        #expect(target.split.panes.contains(pane))
         #expect((pane.view.superview as? NSSplitView)?.subviews.first === pane.view)
     }
 

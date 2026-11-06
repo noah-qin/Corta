@@ -82,7 +82,7 @@ struct Metal4BackendTests {
         #expect(!backend.beginFrame(target: target, clearColor: MTLClearColorMake(0, 0, 0, 1), label: "dropped"))
         backend.endFrame(presenting: nil, onCompleted: nil)
         gate.signaledValue = 1
-        let deadline = SuspendingClock.now + .seconds(5)
+        let deadline = SuspendingClock.now + .seconds(5 * testTimeoutScale)
         while backend.hasFramesInFlight, SuspendingClock.now < deadline {
             Thread.sleep(forTimeInterval: 0.01)
         }

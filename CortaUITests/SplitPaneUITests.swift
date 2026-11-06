@@ -72,7 +72,9 @@ final class SplitPaneUITests: XCTestCase {
             dx: first.minX - 150 - window.frame.minX, dy: first.midY - window.frame.minY))
         let edge = origin.withOffset(CGVector(
             dx: second.minX - 120 - window.frame.minX, dy: window.frame.height - 12))
-        header.press(forDuration: 0.3, thenDragTo: edge)
+        // `click`, not `press`: on macOS `press(forDuration:thenDragTo:)` reaches the
+        // app as no mouse event at all.
+        header.click(forDuration: 0.5, thenDragTo: edge, withVelocity: .slow, thenHoldForDuration: 0.5)
         XCTAssertTrue(waitUntil(timeout: 5) {
             abs(closes.element(boundBy: 0).frame.minY - closes.element(boundBy: 1).frame.minY) > 50
         }, "one pane now stands below the other")
