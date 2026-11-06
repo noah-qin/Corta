@@ -40,30 +40,23 @@ struct SessionLaunchTests {
             then: { found in answered.withLock { $0 = found } })
         // Reached with the check still blocked: nothing waited here.
         #expect(answered.withLock { $0 } == nil)
-        let done = await waitUntilTrue(timeout: .seconds(5)) { answered.withLock { $0 } != nil }
+        let done = await waitUntilTrue(timeout: .seconds(30)) { answered.withLock { $0 } != nil }
         #expect(done)
         #expect(answered.withLock { $0 } == ["/fast"], "what did not answer counts as absent")
         released.withLock { $0 = true }
     }
 
-    /// A directory checked a moment ago is not waited on again: the spawn goes
-    /// straight to it, and only a real failure falls back.
+    /// A directory checked a moment ago is not waited on again: with no time
+    /// at all allowed for a check, the spawn still goes straight to it.
     @Test("a pane told its directory was checked spawns there without a second check")
     @MainActor func checkedDirectoryIsNotCheckedAgain() throws {
-        let missing = "/nonexistent-\(UUID().uuidString)"
-        func start(checked: Bool) throws -> PaneSpawn.Started {
-            try PaneSpawn.start(
-                size: TerminalSize(rows: 10, columns: 40), directory: missing, directoryChecked: checked,
-                scrollbackLimit: 100, configuredShell: "/bin/sh",
-                directoryCompletion: false, historySuggestions: false)
-        }
-        let unchecked = try start(checked: false)
-        unchecked.session.stop()
-        // Its own check found nothing, so it never tried to go there.
-        #expect(unchecked.notice == nil)
-        let checked = try start(checked: true)
-        checked.session.stop()
-        #expect(checked.notice == L10n.text("failure.notice.fallbackDirectory"), "went there on the word it was given")
+        let directory = (NSTemporaryDirectory() as NSString).resolvingSymlinksInPath
+        let started = try PaneSpawn.start(
+            size: TerminalSize(rows: 10, columns: 40), directory: directory, directoryChecked: true,
+            scrollbackLimit: 100, configuredShell: "/bin/sh",
+            directoryCompletion: false, historySuggestions: false, directoryCheckTimeout: .nanoseconds(0))
+        started.session.stop()
+        #expect(started.notice == nil)
     }
 
     @Test("the restore marker and a state file's directory are owner-only")

@@ -114,7 +114,7 @@ struct ChildDescriptorTests {
     func sshAndAskpassHoldOnlyTheirStandardPipes() throws {
         try withScratch { folder in
             try withOpenPipe {
-                let broker = SSHAskpassBroker(executable: Bundle.main.executablePath) { _, _, _ in nil }
+                let broker = SSHAskpassBroker(executable: Bundle.main.executablePath) { _ in nil }
                 defer { broker.stop() }
                 let grant = try #require(broker.grant(host: "probe"))
                 let sshReport = folder.appendingPathComponent("ssh")

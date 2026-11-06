@@ -104,19 +104,21 @@ struct SSHPresetPaneTests {
         #expect(session.workingDirectory == nil)
     }
 
-    /// The badge is child-supplied text like every other title component:
-    /// a percent-encoded newline in the OSC 7 path decodes to a real one,
-    /// and must be stripped before it reaches the title bar.
+    /// The badge is child-supplied text like every other title component: a
+    /// percent-encoded newline in the OSC 7 path decodes to a real one, and
+    /// that report is ignored rather than cleaned up (`SECURITY.md` §2.8).
     @Test func theBadgeIsSanitisedLikeEveryOtherTitleComponent() async throws {
         let launcher = try Self.makeStagingLauncher()
         defer { try? FileManager.default.removeItem(at: launcher.deletingLastPathComponent()) }
         let pane = Self.makePane(
             launcher: launcher,
-            script: "printf '\\033]7;file://build-box/srv/app%%0Ainjected\\007'; sleep 60")
+            script: "printf '\\033]7;file://build-box/srv/app\\007\\033]7;file://build-box/srv/app%%0Ainjected\\007'; "
+                + "sleep 60")
         defer { pane.teardown() }
         let session = try #require(pane.session)
         #expect(await waitUntilTrue { session.remoteContext != nil })
-        #expect(session.remoteContext?.directory == "/srv/app\ninjected")
+        #expect(await waitUntilTrue { session.snapshot().cursor.column == 0 })
+        #expect(session.remoteContext?.directory == "/srv/app")
         pane.windowTitle.invalidateProcessFacts()
         let title = pane.windowTitle.composed
         #expect(title.contains(PaneRemoteState.badge("build-box")))
