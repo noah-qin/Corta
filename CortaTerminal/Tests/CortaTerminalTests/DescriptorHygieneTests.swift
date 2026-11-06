@@ -23,7 +23,9 @@ import Testing
 
 @testable import CortaTerminal
 
-/// What a shell may hold of this process's descriptors, a number that stays
+/// What a shell may hold of this process's descriptors (its terminal on 0, 1
+/// and 2, and nothing else: `SFTPChildDescriptorTests` and the app's
+/// `ChildDescriptorTests` hold the other children to theirs), a number that stays
 /// taken while a call on it is in flight, and a session that ends with its
 /// shell even when a background job keeps the replica open.
 ///
@@ -42,20 +44,28 @@ struct DescriptorHygieneTests {
             close(ends[1])
         }
         let leaked = ends[1]
+        // Every number a child could be handed, not only this pipe's: anything
+        // between 3 and 200 besides the replica on 0, 1 and 2 is a leak. A
+        // duplicate onto an unused number rather than `-e /dev/fd/n`, which cannot
+        // stat a shared-memory object; redirecting a number that is open (0, or
+        // 2 per command) makes bash park the old one on 10, which then reads as held.
         let pty = try PTYFixture.shell(
             """
             [ -e /dev/fd/1 ] && echo CORTA-STDOUT-SEEN
-            if [ -e /dev/fd/\(leaked) ]; then echo CORTA-LEAKED; else echo CORTA-SEALED; fi
+            exec 2>/dev/null; open=; n=3
+            while [ $n -le 200 ]; do ( exec 222<&$n ) && open="$open $n"; n=$((n + 1)); done
+            echo "CORTA-OPEN:$open:END"
             """)
         defer {
             pty.terminate()
             _ = pty.waitForExit()
             pty.close()
         }
-        let output = pty.readOutput { $0.contains("CORTA-LEAKED") || $0.contains("CORTA-SEALED") }
+        let output = pty.readOutput { $0.contains(":END") }
         // The probe can see a descriptor that is there.
         #expect(output.contains("CORTA-STDOUT-SEEN"))
-        #expect(output.contains("CORTA-SEALED"), "the shell held descriptor \(leaked):\n\(output)")
+        #expect(leaked <= 200, "the probe does not reach descriptor \(leaked)")
+        #expect(output.contains("CORTA-OPEN::END"), "the shell held more than its terminal:\n\(output)")
     }
 
     @Test("a close during a read returns at once and keeps the number until the read does")

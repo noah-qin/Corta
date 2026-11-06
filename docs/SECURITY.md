@@ -267,7 +267,14 @@ unreachable by a remote path by construction. Restore also drops a saved
 directory that does not exist locally.
 
 A remote report is recorded separately as the pane's `RemoteContext`, for
-the title badge, the history's host filter and the SFTP browser. Its host is
+the title badge, the history's host filter and the SFTP browser. A report
+whose remote host falls outside the character rule `RemoteHost` uses (§2.10:
+letters, digits, `-`, `.`, `:`, at most 255 bytes) is ignored, as is any path,
+from any intake, with a C0, DEL or C1 control or longer than 1,024 bytes; the
+checks run after percent-decoding, so `%1B` or a bidi override cannot arrive
+that way. Every label that shows a reported host or path goes through
+`RemoteContext.displayText`: controls and format characters become U+FFFD, and
+255 scalars is the most shown. Its host is
 attacker-influenced text: displayed, never parsed for credentials, paths to
 run or hosts to connect to without the user's own command. The first SFTP
 connection to a reported host in a run shows the name, prefilled and
@@ -313,7 +320,7 @@ count, but cannot pass a pane already waiting.
 | OSC 1337 SetBadgeFormat | Refused: persistent program text over the canvas needs a separate decision |
 | OSC 1337 ReportVariable | Refused: no program text or variable values echoed into child input (§2.1–2.2) |
 | OSC 1337 Custom | Refused: no arbitrary script consumers (D09) |
-| OSC 5522 read; MIME aliases; non-text; primary selection | Refused: no clipboard disclosure, file data or extra clipboard surfaces; same user-controlled write gate as OSC 52. A completed text write is answered with a fixed `status=DONE`, `EPERM` (writes disallowed) or `EIO` (pasteboard failure) |
+| OSC 5522 read; MIME aliases; non-text; primary selection | Refused: no clipboard disclosure, file data or extra clipboard surfaces; same user-controlled write gate as OSC 52. A completed text write is answered with a fixed `status=DONE`, `EPERM` (writes disallowed) or `EIO` (pasteboard failure, or nothing left to publish once sanitised, whether writes are allowed or not) |
 | OSC 9;9 cwd | Ignored: no host, so remote paths cannot become local spawn targets (§2.8) |
 
 OSC 1337 CurrentDir and OSC 633 P;Cwd update remote metadata while a remote
@@ -341,12 +348,12 @@ allocating without bound. These caps are asserted in the fuzz harness
 | iTerm2 image OSC | File: base64 of at most 64 MiB decoded data plus 4100 header bytes, and never more than the pane/process image allowance left when the sequence begins (the parser asks before buffering); FilePart: 1 MiB per packet. A placement spans at most 4096 cells each way, as kitty's `c=`/`r=` do. Multipart total: at most 64 MiB decoded and the pane/process allowance. Unrelated OSC/CSI/APC abandons it; malformed base64, declared-size mismatch and oversized dimensions are dropped. The parser releases large string capacity after dispatch. Large base64 decoding uses the existing decode pause outside the session lock |
 | Extended clipboard / pointer stack | OSC 5522: 8192-byte packet cap, 3072 decoded bytes per text transaction, publish only at end; any invalid part discards it. OSC 22: 16 fixed names per screen; oldest evicted, RIS clears both |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
-| Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size; 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) |
-| Kitty PNG / iTerm2 PNG and GIF-first-frame decoding | `corta-image-decoder`, a process of its own under the independent App Sandbox (no access to host user files or network entitlements), 10 s, a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor inside its sandbox, so decoded pixels never travel over stdout |
+| Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size, and held until its last chunk, a delete command, a replacing transmission or RIS (other output between chunks ends nothing: the protocol's rule concerns graphics commands); 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) |
+| Kitty PNG / iTerm2 PNG and GIF-first-frame decoding | `corta-image-decoder`, a process of its own under the independent App Sandbox (no access to host user files or network entitlements), 10 s enforced by the app (SIGKILL, the image is not drawn) and 15 s by the helper's own `SIGALRM`, armed before it reads a byte, for a helper whose app has gone; a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor inside its sandbox, so decoded pixels never travel over stdout |
 | Compressed Kitty image (`o=z`) | Inflates to exactly its declared pixels (RGB, RGBA) or at most the 64 MB image cap (PNG); the stream stops at the ceiling and the image is refused, so the expansion is never allocated. The zlib header and Adler-32 must check out; any other `o=` value is refused |
 | CSI parameter count        | 16 (xterm's limit); ignore the remainder               |
 | CSI parameter value        | Clamp to a sane maximum before use                     |
-| Repeat counts (e.g. `REP`) | Clamp to the screen or scrollback dimension            |
+| Repeat counts (`SU`, `SD`, `IL`, `DL`, `ICH`, `DCH`, `ECH`, `CHT`, `CBT`) | Clamp to the scroll region, line or tab margin; `REP` (`CSI b`) is not implemented and is ignored |
 | Scrollback                 | Configured line cap, enforced by the ring buffer       |
 | Title stacks | Ten window titles and ten icon names per terminal, each bounded by the 4096-byte OSC cap; overflow discards the oldest entry, empty pops do nothing; RIS clears both |
 | Underline colours | 4095 interned colours per screen, at most two screens per pane; zero falls back to the cell foreground. Reclaim only entries absent from live cells, compressed history and both pens; defer low-yield sweeps for 1023 failed interns. Snapshots own their value copy; screen replacement/RIS drops the table |
@@ -408,7 +415,17 @@ alongside it:
 
 - Reset the signal mask and dispositions in the child.
 - Close all inherited descriptors except the PTY replica
-  (`POSIX_SPAWN_CLOEXEC_DEFAULT`; `DescriptorHygieneTests` pins it).
+  (`POSIX_SPAWN_CLOEXEC_DEFAULT`). Each child is tested through its real spawn,
+  with a probe of descriptors 3 to 200 and a pipe left open without
+  close-on-exec: a shell holds nothing past its terminal
+  (`DescriptorHygieneTests`), the image decoder holds only its pixel mapping on 3
+  and whatever stands where `ssh` stands holds only its three pipes, as does
+  what it runs as `SSH_ASKPASS`, with the broker's socket open
+  (`ChildDescriptorTests`, `SFTPChildDescriptorTests`). Corta's real askpass
+  client spawns nothing.
+- Inside an app bundle, run `corta-exec` from `Contents/MacOS` and nowhere else,
+  the one place the signature covers. Only a build outside a bundle (a SwiftPM
+  test or tool) walks up, at most six parents, to the helper beside it.
 - Establish a new session and controlling terminal (`POSIX_SPAWN_SETSID`
   / `TIOCSCTTY`) so job control and signals are correctly scoped.
 - Sanitise the environment; do not leak internal variables to the child.
@@ -470,8 +487,22 @@ environment, which admits only `main` and — since that amendment — no
 longer waits for a reviewer: the boundary is the code admitted to `main`
 and the person who requests the run, which for this repository is one
 maintainer credential (D20 says what that costs). The key reaches
-`generate_appcast` on stdin rather than as a file or an argument. The
-feed item is then held to `corta-release-check --appcast
+`generate_appcast` on stdin rather than as a file or an argument.
+
+No step of that job runs anything from the release tag's tree, because every
+step can reach the key: the runner holds the job's secrets, and code run in an
+earlier step can replace the tool a later one trusts. The job checks out `main`,
+refuses a tag whose commit is not an ancestor of `origin/main` before any
+repository code runs, reads the tag's archive with `gh release download` and its
+files with `git cat-file` as data only, and runs `appcast-header.py`,
+`corta-release-check` and `verify-appcast.swift` as `main` has them. Only the
+signing step names a secret, and it runs only the hash-pinned `generate_appcast`.
+What this does not cover is a person who can push to `main`, which is the boundary
+stated above. A ruleset on `v*` tags is a repository setting outside this
+workflow; without one a tag can still be moved or made, though only to a commit
+on `main`.
+
+The feed item is then held to `corta-release-check --appcast
 --require-notarized` — build number, enclosure URL, exact length,
 signature, Developer ID, staple, Gatekeeper — before a pull request
 carries it to `main` through the ordinary checks. The key has no
