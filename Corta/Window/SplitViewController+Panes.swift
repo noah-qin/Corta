@@ -159,13 +159,6 @@ extension SplitViewController {
     @objc func renameCurrentTab(_: Any?) {
         tab?.controller?.beginTabRename()
     }
-
-    func setCustomTabTitle(_ value: String) {
-        guard let tab else { return }
-        let title = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        tab.customTitle = title.isEmpty ? nil : String(title.prefix(200))
-        applyWindowTitle()
-    }
 }
 
 extension SplitViewController {

@@ -15,7 +15,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
-import CortaPOSIX
 import CortaTerminal
 import Synchronization
 import Testing

@@ -33,18 +33,18 @@ struct TabStripItem: Equatable {
 /// What the strip asks of its window (`TerminalWindowController`).
 @MainActor
 protocol TabStripDelegate: AnyObject {
-    func tabStrip(_ strip: TabStripView, select index: Int)
-    func tabStrip(_ strip: TabStripView, close index: Int)
-    func tabStrip(_ strip: TabStripView, closeOthersThan index: Int)
-    func tabStrip(_ strip: TabStripView, move from: Int, to: Int)
+    func tabStrip(_: TabStripView, select index: Int)
+    func tabStrip(_: TabStripView, close index: Int)
+    func tabStrip(_: TabStripView, closeOthersThan index: Int)
+    func tabStrip(_: TabStripView, move from: Int, to: Int)
     /// By identity: an edit can end while the strip is a refresh behind.
-    func tabStrip(_ strip: TabStripView, rename tab: String, to title: String?)
-    func tabStripNewTab(_ strip: TabStripView)
+    func tabStrip(_: TabStripView, rename tab: String, to title: String?)
+    func tabStripNewTab(_: TabStripView)
     /// A tab dragged off the strip and let go at `point`, in screen
     /// coordinates: into another window's strip, or a window of its own.
-    func tabStrip(_ strip: TabStripView, drop index: Int, atScreenPoint point: NSPoint)
+    func tabStrip(_: TabStripView, drop index: Int, atScreenPoint point: NSPoint)
     /// The tab's context menu: Move Tab to New Window.
-    func tabStrip(_ strip: TabStripView, moveToNewWindow index: Int)
+    func tabStrip(_: TabStripView, moveToNewWindow index: Int)
 }
 
 /// Corta's tab bar (D30): a capsule track in the titlebar row, one tab per

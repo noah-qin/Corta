@@ -220,7 +220,7 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         strip.itemMouseDown(index, event: event)
     }
     override func mouseDragged(with event: NSEvent) { strip.itemMouseDragged(event) }
-    override func mouseUp(with event: NSEvent) { strip.itemMouseUp(event) }
+    override func mouseUp(with event: NSEvent) { strip.itemMouseUp() }
     override func otherMouseDown(with event: NSEvent) { middleButtonPressed = event.buttonNumber == 2 }
     override func otherMouseUp(with event: NSEvent) {
         // A press that began here: a button released over the strip after a
