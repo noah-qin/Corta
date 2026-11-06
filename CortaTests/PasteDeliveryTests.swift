@@ -48,7 +48,10 @@ struct PasteDeliveryTests {
 
     private func settle(_ done: () -> Bool) async {
         let deadline = SuspendingClock.now + .seconds(10) * testTimeoutScale
-        while !done(), SuspendingClock.now < deadline { await Task.yield(); try? await Task.sleep(for: .milliseconds(2)) }
+        while !done(), SuspendingClock.now < deadline {
+            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(2))
+        }
     }
 
     private static let large = String(repeating: "a plain line of a long log ", count: 40_000)

@@ -26,6 +26,7 @@ import ReleaseCheck
 //
 //     corta-release-check check APP [--version V] [--archive DMG]
 //                                   [--appcast] [--require-notarized]
+//                                   [--source-ref REF]
 //     corta-release-check package APP VERSION [OUTPUT_DIRECTORY]
 //                                   [--require-notarized] [--rehearsal]
 //
@@ -34,7 +35,8 @@ import ReleaseCheck
 // build number is an integer; every file carries its license header;
 // CHANGELOG.md has a heading for the version; README.md documents the release
 // download and the minimum macOS for it; the app's executable and
-// corta-exec are arm64 only (D21); the code signature verifies.
+// corta-exec are arm64 only (D21); the code signature verifies; the app's
+// SU* settings are Sparkle-Info.plist's.
 //
 //     --version V          V (a tag with its `v` stripped) must be the version.
 //     --archive DMG        DMG is named Corta-V.dmg, holds Corta.app, Applications
@@ -48,6 +50,12 @@ import ReleaseCheck
 //     --require-notarized  the signature is a Developer ID one, the
 //                          notarization ticket is stapled, and Gatekeeper
 //                          accepts the app.
+//     --source-ref REF     judge the app against REF's project file, documents,
+//                          updater settings and license headers, read with
+//                          `git cat-file`: nothing of REF is checked out or
+//                          run. The tools, and the feed they check with its
+//                          SUPublicEDKey, stay this checkout's. appcast.yml
+//                          stands on main and passes the tag's commit.
 //
 // `package` checks the finished, signed and notarised Corta-VERSION.dmg in
 // OUTPUT_DIRECTORY (default `dist`) and writes its SHA-256 sidecar. It never
@@ -75,6 +83,7 @@ var checkAppcast = false
 var requireNotarized = false
 var rootOverride: String?
 var rehearsal = false
+var sourceRef: String?
 while let argument = arguments.first {
     arguments.removeFirst()
     func value() -> String {
@@ -88,6 +97,7 @@ while let argument = arguments.first {
     case "--appcast" where command == "check": checkAppcast = true
     case "--require-notarized": requireNotarized = true
     case "--rehearsal" where command == "package": rehearsal = true
+    case "--source-ref" where command == "check": sourceRef = value()
     case "--root": rootOverride = value()
     case let flag where flag.hasPrefix("--"): usageError("unknown argument \(flag)")
     default: positional.append(argument)
@@ -170,7 +180,12 @@ guard let plist = NSDictionary(contentsOf: plistURL) as? [String: Any] else {
 }
 @MainActor func plistValue(_ key: String) -> String { (plist[key] as? String) ?? "" }
 
-let pbxproj = (try? String(contentsOfFile: "\(root)/Corta.xcodeproj/project.pbxproj", encoding: .utf8)) ?? ""
+/// A file of what this app was built from, as text ("" if it cannot be read).
+@MainActor func sourceText(_ path: String) -> String {
+    String(decoding: ReleaseCheck.sourceFile(path, root: root, ref: sourceRef) ?? Data(), as: UTF8.self)
+}
+
+let pbxproj = sourceText("Corta.xcodeproj/project.pbxproj")
 @MainActor func projectSetting(_ name: String) -> String {
     let values = ReleaseCheck.projectSetting(name, in: pbxproj)
     if values.count != 1 {
@@ -216,12 +231,26 @@ if !bundleTarget.isEmpty, bundleTarget == projectTarget {
     fail("LSMinimumSystemVersion '\(bundleTarget)' != MACOSX_DEPLOYMENT_TARGET '\(projectTarget)'")
 }
 
+// --- The updater's settings
+
+// `verify-appcast.swift` reads the key from the source. What protects a user
+// is what the build put in the app.
+let settingProblems = ReleaseCheck.updaterSettingProblems(
+    artifact: plist, sourcePlist: ReleaseCheck.sourceFile("Sparkle-Info.plist", root: root, ref: sourceRef))
+if settingProblems.isEmpty {
+    pass("the app's SU* settings are Sparkle-Info.plist's")
+} else {
+    fail("the app's SU* settings are not Sparkle-Info.plist's:")
+    for problem in settingProblems { print("      \(problem)") }
+}
+
 // --- License headers
 
 // `corta-license` is the one implementation of the header rules
 // (docs/LICENSING.md); CI applies the same rules through `swift test`.
 let license = run("/usr/bin/xcrun", ["swift", "run", "--package-path", "\(root)/CortaTerminal",
-                                      "-c", "release", "-q", "corta-license", "check", "--root", root])
+                                      "-c", "release", "-q", "corta-license", "check", "--root", root]
+                                      + (sourceRef.map { ["--ref", $0] } ?? []))
 if license?.status == 0 {
     pass("every file carries its license header")
 } else {
@@ -233,8 +262,8 @@ if license?.status == 0 {
 
 // --- Documents that name the version
 
-let changelog = (try? String(contentsOfFile: "\(root)/CHANGELOG.md", encoding: .utf8)) ?? ""
-let readme = (try? String(contentsOfFile: "\(root)/README.md", encoding: .utf8)) ?? ""
+let changelog = sourceText("CHANGELOG.md")
+let readme = sourceText("README.md")
 let archiveName = ReleaseCheck.archiveName(version: bundleVersion)
 if ReleaseCheck.changelogHasSection(changelog, version: bundleVersion) {
     pass("CHANGELOG.md has a [\(bundleVersion)] section")

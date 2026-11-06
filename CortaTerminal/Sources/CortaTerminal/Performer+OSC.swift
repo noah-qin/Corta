@@ -285,7 +285,7 @@ extension Performer {
         guard let url = URL(string: string), url.scheme == "file" else { return }
         let host = url.host(percentEncoded: false) ?? ""
         let path = url.path(percentEncoded: false)
-        guard !path.isEmpty else { return }
+        guard !path.isEmpty, Self.isReportableDirectory(path) else { return }
         // Also the names this machine had when the session began: a shell
         // fixes `$HOST` at startup, while the kernel's hostname follows the
         // network (DHCP, reverse DNS) when no HostName is set.
@@ -293,10 +293,36 @@ extension Performer {
             state.workingDirectory = path
             state.remoteContext = nil
         } else {
+            // Percent-decoding can make anything of a host: ESC, a bidi
+            // override. A name matching this machine's is kept out of this
+            // check, since only the path of such a report is stored.
+            guard Self.isReportableHost(host) else { return }
             state.remoteContext = RemoteContext(
                 host: Self.normalizeHostname(host), directory: path,
                 provenance: .osc7, reportedAt: Date())
         }
+    }
+
+    /// The longest reported directory kept: `PATH_MAX` here, and past it no
+    /// local consumer could use the path anyway.
+    static let maximumReportedDirectoryBytes = 1024
+
+    /// Whether a reported path may be recorded: no C0, DEL or C1 control, and
+    /// within the limit. Every intake (OSC 7, OSC 1337 `CurrentDir`, OSC 633
+    /// `P;Cwd`) holds a path to this.
+    static func isReportableDirectory(_ path: String) -> Bool {
+        path.utf8.count <= maximumReportedDirectoryBytes
+            && !path.unicodeScalars.contains { $0.value < 0x20 || (0x7F...0x9F).contains($0.value) }
+    }
+
+    /// A remote hostname: letters, digits, `-`, `.` and `:` (an IPv6 literal),
+    /// at most 255 bytes. OSC 7 and OSC 1337 `RemoteHost` share it.
+    static func isReportableHost(_ host: String) -> Bool {
+        !host.isEmpty && host.utf8.count <= 255
+            && host.utf8.allSatisfy { byte in
+                (48...57).contains(byte) || (65...90).contains(byte) || (97...122).contains(byte)
+                    || byte == 45 || byte == 46 || byte == 58
+            }
     }
 
     /// Whether an OSC 7 host names this machine. Comparison is

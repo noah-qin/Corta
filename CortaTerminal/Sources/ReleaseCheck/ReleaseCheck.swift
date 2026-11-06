@@ -23,6 +23,51 @@ import Foundation
 /// process launches is what lets them be tested without an app.
 public enum ReleaseCheck {
 
+    /// A file of the release's source: `ref`'s blob, read with `git cat-file`
+    /// so that nothing of that commit is checked out, or the work tree's copy
+    /// when there is no `ref`. `appcast.yml` stands on `main` and names the tag.
+    public static func sourceFile(_ path: String, root: String, ref: String?) -> Data? {
+        guard let ref else { return FileManager.default.contents(atPath: "\(root)/\(path)") }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["-C", root, "cat-file", "blob", "\(ref):\(path)"]
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return nil }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return process.terminationStatus == 0 ? data : nil
+    }
+
+    /// What differs between the updater's settings (`SU*`) in a built app's
+    /// `Info.plist` and in `Sparkle-Info.plist`, one line each. A key the
+    /// build dropped or changed turns off a protection (`SURequireSignedFeed`,
+    /// `SUVerifyUpdateBeforeExtraction`, the feed's URL, the public key) while
+    /// every check of the source stays green. A source with no such settings
+    /// is itself a problem: nothing would have been compared.
+    public static func updaterSettingProblems(artifact: [String: Any], sourcePlist: Data?) -> [String] {
+        let source = sourcePlist.flatMap {
+            try? PropertyListSerialization.propertyList(from: $0, format: nil) as? [String: Any]
+        }
+        return updaterSettingProblems(artifact: artifact, source: source ?? [:])
+    }
+
+    /// `updaterSettingProblems(artifact:sourcePlist:)`, over the parsed source.
+    public static func updaterSettingProblems(artifact: [String: Any], source: [String: Any]) -> [String] {
+        func settings(_ plist: [String: Any]) -> [String: Any] { plist.filter { $0.key.hasPrefix("SU") } }
+        let built = settings(artifact), wanted = settings(source)
+        guard !wanted.isEmpty else { return ["the source has no SU* settings to compare with"] }
+        return Set(built.keys).union(wanted.keys).sorted().compactMap { key in
+            switch (built[key], wanted[key]) {
+            case (nil, _): return "\(key) is missing from the app"
+            case (_, nil): return "\(key) is in the app but not in the source"
+            case (let built?, let wanted?):
+                return (built as AnyObject).isEqual(wanted) ? nil : "\(key) in the app differs from the source"
+            }
+        }
+    }
+
     /// Every distinct value a build setting takes across the project's
     /// configurations, in first-seen order. More than one means the project
     /// disagrees with itself, and the check says so rather than picking one.

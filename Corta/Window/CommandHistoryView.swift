@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import CortaTerminal
 import SwiftUI
 
 /// The SwiftUI half of the command history window;
@@ -93,7 +94,7 @@ struct CommandHistoryView: View {
                 Text(L10n.text("commandHistory.hostLocal"))
                     .tag(CommandHistoryModel.HostScope.local)
                 ForEach(model.knownHosts, id: \.self) { host in
-                    Text(host).tag(CommandHistoryModel.HostScope.host(host))
+                    Text(RemoteContext.displayText(host)).tag(CommandHistoryModel.HostScope.host(host))
                 }
             } label: { EmptyView() }
             .labelsHidden()

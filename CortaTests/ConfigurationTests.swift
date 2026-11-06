@@ -452,11 +452,11 @@ extension ConfigurationTests {
         try Data([0xFF, 0xFE, 0x00]).write(to: url)
         let store = ConfigurationStore(fileURL: url)
         var reported = 0
-        #expect(!AppDelegate.save({ $0.secureKeyboardEntry.toggle() }, to: store) { reported += 1 })
+        #expect(!AppDelegate.save({ $0.secureKeyboardEntry.toggle() }, to: store, onFailure: { reported += 1 }))
         #expect(reported == 1)
 
         try "".write(to: url, atomically: true, encoding: .utf8)
-        #expect(AppDelegate.save({ $0.secureKeyboardEntry.toggle() }, to: store) { reported += 1 })
+        #expect(AppDelegate.save({ $0.secureKeyboardEntry.toggle() }, to: store, onFailure: { reported += 1 }))
         #expect(reported == 1)
     }
 

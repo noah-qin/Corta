@@ -68,6 +68,22 @@ func hasRestrictedSandboxSignature() -> Bool {
 
 guard hasRestrictedSandboxSignature() else { exit(3) }
 
+// The app kills a decode that outlives its 10 s (`ImageDecoderProcess.timeout`),
+// but only while the app lives. Killed while ImageIO is stuck on a crafted file,
+// it would leave this process running for ever: so this process has a deadline
+// of its own, past the app's so that the app's stays the one that normally
+// fires. Nothing handles the signal, and the helper decodes once and exits, so
+// the alarm is never reset. Dying of it is a nonzero exit with nothing written,
+// the failure the app already expects. A spawn from the app resets every signal;
+// this holds however it was started.
+let selfDeadlineSeconds: UInt32 = 15
+signal(SIGALRM, SIG_DFL)
+var alarmSignal = sigset_t()
+sigemptyset(&alarmSignal)
+sigaddset(&alarmSignal, SIGALRM)
+sigprocmask(SIG_UNBLOCK, &alarmSignal, nil)
+alarm(selfDeadlineSeconds)
+
 /// The decode the app did in process (`KittyImageRenderer.decodePNG`):
 /// the PNG/GIF signature, its matching ImageIO type, and the dimensions
 /// under the caps before the first frame is decoded. No other type is admitted.

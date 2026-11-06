@@ -43,6 +43,11 @@ nonisolated extension KittyImageRenderer {
         /// Nothing about the bytes: the mapping budget, a descriptor, the
         /// helper not starting or running out of time. Retried with backoff.
         case unavailable
+
+        var isUnavailable: Bool {
+            if case .unavailable = self { return true }
+            return false
+        }
     }
 
     /// Tries after the first failure; the delay doubles from `transientRetryDelay`.

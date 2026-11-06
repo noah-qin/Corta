@@ -195,7 +195,9 @@ goes there and nowhere else. The feed's own invariant — the appcast, its
 signature and the archive it names being the same bytes, verified under
 the app's `SUPublicEDKey` — is `scripts/verify-appcast.swift`, which that
 check calls at release time, `ci.yml` runs offline on every run and
-`nightly.yml` runs against the published archives. The feed is signed whole,
+`nightly.yml` runs against the published archives. `appcast.yml` runs them all
+as `main` has them and never the tag's tree: the signing job can reach the
+unrevocable key, so `--source-ref` hands the check the tag's files as data. The feed is signed whole,
 so `appcast.xml` is never edited on `main`: a path its header comment names
 that has moved is repointed by `scripts/appcast-header.py`, which the
 signing run calls before it signs.

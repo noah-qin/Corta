@@ -206,27 +206,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         saveFromMenu { $0.appearance = appearance }
     }
 
-    /// A menu has no status row to say a write failed, as Settings does, so it
-    /// says so here: the tick would simply stay where it was, and a toast
-    /// claiming the change happened would be worse. Returns whether it saved.
-    @discardableResult
-    private func saveFromMenu(_ change: (inout Configuration) -> Void) -> Bool {
-        Self.save(change, to: .shared) {
-            NSApp.keyWindow?.terminalSplit?.focusedPane?.terminalView?.showToast(
-                L10n.text("toast.settingNotSaved"), kind: .warning)
-        }
-    }
-
-    static func save(
-        _ change: (inout Configuration) -> Void, to store: ConfigurationStore, onFailure: () -> Void
-    ) -> Bool {
-        guard store.update(change) else {
-            onFailure()
-            return false
-        }
-        return true
-    }
-
     @objc func nextWaitingPane(_: Any?) { AgentDirectory.jumpToNextWaitingPane() }
 
     /// Ticks the live theme and appearance as the menu opens.
@@ -276,7 +255,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private var stallTimer: Timer?
     /// Saved windows are about to open (`openInitialWindows`).
-    private var isWaitingForRestore = false
+    var isWaitingForRestore = false
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         if let stall = DiagnosticsEnvironment.mainStall() {
             let timer = Timer(timeInterval: stall.periodMilliseconds / 1000, repeats: true) { _ in
@@ -298,12 +277,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         UNUserNotificationCenter.current().delegate = self
     }
 
+    // MARK: - Reopening
+
+    /// A Dock click with no window open opens one; Corta keeps running with
+    /// no windows, and otherwise there was no way back but ⌘N.
+    func applicationShouldHandleReopen(
+        _ sender: NSApplication, hasVisibleWindows: Bool
+    ) -> Bool {
+        guard !hasVisibleWindows, !isWaitingForRestore else { return true }
+        newDocument(sender)
+        return false
+    }
+
+}
+
+// MARK: - Restoring the arrangement
+
+extension AppDelegate {
+
     /// The saved arrangement, or one window; restored windows are born in
     /// their saved directories, so no first window is opened to replace. The
     /// directories are checked off the main thread first: one on a mount that
     /// stopped answering held the whole launch. Local ones answer before the
     /// next pass of the run loop.
-    private func openInitialWindows() {
+    func openInitialWindows() {
         guard Self.isRestoreEnabled else {
             openWindow(workingDirectory: nil)
             finishOpeningInitialWindows()
@@ -365,24 +362,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         #endif
     }
 
-    // MARK: - Reopening
-
-    /// A Dock click with no window open opens one; Corta keeps running with
-    /// no windows, and otherwise there was no way back but ⌘N.
-    func applicationShouldHandleReopen(
-        _ sender: NSApplication, hasVisibleWindows: Bool
-    ) -> Bool {
-        guard !hasVisibleWindows, !isWaitingForRestore else { return true }
-        newDocument(sender)
-        return false
-    }
-
-}
-
-// MARK: - Restoring the arrangement
-
-extension AppDelegate {
-
     /// The setting, plus an escape hatch the UI tests set so each launch
     /// doesn't reopen the previous test's windows. A real launch never has it.
     static var isRestoreEnabled: Bool {
@@ -401,7 +380,8 @@ extension AppDelegate {
         var opened = 0
         for ordered in Self.restoredWindows(states) {
             guard let first = ordered.first else { continue }
-            let controller = makeWindowController(setup: SplitViewController.Setup(restore: first, directoriesChecked: true))
+            let controller = makeWindowController(
+                setup: SplitViewController.Setup(restore: first, directoriesChecked: true))
             for state in ordered.dropFirst() {
                 controller.addTab(
                     setup: SplitViewController.Setup(restore: state, directoriesChecked: true), select: false)
@@ -541,5 +521,30 @@ extension AppDelegate {
     /// `SessionRestore` saves the arrangement instead.
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return false
+    }
+}
+
+// MARK: - Saving from a menu
+
+extension AppDelegate {
+    /// A menu has no status row to say a write failed, as Settings does, so it
+    /// says so here: the tick would simply stay where it was, and a toast
+    /// claiming the change happened would be worse. Returns whether it saved.
+    @discardableResult
+    func saveFromMenu(_ change: (inout Configuration) -> Void) -> Bool {
+        Self.save(change, to: .shared) {
+            NSApp.keyWindow?.terminalSplit?.focusedPane?.terminalView?.showToast(
+                L10n.text("toast.settingNotSaved"), kind: .warning)
+        }
+    }
+
+    static func save(
+        _ change: (inout Configuration) -> Void, to store: ConfigurationStore, onFailure: () -> Void
+    ) -> Bool {
+        guard store.update(change) else {
+            onFailure()
+            return false
+        }
+        return true
     }
 }

@@ -17,9 +17,14 @@
 name: Update feed
 
 # Called by Release after publication, and manually for recovery/rehearsal.
-# Uses the release tag's code and metadata but carries over the latest feed
-# from main. The signing key remains an environment secret piped to stdin.
-# Publishing the feed still uses a PR and explicitly dispatched CI.
+# Every tool here comes from main, and so does the feed it adds to. Of the tag
+# it reads only data: the published archive through `gh release download`, and
+# the files the release check compares it with through `git cat-file`. The tag's
+# tree is never checked out, because no step of this job may run it: the Sparkle
+# key cannot be revoked, the runner holds the job's secrets, and code from an
+# earlier step can replace a tool a later one runs (D20, SECURITY.md 4.7).
+# The signing key remains an environment secret piped to stdin. Publishing the
+# feed still uses a PR and explicitly dispatched CI.
 
 on:
   workflow_call:
@@ -72,12 +77,18 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       changed: ${{ steps.sign.outputs.changed }}
     steps:
+      # Whole history and tags: the ancestry check and `git cat-file` need the
+      # tag's objects, which are read and never placed in the work tree.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag }}
+          ref: main
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Work out the version
+      # Before anything from the repository runs: only a commit that reached
+      # main names a release this job will sign. One resolution, kept as a
+      # commit, so a tag moved during the run changes nothing below.
+      - name: Work out the version and hold the tag to main
         id: version
         env:
           TAG: ${{ inputs.tag }}
@@ -86,9 +97,16 @@ jobs:
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
             echo "::error::Expected a stable vX.Y.Z release tag"; exit 1;
           }
-          test "$(git rev-parse "refs/tags/$tag^{commit}")" = "$(git rev-parse HEAD)"
+          commit="$(git rev-parse --verify --quiet "refs/tags/$tag^{commit}")" || {
+            echo "::error::No tag $tag"; exit 1;
+          }
+          git merge-base --is-ancestor "$commit" origin/main || {
+            echo "::error::$tag ($commit) is not on main; this job signs only what main admitted"; exit 1;
+          }
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
 
       - name: Download the published archive and its checksum
         env:
@@ -112,22 +130,21 @@ jobs:
           tar -xJf sparkle.tar.xz -C sparkle ./bin/generate_appcast
           test -x sparkle/bin/generate_appcast
 
-      - name: Carry over the latest update feed
-        run: |
-          git fetch origin main
-          git show origin/main:appcast.xml > appcast.xml
-          cp appcast.xml "$RUNNER_TEMP/original-appcast.xml"
+      # The checkout is main, so appcast.xml already is the latest feed.
+      - name: Keep the feed as it was
+        run: cp appcast.xml "$RUNNER_TEMP/original-appcast.xml"
 
       # A rerun of an already published feed verifies its existing item;
       # it never regenerates dates or signatures and never replaces bytes.
-      - name: Sign the archive into appcast.xml
-        id: sign
+      # The feed is signed whole: a path its comment names that has since
+      # moved can only be corrected here, before signing. Main's script, against
+      # main's tree, with no key in reach.
+      - name: Prepare the feed for signing
+        id: prepare
         env:
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
           VERSION: ${{ steps.version.outputs.version }}
-          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          exists=$(python3 - <<'PYTHON'
+          exists=$(python3 -I - <<'PYTHON'
           import os
           import xml.etree.ElementTree as ET
           ns = '{http://www.andymatuschak.org/xml-namespaces/sparkle}'
@@ -135,18 +152,30 @@ jobs:
                 for n in ET.parse('appcast.xml').iter(ns + 'shortVersionString')) else 'false')
           PYTHON
           )
+          echo "exists=$exists" >> "$GITHUB_OUTPUT"
           if [ "$exists" != true ]; then
-            test -n "$SPARKLE_PRIVATE_KEY" || { echo "::error::SPARKLE_PRIVATE_KEY is empty"; exit 1; }
-            # The feed is signed whole: a path its comment names that has
-            # since moved can only be corrected here, before signing.
             python3 -B scripts/appcast-header.py appcast.xml
             cp appcast.xml feed/appcast.xml
-            printf '%s\n' "$SPARKLE_PRIVATE_KEY" | sparkle/bin/generate_appcast \
-              --ed-key-file - \
-              --download-url-prefix "https://github.com/noah-qin/Corta/releases/download/$TAG/" \
-              feed
-            cp feed/appcast.xml appcast.xml
           fi
+
+      # The one step that holds a secret, and it runs the hash-pinned tool and
+      # nothing from the repository.
+      - name: Sign the archive into appcast.xml
+        if: ${{ steps.prepare.outputs.exists != 'true' }}
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          test -n "$SPARKLE_PRIVATE_KEY" || { echo "::error::SPARKLE_PRIVATE_KEY is empty"; exit 1; }
+          printf '%s\n' "$SPARKLE_PRIVATE_KEY" | sparkle/bin/generate_appcast \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/noah-qin/Corta/releases/download/$TAG/" \
+            feed
+          cp feed/appcast.xml appcast.xml
+
+      - name: Record whether the feed changed
+        id: sign
+        run: |
           if cmp -s appcast.xml "$RUNNER_TEMP/original-appcast.xml"; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
           else
@@ -156,7 +185,9 @@ jobs:
       # The release check, against the unpacked archive:
       # the item's build, URL, length and signature agree with the app the
       # release actually shipped, and that app is Developer ID signed,
-      # stapled and accepted by Gatekeeper.
+      # stapled and accepted by Gatekeeper. The check and everything it runs
+      # are main's; `--source-ref` gives it the tag's version numbers,
+      # documents and updater settings as data, by `git cat-file`.
       - name: Check the app, the archive and the feed agree
         run: |
           set -euo pipefail
@@ -169,6 +200,7 @@ jobs:
             check "$mount/Corta.app" \
             --version "${{ steps.version.outputs.version }}" \
             --archive "$image" \
+            --source-ref "${{ steps.version.outputs.commit }}" \
             --appcast --require-notarized
 
       - name: Hand the signed feed to the publish job

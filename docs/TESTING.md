@@ -916,7 +916,8 @@ swift scripts/verify-appcast.swift --download            # every item, against t
   every byte before it; from build 11 on the feed must carry one.
 - The **archive** layer is what `corta-release-check check --archive`
   adds, offline, against the archive it already holds, with or without
-  `--appcast` — `appcast.yml` runs it once the feed is signed. `corta-release-check
+  `--appcast` — `appcast.yml` runs it once the feed is signed, standing on
+  `main` and passing the tag's commit as `--source-ref`. `corta-release-check
   package` cannot: it runs in `release.yml` before the release is
   published, and the feed is signed only after that (D20), so there is no
   signature yet. It verifies the feed alone and checks that the feed does
@@ -935,6 +936,11 @@ that — it proves the bytes are the published bytes, not that the key pairs
 with the app.
 
 Exit status is the number of failed checks, as `corta-release-check` reports.
+`scripts/tests/test_appcast_formats.py` holds the rejections to fixtures: a
+feed changed after signing or stripped of its signature, another key, a wrong
+length, an archive shortened or changed. `test_appcast_workflow.py` reads
+`appcast.yml` for what its signing job may run; it does not replace `actionlint`
+or a rehearsal.
 
 ## Packaging
 
@@ -965,7 +971,8 @@ executables (D21), the code signature, every Mach-O in the bundle (the app,
 one team identifier, carrying none of the entitlements that undo it
 (`ReleaseCheck.deniedEntitlements`: `get-task-allow`, library-validation,
 `DYLD_*`, JIT and unsigned-memory exceptions) and searching only the bundle
-and the system for libraries (`LC_RPATH` and dylib paths), and — with the flags — the archive
+and the system for libraries (`LC_RPATH` and dylib paths), the app's `SU*`
+`Info.plist` values being exactly `Sparkle-Info.plist`'s, and — with the flags — the archive
 and its sidecar, the feed item, Developer ID, the staple and Gatekeeper.
 Every rule prints `ok` or `FAIL`; the exit status is the number that
 failed. The judgements over text live in the `ReleaseCheck` library and

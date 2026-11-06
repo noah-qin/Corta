@@ -101,7 +101,9 @@ final class ConfigurationStore {
     /// The file's contents, waited for at most `fileAccessTimeout`.
     private func readFileBounded() -> UserFile.ReadResult {
         let (url, read) = (fileURL, readFile)
-        let answer = PathProbe.answer(timeout: fileAccessTimeout, budget: accessBudget) { SendableRead(result: read(url)) }
+        let answer = PathProbe.answer(timeout: fileAccessTimeout, budget: accessBudget) {
+            SendableRead(result: read(url))
+        }
         return answer?.result ?? .unreadable(TimedOutError())
     }
 

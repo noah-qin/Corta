@@ -220,8 +220,12 @@ struct OpenFileCommandTests {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try Data().write(to: directory.appendingPathComponent("file.swift"))
         }
-        func report(_ path: String) -> String { #"printf '\033]7;file://%s%s\033\\' "$(hostname)" '"# + path + "'; " }
-        let script = report(first.path) + "read -r _; " + report(second.path) + "cd '\(second.path)'; echo MOVED; sleep 60"
+        func report(_ path: String) -> String {
+            #"printf '\033]7;file://%s%s\033\\' "$(hostname)" '"# + path + "'; "
+        }
+        let script =
+            report(first.path) + "read -r _; " + report(second.path)
+            + "cd '\(second.path)'; echo MOVED; sleep 60"
         let host = ReferenceTestHost()
         // With no editor configured, opening anything leaves a toast to find.
         host.terminalView = TerminalView(frame: .zero)

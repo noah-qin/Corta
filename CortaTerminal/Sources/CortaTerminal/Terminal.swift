@@ -155,6 +155,11 @@ public struct Terminal: Sendable {
         performer.completeDeferredImage(decoded)
     }
 
+}
+
+// MARK: - Size, modes and what is drained per frame
+
+extension Terminal {
     /// `Grid.resize`, keeping command records on their rows through a reflow.
     /// Resize through this, not `grid`, or the records point where the rows
     /// used to be.

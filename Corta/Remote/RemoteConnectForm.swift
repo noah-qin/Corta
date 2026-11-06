@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 import SwiftUI
 
 /// The connect form the dialog and the file browser's own host step use: a
@@ -232,7 +233,7 @@ struct RemoteConnectForm: View {
                 Text(L10n.text("ui.connect.thisPane"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                Text(paneFiles.host ?? L10n.text("ui.connect.thisPaneUnknown"))
+                Text(paneFiles.host.map(RemoteContext.displayText) ?? L10n.text("ui.connect.thisPaneUnknown"))
                     .lineLimit(1)
                     .truncationMode(.middle)
             }

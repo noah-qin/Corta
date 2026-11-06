@@ -46,10 +46,12 @@ signatures, notarisation and archive/feed checks still gate delivery.
 5. Only after those checks does it create the version tag, upload the DMG
    and SHA-256 sidecar to a temporary draft, and publish it automatically.
    A draft is only an upload staging area, never an approval step.
-6. The same pipeline calls `Update feed` as a reusable workflow. It checks
-   the published archive, carries over the latest feed from `main`, signs
-   the new item with Sparkle, validates it against the app, and opens an
-   automatically merged feed PR after CI. The pipeline waits until the
+6. The same pipeline calls `Update feed` as a reusable workflow. On a checkout
+   of `main`, it requires the tag's commit to be an ancestor of `main`, checks
+   the published archive, signs the new item into `main`'s feed with Sparkle,
+   validates it against the app with `main`'s tools, and opens an
+   automatically merged feed PR after CI. Nothing from the tag's tree runs:
+   its files reach the check as data (`--source-ref`, read with `git cat-file`). The pipeline waits until the
    feed PR has actually merged, so installed users can see the update.
 
 The pipeline is serialized with `cancel-in-progress: false`: an active
@@ -117,7 +119,7 @@ The feed workflow checks the checksum, mounts read-only with cleanup on
 success or failure, and generates/signs from the same DMG with the key on
 stdin. `verify-appcast.swift` accepts historical ZIP URLs through 1.1.8
 and requires DMG afterwards; nightly verifies the bytes of both formats.
-Sparkle 2.9.6 and pinned 2.10.0 support DMG with pre-extraction verification
+Sparkle 2.9.6 and pinned 2.10.1 support DMG with pre-extraction verification
 and a signed feed with zero grace period; neither security setting changes.
 
 After a packaging change merges on main, run the signed/notarised dry run
@@ -151,7 +153,8 @@ repair just the feed. If the feed already carries that version, it verifies
 the published bytes and the existing signed item without generating
 another PR. A preparation/feed PR left blocked by strict branch checks
 stays open; resolve its checks and rerun. Closed unmerged version PRs and
-unexpected changes to an existing automation branch fail explicitly.
+unexpected changes to an existing automation branch fail explicitly. A tag
+whose commit is not on `main` is refused before any repository code runs.
 
 ## One-time GitHub configuration
 
@@ -192,6 +195,18 @@ verifies the feed's own signature and the archive's signature with
 days. It does not push that feed or publish the archive; the publication
 job stays skipped. This exercises `SURequireSignedFeed` before a release
 can offer a build that requires it.
+
+The feed workflow rehearses on its own, once its change is on `main`, against
+the latest published tag:
+
+```sh
+gh workflow run appcast.yml --ref main -f tag=<latest released tag> -f dry_run=true
+```
+
+That proves the checkout of `main`, the ancestry check, the download and
+`corta-release-check` with the tag's files as data. That tag is already in the
+feed, so the signing step is skipped: its key handling is exercised by the
+`release.yml` rehearsal's own `generate_appcast` call, and by the next release.
 
 The feed is signed whole, so its header comment cannot be edited on
 `main` between releases: one changed byte and every Corta that checks the
@@ -287,8 +302,11 @@ Platform settings can change independently from this repository; recheck
 them when diagnosing a blocked workflow. Never download secret values to
 verify their presence.
 
-Sparkle 2.10.0 is pinned to revision
-eef1a539a373c1f1a320624b1130fc5de7b2e100. Follow-up source review covered
+Sparkle 2.10.1 is pinned to revision
+ab7d71291238df6e0492143b120c9b696a35f603 (`Package.resolved`;
+`scripts/tests/test_appcast_workflow.py` holds this paragraph to it). The source
+review below was made at 2.10.0, eef1a539a373c1f1a320624b1130fc5de7b2e100, and
+has not been repeated since. It covered
 `SUSignatureVerifier`, `SUUpdateValidator` and their code-signing calls:
 missing/invalid Ed25519 signatures are rejected when the installed app has
 an Ed25519 key, the downloaded bytes are verified, and update validation

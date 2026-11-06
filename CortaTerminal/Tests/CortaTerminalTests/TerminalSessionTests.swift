@@ -173,7 +173,9 @@ import Testing
             while !open.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
         }
         // Stays quiet until told to speak, by the child's own timer.
-        let script = #"i=0; while [ $i -lt 200 ]; do echo "line-$i"; i=$((i+1)); done; echo READY; sleep 0.5; echo LATE; sleep 60"#
+        let script =
+            #"i=0; while [ $i -lt 200 ]; do echo "line-$i"; i=$((i+1)); done; "#
+            + #"echo READY; sleep 0.5; echo LATE; sleep 60"#
         let session = try TerminalSession(
             executable: "/bin/sh", arguments: ["-c", script], size: TerminalSize(rows: 24, columns: 80), seams: seams)
         defer {
@@ -243,7 +245,7 @@ import Testing
         }
     }
 
-    @Test func draningAFrameDuringAReflowDoesNotSpoilTheRebuild() throws {
+    @Test func drainingAFrameDuringAReflowDoesNotSpoilTheRebuild() throws {
         var terminal = Terminal(rows: 5, columns: 20)
         terminal.feed(Array("x".utf8))
         let before = terminal.gridGeneration
@@ -255,14 +257,17 @@ import Testing
     }
 
     @Test func aRecordFollowsItsRowThroughAReflowOutsideTheLock() throws {
-        let script = #"printf '\033]133;A\007'; i=0; while [ $i -lt 40 ]; do printf 'wide-line-'; i=$((i+1)); done; echo; echo READY; sleep 60"#
+        let script =
+            #"printf '\033]133;A\007'; i=0; while [ $i -lt 40 ]; do printf 'wide-line-'; i=$((i+1)); done; "#
+            + #"echo; echo READY; sleep 60"#
         let session = try TerminalSession(
             executable: "/bin/sh", arguments: ["-c", script], size: TerminalSize(rows: 10, columns: 80))
         defer { session.stop() }
         session.start()
         _ = waitForGrid(session) { $0.contains("READY") }
         var inline = Terminal(rows: 10, columns: 80)
-        inline.feed(Array("\u{1B}]133;A\u{07}".utf8) + Array(repeating: Array("wide-line-".utf8), count: 40).flatMap { $0 } + Array("\r\nREADY\r\n".utf8))
+        let wide = Array(repeating: Array("wide-line-".utf8), count: 40).flatMap { $0 }
+        inline.feed(Array("\u{1B}]133;A\u{07}".utf8) + wide + Array("\r\nREADY\r\n".utf8))
         inline.resize(rows: 10, columns: 40)
         session.resize(to: TerminalSize(rows: 10, columns: 40))
         waitForColumns(session, 40)

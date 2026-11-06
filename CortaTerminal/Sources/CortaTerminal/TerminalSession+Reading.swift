@@ -100,32 +100,7 @@ extension TerminalSession {
             let slice = batch[offset..<end]
             let finished = decoded
             decoded = nil
-            let outcome = state.withLock { current -> SliceOutcome? in
-                // In the lock, so a resize's copy cannot miss a slice that
-                // had already passed this check.
-                guard !current.isResizing else { return nil }
-                let episodeBefore = current.terminal.synchronizedOutputEpisode
-                if let finished { current.terminal.completeDeferredImage(finished) }
-                let consumed = current.terminal.feedDeferringImageDecode(slice)
-                let deferred = current.terminal.takeDeferredImage()
-                reportImageBytes(current.terminal)
-                let sliceResponses = current.terminal.takeOutput()
-                // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
-                // A repeated BSU does not extend it, or a child that never sends
-                // ESU could stall presentation forever.
-                let episodeAfter = current.terminal.synchronizedOutputEpisode
-                // An integer compare: a pass is queued only once a batch seals.
-                let compress = current.terminal.hasCompressionWork
-                guard episodeAfter != episodeBefore else {
-                    return SliceOutcome(
-                        responses: sliceResponses, episode: nil, compress: compress, consumed: consumed,
-                        deferred: deferred)
-                }
-                current.synchronizedOutputEpisode = episodeAfter
-                return SliceOutcome(
-                    responses: sliceResponses, episode: episodeAfter, compress: compress, consumed: consumed,
-                    deferred: deferred)
-            }
+            let outcome = applySlice(slice, completing: finished)
             guard var applied = outcome else {
                 decoded = finished
                 guard waitOutResize() else { return }
@@ -154,6 +129,38 @@ extension TerminalSession {
             scheduleSynchronizedOutputTimeout(episode: episode)
         }
         callbacks.withLock { $0.onOutput }?()
+    }
+
+    /// One slice under the lock, or nil with a resize under way.
+    private func applySlice(
+        _ slice: ArraySlice<UInt8>, completing finished: DecodedImageTransmission?
+    ) -> SliceOutcome? {
+        state.withLock { current -> SliceOutcome? in
+            // In the lock, so a resize's copy cannot miss a slice that had
+            // already passed this check.
+            guard !current.isResizing else { return nil }
+            let episodeBefore = current.terminal.synchronizedOutputEpisode
+            if let finished { current.terminal.completeDeferredImage(finished) }
+            let consumed = current.terminal.feedDeferringImageDecode(slice)
+            let deferred = current.terminal.takeDeferredImage()
+            reportImageBytes(current.terminal)
+            let sliceResponses = current.terminal.takeOutput()
+            // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
+            // A repeated BSU does not extend it, or a child that never sends
+            // ESU could stall presentation forever.
+            let episodeAfter = current.terminal.synchronizedOutputEpisode
+            // An integer compare: a pass is queued only once a batch seals.
+            let compress = current.terminal.hasCompressionWork
+            guard episodeAfter != episodeBefore else {
+                return SliceOutcome(
+                    responses: sliceResponses, episode: nil, compress: compress, consumed: consumed,
+                    deferred: deferred)
+            }
+            current.synchronizedOutputEpisode = episodeAfter
+            return SliceOutcome(
+                responses: sliceResponses, episode: episodeAfter, compress: compress, consumed: consumed,
+                deferred: deferred)
+        }
     }
 
     /// Parks the reader until a resize has committed; false if the session
