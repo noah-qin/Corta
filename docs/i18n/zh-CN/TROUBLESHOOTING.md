@@ -120,6 +120,20 @@ Corta 会保留已有的设置，并拒绝写入这个文件，因为写入会�
 
 ---
 
+<a id="file-drops"></a>
+
+## 拖放文件
+
+### 之前拖入的路径不存在了
+
+只有其他应用才能提供的文件（例如照片或邮件附件）是临时副本。窗格关闭（连同其标签页或窗口）或 Corta 退出时副本会被删除，更新后第一次启动也会删除旧版本留下的副本。此后路径处处失效：还在运行的程序、复制到别处的路径、滚动内容和 shell 历史。⇧⌘T 恢复窗格时副本不会回来。想保留请先另存。从访达拖来的文件直接使用原路径，绝不会被删除。
+
+### 拖放副本占用磁盘空间
+
+**设置 ▸ 隐私与安全 ▸ 本地数据** 显示占用的空间并提供 **立即清理…**，只保留正在接收或上传的文件。别的程序开着文件或系统快照存在时，空间可能不会立刻释放。
+
+如果 Corta 崩溃或已卸载、不会再打开，就没有什么会清理它们了。退出 Corta 后可以手动删除这两个文件夹：`~/Library/Application Support/Corta/DroppedFiles/` 和 `~/Library/Application Support/Corta/SFTPDragStaging/`。开发版用 `~/Library/Application Support/Corta Dev/ApplicationSupport/` 代替 `Corta` 文件夹。
+
 <a id="typing-and-rendering"></a>
 
 ## 输入和渲染
