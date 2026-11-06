@@ -47,15 +47,17 @@ export function ProductDemo({ src, poster, copy, overview }: Props) {
         !document.hidden &&
         !manualPause.current &&
         (!motion.matches || optedIn.current);
-      video.autoplay = shouldPlay;
+      if (video.autoplay !== shouldPlay) video.autoplay = shouldPlay;
       if (shouldPlay) {
         // Set the media properties before assigning a source for native autoplay.
         video.defaultMuted = true;
         video.muted = true;
         if (!video.getAttribute("src")) video.src = src;
-        void video.play().catch(() => {
-          /* The explicit play button can retry. */
-        });
+        if (video.paused) {
+          void video.play().catch(() => {
+            /* The explicit play button can retry. */
+          });
+        }
       } else video.pause();
     }
     function preferenceChanged() {
@@ -64,10 +66,11 @@ export function ProductDemo({ src, poster, copy, overview }: Props) {
     }
     const observer = new IntersectionObserver(
       ([entry]) => {
+        if (visible === entry.isIntersecting) return;
         visible = entry.isIntersecting;
         reconcile();
       },
-      { threshold: 0.2 },
+      { threshold: 0 },
     );
     observer.observe(video);
     video.addEventListener("canplay", reconcile);
