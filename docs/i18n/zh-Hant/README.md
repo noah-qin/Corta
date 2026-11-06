@@ -29,7 +29,7 @@ Metal 4 算繪 · 原生中日韓輸入法 · SSH、SFTP 與遠端編輯
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
-  <img src="../../brand/interaction-demo.gif" width="960" height="588" alt="Corta 互動示範：分割窗格、重排執行中的工作階段，以及切換和排序分頁">
+  <img src="../../brand/interaction-demo@2x.gif" width="960" alt="Corta 互動示範：分割窗格、重排執行中的工作階段，以及切換和排序分頁">
 </picture>
 
 </div>

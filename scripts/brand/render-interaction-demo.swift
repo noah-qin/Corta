@@ -17,7 +17,7 @@
 // Renders dedicated silent interaction demos from the isolated app-only recording.
 // swiftc -O scripts/brand/render-interaction-demo.swift -o /tmp/render-demo
 // /tmp/render-demo source.mp4 window-buttons.png <website|gif-frames|poster> output
-// gif-frames writes 150 raw RGBA frames, each 960 × 588; encode with
+// gif-frames writes 150 raw RGBA frames, each 1920 × 1176; encode with
 // node website/scripts/encode-interaction-gif.mjs frames.rgba output.gif
 
 import AVFoundation
@@ -29,8 +29,8 @@ import CoreImage
 let args = CommandLine.arguments
 if args.count != 5 { fatalError("Expected source.mp4, window-buttons.png, mode and output") }
 let mode = args[3]
-let canvasWidth = mode == "gif-frames" ? 960 : 1600
-let canvasHeight = mode == "gif-frames" ? 588 : 980
+let canvasWidth = mode == "gif-frames" ? 1920 : 1600
+let canvasHeight = mode == "gif-frames" ? 1176 : 980
 let fps = mode == "gif-frames" ? 15 : 60
 let duration = mode == "gif-frames" ? 10.0 : 12.0
 let outURL = URL(fileURLWithPath: args[4])

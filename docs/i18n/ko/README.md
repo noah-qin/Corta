@@ -29,7 +29,7 @@ Metal 4 렌더링 · 네이티브 CJK / IME · SSH, SFTP, 원격 편집
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
-  <img src="../../brand/interaction-demo.gif" width="960" height="588" alt="Corta 동작 데모: 페인 분할, 실행 중인 세션 이동, 탭 전환 및 순서 변경">
+  <img src="../../brand/interaction-demo@2x.gif" width="960" alt="Corta 동작 데모: 페인 분할, 실행 중인 세션 이동, 탭 전환 및 순서 변경">
 </picture>
 
 </div>

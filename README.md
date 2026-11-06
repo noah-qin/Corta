@@ -30,7 +30,7 @@ Metal 4 rendering · Native CJK / IME · SSH, SFTP and remote editing
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="docs/brand/interaction-demo-poster.png 1600w">
-  <img src="docs/brand/interaction-demo.gif" width="960" height="588" alt="Corta in motion: split panes, rearrange running sessions and switch or reorder tabs">
+  <img src="docs/brand/interaction-demo@2x.gif" width="960" alt="Corta in motion: split panes, rearrange running sessions and switch or reorder tabs">
 </picture>
 
 </div>
