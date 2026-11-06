@@ -8,6 +8,7 @@
 > [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md).
 > Si la versión en inglés ha cambiado desde entonces, o si ambas difieren, prevalece la versión en inglés.
 > Los mensajes de macOS van acompañados de su texto original en inglés.
+> Los cambios de pegado, enlaces y trabajo remoto se han actualizado según este commit inglés: [`6e5f7d5`](https://github.com/noah-qin/Corta/blob/6e5f7d5/docs/TROUBLESHOOTING.md).
 
 Qué hacer cuando Corta no se instala, no arranca o hace algo que tu terminal anterior no hacía. Cada entrada dice qué
 verás, por qué y cómo solucionarlo — y la última sección explica cómo volver limpiamente a tu terminal de antes si nada de
@@ -130,6 +131,12 @@ la app no se vuelve a intentar: la disposición guardada se descarta y se abre u
 o no tienes permiso para leerlo. Corta mantiene los ajustes que tiene y se niega a escribir el archivo, porque escribirlo
 sustituiría todo su contenido. Vuelve a guardar el archivo como UTF-8 (o elimina la línea defectuosa); Corta lo recoge en
 cuanto vuelve a leerlo. La integración del shell hace lo mismo con un archivo rc que no puede leer: lo indica y no lo toca.
+
+<a id="settings-says-the-configuration-file-did-not-answer-in-time"></a>
+
+### El archivo de configuración no responde a tiempo
+
+El archivo o la carpeta a la que apunta está en un disco que dejó de responder, a menudo un montaje de red. Corta espera como máximo un segundo, conserva los ajustes y rechaza guardar para no sobrescribir un archivo que no pudo leer. Reintenta cada pocos segundos y avisa si un cambio de menú no se guardó. Se recupera solo cuando el disco responde.
 
 ---
 
@@ -324,6 +331,21 @@ comparación de contenido puede detectar cambios remotos aunque el tamaño y la 
 La conexión se atascó. Una vez conectada, cada operación de la edición remota tiene 120 segundos para terminar; después,
 Corta cierra la conexión y vuelve a ofrecer la subida. Apruébala para reintentar con una conexión nueva. Un archivo muy
 grande en un enlace lento también puede alcanzar el límite: cópialo con el navegador SFTP.
+
+<a id="clicking-a-link-did-nothing"></a>
+<a id="a-paste-says-not-pasted--thats-more-than-64-mib"></a>
+
+### Un enlace no se abre o el pegado supera el límite
+
+Si la salida cambió el destino de la ayuda emergente, el clic solo la actualiza. Compruébala y vuelve a hacer clic. Un aviso de más de 64 MiB significa que no se envió nada. Pega por partes o guarda el texto en un archivo para que el programa lo lea. El límite es fijo.
+
+<a id="an-ssh-pane-stopped-responding-and-reconnect-is-greyed-out"></a>
+<a id="browse-remote-files-stays-on-connecting-then-says-it-could-not-reach-the-host"></a>
+<a id="a-transfer-failed-saying-the-disk-did-not-answer"></a>
+
+### Una conexión remota se bloquea o el disco de la transferencia no responde
+
+Mientras `ssh` siga activo, la reconexión normal está desactivada. Si aún lee teclas, `~.` puede terminarlo. Si no, elige **Forzar cierre y reconectar al host…** y confirma: termina la conexión, repite el comando y borra la salida; las tareas remotas pueden detenerse. SFTP espera 30 segundos por paso de conexión, sin contar los diálogos de autenticación. Después puedes reintentar o cancelar antes. Comprueba la red o VPN y ejecuta `ssh -v` con el mismo usuario y puerto. Antes de transferir, una comprobación local espera como máximo cinco segundos. Recupera el disco o el recurso compartido y reintenta la fila.
 
 ---
 

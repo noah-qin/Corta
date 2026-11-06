@@ -8,6 +8,7 @@
 > [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/USER-GUIDE.md).
 > Se a versão em inglês mudou desde então, ou se as duas divergirem, vale a versão em inglês.
 > Os nomes da interface seguem a interface em português do Corta; chaves de configuração, comandos e código ficam no original.
+> As mudanças de colagem, links e trabalho remoto foram atualizadas conforme este commit em inglês: [`6e5f7d5`](https://github.com/noah-qin/Corta/blob/6e5f7d5/docs/USER-GUIDE.md).
 
 Tudo o que o Corta faz e como chegar lá. Cada seção diz onde o recurso fica — um menu, um atalho, um ajuste — e aponta
 para a referência com os detalhes. Os atalhos são os padrões, e todos, exceto Buscar próxima e Buscar anterior, podem ser
@@ -331,6 +332,8 @@ ou, para uma conexão, **Reconectar**; o texto de erro do sistema fica em **Deta
   Defina `paste-warning = always` para avisar a cada colagem de várias linhas, ou `off` para desativar esses diálogos. São
   padrões cautelosos, não um analisador de shell nem uma garantia de que o resto do texto é seguro. Uma colagem grande que o
   shell ainda está processando pode ser cancelada com ⌃C: a parte ainda não enviada é descartada e a interrupção passa direto.
+
+  Colagens acima de 64 KiB são verificadas em segundo plano e a janela continua utilizável. Colar novamente substitui o texto ainda em verificação. Acima de 64 MiB, nada é enviado e o Corta avisa. Um programa pode ativar a colagem delimitada sem realmente entendê-la. Para sempre avisar ao colar várias linhas em programas remotos ou antigos, use `paste-warning = always`.
 - **Soltar arquivos.** Solte arquivos, ou arquivos fornecidos por outro app, em um painel para inserir seus caminhos entre aspas pelo canal de colagem, sem Return. Passar por cima não inicia nenhum download. O recebimento é assíncrono e para de esperar após 120 segundos; falhas aparecem no painel. Se a sessão ou o grupo de processos em primeiro plano mudar nesse meio-tempo, o Corta descarta a operação.
 
   **Um arquivo do Finder é usado onde está, e o Corta nunca o remove. Um arquivo que só outro app pode fornecer, como uma foto ou um anexo do Mail, chega como cópia temporária:** salve-o em outro lugar se quiser mantê-lo. A cópia é removida quando seu painel fecha, também junto com a aba ou janela, ou quando o Corta encerra. Um programa ainda em execução não poderá mais lê-la, e um caminho copiado para outro lugar deixa de valer. O mesmo vale para caminhos antigos no histórico de rolagem e do shell, e ⇧⌘T traz um painel de volta sem suas cópias. Mover o painel para outra aba ou janela as mantém. Se outro programa mantiver um arquivo aberto ou houver um instantâneo do sistema, o espaço pode demorar a voltar. **Ajustes ▸ Privacidade e segurança ▸ Dados locais** mostra o espaço e oferece **Limpar agora…**.
@@ -373,6 +376,8 @@ ou, para uma conexão, **Reconectar**; o texto de erro do sistema fica em **Deta
 
 Abrir qualquer referência a arquivo exige um `open-file-command` configurado. O Corta nunca abre arquivos vindos da saída
 no aplicativo padrão do sistema: alguns tipos de arquivo executam código ao serem abertos.
+
+Um clique abre somente o destino exibido na dica. Se a saída mudou o texto sob o ponteiro, esse clique apenas atualiza a dica; confira e clique novamente. Referências `path:line:column` continuam exigindo ⌘-clique em qualquer opção de `link-activation`.
 
 <a id="shell-integration"></a>
 
@@ -569,6 +574,12 @@ envio que falhou mantém a decisão pendente. Depois de conectado,
 uma operação que não terminou em 120 segundos é interrompida e o envio é oferecido de novo: uma conexão travada não
 prende uma edição para sempre. Preserve as edições locais não decididas antes de apagar os dados do app. Veja
 a [política de dados em repouso](../../SECURITY.md#5-data-at-rest) (em inglês).
+
+**Conexão travada.** Após uma queda de rede, o `ssh` pode continuar rodando e a reconexão comum fica indisponível. **Forçar encerramento e reconectar ao host…**, no menu e na paleta de comandos, pede confirmação, encerra a conexão e executa o mesmo comando novamente. Tarefas remotas podem parar e a saída do painel é apagada.
+
+Com `ProxyJump` ou `ProxyCommand`, a pergunta pode vir de um host intermediário. O título do diálogo informa isso e a orientação sobre a chave esclarece que a impressão digital não é a do destino. Confira quem pergunta antes de digitar a senha do destino. Cada etapa da conexão tem 30 segundos, sem contar o tempo com o diálogo de autenticação aberto. Depois é possível tentar novamente.
+
+Uma transferência pode ser cancelada até durante a verificação do destino. Cancelar uma transferência retomada preserva o arquivo parcial; o botão de nova tentativa da linha continua dali. Se o disco local não responder em cinco segundos, a linha falha e permite tentar de novo, enquanto a janela continua utilizável. Uma nova transferência do servidor que falhar exibe o erro e oferece de novo a decisão sobre o conflito, mantendo a cópia local. Uma edição salva durante esse download é preservada e pede nova aprovação.
 
 <a id="images-in-the-terminal"></a>
 
