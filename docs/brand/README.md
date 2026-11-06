@@ -13,10 +13,10 @@ repository root.
 | `corta-pangolin-loop.gif`   | Looping mascot animation, 360 × 360                              |
 | `session-ended.png` | Ended session: the centered glass status panel over dimmed, retained output, from an isolated local-zsh UI fixture |
 | `native-tab-icon.png` | The tab strip in the titlebar row, with single-pane and split-pane program icons, from an isolated development build |
-| `screenshot.png` | Static terminal reference — light theme, a clean demo shell |
-| `interaction-demo@2x.gif` | README interaction loop, 1920 × 1176 for Retina displays, 10 seconds |
+| `screenshot.png` | README hero screenshot — original 2484 × 1524 PNG, light theme |
+| `interaction-demo@2x.gif` | Optional interaction loop, 1920 × 1176, 10 seconds; not embedded in READMEs |
 | `interaction-demo.mp4` | Website interaction loop, 1600 × 980, 60 fps, 12 seconds, no audio |
-| `interaction-demo-poster.png` | Still fallback for both interaction demos, 1600 × 980 |
+| `interaction-demo-poster.png` | Website video poster, 1600 × 980 |
 | `input-source-indicator.png` | Independent Chinese input-source badge, separated from toolbar action buttons, from an isolated demo shell |
 | `input-source-long-command.png` | Right-edge badge moved below a long command, without changing the grid |
 | `history-suggestions.png` | Local zsh history suffix, from the isolated history-suggestions UI fixture |
@@ -103,12 +103,12 @@ swiftc -O scripts/brand/compose-screenshot.swift -o /tmp/compose
 /tmp/compose poster with-palette.png card.png "Every command, one search away" "⇧⌘P opens the command palette"
 ```
 
-## Interaction demos
+## README screenshot and website demo
 
-The README and homepage use separate edits of an isolated light-theme development-build recording. They show pane splits, moving running sessions, and tab creation, switching and reordering. The website also shows detached windows. Pauses are shortened and the end returns to the beginning with a crossfade. There is no soundtrack, promotional introduction or caption overlay. These demos reflect the main development tree, including changes listed in Unreleased.
+All nine READMEs use the original lossless `screenshot.png`, showing the light-theme tab strip and three split panes with multilingual text, the mascot and colour samples. Each screenshot links directly to that locale's homepage `#demo` section. Only the display width is specified, so GitHub can scale the image proportionally within its article column.
 
-`render-interaction-demo.swift` composes the video, static poster and raw GIF frames from an app-only recording and a clean window-button capture. `website/scripts/encode-interaction-gif.mjs` encodes the raw frames using the website's existing Sharp dependency. See each script's usage for the required inputs. Original recording coordinates are documented in the renderer; a different recording requires adjusting its source rectangles and edit timeline.
+The homepage retains its dedicated 12-second silent MP4, edited from an isolated light-theme development-build recording. It shows pane splits, moving running sessions, tab interactions and detached windows. Pauses are shortened and the end returns to the beginning with a crossfade. It reflects the main development tree, including changes listed in Unreleased.
 
-The README selects the still for readers whose viewer supports `prefers-reduced-motion`. The homepage initially renders a responsive still and only loads the muted video when visible; it includes a pause/play button and respects reduced motion by default.
+`render-interaction-demo.swift` composes the video, poster and optional raw GIF frames from an app-only recording and a clean window-button capture. `website/scripts/encode-interaction-gif.mjs` encodes those frames using Sharp. The existing GIF is retained as an optional asset; it is not used as a README hero. A different recording requires adjusting the renderer's source rectangles and edit timeline.
 
-The README image specifies only a display width. GitHub constrains image widths inside its article column without scaling an explicit HTML height, so a fixed height would stretch the loop. Its intrinsic aspect ratio must determine the rendered height. The GIF is rendered at twice its 960px display width from the original app recording, rather than enlarging an already-encoded image.
+The homepage initially renders a responsive poster and loads the muted video when visible. It includes a pause/play button and respects reduced motion by default.
