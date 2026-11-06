@@ -85,6 +85,11 @@ extension SFTPTransferEngine {
         public struct Skipped: Equatable, Sendable {
             public var relativePath: String
             public var reason: SkipReason
+
+            public init(relativePath: String, reason: SkipReason) {
+                self.relativePath = relativePath
+                self.reason = reason
+            }
         }
 
         public init(

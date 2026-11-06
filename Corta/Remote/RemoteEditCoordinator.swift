@@ -42,7 +42,8 @@ import Foundation
 /// Uploads run under `.overwrite` with the partial `.remove`d on failure,
 /// so an interrupted upload leaves the remote file untouched and no
 /// silent `.corta-part` behind — and the failure wording says exactly
-/// that. Re-downloads likewise overwrite the local copy atomically.
+/// that. A re-download lands beside the local copy and replaces it
+/// atomically once complete, unless the copy was saved again meanwhile.
 ///
 /// All UI goes through the `RemoteEditPresenter` closures, so tests drive
 /// the coordinator with fakes and never see an alert; the production
@@ -135,8 +136,13 @@ final class RemoteEditCoordinator {
     /// How long a connection may take to answer before it is given up:
     /// ssh's own connect, authentication, and SFTP's INIT/VERSION. A server
     /// whose subsystem never answers would otherwise hold every operation
-    /// on that host until the app quit.
+    /// on that host until the app quit. A question on screen does not count
+    /// (`ConnectionDeadline`): typing a password must not end the connection.
     private let connectTimeout: Duration
+    /// Whether a sign-in question for this host is on screen. A test's own.
+    var isAskingHost: (String) -> Bool = { SSHAskpassPrompter.isAsking(host: $0) }
+    /// Secures a file a re-download has put in place. A test's own, to fail it.
+    lazy var secureFile: (URL) throws -> Void = { [store] in try store.secureCopy(at: $0) }
     /// A connected subsystem can keep ssh alive without answering requests.
     /// Retire that connection so continuations unwind and Upload can retry.
     private let operationTimeout: Duration
@@ -145,19 +151,19 @@ final class RemoteEditCoordinator {
     var pendingConflicts: [UploadConflict] = []
 
     /// Each watched copy's source; cancelling one closes its descriptor.
-    private var watches: [String: DispatchSourceFileSystemObject] = [:]
+    var watches: [String: DispatchSourceFileSystemObject] = [:]
     /// The SHA-256 of each watched copy as last approved (at download,
     /// upload, or the previously-prompted edit) — the baseline the next
     /// change is measured against.
     var digests: [String: String] = [:]
-    private struct DigestCheck {
+    struct DigestCheck {
         let id: UUID
         let task: Task<Void, Never>
     }
     /// Keep completion as well as identity: a caller displaced by a newer
     /// check still waits until the replacement has applied its result.
-    private var digestChecks: [String: DigestCheck] = [:]
-    private var pendingChecks: [String: DispatchWorkItem] = [:]
+    var digestChecks: [String: DigestCheck] = [:]
+    var pendingChecks: [String: DispatchWorkItem] = [:]
     var uploadsInFlight: Set<String> = []
     var approvedSnapshots: [String: URL] = [:]
 
@@ -166,7 +172,7 @@ final class RemoteEditCoordinator {
         makeClient: ((String) -> any SFTPClient)? = nil,
         opener: (@MainActor (URL, Int, Int?) -> Bool)? = nil,
         presenter: RemoteEditPresenter? = nil,
-        connectTimeout: Duration = .seconds(30),
+        connectTimeout: Duration = ConnectionDeadline.timeout,
         operationTimeout: Duration = .seconds(120)
     ) {
         self.store = store
@@ -283,7 +289,8 @@ extension RemoteEditCoordinator {
         let tellAboutOrphan = { [presenter] in
             if let keptOrphan {
                 presenter.showError(L10n.format(
-                    "remoteEdit.orphanKept", remotePath, SSHTarget.displayName(forKey: host), keptOrphan.path))
+                    "remoteEdit.orphanKept", SFTPBrowserModel.peerText(remotePath),
+                    SSHTarget.displayName(forKey: host), keptOrphan.path))
             }
         }
         let copy: RemoteEditStore.RemoteCopy
@@ -358,12 +365,12 @@ extension RemoteEditCoordinator {
             self?.finish(attempt, host: host, failure: failure)
         }
         let timeout = connectTimeout
+        let shown = SSHTarget.displayName(forKey: host)
         attempt.deadline = Task { [weak self] in
-            do { try await Task.sleep(for: timeout, clock: .suspending) } catch { return }
-            self?.abandon(
-                attempt, host: host,
-                error: .transport(.hostUnreachable(
-                    diagnostics: "no SFTP answer within \(timeout.components.seconds) seconds")))
+            do {
+                try await ConnectionDeadline.wait(timeout) { self?.isAskingHost(shown) ?? false }
+            } catch { return }
+            self?.abandon(attempt, host: host, error: ConnectionDeadline.failure(after: timeout))
         }
         return attempt
     }
@@ -419,8 +426,12 @@ extension RemoteEditCoordinator {
         let client = try await client(for: host)
         var timedOut = false
         let timeout = operationTimeout
+        let shown = SSHTarget.displayName(forKey: host)
         let deadline = Task { @MainActor [weak self] in
-            do { try await Task.sleep(for: timeout, clock: .suspending) } catch { return }
+            // An operation can reconnect, and a reconnect can ask for a password.
+            do {
+                try await ConnectionDeadline.wait(timeout) { self?.isAskingHost(shown) ?? false }
+            } catch { return }
             timedOut = true
             if self?.clients[host] === client { self?.clients[host] = nil }
             // close resumes in-flight protocol requests, including cleanup.
@@ -449,120 +460,6 @@ extension RemoteEditCoordinator {
             }
             throw error
         }
-    }
-
-}
-
-// MARK: - Local change detection
-
-extension RemoteEditCoordinator {
-
-    func watch(_ copy: RemoteEditStore.RemoteCopy) {
-        unwatch(copy.id, invalidatingDigest: false)
-        let url = store.localURL(for: copy)
-        let descriptor = Darwin.open(url.path, O_EVTONLY | O_CLOEXEC)
-        guard descriptor >= 0 else { return }
-        let source = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: descriptor, eventMask: [.write, .extend, .rename, .delete],
-            queue: .main)
-        let id = copy.id
-        source.setEventHandler { [weak self] in
-            guard let self else { return }
-            // An editor's save is often several events and, for an atomic
-            // save, a rename that retires the inode this descriptor holds —
-            // so coalesce briefly, then re-point the watch and compare
-            // content (the ConfigurationStore pattern).
-            self.pendingChecks[id]?.cancel()
-            let work = DispatchWorkItem { [weak self] in
-                self?.repointWatch(copyID: id)
-                Task { [weak self] in await self?.noteLocalWrite(copyID: id) }
-            }
-            self.pendingChecks[id] = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
-        }
-        source.setCancelHandler { Darwin.close(descriptor) }
-        source.resume()
-        watches[copy.id] = source
-    }
-
-    private func repointWatch(copyID: String) {
-        guard pendingChecks[copyID] != nil else { return }
-        pendingChecks[copyID] = nil
-        guard let copy = store.copies[copyID] else { return }
-        watch(copy)
-    }
-
-    private func unwatch(_ copyID: String, invalidatingDigest: Bool = true) {
-        if invalidatingDigest { digestChecks[copyID] = nil }
-        pendingChecks[copyID]?.cancel()
-        pendingChecks[copyID] = nil
-        watches[copyID]?.cancel()
-        watches[copyID] = nil
-    }
-
-    /// The watch handler's payload, separated so tests can drive it
-    /// directly: a write whose content matches the approved digest is
-    /// noise; anything else is an edit awaiting a decision. Internal, not
-    /// private, for exactly that reason.
-    func noteLocalWrite(copyID: String) async {
-        guard let copy = store.copies[copyID] else { return }
-        let check = UUID()
-        let task = Task { [weak self] in
-            guard let self else { return }
-            await self.checkLocalWrite(copyID: copyID, at: self.store.localURL(for: copy), check: check)
-        }
-        digestChecks[copyID] = DigestCheck(id: check, task: task)
-        await withTaskCancellationHandler {
-            await task.value
-        } onCancel: {
-            task.cancel()
-        }
-        // A save event may have started a newer check while this one read.
-        // In particular, `open` must not return before an immediate editor
-        // save has reached the pending-decision state.
-        while !Task.isCancelled, let latest = digestChecks[copyID] {
-            await latest.task.value
-        }
-    }
-
-    private func checkLocalWrite(copyID: String, at url: URL, check: UUID) async {
-        defer {
-            if digestChecks[copyID]?.id == check { digestChecks[copyID] = nil }
-        }
-        let result = await readDigest(at: url)
-        guard !Task.isCancelled, digestChecks[copyID]?.id == check,
-            let copy = store.copies[copyID]
-        else { return }
-        guard let digest = result else {
-            // The copy was deleted underneath us: stop watching and drop
-            // any pending decision about it.
-            unwatch(copyID)
-            pendingUploads.removeAll { $0.id == copyID }
-            return
-        }
-        guard digest != digests[copyID] else { return }
-        // Approve this state as the new baseline: Dismiss means "not this
-        // edit", and the next save is measured against this content, not
-        // against the download.
-        digests[copyID] = digest
-        guard !pendingUploads.contains(where: { $0.id == copyID }),
-            !pendingConflicts.contains(where: { $0.id == copyID }),
-            !uploadsInFlight.contains(copyID)
-        else { return }
-        let pending = PendingUpload(copy: copy, contentDigest: digest)
-        pendingUploads.append(pending)
-        presenter.promptUpload(pending)
-    }
-
-    /// File content I/O never inherits the UI actor, even with approachable
-    /// concurrency enabled.
-    @concurrent nonisolated func readDigest(at url: URL) async -> String? {
-        RemoteEditStore.sha256Hex(ofFile: url)
-    }
-
-    func setDigest(_ digest: String?, for copyID: String) {
-        digestChecks[copyID] = nil
-        digests[copyID] = digest
     }
 
 }

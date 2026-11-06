@@ -34,13 +34,10 @@ extension SFTPConnection {
         var engine = SFTPTransferEngine.Configuration()
         engine.quarantinesDownloads = true
         engine.maximumDownloadBytes = maximumDownloadBytes
-        // Every connection to one host claims its remote paths under the
-        // same scope, so a browser upload and a remote-edit save to one file
-        // take turns instead of sharing its partial.
-        engine.destinationScope = key
         // `key` (`SSHTarget.key`) carries the user, port and key the
         // connection is made with. Callers have already checked it.
         let target = SSHTarget(key: key) ?? SSHTarget(host: key)
+        engine.destinationScope = destinationScope(for: target)
         let arguments = SFTPSubprocessChannel.arguments(host: target.host, options: target.sshOptions)
         // ssh asks for a password, a passphrase or a new host key through
         // Corta (`SSHAskpass`, D27). The grant lives as long as this
@@ -56,5 +53,46 @@ extension SFTPConnection {
             sshExecutable: DiagnosticsEnvironment.sftpSSHExecutable() ?? SFTPSubprocessChannel.defaultSSHPath,
             arguments: arguments, environment: environment, engineConfiguration: engine,
             onSpawn: onSpawn)
+    }
+
+    /// Every connection to one machine claims its remote paths under the same
+    /// scope, so a browser upload and a remote-edit save to one file take
+    /// turns instead of sharing its partial. The host and port name the
+    /// machine; who signs in, and with which key, reach the same files. An
+    /// alias and the name it stands for stay two scopes: ssh's configuration
+    /// is not read to say otherwise.
+    nonisolated static func destinationScope(for target: SSHTarget) -> String {
+        target.port.map { "\(target.host):\($0)" } ?? target.host
+    }
+}
+
+/// How long a connection may take to answer, not counting the time a person
+/// is being asked something: typing a password must not be what disconnects
+/// them. A question answered starts the time over — ssh is plainly alive, and
+/// what it does next is one more trip to the server.
+enum ConnectionDeadline {
+    /// The same for the browser and for remote editing.
+    static let timeout: Duration = .seconds(30)
+
+    /// Returns when the time is up; throws if cancelled first. Time is counted
+    /// tick by tick, each at most twice its length: a main thread busy for
+    /// a while is no silence from the server, whose answer may be queued
+    /// behind this very check.
+    static func wait(_ timeout: Duration, isAsking: () -> Bool) async throws {
+        let tick = min(timeout, .milliseconds(100))
+        var counted = Duration.zero
+        var last = SuspendingClock.now
+        while counted < timeout {
+            try await Task.sleep(for: tick, clock: .suspending)
+            let now = SuspendingClock.now
+            counted += min(last.duration(to: now), tick * 2)
+            last = now
+            if isAsking() { counted = .zero }
+        }
+    }
+
+    /// The failure a deadline ends in: the host did not answer, retryably.
+    nonisolated static func failure(after timeout: Duration) -> SFTPError {
+        .transport(.hostUnreachable(diagnostics: "no SFTP answer within \(timeout.components.seconds) seconds"))
     }
 }

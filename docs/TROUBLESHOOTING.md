@@ -343,6 +343,32 @@ the badge reads. A `tmux` or `screen` in the foreground reads *Remote?*
 because the session it is attached to may itself be on another machine
 and nothing here can tell — it is uncertainty, not an accusation.
 
+### An `ssh` pane stopped responding and Reconnect is greyed out
+
+`ssh` is still running, waiting on a network that went away, so it has not
+ended and there is nothing yet to reconnect. Its own `~.` escape ends it if it
+is still reading keys. Otherwise **Shell ▸ Terminal and Connection ▸ Kill and
+Reconnect to Host…** ends it and runs the same command again, once you confirm.
+Corta asks because a hung connection and an idle one look the same from here:
+what the old connection was running on the other machine may stop, and the
+output above is cleared.
+
+### Browse Remote Files… stays on Connecting, then says it could not reach the host
+
+A connection gets 30 seconds for each step of connecting to answer: ssh's own
+connection and sign-in, then the first directory. Past that the window says it
+could not reach the host and offers Retry; **Cancel** stops it sooner. The time
+a sign-in dialog is on screen does not count, so a slow password is not the
+cause. A host that takes longer than that needs a look at the network or VPN:
+`ssh -v` with the same user and port in a terminal shows where it stops.
+
+### A transfer failed saying the disk did not answer
+
+Before a transfer starts, Corta reads the local file's details on a thread of
+its own and waits five seconds. This means the file is on a volume that did not
+answer in that time, usually a network share whose server has gone. The window
+stays usable. Reconnect the volume, then use the row's Retry button.
+
 ### Browse Remote Files… says authentication failed, but `ssh` works in the pane
 
 The SFTP connection asks for a password or a key passphrase in a dialog

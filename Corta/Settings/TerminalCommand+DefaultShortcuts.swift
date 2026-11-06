@@ -109,6 +109,8 @@ nonisolated extension TerminalCommand {
         // default. And it is enabled only for a dead remote pane, where a
         // keypress is rarely how anyone gets there.
         case .reconnectRemote: return nil
+        // Unbound for the same reason, and more so: it ends a live connection.
+        case .killAndReconnectRemote: return nil
         // Unbound: it opens a window against a specific pane's host, which
         // is a mouse's or a menu's gesture more than a keystroke's — and a
         // key spent here is a key the child process can never have.

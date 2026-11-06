@@ -566,21 +566,56 @@ all of these hold:
 - A closed connection's token is dead: the broker holds it weakly, and
   nothing listens again once the app has stopped the broker at quit.
 
-The request is one line of at most 16 KiB, read under a five-second
-timeout on a queue of its own, so a silent client holds up no other. A
-keyboard-interactive prompt is the *server's* text: the dialog shows it
-with controls and concealing scalars as U+FFFD, at most 24 lines and 2,000
-characters, and says it comes from OpenSSH or the server. A host-key
-dialog defaults to Cancel. In the background Corta bounces in the Dock
-rather than taking focus; with no window open, the question gets a window
-of its own. The answer is written to that socket and nowhere else — not
-stored, not logged — and the dialog closes, answering nothing, the moment
-the asking process goes away. A refused password or code — not a key's
-passphrase, which only makes ssh skip that key — ends the ssh it came from — `SIGTERM` to the admitted process, checked again by
-its start time, never Corta itself — because OpenSSH reads a failed askpass
-as an empty answer and would send it and ask again. Within §1's threat model a process already
-running as the user is out of scope; the ancestry check exists so that one
-*reading* ssh's environment cannot use the token on its own.
+The request is one line of at most 16 KiB, with five seconds to arrive whole
+however it dribbles; at most sixteen clients may be sending one at a time, each
+on a queue of its own, and one past that is dropped, which ssh reads as
+cancelled. A dialog holds no thread. A prompt shown in a dialog is cleaned:
+controls and concealing scalars as U+FFFD, at most 24 lines and 2,000
+characters. Each dialog says the question comes from OpenSSH or the server: a
+password or host-key prompt is usually the local ssh's own text and only a
+keyboard-interactive prompt is the server's, and the app cannot tell which it
+holds.
+
+**Who is asking.** A dialog names the connection's destination only when the
+asker's parent is the ssh that connection spawned. Anything further down — a
+`ProxyJump`'s inner ssh, a `ProxyCommand` — gets a title saying an intermediate
+step on the way to the destination is asking, and the line under its prompt
+says the question is not from the destination. Without that, a compromised jump
+host could collect the destination's password under a title naming the
+destination, or have its own host key accepted as the destination's: the
+host-key advice says this is not the destination's key. Distance is measured
+from the kernel's view of the process tree, not from anything the server sends.
+A server reached directly can still word a keyboard-interactive prompt however it
+likes, and one at the far end of a jump is that destination's own question.
+
+A host-key dialog defaults to Cancel, whoever asks. In the background Corta
+bounces in the Dock rather than taking focus; with no window open, the question
+gets a window of its own. The answer is written to that socket and nowhere else
+— not stored, not logged — and the dialog closes, answering nothing, the moment
+the asking process or the connection's ssh goes away, or the window it hangs on
+closes. Whether a refusal ends the connection is decided once, by the broker,
+from the whole prompt, and the dialog is told. A refused password or code — not
+a key's passphrase, which only makes ssh skip that key — ends the connection's
+ssh: `SIGTERM` to the admitted process, checked again by its start time, never
+Corta itself — because OpenSSH reads a failed askpass as an empty answer and
+would send it and ask again. Within §1's threat model a process already running
+as the user is out of scope; the ancestry check exists so that one *reading*
+ssh's environment cannot use the token on its own.
+
+Two residuals are accepted, because ssh's wording is all there is to go on and a
+server can copy it exactly. A keyboard-interactive prompt ending in ssh's
+host-key question opens the host-key dialog: it has no field, and "Trust and
+Connect" sends that server the word `yes`, not a key. One containing
+"passphrase" gets a plain Cancel: ssh then asks again, up to its own limit, and
+the connection's Cancel, closing its window, or the server running out of tries
+ends that.
+
+Elsewhere in the browser and in remote editing, what the far end chose — a
+STATUS message, a file name, a path, a server's banner in ssh's error output —
+reaches a confirmation or an error line through one function: the same scalars
+replaced, and bounded (`SFTPBrowserModel.peerText`, 2,048 scalars). The name
+sent back to the server stays as it came, which is why a Rename field starts
+from the raw name.
 
 ### 4.9 Local status and themes cross no boundary
 
@@ -806,6 +841,12 @@ budget explicitly rather than assuming another layer accounts for them.
 Cancelled SFTP requests that still owe a wire reply have a separate 1,024-ID
 budget; exhausting it closes the session with a protocol error and releases
 the ledger. Those IDs are never recycled into live requests before a reply.
+Senders waiting behind a full 32-request window are capped at 1,024; one past
+that fails at once and the session goes on. A browser connection that does not
+answer has 30 seconds per step, not counting a sign-in question on screen, and a
+local file check before a transfer has five seconds on a thread of its own, with
+at most eight left blocked per window; a mount that never answers costs those
+threads and fails those rows, never the main thread.
 Remote path breadcrumbs retain at most eight items (root, a folded ancestor,
 and six trailing components), constructing only those prefixes. Slash trimming
 walks the path once. Progress fractions sum peer sizes as floating point rather

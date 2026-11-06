@@ -116,7 +116,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         /// OPEN, and bytes past it end the transfer, whatever was stated.
         public var maximumDownloadBytes: UInt64?
 
-        /// What makes a remote path unique across engines: the host the
+        /// What makes a remote path unique across engines: the machine the
         /// session reaches. Two engines with the same scope never transfer
         /// to the same remote path at once (`SFTPDestinationLocks`); `nil`
         /// scopes the engine to itself, which still serialises its own
@@ -308,7 +308,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
     /// The claim key for a remote destination under this engine's scope.
     func remoteClaim(_ remotePath: String) -> String {
         let scope = configuration.destinationScope ?? "engine-\(ObjectIdentifier(self))"
-        return "remote\u{0}\(scope)\u{0}" + SFTPDestinationLocks.normalizedRemotePath(remotePath)
+        return "remote\u{0}\(scope)\u{0}" + SFTPDestinationLocks.remoteClaimPath(remotePath)
     }
 
     /// Best effort: a volume without extended attributes cannot carry the
@@ -346,7 +346,7 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 }
                 attempt += 1
                 do {
-                    try await Task.sleep(for: backoff)
+                    try await Task.sleep(for: backoff, clock: .suspending)
                 } catch {
                     throw SFTPError.cancelled
                 }
@@ -355,6 +355,9 @@ public final class SFTPTransferEngine: @unchecked Sendable {
                 do {
                     fresh = try await reconnect()
                 } catch {
+                    // A reconnect the caller cancelled is that cancellation,
+                    // not the failure it was recovering from.
+                    if Task.isCancelled { throw SFTPError.cancelled }
                     // Reconnection is the app layer's ssh spawn; its
                     // failure means the retry policy is exhausted in
                     // practice — surface the original transport failure.

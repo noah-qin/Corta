@@ -181,10 +181,10 @@ extension SFTPBrowserModel {
         switch error {
         case .server(let status):
             if status.code == .permissionDenied {
-                return L10n.format("sftp.error.permissionDenied", host, status.messageString)
+                return L10n.format("sftp.error.permissionDenied", host, peerText(status.messageString))
             }
             return L10n.format(
-                "sftp.error.server", host, Int(status.code.rawValue), status.messageString)
+                "sftp.error.server", host, Int(status.code.rawValue), peerText(status.messageString))
         case .transport(let transport):
             switch transport {
             case .authenticationFailed(let diagnostics):
@@ -209,17 +209,18 @@ extension SFTPBrowserModel {
                 return L10n.format("sftp.error.connectionLost", host)
             }
         case .protocolViolation(let detail):
-            return L10n.format("sftp.error.protocol", host, detail)
+            return L10n.format("sftp.error.protocol", host, peerText(detail))
         case .cancelled:
             return L10n.text("sftp.transfer.cancelled")
         case .destinationConflict(let path):
-            return L10n.format("sftp.error.conflict", path)
+            return L10n.format("sftp.error.conflict", peerText(path))
         case .localIOFailed(let operation, let code):
             return L10n.format("sftp.error.localIO", operation, code)
         case .sourceChanged(let path):
-            return L10n.format("sftp.error.sourceChanged", path)
+            return L10n.format("sftp.error.sourceChanged", peerText(path))
         case .replaceIncomplete(let destination, let previousCopy, let newCopy):
-            return L10n.format("sftp.error.replaceIncomplete", destination, previousCopy, newCopy)
+            return L10n.format(
+                "sftp.error.replaceIncomplete", peerText(destination), peerText(previousCopy), peerText(newCopy))
         }
     }
 
@@ -263,8 +264,14 @@ extension SFTPBrowserModel {
         }
     }
 
+    /// A server's pre-authentication banner reaches ssh's stderr, so this is
+    /// the far end's text too: cleaned line by line, and its end kept, since
+    /// ssh says what went wrong last.
     nonisolated static func trimmedDiagnostics(_ diagnostics: String) -> String {
-        diagnostics.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleaned = replacingConcealedScalars(in: diagnostics, with: "\u{FFFD}", keepingNewlines: true)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleaned.unicodeScalars.count > peerTextLimit else { return cleaned }
+        return "…" + String(String.UnicodeScalarView(cleaned.unicodeScalars.suffix(peerTextLimit)))
     }
 
     /// Narrowing for plain `catch` clauses: this toolchain binds a

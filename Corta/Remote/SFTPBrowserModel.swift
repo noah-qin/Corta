@@ -240,6 +240,15 @@ final class SFTPBrowserModel {
 
     let transferQueue = SFTPTransferQueue()
 
+    /// How long each step of connecting may go unanswered, not counting a
+    /// question on screen (`ConnectionDeadline`).
+    var connectTimeout = ConnectionDeadline.timeout
+    /// Whether a sign-in question for this host is on screen. A test's own.
+    var isAskingHost: (String) -> Bool = { SSHAskpassPrompter.isAsking(host: $0) }
+    @ObservationIgnored var connectDeadline: Task<Void, Never>?
+    /// The listing being loaded: a newer one replaces it.
+    @ObservationIgnored var loadTask: Task<Void, Never>?
+
     /// A host the pane *reported* but the user has not yet agreed to
     /// connect to (`RemoteHostConsent`): shown prefilled in the host field
     /// with wording that says where the name came from, and connected to

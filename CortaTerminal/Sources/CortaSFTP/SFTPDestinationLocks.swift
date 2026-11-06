@@ -30,7 +30,7 @@ import Synchronization
 ///
 /// A claim is a key, not a path: the engine builds it from its
 /// `destinationScope` (the host, for remote paths) and a lexically
-/// normalised path. Another process gets no claim from here; the engine's
+/// normalised, case-folded path. Another process gets no claim from here; the engine's
 /// exclusive partial creation is what keeps it from writing into ours.
 final class SFTPDestinationLocks: @unchecked Sendable {
     static let shared = SFTPDestinationLocks()
@@ -117,6 +117,15 @@ final class SFTPDestinationLocks: @unchecked Sendable {
         }
         let joined = components.joined(separator: "/")
         return path.hasPrefix("/") ? "/" + joined : joined
+    }
+
+    /// A remote destination's key. Case-folded, as a local one is: whether
+    /// the far end's volume tells `/A` from `/a` is not something SFTP says,
+    /// and a macOS or Windows server does not. Taking turns over two names
+    /// that differ only in case costs a wait, never a file; the path sent to
+    /// the server is not this one.
+    static func remoteClaimPath(_ path: String) -> String {
+        normalizedRemotePath(path).lowercased()
     }
 
     /// A local destination's key: standardised, and case-folded because the

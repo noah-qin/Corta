@@ -638,6 +638,12 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   sheet; otherwise it says the pane is remote without knowing which host.
 - **Reconnect.** When an `ssh` or `mosh` session ends, **Reconnect to Host**
   runs the same command again, as a new connection.
+- **A connection that hangs.** An `ssh` waiting on a network that went away
+  has not ended, so there is nothing yet to reconnect. **Shell ▸ Terminal and
+  Connection ▸ Kill and Reconnect to Host…** (also in the command palette) asks
+  first, since a hung connection and an idle one look the same from here, then
+  ends it and runs the same command again. What it was running on the other
+  machine may stop, and the output above is cleared.
 - **Connecting.** The toolbar's globe button opens **Connect to Host**, a
   sheet with a **Terminal / Files (SFTP)** switch: a terminal over SSH, or
   the file browser. Type the host — a name, an address, `user@host` or an
@@ -705,16 +711,31 @@ the fingerprint and defaults to Cancel. A key held by `ssh-agent` or the
 keychain, or an existing `ControlMaster` connection from your terminal,
 signs in without asking.
 
+Through a `ProxyJump` or `ProxyCommand`, a question can come from a machine on
+the way rather than the destination. Its dialog says so in its title, and its
+host-key advice says the fingerprint is not the destination's: check who is
+asking before typing the destination's password there.
+
 A connection that fails says why in a sentence — the password or key was
 not accepted, the host did not answer, its host key is unknown or changed,
 the server offers no SFTP — with ssh's own words under **Details**, and
-offers **Try Again** or **Edit Connection**.
+offers **Try Again** or **Edit Connection**. A host that says nothing is given
+up on after 30 seconds per step of connecting; the time a sign-in dialog is on
+screen does not count.
+
+A transfer's row can be cancelled at any point, including while it is still
+looking at the destination. Cancelling a resumed transfer keeps its partial
+file, and the row's **Retry** continues from there. A row whose local disk does
+not answer within five seconds fails with **Retry**, and the window stays usable.
 
 Remote-edit uploads compare remote content as well as size and modification
 time and send the private snapshot you approved. If you save another local
 edit after the approval prompt, Corta asks for a new decision; saves during
 an upload remain pending. After a connection failure, the next edit or
-upload connects again, and a failed upload keeps its pending decision.
+upload connects again, and a failed upload keeps its pending decision. A
+re-download that fails says so and asks about the conflict again, with the copy
+untouched; a save made while one runs is kept instead of the download, and is
+offered as a new edit.
 Once connected, an operation that has not finished after 120 seconds is
 stopped and the upload offered again, so a stalled connection cannot hold
 an edit forever.

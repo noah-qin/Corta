@@ -75,6 +75,21 @@ struct PaneRemoteTests {
         #expect(host.remote.reconnectNotice == L10n.text("toast.reconnected"))
     }
 
+    @Test("with no running connection there is nothing to kill, and the action refuses")
+    func nothingToKill() {
+        let host = RemoteTestHost()
+        host.launchedCommand = ("/usr/bin/ssh", ["box"])
+        var asked = false
+        host.remote.confirmKill = { _, _, answer in
+            asked = true
+            answer(true)
+        }
+        #expect(!host.remote.canKillAndReconnect)
+        host.remote.killAndReconnectRemote(nil)
+        #expect(!asked)
+        #expect(host.rebuilds.isEmpty)
+    }
+
     @Test("a failed pane is local and offers no browser")
     func failedPaneIsLocal() {
         let host = RemoteTestHost()
@@ -102,7 +117,8 @@ struct PaneRemoteTests {
         // Not loaded: no session, nothing spawned, so neither applies.
         let pane = ViewController()
         for action in [
-            #selector(PaneRemote.reconnectRemote(_:)), #selector(PaneRemote.browseRemoteFiles(_:)),
+            #selector(PaneRemote.reconnectRemote(_:)), #selector(PaneRemote.killAndReconnectRemote(_:)),
+            #selector(PaneRemote.browseRemoteFiles(_:)),
         ] {
             #expect(pane.responds(to: action))
             let item = NSMenuItem(title: "", action: action, keyEquivalent: "")

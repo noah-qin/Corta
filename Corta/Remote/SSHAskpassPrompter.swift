@@ -30,37 +30,61 @@ enum SSHAskpassPrompter {
     /// both go back — rare, and Connect is one click away.
     static let refusedNotification = Notification.Name("CortaSSHAskpassRefused")
 
-    /// Nil is a refusal. Task cancellation — ssh no longer waiting — takes
-    /// the sheet down and refuses.
-    static func ask(_ question: SSHAskpass.Question, host: String, prompt: String) async -> String? {
+    /// Questions on screen, by host: a connection's deadline does not run
+    /// while its user is being asked something (`ConnectionDeadline`).
+    private static var openQuestions: [String: Int] = [:]
+
+    static func isAsking(host: String) -> Bool {
+        openQuestions[host, default: 0] > 0
+    }
+
+    /// Nil is a refusal. Task cancellation — ssh no longer waiting — or the
+    /// window it hangs on closing takes the sheet down and refuses.
+    static func ask(_ asking: SSHAskpass.Asking) async -> String? {
+        let host = asking.host
         // With every window closed — a remote-edit save reconnecting — the
         // question gets a window of its own rather than a silent refusal.
-        let endsConnection = question == .secret && SSHAskpass.refusalEndsConnection(kind: .secret, prompt: prompt)
         let found = window(for: host)
         let standalone = found == nil ? makeStandaloneWindow() : nil
         guard let window = found ?? standalone else {
             // Refused unasked: the broker still ends the connection.
-            if endsConnection { NotificationCenter.default.post(name: refusedNotification, object: host) }
+            if asking.refusalEndsConnection {
+                NotificationCenter.default.post(name: refusedNotification, object: host)
+            }
             return nil
         }
         defer { standalone?.close() }
+        openQuestions[host, default: 0] += 1
+        defer {
+            openQuestions[host, default: 1] -= 1
+            if openQuestions[host] == 0 { openQuestions[host] = nil }
+        }
         // In the background the sheet is out of sight: bounce until the
         // user comes, and stop once the question is gone.
         let attention = NSApp.isActive ? nil : NSApp.requestUserAttention(.criticalRequest)
         defer { if let attention { NSApp.cancelUserAttentionRequest(attention) } }
-        let alert = makeAlert(question, host: host, prompt: prompt)
+        let alert = makeAlert(asking)
         let field = alert.accessoryView as? NSSecureTextField
-        let answer = await answer(alert, field: field, question: question, on: window)
-        if endsConnection, answer == nil, !Task.isCancelled {
+        let answer = await answer(alert, field: field, question: asking.question, on: window)
+        if asking.refusalEndsConnection, answer == nil, !Task.isCancelled {
             NotificationCenter.default.post(name: refusedNotification, object: host)
         }
         return answer
     }
 
-    private static func answer(
+    static func answer(
         _ alert: NSAlert, field: NSSecureTextField?, question: SSHAskpass.Question, on window: NSWindow
     ) async -> String? {
-        await withTaskCancellationHandler {
+        // A window can be closed from under its sheet by something other than
+        // the user — a terminal window its shell ended, say. AppKit then never
+        // calls the sheet's completion, and ssh would wait for ever.
+        let closing = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: window, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { window.endSheet(alert.window, returnCode: .cancel) }
+        }
+        defer { NotificationCenter.default.removeObserver(closing) }
+        return await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
                 alert.beginSheetModal(for: window) { response in
                     guard response == acceptResponse(question) else {
@@ -118,44 +142,55 @@ enum SSHAskpassPrompter {
         question == .hostKey ? .alertSecondButtonReturn : .alertFirstButtonReturn
     }
 
-    static func makeAlert(_ question: SSHAskpass.Question, host: String, prompt: String) -> NSAlert {
+    /// Below the connection's own ssh, the asker is a machine on the way to
+    /// `host`, whatever its prompt says, and a dialog's own words must not say
+    /// otherwise. Which words came from where: the title and advice are
+    /// Corta's; a password or host-key prompt is usually the local ssh's; only
+    /// a keyboard-interactive prompt is a server's.
+    static func makeAlert(_ asking: SSHAskpass.Asking) -> NSAlert {
         let alert = NSAlert()
-        let source = L10n.text("askpass.source")
-        switch question {
+        let host = asking.host, prompt = asking.prompt
+        let step = asking.isIntermediateStep
+        let source = step ? L10n.format("askpass.source.intermediate", host) : L10n.text("askpass.source")
+        switch asking.question {
         case .secret:
-            // One title, then ssh's own question and where it came from in
-            // one line: the prompt usually names the host again, so a
-            // separate paragraph for each said the same thing three times.
+            // The prompt, then where it came from: a server can write
+            // anything here, so the line after it always says it may have.
             alert.icon = symbolIcon("lock.fill", tint: .controlAccentColor)
-            alert.messageText = L10n.format("askpass.secret.title", host)
-            alert.informativeText = "“\(prompt)” · " + L10n.text("askpass.source.short")
+            let title = L10n.format(step ? "askpass.secret.title.intermediate" : "askpass.secret.title", host)
+            alert.messageText = title
+            alert.informativeText = "“\(prompt)”\n\n" + source
             alert.addButton(withTitle: L10n.text("askpass.continue"))
             // Cancel ends the connection (the broker), so it says so; for a
             // key's passphrase it only skips that key.
             alert.addButton(withTitle: L10n.text(
-                SSHAskpass.refusalEndsConnection(kind: .secret, prompt: prompt)
-                    ? "askpass.cancelConnection" : "common.cancel"))
+                asking.refusalEndsConnection ? "askpass.cancelConnection" : "common.cancel"))
             let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
             field.placeholderString = placeholder(for: prompt)
             field.setAccessibilityIdentifier("askpass-answer")
-            field.setAccessibilityLabel(L10n.format("askpass.secret.title", host))
+            field.setAccessibilityLabel(title)
             alert.accessoryView = field
         case .hostKey:
             alert.alertStyle = .warning
             alert.icon = symbolIcon("exclamationmark.shield.fill", tint: .systemOrange)
-            alert.messageText = L10n.format("askpass.hostKey.title", host)
-            alert.informativeText = prompt + "\n\n" + L10n.text("askpass.hostKey.advice")
+            alert.messageText = L10n.format(
+                step ? "askpass.hostKey.title.intermediate" : "askpass.hostKey.title", host)
+            let advice = step
+                ? L10n.format("askpass.hostKey.advice.intermediate", host) : L10n.text("askpass.hostKey.advice")
+            alert.informativeText = prompt + "\n\n" + advice
             // Cancel is the default: Return must not trust a key unread.
             alert.addButton(withTitle: L10n.text("common.cancel"))
             alert.addButton(withTitle: L10n.text("askpass.hostKey.trust"))
         case .confirm:
             alert.icon = symbolIcon("key.fill", tint: .controlAccentColor)
-            alert.messageText = L10n.format("askpass.confirm.title", host)
+            alert.messageText = L10n.format(
+                step ? "askpass.confirm.title.intermediate" : "askpass.confirm.title", host)
             alert.informativeText = prompt + "\n\n" + source
             alert.addButton(withTitle: L10n.text("askpass.confirm.allow"))
             alert.addButton(withTitle: L10n.text("askpass.confirm.deny"))
         case .notify:
-            alert.messageText = L10n.format("askpass.notify.title", host)
+            alert.messageText = L10n.format(
+                step ? "askpass.notify.title.intermediate" : "askpass.notify.title", host)
             alert.informativeText = prompt
             alert.addButton(withTitle: L10n.text("askpass.notify.hide"))
         }
