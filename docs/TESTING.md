@@ -1059,6 +1059,13 @@ the UI or Release plans use, build each plan with
 `COMPILER_INDEX_STORE_ENABLE=YES` into its own derived data and pass every
 `Index.noindex/DataStore` with `--index-store-path`.
 
+If combining Debug and Benchmark indexes reports a declaration conflict for
+the same module, scan each plan separately instead. A declaration is removable
+only when every scan that can see its callers reports it unused: read app, UI
+and Release results together, then cross-check package declarations against
+the package scan. Do not silence the conflict by excluding a test target or
+retaining all public declarations.
+
 Code kept on purpose carries a `// periphery:ignore - reason` comment on
 the member the scan reports, not on its type, which the scan would call
 superfluous: a field read only by a synthesised `==` or `hash`, one the

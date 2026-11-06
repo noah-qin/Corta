@@ -37,10 +37,11 @@ extension TerminalView {
     }
 
     /// A click focuses its pane — keyboard input follows focus, and focus is
-    /// the only routing rule a split window has. Not while the pane's search
-    /// bar has the keyboard, though: clicking a match with the bar open must
-    /// not strand the bar. A bar merely open is no reason: with the keyboard in
-    /// another pane, this click would leave it there, typing into that one.
+    /// the only routing rule a split window has. In the launched app a click
+    /// on this view has already moved the keyboard here by the time `mouseDown`
+    /// runs, the search bar staying open; this holds for a view clicked with
+    /// no such move behind it, and leaves a bar that still has the keyboard
+    /// alone. A bar merely open is no reason to skip it.
     func takeFocusForClick() {
         if paneController?.search.hasKeyboardFocus != true {
             window?.makeFirstResponder(self)

@@ -36,6 +36,8 @@ enum PaneSpawn {
     /// pane. Each is dropped in turn; `/bin/sh` in `/` is guaranteed by POSIX.
     /// - Parameter size: the grid the child starts at.
     /// - Parameter directory: where it starts; dropped when it is unusable.
+    /// - Parameter directoryChecked: the startup phase already verified the
+    ///   directory off the main thread; do not probe it again while opening.
     /// - Parameter scrollbackLimit: the history cap, in lines.
     /// - Parameter commandHistoryLimit: the OSC 133 records kept.
     /// - Parameter preset: the shell, directory and environment it names.
