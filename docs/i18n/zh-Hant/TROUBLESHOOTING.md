@@ -120,6 +120,20 @@ Corta 會保留已有的設定，並拒絕寫入這個檔案，因為寫入會�
 
 ---
 
+<a id="file-drops"></a>
+
+## 拖放檔案
+
+### 之前拖入的路徑不存在了
+
+只有其他應用程式才能提供的檔案（例如照片或郵件附件）是暫存副本。窗格關閉（連同其標籤頁或視窗）或 Corta 結束時副本會被刪除，更新後第一次啟動也會刪除舊版本留下的副本。此後路徑處處失效：還在執行的程式、複製到別處的路徑、捲動內容和 shell 歷史。⇧⌘T 恢復窗格時副本不會回來。想保留請先另存。從 Finder 拖來的檔案直接使用原路徑，絕不會被刪除。
+
+### 拖放副本佔用磁碟空間
+
+**設定 ▸ 隱私權與安全性 ▸ 本機資料** 顯示佔用的空間並提供 **立即清理…**，只保留正在接收或上傳的檔案。別的程式開著檔案或系統快照存在時，空間可能不會立刻釋放。
+
+如果 Corta 當機或已解除安裝、不會再打開，就沒有什麼會清理它們了。結束 Corta 後可以手動刪除這兩個資料夾：`~/Library/Application Support/Corta/DroppedFiles/` 和 `~/Library/Application Support/Corta/SFTPDragStaging/`。開發版用 `~/Library/Application Support/Corta Dev/ApplicationSupport/` 代替 `Corta` 資料夾。
+
 <a id="typing-and-rendering"></a>
 
 ## 輸入和算繪

@@ -131,6 +131,20 @@ assim que lê de novo. A integração com o shell faz o mesmo com um arquivo rc 
 
 ---
 
+<a id="file-drops"></a>
+
+## Soltar arquivos
+
+### Um caminho que soltei antes não existe mais
+
+Arquivos que só outro app pode fornecer, como uma foto ou um anexo do Mail, chegam como cópias temporárias. Uma cópia é removida quando seu painel fecha, também junto com a aba ou janela, ou quando o Corta encerra, e a primeira abertura após uma atualização remove as cópias de versões anteriores. Depois disso o caminho não vale em lugar nenhum: nem em um programa em execução, nem onde você o copiou, nem no histórico de rolagem ou do shell. ⇧⌘T traz um painel de volta sem suas cópias. Para manter um arquivo assim, salve-o antes em outro lugar. Um arquivo solto do Finder é usado onde está e nunca é removido.
+
+### Cópias de arquivos soltos ocupam espaço
+
+**Ajustes ▸ Privacidade e segurança ▸ Dados locais** mostra o espaço e oferece **Limpar agora…**, que só mantém o que está sendo recebido ou enviado. Se outro programa mantiver um arquivo aberto ou houver um instantâneo do sistema, o espaço pode demorar a voltar.
+
+Se o Corta travou ou foi desinstalado e não será aberto de novo, nada limpará essas pastas. Depois de encerrar o Corta, você pode removê-las manualmente: `~/Library/Application Support/Corta/DroppedFiles/` e `~/Library/Application Support/Corta/SFTPDragStaging/`. Builds de desenvolvimento usam `~/Library/Application Support/Corta Dev/ApplicationSupport/` no lugar da pasta `Corta`.
+
 <a id="typing-and-rendering"></a>
 
 ## Digitação e renderização

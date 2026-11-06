@@ -137,6 +137,20 @@ rc-Datei, die sie nicht lesen kann: Sie meldet es und lässt die Datei in Ruhe.
 
 ---
 
+<a id="file-drops"></a>
+
+## Dateien ablegen
+
+### Ein früher abgelegter Pfad existiert nicht mehr
+
+Dateien, die nur eine andere App liefern kann, etwa aus Fotos oder Mail-Anhänge, kommen als temporäre Kopien an. Eine Kopie verschwindet, wenn ihr Bereich geschlossen wird, auch mit seinem Tab oder Fenster, oder wenn Corta endet, und der erste Start nach einem Update entfernt Kopien älterer Versionen. Danach gilt der Pfad nirgends mehr: nicht in einem laufenden Programm, nicht dort, wohin du ihn kopiert hast, nicht im Verlauf und nicht in der Shell-Historie. ⇧⌘T bringt einen Bereich ohne seine Kopien zurück. Sichere eine solche Datei vorher an anderer Stelle. Eine aus dem Finder abgelegte Datei wird dort verwendet, wo sie liegt, und nie entfernt.
+
+### Kopien abgelegter Dateien belegen Speicherplatz
+
+**Einstellungen ▸ Datenschutz & Sicherheit ▸ Lokale Daten** zeigt den Platz und bietet **Jetzt entfernen …**; nur was gerade empfangen oder hochgeladen wird, bleibt. Hält ein anderes Programm eine Datei offen oder gibt es einen System-Snapshot, wird der Platz eventuell erst später frei.
+
+Ist Corta abgestürzt oder deinstalliert und wird nicht mehr geöffnet, räumt nichts mehr auf. Nach dem Beenden von Corta kannst du diese Ordner von Hand löschen: `~/Library/Application Support/Corta/DroppedFiles/` und `~/Library/Application Support/Corta/SFTPDragStaging/`. Entwicklungs-Builds verwenden `~/Library/Application Support/Corta Dev/ApplicationSupport/` statt des Ordners `Corta`.
+
 <a id="typing-and-rendering"></a>
 
 ## Tippen und Darstellung

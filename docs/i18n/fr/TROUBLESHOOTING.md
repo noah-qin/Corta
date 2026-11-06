@@ -136,6 +136,20 @@ le signale et n’y touche pas.
 
 ---
 
+<a id="file-drops"></a>
+
+## Déposer des fichiers
+
+### Un chemin déposé plus tôt n'existe plus
+
+Les fichiers que seule une autre app peut fournir, comme une photo ou une pièce jointe de Mail, arrivent sous forme de copies temporaires. Une copie disparaît à la fermeture de son panneau, y compris avec son onglet ou sa fenêtre, ou quand Corta quitte, et le premier lancement après une mise à jour supprime les copies des anciennes versions. Le chemin ne vaut alors plus nulle part : ni dans un programme en cours, ni là où vous l'avez copié, ni dans l'historique de défilement ou du shell. ⇧⌘T rouvre un panneau sans ses copies. Pour conserver un tel fichier, enregistrez-le d'abord ailleurs. Un fichier déposé depuis le Finder est utilisé là où il se trouve et n'est jamais supprimé.
+
+### Les copies de fichiers déposés occupent de l'espace
+
+**Réglages ▸ Confidentialité et sécurité ▸ Données locales** indique l'espace et propose **Nettoyer maintenant…**, qui ne garde que ce qui est en cours de réception ou d'envoi. Si un autre programme garde un fichier ouvert ou qu'un instantané système existe, l'espace peut ne pas revenir tout de suite.
+
+Si Corta a planté ou a été désinstallé et ne sera plus ouvert, plus rien ne nettoie. Après avoir quitté Corta, vous pouvez supprimer ces dossiers à la main : `~/Library/Application Support/Corta/DroppedFiles/` et `~/Library/Application Support/Corta/SFTPDragStaging/`. Les versions de développement utilisent `~/Library/Application Support/Corta Dev/ApplicationSupport/` à la place du dossier `Corta`.
+
 <a id="typing-and-rendering"></a>
 
 ## Saisie et rendu
