@@ -19,12 +19,12 @@ The development wrapper prepares content before Next starts, then watches root R
 ```sh
 bun run build    # Markdown preparation and static export to out/
 bun run check    # TypeScript
-bun run test     # origin/basePath, source-date and prose-extraction regression tests
+bun run test     # site metadata and HTTP video-preview regression tests
 bun run verify   # HTML/links/anchors, SEO, sitemap, responsive assets
 bun run start    # static production preview at http://localhost:3001/
 ```
 
-`bun run dev --port 3002` and `PORT=3002 bun run start` select a different port. Both servers bind loopback. The development preview watches documents; the static `out/` preview changes only after a new build. `next start` is not used because no production server is required.
+`bun run dev --port 3002` and `PORT=3002 bun run start` select a different port. Both servers bind loopback. The static preview serves MP4 as `video/mp4` and supports byte-range probes/seeks and HEAD responses, including the requests Safari uses to load video. The development preview watches documents; the static `out/` preview changes only after a new build. `next start` is not used because no production server is required.
 
 ## Content and languages
 
