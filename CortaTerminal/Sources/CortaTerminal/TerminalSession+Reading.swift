@@ -100,7 +100,10 @@ extension TerminalSession {
             let slice = batch[offset..<end]
             let finished = decoded
             decoded = nil
-            let applied = state.withLock { current -> SliceOutcome in
+            let outcome = state.withLock { current -> SliceOutcome? in
+                // In the lock, so a resize's copy cannot miss a slice that
+                // had already passed this check.
+                guard !current.isResizing else { return nil }
                 let episodeBefore = current.terminal.synchronizedOutputEpisode
                 if let finished { current.terminal.completeDeferredImage(finished) }
                 let consumed = current.terminal.feedDeferringImageDecode(slice)
@@ -123,6 +126,11 @@ extension TerminalSession {
                     responses: sliceResponses, episode: episodeAfter, compress: compress, consumed: consumed,
                     deferred: deferred)
             }
+            guard var applied = outcome else {
+                decoded = finished
+                guard waitOutResize() else { return }
+                continue
+            }
             if responses.count + applied.responses.count <= Self.maxResponseBytesPerBatch {
                 responses.append(contentsOf: applied.responses)
             }
@@ -133,7 +141,10 @@ extension TerminalSession {
             // one `read(2)` away, sooner than a waiter's wake, so a flood
             // of one-slice batches would never leave a gap.
             yieldToStateWaiters()
-            decoded = applied.deferred?.decode()
+            // Out of the outcome, so the decode can free the text as it goes.
+            var deferred = applied.deferred
+            applied.deferred = nil
+            decoded = deferred?.decode()
         }
         // Fixed-format only (`SECURITY.md` §2.1); same queue as input.
         if !responses.isEmpty {
@@ -143,6 +154,17 @@ extension TerminalSession {
             scheduleSynchronizedOutputTimeout(episode: episode)
         }
         callbacks.withLock { $0.onOutput }?()
+    }
+
+    /// Parks the reader until a resize has committed; false if the session
+    /// stopped first. Polled: it is short, this runs only while one is under
+    /// way, and a wait nothing can wake is the one thing `stop()` must not meet.
+    private func waitOutResize() -> Bool {
+        while state.withLock({ $0.isResizing }) {
+            if stopped.withLock({ $0 }) { return false }
+            Thread.sleep(forTimeInterval: 0.0005)
+        }
+        return true
     }
 
     /// After the last read: ends a `?2026` episode the dead child never
