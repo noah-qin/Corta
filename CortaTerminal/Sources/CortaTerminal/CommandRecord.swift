@@ -53,14 +53,30 @@ public struct CommandRecordStore: Sendable, Equatable {
     /// A session left running for days must not grow this without limit.
     public let capacity: Int
 
-    public internal(set) var records: [CommandRecord] = []
+    /// Oldest first. A copy once evictions have begun, until the next
+    /// compaction: read per command or per click, never per frame.
+    public var records: [CommandRecord] {
+        head == 0 ? storage : Array(storage[head...])
+    }
+
+    /// The window `storage[head...]` is the history. Evicting moves `head`, and
+    /// the dead prefix goes in one compaction, so a flood of OSC 133 prompts
+    /// costs amortized O(1) per record at any capacity. A prompt once moved the
+    /// whole array, under the session's lock, for 18 bytes of output.
+    private var storage: [CommandRecord] = []
+    private var head = 0
     private var nextID = 0
 
     public init(capacity: Int = defaultCapacity) {
         self.capacity = max(0, capacity)
     }
 
-    public var last: CommandRecord? { records.last }
+    public var last: CommandRecord? { head < storage.count ? storage.last : nil }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.capacity == rhs.capacity && lhs.nextID == rhs.nextID
+            && lhs.storage[lhs.head...] == rhs.storage[rhs.head...]
+    }
 
     mutating func begin(
         promptRow: Int, workingDirectory: String?, host: String? = nil, at date: Date
@@ -70,9 +86,14 @@ public struct CommandRecordStore: Sendable, Equatable {
             startedAt: date, endedAt: nil, exitStatus: nil,
             workingDirectory: workingDirectory, host: host, promptEndColumn: nil)
         nextID += 1
-        records.append(record)
-        if records.count > capacity {
-            records.removeFirst(records.count - capacity)
+        storage.append(record)
+        if storage.count - head > capacity {
+            head += 1
+            // Half a capacity of dead records: two moves per insert at worst.
+            if head >= max(16, capacity / 2) || head == storage.count {
+                storage.removeFirst(head)
+                head = 0
+            }
         }
     }
 
@@ -81,53 +102,53 @@ public struct CommandRecordStore: Sendable, Equatable {
     mutating func movePrompt(
         to promptRow: Int, workingDirectory: String?, host: String? = nil, at date: Date
     ) {
-        guard !records.isEmpty else { return }
-        let last = records.count - 1
-        records[last].promptRow = promptRow
-        records[last].workingDirectory = workingDirectory
-        records[last].host = host
-        records[last].startedAt = date
-        records[last].promptEndColumn = nil
+        guard head < storage.count else { return }
+        let last = storage.count - 1
+        storage[last].promptRow = promptRow
+        storage[last].workingDirectory = workingDirectory
+        storage[last].host = host
+        storage[last].startedAt = date
+        storage[last].promptEndColumn = nil
     }
 
     mutating func markOutputStart(_ row: Int) {
-        guard !records.isEmpty else { return }
-        records[records.count - 1].outputStartRow = row
+        guard head < storage.count else { return }
+        storage[storage.count - 1].outputStartRow = row
     }
 
     mutating func markPromptEnd(column: Int) {
-        guard !records.isEmpty else { return }
-        records[records.count - 1].promptEndColumn = column
+        guard head < storage.count else { return }
+        storage[storage.count - 1].promptEndColumn = column
     }
 
     mutating func finish(exitStatus: Int, endRow: Int, at date: Date) {
-        guard !records.isEmpty else { return }
-        let last = records.count - 1
-        records[last].exitStatus = exitStatus
-        records[last].endRow = endRow
-        records[last].endedAt = date
+        guard head < storage.count else { return }
+        let last = storage.count - 1
+        storage[last].exitStatus = exitStatus
+        storage[last].endRow = endRow
+        storage[last].endedAt = date
     }
 
     mutating func remapRows(_ remap: RowRemap) {
-        for index in records.indices {
-            let oldPromptRow = records[index].promptRow
-            records[index].promptRow = remap.map(oldPromptRow)
-            records[index].promptEndColumn = records[index].promptEndColumn.flatMap {
+        for index in head..<storage.count {
+            let oldPromptRow = storage[index].promptRow
+            storage[index].promptRow = remap.map(oldPromptRow)
+            storage[index].promptEndColumn = storage[index].promptEndColumn.flatMap {
                 remap.promptEndColumn(promptRow: oldPromptRow, column: $0)
             }
-            records[index].outputStartRow = records[index].outputStartRow.map(remap.map)
-            records[index].endRow = records[index].endRow.map(remap.map)
+            storage[index].outputStartRow = storage[index].outputStartRow.map(remap.map)
+            storage[index].endRow = storage[index].endRow.map(remap.map)
         }
     }
 
     /// The command whose output covers `absoluteRow`, finished or not.
     public func record(before absoluteRow: Int) -> CommandRecord? {
-        records.last { $0.promptRow <= absoluteRow }
+        storage[head...].last { $0.promptRow <= absoluteRow }
     }
 
     /// Unlike `last`, never the one still running.
     public var lastCompleted: CommandRecord? {
-        records.last { !$0.isRunning }
+        storage[head...].last { !$0.isRunning }
     }
 
     /// Most recent first; every filter optional and independent.
@@ -138,7 +159,7 @@ public struct CommandRecordStore: Sendable, Equatable {
         exitStatus: Int? = nil,
         host: String? = nil
     ) -> [CommandRecord] {
-        records.reversed().filter { record in
+        storage[head...].reversed().filter { record in
             if let directory, record.workingDirectory != directory { return false }
             if let since, record.startedAt < since { return false }
             if let until, record.startedAt > until { return false }
