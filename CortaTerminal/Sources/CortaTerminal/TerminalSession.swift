@@ -64,6 +64,10 @@ public final class TerminalSession: @unchecked Sendable {
     static let batchByteCap = 1024 * 1024
     public let pty: PTY
 
+    /// Never reused, as an address is: what a caller keeps to ask later whether
+    /// this is still the session it meant.
+    public let id = UUID()
+
     struct State {
         var terminal: Terminal
         /// The `?2026` episode the recovery timeout was armed for, so a stale
@@ -601,6 +605,9 @@ extension TerminalSession {
         withExtendedLifetime(original) {}
         return current
     }
+
+    /// `stop()` has been called; it may still be readable, but takes no input.
+    public var isStopped: Bool { stopped.withLock { $0 } }
 
     /// Idempotent. Pending input is discarded; a drain parked in `write(2)`
     /// fails with `EIO` once the child dies, then sees `stopped`.

@@ -86,10 +86,7 @@ extension PaneCommands {
         if let notice = result.notice { self.host?.terminalView?.showToast(notice, kind: .warning) }
         let text = Self.quotedDropText(result.urls.map(\.path))
         guard !text.isEmpty else { FileDropStorage.remove(result.directory); return }
-        if let directory = result.directory {
-            FileDropStorage.release(directory)
-            droppedCopies.insert(directory)
-        }
+        if let directory = result.directory { droppedCopies.insert(directory) }
         insertAsPaste(text, validate: { [weak self] in
             guard context == self?.dropInputContext else {
                 self?.host?.terminalView?.showToast(L10n.text("drop.targetChanged"), kind: .warning)
@@ -97,14 +94,21 @@ extension PaneCommands {
             }
             return true
         }, onDiscard: { [weak self] in
-            if let directory = result.directory { self?.droppedCopies.remove(directory) }
+            if let directory = result.directory {
+                self?.droppedCopies.remove(directory)
+                FileDropStorage.release(directory)
+            }
             FileDropStorage.remove(result.directory)
+        }, onSent: {
+            // Pinned until now: Clean Now must not take the copies out from
+            // under a warning that is still asking whether to name them.
+            if let directory = result.directory { FileDropStorage.release(directory) }
         })
     }
 
     var dropInputContext: FileDropInputContext? {
         guard let session = host?.session, let group = session.pty.foregroundProcessGroup else { return nil }
-        return FileDropInputContext(session: ObjectIdentifier(session), foregroundGroup: group)
+        return FileDropInputContext(session: session.id, foregroundGroup: group)
     }
 
     /// One space-separated, quoted run. Each path is sanitised first (a name
@@ -146,19 +150,101 @@ extension PaneCommands {
         return String(quoted)
     }
 
+    /// One paste on its way from the pasteboard to a session: which session it
+    /// was asked for, and what `?2004` said when it was judged.
+    struct PasteDelivery {
+        let session: TerminalSession
+        /// Read once. The risks were judged by it and the bytes are encoded by
+        /// it, so output cannot change one without the other.
+        let bracketed: Bool
+        let warns: Bool
+        let validate: (() -> Bool)?
+        let onDiscard: (() -> Void)?
+        let onSent: (() -> Void)?
+    }
+
     /// Drops and Services go down the ⌘V path (`SECURITY.md` §2.3): C0
     /// stripped, bracketed paste when asked, and the configured risk warning
     /// — service text and filenames can hold newlines or concealed scalars.
-    func insertAsPaste(_ text: String, validate: (() -> Bool)? = nil, onDiscard: (() -> Void)? = nil) {
-        guard validate?() != false, let host, host.session != nil else { onDiscard?(); return }
-        let sanitized = Paste.sanitized(text)
-        guard !sanitized.isEmpty else { onDiscard?(); return }
-        guard !suppressPasteWarnings else { pasteNow(sanitized); return }
-        let risks = Paste.warningRisks(
-            in: text, bracketedPasteEnabled: bracketedPasteEnabled(),
-            policy: ConfigurationStore.shared.configuration.pasteWarning)
-        guard !risks.isEmpty else {
-            pasteNow(sanitized)
+    ///
+    /// Too large is refused before any of it is walked. Small text is judged
+    /// here, keeping its place among the keystrokes around it; larger text off
+    /// the main thread, where a newer paste replaces it.
+    func insertAsPaste(
+        _ text: String, validate: (() -> Bool)? = nil, onDiscard: (() -> Void)? = nil, onSent: (() -> Void)? = nil
+    ) {
+        cancelPasteScan()
+        guard validate?() != false, let session = host?.session, !session.isStopped else { onDiscard?(); return }
+        // UTF-16 first: O(1) on the pasteboard's bridged string, and never more
+        // than the UTF-8 count it stands in for.
+        guard text.utf16.count <= Paste.maximumBytes, text.utf8.count <= Paste.maximumBytes else {
+            host?.terminalView?.showToast(L10n.text("toast.pasteTooLarge"), kind: .warning)
+            onDiscard?()
+            return
+        }
+        let policy = ConfigurationStore.shared.configuration.pasteWarning
+        let delivery = PasteDelivery(
+            session: session, bracketed: session.isBracketedPasteEnabled,
+            warns: !suppressPasteWarnings && policy != .off,
+            validate: validate, onDiscard: onDiscard, onSent: onSent)
+        guard text.utf8.count >= Paste.synchronousScanLimit else {
+            let risks =
+                delivery.warns
+                ? Paste.warningRisks(in: text, bracketedPasteEnabled: delivery.bracketed, policy: policy) : []
+            decide(Paste.sanitized(text), risks: risks, delivery: delivery)
+            return
+        }
+        scanPaste(text, policy: policy, delivery: delivery)
+    }
+
+    /// The scan off the main thread. Nothing comes back of one this has since
+    /// replaced, and what does come back is checked against its session again.
+    private func scanPaste(_ text: String, policy: Configuration.PasteWarning, delivery: PasteDelivery) {
+        nextPasteScanID += 1
+        let id = nextPasteScanID
+        let (warns, bracketed) = (delivery.warns, delivery.bracketed)
+        let task = Task.detached(priority: .userInitiated) { [weak self] in
+            let sanitized = Paste.sanitized(text)
+            let risks =
+                warns
+                ? Paste.warningRisks(
+                    in: text, bracketedPasteEnabled: bracketed, policy: policy,
+                    shouldStop: { Task.isCancelled }) : []
+            await self?.finishPasteScan(id, sanitized: sanitized, risks: risks, delivery: delivery)
+        }
+        pasteScan = PasteScan(id: id, task: task, onDiscard: delivery.onDiscard)
+        // Silence for a moment, then an explanation of what is taking so long.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.pasteScanNoticeDelay, clock: .suspending)
+            guard let self, self.pasteScan?.id == id else { return }
+            self.host?.terminalView?.showToast(L10n.text("toast.pasteChecking"))
+        }
+    }
+
+    private func finishPasteScan(
+        _ id: Int, sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery
+    ) {
+        guard pasteScan?.id == id else { return }
+        pasteScan = nil
+        decide(sanitized, risks: risks, delivery: delivery)
+    }
+
+    /// A scan still running gives way: its text is not sent, and whoever asked
+    /// for it hears so.
+    func cancelPasteScan() {
+        guard let scan = pasteScan else { return }
+        pasteScan = nil
+        scan.task.cancel()
+        scan.onDiscard?()
+    }
+
+    /// Sends the text, or asks first when it has risks to name.
+    private func decide(_ sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery) {
+        guard !sanitized.isEmpty else { delivery.onDiscard?(); return }
+        guard !risks.isEmpty, let host else { deliver(sanitized, risks: risks, delivery: delivery); return }
+        if let answer = pasteWarningAnswer {
+            guard answer(risks) else { delivery.onDiscard?(); return }
+            deliver(sanitized, risks: risks, delivery: delivery)
             return
         }
         let alert = NSAlert()
@@ -171,12 +257,35 @@ extension PaneCommands {
         alert.addButton(withTitle: L10n.text("common.paste"))
         alert.addButton(withTitle: L10n.text("common.cancel"))
         alert.present(for: host.view.window) { [weak self] response in
-            // The pane may have closed while the sheet was up.
-            guard response == .alertFirstButtonReturn, self?.host?.session != nil, validate?() != false
-            else { onDiscard?(); return }
-            if alert.suppressionButton?.state == .on { self?.suppressPasteWarnings = true }
-            self?.pasteNow(sanitized)
+            guard let self, response == .alertFirstButtonReturn else { delivery.onDiscard?(); return }
+            if alert.suppressionButton?.state == .on { self.suppressPasteWarnings = true }
+            self.deliver(sanitized, risks: risks, delivery: delivery)
         }
+    }
+
+    /// The last check before the bytes go: the sheet or the scan took time, and
+    /// any of it may have changed. The pane may have closed, or been rebuilt
+    /// with a new session this text was never meant for. And `?2004` is the
+    /// child's to change: text judged safe because it would arrive marked must
+    /// not go unmarked, its newlines then Returns, so it is asked about again.
+    func deliver(_ sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery) {
+        guard let host, host.session === delivery.session, !delivery.session.isStopped,
+            delivery.validate?() != false
+        else { delivery.onDiscard?(); return }
+        let live = delivery.session.isBracketedPasteEnabled
+        if delivery.warns, delivery.bracketed, !live, Paste.containsNewline(sanitized) {
+            let judgedAgain = PasteDelivery(
+                session: delivery.session, bracketed: false, warns: true, validate: delivery.validate,
+                onDiscard: delivery.onDiscard, onSent: delivery.onSent)
+            decide(sanitized, risks: risks.filter { $0 != .multiline } + [.multiline], delivery: judgedAgain)
+            return
+        }
+        // Nothing warns here, by choice: nothing was judged, so nothing to keep to.
+        let bracketed = delivery.warns ? delivery.bracketed : live
+        delivery.onSent?()
+        (host as? ViewController)?.updateReaderPriority(input: true)
+        host.pointer.returnToBottomOnInput()
+        sendPaste(sanitized, bracketed: bracketed, to: delivery.session)
     }
 
     /// The text about to be pasted, its concealed scalars made visible, in a
@@ -215,15 +324,6 @@ extension PaneCommands {
         previewBox.layer?.masksToBounds = true
         previewBox.contentView = scroll
         return previewBox
-    }
-
-    /// A paste in every way that matters, as in `pasteFromClipboard` —
-    /// including saying so when the child is not reading, rather than
-    /// dropping the drop without a word.
-    private func pasteNow(_ sanitized: String) {
-        (host as? ViewController)?.updateReaderPriority(input: true)
-        host?.pointer.returnToBottomOnInput()
-        sendPaste(sanitized)
     }
 
     /// The selection's text, or nil when there is none or it is empty.
@@ -271,9 +371,9 @@ extension PaneCommands {
     /// shell stayed in paste mode, taking every later Return as pasted text.
     /// Once queued, Ctrl-C may drop the rest (`ViewController.onKeyBytes`);
     /// a paste the child started reading is then closed with `ESC[201~`.
-    func sendPaste(_ sanitized: String) {
-        let bracketed = bracketedPasteEnabled()
-        guard let session = host?.session else { return }
+    /// Saying so when the child is not reading, rather than dropping it
+    /// without a word.
+    private func sendPaste(_ sanitized: String, bracketed: Bool, to session: TerminalSession) {
         let outcome = session.write(
             paste: Paste.chunks(for: sanitized, bracketedPasteEnabled: bracketed),
             closing: Paste.closing(bracketedPasteEnabled: bracketed))
@@ -300,9 +400,11 @@ extension PaneCommands {
     }
 }
 
-/// A kernel foreground-group sample and object identity, never a process name.
+/// A kernel foreground-group sample and session identity, never a process name.
 /// Missing samples fail closed; an unrelated new session cannot inherit a drop.
 nonisolated struct FileDropInputContext: Equatable {
-    let session: ObjectIdentifier
+    /// `TerminalSession.id`, never reused: an address can be, by the session
+    /// that replaced this one.
+    let session: UUID
     let foregroundGroup: Int32
 }

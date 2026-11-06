@@ -14,8 +14,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import Foundation
 import CortaTerminal
+import Darwin
+import Foundation
 
 /// Sanitises and wraps pasted text for the child (`SECURITY.md` §2.3: "a
 /// paste is data, never a command stream"): strip ESC and other C0, and
@@ -26,26 +27,67 @@ nonisolated enum Paste {
     static let bracketStart: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E]
     static let bracketEnd: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
 
+    /// The most a paste may be, in UTF-8 bytes, checked before any of it is
+    /// walked: the write queue admits one whole paste however large
+    /// (`TerminalSession.maxPendingWriteBytes` pushes back on a child that
+    /// stopped reading, not on size), so this is what bounds the pasteboard.
+    static let maximumBytes = 64 * 1024 * 1024
+
+    /// Below this a paste is scanned where it was asked for, so it keeps its
+    /// place among the keystrokes around it; above, off the main thread.
+    static let synchronousScanLimit = 64 * 1024
+
     /// Strips C0 except tab, LF and CR (newlines are guarded by the warning),
     /// DEL and C1. DEL is a line editor's backspace, so a pasted one erased
     /// text the user had seen and left a different command than the one on
     /// the clipboard; C1 includes CSI and ST, which a program reading 8-bit
-    /// controls takes for the end of a bracketed paste.
+    /// controls takes for the end of a bracketed paste. Clean text comes back
+    /// without a copy.
     static func sanitized(_ text: String) -> String {
-        String(String.UnicodeScalarView(text.unicodeScalars.filter { scalar in
-            switch scalar.value {
-            case 0x09, 0x0A, 0x0D: return true
-            case 0x00..<0x20, 0x7F...0x9F: return false
-            default: return true
+        var text = text
+        let filtered: [UInt8]? = text.withUTF8 { bytes in
+            var index = 0
+            while index < bytes.count, !isStripped(bytes, at: index) { index += 1 }
+            guard index < bytes.count else { return nil }
+            var kept = [UInt8]()
+            kept.reserveCapacity(bytes.count)
+            kept.append(contentsOf: bytes[..<index])
+            while index < bytes.count {
+                if isStripped(bytes, at: index) {
+                    // A C1 is two bytes in UTF-8, the first of them `C2`.
+                    index += bytes[index] == 0xC2 ? 2 : 1
+                } else {
+                    kept.append(bytes[index])
+                    index += 1
+                }
             }
-        }))
+            return kept
+        }
+        guard let filtered else { return text }
+        return String(decoding: filtered, as: UTF8.self)
+    }
+
+    /// The byte at `index` starts a control `sanitized` removes.
+    @inline(__always)
+    private static func isStripped(_ bytes: UnsafeBufferPointer<UInt8>, at index: Int) -> Bool {
+        let byte = bytes[index]
+        switch byte {
+        case 0x09, 0x0A, 0x0D: return false
+        case 0x00..<0x20, 0x7F: return true
+        case 0xC2: return index + 1 < bytes.count && (0x80...0x9F).contains(bytes[index + 1])
+        default: return false
+        }
+    }
+
+    static func containsNewline(_ text: String) -> Bool {
+        text.utf8.contains { $0 == 0x0A || $0 == 0x0D }
     }
 
     /// A newline (LF or CR) without bracketed paste would execute.
     static func needsWarning(text: String, bracketedPasteEnabled: Bool) -> Bool {
         // CRLF is one Swift Character; matching individual Characters misses
-        // it. The child receives bytes, so inspect the scalar representation.
-        !bracketedPasteEnabled && text.unicodeScalars.contains { $0.value == 10 || $0.value == 13 }
+        // it. The child receives bytes, so inspect the bytes.
+        !bracketedPasteEnabled && containsNewline(text)
     }
 
     enum PasteRisk: String, CaseIterable, Sendable {
@@ -54,50 +96,133 @@ nonisolated enum Paste {
         var localizationKey: String { "paste.risk." + rawValue }
     }
 
+    /// `needle` occurs in `bytes`.
+    private static func contains(_ bytes: UnsafeBufferPointer<UInt8>, _ needle: StaticString) -> Bool {
+        guard let base = bytes.baseAddress, bytes.count >= needle.utf8CodeUnitCount else { return false }
+        return memmem(base, bytes.count, needle.utf8Start, needle.utf8CodeUnitCount) != nil
+    }
+
+    /// `bytes` without each occurrence of `pattern`.
+    private static func removing(_ pattern: [UInt8], from bytes: [UInt8]) -> [UInt8] {
+        var kept = [UInt8]()
+        kept.reserveCapacity(bytes.count)
+        var index = 0
+        while index < bytes.count {
+            if bytes[index] == pattern[0], bytes[index...].starts(with: pattern) {
+                index += pattern.count
+            } else {
+                kept.append(bytes[index])
+                index += 1
+            }
+        }
+        return kept
+    }
+
+    /// What a shell's quoting leaves of the text, as far as these patterns
+    /// care: continuation lines joined, one level of backslash escapes taken
+    /// off and quotes dropped, so `s\udo` and `s'u'do` read `sudo`. One pass
+    /// over bytes: this ran six whole-string replacements, one of them a regex.
+    private static func unquoted(_ payload: String) -> [UInt8] {
+        var bytes = Array(payload.utf8)
+        if bytes.contains(0x5C) {
+            for pattern: [UInt8] in [[0x5C, 0x0D, 0x0A], [0x5C, 0x0A], [0x5C, 0x0D]] {
+                bytes = removing(pattern, from: bytes)
+            }
+        }
+        var kept = [UInt8]()
+        kept.reserveCapacity(bytes.count)
+        var index = 0
+        while index < bytes.count {
+            let byte = bytes[index]
+            index += 1
+            switch byte {
+            case 0x27, 0x22:
+                continue
+            case 0x5C where index < bytes.count && !startsLine(bytes, at: index):
+                // The escaped character, whatever it is, and no second look at it.
+                kept.append(bytes[index])
+                index += 1
+            default:
+                kept.append(byte)
+            }
+        }
+        return kept
+    }
+
+    /// A line terminator starts at `index`: what `.` would not have matched.
+    private static func startsLine(_ bytes: [UInt8], at index: Int) -> Bool {
+        switch bytes[index] {
+        case 0x0A, 0x0D: return true
+        case 0xC2: return index + 1 < bytes.count && bytes[index + 1] == 0x85
+        case 0xE2:
+            return index + 2 < bytes.count && bytes[index + 1] == 0x80
+                && (bytes[index + 2] == 0xA8 || bytes[index + 2] == 0xA9)
+        default: return false
+        }
+    }
+
     /// Conservative, deterministic patterns, not a shell parser. Inspect the
     /// sanitized payload so stripped controls cannot split a dangerous word.
-    static func risks(in text: String, bracketedPasteEnabled: Bool = true) -> [PasteRisk] {
+    ///
+    /// Each pattern is tried only if the literal text it needs is there: on a
+    /// megabyte of log the regular expressions cost seconds, and almost none
+    /// of them could match. Safe off the main thread. `shouldStop` is asked
+    /// between steps; what comes back after it says yes is to be thrown away.
+    static func risks(
+        in text: String, bracketedPasteEnabled: Bool = true, shouldStop: () -> Bool = { false }
+    ) -> [PasteRisk] {
         let payload = sanitized(text)
-        let joined = payload.replacingOccurrences(of: "\\\r\n", with: "")
-            .replacingOccurrences(of: "\\\n", with: "")
-            .replacingOccurrences(of: "\\\r", with: "")
-            .replacingOccurrences(of: #"\\(.)"#, with: "$1", options: .regularExpression)
-            .replacingOccurrences(of: "'", with: "")
-            .replacingOccurrences(of: "\"", with: "")
+        let joinedBytes = unquoted(payload)
+        let literals = joinedBytes.withUnsafeBufferPointer { joined in
+            (
+                pipeToShell: contains(joined, "|") && contains(joined, "sh"),
+                processSubstitution: contains(joined, "<("),
+                download: (contains(joined, "$(") || contains(joined, "`"))
+                    && (contains(joined, "curl") || contains(joined, "wget") || contains(joined, "fetch")),
+                sudo: contains(joined, "sudo"),
+                remove: contains(joined, "rm") && contains(joined, "-")
+            )
+        }
+        // Built only for a pattern that gets to look at it.
+        var joinedText: String?
         func matches(_ pattern: String) -> Bool {
-            joined.range(of: pattern, options: .regularExpression) != nil
+            let joined = joinedText ?? String(decoding: joinedBytes, as: UTF8.self)
+            joinedText = joined
+            return joined.range(of: pattern, options: .regularExpression) != nil
         }
         var result: [PasteRisk] = []
         // The same feed without a pipe: `bash <(curl …)`, `source <(…)`, and
         // `sh -c "$(curl …)"` / `eval "$(wget …)"`, which run a download.
-        if matches(
-            #"\|&?\s*(?:(?:/[^\s;|&]+/)?sudo\s+(?:-[^\s;|&]+\s+)*(?:(?:root|[0-9]+)\s+)?)?"#
-                + #"(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)(?=$|[\s;|&])"#)
-            || matches(#"(?:^|[\s;|&(])(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh|source|\.)\s+<\("#)
-            || matches(
-                #"(?:^|[\s;|&(])(?:eval|(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)\s+(?:-[^\s;|&]+\s+)*"#
-                    + #"-[A-Za-z]*c[A-Za-z]*)\s+(?:\$\(|`)\s*(?:[^)`]*[\s/])?(?:curl|wget|fetch)(?=$|[\s;|&)`])"#)
+        if (literals.pipeToShell
+            && matches(
+                #"\|&?\s*(?:(?:/[^\s;|&]+/)?sudo\s+(?:-[^\s;|&]+\s+)*(?:(?:root|[0-9]+)\s+)?)?"#
+                    + #"(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)(?=$|[\s;|&])"#))
+            || (literals.processSubstitution
+                && matches(#"(?:^|[\s;|&(])(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh|source|\.)\s+<\("#))
+            || (literals.download
+                && matches(
+                    #"(?:^|[\s;|&(])(?:eval|(?:/[^\s;|&]+/)?(?:sh|bash|zsh|fish|dash|ksh|csh|tcsh)\s+(?:-[^\s;|&]+\s+)*"#
+                        + #"-[A-Za-z]*c[A-Za-z]*)\s+(?:\$\(|`)\s*(?:[^)`]*[\s/])?(?:curl|wget|fetch)(?=$|[\s;|&)`])"#))
         {
             result.append(.shellPipe)
         }
-        if matches(#"(?:^|[\s;|&()`'"])(?:/[^\s;|&]+/)?sudo(?=$|[\s;|&()`'"])"#) {
+        if shouldStop() { return result }
+        if literals.sudo, matches(#"(?:^|[\s;|&()`'"])(?:/[^\s;|&]+/)?sudo(?=$|[\s;|&()`'"])"#) {
             result.append(.sudo)
         }
-        // Options may be combined, separate, long, or interspersed with paths.
-        let commands = joined.components(separatedBy: CharacterSet(charactersIn: ";|&\n\r"))
-        for command in commands {
-            let words = command.split(whereSeparator: { $0.isWhitespace }).map(String.init)
-            guard let index = words.firstIndex(where: { $0 == "rm" || $0.hasSuffix("/rm") }) else { continue }
-            let options = words.dropFirst(index + 1).prefix(while: { $0 != "--" }).filter { $0.hasPrefix("-") }
-            let recursive = options.contains {
-                $0 == "--recursive" || (!$0.hasPrefix("--") && ($0.contains("r") || $0.contains("R")))
+        if shouldStop() { return result }
+        if literals.remove, containsRecursiveDelete(joinedBytes) {
+            result.append(.recursiveDelete)
+        }
+        var scan = payload
+        let continues = scan.withUTF8 { bytes -> Bool in
+            guard bytes.count > 1 else { return false }
+            for index in 0..<(bytes.count - 1) where bytes[index] == 0x5C {
+                if bytes[index + 1] == 0x0A || bytes[index + 1] == 0x0D { return true }
             }
-            let force = options.contains { $0 == "--force" || (!$0.hasPrefix("--") && $0.contains("f")) }
-            if recursive && force { result.append(.recursiveDelete); break }
+            return false
         }
-        if payload.range(of: #"\\(?:\r\n|\n|\r)"#, options: .regularExpression) != nil {
-            result.append(.continuation)
-        }
+        if continues { result.append(.continuation) }
         if text.unicodeScalars.contains(where: { ConcealingScalars.contains($0.value) }) {
             result.append(.concealed)
         }
@@ -107,14 +232,56 @@ nonisolated enum Paste {
         return result
     }
 
+    /// Options may be combined, separate, long, or interspersed with paths.
+    /// Commands without the word are not split into words at all.
+    private static func containsRecursiveDelete(_ joined: [UInt8]) -> Bool {
+        joined.withUnsafeBufferPointer { bytes in
+            let separators: Set<UInt8> = [0x3B, 0x7C, 0x26, 0x0A, 0x0D]
+            var start = 0
+            for end in 0...bytes.count where end == bytes.count || separators.contains(bytes[end]) {
+                defer { start = end + 1 }
+                guard end > start else { continue }
+                let command = UnsafeBufferPointer(rebasing: bytes[start..<end])
+                guard contains(command, "rm"), contains(command, "-") else { continue }
+                let words = String(decoding: command, as: UTF8.self)
+                    .split(whereSeparator: { $0.isWhitespace }).map(String.init)
+                guard let index = words.firstIndex(where: { $0 == "rm" || $0.hasSuffix("/rm") }) else { continue }
+                let options = words.dropFirst(index + 1).prefix(while: { $0 != "--" }).filter { $0.hasPrefix("-") }
+                let recursive = options.contains {
+                    $0 == "--recursive" || (!$0.hasPrefix("--") && ($0.contains("r") || $0.contains("R")))
+                }
+                let force = options.contains { $0 == "--force" || (!$0.hasPrefix("--") && $0.contains("f")) }
+                if recursive && force { return true }
+            }
+            return false
+        }
+    }
+
     static func warningRisks(
-        in text: String, bracketedPasteEnabled: Bool, policy: Configuration.PasteWarning
+        in text: String, bracketedPasteEnabled: Bool, policy: Configuration.PasteWarning,
+        shouldStop: () -> Bool = { false }
     ) -> [PasteRisk] {
         guard policy != .off else { return [] }
-        var result = risks(in: text, bracketedPasteEnabled: bracketedPasteEnabled)
+        var result = risks(in: text, bracketedPasteEnabled: bracketedPasteEnabled, shouldStop: shouldStop)
         if policy == .always, needsWarning(text: text, bracketedPasteEnabled: false),
             !result.contains(.multiline) { result.append(.multiline) }
         return result
+    }
+
+    /// What `insertText` may send as typed: nothing a line editor or a
+    /// bracketed paste would read as a command. Walks the bytes it was given,
+    /// and allocates nothing; plain typing takes this path on every key.
+    /// A lone Return or newline is the key, not a commit of text.
+    static func isPlainInput(_ bytes: [UInt8]) -> Bool {
+        if bytes.count == 1, bytes[0] == 0x0A || bytes[0] == 0x0D { return true }
+        var previous: UInt8 = 0
+        for byte in bytes {
+            if byte < 0x20, byte != 0x09 { return false }
+            if byte == 0x7F { return false }
+            if previous == 0xC2, (0x80...0x9F).contains(byte) { return false }
+            previous = byte
+        }
+        return true
     }
 
     /// Never let the preview conceal the very characters it warns about.
@@ -163,7 +330,8 @@ nonisolated enum Paste {
         for text: String, bracketedPasteEnabled: Bool, trailer: [UInt8] = [],
         maxChunkSize: Int = defaultChunkSize
     ) -> [[UInt8]] {
-        var chunks = chunked(Array(text.utf8), maxChunkSize: maxChunkSize)
+        var text = text
+        var chunks = text.withUTF8 { chunked($0, maxChunkSize: maxChunkSize) }
         if bracketedPasteEnabled {
             if chunks.isEmpty { chunks = [bracketStart] } else { chunks[0] = bracketStart + chunks[0] }
             chunks.append(bracketEnd + trailer)
@@ -199,8 +367,12 @@ nonisolated enum Paste {
     /// A cut lands before a UTF-8 lead byte, never inside a character, unless
     /// a whole chunk is continuation bytes (not UTF-8 anyway).
     static func chunked(_ bytes: [UInt8], maxChunkSize: Int = defaultChunkSize) -> [[UInt8]] {
+        bytes.withUnsafeBufferPointer { chunked($0, maxChunkSize: maxChunkSize) }
+    }
+
+    private static func chunked(_ bytes: UnsafeBufferPointer<UInt8>, maxChunkSize: Int) -> [[UInt8]] {
         guard !bytes.isEmpty else { return [] }
-        guard maxChunkSize > 0 else { return [bytes] }
+        guard maxChunkSize > 0 else { return [Array(bytes)] }
         var chunks: [[UInt8]] = []
         chunks.reserveCapacity((bytes.count + maxChunkSize - 1) / maxChunkSize)
         var offset = 0

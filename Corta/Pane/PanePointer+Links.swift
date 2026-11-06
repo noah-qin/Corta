@@ -20,6 +20,72 @@ import CortaTerminal
 extension PanePointer {
     // MARK: - Links and file references
 
+    /// What a click will open, by the text the tooltip gave for it.
+    nonisolated enum HoverTarget: Equatable {
+        case url(String)
+        case reference(String)
+    }
+
+    nonisolated enum HoverState: Equatable {
+        /// No hover since the pointer came in: nothing has been shown to differ.
+        case none
+        /// Shown by the last hover; nil when it found nothing to open.
+        case shown(HoverTarget?)
+    }
+
+    /// Output rewrites cells under a resting pointer, so a tooltip can name one
+    /// thing while the click would open another. A click opens only what was
+    /// shown: otherwise the tooltip is brought up to date and the click goes
+    /// no further. `pending` is a local path whose check has not answered,
+    /// which a hover that found nothing has not yet had the chance to show.
+    private func confirmsShownTarget(
+        _ target: HoverTarget, pending: Bool = false, event: NSEvent, in terminalView: TerminalView
+    ) -> Bool {
+        guard Self.clickOpens(target, pending: pending, shown: hoverState) else {
+            handleLinkHover(event, in: terminalView)
+            return false
+        }
+        return true
+    }
+
+    nonisolated static func clickOpens(_ target: HoverTarget, pending: Bool = false, shown: HoverState) -> Bool {
+        switch shown {
+        case .none: return true
+        case .shown(let shown?): return shown == target
+        case .shown(nil): return pending
+        }
+    }
+
+    /// The cells may have changed: the tooltip is asked again, at most every
+    /// `hoverRefreshInterval`, with one more after the last so it ends current.
+    func noteGridChanged() {
+        guard case .shown = hoverState, let last = lastPointerEvent else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        if now - lastHoverRefresh >= Self.hoverRefreshInterval {
+            lastHoverRefresh = now
+            handleLinkHover(last.event, in: last.view)
+            return
+        }
+        guard trailingHoverRefresh == nil else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.trailingHoverRefresh = nil
+            self.noteGridChanged()
+        }
+        trailingHoverRefresh = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.hoverRefreshInterval, execute: work)
+    }
+
+    private static let hoverRefreshInterval: TimeInterval = 0.1
+
+    /// How a reference reads in its tooltip, and what a click on it compares.
+    private static func hoverText(of reference: OpenableReference) -> String {
+        switch reference {
+        case .local(let local): "\(local.url.path):\(local.line)"
+        case .remote(let remote): "\(remote.host):\(remote.remotePath):\(remote.line)"
+        }
+    }
+
     var opensLinksOnPlainClick: Bool {
         ConfigurationStore.shared.configuration.linkActivation == .click
     }
@@ -28,19 +94,28 @@ extension PanePointer {
     /// reporting or selection. Plain clicks: `openLinkOnPlainClick`.
     func handleLinkClick(_ event: NSEvent, in terminalView: TerminalView) -> Bool {
         guard event.modifierFlags.contains(.command) else { return false }
-        if let link = linkUnder(event, in: terminalView) { return open(link) }
+        if let link = linkUnder(event, in: terminalView) { return openShown(link, event: event, in: terminalView) }
         // A `path:line`, local or remote. URLs win; the detectors don't
         // overlap in practice, and the order makes that explicit.
         return openReference(under: event, in: terminalView)
     }
 
     /// `link-activation = click` on mouse-up, for a click that never moved.
+    /// URLs only: a click also focuses a pane and clears a selection, and a
+    /// `path:line` starts the editor the user configured, so it stays on ⌘.
     @discardableResult
     func openLinkOnPlainClick(_ event: NSEvent, in terminalView: TerminalView) -> Bool {
-        guard opensLinksOnPlainClick, !event.modifierFlags.contains(.shift)
+        guard opensLinksOnPlainClick, !event.modifierFlags.contains(.shift),
+            let link = linkUnder(event, in: terminalView)
         else { return false }
-        if let link = linkUnder(event, in: terminalView) { return open(link) }
-        return openReference(under: event, in: terminalView)
+        return openShown(link, event: event, in: terminalView)
+    }
+
+    /// A click on a link, which is taken whether or not it opens.
+    private func openShown(_ link: LinkDetection.Link, event: NSEvent, in terminalView: TerminalView) -> Bool {
+        let target = Self.target(of: link.url)?.absoluteString ?? ""
+        guard confirmsShownTarget(.url(target), event: event, in: terminalView) else { return true }
+        return open(link)
     }
 
     /// Re-checks the scheme at the boundary where output launches another
@@ -72,8 +147,10 @@ extension PanePointer {
     /// cursor.
     func handleLinkHover(_ event: NSEvent, in terminalView: TerminalView) {
         if lastHover?.event !== event { lastHover = nil }
-        // The underline must mean "this will open".
-        let armed = opensLinksOnPlainClick || event.modifierFlags.contains(.command)
+        lastPointerEvent = (event, terminalView)
+        // The underline must mean "this will open". Only ⌘ opens a `path:line`.
+        let commandHeld = event.modifierFlags.contains(.command)
+        let armed = opensLinksOnPlainClick || commandHeld
         if session != nil, let link = linkUnder(event, in: terminalView) {
             if armed, !hoveringLink {
                 NSCursor.pointingHand.set()
@@ -86,8 +163,9 @@ extension PanePointer {
             let tip = opensLinksOnPlainClick
                 ? target : L10n.format("link.commandClick", target)
             if terminalView.toolTip != tip { terminalView.toolTip = tip }
+            hoverState = .shown(.url(target))
             setHoveredLink(armed ? link.range : nil)
-        } else if armed, session != nil,
+        } else if commandHeld, session != nil,
             let reference = hoverReference(event, in: terminalView)
         {
             if !hoveringLink {
@@ -107,9 +185,11 @@ extension PanePointer {
                     "link.remoteFile", "\(remote.host):\(remote.remotePath):\(remote.line)")
             }
             if terminalView.toolTip != tip { terminalView.toolTip = tip }
+            hoverState = .shown(.reference(Self.hoverText(of: reference)))
             setHoveredLink(reference.range)
         } else {
             resetLinkHover(terminalView)
+            hoverState = .shown(nil)
         }
     }
 
@@ -141,6 +221,10 @@ extension PanePointer {
 
     /// Resets hover state, only if the hand is up.
     func resetLinkHover(_ terminalView: TerminalView) {
+        hoverState = .none
+        lastPointerEvent = nil
+        trailingHoverRefresh?.cancel()
+        trailingHoverRefresh = nil
         if hoveringLink {
             programCursor.set()
             hoveringLink = false
@@ -269,7 +353,18 @@ extension PanePointer {
     /// click is taken either way, since it named a reference.
     private func openReference(under event: NSEvent, in terminalView: TerminalView) -> Bool {
         let detected = detectedReferenceUnder(event, in: terminalView)
-        if case .resolved(nil) = lookUpReference(detected) { return false }
+        switch lookUpReference(detected) {
+        case .resolved(nil):
+            return false
+        case .resolved(let reference?):
+            guard confirmsShownTarget(
+                .reference(Self.hoverText(of: reference)), event: event, in: terminalView)
+            else { return true }
+        case .pending(let path):
+            guard let line = detected?.line,
+                confirmsShownTarget(.reference("\(path):\(line)"), pending: true, event: event, in: terminalView)
+            else { return true }
+        }
         openDetected(detected)
         return true
     }
@@ -285,10 +380,19 @@ extension PanePointer {
         case .resolved(nil):
             otherwise()
         case .pending(let path):
-            fileProbe.probe(path) { [weak self] _ in
-                guard let self else { return }
-                if case .resolved(let reference?) = self.lookUpReference(detected) {
-                    self.open(reference)
+            let asked = session
+            fileProbe.probe(path) { [weak self] isFile in
+                guard let self, let detected else { return }
+                // Resolved again from here, the pane's directory would pick
+                // the file: a `cd` during the check and the same text names
+                // another one, or a remote one. What was checked or nothing.
+                guard self.session === asked,
+                    Self.candidatePath(detected, directory: self.session.workingDirectory) == path
+                else { return }
+                if isFile {
+                    self.open(.local(Self.resolved(detected, at: path)))
+                } else if let remote = self.host?.remote.resolve(detected) {
+                    self.open(.remote(remote))
                 } else {
                     otherwise()
                 }
@@ -330,31 +434,19 @@ extension PanePointer {
 
     /// Opens a local file, at the line if the configured command takes one;
     /// shared by local references and `RemoteEditCoordinator`'s managed
-    /// copies. Output-derived files require `open-file-command`: a default
-    /// application can execute a .command or .terminal file. Runs via `Process` with
-    /// separate arguments, **never a shell**, which would revive the path's
+    /// copies. Only `open-file-command`, never LaunchServices: output and
+    /// remote servers choose these files, and a default application can
+    /// execute a .command or .terminal file. Runs via `Process` with separate
+    /// arguments, **never a shell**, which would revive the path's
     /// metacharacters (`SECURITY.md` §2.3).
+    static func openRemoteFileAt(url: URL, line: Int, column: Int?) -> Bool {
+        openFileAt(url: url, line: line, column: column)
+    }
+
     @discardableResult
     static func openFileAt(url: URL, line: Int, column: Int?, command: String? = nil) -> Bool {
-        openFileAt(url: url, line: line, column: column, allowsDefaultApplication: false, command: command)
-    }
-
-    /// Remote bytes must go to an explicitly configured editor, never to a
-    /// LaunchServices handler that could execute a .command or .terminal file.
-    static func openRemoteFileAt(url: URL, line: Int, column: Int?) -> Bool {
-        openFileAt(url: url, line: line, column: column, allowsDefaultApplication: false)
-    }
-
-    static func openFileAt(
-        url: URL, line: Int, column: Int?, allowsDefaultApplication: Bool,
-        command: String? = nil
-    ) -> Bool {
         let template = command ?? ConfigurationStore.shared.configuration.openFileCommand
-        guard !template.isEmpty else {
-            guard allowsDefaultApplication else { return false }
-            NSWorkspace.shared.open(url)
-            return true
-        }
+        guard !template.isEmpty else { return false }
         let arguments = openFileArguments(
             template: template, path: url.path, line: line, column: column)
         guard let executable = arguments.first, executable.hasPrefix("/") else {

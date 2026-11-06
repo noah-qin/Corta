@@ -35,7 +35,7 @@ struct FileReferenceResolutionTests {
         }
         #expect(PanePointer.openFileAt(
             url: URL(fileURLWithPath: "/tmp/space ;$(echo).swift"), line: 3, column: 4,
-            allowsDefaultApplication: false, command: "/usr/bin/true {file} {line} {column}"))
+            command: "/usr/bin/true {file} {line} {column}"))
     }
     private static func reference(_ path: String, line: Int = 12) -> FileReferenceDetection.Reference {
         FileReferenceDetection.Reference(
@@ -208,6 +208,52 @@ struct OpenFileCommandTests {
         return true
     }
 
+    /// The answer takes time, and the shell moves on in the meantime.
+    @Test("a check that answers after a `cd` opens nothing, here or on the remote host")
+    func probeOutlivedByADirectoryChange() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-ref-\(UUID().uuidString)", isDirectory: true)
+        let (first, second) = (root.appendingPathComponent("first"), root.appendingPathComponent("second"))
+        for directory in [first, second] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data().write(to: directory.appendingPathComponent("file.swift"))
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+        let script = "printf '\\033]7;file://$(hostname)\(first.path)\\033\\\\'; read -r _; "
+            + "printf '\\033]7;file://$(hostname)\(second.path)\\033\\\\'; cd '\(second.path)'; echo MOVED; sleep 60"
+        let host = ReferenceTestHost()
+        let session = try TerminalSession(
+            executable: "/bin/sh", arguments: ["-c", script], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 10, columns: 80), workingDirectory: first.path)
+        defer { session.stop() }
+        session.start()
+        host.session = session
+        let pointer = PanePointer(host: host)
+        let resume = DispatchSemaphore(value: 0)
+        defer { resume.signal() }
+        pointer.fileProbe = FileReferenceProbe(check: { _ in
+            resume.wait()
+            return true
+        }, timeout: .seconds(30))
+        let reported = await waitUntilTrue(timeout: .seconds(5)) { session.workingDirectory != nil }
+        try #require(reported)
+        var nothingOpened = false
+        let reference = FileReferenceDetection.Reference(
+            path: "file.swift", line: 3, column: nil,
+            range: SelectionRange(start: SelectionPoint(row: 0, column: 0), end: SelectionPoint(row: 0, column: 3)))
+        pointer.openDetected(reference) { nothingOpened = true }
+        session.write(Array("\n".utf8))
+        let moved = await waitUntilTrue(timeout: .seconds(5)) {
+            session.workingDirectory == second.path || session.workingDirectory?.hasSuffix("second") == true
+        }
+        try #require(moved)
+        resume.signal()
+        try await Task.sleep(for: .milliseconds(100))
+        // Gave up: neither `otherwise` nor an open, for any file.
+        #expect(!nothingOpened)
+        #expect(host.terminalViewToasts == 0)
+    }
+
     @Test("a link opens, and is shown as, the URL the browser receives")
     func linkTargets() {
         #expect(PanePointer.target(of: "https://\u{0430}pple.com/login")?.absoluteString
@@ -306,4 +352,31 @@ struct OpenFileCommandTests {
         let line = terminal.grid.logicalLine(containing: 0)
         #expect(LinkDetection.links(in: line).isEmpty)
     }
+}
+
+/// Just enough of a pane for a pointer to read its session.
+@MainActor
+private final class ReferenceTestHost: PanePointerHost {
+    let view = NSView()
+    var session: TerminalSession! = nil
+    var terminalView: TerminalView! = nil
+    var terminalRenderer: TerminalRenderer! = nil
+    var isOperable = true
+    var topInset: CGFloat = 0
+    var verticalInsets: CGFloat = 0
+    var scrollOffset = 0
+    var selection: TerminalSelection?
+    var sawOutputWhileScrolled = false
+    let remote = PaneRemote()
+    private let commandsHost = CommandsTestHost()
+    var commands: PaneCommands { commandsHost.commands }
+    var terminalViewToasts = 0
+    func invalidateDisplay() {}
+}
+
+@MainActor
+private func waitUntilTrue(timeout: Duration, _ condition: () -> Bool) async -> Bool {
+    let deadline = SuspendingClock.now + timeout * testTimeoutScale
+    while !condition(), SuspendingClock.now < deadline { try? await Task.sleep(for: .milliseconds(5)) }
+    return condition()
 }

@@ -260,12 +260,12 @@ struct FileDropTests {
 extension FileDropTests {
     @Test("session identity and foreground group must both match; missing context fails closed")
     func contextBinding() {
-        let session = NSObject()
-        let otherSession = NSObject()
-        let original = FileDropInputContext(session: ObjectIdentifier(session), foregroundGroup: 123)
-        #expect(original == FileDropInputContext(session: ObjectIdentifier(session), foregroundGroup: 123))
-        #expect(original != FileDropInputContext(session: ObjectIdentifier(otherSession), foregroundGroup: 123))
-        #expect(original != FileDropInputContext(session: ObjectIdentifier(session), foregroundGroup: 456))
+        let session = UUID()
+        let otherSession = UUID()
+        let original = FileDropInputContext(session: session, foregroundGroup: 123)
+        #expect(original == FileDropInputContext(session: session, foregroundGroup: 123))
+        #expect(original != FileDropInputContext(session: otherSession, foregroundGroup: 123))
+        #expect(original != FileDropInputContext(session: session, foregroundGroup: 456))
         #expect(CommandsTestHost().commands.dropInputContext == nil)
         // This is the same validation gate used again after a paste-warning sheet.
         var discarded = false
@@ -291,11 +291,10 @@ extension FileDropTests {
         session.start()
         host.session = session
         let actual = try #require(host.commands.dropInputContext)
-        let otherIdentity = NSObject()
         let captured: FileDropInputContext
         switch change {
         case "session":
-            captured = FileDropInputContext(session: ObjectIdentifier(otherIdentity),
+            captured = FileDropInputContext(session: UUID(),
                 foregroundGroup: actual.foregroundGroup)
         case "foreground":
             captured = FileDropInputContext(session: actual.session, foregroundGroup: actual.foregroundGroup + 1)
@@ -307,7 +306,6 @@ extension FileDropTests {
             failed: false, timedOut: false), context: captured)
         #expect(!FileManager.default.fileExists(atPath: directory.path))
         #expect(host.terminalView.toastLayer != nil)
-        withExtendedLifetime(otherIdentity) {}
     }
 
     @Test("drop payloads use the existing paste encoder and never append Return")

@@ -116,9 +116,13 @@ extension PaneCommands {
     ///   busy shell or a TUI must not get prompt input.
     /// - **Existing input**: the cursor is still at `promptEndPosition`, so
     ///   nothing the user typed gets a `cd` spliced into it.
+    /// - **Input on its way**: the grid knows nothing of what is still queued
+    ///   or being checked. A Return behind a paste the shell has not echoed
+    ///   would run that paste too, and nobody pressed Return for it.
     var canChangeDirectorySafely: Bool {
         guard let host, host.isOperable, let session = host.session,
-            session.hasShellIntegration, !session.isCommandRunning
+            session.hasShellIntegration, !session.isCommandRunning,
+            !session.hasPendingInput, pasteScan == nil
         else {
             return false
         }

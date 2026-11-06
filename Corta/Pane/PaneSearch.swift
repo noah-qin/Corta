@@ -171,6 +171,8 @@ final class PaneSearch: NSObject {
     /// Whether the first responder belongs to this pane's search bar: either
     /// the field editor, whose delegate is our `field`, or a bar
     /// control focused by Full Keyboard Access, found by ancestry.
+    var hasKeyboardFocus: Bool { isResponderActive }
+
     private var isResponderActive: Bool {
         guard let responder = host?.view.window?.firstResponder else { return false }
         if let text = responder as? NSText, text.delegate === field { return true }
