@@ -80,7 +80,9 @@ export function ProductDemo({ src, poster, copy, overview }: Props) {
   function toggle() {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) {
+    // A pending play() already clears video.paused before onPlaying fires.
+    // Follow the same state as the visible label so Play cannot cancel buffering.
+    if (!playing) {
       manualPause.current = false;
       optedIn.current = true;
       if (!video.getAttribute("src")) video.src = src;
