@@ -214,23 +214,38 @@ enum Spawn {
             free(resolved)
         }
 
+        return helperCandidates(forImage: path).first { access($0, X_OK) == 0 }
+    }
+
+    /// Where `corta-exec` may be for a module loaded from `path`, in order.
+    ///
+    /// Inside an app bundle, exactly one place: the signature covers
+    /// `Contents/MacOS`, and looking anywhere else could only ever find
+    /// something that should not be there. The first `.app/Contents/` in the
+    /// path is the outermost bundle, which is also what a hosted test bundle
+    /// under `Contents/PlugIns` runs in.
+    ///
+    /// Outside one (a SwiftPM build's `.xctest`, `corta-bench`), a walk of at
+    /// most six parents, because the helper is the build directory's sibling.
+    /// A bundle under a build directory (the `.xctest`) has a `Contents` of
+    /// its own, so the walk also looks in that `MacOS`.
+    static func helperCandidates(forImage path: String) -> [String] {
+        if let bundle = path.firstRange(of: ".app/Contents/") {
+            return [String(path[..<bundle.upperBound]) + "MacOS/corta-exec"]
+        }
+        var candidates: [String] = []
         var directory = path
         for _ in 0..<6 {
             guard let slash = directory.lastIndex(of: "/"), slash != directory.startIndex else {
                 break
             }
             directory = String(directory[directory.startIndex..<slash])
-            let candidate = directory + "/corta-exec"
-            if access(candidate, X_OK) == 0 { return candidate }
-            // In the app, the helper is in Contents/MacOS while this image is a
-            // framework under Contents/Frameworks — never an ancestor, so check it
-            // when the walk passes Contents. The only layout app-hosted tests spawn in.
+            candidates.append(directory + "/corta-exec")
             if directory.hasSuffix("/Contents") {
-                let insideBundle = directory + "/MacOS/corta-exec"
-                if access(insideBundle, X_OK) == 0 { return insideBundle }
+                candidates.append(directory + "/MacOS/corta-exec")
             }
         }
-        return nil
+        return candidates
     }
 }
 
