@@ -283,6 +283,7 @@ img {
   filter: drop-shadow(0 25px 25px #31513b16);
 }
 .product-shot {
+  max-width: 960px;
   margin-top: 25px;
 }
 .demo-stage {

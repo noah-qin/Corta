@@ -99,7 +99,7 @@ export function ProductDemo({ src, poster, copy, overview }: Props) {
         <img
           src={poster.src}
           srcSet={poster.srcSet}
-          sizes="(max-width: 800px) calc(100vw - 40px), (max-width: 1416px) calc(100vw - 96px), 1320px"
+          sizes="(max-width: 800px) calc(100vw - 40px), (max-width: 1056px) calc(100vw - 96px), 960px"
           width={poster.width}
           height={poster.height}
           alt={copy.description}
