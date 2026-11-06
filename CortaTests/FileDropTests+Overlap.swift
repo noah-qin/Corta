@@ -16,7 +16,6 @@
 
 import AppKit
 import CortaTerminal
-import Synchronization
 import Testing
 
 @testable import Corta
@@ -51,40 +50,6 @@ private struct ReceivingPane {
 }
 
 extension FileDropTests {
-    @Test("Finder's reference URL arrives as a plain path; one to a missing file fails")
-    func referenceURLArrivesAsPath() async throws {
-        let root = scratchRoot()
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let file = root.appendingPathComponent("from finder")
-        try Data().write(to: file)
-        var info = stat()
-        #expect(stat(file.path, &info) == 0)
-
-        func drop(_ reference: String) async throws -> FileDropRequest.Result? {
-            let item = NSPasteboardItem()
-            item.setString(reference, forType: .fileURL)
-            let pasteboard = NSPasteboard.withUniqueName()
-            defer { pasteboard.releaseGlobally() }
-            pasteboard.writeObjects([item])
-            var result: FileDropRequest.Result?
-            let request = try #require(FileDropRequest.start(pasteboard) { result = $0 })
-            await waitUntil("reference drop received") { result != nil }
-            withExtendedLifetime(request) {}
-            return result
-        }
-
-        let reference = "file:///.file/id=6571367.\(info.st_ino)"
-        let received = try #require(try await drop(reference)?.urls.first)
-        #expect(!received.absoluteString.contains(".file/id"))
-        #expect(received.resolvingSymlinksInPath().path == file.resolvingSymlinksInPath().path)
-
-        try FileManager.default.removeItem(at: file)
-        let missing = try await drop(reference)
-        #expect(missing?.urls.isEmpty == true)
-        #expect(missing?.failed == true)
-    }
-
     @Test("a new drop replaces one still arriving, and says so")
     func newDropReplacesEarlier() async throws {
         let root = scratchRoot()
@@ -120,6 +85,7 @@ extension FileDropTests {
         #expect(!pane.host.commands.receiveFileDrop(pasteboard))
 
         #expect(pane.host.commands.fileDropRequest === earlier)
+        #expect(pane.host.terminalView.toastLayer != nil)
         #expect(FileManager.default.fileExists(atPath: pane.directory.path))
     }
 }

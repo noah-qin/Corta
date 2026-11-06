@@ -238,6 +238,65 @@
         }
       }
     },
+    "drop.notStarted": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This drop could not start. The earlier drop is still being received."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这次拖放无法开始。上一次拖放仍在接收中。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "這次拖放無法開始。上一次拖放仍在接收中。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "このドロップを開始できませんでした。前のドロップは引き続き受信中です。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이번 드롭을 시작할 수 없습니다. 이전 드롭은 계속 수신 중입니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dieses Ablegen konnte nicht starten. Das vorherige wird weiter empfangen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ce dépôt n’a pas pu démarrer. Le précédent est toujours en cours de réception."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta operación no pudo iniciarse. La anterior se sigue recibiendo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta operação não pôde ser iniciada. A anterior continua sendo recebida."
+          }
+        }
+      }
+    },
     "drop.replaced": {
       "extractionState": "manual",
       "localizations": {

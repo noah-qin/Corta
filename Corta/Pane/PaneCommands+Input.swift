@@ -65,7 +65,8 @@ extension PaneCommands {
             self.completeFileDrop(result, context: context)
         }
         guard let request else {
-            host?.terminalView?.showToast(L10n.text("drop.failed"), kind: .warning)
+            let notice = fileDropRequest == nil ? "drop.failed" : "drop.notStarted"
+            host?.terminalView?.showToast(L10n.text(notice), kind: .warning)
             return false
         }
         if let earlier = fileDropRequest {
