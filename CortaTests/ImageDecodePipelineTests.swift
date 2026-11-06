@@ -422,7 +422,6 @@ extension ImageDecodePipelineTests {
         let device = try #require(Self.makeDevice())
         let waiting = DispatchSemaphore(value: 0)
         let finish = DispatchSemaphore(value: 0)
-        defer { finish.signal() }
         let held = Mutex<Int?>(nil)
         let renderer = KittyImageRenderer(
             device: device,
@@ -435,6 +434,12 @@ extension ImageDecodePipelineTests {
                 waiting.signal()
                 finish.wait()
             })
+        let wakes = Mutex(0)
+        let wakeAfterInstall = DispatchSemaphore(value: 0)
+        renderer.onImagesReady = {
+            wakes.withLock { $0 += 1 }
+            wakeAfterInstall.signal()
+        }
         var terminal = Terminal(rows: 10, columns: 40)
         Self.placeRGBA(&terminal, id: 1, byte: 255)
         renderer.update(
@@ -444,6 +449,13 @@ extension ImageDecodePipelineTests {
         let reached = waiting.wait(timeout: .now() + .seconds(10 * testTimeoutScale))
         try #require(reached == .success)
         #expect(held.withLock { $0 } == 0)
+        // Nothing to draw yet, and no wake that says otherwise; then one that does.
+        #expect(renderer.textureCount == 0)
+        #expect(wakes.withLock { $0 } == 0, "giving up the permit is not the image being ready")
+        finish.signal()
+        let ready = wakeAfterInstall.wait(timeout: .now() + .seconds(10 * testTimeoutScale))
+        #expect(ready == .success, "an image must ask for the frame that draws it")
+        #expect(renderer.textureCount == 1)
     }
 
     @Test("bytes that are no image are refused once")

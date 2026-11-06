@@ -124,7 +124,7 @@ nonisolated extension KittyImageRenderer {
         // permit: two uploads on a stuck GPU stopped every pane's images.
         let holdsWaitSlot = Self.uploadWaitBudget.tryReserve(1)
         defer { if holdsWaitSlot { Self.uploadWaitBudget.release(1) } }
-        if holdsWaitSlot { permit?.release() }
+        if holdsWaitSlot { permit?.release(whileWorking: self) }
         uploadWaitGate?()
         guard finished.wait(timeout: .now() + 10) == .success,
             success.load(ordering: .acquiring)

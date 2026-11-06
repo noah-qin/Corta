@@ -187,7 +187,10 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         }
         decodeObserver = NotificationCenter.default.addObserver(
             forName: Self.decodeFinished, object: nil, queue: nil
-        ) { [weak self] _ in self?.onImagesReady?() }
+        ) { [weak self] note in
+            guard let self, note.object as AnyObject? !== self else { return }
+            self.onImagesReady?()
+        }
     }
 
     deinit {
@@ -399,7 +402,9 @@ nonisolated extension KittyImageRenderer {
         let installed = lock.withLock {
             install(made, lease: lease, id: id, generation: generation)
         }
-        if installed, generation == 0 { onImagesReady?() }
+        // Its permit may have gone before the upload's wait (`uploadWaitBudget`),
+        // so that release's wake came too early to draw this.
+        if installed { onImagesReady?() }
     }
 
     /// Caller holds `lock`.
