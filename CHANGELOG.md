@@ -29,7 +29,8 @@ Versioning for compatibility changes.
   adds Split Pane Along Longer Side. In Settings; ⌘D and ⇧⌘D do not change.
 - Corta has a website, https://corta.noahqin.dev, with the user guide,
   the documentation and the changelog in all nine languages the
-  repository is translated into.
+  repository is translated into. The README and homepage include dedicated
+  silent interaction loops, with still-image fallbacks and a homepage pause control.
 - Kill and Reconnect to Host…, in Shell ▸ Terminal and Connection and the
   command palette, ends an `ssh` or `mosh` that has hung rather than exited and
   runs the same command again as a new connection, once you confirm. Rebindable

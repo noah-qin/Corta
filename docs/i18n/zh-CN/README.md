@@ -27,7 +27,10 @@ Metal 4 渲染 · 原生中日韩输入法 · SSH、SFTP 与远程编辑
 
 🇺🇸 [English](../../../README.md) · 🇨🇳 [简体中文](README.md) · 🇭🇰 [繁體中文](../zh-Hant/README.md) · 🇯🇵 [日本語](../ja/README.md) · 🇰🇷 [한국어](../ko/README.md) · 🇩🇪 [Deutsch](../de/README.md) · 🇫🇷 [Français](../fr/README.md) · 🇪🇸 [Español](../es/README.md) · 🇧🇷 [Português](../pt-BR/README.md)
 
-<img src="../../brand/screenshot.png" width="960" alt="Corta 的三个分屏：git log 与中日韩及 emoji 对齐表、在终端中显示的穿山甲图片、24 位色彩渐变">
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
+  <img src="../../brand/interaction-demo.gif" width="960" height="588" alt="Corta 交互演示：分屏、重排运行中的会话，以及切换和排序标签页">
+</picture>
 
 </div>
 

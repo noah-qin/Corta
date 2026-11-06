@@ -79,6 +79,7 @@ struct LicenseHeaderRuleTests {
             ("CortaTerminal/Tests/CortaTerminalTests/Golden/sgr.in", .reuse),
             ("CortaTerminal/Tests/Fuzz/corpus/seed-1.bin", .reuse),
             ("docs/brand/corta-pangolin-mascot.png", .reuse),
+            ("docs/brand/interaction-demo.mp4", .reuse),
             ("scripts/brand/social-preview.swift", .header(.slashes)),
             ("Corta/Acknowledgements/Sparkle-LICENSE.txt", .reuse),
             ("AppIcon.icon/icon.json", .reuse),

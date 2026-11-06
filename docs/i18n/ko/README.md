@@ -27,7 +27,10 @@ Metal 4 렌더링 · 네이티브 CJK / IME · SSH, SFTP, 원격 편집
 
 🇺🇸 [English](../../../README.md) · 🇨🇳 [简体中文](../zh-CN/README.md) · 🇭🇰 [繁體中文](../zh-Hant/README.md) · 🇯🇵 [日本語](../ja/README.md) · 🇰🇷 [한국어](README.md) · 🇩🇪 [Deutsch](../de/README.md) · 🇫🇷 [Français](../fr/README.md) · 🇪🇸 [Español](../es/README.md) · 🇧🇷 [Português](../pt-BR/README.md)
 
-<img src="../../brand/screenshot.png" width="960" alt="세 개로 분할된 Corta 페인: git log와 한중일 및 이모지 정렬표, 터미널에 표시된 천산갑 이미지, 24비트 색상 그라데이션">
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
+  <img src="../../brand/interaction-demo.gif" width="960" height="588" alt="Corta 동작 데모: 페인 분할, 실행 중인 세션 이동, 탭 전환 및 순서 변경">
+</picture>
 
 </div>
 

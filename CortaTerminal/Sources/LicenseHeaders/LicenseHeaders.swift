@@ -68,6 +68,7 @@ public enum LicenseHeaders {
         ("CortaTests/RenderReferences/**", .reuse),
         ("docs/brand/*.png", .reuse),
         ("docs/brand/*.gif", .reuse),
+        ("docs/brand/*.mp4", .reuse),
         ("AppIcon.icon/**", .reuse),
         ("AppIconDev.icon/**", .reuse),
         ("Corta/Acknowledgements/**", .reuse),

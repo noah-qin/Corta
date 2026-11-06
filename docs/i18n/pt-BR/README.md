@@ -27,7 +27,10 @@ Renderização com Metal 4 · Entrada CJK / IME nativa · SSH, SFTP e edição r
 
 🇺🇸 [English](../../../README.md) · 🇨🇳 [简体中文](../zh-CN/README.md) · 🇭🇰 [繁體中文](../zh-Hant/README.md) · 🇯🇵 [日本語](../ja/README.md) · 🇰🇷 [한국어](../ko/README.md) · 🇩🇪 [Deutsch](../de/README.md) · 🇫🇷 [Français](../fr/README.md) · 🇪🇸 [Español](../es/README.md) · 🇧🇷 [Português](README.md)
 
-<img src="../../brand/screenshot.png" width="960" alt="O Corta com três painéis: um git log e uma tabela de alinhamento com chinês, japonês, coreano e emoji; o mascote pangolim exibido como imagem no terminal; e degradês de cor de 24 bits">
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
+  <img src="../../brand/interaction-demo.gif" width="960" height="588" alt="Corta em ação: dividir painéis, mover sessões ativas e alternar ou reordenar abas">
+</picture>
 
 </div>
 

@@ -57,6 +57,7 @@ SPDX-License-Identifier = "Apache-2.0"
 path = [
   "docs/brand/*.png",
   "docs/brand/*.gif",
+  "docs/brand/*.mp4",
   "AppIcon.icon/**",
   "AppIconDev.icon/**",
 ]

@@ -16,7 +16,8 @@
 
 import { Footer, Header } from "@/components/chrome";
 import { content } from "@/generated/registry";
-import { dictionary } from "@/lib/i18n";
+import { ProductDemo } from "@/components/product-demo";
+import { dictionary, interactionDemoCopy } from "@/lib/i18n";
 import {
   asset,
   download,
@@ -86,26 +87,19 @@ export default async function Home({
             />
           </div>
         </section>
-        <figure className="product-shot wrap">
-          <img
-            src={asset(manifest.images.screenshot.src)}
-            srcSet={manifest.images.screenshot.variants
+        <ProductDemo
+          src={asset("interaction-demo.mp4")}
+          poster={{
+            src: asset(manifest.images.screenshot.src),
+            srcSet: manifest.images.screenshot.variants
               .map((v) => `${asset(v.file)} ${v.width}w`)
-              .join(", ")}
-            sizes="(max-width: 800px) calc(100vw - 40px), (max-width: 1416px) calc(100vw - 96px), 1320px"
-            width={manifest.images.screenshot.width}
-            height={manifest.images.screenshot.height}
-            alt={d.screenshot}
-            fetchPriority="high"
-          />
-          <figcaption>
-            <span className="dot" />
-            {d.screenshot}
-            <a href={href(lang, "overview")}>
-              {d.overview} <span aria-hidden="true">→</span>
-            </a>
-          </figcaption>
-        </figure>
+              .join(", "),
+            width: manifest.images.screenshot.width,
+            height: manifest.images.screenshot.height,
+          }}
+          copy={interactionDemoCopy[lang] || interactionDemoCopy.en}
+          overview={{ href: href(lang, "overview"), label: d.overview }}
+        />
         <aside className="wrap notice feature-status">
           <p>
             {d.development}{" "}

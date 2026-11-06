@@ -76,7 +76,7 @@ for (const [file, { html }] of cache) {
       anchorDepth++;
     }
   }
-  for (const m of html.matchAll(/\b(href|src)="([^"]+)"/g)) {
+  for (const m of html.matchAll(/\b(href|src|poster)="([^"]+)"/g)) {
     const [_, attr, encoded] = m;
     const url = encoded.replaceAll("&amp;", "&");
     if (/^(?:[a-z][\w+.-]*:|\/\/)/i.test(url) || !url || url === "#") continue;
@@ -222,6 +222,19 @@ for (const language of manifest.languages) {
       );
     }
     if (!slug) {
+      const video = elements(html, "video")[0];
+      assert.ok(video, `${lang}: product video missing`);
+      assert.ok(
+        Object.hasOwn(video, "muted") &&
+          Object.hasOwn(video, "loop") &&
+          Object.hasOwn(video, "playsinline"),
+        `${lang}: video must be muted, inline and looped`,
+      );
+      assert.equal(video.preload, "none", `${lang}: video must defer loading`);
+      assert.ok(
+        html.includes("demo-toggle"),
+        `${lang}: video pause/play control missing`,
+      );
       const screenshot = elements(html, "img").find((i) => i.srcset);
       assert.equal(Number(screenshot?.width), manifest.images.screenshot.width);
       assert.equal(
