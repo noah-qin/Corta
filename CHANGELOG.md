@@ -117,6 +117,8 @@ Versioning for compatibility changes.
   everything beneath them, a new subtask past the limit replaces the stalest instead
   of being refused, and spaces around fields are ignored. The differences that remain
   are listed in `docs/CONFORMANCE.md`.
+- A second file drop on a pane still receiving the first now says the first was
+  cancelled, and a drop that cannot start no longer cancels it.
 - ⌘Q no longer hangs after an SFTP row has been dragged. On the way out the app
   waited for a file promise nobody could keep.
 - An edit to the config file is picked up within about a second even while something
