@@ -47,13 +47,22 @@ nonisolated extension KittyImageRenderer {
         }
     }
 
+    /// A decode that failed for want of something that may come back.
+    struct TransientFailure {
+        var generation: UInt64
+        var attempts: Int
+        var retryAt: TimeInterval
+    }
+
     /// Scheduler abandonment and renderer teardown return admission too.
     final class DecodePermit: Sendable {
         private let released = Atomic<Bool>(false)
-        func release() {
+        /// `holder` still has work to finish, so the wake is for everyone else:
+        /// those waiting on this permit. It wakes itself when it has installed.
+        func release(whileWorking holder: KittyImageRenderer? = nil) {
             guard !released.exchange(true, ordering: .acquiringAndReleasing) else { return }
             KittyImageRenderer.decodeBudget.release(1)
-            NotificationCenter.default.post(name: KittyImageRenderer.decodeFinished, object: nil)
+            NotificationCenter.default.post(name: KittyImageRenderer.decodeFinished, object: holder)
         }
         deinit { release() }
     }

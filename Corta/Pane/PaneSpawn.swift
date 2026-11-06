@@ -36,6 +36,8 @@ enum PaneSpawn {
     /// pane. Each is dropped in turn; `/bin/sh` in `/` is guaranteed by POSIX.
     /// - Parameter size: the grid the child starts at.
     /// - Parameter directory: where it starts; dropped when it is unusable.
+    /// - Parameter directoryChecked: the startup phase already verified the
+    ///   directory off the main thread; do not probe it again while opening.
     /// - Parameter scrollbackLimit: the history cap, in lines.
     /// - Parameter commandHistoryLimit: the OSC 133 records kept.
     /// - Parameter preset: the shell, directory and environment it names.
@@ -47,7 +49,7 @@ enum PaneSpawn {
     /// - Parameter directoryCheckTimeout: how long the off-main existence
     ///   check of `directory` may take before the next rung.
     static func start(
-        size: TerminalSize, directory: String?, scrollbackLimit: Int,
+        size: TerminalSize, directory: String?, directoryChecked: Bool = false, scrollbackLimit: Int,
         commandHistoryLimit: Int = CommandRecordStore.defaultCapacity, preset: Preset? = nil,
         configuredShell: String? = nil, directoryCompletion: Bool = true, historySuggestions: Bool = true,
         directoryCheckTimeout: DispatchTimeInterval = .milliseconds(500)
@@ -65,9 +67,11 @@ enum PaneSpawn {
         let preferred = preset?.directory ?? directory ?? home
         // `posix_spawn` changes into the directory on this thread — the main
         // one — and a mount that stopped answering blocks it there. Checked
-        // first, bounded; unconfirmed, it is skipped like a missing one.
+        // first, bounded; unconfirmed, it is skipped like a missing one. What
+        // remains is the moment between that check and the spawn, for a mount
+        // that fails in it: only moving the spawn off this thread would close it.
         let preferredUsable =
-            preferred == home
+            preferred == home || (directoryChecked && preset?.directory == nil)
             || !PathProbe.directories(among: [preferred], timeout: directoryCheckTimeout).isEmpty
         struct Attempt {
             var shell: String

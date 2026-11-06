@@ -78,6 +78,13 @@ extension TerminalSession {
         pendingWrites.withLock { $0.writing && $0.inFlightPaste != nil }
     }
 
+    /// Something written has not reached the child yet: queued, or in a write
+    /// that has not returned. The grid cannot say so, because nothing has been
+    /// echoed, so a caller about to add a Return asks here.
+    public var hasPendingInput: Bool {
+        pendingWrites.withLock { $0.bytes > 0 || $0.writing }
+    }
+
     /// What Ctrl-C did to a paste still queued ahead of it.
     public struct PasteInterrupt: Sendable, Equatable {
         /// Queued paste chunks were dropped.

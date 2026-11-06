@@ -105,7 +105,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `paste-warning` | `dangerous`, `always`, `off` | `dangerous` | Warns for shell pipes (and `bash <(curl …)` / `sh -c "$(curl …)"` feeds), sudo, recursive forced deletion, backslash continuations, hidden Unicode characters, and line breaks without bracketed paste. `always` also warns for any multiline paste with bracketed paste enabled; `off` disables dialogs. Applies immediately. “Don’t warn again for this pane” lasts until the pane closes. |
 | `copy-on-select` | boolean | `true` | A finished selection goes straight to the clipboard, confirmed by a label in the corner of the pane. Set `false` for ⌘C only. |
 | `mouse-override-modifier` | `option`, `shift`, `control` | `option` | Hold this modifier when beginning a drag to select terminal text while a TUI owns the mouse. Applies immediately. The pane shows a hint on first use; `copy-on-select` controls automatic copying. |
-| `link-activation` | `command`, `click` | `command` | `command` opens a link on ⌘-click. `click` opens it on a plain click and underlines the link under the pointer; dragging across a URL still selects it. |
+| `link-activation` | `command`, `click` | `command` | `command` opens a link on ⌘-click. `click` opens a URL on a plain click and underlines it under the pointer; dragging across a URL still selects it. A `path:line` reference takes ⌘ either way, since it starts your editor. |
 | `allow-clipboard-write` | boolean | `false` | Whether OSC 52 may put text on the system clipboard — the only route from inside `tmux` or an `ssh` session. Off by default because *any* output could use it. The **read** direction does not exist under any setting (`SECURITY.md` §6). |
 | `secure-keyboard-entry` | boolean | `false` | Secure Keyboard Entry: while a Corta terminal window is key and Corta is the active application, the system stops delivering keystrokes to any other process — event taps, keyloggers, macro tools and accessibility clients alike. Shell ▸ Secure Keyboard Entry toggles this key and shows a checkmark; a lock in the titlebar shows when it is *actually engaged*, which is not while another app is frontmost or Settings is key. Off by default because it is system-wide and also silences the tools a person may rely on (`SECURITY.md` §4.5). |
 
@@ -496,7 +496,9 @@ other terminal; Corta parses none of it. `directory`, if set, remains a
 badge with the remote host and directory once the remote shell reports them
 (OSC 7), and says so when it cannot know them. When the connection dies,
 Shell ▸ Terminal and Connection ▸ Reconnect to Host (`reconnect-remote`) starts a new connection to
-the same host — explicitly a new one, never a restore of the dead session.
+the same host — explicitly a new one, never a restore of the dead session. When
+it hangs instead, Kill and Reconnect to Host… (`kill-and-reconnect-remote`) ends
+it first, once you confirm.
 
 A preset is applied once, at spawn. A pane opened from one is an ordinary
 pane afterwards: there is nothing to leave and nothing to keep in sync. Presets
@@ -614,6 +616,7 @@ the key against both rows, which is how you spot it.
 | `clear-history` | Clear History | *(none)* |
 | `reset-terminal` | Reset Terminal | *(none)* |
 | `reconnect-remote` | Reconnect to Host | *(none)* |
+| `kill-and-reconnect-remote` | Kill and Reconnect to Host… | *(none)* |
 | `browse-remote-files` | Browse Remote Files… | *(none)* |
 | `previous-command` | Previous Command | `cmd+up` |
 | `next-command` | Next Command | `cmd+down` |
@@ -689,6 +692,12 @@ side, same divider, same working directory. It restores the *arrangement*,
 never the process: the child that was running is gone, and its scrollback with
 it. The record is one pane deep, because the position of anything older is
 described against a tree the first reopen has already changed.
+
+`kill-and-reconnect-remote` is the same for a remote launcher that has *not*
+exited, such as an `ssh` left waiting on a network that went away: it asks first,
+with Cancel the default — Corta cannot tell a hung connection from an idle one —
+then hangs the session up, sends `SIGKILL` to whatever ignores that, and runs
+the command again as below.
 
 `reconnect-remote` appears only for a pane whose recorded spawn command was a
 remote launcher (`ssh`, `mosh`) and whose child has exited. It re-runs exactly

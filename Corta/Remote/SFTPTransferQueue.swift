@@ -15,10 +15,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CortaSFTP
-import CortaTerminal
 import Foundation
 import Observation
-import Synchronization
 
 /// Owns transfer planning, conflicts, cancellation and retry for one browser connection.
 /// Resolve conflicts before starting: the engine cannot present an asynchronous sheet.
@@ -32,14 +30,21 @@ final class SFTPTransferQueue {
     var host: String?
     var onUploadFinished: (() -> Void)?
     var onListingError: ((String) -> Void)?
-    private(set) var transfers: [Transfer] = []
-    private(set) var conflictPrompts: [ConflictPrompt] = []
+    var transfers: [Transfer] = []
+    var conflictPrompts: [ConflictPrompt] = []
     /// The clock rates are measured on; a test supplies its own.
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     /// Called once when a transfer reaches a terminal state — how a drag to
     /// Finder waits for the download it started, through the same queue
     /// (and the same progress row) as any other.
-    private var finishHandlers: [UUID: (Result<URL, TransferFailure>) -> Void] = [:]
+    var finishHandlers: [UUID: (Result<URL, TransferFailure>) -> Void] = [:]
+    /// Everything local the queue asks about a file, off the main actor.
+    var localChecks = SFTPLocalChecks()
+    /// How long a cancelled row may wait for its transfer to stop before it
+    /// says Cancelled anyway. A transfer stops at its next check, but a read
+    /// from a volume that has gone may not come back to one; the destination
+    /// is safe either way (the engine commits only whole files).
+    var cancellingTimeout: Duration = .seconds(10)
 
     /// Clears the rows that are over — done, cancelled, skipped or failed —
     /// the way Safari's Downloads list does. Running ones stay.
@@ -50,15 +55,21 @@ final class SFTPTransferQueue {
         transfers.removeAll(where: \.isFinished)
     }
 
-    private struct Job {
+    struct Job {
         var plan: Plan
         /// The host the row names; the queue's `client` follows Change Host.
         let host: String
         var resolution: Resolution?
         var task: Task<Void, Never>?
+        /// The pre-flight or Keep Both search before there is a `task`: only
+        /// questions, cancelled with the row.
+        var preparation: Task<Void, Never>?
+        /// Which `start` `task` is. A run given up on may still finish, after
+        /// a Retry has started another; it speaks only for itself.
+        var run = UUID()
     }
 
-    private var jobs: [UUID: Job] = [:]
+    var jobs: [UUID: Job] = [:]
 
     func disconnect() {
         for id in Array(jobs.keys) {
@@ -95,9 +106,9 @@ extension SFTPTransferQueue {
             Transfer(
                 id: id, isUpload: plan.isUpload, isDirectory: plan.isDirectory, name: name,
                 localURL: plan.localURL,
-                host: host, state: .queued))
+                host: host, state: .queued, revealsInFinder: onFinish == nil))
         jobs[id] = Job(plan: plan, host: host)
-        Task { await preflight(id: id) }
+        jobs[id]?.preparation = Task { await preflight(id: id) }
     }
 
     /// Gathers what the engine's `.decide` callback would have been told,
@@ -105,70 +116,81 @@ extension SFTPTransferQueue {
     /// partial from an interrupted run is in the way, and both ends' sizes
     /// and mtimes for the sheet. Mirrors the engine's own checks — local
     /// attributes for a download's destination, LSTAT for an upload's.
-    private func preflight(id: UUID) async {
-        guard var plan = jobs[id]?.plan, let client else { return }
-        if plan.isDirectory {
-            // Directories merge; the only question is whether one is
-            // already there, and the sheet's answer becomes the per-file
-            // policy inside. Partials belong to the files, not the tree.
-            if plan.isUpload {
-                plan.destinationExists = (try? await client.lstat(path: plan.remotePath)) != nil
-            } else {
-                plan.destinationExists = FileManager.default.fileExists(atPath: plan.localURL.path)
-            }
-            jobs[id]?.plan = plan
-            guard jobs[id] != nil else { return }
-            guard plan.destinationExists else {
-                start(id: id, resolution: .fail)
+    func preflight(id: UUID) async {
+        guard var plan = jobs[id]?.plan, let client, runsHere(id) else { return }
+        // A chosen folder merges; the only question is whether one is already
+        // there, and the sheet's answer becomes the per-file policy inside.
+        // Partials belong to the files, not the tree.
+        if plan.isUpload {
+            let url = plan.localURL
+            guard let source = await localChecks.answer({ SFTPLocalFacts.source(url) }) else {
+                localCheckFailed(id, path: url.path)
                 return
             }
-            guard let transfer = transfers.first(where: { $0.id == id }) else { return }
-            conflictPrompts.append(
-                ConflictPrompt(
-                    id: UUID(), transferID: id,
-                    path: SFTPBrowserModel.displayName(
-                        transfer.isUpload ? plan.remotePath : plan.localURL.path),
-                    sourceDescription: L10n.text("sftp.conflict.directory"),
-                    destinationDescription: L10n.text("sftp.conflict.directoryExists"),
-                    canResume: true, partialOnly: false))
-            return
-        }
-        if plan.isUpload {
-            await Self.inspectUpload(&plan, client: client)
+            plan.isDirectory = plan.isDirectory || source.isDirectory
+            if let index = transfers.firstIndex(where: { $0.id == id }) {
+                transfers[index].isDirectory = plan.isDirectory
+            }
+            if plan.isDirectory {
+                plan.destinationExists = (try? await client.lstat(path: plan.remotePath)) != nil
+            } else {
+                plan.sourceSize = source.attributes.size
+                plan.sourceModified = source.attributes.modified
+                await Self.inspectUpload(&plan, client: client)
+            }
         } else {
-            Self.inspectDownload(&plan)
+            let path = plan.localURL.path
+            guard let found = await localChecks.answer({ SFTPLocalFacts.destination(atPath: path) }) else {
+                localCheckFailed(id, path: path)
+                return
+            }
+            plan.destinationExists = found.destination.exists
+            if !plan.isDirectory {
+                // The source's size and mtime arrive with the listing the
+                // plan was made from.
+                plan.destinationSize = found.destination.size
+                plan.destinationModified = found.destination.modified
+                plan.partialSize = found.partial.size
+            }
         }
-        jobs[id]?.plan = plan
         // Cancelled while the pre-flight ran: the row is already settled.
-        guard jobs[id] != nil else { return }
+        guard !Task.isCancelled, jobs[id] != nil else { return }
+        jobs[id]?.plan = plan
+        jobs[id]?.preparation = nil
         guard plan.destinationExists || plan.partialSize != nil else {
             start(id: id, resolution: .fail)
             return
         }
         guard let transfer = transfers.first(where: { $0.id == id }) else { return }
-        conflictPrompts.append(
-            ConflictPrompt(
-                id: UUID(), transferID: id,
-                path: SFTPBrowserModel.displayName(
-                    transfer.isUpload ? plan.remotePath : plan.localURL.path),
-                sourceDescription: SFTPBrowserModel.describe(
-                    size: plan.sourceSize, modified: plan.sourceModified),
-                // In the partial-only case the middle line describes the
-                // partial itself — the destination genuinely is not there.
-                destinationDescription: plan.destinationExists
-                    ? SFTPBrowserModel.describe(
-                        size: plan.destinationSize, modified: plan.destinationModified)
-                    : SFTPBrowserModel.describe(size: plan.partialSize, modified: nil),
-                canResume: plan.partialSize != nil,
-                partialOnly: !plan.destinationExists))
+        conflictPrompts.append(Self.conflictPrompt(for: plan, transferID: id, isUpload: transfer.isUpload))
     }
 
-    /// An upload's facts for the sheet: the local source, and the remote
-    /// destination and partial by LSTAT.
+    private static func conflictPrompt(for plan: Plan, transferID id: UUID, isUpload: Bool) -> ConflictPrompt {
+        let path = SFTPBrowserModel.peerText(isUpload ? plan.remotePath : plan.localURL.path)
+        if plan.isDirectory {
+            return ConflictPrompt(
+                id: UUID(), transferID: id, path: path,
+                sourceDescription: L10n.text("sftp.conflict.directory"),
+                destinationDescription: L10n.text("sftp.conflict.directoryExists"),
+                canResume: true, partialOnly: false)
+        }
+        return ConflictPrompt(
+            id: UUID(), transferID: id, path: path,
+            sourceDescription: SFTPBrowserModel.describe(
+                size: plan.sourceSize, modified: plan.sourceModified),
+            // In the partial-only case the middle line describes the
+            // partial itself — the destination genuinely is not there.
+            destinationDescription: plan.destinationExists
+                ? SFTPBrowserModel.describe(
+                    size: plan.destinationSize, modified: plan.destinationModified)
+                : SFTPBrowserModel.describe(size: plan.partialSize, modified: nil),
+            canResume: plan.partialSize != nil,
+            partialOnly: !plan.destinationExists)
+    }
+
+    /// An upload's remote facts for the sheet: the destination and partial by
+    /// LSTAT.
     private static func inspectUpload(_ plan: inout Plan, client: any SFTPClient) async {
-        let local = try? FileManager.default.attributesOfItem(atPath: plan.localURL.path)
-        plan.sourceSize = (local?[.size] as? NSNumber)?.uint64Value
-        plan.sourceModified = local?[.modificationDate] as? Date
         let destination = try? await client.lstat(path: plan.remotePath)
         plan.destinationExists = destination != nil
         plan.destinationSize = destination?.size
@@ -180,17 +202,16 @@ extension SFTPTransferQueue {
         plan.partialSize = partial?.size
     }
 
-    /// A download's facts for the sheet: the local destination and partial.
-    /// The source's size and mtime arrive with the listing the plan was
-    /// made from.
-    private static func inspectDownload(_ plan: inout Plan) {
-        let destination = try? FileManager.default.attributesOfItem(atPath: plan.localURL.path)
-        plan.destinationExists = destination != nil
-        plan.destinationSize = (destination?[.size] as? NSNumber)?.uint64Value
-        plan.destinationModified = destination?[.modificationDate] as? Date
-        let partial = try? FileManager.default.attributesOfItem(
-            atPath: SFTPTransferEngine.partialPath(for: plan.localURL.path))
-        plan.partialSize = (partial?[.size] as? NSNumber)?.uint64Value
+    /// The disk did not answer. Unless the row was cancelled meanwhile, it
+    /// fails — Retry asks again — and the rest of the queue goes on.
+    private func localCheckFailed(_ id: UUID, path: String) {
+        guard !Task.isCancelled, jobs[id] != nil else { return }
+        jobs[id]?.preparation = nil
+        setState(
+            id,
+            .failed(
+                message: L10n.format("sftp.transfer.localCheckTimedOut", SFTPBrowserModel.peerText(path)),
+                retryable: finishHandlers[id] == nil))
     }
 
     /// The conflict sheet's answer, mapped onto engine policy (see the
@@ -211,7 +232,7 @@ extension SFTPTransferQueue {
         case .resume:
             start(id: id, resolution: .resume)
         case .keepBoth:
-            Task { await keepBoth(id: id) }
+            jobs[id]?.preparation = Task { await keepBoth(id: id) }
         }
     }
 
@@ -220,38 +241,47 @@ extension SFTPTransferQueue {
     /// starts under `.fail`.
     private func keepBoth(id: UUID) async {
         guard var plan = jobs[id]?.plan, let client else { return }
-        for attempt in 1...1000 {
-            if plan.isUpload {
-                let candidate = SFTPBrowserModel.keepBothCandidate(
-                    plan.remotePath, attempt: attempt)
-                let destinationTaken = (try? await client.lstat(path: candidate)) != nil
+        let attempts = 1000
+        var candidate: String?
+        if plan.isUpload {
+            for attempt in 1...attempts {
+                guard !Task.isCancelled, jobs[id] != nil else { return }
+                let name = SFTPBrowserModel.keepBothCandidate(plan.remotePath, attempt: attempt)
+                let destinationTaken = (try? await client.lstat(path: name)) != nil
                 let partialTaken =
                     (try? await client.lstat(
-                        path: SFTPTransferEngine.partialPath(for: candidate))) != nil
+                        path: SFTPTransferEngine.partialPath(for: name))) != nil
                 if !destinationTaken && !partialTaken {
-                    plan.remotePath = candidate
-                    break
-                }
-            } else {
-                let candidate = SFTPBrowserModel.keepBothCandidate(
-                    plan.localURL.path, attempt: attempt)
-                let destinationTaken = FileManager.default.fileExists(atPath: candidate)
-                let partialTaken = FileManager.default.fileExists(
-                    atPath: SFTPTransferEngine.partialPath(for: candidate))
-                if !destinationTaken && !partialTaken {
-                    plan.localURL = URL(fileURLWithPath: candidate)
+                    candidate = name
                     break
                 }
             }
-            if attempt == 1000 {
-                setState(
-                    id,
-                    .failed(
-                        message: SFTPBrowserModel.errorMessage(
-                            .destinationConflict(path: plan.remotePath), host: host ?? ""),
-                        retryable: false))
+        } else {
+            let path = plan.localURL.path
+            guard let answer = await localChecks.answer({
+                SFTPLocalFacts.firstFreeCandidate(for: path, attempts: attempts)
+            }) else {
+                localCheckFailed(id, path: path)
                 return
             }
+            candidate = answer
+        }
+        guard !Task.isCancelled, jobs[id] != nil else { return }
+        jobs[id]?.preparation = nil
+        guard let candidate else {
+            setState(
+                id,
+                .failed(
+                    message: SFTPBrowserModel.errorMessage(
+                        .destinationConflict(path: plan.isUpload ? plan.remotePath : plan.localURL.path),
+                        host: host ?? ""),
+                    retryable: false))
+            return
+        }
+        if plan.isUpload {
+            plan.remotePath = candidate
+        } else {
+            plan.localURL = URL(fileURLWithPath: candidate)
         }
         jobs[id]?.plan = plan
         if let index = transfers.firstIndex(where: { $0.id == id }) {
@@ -277,231 +307,3 @@ extension SFTPTransferQueue {
     }
 }
 #endif
-
-// MARK: - Transfers: running
-
-extension SFTPTransferQueue {
-
-    private func start(id: UUID, resolution: Resolution) {
-        guard let job = jobs[id], let client else { return }
-        // A failed row outlives Change Host, and its Retry ran on whichever
-        // machine the browser was on by then: a file queued for one host
-        // went to another. It runs only where the row says it goes.
-        guard job.host == host else {
-            jobs[id] = nil
-            setState(
-                id,
-                .failed(
-                    message: L10n.format("sftp.error.connectionLost", job.host),
-                    retryable: false))
-            return
-        }
-        let plan = job.plan
-        jobs[id]?.resolution = resolution
-        let task = Task { [weak self] in
-            guard let self else { return }
-            // The engine reports every 32 KiB block — thousands a second on a
-            // fast link, each a main-actor hop and a list redraw. A row needs a
-            // few a second; the receipt sets the final state.
-            let pacer = ProgressPacer()
-            let progress: SFTPTransferEngine.ProgressHandler = { [weak self] progress in
-                guard pacer.admits() else { return }
-                Task { @MainActor [weak self] in
-                    self?.applyProgress(progress, to: id)
-                }
-            }
-            do {
-                if plan.isDirectory {
-                    let receipt = try await Self.transferDirectory(
-                        plan, policy: resolution.policy, client: client
-                    ) { [weak self] progress in
-                        guard pacer.admits() else { return }
-                        Task { @MainActor [weak self] in
-                            self?.applyDirectoryProgress(progress, to: id)
-                        }
-                    }
-                    finishDirectory(id: id, receipt: receipt, isUpload: plan.isUpload)
-                    return
-                }
-                let receipt = try await Self.transferFile(
-                    plan, resolution: resolution, client: client, progress: progress)
-                finish(id: id, receipt: receipt, isUpload: plan.isUpload)
-            } catch {
-                fail(id: id, error: SFTPBrowserModel.sftpError(error))
-            }
-        }
-        jobs[id]?.task = task
-    }
-
-    private func applyProgress(
-        _ progress: SFTPTransferEngine.SFTPTransferProgress, to id: UUID
-    ) {
-        guard let index = transfers.firstIndex(where: { $0.id == id }) else { return }
-        switch transfers[index].state {
-        case .queued, .active:
-            // Hops from the engine are not ordered; progress is, so a late
-            // older value is dropped rather than regressing the bar.
-            if case .active(let completed, _) = transfers[index].state,
-                progress.completedBytes < completed
-            {
-                return
-            }
-            transfers[index].state = .active(
-                completed: progress.completedBytes, total: progress.totalBytes)
-            transfers[index] = Self.updatedRate(
-                transfers[index], completed: progress.completedBytes, now: now())
-        default:
-            return
-        }
-    }
-
-    private func applyDirectoryProgress(
-        _ progress: SFTPTransferEngine.DirectoryTransferProgress, to id: UUID
-    ) {
-        guard let index = transfers.firstIndex(where: { $0.id == id }) else { return }
-        switch transfers[index].state {
-        case .queued, .active:
-            if case .active(let completed, _) = transfers[index].state,
-                progress.completedBytes < completed
-            {
-                return
-            }
-            transfers[index].filesCompleted = progress.filesCompleted
-            transfers[index].filesTotal = progress.filesTotal
-            transfers[index].state = .active(
-                completed: progress.completedBytes, total: progress.totalBytes)
-            transfers[index] = Self.updatedRate(
-                transfers[index], completed: progress.completedBytes, now: now())
-        default:
-            return
-        }
-    }
-
-    /// A directory's receipt: the row records the bytes, and anything the
-    /// walk skipped (symbolic links, special files, unsafe names) is
-    /// surfaced on the listing's error line — a skipped entry must never
-    /// be silent.
-    private func finishDirectory(
-        id: UUID, receipt: SFTPTransferEngine.DirectoryTransferReceipt, isUpload: Bool
-    ) {
-        jobs[id] = nil
-        if let index = transfers.firstIndex(where: { $0.id == id }) {
-            transfers[index].filesCompleted = receipt.filesTransferred
-            transfers[index].filesTotal = receipt.filesTransferred
-        }
-        setState(id, .done(bytes: receipt.bytesTransferred))
-        if !receipt.skipped.isEmpty {
-            onListingError?(
-                L10n.format(
-                    "sftp.directory.skipped", receipt.skipped.count,
-                    receipt.skipped.prefix(3).map(\.relativePath).joined(separator: ", ")))
-        }
-        if isUpload { onUploadFinished?() }
-    }
-
-    private func finish(
-        id: UUID, receipt: SFTPTransferEngine.SFTPTransferReceipt, isUpload: Bool
-    ) {
-        jobs[id] = nil
-        setState(id, .done(bytes: receipt.bytesTransferred + receipt.resumedFromOffset))
-        if isUpload { onUploadFinished?() }
-    }
-
-    private func fail(id: UUID, error: SFTPError) {
-        jobs[id]?.task = nil
-        let resumable = jobs[id]?.resolution == .resume
-        switch error {
-        case .cancelled:
-            setState(id, .cancelled(partialKept: resumable))
-        default:
-            setState(
-                id,
-                .failed(
-                    message: SFTPBrowserModel.errorMessage(error, host: host ?? ""),
-                    // Someone waited on this one and has had their answer: a
-                    // drag's destination has been told it failed, and its folder
-                    // has gone. Drag the file again instead.
-                    retryable: error.isRetryableTransportFailure && finishHandlers[id] == nil))
-        }
-    }
-
-    private func setState(_ id: UUID, _ state: TransferState) {
-        guard let index = transfers.firstIndex(where: { $0.id == id }) else { return }
-        transfers[index].state = state
-        if case .active = state {} else { transfers[index].bytesPerSecond = nil }
-        guard transfers[index].isFinished, let handler = finishHandlers.removeValue(forKey: id)
-        else { return }
-        switch state {
-        case .done:
-            let transfer = transfers[index]
-            handler(.success(transfer.localURL))
-        case .failed(let message, _):
-            handler(.failure(TransferFailure(message: message)))
-        default:
-            handler(.failure(TransferFailure(message: L10n.text("sftp.transfer.cancelled"))))
-        }
-    }
-
-    /// Folds a progress sample into the transfer's rate: a sample is taken
-    /// at most every half second, and each moves the rate a third of the
-    /// way towards the latest, so the shown speed neither jitters nor lags.
-    nonisolated static func updatedRate(
-        _ transfer: Transfer, completed: UInt64, now: TimeInterval
-    ) -> Transfer {
-        var transfer = transfer
-        guard let last = transfer.sampleTime else {
-            transfer.sampleTime = now
-            transfer.sampleBytes = completed
-            return transfer
-        }
-        let elapsed = now - last
-        guard elapsed >= 0.5 else { return transfer }
-        guard completed >= transfer.sampleBytes else {
-            // A retry or resume restarted the count: start sampling over.
-            transfer.sampleTime = now
-            transfer.sampleBytes = completed
-            transfer.bytesPerSecond = nil
-            return transfer
-        }
-        let instant = Double(completed - transfer.sampleBytes) / elapsed
-        transfer.bytesPerSecond = transfer.bytesPerSecond.map { $0 + (instant - $0) / 3 } ?? instant
-        transfer.sampleTime = now
-        transfer.sampleBytes = completed
-        return transfer
-    }
-
-    /// Cancels one transfer — queued ones never reach the engine, running
-    /// ones are abandoned mid-flight with the partial kept or removed per
-    /// the run's resolution (the engine's guarantee). A transfer still in
-    /// pre-flight has no task yet; it is simply never started.
-    func cancelTransfer(_ id: UUID) {
-        guard let index = transfers.firstIndex(where: { $0.id == id }) else { return }
-        switch transfers[index].state {
-        case .queued, .active:
-            guard let task = jobs[id]?.task else {
-                jobs[id] = nil
-                conflictPrompts.removeAll { $0.transferID == id }
-                setState(id, .cancelled(partialKept: false))
-                return
-            }
-            transfers[index].state = .cancelling
-            task.cancel()
-        default:
-            return
-        }
-    }
-
-    /// Retries a transport-class failure under the same resolution it ran
-    /// with; a resume run's kept partial makes the retry continue where it
-    /// stopped rather than start over.
-    func retryTransfer(_ id: UUID) {
-        guard let index = transfers.firstIndex(where: { $0.id == id }),
-            case .failed(_, let retryable) = transfers[index].state, retryable,
-            let resolution = jobs[id]?.resolution
-        else { return }
-        transfers[index].state = .queued
-        transfers[index].sampleTime = nil
-        transfers[index].bytesPerSecond = nil
-        start(id: id, resolution: resolution)
-    }
-}

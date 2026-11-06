@@ -170,8 +170,9 @@ private struct TransferRow: View {
     }
 
     /// One action per state, as an icon button with its name for VoiceOver:
-    /// stop a running one, retry a retryable failure, show a finished
-    /// download in Finder.
+    /// stop a running one, retry what can be, show a finished download in
+    /// Finder. No file check for that: this is a view's body, on the main
+    /// thread, and the file may be on a volume that does not answer.
     @ViewBuilder
     private var action: some View {
         switch transfer.state {
@@ -179,12 +180,11 @@ private struct TransferRow: View {
             iconButton("xmark.circle.fill", L10n.text("common.cancel")) {
                 model.cancelTransfer(transfer.id)
             }
-        case .failed(_, let retryable) where retryable:
+        case _ where transfer.canRetry:
             iconButton("arrow.clockwise.circle.fill", L10n.text("sftp.retry")) {
                 model.retryTransfer(transfer.id)
             }
-        case .done where !transfer.isUpload
-            && FileManager.default.fileExists(atPath: transfer.localURL.path):
+        case .done where !transfer.isUpload && transfer.revealsInFinder:
             iconButton("magnifyingglass.circle.fill", L10n.text("sftp.transfer.showInFinder")) {
                 NSWorkspace.shared.activateFileViewerSelecting([transfer.localURL])
             }

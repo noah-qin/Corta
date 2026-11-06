@@ -8,6 +8,7 @@
 > [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md).
 > Wurde die englische Fassung seitdem geändert oder weichen die beiden ab, gilt die englische.
 > Meldungen von macOS stehen zusätzlich im englischen Original.
+> Die Änderungen zu Einfügen, Links und Fernzugriff wurden mit diesem englischen Commit abgeglichen: [`6e5f7d5`](https://github.com/noah-qin/Corta/blob/6e5f7d5/docs/TROUBLESHOOTING.md).
 
 Was zu tun ist, wenn Corta sich nicht installieren lässt, nicht startet oder etwas tut, das dein bisheriges Terminal
 nicht getan hat. Jeder Eintrag sagt, was du siehst, warum, und wie es sich beheben lässt – und der letzte Abschnitt
@@ -134,6 +135,12 @@ gespeichert hat – oder du darfst sie nicht lesen. Corta behält die Einstellun
 zu schreiben, weil Schreiben alles darin ersetzen würde. Speichere die Datei erneut als UTF-8 (oder entferne die
 fehlerhafte Zeile); Corta übernimmt sie, sobald es sie wieder liest. Die Shell-Integration verfährt genauso mit einer
 rc-Datei, die sie nicht lesen kann: Sie meldet es und lässt die Datei in Ruhe.
+
+<a id="settings-says-the-configuration-file-did-not-answer-in-time"></a>
+
+### Die Konfigurationsdatei antwortet nicht rechtzeitig
+
+Die Datei oder ihr verknüpfter Ordner liegt auf einem nicht antwortenden Datenträger, oft einem Netzlaufwerk. Corta wartet höchstens eine Sekunde, behält die Einstellungen und verweigert das Speichern, statt eine ungelesene Datei zu überschreiben. Es versucht es alle paar Sekunden erneut; fehlgeschlagene Menüänderungen werden gemeldet. Sobald der Datenträger antwortet, erholt sich Corta selbst.
 
 ---
 
@@ -333,6 +340,21 @@ Die Verbindung ist ins Stocken geraten. Ist sie aufgebaut, hat jeder Vorgang der
 danach schließt Corta die Verbindung und bietet den Upload erneut an. Bestätige ihn, um es über eine neue Verbindung noch
 einmal zu versuchen. Auch eine sehr große Datei über eine langsame Leitung kann die Grenze erreichen: Kopiere sie dann mit
 dem SFTP-Browser.
+
+<a id="clicking-a-link-did-nothing"></a>
+<a id="a-paste-says-not-pasted--thats-more-than-64-mib"></a>
+
+### Ein Link öffnet sich nicht oder der eingefügte Text ist zu groß
+
+Ändert die Ausgabe das angezeigte Ziel, aktualisiert ein Klick nur den Tooltip. Prüfe ihn und klicke erneut. Bei der Meldung, dass der Text größer als 64 MiB ist, wurde nichts gesendet. Füge kleinere Teile ein oder speichere den Text in einer Datei, die das Programm liest. Diese Grenze ist fest.
+
+<a id="an-ssh-pane-stopped-responding-and-reconnect-is-greyed-out"></a>
+<a id="browse-remote-files-stays-on-connecting-then-says-it-could-not-reach-the-host"></a>
+<a id="a-transfer-failed-saying-the-disk-did-not-answer"></a>
+
+### Eine entfernte Verbindung hängt oder die Festplattenprüfung schlägt fehl
+
+Solange `ssh` läuft, ist normales Wiederverbinden deaktiviert. Liest es noch Tastatureingaben, kann `~.` es beenden. Andernfalls wähle **Beenden und erneut mit Host verbinden…** und bestätige: Die alte Verbindung endet, derselbe Befehl startet erneut und die Ausgabe wird gelöscht; entfernte Aufgaben können enden. SFTP wartet pro Verbindungsschritt 30 Sekunden, ohne die Zeit im Anmeldedialog. Danach ist ein neuer Versuch möglich; vorher kannst du abbrechen. Prüfe Netzwerk oder VPN und starte `ssh -v` mit demselben Benutzer und Port. Lokale Dateiprüfungen vor einer Übertragung warten höchstens fünf Sekunden. Stelle den Datenträger oder die Netzwerkfreigabe wieder her und wiederhole die betroffene Zeile.
 
 ---
 

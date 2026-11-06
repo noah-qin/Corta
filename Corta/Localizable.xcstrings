@@ -2,6 +2,1068 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "remoteEdit.redownloadSuperseded": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” was saved while it was being downloaded again, so the download was not applied. The saved content is kept."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@”在重新下载期间被保存，因此未应用这次下载。已保存的内容会保留。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%@」在重新下載期間被儲存，因此未套用這次下載。已儲存的內容會保留。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%@」は再ダウンロード中に保存されたため、ダウンロードは適用されませんでした。保存された内容は保持されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "다시 다운로드하는 동안 “%@”이(가) 저장되어 다운로드를 적용하지 않았습니다. 저장된 내용은 유지됩니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„%@“ wurde gesichert, während es erneut geladen wurde, daher wurde der Download nicht übernommen. Der gesicherte Inhalt bleibt erhalten."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "« %@ » a été enregistré pendant son retéléchargement ; le téléchargement n’a donc pas été appliqué. Le contenu enregistré est conservé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "«%@» se guardó mientras se volvía a descargar, así que la descarga no se aplicó. El contenido guardado se conserva."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@” foi salvo enquanto era baixado novamente, então o download não foi aplicado. O conteúdo salvo é mantido."
+          }
+        }
+      }
+    },
+    "remoteEdit.redownloadUnsecured": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%1$@” was downloaded again from %2$@ and is in place, but its local copy could not be made private again. Check its permissions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@”已从 %2$@ 重新下载并就位，但无法将其本地副本重新设为私有。请检查它的权限。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%1$@」已從 %2$@ 重新下載並就位，但無法將其本機副本重新設為私有。請檢查它的權限。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%1$@」を %2$@ から再ダウンロードして配置しましたが、ローカルコピーを再び非公開にできませんでした。アクセス権を確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@”을(를) %2$@에서 다시 다운로드하여 교체했지만 로컬 복사본을 다시 비공개로 설정할 수 없습니다. 권한을 확인하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„%1$@“ wurde erneut von %2$@ geladen und ist an seinem Platz, aber die lokale Kopie konnte nicht wieder privat gemacht werden. Prüfen Sie ihre Zugriffsrechte."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "« %1$@ » a été retéléchargé depuis %2$@ et est en place, mais sa copie locale n’a pas pu être rendue privée de nouveau. Vérifiez ses autorisations."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "«%1$@» se volvió a descargar de %2$@ y ya está en su lugar, pero su copia local no se pudo volver a hacer privada. Comprueba sus permisos."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%1$@” foi baixado novamente de %2$@ e está no lugar, mas sua cópia local não pôde voltar a ser privada. Verifique as permissões."
+          }
+        }
+      }
+    },
+    "sftp.transfer.localCheckTimedOut": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The disk did not answer in time about “%@”. Try again once it is back."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "磁盘未能及时响应关于“%@”的查询。请在它恢复后重试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "磁碟未能及時回應關於「%@」的查詢。請在它恢復後重試。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「%@」についてディスクが時間内に応答しませんでした。復旧してからもう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“%@”에 대해 디스크가 제때 응답하지 않았습니다. 복구된 후 다시 시도하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Der Datenträger hat zu „%@“ nicht rechtzeitig geantwortet. Versuchen Sie es erneut, sobald er wieder da ist."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le disque n’a pas répondu à temps au sujet de « %@ ». Réessayez lorsqu’il sera de nouveau disponible."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El disco no respondió a tiempo sobre «%@». Vuelve a intentarlo cuando esté disponible."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O disco não respondeu a tempo sobre “%@”. Tente de novo quando ele voltar."
+          }
+        }
+      }
+    },
+    "remote.kill.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kill and Reconnect"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "终止并重新连接"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "終止並重新連線"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "強制終了して再接続"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "종료하고 다시 연결"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Beenden und neu verbinden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Forcer l’arrêt et se reconnecter"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Forzar cierre y reconectar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Forçar encerramento e reconectar"
+          }
+        }
+      }
+    },
+    "remote.kill.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The connection’s process is ended even if it is only idle, and whatever it is running on the other machine may stop. The command then runs again as a new connection, and the output above is cleared."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "即使连接只是处于空闲状态，它的进程也会被终止，另一台机器上正在运行的程序可能会停止。之后命令会作为新连接重新运行，上方的输出会被清除。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "即使連線只是處於閒置狀態，它的程序也會被終止，另一台機器上正在執行的程式可能會停止。之後命令會作為新連線重新執行，上方的輸出會被清除。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続が待機中なだけでもプロセスは終了され、相手のマシンで実行中のものは停止することがあります。その後コマンドは新しい接続として再実行され、上の出力は消去されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결이 유휴 상태일 뿐이어도 프로세스가 종료되며, 상대 컴퓨터에서 실행 중인 작업이 중단될 수 있습니다. 그런 다음 명령이 새 연결로 다시 실행되고 위의 출력은 지워집니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Der Prozess der Verbindung wird beendet, auch wenn sie nur untätig ist, und was sie auf dem anderen Rechner ausführt, kann anhalten. Der Befehl läuft dann als neue Verbindung erneut, und die Ausgabe oben wird gelöscht."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le processus de la connexion est arrêté même s’il est seulement inactif, et ce qu’il exécute sur l’autre machine peut s’interrompre. La commande est ensuite relancée comme une nouvelle connexion, et la sortie ci-dessus est effacée."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El proceso de la conexión se cierra aunque solo esté inactivo, y lo que esté ejecutando en la otra máquina puede detenerse. Después, el comando se ejecuta de nuevo como una conexión nueva y la salida de arriba se borra."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O processo da conexão é encerrado mesmo que esteja apenas ocioso, e o que ele estiver executando na outra máquina pode parar. Depois, o comando é executado de novo como uma nova conexão, e a saída acima é apagada."
+          }
+        }
+      }
+    },
+    "remote.kill.title.host": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kill the connection to %@ and reconnect?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "要终止到 %@ 的连接并重新连接吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "要終止到 %@ 的連線並重新連線嗎？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ への接続を強制終了して再接続しますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ 연결을 종료하고 다시 연결하시겠습니까?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Verbindung zu %@ beenden und neu verbinden?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Forcer l’arrêt de la connexion à %@ et se reconnecter ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "¿Forzar el cierre de la conexión a %@ y reconectar?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Forçar o encerramento da conexão com %@ e reconectar?"
+          }
+        }
+      }
+    },
+    "remote.kill.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kill this connection and reconnect?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "要终止此连接并重新连接吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "要終止此連線並重新連線嗎？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "この接続を強制終了して再接続しますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 연결을 종료하고 다시 연결하시겠습니까?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Diese Verbindung beenden und neu verbinden?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Forcer l’arrêt de cette connexion et se reconnecter ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "¿Forzar el cierre de esta conexión y reconectar?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Forçar o encerramento desta conexão e reconectar?"
+          }
+        }
+      }
+    },
+    "command.killAndReconnectRemote": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kill and Reconnect to Host…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "终止并重新连接到主机…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "終止並重新連線到主機…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "強制終了してホストに再接続…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "종료하고 호스트에 다시 연결…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Beenden und erneut mit Host verbinden…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Forcer l’arrêt et se reconnecter à l’hôte…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Forzar cierre y reconectar al host…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Forçar encerramento e reconectar ao host…"
+          }
+        }
+      }
+    },
+    "askpass.source.intermediate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This question comes from OpenSSH or that intermediate host, not from %@. Corta passes your answer to ssh and keeps no copy."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个问题来自 OpenSSH 或该中间主机，而不是 %@。Corta 只把你的回答交给 ssh，不保留任何副本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "這個問題來自 OpenSSH 或該中間主機，而不是 %@。Corta 只把你的回答交給 ssh，不保留任何副本。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "この質問は OpenSSH またはその中継ホストからのもので、%@ からではありません。Corta は回答を ssh に渡すだけで、写しを残しません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이 질문은 %@이(가) 아니라 OpenSSH 또는 해당 중간 호스트에서 온 것입니다. Corta는 답을 ssh에 전달할 뿐 사본을 남기지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Diese Frage stammt von OpenSSH oder von dieser Zwischenstation, nicht von %@. Corta gibt Ihre Antwort an ssh weiter und behält keine Kopie."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Cette question vient d'OpenSSH ou de cet hôte intermédiaire, pas de %@. Corta transmet votre réponse à ssh et n'en garde aucune copie."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta pregunta viene de OpenSSH o de ese host intermedio, no de %@. Corta pasa tu respuesta a ssh y no guarda ninguna copia."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta pergunta vem do OpenSSH ou desse host intermediário, não de %@. O Corta repassa sua resposta ao ssh e não guarda nenhuma cópia."
+          }
+        }
+      }
+    },
+    "askpass.notify.title.intermediate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ssh is waiting for you (an intermediate step on the way to %@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh 正在等待你的操作（前往 %@ 途中的中间节点）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh 正在等待你的操作（前往 %@ 途中的中間節點）"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh が操作を待っています（%@ への経路上の中継点）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh가 사용자의 동작을 기다리고 있습니다(%@(으)로 가는 경로의 중간 단계)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh wartet auf Sie (eine Zwischenstation auf dem Weg zu %@)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh attend votre action (une étape intermédiaire vers %@)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh está esperando tu acción (un paso intermedio hacia %@)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O ssh está aguardando você (uma etapa intermediária a caminho de %@)"
+          }
+        }
+      }
+    },
+    "askpass.confirm.title.intermediate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow ssh to continue with an intermediate step on the way to %@?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "允许 ssh 继续连接前往 %@ 途中的中间节点吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "允許 ssh 繼續連線前往 %@ 途中的中間節點嗎？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh に %@ への経路上の中継点との処理を続行させますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh가 %@(으)로 가는 경로의 중간 단계 연결을 계속하도록 허용하시겠습니까?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "ssh erlauben, mit einer Zwischenstation auf dem Weg zu %@ fortzufahren?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Autoriser ssh à continuer avec une étape intermédiaire vers %@ ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "¿Permitir que ssh continúe con un paso intermedio hacia %@?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Permitir que o ssh continue com uma etapa intermediária a caminho de %@?"
+          }
+        }
+      }
+    },
+    "askpass.hostKey.advice.intermediate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is not the key of %@. Trust it only if the fingerprint above matches the one the intermediate host’s administrator gave you. OpenSSH then saves it to ~/.ssh/known_hosts."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这不是 %@ 的密钥。只有在上面的指纹与该中间主机的管理员提供的一致时才信任。之后 OpenSSH 会把它保存到 ~/.ssh/known_hosts。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "這不是 %@ 的金鑰。只有在上面的指紋與該中間主機的管理員提供的一致時才信任。之後 OpenSSH 會把它儲存到 ~/.ssh/known_hosts。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "これは %@ の鍵ではありません。上の指紋が中継ホストの管理者から伝えられたものと一致する場合にだけ信頼してください。OpenSSH はそれを ~/.ssh/known_hosts に保存します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이것은 %@의 키가 아닙니다. 위 지문이 중간 호스트 관리자가 알려 준 것과 일치할 때만 신뢰하세요. 그러면 OpenSSH가 ~/.ssh/known_hosts에 저장합니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dies ist nicht der Schlüssel von %@. Vertrauen Sie ihm nur, wenn der Fingerabdruck oben mit dem übereinstimmt, den Ihnen der Administrator der Zwischenstation genannt hat. OpenSSH speichert ihn dann in ~/.ssh/known_hosts."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ce n'est pas la clé de %@. Ne lui faites confiance que si l'empreinte ci-dessus correspond à celle que l'administrateur de l'hôte intermédiaire vous a donnée. OpenSSH l'enregistre ensuite dans ~/.ssh/known_hosts."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta no es la clave de %@. Confía solo si la huella de arriba coincide con la que te dio el administrador del host intermedio. OpenSSH la guardará entonces en ~/.ssh/known_hosts."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Esta não é a chave de %@. Confie apenas se a impressão digital acima corresponder à que o administrador do host intermediário lhe deu. O OpenSSH então a salva em ~/.ssh/known_hosts."
+          }
+        }
+      }
+    },
+    "askpass.hostKey.title.intermediate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trust the host key of an intermediate step on the way to %@?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "要信任前往 %@ 途中一个中间节点的主机密钥吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "要信任前往 %@ 途中一個中間節點的主機金鑰嗎？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ への経路上の中継点のホスト鍵を信頼しますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@(으)로 가는 경로의 중간 단계 호스트 키를 신뢰하시겠습니까?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dem Host-Schlüssel einer Zwischenstation auf dem Weg zu %@ vertrauen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Faire confiance à la clé d'hôte d'une étape intermédiaire vers %@ ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "¿Confiar en la clave de host de un paso intermedio hacia %@?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Confiar na chave de host de uma etapa intermediária a caminho de %@?"
+          }
+        }
+      }
+    },
+    "askpass.secret.title.intermediate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An intermediate step on the way to %@ asks you to sign in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "前往 %@ 途中的一个中间节点要求你登录"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "前往 %@ 途中的一個中間節點要求你登入"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ への経路上の中継点がサインインを求めています"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@(으)로 가는 경로의 중간 단계에서 로그인을 요청합니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Eine Zwischenstation auf dem Weg zu %@ bittet Sie, sich anzumelden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Une étape intermédiaire vers %@ vous demande de vous connecter"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Un paso intermedio hacia %@ te pide iniciar sesión"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Uma etapa intermediária a caminho de %@ pede que você entre"
+          }
+        }
+      }
+    },
+    "settings.status.configTimedOut": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The configuration file did not answer in time. Its location may be on a disk that stopped responding; changes aren’t saved until it does."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "配置文件未及时响应。它可能位于已无响应的磁盘上；恢复响应前不会保存更改。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "設定檔未及時回應。它可能位於已無回應的磁碟上；恢復回應前不會儲存變更。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "設定ファイルが時間内に応答しませんでした。応答しないディスク上にある可能性があります。応答するまで変更は保存されません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "구성 파일이 제때 응답하지 않았습니다. 응답하지 않는 디스크에 있을 수 있으며, 응답할 때까지 변경 사항은 저장되지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Konfigurationsdatei hat nicht rechtzeitig geantwortet. Sie liegt möglicherweise auf einem Datenträger, der nicht mehr reagiert; bis dahin werden Änderungen nicht gesichert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le fichier de configuration n’a pas répondu à temps. Il se trouve peut-être sur un disque qui ne répond plus ; les modifications ne sont pas enregistrées d’ici là."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El archivo de configuración no respondió a tiempo. Puede estar en un disco que dejó de responder; los cambios no se guardan hasta que responda."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O arquivo de configuração não respondeu a tempo. Ele pode estar em um disco que parou de responder; as alterações não são salvas até que responda."
+          }
+        }
+      }
+    },
+    "toast.settingNotSaved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t save that setting. Settings has the reason."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法保存该设置。原因见“设置”。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "無法儲存該設定。原因請見「設定」。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "設定を保存できませんでした。理由は設定画面に表示されています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "설정을 저장하지 못했습니다. 이유는 설정에서 확인하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Einstellung konnte nicht gesichert werden. Der Grund steht in den Einstellungen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Impossible d’enregistrer ce réglage. La raison figure dans les Réglages."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudo guardar el ajuste. El motivo aparece en Ajustes."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não foi possível salvar o ajuste. O motivo aparece em Ajustes."
+          }
+        }
+      }
+    },
+    "toast.pasteChecking": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking the pasted text…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在检查粘贴的文本…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在檢查貼上的文字…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "貼り付けるテキストを確認しています…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "붙여넣을 텍스트를 확인하는 중…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Eingefügter Text wird geprüft …"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Vérification du texte collé…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Comprobando el texto pegado…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verificando o texto colado…"
+          }
+        }
+      }
+    },
+    "toast.pasteTooLarge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not pasted — that’s more than 64 MiB of text."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未粘贴——文本超过 64 MiB。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未貼上——文字超過 64 MiB。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "貼り付けませんでした—テキストが 64 MiB を超えています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "붙여넣지 않았습니다 — 텍스트가 64MiB를 초과합니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nicht eingefügt – der Text ist größer als 64 MiB."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Non collé — le texte dépasse 64 Mio."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pegó: el texto supera los 64 MiB."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não colado — o texto tem mais de 64 MiB."
+          }
+        }
+      }
+    },
     "drop.connectionChanged": {
       "extractionState": "manual",
       "localizations": {
@@ -39351,65 +40413,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Tentar novamente abre uma nova sessão aqui e fecha esta."
-          }
-        }
-      }
-    },
-    "askpass.source.short": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Asked by OpenSSH; Corta keeps no copy."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "来自 OpenSSH 的提问；Corta 不保存任何副本。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "來自 OpenSSH 的提問；Corta 不保存任何副本。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "OpenSSH からの質問です。Corta は回答を保存しません。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "OpenSSH의 질문입니다. Corta는 답을 저장하지 않습니다."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Frage von OpenSSH; Corta speichert keine Kopie."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Question posée par OpenSSH ; Corta n’en garde aucune copie."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Lo pregunta OpenSSH; Corta no guarda ninguna copia."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Pergunta do OpenSSH; o Corta não guarda nenhuma cópia."
           }
         }
       }

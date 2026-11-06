@@ -33,6 +33,75 @@ struct SelectionRewriteTests {
     private let row2 = SelectionRange(
         start: SelectionPoint(row: 2, column: 0), end: SelectionPoint(row: 2, column: 5))
 
+    /// A tab behind another draws nothing, but its bell, title and history go
+    /// on, and what it did not draw is drawn when it comes back.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, "needs a working pane"))
+    func aHiddenPaneRunsItsEffectsAndOwesItsPixels() async throws {
+        let pane = ViewController()
+        pane.loadViewIfNeeded()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentViewController = pane
+        window.orderFront(nil)
+        defer { pane.teardown(); window.close() }
+        let session = try #require(pane.session)
+        let settled = await waitForCondition(timeout: .seconds(5)) {
+            _ = pane.frameLoop.prepareFrame()
+            return session.snapshot().cursor.column > 0
+        }
+        try #require(settled)
+        _ = pane.frameLoop.prepareFrame()
+
+        var batches = 0
+        let onBatch = pane.frameLoop.onOutputBatch
+        pane.frameLoop.onOutputBatch = { batches += 1; onBatch?() }
+        pane.view.isHidden = true
+        session.write(Array("echo BEHIND\n".utf8))
+        let arrived = await waitForCondition(timeout: .seconds(5)) {
+            session.snapshot().logicalLines().contains { $0.text.hasPrefix("BEHIND") }
+        }
+        try #require(arrived)
+        let ran = await waitForCondition(timeout: .seconds(5)) { batches > 0 }
+        #expect(ran, "with no frame coming, the output signal runs the batch stage")
+
+        pane.frameLoop.onOutputBatch = onBatch
+        pane.view.isHidden = false
+        #expect(pane.frameLoop.prepareFrame(), "the pixels were owed all along")
+    }
+
+    /// A link already running when its tab goes behind used to run for as long
+    /// as the output did, drawing what nobody could see.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, "needs a working pane"))
+    func aRunningLinkStopsWhenItsPaneIsHidden() async throws {
+        let pane = ViewController()
+        pane.loadViewIfNeeded()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
+            styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentViewController = pane
+        window.orderFront(nil)
+        defer { pane.teardown(); window.close() }
+        let session = try #require(pane.session)
+        let view = try #require(pane.terminalView)
+        session.write(Array("yes\n".utf8))
+        let flooding = await waitForCondition(timeout: .seconds(5)) {
+            session.snapshot().logicalLines().contains { $0.text == "y" }
+        }
+        try #require(flooding)
+        guard await waitForCondition(timeout: .seconds(2), { !view.isFrameLinkPaused }) else {
+            // A covered test window never runs one; there is nothing to stop.
+            session.write([0x03])
+            return
+        }
+        pane.view.isHidden = true
+        let stopped = await waitForCondition(timeout: .seconds(2)) { view.isFrameLinkPaused }
+        session.write([0x03])
+        #expect(stopped, "the flood is still running, and nothing should be drawing it")
+    }
+
     @Test func aRewrittenRowDropsTheSelectionAndScrollingDoesNot() {
         let pane = ViewController()
         var terminal = numbered()
@@ -150,4 +219,11 @@ struct SelectionLiveOutputTests {
         }
         #expect((pane.selection != nil) == (text == "selected"))
     }
+}
+
+@MainActor
+private func waitForCondition(timeout: Duration, _ condition: () -> Bool) async -> Bool {
+    let deadline = SuspendingClock.now + timeout * testTimeoutScale
+    while !condition(), SuspendingClock.now < deadline { try? await Task.sleep(for: .milliseconds(5)) }
+    return condition()
 }

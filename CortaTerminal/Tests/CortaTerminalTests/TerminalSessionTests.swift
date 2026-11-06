@@ -162,6 +162,128 @@ import Testing
     /// sent `TIOCSWINSZ`, so the redraw is parsed into the still-80-column
     /// grid and `END120` clamps to the right edge and wraps; the ordered
     /// one signals only after the commit, so the text lands at column 100.
+    /// A session with history, its resize held between the unlocked rebuild and
+    /// the commit.
+    private func heldResize(
+        _ body: (TerminalSession, _ release: @escaping @Sendable () -> Void) throws -> Void
+    ) throws {
+        let open = Mutex(false)
+        var seams = TerminalSession.Seams()
+        seams.resizeCommitGate = {
+            while !open.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.001) }
+        }
+        // Stays quiet until told to speak, by the child's own timer.
+        let script =
+            #"i=0; while [ $i -lt 200 ]; do echo "line-$i"; i=$((i+1)); done; "#
+            + #"echo READY; sleep 0.5; echo LATE; sleep 60"#
+        let session = try TerminalSession(
+            executable: "/bin/sh", arguments: ["-c", script], size: TerminalSize(rows: 24, columns: 80), seams: seams)
+        defer {
+            open.withLock { $0 = true }
+            session.stop()
+        }
+        session.start()
+        let ready = waitForGrid(session) { $0.contains("READY") }
+        #expect(ready.contains("READY"))
+        session.resize(to: TerminalSize(rows: 24, columns: 40))
+        let deadline = SuspendingClock.now + testTimeout(10)
+        while !session.state.withLock({ $0.isResizing }), SuspendingClock.now < deadline {
+            Thread.sleep(forTimeInterval: 0.001)
+        }
+        #expect(session.state.withLock { $0.isResizing })
+        try body(session) { open.withLock { $0 = true } }
+    }
+
+    private func waitForColumns(_ session: TerminalSession, _ columns: Int) {
+        let deadline = SuspendingClock.now + testTimeout(10)
+        while session.snapshot().columns != columns, SuspendingClock.now < deadline {
+            Thread.sleep(forTimeInterval: 0.001)
+        }
+    }
+
+    @Test func aFrameDuringAReflowDrawsTheOldSizeWithoutWaiting() throws {
+        try heldResize { session, release in
+            // With the reflow under the lock, this would wait out the gate.
+            #expect(session.snapshot().columns == 80)
+            release()
+            waitForColumns(session, 40)
+            #expect(session.snapshot().columns == 40)
+        }
+    }
+
+    @Test func theReaderAppliesNothingDuringAReflowAndLosesNothingAfter() throws {
+        try heldResize { session, release in
+            // Long past the child's LATE: the bytes wait, unparsed.
+            Thread.sleep(forTimeInterval: 1)
+            #expect(!session.snapshot().dump().contains("LATE"))
+            release()
+            waitForColumns(session, 40)
+            let text = waitForGrid(session) { $0.contains("LATE") }
+            #expect(text.contains("LATE"))
+        }
+    }
+
+    @Test func aClearDuringAReflowIsNotUndoneByItsCommit() throws {
+        try heldResize { session, release in
+            #expect(session.snapshot().scrollback.count > 0)
+            session.apply(.clearHistory)
+            #expect(session.snapshot().scrollback.isEmpty)
+            release()
+            waitForColumns(session, 40)
+            // Redone from what the clear left; the rebuilt copy still had it.
+            #expect(session.snapshot().columns == 40)
+            #expect(!session.snapshot().dump(options: DumpOptions(includeScrollback: true)).contains("line-0"))
+        }
+    }
+
+    @Test func aScaleChangeDuringAReflowSurvivesItsCommit() throws {
+        try heldResize { session, release in
+            session.updateBackingScale(3)
+            release()
+            waitForColumns(session, 40)
+            #expect(session.snapshot().backingScale == 3)
+        }
+    }
+
+    @Test func drainingAFrameDuringAReflowDoesNotSpoilTheRebuild() throws {
+        var terminal = Terminal(rows: 5, columns: 20)
+        terminal.feed(Array("x".utf8))
+        let before = terminal.gridGeneration
+        _ = terminal.takeBell()
+        _ = terminal.takeProgramSignals()
+        _ = terminal.takeFinishedCommand()
+        _ = terminal.takeOutput()
+        #expect(terminal.gridGeneration == before)
+    }
+
+    @Test func aRecordFollowsItsRowThroughAReflowOutsideTheLock() throws {
+        let script =
+            #"printf '\033]133;A\007'; i=0; while [ $i -lt 40 ]; do printf 'wide-line-'; i=$((i+1)); done; "#
+            + #"echo; echo READY; sleep 60"#
+        let session = try TerminalSession(
+            executable: "/bin/sh", arguments: ["-c", script], size: TerminalSize(rows: 10, columns: 80))
+        defer { session.stop() }
+        session.start()
+        _ = waitForGrid(session) { $0.contains("READY") }
+        var inline = Terminal(rows: 10, columns: 80)
+        let wide = Array(repeating: Array("wide-line-".utf8), count: 40).flatMap { $0 }
+        inline.feed(Array("\u{1B}]133;A\u{07}".utf8) + wide + Array("\r\nREADY\r\n".utf8))
+        inline.resize(rows: 10, columns: 40)
+        session.resize(to: TerminalSize(rows: 10, columns: 40))
+        waitForColumns(session, 40)
+        #expect(session.commandRecords.last?.promptRow == inline.commandRecords.last?.promptRow)
+        #expect(session.snapshot().cursor.row == inline.grid.cursor.row)
+    }
+
+    @Test func stoppingDuringAReflowReturnsAndTheReaderExits() throws {
+        try heldResize { session, release in
+            let start = SuspendingClock.now
+            session.stop()
+            #expect(SuspendingClock.now - start < testTimeout(5))
+            release()
+        }
+    }
+
     @Test func childIsNotSignalledASizeTheGridHasNotAdopted() throws {
         let script =
             #"printf '\033[?1049h'; trap 'printf "\033[2J\033[1;1HTOP120"; printf "\033[5;100HEND120"; "#

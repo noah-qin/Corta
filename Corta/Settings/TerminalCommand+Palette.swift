@@ -44,8 +44,8 @@ nonisolated extension TerminalCommand {
             .changeDirectoryToProjectRoot, .openParentDirectoryInNewPane,
             .openProjectRootInNewPane, .searchCommandHistory:
             return .view
-        case .clearScreen, .clearHistory, .resetTerminal, .reconnectRemote, .browseRemoteFiles,
-            .secureKeyboardEntry:
+        case .clearScreen, .clearHistory, .resetTerminal, .reconnectRemote, .killAndReconnectRemote,
+            .browseRemoteFiles, .secureKeyboardEntry:
             return .terminal
         case .find, .copy, .paste, .selectAll, .exportText: return .edit
         case .settings, .commandPalette: return .app
@@ -130,8 +130,9 @@ nonisolated extension TerminalCommand {
         case .clearHistory: return 1
         case .resetTerminal: return 2
         case .reconnectRemote: return 3
-        case .browseRemoteFiles: return 4
-        case .secureKeyboardEntry: return 5
+        case .killAndReconnectRemote: return 4
+        case .browseRemoteFiles: return 5
+        case .secureKeyboardEntry: return 6
         case .settings: return 0
         case .commandPalette: return 1
         }

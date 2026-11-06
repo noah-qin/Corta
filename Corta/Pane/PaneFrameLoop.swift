@@ -65,6 +65,8 @@ final class PaneFrameLoop {
     /// `?2026` withheld a frame, so the next one presents even if the diff
     /// finds nothing.
     private var wasSynchronizedOutputActive = false
+    /// A batch `runEffectsWhileHidden` took: its pixels are still owed.
+    private var hiddenOutputOwed = false
     /// An idle frame costs this one check, not a diff. One per session,
     /// replaced with it.
     private(set) var outputWake = OutputWakeGate()
@@ -191,9 +193,11 @@ final class PaneFrameLoop {
         if session.takeBell() {
             onBell?()
         }
-        let hasOutput = outputWake.takePending()
+        let newOutput = outputWake.takePending()
+        let hasOutput = newOutput || hiddenOutputOwed
+        hiddenOutputOwed = false
         guard needsRedraw || hasOutput else { return false }
-        if hasOutput {
+        if newOutput {
             onOutputBatch?()
         }
         if session.isSynchronizedOutputEnabled {
@@ -224,6 +228,18 @@ final class PaneFrameLoop {
             cursorStyle: content.cursorStyle, dynamicColors: colors.dynamicColors,
             selectionBackground: colors.selectionBackground, selectionForeground: colors.selectionForeground)
         return forced || damaged
+    }
+
+    /// What a frame would have done for a pane no frame comes to, a tab behind
+    /// another: the bell rings and the batch stage runs, while the diff and the
+    /// draw wait until it shows.
+    func runEffectsWhileHidden() {
+        guard !renderingStopped, let session else { return }
+        if session.takeBell() { onBell?() }
+        if outputWake.takePending() {
+            hiddenOutputOwed = true
+            onOutputBatch?()
+        }
     }
 
     /// On the reader thread, per parse batch; `generation` guards against a

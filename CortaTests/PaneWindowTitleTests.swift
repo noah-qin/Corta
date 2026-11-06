@@ -30,6 +30,23 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct PaneWindowTitleTests {
+    /// Blocked on a dead mount, a pool thread is one of the few every task in
+    /// the app shares.
+    @Test("the directory check runs on a probe thread of its own")
+    func directoryCheckIsOffThePool() async {
+        let name = Mutex<String?>(nil)
+        let title = PaneWindowTitle(isDirectory: { _ in
+            name.withLock { $0 = Thread.current.name }
+            return true
+        })
+        title.probeRepresentedDirectory("/somewhere")
+        let deadline = SuspendingClock.now + .seconds(5) * testTimeoutScale
+        while name.withLock({ $0 }) == nil, SuspendingClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(name.withLock { $0 } == "dev.noahqin.Corta.path-probe")
+    }
+
     @Test("without a session the title is the app's name")
     func noSessionIsCorta() {
         #expect(PaneWindowTitle().composed == "Corta")

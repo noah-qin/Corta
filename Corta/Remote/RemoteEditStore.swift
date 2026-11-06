@@ -320,7 +320,7 @@ final class RemoteEditStore {
     }
 
     private func load() {
-        guard let data = try? Data(contentsOf: manifestURL) else { return }
+        guard let data = try? PrivateFile.read(manifestURL) else { return }
         if let version = try? JSONDecoder().decode(VersionProbe.self, from: data).version,
             version > Persisted.currentVersion
         {

@@ -104,19 +104,21 @@ struct SSHPresetPaneTests {
         #expect(session.workingDirectory == nil)
     }
 
-    /// The badge is child-supplied text like every other title component:
-    /// a percent-encoded newline in the OSC 7 path decodes to a real one,
-    /// and must be stripped before it reaches the title bar.
+    /// The badge is child-supplied text like every other title component: a
+    /// percent-encoded newline in the OSC 7 path decodes to a real one, and
+    /// that report is ignored rather than cleaned up (`SECURITY.md` §2.8).
     @Test func theBadgeIsSanitisedLikeEveryOtherTitleComponent() async throws {
         let launcher = try Self.makeStagingLauncher()
         defer { try? FileManager.default.removeItem(at: launcher.deletingLastPathComponent()) }
         let pane = Self.makePane(
             launcher: launcher,
-            script: "printf '\\033]7;file://build-box/srv/app%%0Ainjected\\007'; sleep 60")
+            script: "printf '\\033]7;file://build-box/srv/app\\007\\033]7;file://build-box/srv/app%%0Ainjected\\007'; "
+                + "sleep 60")
         defer { pane.teardown() }
         let session = try #require(pane.session)
         #expect(await waitUntilTrue { session.remoteContext != nil })
-        #expect(session.remoteContext?.directory == "/srv/app\ninjected")
+        #expect(await waitUntilTrue { session.snapshot().cursor.column == 0 })
+        #expect(session.remoteContext?.directory == "/srv/app")
         pane.windowTitle.invalidateProcessFacts()
         let title = pane.windowTitle.composed
         #expect(title.contains(PaneRemoteState.badge("build-box")))
@@ -155,6 +157,41 @@ struct SSHPresetPaneTests {
             await waitUntilTrue {
                 pane.remote.state == .remoteUnknown(provenance: .spawnedLauncher)
             })
+    }
+
+    /// A hung connection is one that has not exited, so plain Reconnect is not
+    /// on offer. This one ends it first, and only when told to: it can't tell
+    /// a hang from an idle shell. The script ignores hangup, as an ssh stuck in
+    /// the kernel would, and is still ended.
+    @Test func aLiveLauncherIsKilledAndReconnectedOnlyOnceConfirmed() async throws {
+        let launcher = try Self.makeStagingLauncher()
+        defer { try? FileManager.default.removeItem(at: launcher.deletingLastPathComponent()) }
+        let pane = Self.makePane(launcher: launcher, script: "trap '' HUP; while :; do sleep 1; done")
+        defer { pane.teardown() }
+        let hung = try #require(pane.session)
+        #expect(await waitUntilTrue { pane.remote.state == .remoteUnknown(provenance: .spawnedLauncher) })
+        #expect(!pane.remote.canReconnect)
+        #expect(pane.remote.canKillAndReconnect)
+        let item = NSMenuItem(title: "", action: #selector(PaneRemote.killAndReconnectRemote(_:)), keyEquivalent: "")
+        #expect(pane.validateMenuItem(item))
+
+        var asked = 0
+        pane.remote.confirmKill = { _, _, answer in
+            asked += 1
+            answer(false)
+        }
+        pane.remote.killAndReconnectRemote(nil)
+        #expect(asked == 1)
+        #expect(pane.session === hung, "declined: nothing happened to it")
+        #expect(hung.pty.exitStatus == nil)
+
+        pane.remote.confirmKill = { _, _, answer in answer(true) }
+        pane.remote.killAndReconnectRemote(nil)
+        let respawned = try #require(pane.session)
+        #expect(respawned !== hung)
+        #expect(pane.launchedCommand?.arguments == ["-c", "trap '' HUP; while :; do sleep 1; done"])
+        #expect(await waitUntilTrue { hung.pty.exitStatus != nil })
+        #expect(pane.remote.canKillAndReconnect, "the new connection is a live one in turn")
     }
 
     /// The honesty half: when the recorded command can no longer run, a

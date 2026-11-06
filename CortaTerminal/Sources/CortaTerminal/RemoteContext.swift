@@ -36,8 +36,9 @@ public struct RemoteContext: Sendable, Equatable {
         case spawnedLauncher
     }
 
-    /// Lowercased, trailing dot stripped; never resolved or validated — it is
-    /// the name the remote chose to send.
+    /// Lowercased, trailing dot stripped, and within the characters
+    /// `Performer.isReportableHost` admits; never resolved — it is the name
+    /// the remote chose to send.
     public let host: String
 
     /// A path on *that* machine; the same path here is a different file.
@@ -53,5 +54,31 @@ public struct RemoteContext: Sendable, Equatable {
         self.directory = directory
         self.provenance = provenance
         self.reportedAt = reportedAt
+    }
+
+    /// The most of a host or path a label shows; the value itself is kept whole.
+    public static let maximumDisplayedScalars = 255
+
+    /// A reported host or path as the app may show it: the one rule for every
+    /// such label. Controls (C0, DEL, C1) and format characters, bidi overrides
+    /// among them, become U+FFFD, so a name cannot read as something it is not,
+    /// and the length is bounded. `Performer` already refuses most of this on
+    /// the way in; this covers what the intake lets through (a path may hold a
+    /// format character) and what an older build recorded.
+    ///
+    /// For display only: never connect to, or navigate by, what this returns.
+    public static func displayText(_ text: String) -> String {
+        var shown = String.UnicodeScalarView()
+        for (index, scalar) in text.unicodeScalars.enumerated() {
+            guard index < maximumDisplayedScalars else {
+                shown.append("\u{2026}")
+                break
+            }
+            let hidden =
+                scalar.properties.generalCategory == .control || scalar.properties.generalCategory == .format
+                || ConcealingScalars.contains(scalar.value)
+            shown.append(hidden ? "\u{FFFD}" : scalar)
+        }
+        return String(shown)
     }
 }

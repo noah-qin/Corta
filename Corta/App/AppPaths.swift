@@ -121,6 +121,18 @@ nonisolated enum AppPaths {
         stageDirectory ?? FileManager.default.homeDirectoryForCurrentUser
     }
 
+    /// `.<name>.<uuid>` left in the state directories by a save that died before
+    /// its rename (`PrivateFile.replace`). Off the main thread, at launch.
+    nonisolated static func removeAbandonedStateFiles() {
+        let support = applicationSupportDirectory
+        for directory in [support, support.appendingPathComponent("RemoteEdit", isDirectory: true)] {
+            PrivateFile.removeAbandonedTemporaries(in: directory, olderThan: abandonedStateFileAge)
+        }
+    }
+
+    /// Past any save in progress, in this Corta or another using the same stage.
+    nonisolated static let abandonedStateFileAge: TimeInterval = 5 * 60
+
     private static var systemApplicationSupportDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser

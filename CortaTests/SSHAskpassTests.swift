@@ -94,6 +94,8 @@ struct SSHAskpassBrokerTests {
             var question: SSHAskpass.Question
             var host: String
             var prompt: String
+            var isIntermediateStep: Bool
+            var refusalEnds: Bool
         }
         let asked = Mutex<[Asked]>([])
         let cancelled = Mutex(false)
@@ -106,8 +108,13 @@ struct SSHAskpassBrokerTests {
         }
 
         var prompter: SSHAskpassBroker.Prompter {
-            { [self] question, host, prompt in
-                asked.withLock { $0.append(Asked(question: question, host: host, prompt: prompt)) }
+            { [self] asking in
+                asked.withLock {
+                    $0.append(Asked(
+                        question: asking.question, host: asking.host, prompt: asking.prompt,
+                        isIntermediateStep: asking.isIntermediateStep,
+                        refusalEnds: asking.refusalEndsConnection))
+                }
                 guard waitsForCancel else { return answer }
                 await withTaskCancellationHandler {
                     while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(10)) }
@@ -119,9 +126,9 @@ struct SSHAskpassBrokerTests {
         }
     }
 
-    private static var executable: String { Bundle.main.executablePath! }
+    static var executable: String { Bundle.main.executablePath! }
 
-    private func run(
+    func run(
         _ grant: SSHAskpassBroker.Grant, token: String? = nil, prompt: String,
         promptKind: String? = nil
     ) throws -> Process {
@@ -138,7 +145,7 @@ struct SSHAskpassBrokerTests {
         return process
     }
 
-    private func finish(_ process: Process) async -> (status: Int32, output: String) {
+    func finish(_ process: Process) async -> (status: Int32, output: String) {
         let deadline = SuspendingClock.now + .seconds(10) * testTimeoutScale
         while process.isRunning, SuspendingClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(10))
@@ -348,17 +355,21 @@ struct SSHAskpassBrokerTests {
         let result = await finish(process)
         #expect(result.status == 0)
         #expect(result.output == "jump-secret\n")
+        // Answered, and not as the connection's destination.
+        let asked = try #require(recorder.asked.withLock { $0.first })
+        #expect(asked.isIntermediateStep)
+        #expect(asked.host == "box")
     }
 
     @Test func nothingListensAgainAfterStop() {
-        let broker = SSHAskpassBroker(executable: Self.executable, prompter: { _, _, _ in nil })
+        let broker = SSHAskpassBroker(executable: Self.executable, prompter: { _ in nil })
         #expect(broker.grant(host: "box") != nil)
         broker.stop()
         #expect(broker.grant(host: "box") == nil, "a quit's late connection leaves no socket behind")
     }
 
     @Test func theSocketIsTheUsersAlone() throws {
-        let broker = SSHAskpassBroker(executable: Self.executable, prompter: { _, _, _ in nil })
+        let broker = SSHAskpassBroker(executable: Self.executable, prompter: { _ in nil })
         let grant = try #require(broker.grant(host: "box"))
         let path = try #require(grant.environment[SSHAskpass.socketVariable])
         let directory = (path as NSString).deletingLastPathComponent

@@ -38,7 +38,10 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     /// pending. The drawable is presented either way; `false` only pauses.
     var shouldRenderFrame: (() -> Bool)?
     /// The view is hidden — a background tab (D30): no frames until it shows,
-    /// which asks for one.
+    /// which asks for one. A link already running when the tab went behind
+    /// stops at its next tick, however much output keeps coming; what output
+    /// does beyond the pixels goes on without it
+    /// (`PaneFrameLoop.runEffectsWhileHidden`).
     var isHidden: () -> Bool = { false }
 
     private let driver: DiagnosticsEnvironment.FrameDriver
@@ -205,6 +208,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     /// The experiment uses a separate pacing link. Mixing nextDrawable with
     /// a paused CAMetalDisplayLink trapped on this OS, so never create both.
     @objc private func pacingTick(_ pacing: CADisplayLink) {
+        guard !isHidden() else { isPaused = true; return }
         RenderMetrics.measure(.cpuFrame) {
             let now = CACurrentMediaTime()
             if RenderMetrics.isEnabled { recordTick(target: pacing.targetTimestamp, now: now) }
@@ -259,6 +263,14 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
     func metalDisplayLink(
         _ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update
     ) {
+        // Presented as it is, never held: nothing diffed, so what was owed is
+        // still owed when the tab comes back.
+        guard !isHidden() else {
+            update.drawable.present()
+            link.isPaused = true
+            previousPresentationTimestamp = nil
+            return
+        }
         let frameInterval = InputLatencySignposts.begin(.frame)
         defer { InputLatencySignposts.end(.frame, frameInterval) }
         let frameStart = RenderMetrics.isEnabled ? DispatchTime.now() : nil

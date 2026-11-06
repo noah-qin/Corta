@@ -82,7 +82,9 @@ extension SFTPBrowserModel {
     }
 
     private func performConnect(client: any SFTPClient, host name: String, generation: Int) async {
+        defer { if generation == connectionGeneration { connectDeadline?.cancel() } }
         do {
+            armConnectDeadline(client: client, host: name, generation: generation)
             _ = try await client.connect()
             // The pane's reported directory when there is one; otherwise
             // the session's own starting directory, canonicalised by the
@@ -91,13 +93,16 @@ extension SFTPBrowserModel {
             if let startDirectory {
                 path = startDirectory
             } else {
+                armConnectDeadline(client: client, host: name, generation: generation)
                 path = try await client.realPath(path: ".")
             }
+            armConnectDeadline(client: client, host: name, generation: generation)
             let listing = try await client.listDirectory(path: path)
             guard generation == connectionGeneration else {
                 client.close()
                 return
             }
+            connectDeadline?.cancel()
             await applyEntries(listing) {
                 // Publish the directory and its rows together.
                 backStack.removeAll()
@@ -111,22 +116,49 @@ extension SFTPBrowserModel {
             await refreshVolume()
         } catch {
             guard generation == connectionGeneration else { return }
-            let error = Self.sftpError(error)
-            connectFailure = Self.connectFailure(error, host: name)
-            connectionState = .failed(message: Self.errorMessage(error, host: name))
-            // Left in the fields, so the destination that failed can be
-            // corrected.
-            fill(from: name)
-            client.close()
-            self.client = nil
+            connectionFailed(Self.sftpError(error), client: client, host: name)
         }
         updateTitle()
+    }
+
+    /// Starts the time for one step of connecting, over again: a server that
+    /// answers is not hung, and a listing's size is no reason to give up on it.
+    private func armConnectDeadline(client: any SFTPClient, host name: String, generation: Int) {
+        connectDeadline?.cancel()
+        let timeout = connectTimeout
+        let shown = SSHTarget.displayName(forKey: name)
+        connectDeadline = Task { [weak self] in
+            do {
+                try await ConnectionDeadline.wait(timeout) { self?.isAskingHost(shown) ?? false }
+            } catch { return }
+            // Cancellation may arrive after wait's last sleep has returned.
+            guard !Task.isCancelled, let self, generation == self.connectionGeneration else { return }
+            // Past this, whatever the abandoned attempt comes back with is
+            // nobody's: its generation is gone.
+            self.connectionGeneration += 1
+            self.connectionFailed(ConnectionDeadline.failure(after: timeout), client: client, host: name)
+            self.updateTitle()
+        }
+    }
+
+    private func connectionFailed(_ error: SFTPError, client: any SFTPClient, host name: String) {
+        connectFailure = Self.connectFailure(error, host: name)
+        connectionState = .failed(message: Self.errorMessage(error, host: name))
+        // Left in the fields, so the destination that failed can be
+        // corrected.
+        fill(from: name)
+        client.close()
+        self.client = nil
     }
 
     /// Closes the session and abandons every transfer. Called by the
     /// controller when the window closes.
     func disconnect() {
         connectionGeneration += 1
+        connectDeadline?.cancel()
+        connectDeadline = nil
+        loadTask?.cancel()
+        loadTask = nil
         receptionNotice = nil
         directoryGeneration += 1
         isLoading = false

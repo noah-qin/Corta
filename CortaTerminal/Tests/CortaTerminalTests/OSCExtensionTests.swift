@@ -134,6 +134,41 @@ struct OSCExtensionTests {
         terminal.feed(Array("\u{1B}c".utf8)); #expect(terminal.pointerShape == nil)
     }
 
+    @Test func hostlessDirectoryReportsRefuseC1ControlsAndOverlongPaths() {
+        var performer = Performer(grid: Grid(rows: 4, columns: 20))
+        Self.feed("1337;CurrentDir=/kept", &performer)
+        for bad in ["/a\u{9B}b", "/a\u{80}b", "/a\u{1B}b", "/a\u{7F}b", "/" + String(repeating: "a", count: 1024)] {
+            Self.feed("1337;CurrentDir=" + bad, &performer)
+            #expect(performer.state.workingDirectory == "/kept")
+        }
+    }
+
+    /// A transaction that ended with nothing to publish still ends: a client
+    /// waits for the status. The reply is one constant, never the text.
+    @Test func aClipboardWriteSanitisedToNothingAnswersAFixedStatus() {
+        let refusal = Array("\u{1B}]5522;type=write:status=EIO\u{1B}\\".utf8)
+        for text in ["\u{1B}\u{7}", "\u{202E}\u{200B}", ""] {
+            var terminal = Terminal()
+            terminal.feed(Self.osc("5522;type=write"))
+            if !text.isEmpty {
+                let encoded = Data(text.utf8).base64EncodedString()
+                terminal.feed(Self.osc("5522;type=wdata:mime=dGV4dC9wbGFpbg==;" + encoded))
+            }
+            #expect(terminal.takeOutput().isEmpty, "nothing is answered before the terminator")
+            terminal.feed(Self.osc("5522;type=wdata"))
+            #expect(terminal.takeClipboardCopy() == nil)
+            #expect(terminal.takeOutput() == refusal)
+        }
+    }
+
+    /// `SECURITY.md` §3: REP is not implemented, so it has no count to clamp.
+    @Test func repeatCharacterIsIgnored() {
+        var terminal = Terminal(rows: 4, columns: 20)
+        terminal.feed(Array("A\u{1B}[99999bB".utf8))
+        #expect(terminal.grid.cursor.column == 2)
+        #expect(terminal.takeOutput().isEmpty)
+    }
+
     @Test func clipboardTransactionsSanitiseAndFailClosed() {
         var terminal = Terminal()
         terminal.feed(Self.osc("1337;Copy=:aGVsbG8="))
@@ -228,7 +263,7 @@ struct OSCExtensionTests {
             parser.parse(source[...], performer: &performer, stoppingAfterAPC: true)
         }
         #expect(consumed < source.count)
-        let deferred = try #require(performer.state.deferredImage)
+        var deferred = try #require(performer.state.deferredImage)
         performer.completeDeferredImage(deferred.decode())
         #expect(performer.grid.imagePlacements.imageCount == 1)
         #expect(performer.state.outputBuffer.isEmpty)

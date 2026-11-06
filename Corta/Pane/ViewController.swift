@@ -90,6 +90,9 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     /// Set before the view loads for a split, so the shell's first output is
     /// laid out at the right width, not reflowed.
     var inheritedWorkingDirectory: String?
+    /// That directory was checked a moment ago, for this first spawn alone;
+    /// a retry later has no such word for it.
+    var inheritedDirectoryChecked = false
     var initialGridSize: TerminalSize?
 
     /// Applied once at spawn; set before the view loads.
@@ -289,6 +292,7 @@ class ViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneComm
     func teardown() {
         guard !didTeardown else { return }
         didTeardown = true
+        terminalView?.discardComposition()
         focus.stop()
         inputSourceIndicator.stop()
         windowTitle.stop()
@@ -527,8 +531,9 @@ extension ViewController {
                     command, size: size, configuration: configuration, preset: preset,
                     workingDirectory: inheritedWorkingDirectory)
             }
+            defer { inheritedDirectoryChecked = false }
             return try PaneSpawn.start(
-                size: size, directory: inheritedWorkingDirectory,
+                size: size, directory: inheritedWorkingDirectory, directoryChecked: inheritedDirectoryChecked,
                 scrollbackLimit: configuration.scrollbackLines,
                 commandHistoryLimit: configuration.commandHistoryLimit, preset: preset,
                 directoryCompletion: configuration.directoryCompletion,
@@ -598,6 +603,7 @@ extension ViewController {
             // A hidden tab draws no frame, and a long task's end must not
             // wait for it to be shown.
             self.noteCommandBoundaries()
+            if self.view.isHiddenOrHasHiddenAncestor { self.frameLoop.runEffectsWhileHidden() }
         }
         taskNotifier.tabInFront = { [weak self] in self?.splitController?.tab?.isSelected ?? true }
         taskNotifier.programCanDeliver = { [weak self] notice in
@@ -821,6 +827,7 @@ extension ViewController {
             first?()
         }
         paneHeader.refresh()
+        pointer.noteGridChanged()
         if isFocusedPane {
             windowTitle.apply(fromOutput: true)
         } else {
@@ -1088,6 +1095,12 @@ extension ViewController {
         // The grid it is shown at, while a session still says so; a pane
         // that never built starts from the configured one.
         let grid = didSizeWindow && session != nil ? lastRequestedSize : nil
+        // Input on its way to the old session has nowhere to land now, and
+        // must not land in the new one.
+        commands.fileDropRequest?.cancel()
+        commands.fileDropRequest = nil
+        commands.cancelPasteScan()
+        terminalView?.discardComposition()
         terminalView?.stopRendering()
         readerDemotion?.cancel()
         readerDemotion = nil

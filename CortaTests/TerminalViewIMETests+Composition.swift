@@ -53,6 +53,46 @@ extension TerminalViewIMETests {
         #expect(view.markedRange().location == NSNotFound)
     }
 
+    @Test func committedControlsComeOffPlainTextStaysAsTyped() {
+        let view = Self.makeView()
+        var bytes: [UInt8] = []
+        view.onKeyBytes = { bytes += $0 }
+        let none = NSRange(location: NSNotFound, length: 0)
+        view.insertText("a\u{1B}[31m\u{7F}b\u{9B}", replacementRange: none)
+        #expect(bytes == Array("a[31mb".utf8))
+        bytes = []
+        view.insertText("\u{1B}", replacementRange: none)
+        #expect(bytes.isEmpty, "nothing left of it, so nothing sent")
+        view.insertText("\t", replacementRange: none)
+        #expect(bytes == [0x09])
+        bytes = []
+        view.insertText("\r", replacementRange: none)
+        #expect(bytes == [0x0D], "a lone Return is the key")
+    }
+
+    @Test func committedLinesGoThroughThePasteFunnel() {
+        let view = Self.makeView()
+        var bytes: [UInt8] = []
+        var pasted: [String] = []
+        view.onKeyBytes = { bytes += $0 }
+        view.onServicesInsert = { pasted.append($0) }
+        view.insertText("first\n\u{1B}second", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(bytes.isEmpty, "a typed Return would have run the first line")
+        #expect(pasted == ["first\nsecond"])
+    }
+
+    @Test func discardingACompositionLeavesNothingToCommit() {
+        let view = Self.makeView()
+        var bytes: [UInt8] = []
+        view.onKeyBytes = { bytes += $0 }
+        view.setMarkedText(
+            "zhong", selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0))
+        view.discardComposition()
+        #expect(!view.hasMarkedText())
+        #expect(bytes.isEmpty)
+    }
+
     @Test func insertTextAcceptsAttributedStrings() {
         let view = Self.makeView()
         var bytes: [UInt8] = []

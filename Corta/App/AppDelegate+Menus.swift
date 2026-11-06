@@ -141,7 +141,7 @@ extension AppDelegate {
         ])
         shell.addItem(.separator())
         shell.addItem(item(for: .clearScreen))
-        group("menu.terminalState", [.clearHistory, .resetTerminal, .reconnectRemote])
+        group("menu.terminalState", [.clearHistory, .resetTerminal, .reconnectRemote, .killAndReconnectRemote])
         shell.addItem(.separator())
         shell.addItem(item(for: .secureKeyboardEntry))
         return shell

@@ -83,6 +83,50 @@ nonisolated enum PathProbe {
         return found.withLock { $0 }
     }
 
+    /// `body`'s answer if it comes within `timeout`, else nil, on a thread of
+    /// its own under `budget`; no room in the budget is nil at once. What a
+    /// late `body` returns goes to `abandoned`, for a descriptor to be closed.
+    static func answer<Answer: Sendable>(
+        timeout: DispatchTimeInterval, budget: Budget = PathProbe.sharedBudget,
+        abandoned: @escaping @Sendable (Answer) -> Void = { _ in },
+        _ body: @escaping @Sendable () -> Answer
+    ) -> Answer? {
+        guard budget.take() else { return nil }
+        let slot = Mutex<(answer: Answer?, waiting: Bool)>((nil, true))
+        let done = DispatchSemaphore(value: 0)
+        run {
+            let answer = body()
+            let late = slot.withLock { slot -> Answer? in
+                guard slot.waiting else { return answer }
+                slot.answer = answer
+                return nil
+            }
+            if let late { abandoned(late) }
+            budget.give()
+            done.signal()
+        }
+        _ = done.wait(timeout: .now() + timeout)
+        return slot.withLock { slot in
+            slot.waiting = false
+            return slot.answer
+        }
+    }
+
+    /// `directories`, answered on the main actor without holding it: the
+    /// waiting happens on a probe thread too, for a launch that has a window to
+    /// draw. Never fails to call back; what has not answered counts as absent.
+    static func directories(
+        among paths: [String], timeout: DispatchTimeInterval,
+        isDirectory: @escaping @Sendable (String) -> Bool = PathProbe.isDirectory,
+        budget: Budget = PathProbe.sharedBudget,
+        then: @escaping @MainActor @Sendable (Set<String>) -> Void
+    ) {
+        run {
+            let found = directories(among: paths, timeout: timeout, isDirectory: isDirectory, budget: budget)
+            Task { @MainActor in then(found) }
+        }
+    }
+
     static func isDirectory(_ path: String) -> Bool {
         var isDirectory = ObjCBool(false)
         return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)

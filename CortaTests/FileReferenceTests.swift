@@ -15,7 +15,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CoreText
 import CortaTerminal
+import Metal
 import Testing
 
 @testable import Corta
@@ -28,6 +30,47 @@ import Testing
 /// an `ssh` would open a different file that happens to share a name.
 @MainActor
 struct FileReferenceResolutionTests {
+    @Test(.metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aRestingPointerFindsALinkAppearingUnderIt() async throws {
+        let host = ReferenceTestHost()
+        let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 500))
+        host.terminalView = view
+        let window = NSWindow(contentRect: view.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = view
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        host.terminalRenderer = try TerminalRenderer(
+            device: device, font: CTFontCreateWithName("Menlo" as CFString, 12, nil), scale: 1)
+        let script = #"printf '\033[2J\033[Hplain'; read -r _; printf '\033[2J\033[Hhttps://hover.example/'; sleep 60"#
+        let session = try TerminalSession(
+            executable: "/bin/sh", arguments: ["-c", script], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 4, columns: 80), workingDirectory: "/")
+        host.session = session
+        let pointer = PanePointer(host: host)
+        defer { pointer.reset(); session.stop(); window.close() }
+        session.start()
+        try #require(await waitUntilTrue(timeout: .seconds(5)) {
+            session.snapshot().logicalLine(containing: 0).text == "plain"
+        })
+        let metrics = host.terminalRenderer.pointMetrics
+        let point = CGPoint(x: TerminalLayout.insets.left + metrics.cellWidth * 2, y: metrics.cellHeight / 2)
+        let event = try #require(NSEvent.mouseEvent(
+            with: .mouseMoved, location: view.convert(point, to: nil), modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0))
+        pointer.handleLinkHover(event, in: view)
+        #expect(view.toolTip == nil)
+        session.write(Array("\n".utf8))
+        try #require(await waitUntilTrue(timeout: .seconds(5)) {
+            session.snapshot().logicalLine(containing: 0).text == "https://hover.example/"
+        })
+        // No second mouse event: output alone must refresh the target.
+        pointer.noteGridChanged()
+        #expect(view.toolTip?.contains("https://hover.example/") == true)
+        #expect(PanePointer.clickOpens(.url("https://hover.example/"), shown: pointer.hoverState))
+        pointer.resetLinkHover(view)
+        #expect(pointer.lastPointerEvent == nil, "leaving must stop further refreshes")
+    }
+
     @Test("local output references require an editor, including executable handler files")
     func localReferenceNeverFallsBackToDefaultHandler() {
         for path in ["/tmp/attack.command", "/tmp/attack.terminal", "/tmp/ordinary.txt"] {
@@ -35,7 +78,7 @@ struct FileReferenceResolutionTests {
         }
         #expect(PanePointer.openFileAt(
             url: URL(fileURLWithPath: "/tmp/space ;$(echo).swift"), line: 3, column: 4,
-            allowsDefaultApplication: false, command: "/usr/bin/true {file} {line} {column}"))
+            command: "/usr/bin/true {file} {line} {column}"))
     }
     private static func reference(_ path: String, line: Int = 12) -> FileReferenceDetection.Reference {
         FileReferenceDetection.Reference(
@@ -208,6 +251,104 @@ struct OpenFileCommandTests {
         return true
     }
 
+    @Test("a failed or timed-out pending local probe cannot run an opening fallback", arguments: [false, true])
+    func pendingLocalProbeNeverFallsBack(timesOut: Bool) async throws {
+        let host = ReferenceTestHost()
+        host.terminalView = TerminalView(frame: .zero)
+        let script = #"printf '\033]7;file://%s/private/tmp\033\\' "$(hostname)"; sleep 60"#
+        let session = try TerminalSession(
+            executable: "/bin/sh", arguments: ["-c", script], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 4, columns: 80), workingDirectory: "/private/tmp")
+        defer { session.stop() }
+        host.session = session
+        session.start()
+        try #require(await waitUntilTrue(timeout: .seconds(5)) { session.workingDirectory != nil })
+        let pointer = PanePointer(host: host)
+        let resume = DispatchSemaphore(value: 0)
+        defer { resume.signal() }
+        pointer.fileProbe = FileReferenceProbe(check: { _ in
+            if timesOut { resume.wait() }
+            return false
+        }, timeout: .milliseconds(20))
+        let reference = FileReferenceDetection.Reference(
+            path: "unconfirmed.swift", line: 12,
+            range: SelectionRange(
+                anchor: SelectionPoint(row: 0, column: 0), head: SelectionPoint(row: 0, column: 5)))
+        guard case .pending = pointer.lookUpReference(reference) else {
+            Issue.record("expected an uncached local target")
+            return
+        }
+        var fallbackRan = false
+        pointer.openDetected(reference) { fallbackRan = true }
+        if timesOut {
+            try await Task.sleep(for: .milliseconds(100) * testTimeoutScale)
+            #expect(pointer.fileProbe.outstanding == 1)
+            #expect(pointer.fileProbe.cached("/private/tmp/unconfirmed.swift") == nil)
+        } else {
+            try #require(await waitUntilTrue(timeout: .seconds(5)) { pointer.fileProbe.outstanding == 0 })
+        }
+        #expect(!fallbackRan, "a pending local click must never become another opening action")
+        #expect(host.terminalView.toastLayer == nil)
+        if timesOut {
+            resume.signal()
+            try #require(await waitUntilTrue(timeout: .seconds(5)) { pointer.fileProbe.outstanding == 0 })
+            #expect(!fallbackRan, "a late answer cannot replay the click")
+        }
+    }
+
+    /// The answer takes time, and the shell moves on in the meantime.
+    @Test("a check that answers after a `cd` opens nothing, here or on the remote host")
+    func probeOutlivedByADirectoryChange() async throws {
+        // Real paths: the kernel's answer has to agree with the reported one.
+        let root = URL(fileURLWithPath: (NSTemporaryDirectory() as NSString).resolvingSymlinksInPath)
+            .appendingPathComponent("corta-ref-\(UUID().uuidString)", isDirectory: true)
+        let (first, second) = (root.appendingPathComponent("first"), root.appendingPathComponent("second"))
+        defer { try? FileManager.default.removeItem(at: root) }
+        for directory in [first, second] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data().write(to: directory.appendingPathComponent("file.swift"))
+        }
+        func report(_ path: String) -> String {
+            #"printf '\033]7;file://%s%s\033\\' "$(hostname)" '"# + path + "'; "
+        }
+        let script =
+            report(first.path) + "read -r _; " + report(second.path)
+            + "cd '\(second.path)'; echo MOVED; sleep 60"
+        let host = ReferenceTestHost()
+        // With no editor configured, opening anything leaves a toast to find.
+        host.terminalView = TerminalView(frame: .zero)
+        let session = try TerminalSession(
+            executable: "/bin/sh", arguments: ["-c", script], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 10, columns: 80), workingDirectory: first.path)
+        defer { session.stop() }
+        session.start()
+        host.session = session
+        let pointer = PanePointer(host: host)
+        let resume = DispatchSemaphore(value: 0)
+        defer { resume.signal() }
+        pointer.fileProbe = FileReferenceProbe(check: { _ in
+            resume.wait()
+            return true
+        }, timeout: .seconds(30))
+        let reported = await waitUntilTrue(timeout: .seconds(5)) { session.workingDirectory != nil }
+        try #require(reported)
+        var nothingOpened = false
+        let reference = FileReferenceDetection.Reference(
+            path: "file.swift", line: 3, column: nil,
+            range: SelectionRange(start: SelectionPoint(row: 0, column: 0), end: SelectionPoint(row: 0, column: 3)))
+        pointer.openDetected(reference) { nothingOpened = true }
+        session.write(Array("\n".utf8))
+        let moved = await waitUntilTrue(timeout: .seconds(5)) {
+            session.workingDirectory == second.path
+        }
+        try #require(moved)
+        resume.signal()
+        try await Task.sleep(for: .milliseconds(100))
+        // Gave up: neither `otherwise` nor an open, for any file.
+        #expect(!nothingOpened)
+        #expect(host.terminalView.toastLayer == nil)
+    }
+
     @Test("a link opens, and is shown as, the URL the browser receives")
     func linkTargets() {
         #expect(PanePointer.target(of: "https://\u{0430}pple.com/login")?.absoluteString
@@ -306,4 +447,30 @@ struct OpenFileCommandTests {
         let line = terminal.grid.logicalLine(containing: 0)
         #expect(LinkDetection.links(in: line).isEmpty)
     }
+}
+
+/// Just enough of a pane for a pointer to read its session.
+@MainActor
+private final class ReferenceTestHost: PanePointerHost {
+    let view = NSView()
+    var session: TerminalSession! = nil
+    var terminalView: TerminalView! = nil
+    var terminalRenderer: TerminalRenderer! = nil
+    var isOperable = true
+    var topInset: CGFloat = 0
+    var verticalInsets: CGFloat = 0
+    var scrollOffset = 0
+    var selection: TerminalSelection?
+    var sawOutputWhileScrolled = false
+    let remote = PaneRemote()
+    private let commandsHost = CommandsTestHost()
+    var commands: PaneCommands { commandsHost.commands }
+    func invalidateDisplay() {}
+}
+
+@MainActor
+private func waitUntilTrue(timeout: Duration, _ condition: () -> Bool) async -> Bool {
+    let deadline = SuspendingClock.now + timeout * testTimeoutScale
+    while !condition(), SuspendingClock.now < deadline { try? await Task.sleep(for: .milliseconds(5)) }
+    return condition()
 }

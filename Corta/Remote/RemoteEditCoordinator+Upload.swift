@@ -173,9 +173,11 @@ extension RemoteEditCoordinator {
                 await self.performUpload(copy)
             }
         case .redownload:
-            pendingConflicts.removeAll { $0.id == conflictID }
-            removeSnapshot(copy.id)
-            Task { [weak self] in await self?.redownload(copy) }
+            // In flight, and the decision still open, until it is known how
+            // this went: nothing else starts on the copy meanwhile, and a
+            // failure has the conflict and its approved snapshot to go back to.
+            uploadsInFlight.insert(copy.id)
+            Task { [weak self] in await self?.redownload(conflict) }
         case .saveCopyElsewhere(let destination):
             uploadsInFlight.insert(copy.id)
             Task { await saveCopyElsewhere(copy, at: destination, conflict: conflict) }
@@ -266,7 +268,11 @@ extension RemoteEditCoordinator {
     private func performUpload(
         _ copy: RemoteEditStore.RemoteCopy
     ) async {
-        guard let url = approvedSnapshots[copy.id] else { return }
+        guard let url = approvedSnapshots[copy.id] else {
+            uploadsInFlight.remove(copy.id)
+            askAgain(copy)
+            return
+        }
         do {
             // `.overwrite` is the intent (this *is* the remote file being
             // updated); `.remove` means a failed upload leaves no partial
@@ -305,36 +311,90 @@ extension RemoteEditCoordinator {
             }
             presenter.showError(
                 L10n.format(
-                    key, copy.remotePath, copy.host,
+                    key, SFTPBrowserModel.peerText(copy.remotePath), copy.host,
                     SFTPBrowserModel.errorMessage(error, host: copy.host)))
             askAgain(copy)
         }
     }
 
-    private func redownload(_ copy: RemoteEditStore.RemoteCopy) async {
+    /// Fetches the remote file beside the copy and swaps it in once it is
+    /// whole. Three endings, and what each means for the decision:
+    ///
+    /// - It did not arrive: the copy is untouched, the error is said and the
+    ///   conflict is asked again. Left pending without a prompt, no later save
+    ///   would ever have prompted.
+    /// - The copy was saved while it came: that save is newer than the choice
+    ///   to discard the edits, so it stands, and is a new edit to decide on.
+    /// - It is in place, whatever follows: the copy *is* the remote version
+    ///   from then on, and a failure to re-tighten its mode is said as that,
+    ///   not as a re-download that did not happen.
+    private func redownload(_ conflict: UploadConflict) async {
+        let copy = conflict.copy
+        let url = store.localURL(for: copy)
+        let discarded = await readDigest(at: url)
+        let incoming = store.approvalsURL.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: incoming) }
+        let attributes: SFTPAttributes
         do {
-            let url = store.localURL(for: copy)
-            let attributes = try await withClient(for: copy.host) { client in
+            try store.secureCopy(at: incoming)
+            attributes = try await withClient(for: copy.host) { client in
                 let attributes = try await client.lstat(path: copy.remotePath)
                 try await client.download(
-                    remotePath: copy.remotePath, to: url,
-                    policy: .overwrite, partialDisposition: .remove, progress: nil)
+                    remotePath: copy.remotePath, to: incoming,
+                    policy: .fail, partialDisposition: .remove, progress: nil)
                 return attributes
             }
-            try store.secureCopy(at: url)
-            let digest = await readDigest(at: url)
-            store.updateRemoteStamp(
-                copy, size: attributes.size, mtime: attributes.modificationTime,
-                digest: digest)
-            setDigest(digest, for: copy.id)
-            pendingUploads.removeAll { $0.id == copy.id }
-            // The atomic download replaced the copy's inode; the watch's
-            // descriptor points at the old one.
-            watch(copy)
+            try store.secureCopy(at: incoming)
         } catch {
-            presenter.showError(
-                SFTPBrowserModel.errorMessage(Self.sftpError(error), host: copy.host))
+            redownloadFailed(conflict, error: Self.sftpError(error))
+            return
         }
+        let digest = await readDigest(at: incoming)
+        guard await readDigest(at: url) == discarded else {
+            redownloadSuperseded(copy, discarded: discarded)
+            await noteLocalWrite(copyID: copy.id)
+            return
+        }
+        guard Darwin.rename(incoming.path, url.path) == 0 else {
+            redownloadFailed(conflict, error: .localIOFailed(operation: "replace local copy", code: errno))
+            return
+        }
+        store.updateRemoteStamp(
+            copy, size: attributes.size, mtime: attributes.modificationTime, digest: digest)
+        setDigest(digest, for: copy.id)
+        pendingConflicts.removeAll { $0.id == copy.id }
+        pendingUploads.removeAll { $0.id == copy.id }
+        removeSnapshot(copy.id)
+        uploadsInFlight.remove(copy.id)
+        // The rename replaced the copy's inode; the watch's descriptor points
+        // at the old one.
+        watch(copy)
+        do {
+            try secureFile(url)
+        } catch {
+            presenter.showError(L10n.format(
+                "remoteEdit.redownloadUnsecured", SFTPBrowserModel.peerText(copy.remotePath), copy.host))
+        }
+    }
+
+    private func redownloadFailed(_ conflict: UploadConflict, error: SFTPError) {
+        uploadsInFlight.remove(conflict.id)
+        presenter.showError(SFTPBrowserModel.errorMessage(error, host: conflict.copy.host))
+        // A prompt answered during that error's alert may have settled it.
+        guard pendingConflicts.contains(where: { $0.id == conflict.id }) else { return }
+        presenter.promptConflict(conflict)
+    }
+
+    /// Back to where a fresh edit starts: the decision that was open was about
+    /// content the save replaced.
+    private func redownloadSuperseded(_ copy: RemoteEditStore.RemoteCopy, discarded: String?) {
+        pendingConflicts.removeAll { $0.id == copy.id }
+        pendingUploads.removeAll { $0.id == copy.id }
+        removeSnapshot(copy.id)
+        uploadsInFlight.remove(copy.id)
+        setDigest(discarded, for: copy.id)
+        presenter.showError(L10n.format(
+            "remoteEdit.redownloadSuperseded", SFTPBrowserModel.peerText(copy.remotePath)))
     }
 
     /// The `catch` narrowing helper, shared with the browser model.

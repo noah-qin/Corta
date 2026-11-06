@@ -80,10 +80,9 @@ struct PaneFrameLoopTests {
         var signals = 0
         rig.loop.onOutputSignal = { signals += 1 }
         rig.session.write(Array("hidden-output\n".utf8))
-        let deadline = SuspendingClock.now + .seconds(5 * testTimeoutScale)
-        while signals == 0 && SuspendingClock.now < deadline {
-            try await Task.sleep(for: .milliseconds(20))
-        }
+        // Counted in ticks: this callback comes on the main queue, which another
+        // test may be holding for seconds (#497).
+        await waitUntil("the metadata signal") { signals > 0 }
         #expect(signals > 0)
         #expect(rig.batches == 0, "metadata must run even without any display frames")
         #expect(rig.loop.prepareFrame())

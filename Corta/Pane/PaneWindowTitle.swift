@@ -231,10 +231,12 @@ final class PaneWindowTitle {
             return
         }
         let isDirectory = isDirectory
-        Task.detached(priority: .utility) { [weak self] in
+        // A thread of its own: a `stat` blocked on a dead mount held one of the
+        // cooperative pool's few threads, and with them every task in the app.
+        PathProbe.run { [weak self] in
             let exists = isDirectory(path)
             Self.directoryProbes.withLock { $0 -= 1 }
-            await MainActor.run { [weak self] in
+            Task { @MainActor [weak self] in
                 guard let self, !self.isStopped,
                     generation == self.directoryProbeGeneration else { return }
                 self.representedDirectory = exists ? URL(fileURLWithPath: path) : nil

@@ -31,6 +31,26 @@ import Testing
     /// between those same two writes — a reply written synchronously from
     /// the reader thread could interleave with a main-thread `write` byte
     /// stream.
+    @Test func pendingInputCoversQueuedAndInFlightWrites() throws {
+        let open = Mutex(false)
+        var seams = TerminalSession.Seams()
+        seams.writerSink = { _ in
+            let deadline = SuspendingClock.now + testTimeout(10)
+            while !open.withLock({ $0 }), SuspendingClock.now < deadline { Thread.sleep(forTimeInterval: 0.001) }
+        }
+        let session = try TerminalSession(executable: "/bin/cat", seams: seams)
+        defer {
+            open.withLock { $0 = true }
+            session.stop()
+        }
+        #expect(!session.hasPendingInput)
+        session.write(Array("a".utf8))
+        #expect(session.hasPendingInput)
+        open.withLock { $0 = true }
+        session.waitForQueuedWrites()
+        #expect(!session.hasPendingInput)
+    }
+
     @Test func userInputAndProtocolRepliesKeepTheirEnqueueOrder() throws {
         var seams = TerminalSession.Seams()
 

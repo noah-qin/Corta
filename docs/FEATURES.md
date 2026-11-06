@@ -34,7 +34,8 @@ the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
   pressure lower it otherwise.
 - An idle blinking cursor is animated by Core Animation; an idle shell causes
   no periodic wakeups; a hidden pane's reader runs at background priority
-  after two seconds; an occluded window does not draw.
+  after two seconds; an occluded window, or a tab behind another, does not
+  draw, even under steady output, and draws what it missed when shown.
 - Glyph atlases and GPU instance buffers sized to what is on screen: a
   24-byte quad, atlases that grow on demand.
 - iTerm2 `imgcat` inline PNG and animated GIF's first frame (OSC 1337),
@@ -142,8 +143,9 @@ and [verification limits](CONFORMANCE.md#cli-signal-compatibility).
   ([usage](USER-GUIDE.md#history-suggestions-zsh)).
 - Optional command-status rules in the prompt margin, with textual tooltips
   and gray interrupted marks for exit status 130.
-- Remote context reported by shell integration, a host indicator and reconnect
-  action. SSH connections use system OpenSSH, including its configuration,
+- Remote context reported by shell integration, a host indicator, a reconnect
+  action, and a confirmed Kill and Reconnect for a connection that hangs instead
+  of ending. SSH connections use system OpenSSH, including its configuration,
   agent and `ProxyJump`; Corta does not provide its own SSH implementation.
 - One connect sheet for a terminal (SSH) and for files (SFTP), behind one
   toolbar button, with host, user, port and private-key fields, each passed

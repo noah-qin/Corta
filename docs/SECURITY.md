@@ -92,7 +92,25 @@ Copying a command from a web page where a hidden element appended
   not prove other text safe. There is no network or model lookup.
 - Strip `ESC` and other C0 control characters from pasted text — a paste
   is data, never a command stream — and DEL and the C1 range with them:
-  DEL is a line editor's backspace, and C1 holds CSI and ST.
+  DEL is a line editor's backspace, and C1 holds CSI and ST. Text an input
+  method or a text replacement commits is held to the same: controls come off,
+  and committed lines take this warning; one lone Return is the key.
+- `?2004` is read once per paste: the warning is judged by that reading and
+  the bytes are encoded by it. A warning takes time, and output can change the
+  mode meanwhile, so if text judged under `?2004h` is about to go with the mode
+  now off and it holds a newline, it is asked about again; it never goes
+  unmarked unasked. The window between that last look and the child reading
+  the bytes cannot be closed from here.
+- **Known limit.** `?2004` is set by output, and Corta cannot see who reads the
+  bytes. A remote host or program can print `ESC[?2004h` with nothing behind it
+  that understands the markers, such as an old line editor beyond `ssh`; a
+  multiline paste then takes no newline warning, and its newlines still run.
+  Warning on every multiline paste in a foreground program instead would ask
+  each time in Claude Code, vim and the like, whose bracketing is real, so it is
+  the user's choice: `paste-warning = always` warns on every multiline paste.
+- A paste, like any other input, is bound to the session it was asked for. If
+  that session has stopped, or the pane has a new one, by the time the warning
+  is answered or the scan finishes, nothing is sent.
 
 ### 2.4 URLs and hyperlinks
 
@@ -267,7 +285,14 @@ unreachable by a remote path by construction. Restore also drops a saved
 directory that does not exist locally.
 
 A remote report is recorded separately as the pane's `RemoteContext`, for
-the title badge, the history's host filter and the SFTP browser. Its host is
+the title badge, the history's host filter and the SFTP browser. A report
+whose remote host falls outside the character rule `RemoteHost` uses (§2.10:
+letters, digits, `-`, `.`, `:`, at most 255 bytes) is ignored, as is any path,
+from any intake, with a C0, DEL or C1 control or longer than 1,024 bytes; the
+checks run after percent-decoding, so `%1B` or a bidi override cannot arrive
+that way. Every label that shows a reported host or path goes through
+`RemoteContext.displayText`: controls and format characters become U+FFFD, and
+255 scalars is the most shown. Its host is
 attacker-influenced text: displayed, never parsed for credentials, paths to
 run or hosts to connect to without the user's own command. The first SFTP
 connection to a reported host in a run shows the name, prefilled and
@@ -313,7 +338,7 @@ count, but cannot pass a pane already waiting.
 | OSC 1337 SetBadgeFormat | Refused: persistent program text over the canvas needs a separate decision |
 | OSC 1337 ReportVariable | Refused: no program text or variable values echoed into child input (§2.1–2.2) |
 | OSC 1337 Custom | Refused: no arbitrary script consumers (D09) |
-| OSC 5522 read; MIME aliases; non-text; primary selection | Refused: no clipboard disclosure, file data or extra clipboard surfaces; same user-controlled write gate as OSC 52. A completed text write is answered with a fixed `status=DONE`, `EPERM` (writes disallowed) or `EIO` (pasteboard failure) |
+| OSC 5522 read; MIME aliases; non-text; primary selection | Refused: no clipboard disclosure, file data or extra clipboard surfaces; same user-controlled write gate as OSC 52. A completed text write is answered with a fixed `status=DONE`, `EPERM` (writes disallowed) or `EIO` (pasteboard failure, or nothing left to publish once sanitised, whether writes are allowed or not) |
 | OSC 9;9 cwd | Ignored: no host, so remote paths cannot become local spawn targets (§2.8) |
 
 OSC 1337 CurrentDir and OSC 633 P;Cwd update remote metadata while a remote
@@ -341,12 +366,13 @@ allocating without bound. These caps are asserted in the fuzz harness
 | iTerm2 image OSC | File: base64 of at most 64 MiB decoded data plus 4100 header bytes, and never more than the pane/process image allowance left when the sequence begins (the parser asks before buffering); FilePart: 1 MiB per packet. A placement spans at most 4096 cells each way, as kitty's `c=`/`r=` do. Multipart total: at most 64 MiB decoded and the pane/process allowance. Unrelated OSC/CSI/APC abandons it; malformed base64, declared-size mismatch and oversized dimensions are dropped. The parser releases large string capacity after dispatch. Large base64 decoding uses the existing decode pause outside the session lock |
 | Extended clipboard / pointer stack | OSC 5522: 8192-byte packet cap, 3072 decoded bytes per text transaction, publish only at end; any invalid part discards it. OSC 22: 16 fixed names per screen; oldest evicted, RIS clears both |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
-| Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size; 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) |
-| Kitty PNG / iTerm2 PNG and GIF-first-frame decoding | `corta-image-decoder`, a process of its own under the independent App Sandbox (no access to host user files or network entitlements), 10 s, a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor inside its sandbox, so decoded pixels never travel over stdout |
+| Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size, and held until its last chunk, a delete command, a replacing transmission or RIS (other output between chunks ends nothing: the protocol's rule concerns graphics commands); 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant). A decode outside the session's lock is charged its whole peak while it runs — text and decoded bytes, or decoded bytes and the inflate ceiling — and refused with `ENOSPC` when that does not fit, even if the image alone would. A 61 MiB raw image peaks at about 2.5× its size, down from 5.1× (`PERFORMANCE.md` §5.22) |
+| Kitty PNG / iTerm2 PNG and GIF-first-frame decoding | `corta-image-decoder`, a process of its own under the independent App Sandbox (no access to host user files or network entitlements), 10 s enforced by the app (SIGKILL, the image is not drawn) and 15 s by the helper's own `SIGALRM`, armed before it reads a byte, for a helper whose app has gone; a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor inside its sandbox, so decoded pixels never travel over stdout |
 | Compressed Kitty image (`o=z`) | Inflates to exactly its declared pixels (RGB, RGBA) or at most the 64 MB image cap (PNG); the stream stops at the ceiling and the image is refused, so the expansion is never allocated. The zlib header and Adler-32 must check out; any other `o=` value is refused |
+| Pasted text | 64 MiB of UTF-8, refused before it is sanitised or scanned, with a notice. Scanned on the main thread below 64 KiB and off it above, where a newer paste replaces it. The write queue's 4 MiB is a back-pressure cap: it refuses a paste while a backlog is over it, and admits one paste whole |
 | CSI parameter count        | 16 (xterm's limit); ignore the remainder               |
 | CSI parameter value        | Clamp to a sane maximum before use                     |
-| Repeat counts (e.g. `REP`) | Clamp to the screen or scrollback dimension            |
+| Repeat counts (`SU`, `SD`, `IL`, `DL`, `ICH`, `DCH`, `ECH`, `CHT`, `CBT`) | Clamp to the scroll region, line or tab margin; `REP` (`CSI b`) is not implemented and is ignored |
 | Scrollback                 | Configured line cap, enforced by the ring buffer       |
 | Title stacks | Ten window titles and ten icon names per terminal, each bounded by the 4096-byte OSC cap; overflow discards the oldest entry, empty pops do nothing; RIS clears both |
 | Underline colours | 4095 interned colours per screen, at most two screens per pane; zero falls back to the cell foreground. Reclaim only entries absent from live cells, compressed history and both pens; defer low-yield sweeps for 1023 failed interns. Snapshots own their value copy; screen replacement/RIS drops the table |
@@ -408,7 +434,17 @@ alongside it:
 
 - Reset the signal mask and dispositions in the child.
 - Close all inherited descriptors except the PTY replica
-  (`POSIX_SPAWN_CLOEXEC_DEFAULT`; `DescriptorHygieneTests` pins it).
+  (`POSIX_SPAWN_CLOEXEC_DEFAULT`). Each child is tested through its real spawn,
+  with a probe of descriptors 3 to 200 and a pipe left open without
+  close-on-exec: a shell holds nothing past its terminal
+  (`DescriptorHygieneTests`), the image decoder holds only its pixel mapping on 3
+  and whatever stands where `ssh` stands holds only its three pipes, as does
+  what it runs as `SSH_ASKPASS`, with the broker's socket open
+  (`ChildDescriptorTests`, `SFTPChildDescriptorTests`). Corta's real askpass
+  client spawns nothing.
+- Inside an app bundle, run `corta-exec` from `Contents/MacOS` and nowhere else,
+  the one place the signature covers. Only a build outside a bundle (a SwiftPM
+  test or tool) walks up, at most six parents, to the helper beside it.
 - Establish a new session and controlling terminal (`POSIX_SPAWN_SETSID`
   / `TIOCSCTTY`) so job control and signals are correctly scoped.
 - Sanitise the environment; do not leak internal variables to the child.
@@ -470,8 +506,22 @@ environment, which admits only `main` and — since that amendment — no
 longer waits for a reviewer: the boundary is the code admitted to `main`
 and the person who requests the run, which for this repository is one
 maintainer credential (D20 says what that costs). The key reaches
-`generate_appcast` on stdin rather than as a file or an argument. The
-feed item is then held to `corta-release-check --appcast
+`generate_appcast` on stdin rather than as a file or an argument.
+
+No step of that job runs anything from the release tag's tree, because every
+step can reach the key: the runner holds the job's secrets, and code run in an
+earlier step can replace the tool a later one trusts. The job checks out `main`,
+refuses a tag whose commit is not an ancestor of `origin/main` before any
+repository code runs, reads the tag's archive with `gh release download` and its
+files with `git cat-file` as data only, and runs `appcast-header.py`,
+`corta-release-check` and `verify-appcast.swift` as `main` has them. Only the
+signing step names a secret, and it runs only the hash-pinned `generate_appcast`.
+What this does not cover is a person who can push to `main`, which is the boundary
+stated above. A ruleset on `v*` tags is a repository setting outside this
+workflow; without one a tag can still be moved or made, though only to a commit
+on `main`.
+
+The feed item is then held to `corta-release-check --appcast
 --require-notarized` — build number, enclosure URL, exact length,
 signature, Developer ID, staple, Gatekeeper — before a pull request
 carries it to `main` through the ordinary checks. The key has no
@@ -516,21 +566,56 @@ all of these hold:
 - A closed connection's token is dead: the broker holds it weakly, and
   nothing listens again once the app has stopped the broker at quit.
 
-The request is one line of at most 16 KiB, read under a five-second
-timeout on a queue of its own, so a silent client holds up no other. A
-keyboard-interactive prompt is the *server's* text: the dialog shows it
-with controls and concealing scalars as U+FFFD, at most 24 lines and 2,000
-characters, and says it comes from OpenSSH or the server. A host-key
-dialog defaults to Cancel. In the background Corta bounces in the Dock
-rather than taking focus; with no window open, the question gets a window
-of its own. The answer is written to that socket and nowhere else — not
-stored, not logged — and the dialog closes, answering nothing, the moment
-the asking process goes away. A refused password or code — not a key's
-passphrase, which only makes ssh skip that key — ends the ssh it came from — `SIGTERM` to the admitted process, checked again by
-its start time, never Corta itself — because OpenSSH reads a failed askpass
-as an empty answer and would send it and ask again. Within §1's threat model a process already
-running as the user is out of scope; the ancestry check exists so that one
-*reading* ssh's environment cannot use the token on its own.
+The request is one line of at most 16 KiB, with five seconds to arrive whole
+however it dribbles; at most sixteen clients may be sending one at a time, each
+on a queue of its own, and one past that is dropped, which ssh reads as
+cancelled. A dialog holds no thread. A prompt shown in a dialog is cleaned:
+controls and concealing scalars as U+FFFD, at most 24 lines and 2,000
+characters. Each dialog says the question comes from OpenSSH or the server: a
+password or host-key prompt is usually the local ssh's own text and only a
+keyboard-interactive prompt is the server's, and the app cannot tell which it
+holds.
+
+**Who is asking.** A dialog names the connection's destination only when the
+asker's parent is the ssh that connection spawned. Anything further down — a
+`ProxyJump`'s inner ssh, a `ProxyCommand` — gets a title saying an intermediate
+step on the way to the destination is asking, and the line under its prompt
+says the question is not from the destination. Without that, a compromised jump
+host could collect the destination's password under a title naming the
+destination, or have its own host key accepted as the destination's: the
+host-key advice says this is not the destination's key. Distance is measured
+from the kernel's view of the process tree, not from anything the server sends.
+A server reached directly can still word a keyboard-interactive prompt however it
+likes, and one at the far end of a jump is that destination's own question.
+
+A host-key dialog defaults to Cancel, whoever asks. In the background Corta
+bounces in the Dock rather than taking focus; with no window open, the question
+gets a window of its own. The answer is written to that socket and nowhere else
+— not stored, not logged — and the dialog closes, answering nothing, the moment
+the asking process or the connection's ssh goes away, or the window it hangs on
+closes. Whether a refusal ends the connection is decided once, by the broker,
+from the whole prompt, and the dialog is told. A refused password or code — not
+a key's passphrase, which only makes ssh skip that key — ends the connection's
+ssh: `SIGTERM` to the admitted process, checked again by its start time, never
+Corta itself — because OpenSSH reads a failed askpass as an empty answer and
+would send it and ask again. Within §1's threat model a process already running
+as the user is out of scope; the ancestry check exists so that one *reading*
+ssh's environment cannot use the token on its own.
+
+Two residuals are accepted, because ssh's wording is all there is to go on and a
+server can copy it exactly. A keyboard-interactive prompt ending in ssh's
+host-key question opens the host-key dialog: it has no field, and "Trust and
+Connect" sends that server the word `yes`, not a key. One containing
+"passphrase" gets a plain Cancel: ssh then asks again, up to its own limit, and
+the connection's Cancel, closing its window, or the server running out of tries
+ends that.
+
+Elsewhere in the browser and in remote editing, what the far end chose — a
+STATUS message, a file name, a path, a server's banner in ssh's error output —
+reaches a confirmation or an error line through one function: the same scalars
+replaced, and bounded (`SFTPBrowserModel.peerText`, 2,048 scalars). The name
+sent back to the server stays as it came, which is why a Rename field starts
+from the raw name.
 
 ### 4.9 Local status and themes cross no boundary
 
@@ -554,6 +639,17 @@ in memory; neither creates a history file. Copy/export commands are explicit exc
 can save selected text, command output, or the whole terminal through a
 Save panel. The file is written owner-only (`0600`); the destination and any
 later sharing are the user's choice.
+
+**A save that dies leaves a copy.** State files are replaced atomically
+through a temporary beside them, `.<name>.<uuid>`, owner-only. A crash or power
+loss between its write and its rename leaves that temporary, holding what the
+file held, where Clear History does not reach it. At launch, off the main
+thread, those older than five minutes are removed from Application Support and
+the RemoteEdit folder; only that exact name shape, only regular files.
+
+**State directories and files are owner-only** as hardening: `~/Library` already
+keeps other accounts out. Directories Corta creates for state are `0700`, and a
+state file an older build left wider is tightened, its ACL cleared, as it loads.
 
 **Custom session restoration saves plaintext metadata, not terminal text.**
 `restore-windows` defaults to `true`. `state.json` can contain window geometry,
@@ -705,6 +801,13 @@ state. Charge retained resources until release; return reservations on
 failure, cancellation, replacement and owner teardown. Test both rejection
 and recovery, including work finishing after cancellation.
 
+OSC 133 prompts need no token and cost 18 bytes a pair, and each opens a
+command record, so a flood is priced in records. Evicting one past
+`command-history-limit` moves an index, amortized constant time at any limit: it
+used to move the array, for 5.22 s of CPU per 4 MiB at the 10000 limit and
+0.23 s at the default 512, against 0.03 s of plain text. That was CPU
+amplification, not a frozen window; a snapshot waited 3.9 ms at most.
+
 Program status has a per-session cap of one main slot plus 32 subtask slots,
 matching Claude Code 2.1.310's maximum emitted set; past it the least recently
 updated subtask makes way, so a stale one cannot hide a new wait; OSC 21337 has
@@ -738,6 +841,12 @@ budget explicitly rather than assuming another layer accounts for them.
 Cancelled SFTP requests that still owe a wire reply have a separate 1,024-ID
 budget; exhausting it closes the session with a protocol error and releases
 the ledger. Those IDs are never recycled into live requests before a reply.
+Senders waiting behind a full 32-request window are capped at 1,024; one past
+that fails at once and the session goes on. A browser connection that does not
+answer has 30 seconds per step, not counting a sign-in question on screen, and a
+local file check before a transfer has five seconds on a thread of its own, with
+at most eight left blocked per window; a mount that never answers costs those
+threads and fails those rows, never the main thread.
 Remote path breadcrumbs retain at most eight items (root, a folded ancestor,
 and six trailing components), constructing only those prefixes. Slash trimming
 walks the path once. Progress fractions sum peer sizes as floating point rather

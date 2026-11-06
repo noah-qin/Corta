@@ -7,6 +7,7 @@
 > 本文譯自英文版 [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md)，對應提交
 > [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md)。
 > 此後英文版如有更新，或兩者有出入，以英文版為準。macOS 的提示文字以英文原文為準，中文為對照譯文。
+> 本次貼上、連結和遠端工作相關更新已同步至英文提交 [`6e5f7d5`](https://github.com/noah-qin/Corta/blob/6e5f7d5/docs/TROUBLESHOOTING.md).
 
 Corta 裝不起來、打不開，或者做了你以前的終端機不會做的事時，該怎麼辦。每一條都說明你會看到什麼、原因是什麼、
 如何修復——最後一節說明如果都沒用，如何乾淨地回到你原來的終端機，因為一份「我換回去了，原因是這樣」的報告
@@ -117,6 +118,12 @@ Corta 以登入 shell（`-l`）的方式啟動它被啟動時所在環境中的 
 `~/.config/corta/config` 存在，但不是 UTF-8 文字——通常是編輯器以其他編碼儲存了某個位元組——或者你沒有讀取權限。
 Corta 會保留已有的設定，並拒絕寫入這個檔案，因為寫入會取代其中的全部內容。請把檔案重新儲存為 UTF-8
 （或刪掉有問題的那一行）；Corta 下次讀取時就會生效。Shell 整合對它無法讀取的 rc 檔案也是這樣處理：回報問題，不去動它。
+
+<a id="settings-says-the-configuration-file-did-not-answer-in-time"></a>
+
+### 設定檔未及時回應
+
+設定檔或它連結到的目錄可能位於無回應的磁碟（常見於網路掛載）。Corta 最多等待一秒，保留目前設定並拒絕儲存，避免覆寫無法讀取的檔案；每隔幾秒重試，選單修改儲存失敗時會提示。磁碟恢復回應後會自行恢復。
 
 ---
 
@@ -284,6 +291,21 @@ Corta 在背景檢查回報的本機目錄。如果裝載很慢，或已有兩�
 
 連線卡住了。連線建立後，每個遠端編輯操作有 120 秒的時間完成；逾時後 Corta 會關閉連線並再次提供上傳。批准它即可透過新連線重試。
 慢速連線上的超大檔案也可能達到這個時限：請改用 SFTP 瀏覽器複製它。
+
+<a id="clicking-a-link-did-nothing"></a>
+<a id="a-paste-says-not-pasted--thats-more-than-64-mib"></a>
+
+### 點按連結沒有反應；貼上超過大小限制
+
+若輸出改變了工具提示對應的目標，點按只會更新提示；確認目標後再次點按。若提示貼上超過 64 MiB，則沒有送出任何內容。請分段貼上，或把文字儲存為檔案讓程式讀取；此上限無法設定。
+
+<a id="an-ssh-pane-stopped-responding-and-reconnect-is-greyed-out"></a>
+<a id="browse-remote-files-stays-on-connecting-then-says-it-could-not-reach-the-host"></a>
+<a id="a-transfer-failed-saying-the-disk-did-not-answer"></a>
+
+### 遠端連線停滯或傳輸磁碟無回應
+
+`ssh` 仍在執行時，一般重新連線無法使用。若它還讀取按鍵，可嘗試其 `~.` 結束序列；否則使用 **終止並重新連線到主機…** 並確認。它會結束舊連線、重新執行相同指令並清除輸出，遠端工作可能停止。SFTP 連線每個步驟最多等 30 秒，不計登入對話框等待；逾時後可重試，也可提前取消。檢查網路或 VPN，並用相同使用者和連接埠執行 `ssh -v`。傳輸前的本機檔案檢查最多等待五秒；若失敗，請恢復磁碟或網路共享後用該列的重試按鈕。
 
 ---
 

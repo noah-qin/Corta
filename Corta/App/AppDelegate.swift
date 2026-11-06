@@ -188,7 +188,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// follows the file.
     @objc func toggleSecureKeyboardEntry(_: Any?) {
         let turningOn = !ConfigurationStore.shared.configuration.secureKeyboardEntry
-        ConfigurationStore.shared.update { $0.secureKeyboardEntry = turningOn }
+        guard saveFromMenu({ $0.secureKeyboardEntry = turningOn }) else { return }
         // A toast, because the effect itself is invisible.
         let key = turningOn ? "secureInput.toast.on" : "secureInput.toast.off"
         NSApp.keyWindow?.terminalSplit?
@@ -198,12 +198,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func selectTheme(_ sender: NSMenuItem) {
         let themes = Theme.all(in: ConfigurationStore.shared.configuration)
         guard sender.tag < themes.count else { return }
-        ConfigurationStore.shared.update { $0.setTheme(themes[sender.tag].name) }
+        saveFromMenu { $0.setTheme(themes[sender.tag].name) }
     }
 
     @objc func selectAppearance(_ sender: NSMenuItem) {
         let appearance = Configuration.Appearance.allCases[sender.tag]
-        ConfigurationStore.shared.update { $0.appearance = appearance }
+        saveFromMenu { $0.appearance = appearance }
     }
 
     @objc func nextWaitingPane(_: Any?) { AgentDirectory.jumpToNextWaitingPane() }
@@ -254,6 +254,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private var stallTimer: Timer?
+    /// Saved windows are about to open (`openInitialWindows`).
+    var isWaitingForRestore = false
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         if let stall = DiagnosticsEnvironment.mainStall() {
             let timer = Timer(timeInterval: stall.periodMilliseconds / 1000, repeats: true) { _ in
@@ -268,9 +270,76 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // Off the main thread: a listing of the temporary directory.
         DispatchQueue.global(qos: .utility).async { ZshBootstrap.removeStaleFolders() }
         DispatchQueue.global(qos: .utility).async { FileDropStorage.cleanUpAtLaunch() }
-        // The saved arrangement, or one window; restored windows are born in
-        // their saved directories, so no first window is opened to replace.
-        if !restoreWindowsIfConfigured() { openWindow(workingDirectory: nil) }
+        DispatchQueue.global(qos: .utility).async { AppPaths.removeAbandonedStateFiles() }
+        openInitialWindows()
+        // A notification click jumps back to its command
+        // (`AppDelegate+Notifications.swift`).
+        UNUserNotificationCenter.current().delegate = self
+    }
+
+    // MARK: - Reopening
+
+    /// A Dock click with no window open opens one; Corta keeps running with
+    /// no windows, and otherwise there was no way back but ⌘N.
+    func applicationShouldHandleReopen(
+        _ sender: NSApplication, hasVisibleWindows: Bool
+    ) -> Bool {
+        guard !hasVisibleWindows, !isWaitingForRestore else { return true }
+        newDocument(sender)
+        return false
+    }
+
+}
+
+// MARK: - Restoring the arrangement
+
+extension AppDelegate {
+
+    /// The saved arrangement, or one window; restored windows are born in
+    /// their saved directories, so no first window is opened to replace. The
+    /// directories are checked off the main thread first: one on a mount that
+    /// stopped answering held the whole launch. Local ones answer before the
+    /// next pass of the run loop.
+    func openInitialWindows() {
+        guard Self.isRestoreEnabled else {
+            openWindow(workingDirectory: nil)
+            finishOpeningInitialWindows()
+            return
+        }
+        let store = SessionRestore.standard
+        let saved: [WindowState]
+        switch store.decideRestore(loading: store.loadUnchecked) {
+        case .skipAfterFailure:
+            // The marker survives only a launch that died mid-restore; that layout
+            // is the suspect, so drop it.
+            store.clear()
+            store.endRestore()
+            openWindow(workingDirectory: nil)
+            finishOpeningInitialWindows()
+            return
+        case .nothingToRestore:
+            openWindow(workingDirectory: nil)
+            finishOpeningInitialWindows()
+            return
+        case .restore(let states):
+            saved = states
+        }
+        // A Dock click in the wait must not open a window beside these.
+        isWaitingForRestore = true
+        PathProbe.directories(
+            among: saved.flatMap { $0.layout.validated().directories },
+            timeout: SessionRestore.directoryCheckTimeout
+        ) { [weak self] existing in
+            guard let self else { return }
+            self.isWaitingForRestore = false
+            let states = SessionRestore.droppingMissingDirectories(saved, existing: existing)
+            if !self.restoreWindows(states) { self.openWindow(workingDirectory: nil) }
+            self.finishOpeningInitialWindows()
+        }
+    }
+
+    /// What a launch does once its first windows are up.
+    private func finishOpeningInitialWindows() {
         #if DEBUG
         if CommandLine.arguments.contains("--sftp-preview") { SFTPBrowserController.showDevelopmentPreview() }
         if CommandLine.arguments.contains("--glass-preview") { GlassAppearancePreview.show() }
@@ -291,28 +360,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             }
         }
         #endif
-        // A notification click jumps back to its command
-        // (`AppDelegate+Notifications.swift`).
-        UNUserNotificationCenter.current().delegate = self
     }
-
-    // MARK: - Reopening
-
-    /// A Dock click with no window open opens one; Corta keeps running with
-    /// no windows, and otherwise there was no way back but ⌘N.
-    func applicationShouldHandleReopen(
-        _ sender: NSApplication, hasVisibleWindows: Bool
-    ) -> Bool {
-        guard !hasVisibleWindows else { return true }
-        newDocument(sender)
-        return false
-    }
-
-}
-
-// MARK: - Restoring the arrangement
-
-extension AppDelegate {
 
     /// The setting, plus an escape hatch the UI tests set so each launch
     /// doesn't reopen the previous test's windows. A real launch never has it.
@@ -321,22 +369,9 @@ extension AppDelegate {
         return ConfigurationStore.shared.configuration.restoreWindows
     }
 
-    /// Reopens last run's windows and splits; false when nothing was.
-    private func restoreWindowsIfConfigured() -> Bool {
-        guard Self.isRestoreEnabled else { return false }
-        let states: [WindowState]
-        switch SessionRestore.standard.decideRestore() {
-        case .skipAfterFailure:
-            // The marker survives only a launch that died mid-restore; that layout
-            // is the suspect, so drop it.
-            SessionRestore.standard.clear()
-            SessionRestore.standard.endRestore()
-            return false
-        case .nothingToRestore:
-            return false
-        case .restore(let saved):
-            states = saved
-        }
+    /// Reopens these windows and splits; false when nothing was. Their
+    /// directories have been checked, so no pane checks one again at its spawn.
+    private func restoreWindows(_ states: [WindowState]) -> Bool {
         SessionRestore.standard.beginRestore()
         // Keep the state file: `noteLayoutChanged` rewrites it, so a later
         // crash still has a last-known-good layout.
@@ -345,9 +380,11 @@ extension AppDelegate {
         var opened = 0
         for ordered in Self.restoredWindows(states) {
             guard let first = ordered.first else { continue }
-            let controller = makeWindowController(setup: SplitViewController.Setup(restore: first))
+            let controller = makeWindowController(
+                setup: SplitViewController.Setup(restore: first, directoriesChecked: true))
             for state in ordered.dropFirst() {
-                controller.addTab(setup: SplitViewController.Setup(restore: state), select: false)
+                controller.addTab(
+                    setup: SplitViewController.Setup(restore: state, directoriesChecked: true), select: false)
             }
             // Every tab's splits now, while each is still laid out at the
             // window's frame; a tab hidden behind the selected one would
@@ -484,5 +521,30 @@ extension AppDelegate {
     /// `SessionRestore` saves the arrangement instead.
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return false
+    }
+}
+
+// MARK: - Saving from a menu
+
+extension AppDelegate {
+    /// A menu has no status row to say a write failed, as Settings does, so it
+    /// says so here: the tick would simply stay where it was, and a toast
+    /// claiming the change happened would be worse. Returns whether it saved.
+    @discardableResult
+    func saveFromMenu(_ change: (inout Configuration) -> Void) -> Bool {
+        Self.save(change, to: .shared) {
+            NSApp.keyWindow?.terminalSplit?.focusedPane?.terminalView?.showToast(
+                L10n.text("toast.settingNotSaved"), kind: .warning)
+        }
+    }
+
+    static func save(
+        _ change: (inout Configuration) -> Void, to store: ConfigurationStore, onFailure: () -> Void
+    ) -> Bool {
+        guard store.update(change) else {
+            onFailure()
+            return false
+        }
+        return true
     }
 }

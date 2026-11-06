@@ -306,7 +306,7 @@ struct RemoteEditCoordinatorTests {
                 opened += 1
                 return PanePointer.openFileAt(
                     url: url, line: line, column: column,
-                    allowsDefaultApplication: false, command: "")
+                    command: "")
             },
             presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
         for name in ["evil.command", "evil.terminal", "evil.app", "script", "source.swift"] {
@@ -328,7 +328,7 @@ struct RemoteEditCoordinatorTests {
         for name in ["file.swift", "evil.command", "semi;$(echo evil).terminal"] {
             #expect(PanePointer.openFileAt(
                 url: URL(fileURLWithPath: "/tmp/" + name), line: 42, column: 7,
-                allowsDefaultApplication: false, command: "/usr/bin/true {file} {line} {column}"))
+                command: "/usr/bin/true {file} {line} {column}"))
         }
     }
 

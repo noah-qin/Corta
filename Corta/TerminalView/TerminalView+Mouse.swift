@@ -20,13 +20,7 @@ import CortaTerminal
 /// Routes a gesture to the subscribed TUI or to local text selection.
 extension TerminalView {
     override func mouseDown(with event: NSEvent) {
-        // A click focuses its pane — keyboard input follows focus, and
-        // focus is the only routing rule a split window has. Not while the
-        // pane's search bar owns the keyboard, though: clicking a match with
-        // the bar open must not strand the bar.
-        if paneController?.search.bar == nil {
-            window?.makeFirstResponder(self)
-        }
+        takeFocusForClick()
         // ⌘-click opens a link before anything else sees the click —
         // it is neither an SGR report nor the start of a selection.
         if event.modifierFlags.contains(.command),
@@ -42,6 +36,18 @@ extension TerminalView {
         controller.pointer.handleSelectionMouseDown(event, in: self)
     }
 
+    /// A click focuses its pane — keyboard input follows focus, and focus is
+    /// the only routing rule a split window has. In the launched app a click
+    /// on this view has already moved the keyboard here by the time `mouseDown`
+    /// runs, the search bar staying open; this holds for a view clicked with
+    /// no such move behind it, and leaves a bar that still has the keyboard
+    /// alone. A bar merely open is no reason to skip it.
+    func takeFocusForClick() {
+        if paneController?.search.hasKeyboardFocus != true {
+            window?.makeFirstResponder(self)
+        }
+    }
+
     override func mouseUp(with event: NSEvent) {
         guard report(event, phase: .release(.left)) else { super.mouseUp(with: event); return }
     }
@@ -51,9 +57,7 @@ extension TerminalView {
         // Mouse reporting is off: the right button belongs to the pane's
         // context menu (copy/paste, split, close). The click focuses the
         // pane first so the menu acts on what the user is looking at.
-        if paneController?.search.bar == nil {
-            window?.makeFirstResponder(self)
-        }
+        takeFocusForClick()
         if let menu = paneController?.commands.contextMenu(event: event) {
             NSMenu.popUpContextMenu(menu, with: event, for: self)
             return

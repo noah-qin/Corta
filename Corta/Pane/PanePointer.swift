@@ -69,6 +69,12 @@ final class PanePointer: NSObject {
     var lastHover: (event: NSEvent, view: TerminalView)?
     /// What the last hover showed, kept while its answer is checked again.
     var lastHoverReference: OpenableReference?
+    /// What the pointer's tooltip says a click opens (`confirmsShownTarget`).
+    var hoverState = HoverState.none
+    /// The event to run the hover again from when the cells under it change.
+    var lastPointerEvent: (event: NSEvent, view: TerminalView)?
+    var lastHoverRefresh: TimeInterval = 0
+    var trailingHoverRefresh: DispatchWorkItem?
     /// Injected so tests answer without the filesystem.
     var fileProbe = FileReferenceProbe.shared
     /// Underlined, so the target shows before a click opens it.
@@ -87,6 +93,10 @@ final class PanePointer: NSObject {
         scrollPositionIndicator = nil
         hoveredLink = nil
         hoveringLink = false
+        hoverState = .none
+        lastPointerEvent = nil
+        trailingHoverRefresh?.cancel()
+        trailingHoverRefresh = nil
     }
 
     init(host: PanePointerHost? = nil) {

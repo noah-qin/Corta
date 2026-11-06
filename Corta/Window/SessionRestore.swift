@@ -303,18 +303,30 @@ struct SessionRestore {
     /// The saved windows, oldest first. A malformed file counts as none:
     /// better a fresh window than a terminal that won't launch.
     func load() -> [WindowState] {
-        guard let data = try? Data(contentsOf: fileURL),
-            let states = try? JSONDecoder().decode([WindowState].self, from: data)
-        else { return [] }
-        // Skip windows from a newer format rather than guess.
-        let current = states.filter { $0.version <= WindowState.currentVersion }
-        // All at once, off the main thread and bounded: this runs at launch,
-        // and a saved directory on a mount that stopped answering blocked it
-        // in `stat` — every launch, until the mount came back.
+        let current = loadUnchecked()
+        // All at once and bounded, but the caller waits for them: a launch goes
+        // through `PathProbe.directories(among:timeout:then:)` instead.
         let existing = PathProbe.directories(
             among: current.flatMap { $0.layout.validated().directories },
             timeout: Self.directoryCheckTimeout)
-        return current.map { saved in
+        return Self.droppingMissingDirectories(current, existing: existing)
+    }
+
+    /// The saved windows of a format this build reads, their directories not
+    /// yet checked. The file is Corta's own, in Application Support.
+    func loadUnchecked() -> [WindowState] {
+        guard let data = try? PrivateFile.read(fileURL),
+            let states = try? JSONDecoder().decode([WindowState].self, from: data)
+        else { return [] }
+        // Skip windows from a newer format rather than guess.
+        return states.filter { $0.version <= WindowState.currentVersion }
+    }
+
+    /// Each window with what `existing` did not confirm replaced by home.
+    nonisolated static func droppingMissingDirectories(
+        _ states: [WindowState], existing: Set<String>
+    ) -> [WindowState] {
+        states.map { saved in
             var state = saved
             state.layout = saved.layout.validated().droppingMissingDirectories {
                 existing.contains($0)
@@ -336,9 +348,7 @@ struct SessionRestore {
     }
 
     func beginRestore() {
-        try? FileManager.default.createDirectory(
-            at: markerURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        FileManager.default.createFile(atPath: markerURL.path, contents: nil)
+        try? PrivateFile.write(Data(), to: markerURL)
     }
 
     func endRestore() {
@@ -353,9 +363,9 @@ struct SessionRestore {
         case restore([WindowState])
     }
 
-    func decideRestore() -> RestoreDecision {
+    func decideRestore(loading load: (() -> [WindowState])? = nil) -> RestoreDecision {
         if previousRestoreFailed { return .skipAfterFailure }
-        let states = load()
+        let states = load?() ?? self.load()
         return states.isEmpty ? .nothingToRestore : .restore(states)
     }
 

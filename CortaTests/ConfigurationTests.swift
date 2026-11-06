@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Foundation
+import Synchronization
 import Testing
 
 @testable import Corta
@@ -439,4 +440,76 @@ extension ConfigurationTests {
         #expect(parsed.mouseOverrideModifier == .option)
         #expect(!unknown.isEmpty)
     }
+
+    @Test("a menu's change that could not be saved says so, and reports no success")
+    @MainActor func menuSaveFailureIsReported() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-config-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("config")
+        // Not UTF-8: the store refuses to write over what it cannot read.
+        try Data([0xFF, 0xFE, 0x00]).write(to: url)
+        let store = ConfigurationStore(fileURL: url)
+        var reported = 0
+        #expect(!AppDelegate.save({ $0.secureKeyboardEntry.toggle() }, to: store, onFailure: { reported += 1 }))
+        #expect(reported == 1)
+
+        try "".write(to: url, atomically: true, encoding: .utf8)
+        #expect(AppDelegate.save({ $0.secureKeyboardEntry.toggle() }, to: store, onFailure: { reported += 1 }))
+        #expect(reported == 1)
+    }
+
+    // MARK: - A file that does not answer
+
+    /// Reads the file normally until told to hang, standing in for a config
+    /// symlinked onto a mount that has stopped answering.
+    private final class HangingReader: Sendable {
+        let hanging = Mutex(false)
+        let released = Mutex(false)
+        func read(_ url: URL) -> UserFile.ReadResult {
+            if hanging.withLock({ $0 }) {
+                while !released.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.005) }
+            }
+            return UserFile.readText(at: url)
+        }
+    }
+
+    @Test("a config file that stops answering keeps memory, refuses writes, and is read again later")
+    @MainActor func hungFileIsNeverOverwritten() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-config-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("config")
+        try "font-size = 17\n".write(to: url, atomically: true, encoding: .utf8)
+        let reader = HangingReader()
+        defer { reader.released.withLock { $0 = true } }
+        let store = ConfigurationStore(
+            fileURL: url, readFile: { reader.read($0) }, fileAccessTimeout: .milliseconds(100), retryDelay: 0.05)
+        #expect(store.configuration.fontSize == 17)
+
+        reader.hanging.withLock { $0 = true }
+        let started = SuspendingClock.now
+        let saved = store.update { $0.fontSize = 30 }
+        #expect(SuspendingClock.now - started < .seconds(5), "bounded, not however long the mount takes")
+        #expect(!saved, "not known what the file holds, so nothing is written over it")
+        #expect(store.configuration.fontSize == 17, "what was in memory stays; never defaults")
+        #expect(store.readError != nil)
+        #expect(try String(contentsOf: url, encoding: .utf8) == "font-size = 17\n")
+
+        reader.hanging.withLock { $0 = false }
+        reader.released.withLock { $0 = true }
+        let recovered = await waitUntilTrue(timeout: .seconds(10)) { store.readError == nil }
+        #expect(recovered, "read again without anyone asking")
+        #expect(store.update { $0.fontSize = 30 })
+        #expect(try String(contentsOf: url, encoding: .utf8).contains("font-size = 30"))
+    }
+}
+
+@MainActor
+private func waitUntilTrue(timeout: Duration, _ condition: () -> Bool) async -> Bool {
+    let deadline = SuspendingClock.now + timeout * testTimeoutScale
+    while !condition(), SuspendingClock.now < deadline { try? await Task.sleep(for: .milliseconds(5)) }
+    return condition()
 }

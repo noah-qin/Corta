@@ -510,6 +510,25 @@ hand after signing, or a signing step that fails, stops updates for every
 new copy until the feed is re-signed — `verify-appcast.swift` fails such a
 feed on every CI run, so it cannot merge.
 
+**Amended 2026-11-06 — no step that can reach the key runs the tag's tree.**
+The sign job used to check out the tag and run `scripts/appcast-header.py` from
+it with the key in its environment, and `swift run corta-release-check` from it
+afterwards, so a commit that never reached `main`, given a tag and a release,
+could read the key: the code admitted to the job was not the code admitted to
+`main`, which is what this record says the boundary is. It now checks out `main`,
+requires `git merge-base --is-ancestor <tag commit> origin/main` before any
+repository code runs, and takes only data from the tag: the archive through `gh
+release download`, its version numbers, documents, updater settings and license
+headers through `git cat-file` (`corta-release-check --source-ref`). Only the
+step running the hash-pinned `generate_appcast` names the key. A later step of
+the job is no safer than the signing step, since the runner holds the job's
+secrets, so a check needing the tag's content uses `main`'s tools rather than
+running the tag's. The feed's format, its signature and the release rules are
+unchanged. The cost: `main`'s tools judge an older tag on a recovery run, so a
+new rule can fail a release built before it. A `v*` tag ruleset is a repository
+setting this does not change; the ancestry check limits a moved tag to commits
+already on `main`.
+
 ## D21 — Corta builds for Apple silicon only
 
 **Decision.** From 1.1.0 the application and `corta-exec` are `arm64`

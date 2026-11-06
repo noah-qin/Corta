@@ -21,6 +21,13 @@ public struct Terminal: Sendable {
     private var parser = Parser()
     private var performer: Performer
 
+    /// Bumped by everything here that can change `grid`, and not by what only
+    /// reads it or drains an edge from beside it (`takeBell`): a resize built
+    /// from a copy of the grid is the current one only if this has not moved
+    /// (`TerminalSession.resize`). A method added below that touches
+    /// `performer.grid` bumps it too.
+    private(set) var gridGeneration: UInt64 = 0
+
     var imageAllowanceProvider: (@Sendable () -> Int)? {
         get { performer.imageAllowanceProvider }
         set { performer.imageAllowanceProvider = newValue }
@@ -47,6 +54,7 @@ public struct Terminal: Sendable {
     /// Standalone-core maintenance. Sessions schedule this work off their
     /// state lock; callers holding their own terminal choose an idle point.
     public mutating func compressColdScrollback() {
+        gridGeneration &+= 1
         while let work = performer.grid.nextCompressionWork() { performer.grid.installCompression(work.compress()) }
     }
 
@@ -55,6 +63,7 @@ public struct Terminal: Sendable {
         performer.grid.nextCompressionWork()
     }
     mutating func installCompression(_ result: Scrollback.CompressionResult) {
+        gridGeneration &+= 1
         performer.grid.installCompression(result)
     }
 
@@ -72,6 +81,7 @@ public struct Terminal: Sendable {
     public var grid: Grid {
         get { performer.grid }
         set {
+            gridGeneration &+= 1
             performer.grid = newValue
             performer.applyRowRemaps()
         }
@@ -80,6 +90,7 @@ public struct Terminal: Sendable {
     /// Clear Screen keeps a ready shell editor visible without sending input
     /// to the child. A full-screen program owns its canvas; leave it alone.
     public mutating func clearScreen() {
+        gridGeneration &+= 1
         guard !performer.grid.isAlternateScreenActive else { return }
         if let promptRow = inputPromptRow {
             let firstRow = promptRow - performer.grid.absoluteRow(ofScreenRow: 0)
@@ -102,16 +113,19 @@ public struct Terminal: Sendable {
     /// A chunk may end mid-character or mid-sequence; all decoding state
     /// lives in the terminal.
     public mutating func feed(_ bytes: some Sequence<UInt8>) {
+        gridGeneration &+= 1
         parser.parse(bytes, performer: &performer)
     }
 
     /// Contiguous, so `Parser` can batch printable ASCII.
     public mutating func feed(_ bytes: [UInt8]) {
+        gridGeneration &+= 1
         parser.parse(bytes, performer: &performer)
     }
 
     /// Contiguous, and fed without a copy: the reader's lock slices.
     public mutating func feed(_ bytes: ArraySlice<UInt8>) {
+        gridGeneration &+= 1
         parser.parse(bytes, performer: &performer)
     }
 
@@ -121,6 +135,7 @@ public struct Terminal: Sendable {
     /// (`takeDeferredImage`), decodes it without holding whatever guards
     /// this terminal, completes it, and feeds the rest.
     mutating func feedDeferringImageDecode(_ bytes: ArraySlice<UInt8>) -> Int {
+        gridGeneration &+= 1
         performer.defersLargeImageDecoding = true
         defer { performer.defersLargeImageDecoding = false }
         return parser.parse(bytes, performer: &performer, stoppingAfterAPC: true)
@@ -129,20 +144,27 @@ public struct Terminal: Sendable {
     mutating func takeDeferredImage() -> DeferredImageTransmission? {
         guard let deferred = performer.state.deferredImage else { return nil }
         performer.state.deferredImage = nil
-        performer.state.decodingImageBytes = deferred.decodedByteEstimate
+        performer.state.decodingImageBytes = deferred.peakByteEstimate
         return deferred
     }
 
     /// Stores and places a deferred transmission, and queues its reply, as
     /// an inline decode would have at the point the feed stopped.
     mutating func completeDeferredImage(_ decoded: DecodedImageTransmission) {
+        gridGeneration &+= 1
         performer.completeDeferredImage(decoded)
     }
 
+}
+
+// MARK: - Size, modes and what is drained per frame
+
+extension Terminal {
     /// `Grid.resize`, keeping command records on their rows through a reflow.
     /// Resize through this, not `grid`, or the records point where the rows
     /// used to be.
     public mutating func resize(rows: Int, columns: Int) {
+        gridGeneration &+= 1
         performer.grid.resize(rows: rows, columns: columns)
         performer.applyRowRemaps()
     }
@@ -354,7 +376,7 @@ public struct Terminal: Sendable {
         performer.grid.retainedImageBytes
             + (performer.state.pendingImageTransmission?.base64.count ?? 0) / 4 * 3
             + (performer.state.itermImage?.base64.count ?? 0) / 4 * 3
-            + (performer.state.deferredImage?.decodedByteEstimate ?? 0)
+            + (performer.state.deferredImage?.peakByteEstimate ?? 0)
             + performer.state.decodingImageBytes
     }
 

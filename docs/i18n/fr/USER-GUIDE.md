@@ -8,6 +8,7 @@
 > [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/USER-GUIDE.md).
 > Si la version anglaise a changé depuis, ou si les deux diffèrent, la version anglaise fait foi.
 > Les noms d’interface suivent l’interface française de Corta ; clés de configuration, commandes et code restent en version originale.
+> Les modifications concernant le collage, les liens et le travail distant suivent ce commit anglais : [`6e5f7d5`](https://github.com/noah-qin/Corta/blob/6e5f7d5/docs/USER-GUIDE.md).
 
 Tout ce que fait Corta, et comment y accéder. Chaque section indique où se trouve la fonctionnalité — un menu, un
 raccourci, un réglage — et renvoie à la référence qui donne les détails. Les raccourcis sont ceux par défaut, et tous
@@ -347,6 +348,8 @@ ou, pour une connexion, **Reconnecter** ; le texte d’erreur du système est so
   à chaque collage de plusieurs lignes, ou `off` pour désactiver ces boîtes de dialogue. Ce sont des motifs prudents, pas un
   analyseur de shell ni une garantie que le reste du texte est sûr. Un gros collage que le shell traite encore peut être
   annulé avec ⌃C : la partie pas encore envoyée est abandonnée et l’interruption passe directement.
+
+  Au-delà de 64 KiB, le collage est vérifié en arrière-plan et la fenêtre reste utilisable. Un nouveau collage remplace le texte en cours de vérification. Au-delà de 64 MiB, rien n’est envoyé et Corta le signale. Un programme peut activer le collage encadré sans le comprendre réellement. Pour toujours afficher un avertissement lors d’un collage multiligne dans des programmes distants ou anciens, utilisez `paste-warning = always`.
 - **Déposer des fichiers.** Déposez des fichiers, ou des fichiers fournis par une autre app, sur un panneau pour saisir leurs chemins entre guillemets par le canal de collage, sans Retour. Le survol ne lance aucun téléchargement. La réception est asynchrone et cesse d'attendre après 120 secondes ; les échecs s'affichent dans le panneau. Si la session ou le groupe de processus au premier plan change entre-temps, Corta abandonne le dépôt.
 
   **Un fichier du Finder est utilisé là où il se trouve, et Corta ne le supprime jamais. Un fichier que seule une autre app peut fournir, comme une photo ou une pièce jointe de Mail, arrive sous forme de copie temporaire :** enregistrez-le ailleurs pour le conserver. La copie disparaît à la fermeture de son panneau, y compris avec son onglet ou sa fenêtre, ou quand Corta quitte. Un programme encore en cours ne peut plus la lire, et un chemin copié ailleurs ne vaut plus. Il en va de même des anciens chemins dans l'historique de défilement et celui du shell, et ⇧⌘T rouvre un panneau sans ses copies. Déplacer le panneau vers un autre onglet ou une autre fenêtre les conserve. Si un autre programme garde un fichier ouvert ou qu'un instantané système existe, l'espace peut ne pas revenir tout de suite. **Réglages ▸ Confidentialité et sécurité ▸ Données locales** indique l'espace et propose **Nettoyer maintenant…**.
@@ -389,6 +392,8 @@ ou, pour une connexion, **Reconnecter** ; le texte d’erreur du système est so
 
 Ouvrir une référence de fichier exige un `open-file-command` configuré. Corta n’ouvre jamais un fichier issu de la sortie
 dans son application par défaut du système : certains types de fichiers exécutent du code à l’ouverture.
+
+Un clic ouvre uniquement la cible affichée dans l’infobulle. Si la sortie a changé le texte sous le pointeur, le clic actualise seulement l’infobulle ; vérifiez-la et cliquez de nouveau. Les références `path:line:column` exigent toujours ⌘-clic, quelle que soit la valeur de `link-activation`.
 
 <a id="shell-integration"></a>
 
@@ -596,6 +601,12 @@ Une fois connecté, une opération qui n’est pas terminée après 120 secondes
 nouveau : une connexion bloquée ne retient pas une modification indéfiniment.
 Préservez les modifications locales non décidées avant de supprimer les données de l’app. Voir la
 [politique des données au repos](../../SECURITY.md#5-data-at-rest) (en anglais).
+
+**Connexion bloquée.** Après une coupure réseau, `ssh` peut rester actif et la reconnexion ordinaire est indisponible. **Forcer l’arrêt et se reconnecter à l’hôte…**, dans le menu et la palette de commandes, demande confirmation, termine la connexion et relance la même commande. Les tâches distantes peuvent s’arrêter et la sortie du volet est effacée.
+
+Avec `ProxyJump` ou `ProxyCommand`, la question peut venir d’un hôte intermédiaire. Le titre du dialogue le précise et le conseil sur la clé indique que l’empreinte n’est pas celle de la destination. Vérifiez qui pose la question avant de saisir le mot de passe de la destination. Chaque étape de connexion dispose de 30 secondes, sans compter le temps passé dans un dialogue d’authentification. Vous pouvez ensuite réessayer.
+
+Une ligne de transfert peut être annulée même pendant la vérification de la destination. Annuler un transfert repris conserve le fichier partiel ; le bouton de nouvel essai reprend à cet endroit. Si le disque local ne répond pas sous cinq secondes, la ligne échoue et propose de réessayer ; la fenêtre reste utilisable. Un nouveau téléchargement qui échoue affiche une erreur et propose à nouveau le choix de conflit, en conservant la copie locale. Une modification enregistrée pendant le téléchargement est conservée et fait l’objet d’une nouvelle demande d’approbation.
 
 <a id="images-in-the-terminal"></a>
 

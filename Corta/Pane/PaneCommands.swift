@@ -85,6 +85,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     func stop() {
         fileDropRequest?.cancel()
         fileDropRequest = nil
+        cancelPasteScan()
         // The copies dropped here go with the pane: a move keeps the pane, and
         // with it this list, while a close comes through here.
         for directory in droppedCopies { FileDropStorage.remove(directory) }
@@ -98,6 +99,19 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     var droppedCopies: Set<URL> = []
 
     var suppressPasteWarnings = false
+    /// Stands in for the warning's sheet: tests read the risks and answer.
+    var pasteWarningAnswer: (([Paste.PasteRisk]) -> Bool)?
+
+    /// A large paste's scan, off the main thread; one per pane, the newest.
+    struct PasteScan {
+        let id: Int
+        let task: Task<Void, Never>
+        let onDiscard: (() -> Void)?
+    }
+    var pasteScan: PasteScan?
+    var nextPasteScanID = 0
+    /// Long enough that a paste that clears quickly says nothing.
+    static let pasteScanNoticeDelay: Duration = .milliseconds(400)
 
     // MARK: - Context menu
 

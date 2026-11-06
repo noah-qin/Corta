@@ -24,6 +24,27 @@ import Testing
 /// decoded. The pipe tests drive `readHelperStatus` directly; the last
 /// three spawn real children (hence `.serialized`).
 @Suite(.serialized) struct SpawnHandshakeTests {
+    @Test("inside an app bundle the helper is looked for in one place only")
+    func insideABundleTheHelperHasOneCandidate() {
+        for image in [
+            "/Applications/Corta.app/Contents/Frameworks/CortaTerminal.framework/Versions/A/CortaTerminal",
+            "/Applications/Corta.app/Contents/MacOS/Corta",
+            "/Applications/Corta.app/Contents/PlugIns/CortaTests.xctest/Contents/MacOS/CortaTests",
+        ] {
+            #expect(Spawn.helperCandidates(forImage: image) == ["/Applications/Corta.app/Contents/MacOS/corta-exec"])
+        }
+    }
+
+    @Test("outside a bundle the helper is found beside a SwiftPM build, at most six levels up")
+    func outsideABundleTheWalkIsBounded() {
+        let candidates = Spawn.helperCandidates(
+            forImage: "/r/.build/debug/CortaTerminalPackageTests.xctest/Contents/MacOS/CortaTerminalPackageTests")
+        #expect(candidates.contains("/r/.build/debug/corta-exec"))
+        #expect(candidates.first == "/r/.build/debug/CortaTerminalPackageTests.xctest/Contents/MacOS/corta-exec")
+        let deep = Spawn.helperCandidates(forImage: "/1/2/3/4/5/6/7/8/image")
+        #expect(deep.count == 6 && deep.last == "/1/2/3/corta-exec")
+    }
+
     @Test func decodesAFullErrnoStatus() throws {
         let ends = try makePipe()
         defer { close(ends.read) }

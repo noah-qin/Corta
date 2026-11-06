@@ -30,6 +30,12 @@ Versioning for compatibility changes.
 - Corta has a website, https://corta.noahqin.dev, with the user guide,
   the documentation and the changelog in all nine languages the
   repository is translated into.
+- Kill and Reconnect to Host…, in Shell ▸ Terminal and Connection and the
+  command palette, ends an `ssh` or `mosh` that has hung rather than exited and
+  runs the same command again as a new connection, once you confirm. Rebindable
+  as `kill-and-reconnect-remote`.
+- A resumed SFTP transfer you cancelled offers Retry, continuing from the
+  partial file it kept.
 
 ### Removed
 
@@ -106,9 +112,29 @@ Versioning for compatibility changes.
   are evenly spaced, the Shortcuts search field matches the sidebar's, and
   setting names use one capitalisation.
 - The bundled updater is Sparkle 2.10.1 (was 2.10.0).
+- `link-activation = click` opens URLs only. A `path:line` takes ⌘-click under
+  either setting, since it starts your editor.
+- A window resize over a long scrollback no longer stalls frames: the reflow
+  runs outside the lock they need.
+- A tab behind another stops drawing under steady output, and draws what it
+  missed when shown.
+- A very large image can now be refused sooner: its whole decoding peak has to
+  fit in the pane's image budget.
+- An SFTP browser connection that does not answer fails after 30 seconds per
+  step of connecting and can be retried. The time a sign-in dialog is on screen
+  does not count, in the browser or in remote editing.
+- An SFTP sign-in dialog now always says its question may come from OpenSSH or
+  the server.
 
 ### Fixed
 
+- A pending local file-reference check that fails or times out abandons the
+  click instead of opening an unconfirmed remote file or another fallback.
+
+- Hovering over empty or ordinary text keeps tracking the resting pointer, so a
+  link that later appears there gets its tooltip without another mouse move.
+- An SFTP connection is not failed by a cancelled deadline that has just reached
+  its last tick, including when a successful answer cancels it at that boundary.
 - A new shell prompt now ends a pane's reported Working and Waiting states, also in
   the Agents list, the Dock count and ⌥⌘J's queue, even when the shell sent no
   command-finished mark. Done and Failed stay.
@@ -185,6 +211,80 @@ Versioning for compatibility changes.
   (`…/claude/versions/2.1.316`). A version-named process now reads as the
   tool whose `versions` directory holds it, in the title, the tab and the
   pane header.
+- A large paste no longer freezes the window: past 64 KiB it is checked in the
+  background, a newer paste replaces one still being checked, and most text is
+  checked far faster. A paste past 64 MiB is refused with a notice.
+- Text judged safe because bracketed paste was on is asked about again if a
+  program turned it off while the warning was open, and is never sent unmarked
+  with its line breaks unasked.
+- A confirmed paste or drop no longer lands in a session started since it was
+  asked for.
+- A click in a split pane with its search bar open, while the keyboard is in
+  another pane, now takes the keyboard back.
+- A link's click opens only what its tooltip names; if output changed the text,
+  the tooltip updates and the click does nothing. Tooltips follow output under a
+  resting pointer.
+- A `path:line` still being checked when the shell changes directory no longer
+  opens a different file.
+- A menu change that could not be saved (theme, appearance, Secure Keyboard
+  Entry) now says so, and Secure Keyboard Entry no longer reports success.
+- A launch no longer waits on saved directories on a mount that stopped
+  answering, and a config file on such a mount no longer stalls the app:
+  settings stay as they are, saving is refused, and it is read again when it
+  answers.
+- `cd` and history Run wait for a paste still on its way, so their Return cannot
+  run it.
+- Input methods and text replacements can no longer commit control characters,
+  and committed line breaks take the paste warning. Losing focus mid-composition
+  also cancels the composition in the input method.
+- An image that failed to decode for lack of memory or a helper that could not
+  start is tried again rather than lost until sent again, and an upload stuck on
+  the GPU no longer stops other panes' images.
+- Compressed Kitty images under 64 KiB of base64 no longer stall frames, and a
+  large image now takes far less memory while it decodes.
+- Through a `ProxyJump` or `ProxyCommand`, an SFTP password or host-key question
+  from a machine on the way named the final destination as asking. Its dialog
+  now says an intermediate step is asking, and that the fingerprint is not the
+  destination's.
+- After a remote-edit re-download failed, later saves to that file no longer
+  prompted. It now says so and asks about the conflict again; a save made while
+  a re-download runs is kept instead of the download.
+- The SFTP browser no longer reads local file details on the main thread: a
+  network volume that stopped answering froze the app before a transfer started.
+  That row now fails after five seconds with Retry.
+- Cancelling an SFTP transfer still in pre-flight or looking for a Keep Both
+  name stops what it was asking, and going to another folder cancels the listing
+  it replaces. A row can no longer stay on Cancelling for good.
+- An SFTP sign-in dialog now closes when its connection's `ssh` is gone or the
+  window it hangs on closes, rather than waiting on nobody.
+- Text an SFTP server chose — a STATUS message, a file name, a path, a banner —
+  reaches confirmations and error lines with control and concealing characters
+  replaced, and bounded in length.
+- Remote file names that differ only in case take turns as transfer
+  destinations, and connections to one machine under different users or keys
+  share those turns.
+- OSC 5522: a clipboard write that sanitising leaves empty now answers a fixed
+  `status=EIO`, so a client no longer waits forever for its status.
+- Kitty graphics: any delete command now aborts an unfinished chunked upload, as
+  the protocol requires, and releases what it held.
+
+### Security
+
+- State directories are created owner-only, state files are tightened as they
+  load, and copies left by a save that died are removed at launch.
+- Opening a file from output can no longer fall through to LaunchServices; the
+  unused path is gone.
+- OSC 7: a remote host outside the `RemoteHost` character rule is ignored, and a
+  path from any working-directory report is ignored if it holds a C0, DEL or C1
+  control or passes 1,024 bytes. Every label showing a reported host or path
+  replaces controls and format characters.
+- `corta-image-decoder` now ends itself after 15 seconds, so a decode stuck when
+  Corta is killed no longer leaves it running.
+- `corta-exec` is only ever run from `Contents/MacOS` inside the app bundle.
+- The update-feed workflow no longer runs any code from a release tag's tree in
+  the job that can reach the signing key, and refuses a tag not on `main`.
+- `corta-release-check` now fails an app whose `SU*` `Info.plist` values differ
+  from `Sparkle-Info.plist`.
 
 ## [1.5.1] - 2026-10-27
 

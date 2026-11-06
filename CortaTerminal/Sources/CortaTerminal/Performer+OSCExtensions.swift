@@ -59,9 +59,7 @@ extension Performer {
 
     /// Hostless reports cannot turn a remote path into a local spawn target.
     mutating func reportedDirectory(_ path: String) {
-        guard path.hasPrefix("/"), !path.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) else {
-            return
-        }
+        guard path.hasPrefix("/"), Self.isReportableDirectory(path) else { return }
         if let remote = state.remoteContext {
             state.remoteContext = RemoteContext(host: remote.host, directory: path,
                 provenance: remote.provenance, reportedAt: Date())
@@ -109,11 +107,7 @@ extension Performer {
     /// `:` only; this machine's own names clear the remote context.
     private mutating func reportedRemoteHost(_ value: String) {
         let host = String(value.split(separator: "@", omittingEmptySubsequences: false).last ?? "")
-        guard !host.isEmpty, host.utf8.count <= 255,
-            host.utf8.allSatisfy({ byte in
-                (48...57).contains(byte) || (65...90).contains(byte) || (97...122).contains(byte)
-                    || [45, 46, 58].contains(byte)
-            }) else { return }
+        guard Self.isReportableHost(host) else { return }
         if Self.isLocalHost(host, localNames: Self.localHostnames().union(state.hostnamesAtStart)) {
             state.remoteContext = nil
         } else {
@@ -150,6 +144,8 @@ extension Performer {
         state.outputBuffer += Array(report.utf8)
     }
 
+    private static let emptyClipboardWriteStatus = Array("\u{1B}]5522;type=write:status=EIO\u{1B}\\".utf8)
+
     /// OSC 5522 is a transaction: publish once at the terminator. This text
     /// subset deliberately keeps OSC 52's smaller cap rather than advertising
     /// the full protocol's 64 MiB minimum or MIME/paste-event support.
@@ -167,10 +163,15 @@ extension Performer {
                 guard base64.count % 4 == 0,
                     let bytes = Data(base64Encoded: Data(base64)) else { return }
                 let text = Self.sanitiseClipboardText(String(decoding: bytes, as: UTF8.self))
-                if !text.isEmpty {
-                    state.pendingClipboardCopy = text
-                    state.clipboardNeedsAcknowledgement = true
+                if text.isEmpty {
+                    // Nothing reached the pasteboard, and the client is waiting
+                    // to hear so. One constant, whatever the text was and
+                    // whether writes are allowed: nothing here reflects either.
+                    state.outputBuffer.append(contentsOf: Self.emptyClipboardWriteStatus)
+                    return
                 }
+                state.pendingClipboardCopy = text
+                state.clipboardNeedsAcknowledgement = true
                 return
             }
             guard metadata["mime"] == "dGV4dC9wbGFpbg==", parts.count == 2,

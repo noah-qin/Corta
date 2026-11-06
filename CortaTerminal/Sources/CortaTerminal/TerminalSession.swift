@@ -64,11 +64,18 @@ public final class TerminalSession: @unchecked Sendable {
     static let batchByteCap = 1024 * 1024
     public let pty: PTY
 
+    /// Never reused, as an address is: what a caller keeps to ask later whether
+    /// this is still the session it meant.
+    public let id = UUID()
+
     struct State {
         var terminal: Terminal
         /// The `?2026` episode the recovery timeout was armed for, so a stale
         /// timer cannot end a later one.
         var synchronizedOutputEpisode = 0
+        /// A resize has copied the grid and is rebuilding it outside the lock:
+        /// the reader and the compressor leave it alone until the commit.
+        var isResizing = false
     }
 
     struct Callbacks {
@@ -97,6 +104,8 @@ public final class TerminalSession: @unchecked Sendable {
         var writerSink: (@Sendable ([UInt8]) throws -> Void)?
         /// Runs first in each queued resize, on the resize queue.
         var resizeWorkGate: (@Sendable () -> Void)?
+        /// Runs between a resize's unlocked rebuild and its commit.
+        var resizeCommitGate: (@Sendable () -> Void)?
         /// How long `?2026` may gate presents — the one-second cap terminals
         /// commonly use; the core reads no configuration.
         var synchronizedOutputTimeout: Duration = .seconds(1)
@@ -117,12 +126,13 @@ public final class TerminalSession: @unchecked Sendable {
     /// `Seams.hangupGracePeriod`.
     let hangupGracePeriod: Duration
     /// Serial: resizes apply in request order.
-    private let resizeQueue = DispatchQueue(label: "dev.corta.terminal-session.resize")
+    let resizeQueue = DispatchQueue(label: "dev.corta.terminal-session.resize")
 
     /// The newest requested size; older queued resizes are skipped.
-    private let requestedResize = Mutex<(serial: UInt64, size: TerminalSize)?>(nil)
+    let requestedResize = Mutex<(serial: UInt64, size: TerminalSize)?>(nil)
 
-    private let resizeWorkGate: (@Sendable () -> Void)?
+    let resizeWorkGate: (@Sendable () -> Void)?
+    let resizeCommitGate: (@Sendable () -> Void)?
     let syncTimeoutQueue = DispatchQueue(label: "dev.corta.terminal-session.sync-timeout")
 
     /// A FIFO with a head index: popping one chunk at a time keeps `bytes` an
@@ -278,6 +288,7 @@ public final class TerminalSession: @unchecked Sendable {
         readerSource = seams.readerSource
         writerSink = seams.writerSink
         resizeWorkGate = seams.resizeWorkGate
+        resizeCommitGate = seams.resizeCommitGate
         synchronizedOutputTimeout = seams.synchronizedOutputTimeout
         scheduleTimeout = seams.scheduleSynchronizedOutputTimeout
         hangupGracePeriod = seams.hangupGracePeriod
@@ -399,14 +410,28 @@ extension TerminalSession {
         compressionQueue.async { [weak self] in
             guard let self else { return }
             while !self.stopped.withLock({ $0 }) {
-                guard let work = self.state.withLock({ $0.terminal.nextCompressionWork() }) else { break }
+                guard let work = self.state.withLock({ $0.isResizing ? nil : $0.terminal.nextCompressionWork() })
+                else { break }
                 let result = work.compress()
-                self.state.withLock { $0.terminal.installCompression(result) }
+                // Held past a resize's commit: installed during one, it would
+                // send the rebuilt grid back to be redone under the lock. A
+                // result for a scrollback the commit replaced is refused.
+                while !self.stopped.withLock({ $0 }) {
+                    let installed = self.state.withLock { current -> Bool in
+                        guard !current.isResizing else { return false }
+                        current.terminal.installCompression(result)
+                        return true
+                    }
+                    if installed { break }
+                    Thread.sleep(forTimeInterval: 0.0005)
+                }
                 self.yieldToStateWaiters()
             }
             self.compressionScheduled.withLock { $0 = false }
             // Close the final feed / drain race without keeping an idle timer.
-            if !self.stopped.withLock({ $0 }), self.state.withLock({ $0.terminal.hasCompressionWork }) {
+            // A resize in progress reschedules this itself once it commits.
+            if !self.stopped.withLock({ $0 }),
+                self.state.withLock({ !$0.isResizing && $0.terminal.hasCompressionWork }) {
                 self.scheduleCompression()
             }
         }
@@ -513,39 +538,8 @@ extension TerminalSession {
         }
     }
 
-    /// The child must never see (`TIOCGWINSZ`/`SIGWINCH`) a size the grid has
-    /// not adopted, or its redraw is parsed into old-size cells — lasting, on the
-    /// alternate screen, which is never reflowed. So on `resizeQueue`, in order:
-    /// the reflow commits under the reader's lock, then `TIOCSWINSZ` signals.
-    ///
-    /// That delays `SIGWINCH` by one reflow (~108 ms at 100k lines), so queued
-    /// requests coalesce to the latest; the work stays off the caller's thread.
-    /// Bytes written before the signal may land at the new width — bounded by
-    /// one batch, and repainted by the child. `onOutput` then wakes a redraw.
-    public func resize(to size: TerminalSize) {
-        let serial = requestedResize.withLock { requested -> UInt64 in
-            let next = (requested?.serial ?? 0) + 1
-            requested = (serial: next, size: size)
-            return next
-        }
-        resizeQueue.async { [self] in
-            resizeWorkGate?()
-            guard requestedResize.withLock({ $0?.serial == serial }) else { return }
-            // Registered: `SIGWINCH` waits on this commit.
-            registerStateWaiter {
-                state.withLock { current in
-                    current.terminal.resize(rows: Int(size.rows), columns: Int(size.columns))
-                    // Set after, and even with rows and columns unchanged:
-                    // a font change alters only the pixels.
-                    current.terminal.grid.cellPixelHeight = size.cellPixelHeight
-                    current.terminal.grid.cellPixelWidth = size.cellPixelWidth
-                }
-            }
-            scheduleCompression()
-            try? pty.resize(to: size)
-            callbacks.withLock { $0.onOutput }?()
-        }
-    }
+    /// `stop()` has been called; it may still be readable, but takes no input.
+    public var isStopped: Bool { stopped.withLock { $0 } }
 
     /// Idempotent. Pending input is discarded; a drain parked in `write(2)`
     /// fails with `EIO` once the child dies, then sees `stopped`.

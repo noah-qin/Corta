@@ -40,13 +40,29 @@ extension TerminalView: NSTextInputClient {
     /// Committed text, the only IME output that reaches the child, via
     /// `onKeyBytes`. Plain typing commits through here too, not through
     /// `deliverBytes`, so the `keyDown` signpost is emitted here as well.
+    ///
+    /// An input method or a text replacement is local and of the user's
+    /// choosing, but what it commits should reach a line editor no more freely
+    /// than a paste: controls come off, and committed lines go through the
+    /// paste funnel's warning. One typed key costs a walk over its bytes.
     func insertText(_ string: Any, replacementRange: NSRange) {
         clearMarkedText()
         let text = (string as? NSAttributedString)?.string ?? (string as? String) ?? ""
         guard !text.isEmpty else { return }
+        var bytes = Array(text.utf8)
+        if !Paste.isPlainInput(bytes) {
+            let cleaned = Paste.sanitized(text)
+            if Paste.containsNewline(cleaned) {
+                noteUserInput()
+                onServicesInsert?(cleaned)
+                return
+            }
+            bytes = Array(cleaned.utf8)
+            guard !bytes.isEmpty else { return }
+        }
         noteUserInput()
         if let event = NSApp.currentEvent { noteKeystrokeForMetrics(at: event.timestamp) }
-        InputLatencySignposts.measure(.keyDown) { onKeyBytes?(Array(text.utf8)) }
+        InputLatencySignposts.measure(.keyDown) { onKeyBytes?(bytes) }
     }
 
     /// Repositions and redraws the overlay; an empty string cancels.
@@ -79,10 +95,21 @@ extension TerminalView: NSTextInputClient {
     /// Losing focus mid-composition discards the preedit — never commits
     /// half-composed input to the PTY.
     override func resignFirstResponder() -> Bool {
-        clearMarkedText()
+        discardComposition()
         let accepted = super.resignFirstResponder()
         onInputContextChange?()
         return accepted
+    }
+
+    /// Tells the input method too, not only the overlay: left alone, it keeps
+    /// its session and may commit the old preedit on the next focus, into
+    /// whatever then has it. `discardMarkedText` cancels; it commits nothing,
+    /// and an input method that commits regardless still comes through
+    /// `insertText` under the usual guards.
+    func discardComposition() {
+        guard hasMarkedText() else { return }
+        inputContext?.discardMarkedText()
+        clearMarkedText()
     }
 
     private func clearMarkedText() {

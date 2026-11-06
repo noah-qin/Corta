@@ -29,24 +29,34 @@ import CryptoKit
 import Foundation
 let directory = URL(fileURLWithPath: CommandLine.arguments[1])
 let version = CommandLine.arguments[2], suffix = CommandLine.arguments[3]
+// How this fixture is broken, if it is; each is signed as the real key would
+// sign it, so that only the one thing is wrong.
+let defect = CommandLine.arguments.count > 4 ? CommandLine.arguments[4] : "none"
 let bytes = Data("signed fixture bytes; not a production disk image".utf8)
 let key = Curve25519.Signing.PrivateKey()
 let name = "Corta-\(version).\(suffix)"
-try bytes.write(to: directory.appendingPathComponent(name))
+var archive = bytes
+if defect == "tampered-archive" { archive[0] ^= 1 }
+if defect == "truncated-archive" { archive.removeLast() }
+try archive.write(to: directory.appendingPathComponent(name))
 let signature = try key.signature(for: bytes).base64EncodedString()
 let xml = """
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel><item>
 <sparkle:version>11</sparkle:version><sparkle:shortVersionString>\(version)</sparkle:shortVersionString>
 <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-<enclosure url="https://github.com/noah-qin/Corta/releases/download/v\(version)/\(name)" length="\(bytes.count)" type="application/octet-stream" sparkle:edSignature="\(signature)"/>
+<enclosure url="https://github.com/noah-qin/Corta/releases/download/v\(version)/\(name)" length="\(defect == "wrong-length" ? bytes.count + 1 : bytes.count)" type="application/octet-stream" sparkle:edSignature="\(signature)"/>
 </item></channel></rss>
 
 """
 let content = Data(xml.utf8)
 let signed = xml + "<!-- sparkle-signatures:\nedSignature: \(try key.signature(for: content).base64EncodedString())\nlength: \(content.count)\n-->\n"
-try Data(signed.utf8).write(to: directory.appendingPathComponent("appcast.xml"))
-let plist: [String: Any] = ["SUPublicEDKey": key.publicKey.rawRepresentation.base64EncodedString(),
+var feed = signed
+if defect == "tampered-feed" { feed = signed.replacingOccurrences(of: "arm64", with: "arm65") }
+if defect == "unsigned-feed" { feed = xml }
+try Data(feed.utf8).write(to: directory.appendingPathComponent("appcast.xml"))
+let appKey = defect == "wrong-key" ? Curve25519.Signing.PrivateKey().publicKey : key.publicKey
+let plist: [String: Any] = ["SUPublicEDKey": appKey.rawRepresentation.base64EncodedString(),
  "SURequireSignedFeed": true, "SUVerifyUpdateBeforeExtraction": true, "SUSignedFeedFailureExpirationInterval": 0]
 try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
  .write(to: directory.appendingPathComponent("key.plist"))
@@ -68,9 +78,9 @@ class AppcastFormatTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.temporary.cleanup()
 
-    def verify(self, version, suffix):
+    def verify(self, version, suffix, defect="none"):
         with tempfile.TemporaryDirectory() as directory:
-            subprocess.run([str(self.generator), directory, version, suffix], check=True, capture_output=True)
+            subprocess.run([str(self.generator), directory, version, suffix, defect], check=True, capture_output=True)
             return subprocess.run(["swift", str(ROOT / "scripts/verify-appcast.swift"),
                                    str(Path(directory) / "appcast.xml"), str(Path(directory) / "key.plist"),
                                    "--archive", str(Path(directory) / f"Corta-{version}.{suffix}"),
@@ -90,3 +100,28 @@ class AppcastFormatTests(unittest.TestCase):
             result = self.verify(version, suffix)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("enclosure url", result.stdout)
+
+    def assert_rejected(self, defect, *reasons):
+        result = self.verify("1.2.0", "dmg", defect)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        for reason in reasons:
+            self.assertIn(reason, result.stdout)
+        return result
+
+    def test_a_feed_changed_after_signing_is_rejected(self):
+        self.assert_rejected("tampered-feed", "sparkle-signatures block does not verify")
+
+    def test_a_feed_stripped_of_its_signature_is_rejected(self):
+        self.assert_rejected("unsigned-feed", "carries no sparkle-signatures block")
+
+    def test_a_feed_and_archive_signed_with_another_key_are_rejected(self):
+        self.assert_rejected("wrong-key", "sparkle-signatures block does not verify", "does NOT verify")
+
+    def test_a_length_that_is_not_the_archives_is_rejected(self):
+        self.assert_rejected("wrong-length", "feed says")
+
+    def test_an_archive_shorter_than_the_feed_says_is_rejected(self):
+        self.assert_rejected("truncated-archive", "feed says")
+
+    def test_an_archive_with_changed_bytes_is_rejected(self):
+        self.assert_rejected("tampered-archive", "does NOT verify")

@@ -50,6 +50,40 @@ private struct ReceivingPane {
 }
 
 extension FileDropTests {
+    /// Clean Now is in another window: it must not take the files out from
+    /// under a warning still asking whether to name them.
+    @Test("a dropped copy stays pinned while its warning is open, and is released once sent")
+    func copyPinnedThroughTheWarning() throws {
+        let root = scratchRoot()
+        defer { FileDropStorage.remove(root) }
+        let directory = try FileDropStorage.makeDirectory(in: root)
+        let file = directory.appendingPathComponent("name\nwith a line")
+        try Data().write(to: file)
+        let host = CommandsTestHost()
+        host.terminalView = TerminalView(frame: .zero)
+        let session = try TerminalSession(executable: "/bin/cat", arguments: [],
+            environment: ChildEnvironment.default(), size: TerminalSize(rows: 10, columns: 60),
+            workingDirectory: "/")
+        defer { session.stop() }
+        session.start()
+        host.session = session
+        var survived = false
+        // Named with a concealed scalar, so it warns under any `?2004`.
+        let named = directory.appendingPathComponent("a\u{202E}b")
+        try Data().write(to: named)
+        host.commands.pasteWarningAnswer = { _ in
+            FileDropStorage.removeUnpinned(in: [root])
+            survived = FileManager.default.fileExists(atPath: named.path)
+            return true
+        }
+        host.commands.completeFileDrop(.init(urls: [named], directory: directory,
+            failed: false, timedOut: false), context: try #require(host.commands.dropInputContext))
+        #expect(survived)
+        // Sent: an ordinary finished copy now, for Clean Now to take.
+        FileDropStorage.removeUnpinned(in: [root])
+        #expect(!FileManager.default.fileExists(atPath: named.path))
+    }
+
     @Test("a new drop replaces one still arriving, and says so")
     func newDropReplacesEarlier() async throws {
         let root = scratchRoot()

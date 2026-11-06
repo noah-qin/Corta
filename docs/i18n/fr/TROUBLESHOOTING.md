@@ -8,6 +8,7 @@
 > [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/TROUBLESHOOTING.md).
 > Si la version anglaise a changé depuis, ou si les deux diffèrent, la version anglaise fait foi.
 > Les messages de macOS sont accompagnés de leur texte anglais d’origine.
+> Les modifications concernant le collage, les liens et le travail distant suivent ce commit anglais : [`6e5f7d5`](https://github.com/noah-qin/Corta/blob/6e5f7d5/docs/TROUBLESHOOTING.md).
 
 Que faire quand Corta ne s’installe pas, ne démarre pas, ou fait quelque chose que votre terminal précédent ne faisait
 pas. Chaque entrée dit ce que vous verrez, pourquoi, et la solution — et la dernière section explique comment revenir
@@ -133,6 +134,12 @@ autre encodage — ou vous ne pouvez pas le lire. Corta conserve les réglages q
 l’écrire en remplacerait tout le contenu. Réenregistrez le fichier en UTF-8 (ou supprimez la ligne fautive) ; Corta le
 prend en compte dès qu’il le relit. L’intégration du shell fait de même pour un fichier rc qu’elle ne peut pas lire : elle
 le signale et n’y touche pas.
+
+<a id="settings-says-the-configuration-file-did-not-answer-in-time"></a>
+
+### Le fichier de configuration ne répond pas à temps
+
+Le fichier ou le dossier vers lequel il pointe se trouve sur un disque qui ne répond plus, souvent un volume réseau. Corta attend au plus une seconde, conserve les réglages et refuse d’enregistrer plutôt que d’écraser un fichier illisible. Il réessaie toutes les quelques secondes et signale les modifications de menu non enregistrées. Le retour du disque résout le problème automatiquement.
 
 ---
 
@@ -329,6 +336,21 @@ Une comparaison de contenu peut repérer des changements distants même quand la
 La connexion s’est bloquée. Une fois connecté, chaque opération d’édition à distance dispose de 120 secondes ; ensuite
 Corta ferme la connexion et propose à nouveau l’envoi. Approuvez-le pour réessayer sur une nouvelle connexion. Un très gros
 fichier sur un lien lent peut aussi atteindre la limite : copiez-le plutôt avec le navigateur SFTP.
+
+<a id="clicking-a-link-did-nothing"></a>
+<a id="a-paste-says-not-pasted--thats-more-than-64-mib"></a>
+
+### Un lien ne s’ouvre pas ou le collage est trop volumineux
+
+Si la sortie a changé la cible de l’infobulle, le clic ne fait que l’actualiser. Vérifiez puis cliquez de nouveau. Un message indiquant plus de 64 MiB signifie que rien n’a été envoyé. Collez par morceaux ou enregistrez le texte dans un fichier que le programme pourra lire. Cette limite est fixe.
+
+<a id="an-ssh-pane-stopped-responding-and-reconnect-is-greyed-out"></a>
+<a id="browse-remote-files-stays-on-connecting-then-says-it-could-not-reach-the-host"></a>
+<a id="a-transfer-failed-saying-the-disk-did-not-answer"></a>
+
+### Une connexion distante bloque ou le disque du transfert ne répond pas
+
+Tant que `ssh` tourne, la reconnexion ordinaire est désactivée. S’il lit encore les touches, `~.` peut le terminer. Sinon, choisissez **Forcer l’arrêt et se reconnecter à l’hôte…** et confirmez : la connexion est terminée, la même commande relancée et la sortie effacée ; les tâches distantes peuvent s’arrêter. SFTP attend 30 secondes par étape de connexion, hors dialogue d’authentification. Vous pouvez réessayer ensuite ou annuler plus tôt. Vérifiez le réseau ou le VPN et lancez `ssh -v` avec le même utilisateur et le même port. Une vérification de fichier local attend au plus cinq secondes avant le transfert. Rétablissez le disque ou le partage réseau, puis réessayez la ligne.
 
 ---
 

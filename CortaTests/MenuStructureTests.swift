@@ -46,7 +46,7 @@ struct MenuStructureTests {
                 .openParentDirectoryInNewPane, .openProjectRootInNewPane, .browseRemoteFiles]),
             ("menu.paneLayout", [.zoomPane, .growPaneHorizontally, .shrinkPaneHorizontally,
                 .growPaneVertically, .shrinkPaneVertically, .equalizePanes, .splitBestFit]),
-            ("menu.terminalState", [.clearHistory, .resetTerminal, .reconnectRemote]),
+            ("menu.terminalState", [.clearHistory, .resetTerminal, .reconnectRemote, .killAndReconnectRemote]),
         ]
         for (key, commands) in groups {
             let submenu = try #require(shell.items.first { $0.title == L10n.text(key) }?.submenu)

@@ -134,6 +134,14 @@ the config file overrides this per pane.
 Settings ▸ General. A restore that crashed the app is not retried: the
 saved arrangement is dropped and one fresh window opens.
 
+### Settings says the configuration file did not answer in time
+
+The file, or the folder it is linked into, is on a disk that has stopped
+responding, often a network mount. Corta waits at most a second, keeps the
+settings it already has, refuses to save rather than write over a file it could
+not read, and tries again every few seconds; a menu change says it could not be
+saved. Once the disk answers, this clears by itself.
+
 ### Settings says it can't read the config file
 
 `~/.config/corta/config` exists but is not UTF-8 text — usually a byte
@@ -293,6 +301,18 @@ hooks get the bundled version when a new shell starts.
 
 ## Behaviour that differs from other terminals
 
+### Clicking a link did nothing
+
+Output changed the text under the pointer after the tooltip appeared. A click
+opens only what the tooltip names, so the tooltip was brought up to date
+instead. Read it and click again.
+
+### A paste says "Not pasted — that's more than 64 MiB"
+
+The limit is fixed, and nothing was sent. Write the text to a file and have the
+program read that, or paste it in parts. A paste this size through a terminal
+takes seconds even when it is allowed.
+
 ### Copying happens as soon as I finish selecting
 
 `copy-on-select` is on by default and confirms with a label in the pane's
@@ -322,6 +342,32 @@ Terminal into the remote machine's `~/.zshrc` too; it emits the `OSC 7`
 the badge reads. A `tmux` or `screen` in the foreground reads *Remote?*
 because the session it is attached to may itself be on another machine
 and nothing here can tell — it is uncertainty, not an accusation.
+
+### An `ssh` pane stopped responding and Reconnect is greyed out
+
+`ssh` is still running, waiting on a network that went away, so it has not
+ended and there is nothing yet to reconnect. Its own `~.` escape ends it if it
+is still reading keys. Otherwise **Shell ▸ Terminal and Connection ▸ Kill and
+Reconnect to Host…** ends it and runs the same command again, once you confirm.
+Corta asks because a hung connection and an idle one look the same from here:
+what the old connection was running on the other machine may stop, and the
+output above is cleared.
+
+### Browse Remote Files… stays on Connecting, then says it could not reach the host
+
+A connection gets 30 seconds for each step of connecting to answer: ssh's own
+connection and sign-in, then the first directory. Past that the window says it
+could not reach the host and offers Retry; **Cancel** stops it sooner. The time
+a sign-in dialog is on screen does not count, so a slow password is not the
+cause. A host that takes longer than that needs a look at the network or VPN:
+`ssh -v` with the same user and port in a terminal shows where it stops.
+
+### A transfer failed saying the disk did not answer
+
+Before a transfer starts, Corta reads the local file's details on a thread of
+its own and waits five seconds. This means the file is on a volume that did not
+answer in that time, usually a network share whose server has gone. The window
+stays usable. Reconnect the volume, then use the row's Retry button.
 
 ### Browse Remote Files… says authentication failed, but `ssh` works in the pane
 

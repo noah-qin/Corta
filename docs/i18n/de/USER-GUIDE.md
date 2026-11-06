@@ -8,6 +8,7 @@
 > [`68169b9`](https://github.com/noah-qin/Corta/blob/68169b98164d5780f2959377a810eaf1be55e524/docs/USER-GUIDE.md).
 > Wurde die englische Fassung seitdem geändert oder weichen die beiden ab, gilt die englische.
 > Namen in der Oberfläche folgen Cortas deutscher Oberfläche; Konfigurationsschlüssel, Befehle und Code bleiben im Original.
+> Die Änderungen zu Einfügen, Links und Fernzugriff wurden mit diesem englischen Commit abgeglichen: [`6e5f7d5`](https://github.com/noah-qin/Corta/blob/6e5f7d5/docs/USER-GUIDE.md).
 
 Alles, was Corta kann, und wie du es erreichst. Jeder Abschnitt sagt, wo die Funktion zu finden ist – ein Menü, ein
 Kurzbefehl, eine Einstellung – und verweist auf die Referenz mit den Details. Die Kurzbefehle sind die Standardwerte,
@@ -346,6 +347,8 @@ oder, bei einer Verbindung, **Neu verbinden**; der Fehlertext des Systems steht 
   mit `off` gar nicht. Das sind vorsichtige Muster, kein Shell-Parser und keine Garantie, dass anderer Text sicher ist.
   Eine große Einfügung, die die Shell noch abarbeitet, lässt sich mit ⌃C abbrechen: Der noch nicht gesendete Teil wird
   verworfen, und der Interrupt geht direkt durch.
+
+  Einfügevorgänge über 64 KiB werden im Hintergrund geprüft; das Fenster bleibt bedienbar. Erneutes Einfügen ersetzt den noch geprüften Text. Über 64 MiB wird nichts gesendet und Corta meldet dies. Ein Programm kann Bracketed Paste einschalten, ohne es tatsächlich zu verstehen. Für eine Warnung bei jedem mehrzeiligen Einfügen in entfernte oder ältere Programme verwende `paste-warning = always`.
 - **Dateien ablegen.** Lege Dateien oder von anderen Apps bereitgestellte Dateien auf einem Bereich ab, um ihre Pfade in Anführungszeichen über den Einfügekanal einzutragen, ohne Return. Beim Überfahren beginnt kein Download. Der Empfang läuft asynchron und wartet höchstens 120 Sekunden; Fehler erscheinen im Bereich. Ändert sich währenddessen die Sitzung oder die Vordergrund-Prozessgruppe, verwirft Corta das Ablegen.
 
   **Eine Datei aus dem Finder wird dort verwendet, wo sie liegt, und Corta entfernt sie nie. Eine Datei, die nur eine andere App liefern kann, etwa aus Fotos oder ein Mail-Anhang, kommt als temporäre Kopie an:** Sichere sie an anderer Stelle, wenn du sie behalten willst. Die Kopie verschwindet, wenn ihr Bereich geschlossen wird, auch mit seinem Tab oder Fenster, oder wenn Corta endet. Ein danach noch laufendes Programm kann sie nicht mehr lesen, und ein anderswohin kopierter Pfad gilt nicht mehr. Das gilt auch für alte Pfade im Verlauf und in der Shell-Historie, und ⇧⌘T bringt einen Bereich ohne seine Kopien zurück. Beim Verschieben des Bereichs in einen anderen Tab oder ein anderes Fenster bleiben sie erhalten. Hält ein anderes Programm eine Datei offen oder gibt es einen System-Snapshot, wird der Platz eventuell erst später frei. **Einstellungen ▸ Datenschutz & Sicherheit ▸ Lokale Daten** zeigt den Platz und bietet **Jetzt entfernen …**.
@@ -389,6 +392,8 @@ oder, bei einer Verbindung, **Neu verbinden**; der Fehlertext des Systems steht 
 
 Das Öffnen eines Dateiverweises setzt ein konfiguriertes `open-file-command` voraus. Corta öffnet aus der Ausgabe
 abgeleitete Dateien nie in ihrer Standard-App des Systems: Manche Dateitypen führen beim Öffnen Code aus.
+
+Ein Klick öffnet nur das im Tooltip genannte Ziel. Hat neue Ausgabe den Text unter dem Zeiger verändert, aktualisiert der Klick nur den Tooltip. Prüfe ihn und klicke erneut. Dateiverweise wie `path:line:column` erfordern bei beiden Einstellungen von `link-activation` weiterhin ⌘-Klick.
 
 <a id="shell-integration"></a>
 
@@ -592,6 +597,12 @@ verbindet die nächste Bearbeitung oder der nächste Upload neu, und ein fehlges
 Entscheidung. Ist die Verbindung aufgebaut, wird ein Vorgang, der nach 120 Sekunden nicht fertig ist,
 abgebrochen und der Upload erneut angeboten – eine hängende Verbindung hält eine Bearbeitung nicht ewig fest. Bewahre unentschiedene lokale Änderungen auf, bevor du App-Daten löschst. Siehe die
 [Richtlinie zu gespeicherten Daten](../../SECURITY.md#5-data-at-rest) (Englisch).
+
+**Eine hängende Verbindung.** Nach einem Netzausfall kann `ssh` weiterlaufen; normales Wiederverbinden ist dann nicht verfügbar. **Beenden und erneut mit Host verbinden…** im Menü und in der Befehlspalette fragt nach Bestätigung, beendet die alte Verbindung und startet denselben Befehl erneut. Entfernte Aufgaben können dabei enden, und die Ausgabe im Bereich wird gelöscht.
+
+Bei `ProxyJump` oder `ProxyCommand` kann ein Zwischenhost fragen. Der Dialogtitel weist darauf hin, und der Hinweis zum Hostschlüssel sagt, dass der Fingerabdruck nicht zum Ziel gehört. Prüfe den Fragesteller, bevor du das Passwort des Ziels eingibst. Jeder Verbindungsschritt hat 30 Sekunden Zeit; die Anzeige eines Anmeldedialogs zählt nicht mit. Danach ist ein neuer Versuch möglich.
+
+Eine Übertragung lässt sich auch während der Zielprüfung abbrechen. Beim Abbruch einer fortgesetzten Übertragung bleibt die Teildatei erhalten; die Schaltfläche zum Wiederholen setzt dort fort. Antwortet die lokale Festplatte bei der Prüfung nicht binnen fünf Sekunden, schlägt diese Zeile mit Wiederholungsmöglichkeit fehl; das Fenster bleibt bedienbar. Ein fehlgeschlagener erneuter Download meldet den Fehler und bietet die Konfliktentscheidung wieder an, ohne die lokale Kopie zu ändern. Während des Downloads gespeicherte Änderungen bleiben erhalten und benötigen eine neue Freigabe.
 
 <a id="images-in-the-terminal"></a>
 

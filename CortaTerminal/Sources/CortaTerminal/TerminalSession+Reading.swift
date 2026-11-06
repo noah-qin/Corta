@@ -100,28 +100,11 @@ extension TerminalSession {
             let slice = batch[offset..<end]
             let finished = decoded
             decoded = nil
-            let applied = state.withLock { current -> SliceOutcome in
-                let episodeBefore = current.terminal.synchronizedOutputEpisode
-                if let finished { current.terminal.completeDeferredImage(finished) }
-                let consumed = current.terminal.feedDeferringImageDecode(slice)
-                let deferred = current.terminal.takeDeferredImage()
-                reportImageBytes(current.terminal)
-                let sliceResponses = current.terminal.takeOutput()
-                // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
-                // A repeated BSU does not extend it, or a child that never sends
-                // ESU could stall presentation forever.
-                let episodeAfter = current.terminal.synchronizedOutputEpisode
-                // An integer compare: a pass is queued only once a batch seals.
-                let compress = current.terminal.hasCompressionWork
-                guard episodeAfter != episodeBefore else {
-                    return SliceOutcome(
-                        responses: sliceResponses, episode: nil, compress: compress, consumed: consumed,
-                        deferred: deferred)
-                }
-                current.synchronizedOutputEpisode = episodeAfter
-                return SliceOutcome(
-                    responses: sliceResponses, episode: episodeAfter, compress: compress, consumed: consumed,
-                    deferred: deferred)
+            let outcome = applySlice(slice, completing: finished)
+            guard var applied = outcome else {
+                decoded = finished
+                guard waitOutResize() else { return }
+                continue
             }
             if responses.count + applied.responses.count <= Self.maxResponseBytesPerBatch {
                 responses.append(contentsOf: applied.responses)
@@ -133,7 +116,10 @@ extension TerminalSession {
             // one `read(2)` away, sooner than a waiter's wake, so a flood
             // of one-slice batches would never leave a gap.
             yieldToStateWaiters()
-            decoded = applied.deferred?.decode()
+            // Out of the outcome, so the decode can free the text as it goes.
+            var deferred = applied.deferred
+            applied.deferred = nil
+            decoded = deferred?.decode()
         }
         // Fixed-format only (`SECURITY.md` §2.1); same queue as input.
         if !responses.isEmpty {
@@ -143,6 +129,49 @@ extension TerminalSession {
             scheduleSynchronizedOutputTimeout(episode: episode)
         }
         callbacks.withLock { $0.onOutput }?()
+    }
+
+    /// One slice under the lock, or nil with a resize under way.
+    private func applySlice(
+        _ slice: ArraySlice<UInt8>, completing finished: DecodedImageTransmission?
+    ) -> SliceOutcome? {
+        state.withLock { current -> SliceOutcome? in
+            // In the lock, so a resize's copy cannot miss a slice that had
+            // already passed this check.
+            guard !current.isResizing else { return nil }
+            let episodeBefore = current.terminal.synchronizedOutputEpisode
+            if let finished { current.terminal.completeDeferredImage(finished) }
+            let consumed = current.terminal.feedDeferringImageDecode(slice)
+            let deferred = current.terminal.takeDeferredImage()
+            reportImageBytes(current.terminal)
+            let sliceResponses = current.terminal.takeOutput()
+            // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
+            // A repeated BSU does not extend it, or a child that never sends
+            // ESU could stall presentation forever.
+            let episodeAfter = current.terminal.synchronizedOutputEpisode
+            // An integer compare: a pass is queued only once a batch seals.
+            let compress = current.terminal.hasCompressionWork
+            guard episodeAfter != episodeBefore else {
+                return SliceOutcome(
+                    responses: sliceResponses, episode: nil, compress: compress, consumed: consumed,
+                    deferred: deferred)
+            }
+            current.synchronizedOutputEpisode = episodeAfter
+            return SliceOutcome(
+                responses: sliceResponses, episode: episodeAfter, compress: compress, consumed: consumed,
+                deferred: deferred)
+        }
+    }
+
+    /// Parks the reader until a resize has committed; false if the session
+    /// stopped first. Polled: it is short, this runs only while one is under
+    /// way, and a wait nothing can wake is the one thing `stop()` must not meet.
+    private func waitOutResize() -> Bool {
+        while state.withLock({ $0.isResizing }) {
+            if stopped.withLock({ $0 }) { return false }
+            Thread.sleep(forTimeInterval: 0.0005)
+        }
+        return true
     }
 
     /// After the last read: ends a `?2026` episode the dead child never

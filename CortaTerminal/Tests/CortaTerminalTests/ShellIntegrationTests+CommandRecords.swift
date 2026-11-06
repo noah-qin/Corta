@@ -77,6 +77,51 @@ extension ShellIntegrationTests {
         #expect(store.records.last?.id == CommandRecordStore.defaultCapacity + 9)
     }
 
+    /// An OSC 133 prompt is 18 bytes of output, and each one past the capacity
+    /// used to move the whole array. Compared with itself at a small capacity,
+    /// so a loaded machine slows both sides.
+    @Test("evicting is amortized: a large capacity costs what a small one does")
+    func evictionDoesNotScaleWithCapacity() {
+        func cost(capacity: Int) -> Duration {
+            var best = Duration.seconds(3600)
+            for _ in 0..<3 {
+                var store = CommandRecordStore(capacity: capacity)
+                let date = Date()
+                for row in 0..<capacity { store.begin(promptRow: row, workingDirectory: nil, at: date) }
+                let elapsed = SuspendingClock().measure {
+                    for row in 0..<20000 { store.begin(promptRow: row, workingDirectory: nil, at: date) }
+                }
+                best = min(best, elapsed)
+            }
+            return best
+        }
+        // A moved array would be 100× here.
+        #expect(cost(capacity: 10000) < cost(capacity: 100) * 20)
+    }
+
+    @Test("evicting keeps every view of the store exact")
+    func evictionKeepsTheStoreExact() {
+        var store = CommandRecordStore(capacity: 40)
+        for row in 0..<1000 {
+            store.begin(promptRow: row, workingDirectory: nil, at: Date(timeIntervalSince1970: 0))
+            let kept = Array(max(0, row - 39)...row)
+            #expect(store.records.map(\.promptRow) == kept)
+            #expect(store.last?.promptRow == row)
+            #expect(store.record(before: row)?.promptRow == row)
+            #expect(store.records(inDirectory: nil).map(\.promptRow) == kept.reversed())
+        }
+        // Equal by what they hold, not by where eviction has got to.
+        var same = CommandRecordStore(capacity: 40)
+        for row in 0..<1000 { same.begin(promptRow: row, workingDirectory: nil, at: Date(timeIntervalSince1970: 0)) }
+        #expect(same == store)
+        var empty = CommandRecordStore(capacity: 0)
+        empty.begin(promptRow: 1, workingDirectory: nil, at: Date())
+        #expect(empty.records.isEmpty)
+        #expect(empty.last == nil)
+        empty.finish(exitStatus: 0, endRow: 1, at: Date())
+        #expect(empty.lastCompleted == nil)
+    }
+
     @Test("a store's capacity is configurable per instance")
     func recordStoreCapacityIsConfigurable() {
         var store = CommandRecordStore(capacity: 3)

@@ -14,11 +14,50 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Darwin
 import Foundation
 import Testing
 @testable import CortaSFTP
 
 extension SFTPSessionTests {
+    /// A server that stops answering must not let every request anyone makes
+    /// meanwhile pile up as a suspended task.
+    @Test("past the waiter cap a request fails at once and the session goes on")
+    func windowWaiterCap() async throws {
+        let connection = SFTPLoopbackConnection()
+        let server = FakeSFTPServer(connection: connection, fileSystem: FakeRemoteFileSystem())
+        server.interceptor = { message in
+            if case .read = message.payload { return .ignore }
+            return .proceed
+        }
+        server.start()
+        var configuration = SFTPSession.Configuration()
+        configuration.maxInFlightRequests = 1
+        configuration.maxWindowWaiters = 2
+        let session = SFTPSession(transport: connection.clientTransport(), configuration: configuration)
+        defer {
+            session.close()
+            connection.close()
+        }
+        _ = try await session.connect()
+        let handle = SFTPHandle(rawValue: [1])
+        var held: [Task<Void, any Error>] = []
+        for offset in 0..<3 {
+            held.append(Task { _ = try await session.read(handle: handle, offset: UInt64(offset), length: 1) })
+        }
+        let deadline = SuspendingClock.now + .seconds(testTimeoutInterval(10))
+        while session.windowWaiterCount < 2, SuspendingClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(session.windowWaiterCount == 2)
+        await #expect(throws: SFTPError.localIOFailed(operation: "wait for a free request slot", code: EAGAIN)) {
+            _ = try await session.read(handle: handle, offset: 9, length: 1)
+        }
+        #expect(session.windowWaiterCount == 2, "the ones already waiting keep their places")
+        session.close()
+        for task in held { _ = try? await task.value }
+    }
+
     @Test("cancelling an in-flight request resumes it cancelled and the session survives")
     func requestCancellation() async throws {
         let pair = try await makePair { server in

@@ -34,33 +34,67 @@ nonisolated extension KittyImageRenderer {
         }
     }
 
+    /// How a decode ended. The client was told OK long ago, so an image that
+    /// failed for a reason of the moment was simply gone until sent again.
+    enum DecodeOutcome {
+        case decoded(DecodedImage)
+        /// The bytes themselves: not an image, or past the caps. Never retried.
+        case refused
+        /// Nothing about the bytes: the mapping budget, a descriptor, the
+        /// helper not starting or running out of time. Retried with backoff.
+        case unavailable
+
+        var isUnavailable: Bool {
+            if case .unavailable = self { return true }
+            return false
+        }
+    }
+
+    /// Tries after the first failure; the delay doubles from `transientRetryDelay`.
+    static let maximumTransientRetries = 3
+    static let transientRetryDelay: TimeInterval = 0.5
+
     static func decode(_ data: KittyGraphics.ImageData, alignment: Int = 256) -> DecodedImage? {
+        guard case .decoded(let image) = decodeOutcome(data, alignment: alignment) else { return nil }
+        return image
+    }
+
+    static func decodeOutcome(_ data: KittyGraphics.ImageData, alignment: Int = 256) -> DecodeOutcome {
         switch data.format {
         case .rgb:
             return decodeRaw(data, bytesPerPixel: 3, alignment: alignment)
         case .rgba:
             return decodeRaw(data, bytesPerPixel: 4, alignment: alignment)
         case .png:
-            return decodePNG(data.bytes, alignment: alignment)
+            return decodePNGOutcome(data.bytes, alignment: alignment)
         case .gif:
-            guard data.bytes.starts(with: Array("GIF87a".utf8)) || data.bytes.starts(with: Array("GIF89a".utf8)),
-                let decoded = ImageDecoderProcess.decodePNG(data.bytes, alignment: alignment, allowGIF: true)
-            else { return nil }
-            return DecodedImage(width: decoded.width, height: decoded.height, pixels: decoded.pixels)
+            guard data.bytes.starts(with: Array("GIF87a".utf8)) || data.bytes.starts(with: Array("GIF89a".utf8))
+            else { return .refused }
+            return outcome(of: ImageDecoderProcess.decodeOutcome(data.bytes, alignment: alignment, allowGIF: true))
+        }
+    }
+
+    private static func outcome(of result: ImageDecoderProcess.Outcome) -> DecodeOutcome {
+        switch result {
+        case .decoded(let decoded):
+            .decoded(DecodedImage(width: decoded.width, height: decoded.height, pixels: decoded.pixels))
+        case .refused: .refused
+        case .unavailable: .unavailable
         }
     }
 
     private static func decodeRaw(
         _ data: KittyGraphics.ImageData, bytesPerPixel: Int,
         alignment: Int
-    ) -> DecodedImage? {
+    ) -> DecodeOutcome {
         let width = data.width
         let height = data.height
         guard KittyGraphics.dimensionsFit(width: width, height: height),
-            data.bytes.count == width * height * bytesPerPixel,
-            let pixels = ImageDecoderProcess.SharedPixels(
-                width: width, height: height, alignment: alignment, shared: false)
-        else { return nil }
+            data.bytes.count == width * height * bytesPerPixel
+        else { return .refused }
+        guard let pixels = ImageDecoderProcess.SharedPixels(
+            width: width, height: height, alignment: alignment, shared: false)
+        else { return .unavailable }
         let destination = pixels.address.assumingMemoryBound(to: UInt8.self)
         data.bytes.withUnsafeBufferPointer { source in
             for row in 0..<height {
@@ -76,7 +110,7 @@ nonisolated extension KittyImageRenderer {
                 }
             }
         }
-        return DecodedImage(width: width, height: height, pixels: pixels)
+        return .decoded(DecodedImage(width: width, height: height, pixels: pixels))
     }
 
     /// The eight bytes every PNG starts with (RFC 2083 §3.1).
@@ -89,8 +123,12 @@ nonisolated extension KittyImageRenderer {
     /// dimensions before it decodes. ImageIO itself runs only in that
     /// process, sandboxed (`ImageDecoderProcess`).
     static func decodePNG(_ bytes: [UInt8], alignment: Int = 256) -> DecodedImage? {
-        guard bytes.starts(with: pngSignature), let decoded = ImageDecoderProcess.decodePNG(bytes, alignment: alignment)
-        else { return nil }
-        return DecodedImage(width: decoded.width, height: decoded.height, pixels: decoded.pixels)
+        guard case .decoded(let image) = decodePNGOutcome(bytes, alignment: alignment) else { return nil }
+        return image
+    }
+
+    private static func decodePNGOutcome(_ bytes: [UInt8], alignment: Int) -> DecodeOutcome {
+        guard bytes.starts(with: pngSignature) else { return .refused }
+        return outcome(of: ImageDecoderProcess.decodeOutcome(bytes, alignment: alignment))
     }
 }

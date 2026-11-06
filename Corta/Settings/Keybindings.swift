@@ -224,6 +224,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case clearHistory = "clear-history"
     case resetTerminal = "reset-terminal"
     case reconnectRemote = "reconnect-remote"
+    case killAndReconnectRemote = "kill-and-reconnect-remote"
     case browseRemoteFiles = "browse-remote-files"
     case secureKeyboardEntry = "secure-keyboard-entry"
     case settings
@@ -296,6 +297,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .clearHistory: return L10n.text("command.clearHistory")
         case .resetTerminal: return L10n.text("command.resetTerminal")
         case .reconnectRemote: return L10n.text("command.reconnectRemote")
+        case .killAndReconnectRemote: return L10n.text("command.killAndReconnectRemote")
         case .browseRemoteFiles: return L10n.text("command.browseRemoteFiles")
         case .secureKeyboardEntry: return L10n.text("command.secureKeyboardEntry")
         case .settings: return L10n.text("command.settings")
@@ -303,6 +305,45 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         }
     }
 
+    /// The config-file key this command's binding is written under.
+    var configurationKey: String { "bind.\(rawValue)" }
+
+    /// The tab a "select tab" command shows, counted from 1; the last tab's
+    /// command is 9, as ⌘9 is in a browser.
+    var tabNumber: Int? {
+        switch self {
+        case .selectTab1: return 1
+        case .selectTab2: return 2
+        case .selectTab3: return 3
+        case .selectTab4: return 4
+        case .selectTab5: return 5
+        case .selectTab6: return 6
+        case .selectTab7: return 7
+        case .selectTab8: return 8
+        case .selectLastTab: return 9
+        default: return nil
+        }
+    }
+
+    /// The commands that select a tab by its place, in order.
+    static let tabSelection: [TerminalCommand] = [
+        .selectTab1, .selectTab2, .selectTab3, .selectTab4, .selectTab5, .selectTab6,
+        .selectTab7, .selectTab8, .selectLastTab,
+    ]
+
+    /// The menu item tag that tells this command apart from others sharing
+    /// its action. Only the Find family needs one: four menu items send
+    /// `performFindPanelAction:` and are distinguished by tag, so rebinding
+    /// "Find…" must not also rebind "Find Next".
+    var menuTag: Int? {
+        switch self {
+        case .find: return 1
+        default: return nil
+        }
+    }
+}
+
+nonisolated extension TerminalCommand {
     /// The message sent through the responder chain. Sharing selectors with
     /// AppKit's standard items is deliberate: rebinding then means rewriting
     /// one menu item's key equivalent, not intercepting keys behind AppKit's
@@ -386,47 +427,11 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .clearHistory: return #selector(PaneCommands.clearHistory(_:))
         case .resetTerminal: return #selector(PaneCommands.resetTerminal(_:))
         case .reconnectRemote: return #selector(PaneRemote.reconnectRemote(_:))
+        case .killAndReconnectRemote: return #selector(PaneRemote.killAndReconnectRemote(_:))
         case .browseRemoteFiles: return #selector(PaneRemote.browseRemoteFiles(_:))
         case .secureKeyboardEntry: return #selector(AppDelegate.toggleSecureKeyboardEntry(_:))
         case .settings: return #selector(AppDelegate.showSettings(_:))
         case .commandPalette: return #selector(AppDelegate.showCommandPalette(_:))
-        }
-    }
-
-    /// The config-file key this command's binding is written under.
-    var configurationKey: String { "bind.\(rawValue)" }
-
-    /// The tab a "select tab" command shows, counted from 1; the last tab's
-    /// command is 9, as ⌘9 is in a browser.
-    var tabNumber: Int? {
-        switch self {
-        case .selectTab1: return 1
-        case .selectTab2: return 2
-        case .selectTab3: return 3
-        case .selectTab4: return 4
-        case .selectTab5: return 5
-        case .selectTab6: return 6
-        case .selectTab7: return 7
-        case .selectTab8: return 8
-        case .selectLastTab: return 9
-        default: return nil
-        }
-    }
-
-    /// The commands that select a tab by its place, in order.
-    static let tabSelection: [TerminalCommand] = [
-        .selectTab1, .selectTab2, .selectTab3, .selectTab4, .selectTab5, .selectTab6,
-        .selectTab7, .selectTab8, .selectLastTab,
-    ]
-
-    /// The menu item tag that tells this command apart from others sharing
-    /// its action. Only the Find family needs one: four menu items send
-    /// `performFindPanelAction:` and are distinguished by tag, so rebinding
-    /// "Find…" must not also rebind "Find Next".
-    var menuTag: Int? {
-        switch self {
-        case .find: return 1
-        default: return nil
         }
     }
 }
