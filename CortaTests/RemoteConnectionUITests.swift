@@ -231,6 +231,8 @@ struct SFTPConnectFailureTests {
         #expect(first.closed)
         #expect(model.client == nil)
         #expect(model.connectFailure?.title == L10n.format("sftp.failure.unreachable.title", "slow-box"))
+        // The retry is not what is under test: it gets the time a real one does.
+        model.connectTimeout = .seconds(30)
         model.retry()
         await waitUntil("reconnected") { model.connectionState == .connected }
         model.disconnect()
