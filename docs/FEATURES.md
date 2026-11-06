@@ -148,7 +148,11 @@ and [verification limits](CONFORMANCE.md#cli-signal-compatibility).
   of ending. SSH connections use system OpenSSH, including its configuration,
   agent and `ProxyJump`; Corta does not provide its own SSH implementation.
 - One connect sheet for a terminal (SSH) and for files (SFTP), behind one
-  toolbar button, with host, user, port and private-key fields, each passed
+  toolbar button. SSH connects in the focused terminal pane of the window
+  that opened the sheet, replacing its session and clearing its previous
+  output. Select **Connect in a new window** for a separate
+  window; without an available terminal window, a new window opens.
+  Host, user, port and private-key fields are each passed
   to OpenSSH as its own argument; empty ones fall to `~/.ssh/config`. It
   suggests recent connections, with the fields they used and when, and the
   `Host` names in `~/.ssh/config` (read, never executed), leaving out hosts

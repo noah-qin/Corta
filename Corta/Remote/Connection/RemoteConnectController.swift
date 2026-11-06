@@ -69,6 +69,7 @@ struct RemoteConnectPaneFiles {
 final class RemoteConnectController: NSWindowController {
     static let shared = RemoteConnectController()
     private let draft = RemoteConnectDraft()
+    private(set) weak var sourceWindow: NSWindow?
 
     private init() {
         let window = NSPanel(
@@ -102,6 +103,9 @@ final class RemoteConnectController: NSWindowController {
         }
         // A fresh dialog each time: a host left over from the last one is a
         // connection nobody asked for.
+        sourceWindow = Self.terminalWindow(
+            from: (sender as? NSView)?.window ?? NSApp.keyWindow,
+            main: NSApp.mainWindow, ordered: NSApp.orderedWindows)
         draft.reset(mode: mode, paneFiles: paneFiles)
         window.title = L10n.text("ui.connect.title")
         if let parent = NSApp.keyWindow ?? NSApp.mainWindow, parent.isVisible,
@@ -118,6 +122,13 @@ final class RemoteConnectController: NSWindowController {
             window.makeKeyAndOrderFront(sender)
         }
         NSApp.activate()
+    }
+
+    /// Capture before presenting the sheet; focus can change before Connect.
+    static func terminalWindow(from source: NSWindow?, main: NSWindow?, ordered: [NSWindow]) -> NSWindow? {
+        ([source, main].compactMap { $0 } + ordered).first {
+            $0.isVisible && $0.windowController is TerminalWindowController
+        }
     }
 
     override func close() {
@@ -146,8 +157,8 @@ final class RemoteConnectController: NSWindowController {
         case .ssh:
             // Recorded once the connection is established, by the pane
             // (`PaneRemote.watchForEstablishedConnection`).
-            (NSApp.delegate as? AppDelegate)?.launchPreset(
-                SSHDestination.preset(for: target), inNewWindow: true)
+            (NSApp.delegate as? AppDelegate)?.launchConnection(
+                SSHDestination.preset(for: target), from: sourceWindow, inNewWindow: draft.inNewWindow)
         case .sftp:
             // Recorded once connected, by the browser.
             SFTPBrowserController.open(target)
@@ -162,6 +173,7 @@ final class RemoteConnectController: NSWindowController {
 final class RemoteConnectDraft {
     var mode: RemoteConnectMode = .ssh
     var fields = SSHTargetFields()
+    var inNewWindow = false
     var problem: SSHTarget.Problem?
     var paneFiles: RemoteConnectPaneFiles?
     /// The tallest the dialog may be: its parent window's content height
@@ -173,6 +185,7 @@ final class RemoteConnectDraft {
     func reset(mode: RemoteConnectMode, paneFiles: RemoteConnectPaneFiles? = nil) {
         self.mode = mode
         self.paneFiles = paneFiles
+        inNewWindow = false
         fields = SSHTargetFields()
         problem = nil
         generation += 1
@@ -189,7 +202,7 @@ private struct RemoteConnectSheet: View {
         ScrollView {
             RemoteConnectForm(
                 mode: draft.mode, modeSelection: $draft.mode, fields: $draft.fields,
-                paneFiles: draft.paneFiles,
+                paneFiles: draft.paneFiles, inNewWindow: $draft.inNewWindow,
                 error: draft.problem.map(RemoteConnectForm.message),
                 focusGeneration: draft.generation,
                 onCancel: { RemoteConnectController.shared.close() },

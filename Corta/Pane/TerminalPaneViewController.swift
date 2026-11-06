@@ -1090,8 +1090,24 @@ extension TerminalPaneViewController {
         failureView = failure
     }
 
+    /// Connect replaces this pane's session with the chosen destination.
+    /// Clear the old spawn record so strict startup uses the new preset.
+    func connect(using preset: Preset) {
+        guard !didTeardown else { return }
+        remote.cancelPendingOpens()
+        remote.stopWatchingConnection()
+        search.close()
+        self.preset = preset
+        launchedCommand = nil
+        rebuildPane(strictRespawn: true, showsReconnectNotice: false)
+    }
+
     /// Behind Try Again (the ladder) and Reconnect (the exact command).
     func rebuildPane(strictRespawn: Bool) {
+        rebuildPane(strictRespawn: strictRespawn, showsReconnectNotice: true)
+    }
+
+    private func rebuildPane(strictRespawn: Bool, showsReconnectNotice: Bool) {
         // The grid it is shown at, while a session still says so; a pane
         // that never built starts from the configured one.
         let grid = didSizeWindow && session != nil ? lastRequestedSize : nil
@@ -1130,7 +1146,7 @@ extension TerminalPaneViewController {
         view.window?.makeFirstResponder(terminalView)
         resizeSessionToFitView(coalesce: false)
         invalidateDisplay()
-        if strictRespawn {
+        if strictRespawn && showsReconnectNotice {
             // Every time: a new connection; the old scrollback is gone.
             terminalView.showToast(remote.reconnectNotice)
         }

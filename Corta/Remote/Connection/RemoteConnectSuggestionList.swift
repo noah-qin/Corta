@@ -93,8 +93,8 @@ struct RemoteConnectSuggestionList: View {
             .background(
                 isPicked ? AnyShapeStyle(Color.accentColor.opacity(0.16))
                     : isHovered ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear),
-                in: .rect(cornerRadius: 12))
-            .contentShape(.rect(cornerRadius: 12))
+                in: .rect(cornerRadius: RemoteConnectForm.cardRadius))
+            .contentShape(.rect(cornerRadius: RemoteConnectForm.cardRadius))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isPicked ? .isSelected : [])

@@ -662,6 +662,10 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   or has no shell, does not. Hover over a recent host and click ✕, or
   right-click it, to forget it; Settings ▸ Privacy & Security ▸ Recent
   Hosts clears them all.
+  SSH connects in the focused terminal pane of the window that opened the
+  sheet, replacing that pane’s session and clearing its previous output.
+  Select **Connect in a new window** for a separate
+  window; without an available terminal window, a new window opens.
 - **This pane's files.** Opened from a pane connected to another machine,
   the sheet offers that host's files first; press Return or **Browse
   Files** to open them.
