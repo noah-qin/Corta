@@ -36,7 +36,8 @@ protocol PaneRemoteHost: AnyObject {
 }
 
 /// One pane's remote side: whether the pane is talking to another
-/// machine and which, the honest Reconnect that follows a dead connection,
+/// machine and which, the honest Reconnect that follows a dead connection —
+/// or, confirmed, ends a hung one —
 /// `path:line` references resolved on the remote host, and the way into
 /// the SFTP browser.
 ///
@@ -104,7 +105,7 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
     }
 
     /// Only for a remote launcher whose child is gone: a local shell has Try
-    /// Again, and a live `ssh` would have to be killed.
+    /// Again, and a live `ssh` has to be killed first (`canKillAndReconnect`).
     ///
     /// No Corta-side `ControlMaster`: an opaque master process whose lifetime
     /// Corta owns, coupling panes by host. The system `/usr/bin/ssh` already
@@ -248,6 +249,11 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
         host?.rebuildPane(strictRespawn: true)
     }
 
+    /// Asks whether to end the connection; a test answers for it. The pane's
+    /// window has the sheet, Cancel its default.
+    var confirmKill: @MainActor (_ host: String?, _ window: NSWindow?, _ answer: @escaping (Bool) -> Void) -> Void =
+        { PaneRemote.askToKill(host: $0, window: $1, answer: $2) }
+
     /// Never "restored": the process and remote state are gone. A reattach
     /// command gets the credit, attaching to whatever exists now.
     var reconnectNotice: String {
@@ -386,12 +392,58 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
         case #selector(reconnectRemote(_:)):
             // Only a dead remote launcher can reconnect.
             return canReconnect
+        case #selector(killAndReconnectRemote(_:)):
+            // Only a live one needs killing first.
+            return canKillAndReconnect
         case #selector(browseRemoteFiles(_:)):
             // Remote panes only (an unknown host asks for one).
             return canBrowseFiles
         default:
             return true
         }
+    }
+}
+
+// MARK: - Kill and Reconnect
+
+extension PaneRemote {
+    /// A remote launcher still running: a connection that has gone silent is
+    /// indistinguishable from an idle one, so ending it is only ever asked for.
+    var canKillAndReconnect: Bool {
+        guard let command = reconnectCommand,
+            PaneRemoteState.isRemoteLauncher(executable: command.executable),
+            let session = host?.session
+        else { return false }
+        return session.pty.exitStatus == nil
+    }
+
+    /// Ends a live connection and runs its command again: `rebuildPane` hangs
+    /// the session up, and its reader sends what ignores that `SIGKILL`.
+    /// Everything the far end was running under it may stop, and the output
+    /// is cleared, so it is never a keystroke away from happening unasked.
+    @objc func killAndReconnectRemote(_: Any?) {
+        guard canKillAndReconnect else { return }
+        confirmKill(connectionHost, host?.terminalView?.window) { [weak self] confirmed in
+            // The answer may have taken a while; a connection that died
+            // meanwhile still wants the new one that was asked for.
+            guard confirmed, let self, self.canKillAndReconnect || self.canReconnect else { return }
+            self.host?.rebuildPane(strictRespawn: true)
+        }
+    }
+
+    fileprivate static func askToKill(host: String?, window: NSWindow?, answer: @escaping (Bool) -> Void) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = host.map { L10n.format("remote.kill.title.host", $0) } ?? L10n.text("remote.kill.title")
+        alert.informativeText = L10n.text("remote.kill.message")
+        // Cancel first: Return must not end a connection that may only be idle.
+        alert.addButton(withTitle: L10n.text("common.cancel"))
+        alert.addButton(withTitle: L10n.text("remote.kill.confirm"))
+        guard let window else {
+            answer(alert.runModal() == .alertSecondButtonReturn)
+            return
+        }
+        alert.beginSheetModal(for: window) { answer($0 == .alertSecondButtonReturn) }
     }
 }
 

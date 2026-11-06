@@ -142,8 +142,9 @@ and [verification limits](CONFORMANCE.md#cli-signal-compatibility).
   ([usage](USER-GUIDE.md#history-suggestions-zsh)).
 - Optional command-status rules in the prompt margin, with textual tooltips
   and gray interrupted marks for exit status 130.
-- Remote context reported by shell integration, a host indicator and reconnect
-  action. SSH connections use system OpenSSH, including its configuration,
+- Remote context reported by shell integration, a host indicator, a reconnect
+  action, and a confirmed Kill and Reconnect for a connection that hangs instead
+  of ending. SSH connections use system OpenSSH, including its configuration,
   agent and `ProxyJump`; Corta does not provide its own SSH implementation.
 - One connect sheet for a terminal (SSH) and for files (SFTP), behind one
   toolbar button, with host, user, port and private-key fields, each passed

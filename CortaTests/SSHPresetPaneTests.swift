@@ -157,6 +157,41 @@ struct SSHPresetPaneTests {
             })
     }
 
+    /// A hung connection is one that has not exited, so plain Reconnect is not
+    /// on offer. This one ends it first, and only when told to: it can't tell
+    /// a hang from an idle shell. The script ignores hangup, as an ssh stuck in
+    /// the kernel would, and is still ended.
+    @Test func aLiveLauncherIsKilledAndReconnectedOnlyOnceConfirmed() async throws {
+        let launcher = try Self.makeStagingLauncher()
+        defer { try? FileManager.default.removeItem(at: launcher.deletingLastPathComponent()) }
+        let pane = Self.makePane(launcher: launcher, script: "trap '' HUP; while :; do sleep 1; done")
+        defer { pane.teardown() }
+        let hung = try #require(pane.session)
+        #expect(await waitUntilTrue { pane.remote.state == .remoteUnknown(provenance: .spawnedLauncher) })
+        #expect(!pane.remote.canReconnect)
+        #expect(pane.remote.canKillAndReconnect)
+        let item = NSMenuItem(title: "", action: #selector(PaneRemote.killAndReconnectRemote(_:)), keyEquivalent: "")
+        #expect(pane.validateMenuItem(item))
+
+        var asked = 0
+        pane.remote.confirmKill = { _, _, answer in
+            asked += 1
+            answer(false)
+        }
+        pane.remote.killAndReconnectRemote(nil)
+        #expect(asked == 1)
+        #expect(pane.session === hung, "declined: nothing happened to it")
+        #expect(hung.pty.exitStatus == nil)
+
+        pane.remote.confirmKill = { _, _, answer in answer(true) }
+        pane.remote.killAndReconnectRemote(nil)
+        let respawned = try #require(pane.session)
+        #expect(respawned !== hung)
+        #expect(pane.launchedCommand?.arguments == ["-c", "trap '' HUP; while :; do sleep 1; done"])
+        #expect(await waitUntilTrue { hung.pty.exitStatus != nil })
+        #expect(pane.remote.canKillAndReconnect, "the new connection is a live one in turn")
+    }
+
     /// The honesty half: when the recorded command can no longer run, a
     /// reconnect fails as itself — the fallback ladder would land the pane
     /// in a local `/bin/zsh` while the user asked for the host back, which
