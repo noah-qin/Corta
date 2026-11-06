@@ -203,8 +203,25 @@ public enum KittyGraphics {
 
     /// Base64 bytes from which a session decodes a transmission outside its
     /// lock. Below it the decode is shorter than the extra lock round trip
-    /// is worth; one `kitten icat` chunk (128 KiB) is past it.
+    /// is worth; one `kitten icat` chunk (128 KiB) is past it. Not a measure
+    /// of a compressed payload, which is deferred at any length.
     static let deferredDecodeThreshold = 64 * 1024
+
+    /// `s= × v= × bytes per pixel` when raw pixels declare a size that fits the
+    /// per-image cap; `nil` for PNG and for one past the cap.
+    static func declaredPixelBytes(of header: TransmitHeader) -> Int? {
+        let bytesPerPixel: Int
+        switch header.format ?? .rgba {
+        case .rgb: bytesPerPixel = 3
+        case .rgba: bytesPerPixel = 4
+        case .png, .gif: return nil
+        }
+        guard let width = header.width, let height = header.height,
+            dimensionsFit(width: width, height: height)
+        else { return nil }
+        let bytes = width * height * bytesPerPixel
+        return bytes <= maximumImageBytes ? bytes : nil
+    }
 
     /// Per axis; every Metal feature set on macOS supports 8192² textures.
     public static let maximumImageDimension = 8192

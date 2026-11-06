@@ -60,7 +60,7 @@ struct KittyGraphicsDeferredDecodeTests {
         var decodes = 0
         while offset < bytes.count {
             offset += terminal.feedDeferringImageDecode(bytes[offset...])
-            if let deferred = terminal.takeDeferredImage() {
+            if var deferred = terminal.takeDeferredImage() {
                 decodes += 1
                 terminal.completeDeferredImage(deferred.decode())
             }
@@ -129,6 +129,50 @@ struct KittyGraphicsDeferredDecodeTests {
         #expect(terminal.grid.imagePlacements.imageCount == 1)
     }
 
+    /// A 3500 × 3500 image of one colour compresses to well under the
+    /// threshold, and inflating it held the lock for 21–32 ms.
+    @Test("a compressed image under the threshold is still decoded outside the parse")
+    func smallCompressedTransmissionDefers() throws {
+        let raw = [UInt8](repeating: 0x7F, count: 3500 * 3500 * 4)
+        let payload = Data(try KittyGraphicsCompressionTests.zlib(raw)).base64EncodedString()
+        #expect(payload.utf8.count < KittyGraphics.deferredDecodeThreshold)
+        let stream = Array("\u{1B}_Ga=T,i=9,f=32,s=3500,v=3500,o=z;\(payload)\u{1B}\\".utf8)
+        var terminal = Terminal(rows: 10, columns: 40)
+        _ = terminal.feedDeferringImageDecode(stream[...])
+        let taken = terminal.takeDeferredImage()
+        var deferred = try #require(taken, "inflating here would hold the session's lock")
+        // Nothing inflated yet: it is not stored, and its worst is on the bill.
+        #expect(terminal.grid.imagePlacements.imageCount == 0)
+        #expect(terminal.retainedImageBytes >= raw.count)
+        terminal.completeDeferredImage(deferred.decode())
+        #expect(terminal.grid.imagePlacements.imageCount == 1)
+    }
+
+    @Test("a decode with no room for its peak is refused before it runs")
+    func decodeWithoutRoomForItsPeakIsRefused() throws {
+        let raw = [UInt8](repeating: 0x7F, count: 1024 * 1024 * 4)
+        let payload = Data(try KittyGraphicsCompressionTests.zlib(raw)).base64EncodedString()
+        let stream = Array("\u{1B}_Ga=T,i=9,f=32,s=1024,v=1024,o=z;\(payload)\u{1B}\\".utf8)
+        var terminal = Terminal(rows: 10, columns: 40)
+        terminal.imageByteAllowance = raw.count / 2
+        _ = terminal.feedDeferringImageDecode(stream[...])
+        #expect(terminal.takeDeferredImage() == nil)
+        #expect(String(decoding: terminal.takeOutput(), as: UTF8.self).contains("ENOSPC"))
+        #expect(terminal.retainedImageBytes == 0)
+    }
+
+    @Test("the decode frees the text it consumed")
+    func decodeConsumesTheText() throws {
+        var terminal = Terminal(rows: 10, columns: 40)
+        let stream = try Self.transmission(id: 3, width: 256, height: 256)
+        _ = terminal.feedDeferringImageDecode(stream[...])
+        let taken = terminal.takeDeferredImage()
+        var deferred = try #require(taken)
+        let decoded = deferred.decode()
+        #expect(deferred.pending.base64.isEmpty)
+        #expect(decoded.pending.base64.isEmpty)
+    }
+
     @Test("a reset in the pause leaves nothing of the stopped sequence on screen")
     func resetInThePauseStrandsNothing() throws {
         var terminal = Terminal(rows: 10, columns: 40)
@@ -151,10 +195,10 @@ struct KittyGraphicsDeferredDecodeTests {
         #expect(pending > 0)
         _ = terminal.feedDeferringImageDecode(stream[(stream.count - 2)...])
         let taken = terminal.takeDeferredImage()
-        let deferred = try #require(taken)
+        var deferred = try #require(taken)
         // The whole transmission now, final chunk included.
         #expect(
-            terminal.retainedImageBytes == deferred.decodedByteEstimate,
+            terminal.retainedImageBytes == deferred.peakByteEstimate,
             "taking the decode out of the parse must not uncharge it")
         #expect(terminal.retainedImageBytes > pending)
         terminal.completeDeferredImage(deferred.decode())
@@ -167,7 +211,7 @@ struct KittyGraphicsDeferredDecodeTests {
         let stream = try Self.transmission(id: 3, width: 256, height: 256)
         _ = terminal.feedDeferringImageDecode(stream[...])
         let taken = terminal.takeDeferredImage()
-        let deferred = try #require(taken)
+        var deferred = try #require(taken)
         terminal.reset()
         _ = terminal.takeOutput()
         terminal.completeDeferredImage(deferred.decode())
@@ -199,5 +243,39 @@ struct KittyGraphicsDeferredDecodeTests {
         #expect(Self.placements(grid) == Self.placements(inline.grid))
         #expect(Self.placements(grid).count == 1)
         #expect(grid.cursor == inline.grid.cursor)
+    }
+}
+
+@Suite("Base64, decoded in place")
+struct Base64DecoderTests {
+    /// What the path through Foundation accepted: the same bytes, and the same
+    /// refusals, or a stream that used to draw stops drawing.
+    @Test("it agrees with Foundation, padded and unpadded")
+    func agreesWithFoundation() {
+        var seed: UInt32 = 7
+        for length in 0..<200 {
+            let raw = (0..<length).map { _ -> UInt8 in
+                seed = seed &* 1_664_525 &+ 1_013_904_223
+                return UInt8(truncatingIfNeeded: seed >> 24)
+            }
+            let text = Array(Data(raw).base64EncodedString().utf8)
+            #expect(Base64Decoder.decode(text, paddingOptional: false) == raw)
+            #expect(Base64Decoder.decode(text, paddingOptional: true) == raw)
+            var bare = text
+            while bare.last == UInt8(ascii: "=") { bare.removeLast() }
+            #expect(Base64Decoder.decode(bare, paddingOptional: true) == raw)
+            if bare.count != text.count {
+                #expect(Base64Decoder.decode(bare, paddingOptional: false) == nil)
+            }
+        }
+    }
+
+    @Test(arguments: ["Q", "=", "==", "====", "Q===", "QQ=Q", "QQQQ=", "QQQ==", "Q\nQQ", "QQ Q", "QQ-_", "é"])
+    func refusesMalformedText(text: String) {
+        // Stricter than Foundation, which takes `QQ=Q` and `====`: no encoder
+        // writes them, and a sequence that is not base64 draws nothing.
+        let bytes = Array(text.utf8)
+        #expect(Base64Decoder.decode(bytes, paddingOptional: true) == nil)
+        #expect(Base64Decoder.decode(bytes, paddingOptional: false) == nil)
     }
 }

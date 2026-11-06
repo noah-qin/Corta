@@ -79,8 +79,15 @@ extension Performer {
             resolved.format = header.format ?? .rgba
             resolved.width = header.width ?? 0
             resolved.height = header.height ?? 0
+            var base64: [UInt8] = []
+            // Raw pixels say how much text is coming: reserving spares the
+            // doubling reallocation that held two copies of it. Pages nothing
+            // writes to stay untouched, so a false size costs address space.
+            if !resolved.compressed, let bytes = KittyGraphics.declaredPixelBytes(of: resolved) {
+                base64.reserveCapacity(bytes / 3 * 4 + 4)
+            }
             state.pendingImageTransmission = PendingImageTransmission(
-                header: resolved, display: display, base64: [])
+                header: resolved, display: display, base64: base64)
         }
         // Checked per chunk, so a stream cannot park just under the limit. The
         // text is charged to the pane as the image it will become: held until
@@ -112,15 +119,29 @@ extension Performer {
         finishTransmission(pending)
     }
 
-    /// Decodes inline, or — for a large transmission when the session asks
-    /// (`defersLargeImageDecoding`) — parks it for a decode outside the
-    /// session's lock: base64 and zlib over up to 64 MiB held every frame's
-    /// snapshot for ~100 ms at 4K. The parse stops right after this
-    /// dispatch, so nothing later in the stream is applied before
-    /// `completeDeferredImage` stores and places it.
+    /// Decodes inline, or — for a large or compressed transmission when the
+    /// session asks (`defersLargeImageDecoding`) — parks it for a decode
+    /// outside the session's lock: base64 and zlib over up to 64 MiB held
+    /// every frame's snapshot for ~100 ms at 4K. A compressed one goes
+    /// whatever its length: its text says nothing of what it inflates to, and
+    /// a 3500 × 3500 image fits under the threshold yet held the lock for
+    /// ~30 ms. The parse stops right after this dispatch, so nothing later in
+    /// the stream is applied before `completeDeferredImage` stores and places
+    /// it.
     mutating func finishTransmission(_ pending: PendingImageTransmission) {
-        let deferred = DeferredImageTransmission(pending: pending, resetCount: resetCount)
-        if defersLargeImageDecoding, pending.base64.count >= KittyGraphics.deferredDecodeThreshold {
+        var deferred = DeferredImageTransmission(pending: pending, resetCount: resetCount)
+        if defersLargeImageDecoding,
+            pending.header.compressed || pending.base64.count >= KittyGraphics.deferredDecodeThreshold {
+            // The decode's whole peak, up front: what it holds at its worst
+            // is charged while it runs, and refused here if there is no room.
+            applyImageAllowance()
+            guard deferred.peakByteEstimate
+                <= grid.imagePlacements.availableBytes(for: pending.header.imageID)
+            else {
+                completeTransmission(
+                    pending, decoded: .failure(TransmissionRefusal(message: "ENOSPC:image data too large")))
+                return
+            }
             state.deferredImage = deferred
             return
         }
@@ -184,14 +205,21 @@ extension Performer {
     /// declared size: exactly `width * height * bytesPerPixel`, or refused —
     /// never padded. A PNG is decoded (and validated) by the app layer,
     /// which owns ImageIO.
+    ///
+    /// Takes the text out of `pending` and frees it as soon as it is decoded,
+    /// so at most text + bytes, or bytes + inflated, are held at once
+    /// (`DeferredImageTransmission.peakByteEstimate`).
     static func transmittedImage(
-        _ pending: PendingImageTransmission
+        _ pending: inout PendingImageTransmission
     ) throws(TransmissionRefusal) -> KittyGraphics.ImageData {
-        let base64 = pending.itermOptions == nil ? padded(pending.base64) : pending.base64
-        guard let decoded = Data(base64Encoded: Data(base64)) else {
+        var base64: [UInt8] = []
+        swap(&base64, &pending.base64)
+        // Kitty's chunks may leave the padding off (RFC 4648 §3.2, `kitten
+        // icat`); iTerm2's payload has to carry its own.
+        guard var bytes = Base64Decoder.decode(base64, paddingOptional: pending.itermOptions == nil) else {
             throw TransmissionRefusal(message: "EINVAL:bad base64")
         }
-        var bytes = [UInt8](decoded)
+        base64 = []
         guard bytes.count <= KittyGraphics.maximumImageBytes else {
             throw TransmissionRefusal(message: "EINVAL:too large")
         }
@@ -320,38 +348,98 @@ extension Performer {
         }
         grid.moveCursor(row: row, column: column)
     }
-
-    /// Pads to a multiple of 4: `Data(base64Encoded:)` rejects unpadded input,
-    /// which RFC 4648 §3.2 allows and `kitten icat` sends.
-    private static func padded(_ base64: [UInt8]) -> [UInt8] {
-        let remainder = base64.count % 4
-        guard remainder != 0 else { return base64 }
-        return base64 + Array(repeating: UInt8(ascii: "="), count: 4 - remainder)
-    }
 }
 
 /// A finished transmission whose decode runs outside the session's lock:
 /// pure work on its own bytes, safe on any thread.
 struct DeferredImageTransmission: Sendable {
-    let pending: PendingImageTransmission
+    private(set) var pending: PendingImageTransmission
     let resetCount: Int
 
-    /// The bytes the decode will hold, charged to the image budget while it
-    /// runs (`Terminal.retainedImageBytes`).
-    var decodedByteEstimate: Int { pending.base64.count / 4 * 3 }
+    init(pending: PendingImageTransmission, resetCount: Int) {
+        self.pending = pending
+        self.resetCount = resetCount
+    }
 
-    func decode() -> DecodedImageTransmission {
+    /// The most the decode can hold at once, charged to the image budget
+    /// while it runs (`Terminal.retainedImageBytes`): the text and its
+    /// decoded bytes, or those bytes and what they may inflate to.
+    var peakByteEstimate: Int {
+        let text = pending.base64.count
+        let decoded = text / 4 * 3
+        guard pending.header.compressed else { return text + decoded }
+        // A PNG's size is unknown until decoded, so it gets the per-image cap.
+        let inflated = KittyGraphics.declaredPixelBytes(of: pending.header) ?? KittyGraphics.maximumImageBytes
+        return max(text + decoded, decoded + inflated)
+    }
+
+    /// Consumes the text: a copy of this value left elsewhere keeps it alive.
+    mutating func decode() -> DecodedImageTransmission {
         let result: Result<KittyGraphics.ImageData, Performer.TransmissionRefusal>
         do throws(Performer.TransmissionRefusal) {
-            result = .success(try Performer.transmittedImage(pending))
+            result = .success(try Performer.transmittedImage(&pending))
         } catch {
             result = .failure(error)
         }
-        // Completion needs the header and display alone; the base64 (up to
-        // ~85 MiB) goes now, not after another lock round trip.
-        var settled = pending
-        settled.base64 = []
-        return DecodedImageTransmission(pending: settled, resetCount: resetCount, result: result)
+        return DecodedImageTransmission(pending: pending, resetCount: resetCount, result: result)
+    }
+}
+
+/// Strict base64 straight into the buffer the image keeps. Through Foundation
+/// this took a `Data` of the text, a `Data` of the result and an array of that:
+/// 4.6× the image at the worst point of a 64 MiB transmission.
+enum Base64Decoder {
+    /// 0–63 for the alphabet, 0xFF for anything else, padding included.
+    private static let values: [UInt8] = {
+        var table = [UInt8](repeating: 0xFF, count: 256)
+        let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+        for (value, byte) in alphabet.utf8.enumerated() { table[Int(byte)] = UInt8(value) }
+        return table
+    }()
+
+    /// `nil` for any byte outside the alphabet, padding anywhere but the end
+    /// and a final group that cannot be: nothing is skipped or guessed.
+    /// `paddingOptional` lets a final group leave its `=` off, in part or whole.
+    static func decode(_ text: [UInt8], paddingOptional: Bool) -> [UInt8]? {
+        var inputCount = text.count
+        var padding = 0
+        while padding < 2, inputCount > 0, text[inputCount - 1] == UInt8(ascii: "=") {
+            inputCount -= 1
+            padding += 1
+        }
+        let remainder = inputCount % 4
+        guard remainder != 1 else { return nil }
+        let expectedPadding = (4 - remainder) % 4
+        guard paddingOptional ? padding <= expectedPadding : padding == expectedPadding else { return nil }
+        let outputCount = inputCount / 4 * 3 + max(0, remainder - 1)
+        var valid = true
+        let output = [UInt8](unsafeUninitializedCapacity: outputCount) { buffer, initialized in
+            values.withUnsafeBufferPointer { table in
+                text.withUnsafeBufferPointer { input in
+                    var accumulator: UInt32 = 0
+                    var pendingBits = 0
+                    var written = 0
+                    var bad: UInt8 = 0
+                    for index in 0..<inputCount {
+                        let value = table[Int(input[index])]
+                        bad |= value
+                        accumulator = accumulator << 6 | UInt32(value & 0x3F)
+                        pendingBits += 6
+                        if pendingBits >= 8 {
+                            pendingBits -= 8
+                            if written < outputCount {
+                                buffer[written] = UInt8(truncatingIfNeeded: accumulator >> UInt32(pendingBits))
+                            }
+                            written += 1
+                        }
+                    }
+                    // 0xFF is the only table entry with the high bit set.
+                    valid = bad & 0x80 == 0 && written == outputCount
+                    initialized = min(written, outputCount)
+                }
+            }
+        }
+        return valid ? output : nil
     }
 }
 

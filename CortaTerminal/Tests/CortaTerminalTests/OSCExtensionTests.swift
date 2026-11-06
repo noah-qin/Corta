@@ -228,7 +228,7 @@ struct OSCExtensionTests {
             parser.parse(source[...], performer: &performer, stoppingAfterAPC: true)
         }
         #expect(consumed < source.count)
-        let deferred = try #require(performer.state.deferredImage)
+        var deferred = try #require(performer.state.deferredImage)
         performer.completeDeferredImage(deferred.decode())
         #expect(performer.grid.imagePlacements.imageCount == 1)
         #expect(performer.state.outputBuffer.isEmpty)
