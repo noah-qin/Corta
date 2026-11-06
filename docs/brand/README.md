@@ -14,7 +14,7 @@ repository root.
 | `session-ended.png` | Ended session: the centered glass status panel over dimmed, retained output, from an isolated local-zsh UI fixture |
 | `native-tab-icon.png` | The tab strip in the titlebar row, with single-pane and split-pane program icons, from an isolated development build |
 | `screenshot.png` | Static terminal reference — light theme, a clean demo shell |
-| `interaction-demo.gif` | README interaction loop, 960 × 588, 10 seconds |
+| `interaction-demo@2x.gif` | README interaction loop, 1920 × 1176 for Retina displays, 10 seconds |
 | `interaction-demo.mp4` | Website interaction loop, 1600 × 980, 60 fps, 12 seconds, no audio |
 | `interaction-demo-poster.png` | Still fallback for both interaction demos, 1600 × 980 |
 | `input-source-indicator.png` | Independent Chinese input-source badge, separated from toolbar action buttons, from an isolated demo shell |
@@ -110,3 +110,5 @@ The README and homepage use separate edits of an isolated light-theme developmen
 `render-interaction-demo.swift` composes the video, static poster and raw GIF frames from an app-only recording and a clean window-button capture. `website/scripts/encode-interaction-gif.mjs` encodes the raw frames using the website's existing Sharp dependency. See each script's usage for the required inputs. Original recording coordinates are documented in the renderer; a different recording requires adjusting its source rectangles and edit timeline.
 
 The README selects the still for readers whose viewer supports `prefers-reduced-motion`. The homepage initially renders a responsive still and only loads the muted video when visible; it includes a pause/play button and respects reduced motion by default.
+
+The README image specifies only a display width. GitHub constrains image widths inside its article column without scaling an explicit HTML height, so a fixed height would stretch the loop. Its intrinsic aspect ratio must determine the rendered height. The GIF is rendered at twice its 960px display width from the original app recording, rather than enlarging an already-encoded image.

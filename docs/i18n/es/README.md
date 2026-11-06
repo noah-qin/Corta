@@ -29,7 +29,7 @@ Renderizado con Metal 4 · Entrada CJK / IME nativa · SSH, SFTP y edición remo
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
-  <img src="../../brand/interaction-demo.gif" width="960" height="588" alt="Corta en acción: dividir paneles, mover sesiones activas y cambiar o reordenar pestañas">
+  <img src="../../brand/interaction-demo@2x.gif" width="960" alt="Corta en acción: dividir paneles, mover sesiones activas y cambiar o reordenar pestañas">
 </picture>
 
 </div>

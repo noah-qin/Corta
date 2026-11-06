@@ -29,7 +29,7 @@ Metal 4 レンダリング · ネイティブな CJK / IME · SSH、SFTP、リ�
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
-  <img src="../../brand/interaction-demo.gif" width="960" height="588" alt="Corta の操作デモ：ペインの分割、実行中のセッションの移動、タブの切り替えと並べ替え">
+  <img src="../../brand/interaction-demo@2x.gif" width="960" alt="Corta の操作デモ：ペインの分割、実行中のセッションの移動、タブの切り替えと並べ替え">
 </picture>
 
 </div>

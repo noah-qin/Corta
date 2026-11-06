@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // node website/scripts/encode-interaction-gif.mjs frames.rgba output.gif
-// Input: 150 consecutive 960 × 588 RGBA frames from render-interaction-demo.
+// Input: 150 consecutive 1920 × 1176 RGBA frames from render-interaction-demo.
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 const require = createRequire(new URL("../package.json", import.meta.url));
@@ -23,20 +23,21 @@ const sharp = require("sharp");
 const [input, output] = process.argv.slice(2);
 if (!input || !output)
   throw new Error("Usage: encode-interaction-gif.mjs frames.rgba output.gif");
-const width = 960,
-  height = 588,
+const width = 1920,
+  height = 1176,
   frames = 150;
 const raw = await readFile(input);
 if (raw.length !== width * height * frames * 4)
   throw new Error("Unexpected raw frame length");
 await sharp(raw, {
+  limitInputPixels: width * height * frames,
   raw: { width, height: height * frames, channels: 4, pageHeight: height },
 })
   .gif({
-    colours: 128,
-    dither: 0.25,
+    colours: 256,
+    dither: 0,
     effort: 7,
-    interFrameMaxError: 1,
+    interFrameMaxError: 0,
     loop: 0,
     delay: Array.from({ length: frames }, (_, i) => [70, 60, 70][i % 3]),
   })

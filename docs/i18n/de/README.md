@@ -29,7 +29,7 @@ Metal-4-Rendering · Native CJK-Eingabe / IME · SSH, SFTP und Bearbeiten aus de
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
-  <img src="../../brand/interaction-demo.gif" width="960" height="588" alt="Corta in Aktion: Bereiche teilen, laufende Sitzungen verschieben und Tabs wechseln oder sortieren">
+  <img src="../../brand/interaction-demo@2x.gif" width="960" alt="Corta in Aktion: Bereiche teilen, laufende Sitzungen verschieben und Tabs wechseln oder sortieren">
 </picture>
 
 </div>

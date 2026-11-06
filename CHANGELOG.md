@@ -129,6 +129,9 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- The README demo keeps its aspect ratio in narrow GitHub columns and uses
+  a Retina-resolution GIF for sharper text.
+
 - Closing a split pane smoothly collapses its gutter and prepares the final
   terminal size before the transition, avoiding a second reflow at the end.
 - Opening and closing tabs moves and fades their entire terminal content,

@@ -242,6 +242,18 @@ for (const language of manifest.languages) {
         manifest.images.screenshot.height,
       );
     }
+    if (slug === "overview") {
+      const demo = elements(html, "img").find((image) =>
+        image.src?.endsWith("interaction-demo@2x.gif"),
+      );
+      assert.ok(demo, `${lang}: README interaction demo missing`);
+      assert.equal(demo.width, "960", `${lang}: README display width`);
+      assert.equal(
+        demo.height,
+        undefined,
+        `${lang}: a fixed height stretches the README on GitHub`,
+      );
+    }
     if (slug) {
       const info = manifest.pages[`${lang}/${slug}`];
       if (info.contentLang !== lang) {
@@ -304,6 +316,12 @@ for (const variant of manifest.images.screenshot.variants) {
   assert.equal(image.width, variant.width);
   assert.equal(image.format, "webp");
 }
+const readmeDemo = await sharp(
+  path.join(root, "content-assets/docs/brand/interaction-demo@2x.gif"),
+  { animated: true, limitInputPixels: 1920 * 1176 * 150 },
+).metadata();
+assert.equal(readmeDemo.width, 1920, "README demo must have Retina resolution");
+assert.equal(readmeDemo.pageHeight, 1176, "README demo intrinsic aspect ratio");
 console.log(
   `Verified SEO metadata, ${sitemapEntries.length} canonical sitemap URLs, committed-source dates, and responsive WebP assets.`,
 );

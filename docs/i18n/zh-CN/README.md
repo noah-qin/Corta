@@ -29,7 +29,7 @@ Metal 4 渲染 · 原生中日韩输入法 · SSH、SFTP 与远程编辑
 
 <picture>
   <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
-  <img src="../../brand/interaction-demo.gif" width="960" height="588" alt="Corta 交互演示：分屏、重排运行中的会话，以及切换和排序标签页">
+  <img src="../../brand/interaction-demo@2x.gif" width="960" alt="Corta 交互演示：分屏、重排运行中的会话，以及切换和排序标签页">
 </picture>
 
 </div>
