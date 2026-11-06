@@ -14,7 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import CortaSFTP
 import Foundation
 
 // MARK: - Local change detection

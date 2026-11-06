@@ -20,8 +20,6 @@ import Testing
 
 /// A click opens what the tooltip said, or nothing.
 struct HoverTargetTests {
-    private typealias Target = PanePointer.HoverTarget
-
     @Test("the shown target opens; anything else does not")
     func shownTarget() {
         let shown = PanePointer.HoverState.shown(.url("https://a.example/"))
