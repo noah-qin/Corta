@@ -132,7 +132,7 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         }
     }
 
-    @objc private func navigate(_ sender: Any?) {
+    @objc private func navigate(_: Any?) {
         guard let control = navigationControl else { return }
         if control.selectedSegment == 0 { navigation.goBack() } else { navigation.goForward() }
     }
@@ -164,16 +164,16 @@ final class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         show(nil)
     }
 
-    func showPrivacySettings(_ sender: Any?) {
+    func showPrivacySettings(_: Any?) {
         open(.privacy)
     }
 
-    func showThemeEditor(_ sender: Any?) {
+    func showThemeEditor(_: Any?) {
         open(.themes)
         navigation.themeEditorRequest += 1
     }
 
-    func showHostDetails(_ sender: Any?) {
+    func showHostDetails(_: Any?) {
         open(.appearance)
         navigation.showHostDetails = true
     }

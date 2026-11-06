@@ -99,12 +99,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         set { selectedTab?.id = newValue }
     }
 
-    /// The selected tab's user-given title.
-    var customTabTitle: String? {
-        get { selectedTab?.customTitle }
-        set { selectedTab?.customTitle = newValue }
-    }
-
     private var splitController: SplitViewController? { selectedTab?.split }
 
     /// A titlebar lock while Secure Keyboard Entry is engaged — the effect is
@@ -491,42 +485,42 @@ extension TerminalWindowController {
 }
 
 extension TerminalWindowController: TabStripDelegate {
-    func tabStrip(_ strip: TabStripView, select index: Int) {
+    func tabStrip(_: TabStripView, select index: Int) {
         guard tabs.indices.contains(index) else { return }
         selectTab(tabs[index])
     }
 
-    func tabStrip(_ strip: TabStripView, close index: Int) {
+    func tabStrip(_: TabStripView, close index: Int) {
         guard tabs.indices.contains(index) else { return }
         performCloseTab(tabs[index])
     }
 
-    func tabStrip(_ strip: TabStripView, closeOthersThan index: Int) {
+    func tabStrip(_: TabStripView, closeOthersThan index: Int) {
         guard tabs.indices.contains(index) else { return }
         closeOtherTabs(than: tabs[index])
     }
 
-    func tabStrip(_ strip: TabStripView, move from: Int, to: Int) {
+    func tabStrip(_: TabStripView, move from: Int, to: Int) {
         moveTab(from: from, to: to)
     }
 
-    func tabStrip(_ strip: TabStripView, rename id: String, to title: String?) {
+    func tabStrip(_: TabStripView, rename id: String, to title: String?) {
         guard let tab = tabs.first(where: { $0.id == id }) else { return }
         tab.customTitle = title
         tab.split.applyWindowTitle()
         refreshTabStrip()
     }
 
-    func tabStripNewTab(_ strip: TabStripView) {
+    func tabStripNewTab(_: TabStripView) {
         (NSApp.delegate as? AppDelegate)?.newTab(beside: window, sender: nil)
     }
 
-    func tabStrip(_ strip: TabStripView, drop index: Int, atScreenPoint point: NSPoint) {
+    func tabStrip(_: TabStripView, drop index: Int, atScreenPoint point: NSPoint) {
         guard tabs.indices.contains(index) else { return }
         drop(tabs[index], atScreenPoint: point)
     }
 
-    func tabStrip(_ strip: TabStripView, moveToNewWindow index: Int) {
+    func tabStrip(_: TabStripView, moveToNewWindow index: Int) {
         guard tabs.indices.contains(index) else { return }
         moveToNewWindow(tabs[index])
     }

@@ -120,7 +120,7 @@ extension TabStripView {
         edgeScroll = nil
     }
 
-    func itemMouseUp(_ event: NSEvent) {
+    func itemMouseUp() {
         let ended = drag
         drag = nil
         stopEdgeScroll()

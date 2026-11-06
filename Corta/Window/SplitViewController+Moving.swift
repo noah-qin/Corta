@@ -15,7 +15,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
-import CortaTerminal
 
 /// Moving and swapping the focused pane: the running pane itself, in a new
 /// place. Nothing here spawns or tears down a session, so the process, its

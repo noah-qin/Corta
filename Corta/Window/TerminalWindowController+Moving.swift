@@ -21,14 +21,14 @@ import AppKit
 /// that restarts its shells.
 extension TerminalWindowController {
     /// Window ▸ Move Tab to New Window.
-    @objc func moveTabToNewWindow(_ sender: Any?) {
+    @objc func moveTabToNewWindow(_: Any?) {
         guard let selectedTab else { return }
         moveToNewWindow(selectedTab)
     }
 
     /// Window ▸ Merge All Windows: every other window's tabs join this one,
     /// after its own, window by window; the emptied windows close.
-    @objc func mergeAllWindows(_ sender: Any?) {
+    @objc func mergeAllWindows(_: Any?) {
         merge((NSApp.delegate as? AppDelegate)?.terminalWindowControllers ?? [])
     }
 

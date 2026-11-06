@@ -206,7 +206,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ConfigurationStore.shared.update { $0.appearance = appearance }
     }
 
-    @objc func nextWaitingPane(_ sender: Any?) { AgentDirectory.jumpToNextWaitingPane() }
+    @objc func nextWaitingPane(_: Any?) { AgentDirectory.jumpToNextWaitingPane() }
 
     /// Ticks the live theme and appearance as the menu opens.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
