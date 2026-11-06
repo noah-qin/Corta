@@ -296,11 +296,10 @@ final class SFTPBrowserModel {
 
     // MARK: - Drags to Finder
 
-    /// Staging folders made for drags to Finder. Each goes after its transfer
-    /// fails, or a while after it lands; the controller removes the rest when
-    /// the window closes.
+    /// Staging folders made for drags to Finder. Each goes when its file has
+    /// been handed over or its transfer has failed; the controller removes the
+    /// rest when the window closes.
     private(set) var dragStagingDirectories: [URL] = []
-    var dragCopyLifetime: Duration = .seconds(120)
 
     /// `entry` as a drag, with the folder and connection it was picked up in:
     /// the browser may have moved on by the time something asks for the file.
@@ -311,6 +310,8 @@ final class SFTPBrowserModel {
             guard let self
             else { throw SFTPTransferQueue.TransferFailure(message: L10n.text("sftp.drag.unavailable")) }
             return try await self.exportForDrag(entry, from: directory, connection: connection)
+        } delivered: { [weak self] url in
+            await self?.removeDeliveredDragCopy(url)
         }
     }
 
@@ -333,24 +334,16 @@ final class SFTPBrowserModel {
                     isUpload: false, remotePath: remotePath, localURL: local,
                     sourceSize: entry.size, sourceModified: entry.modified)
             ) { [weak self] result in
-                switch result {
-                case .success: self?.removeDragCopyAfterDelivery(staging)
-                case .failure: self?.removeDragCopy(staging)
-                }
+                if case .failure = result { self?.removeDragCopy(staging) }
                 continuation.resume(with: result.mapError { $0 as any Error })
             }
         }
     }
 
-    /// The system copies the file some time after the provider answers, and
-    /// says nothing when it has: a reader that has opened it survives the
-    /// removal, one that has not needs the file a while yet.
-    private func removeDragCopyAfterDelivery(_ staging: URL) {
-        let delay = dragCopyLifetime
-        Task { [weak self] in
-            try? await Task.sleep(for: delay, clock: .suspending)
-            self?.removeDragCopy(staging)
-        }
+    /// The system has its own copy once the provider's completion returns.
+    private func removeDeliveredDragCopy(_ url: URL) {
+        guard let staging = dragStagingDirectories.first(where: { url.path.hasPrefix($0.path + "/") }) else { return }
+        removeDragCopy(staging)
     }
 
     private func removeDragCopy(_ staging: URL) {
