@@ -115,6 +115,45 @@ struct OSCTests {
         #expect(remote.remoteContext?.directory == "/elsewhere")
     }
 
+    @Test("a remote OSC 7 host outside RemoteHost's character rule is refused, whatever it percent-decodes to")
+    func remoteHostOutsideTheCharacterRuleIsRefused() throws {
+        // ESC and an RLO: both reached the history's host column undecorated.
+        for host in ["evil%1B%5B31m", "evil%E2%80%AEtxt", "a%20b", "a%C2%9Bb"] {
+            var terminal = try terminal("\\e]7;file://good/before\\a\\e]7;file://\(host)/after\\a")
+            #expect(terminal.remoteContext?.host == "good", "\(host) replaced the report")
+            #expect(terminal.remoteContext?.directory == "/before")
+            terminal = try self.terminal("\\e]7;file://\(host)/after\\a")
+            #expect(terminal.remoteContext == nil && terminal.workingDirectory == nil)
+        }
+        let long = String(repeating: "a", count: 256)
+        #expect(try terminal("\\e]7;file://\(long)/x\\a").remoteContext == nil)
+        #expect(try terminal("\\e]7;file://\(String(long.dropLast()))/x\\a").remoteContext != nil)
+    }
+
+    @Test("an OSC 7 path with a C0, DEL or C1 control, or past the length limit, is refused")
+    func reportedPathControlsAndLengthAreRefused() throws {
+        for path in ["/a%1Bb", "/a%0Ab", "/a%7Fb", "/a%C2%9Bb", "/a%C2%80b"] {
+            let local = try terminal("\\e]7;file:///kept\\a\\e]7;file://\(path)\\a")
+            #expect(local.workingDirectory == "/kept", "\(path) replaced a local directory")
+            let remote = try terminal("\\e]7;file://host/kept\\a\\e]7;file://host\(path)\\a")
+            #expect(remote.remoteContext?.directory == "/kept", "\(path) replaced a remote directory")
+        }
+        let fits = "/" + String(repeating: "a", count: 1023)
+        #expect(try terminal("\\e]7;file://\(fits)\\a").workingDirectory == fits)
+        #expect(try terminal("\\e]7;file://\(fits)a\\a").workingDirectory == nil)
+    }
+
+    @Test("a host and path are shown with controls and format characters replaced, and bounded")
+    func hostAndPathDisplayText() {
+        #expect(RemoteContext.displayText("build-box.example") == "build-box.example")
+        #expect(RemoteContext.displayText("/srv/caf\u{E9}/\u{65E5}\u{672C}") == "/srv/caf\u{E9}/\u{65E5}\u{672C}")
+        #expect(RemoteContext.displayText("a\u{1B}[31m") == "a\u{FFFD}[31m")
+        #expect(RemoteContext.displayText("a\u{7F}b\u{9B}c") == "a\u{FFFD}b\u{FFFD}c")
+        #expect(RemoteContext.displayText("a\u{202E}b\u{200B}c\u{E0041}") == "a\u{FFFD}b\u{FFFD}c\u{FFFD}")
+        let long = RemoteContext.displayText(String(repeating: "x", count: 5000))
+        #expect(long.unicodeScalars.count == RemoteContext.maximumDisplayedScalars + 1 && long.hasSuffix("\u{2026}"))
+    }
+
     @Test("a local OSC 7 report clears a recorded remote context")
     func localReportClearsRemoteContext() throws {
         let terminal = try terminal(

@@ -150,7 +150,9 @@ nonisolated enum PaneRemoteState: Equatable {
 
     /// `Remote: <what>`, for the title and the command history's host column.
     static func badge(_ what: String) -> String {
-        L10n.format("remote.badge", what)
+        // Every badge passes here, the history's host column included. `what`
+        // can come from a remote shell, or from a record an older build made.
+        L10n.format("remote.badge", RemoteContext.displayText(what))
     }
 
     /// The last component, without the local `~` rule, which means nothing

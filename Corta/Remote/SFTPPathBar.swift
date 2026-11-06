@@ -16,6 +16,7 @@
 
 import AppKit
 import CortaSFTP
+import CortaTerminal
 import SwiftUI
 
 // MARK: - Path bar
@@ -45,15 +46,18 @@ struct SFTPPathBar: View {
         let components = path.split(separator: "/")
         let kept = min(6, max(1, count))
         var result = [Crumb(title: "/", path: "/")]
+        func crumb(_ component: Substring) -> Crumb {
+            Crumb(title: RemoteContext.displayText(String(component)), path: String(path[..<component.endIndex]))
+        }
         if components.count > kept + 1 {
             let ancestor = components[components.count - kept - 1]
             result.append(Crumb(title: "…", path: String(path[..<ancestor.endIndex])))
             for component in components.suffix(kept) {
-                result.append(Crumb(title: String(component), path: String(path[..<component.endIndex])))
+                result.append(crumb(component))
             }
         } else {
             for component in components {
-                result.append(Crumb(title: String(component), path: String(path[..<component.endIndex])))
+                result.append(crumb(component))
             }
         }
         return result

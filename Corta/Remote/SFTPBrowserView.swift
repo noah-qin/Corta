@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CortaTerminal
 import SwiftUI
 
 /// The SwiftUI half of the remote-file browser;
@@ -109,7 +110,9 @@ struct SFTPBrowserView: View {
         ScrollView {
             RemoteConnectForm(
                 mode: .sftp, fields: $model.fields,
-                notice: model.suggestedHost.map { L10n.format("sftp.host.suggestedMessage", $0) },
+                notice: model.suggestedHost.map {
+                    L10n.format("sftp.host.suggestedMessage", RemoteContext.displayText($0))
+                },
                 error: error,
                 onConnect: { model.isFailed ? model.retry() : model.connect() })
                 .frame(maxWidth: 500)
