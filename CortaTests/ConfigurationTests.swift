@@ -278,6 +278,29 @@ struct ConfigurationStoreTests {
         #expect(await waitUpTo(5) { store.configuration.fontSize == 20 })
     }
 
+    /// A busy parent folder: each event used to restart the wait, so the reload
+    /// never came. In the suite the folder is `$TMPDIR`, which other tests write.
+    @Test("steady writes beside the file do not hold off a reload for ever")
+    func aBusyFolderDoesNotStarveTheReload() async throws {
+        defer { removeDirectory() }
+        try writeFile("font-size = 14\n")
+        let store = ConfigurationStore(fileURL: file)
+        let neighbour = file.deletingLastPathComponent().appendingPathComponent("neighbour")
+        let churn = Task.detached {
+            var count = 0
+            while !Task.isCancelled {
+                count += 1
+                // Atomic: rewriting a file in place tells the folder nothing.
+                try? Data("\(count)".utf8).write(to: neighbour.appendingPathExtension("\(count % 4)"), options: .atomic)
+                try? await Task.sleep(for: .milliseconds(30))
+            }
+        }
+        defer { churn.cancel() }
+        try await Task.sleep(for: .milliseconds(200), clock: .suspending)
+        try writeFile("font-size = 20\n")
+        #expect(await waitUpTo(5) { store.configuration.fontSize == 20 })
+    }
+
     @Test("deleting the file restores the defaults")
     func externalDeletionRestoresDefaults() async throws {
         defer { removeDirectory() }
