@@ -217,15 +217,24 @@ private struct TransferRow: View {
 nonisolated struct SFTPDragItem: Sendable {
     let name: String
     let export: @Sendable () async throws -> URL
+    /// The file has been handed over: the provider's completion has returned,
+    /// and it is the system's copy from here on.
+    var delivered: @Sendable (URL) async -> Void = { _ in }
 
     func itemProvider() -> NSItemProvider {
         let provider = NSItemProvider()
         provider.suggestedName = name
         provider.registerFileRepresentation(
             forTypeIdentifier: UTType.data.identifier, fileOptions: [], visibility: .all
-        ) { [export] completion in
+        ) { [export, delivered] completion in
             Task.detached {
-                do { completion(try await export(), false, nil) } catch { completion(nil, false, error) }
+                do {
+                    let url = try await export()
+                    completion(url, false, nil)
+                    await delivered(url)
+                } catch {
+                    completion(nil, false, error)
+                }
             }
             return nil
         }

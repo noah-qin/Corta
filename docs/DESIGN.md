@@ -610,7 +610,9 @@ hovering started the download, twice, and held Finder's main thread on Corta's
 answer. The provider advertises the file promise alone, its handler returns at
 once, and only a drop asks for the file. The folder and connection are captured
 as the drag starts: the browser may have moved on by the drop, and a promise
-from a connection that has ended fails rather than downloads.
+from a connection that has ended fails rather than downloads. The staging folder goes
+as soon as the provider's completion returns: checked with real drops onto Finder on
+APFS and exFAT, the receiver has its own copy by then.
 
 ### 7.10 The status bar and the theme editor
 

@@ -171,17 +171,56 @@ struct SFTPDragProviderTests {
 
         let (delivering, delivered) = try await model { try write($0) }
         defer { delivering.disconnect() }
-        delivering.dragCopyLifetime = .milliseconds(150)
-        let url = try await delivered.export()
-        #expect(FileManager.default.fileExists(atPath: url.path), "the system has yet to copy it")
-        await waitUntil("removed a while after delivery") { !FileManager.default.fileExists(atPath: url.path) }
-        #expect(delivering.dragStagingDirectories.isEmpty)
+        let answer = Mutex<Data?>(nil)
+        _ = delivered.itemProvider().loadFileRepresentation(forTypeIdentifier: UTType.data.identifier) { url, _ in
+            answer.withLock { $0 = url.flatMap { try? Data(contentsOf: $0) } }
+        }
+        await waitUntil("handed over") { answer.withLock { $0 != nil } }
+        #expect(answer.withLock { $0 } == Data("remote".utf8), "the receiver has the file though ours goes")
+        await waitUntil("removed once handed over") { delivering.dragStagingDirectories.isEmpty }
 
         let (closing, closed) = try await model { try write($0) }
         defer { closing.disconnect() }
         let kept = try await closed.export()
         closing.removeDragStaging()
         #expect(!FileManager.default.fileExists(atPath: kept.path))
+    }
+
+    @Test("a failed drag row offers no Retry: its receiver has had its answer and its folder is gone")
+    func aFailedDragOffersNoRetry() async throws {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = [makeEntry("notes.txt")]
+        fake.onTransfer = { _, _ in throw SFTPError.transport(.connectionLost) }
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect() }
+        let entry = try #require(model.entries.first)
+        await #expect(throws: (any Error).self) { try await model.dragItem(for: entry).export() }
+        guard case .failed(_, let retryable) = try #require(model.transfers.first).state else {
+            Issue.record("the row should have failed")
+            return
+        }
+        #expect(!retryable)
+    }
+
+    @Test("an ordinary download that fails the same way still offers Retry")
+    func anOrdinaryDownloadStillOffersRetry() async throws {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = [makeEntry("notes.txt")]
+        fake.onTransfer = { _, _ in throw SFTPError.transport(.connectionLost) }
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect() }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        model.transferQueue.enqueue(SFTPTransferQueue.Plan(
+            isUpload: false, remotePath: "/srv/app/notes.txt",
+            localURL: folder.appendingPathComponent("notes.txt"), sourceSize: nil, sourceModified: nil))
+        await waitUntil("failed") {
+            if case .failed = model.transfers.first?.state { return true }
+            return false
+        }
+        guard case .failed(_, let retryable) = try #require(model.transfers.first).state else { return }
+        #expect(retryable)
     }
 
     @Test("a drag's folder is under this build's own storage, not the shared temporary folder")

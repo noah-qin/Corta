@@ -418,7 +418,10 @@ extension SFTPTransferQueue {
                 id,
                 .failed(
                     message: SFTPBrowserModel.errorMessage(error, host: host ?? ""),
-                    retryable: error.isRetryableTransportFailure))
+                    // Someone waited on this one and has had their answer: a
+                    // drag's destination has been told it failed, and its folder
+                    // has gone. Drag the file again instead.
+                    retryable: error.isRetryableTransportFailure && finishHandlers[id] == nil))
         }
     }
 
