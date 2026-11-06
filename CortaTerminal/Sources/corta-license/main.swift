@@ -30,9 +30,13 @@ import LicenseHeaders
 /// twice changes nothing the second time. `check` looks at the files git
 /// tracks; `fix` also at untracked files that are not ignored, so a file
 /// created a moment ago gets its header before it is committed.
+/// `check --ref <commit>` judges that commit's files instead, read with `git
+/// cat-file`: nothing is checked out, and neither the work tree nor the
+/// commit's own code plays any part (`appcast.yml`, through
+/// `corta-release-check --source-ref`).
 
 let usage = """
-    usage: corta-license check [--root <dir>]
+    usage: corta-license check [--root <dir>] [--ref <commit>]
            corta-license fix [--root <dir>] [--year <yyyy>] [path ...]
     """
 
@@ -47,12 +51,17 @@ let currentYear = Calendar(identifier: .gregorian).component(.year, from: Date()
 var root = FileManager.default.currentDirectoryPath
 var year = currentYear
 var only: [String] = []
+var ref: String?
 while let argument = arguments.first {
     arguments.removeFirst()
     switch argument {
     case "--root":
         guard let value = arguments.first else { FileHandle.standardError.write(Data((usage + "\n").utf8)); exit(2) }
         root = value
+        arguments.removeFirst()
+    case "--ref" where command == "check":
+        guard let value = arguments.first else { FileHandle.standardError.write(Data((usage + "\n").utf8)); exit(2) }
+        ref = value
         arguments.removeFirst()
     case "--year":
         guard let value = arguments.first.flatMap(Int.init) else {
@@ -88,6 +97,15 @@ else {
     exit(2)
 }
 
+/// The regular files of `ref`, without its symlinks and submodules, which
+/// hold no text of their own.
+func files(at ref: String, in directory: String) -> [String]? {
+    git(["ls-tree", "-r", "-z", ref], in: directory)?.split(separator: "\0").compactMap { entry -> String? in
+        guard let tab = entry.firstIndex(of: "\t"), entry.hasPrefix("100") else { return nil }
+        return String(entry[entry.index(after: tab)...])
+    }
+}
+
 // `check` judges what is committed: a release or CI job leaves build
 // products (archives, unpacked apps) in the checkout that are neither
 // tracked nor ignored, and they are not the repository's files. `fix` also
@@ -96,12 +114,21 @@ else {
 let listArguments = command == "fix"
     ? ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]
     : ["ls-files", "-z", "--cached"]
-guard let listed = git(listArguments, in: top) else {
-    FileHandle.standardError.write(Data("corta-license: git ls-files failed in \(top)\n".utf8))
-    exit(2)
+var paths: [String]
+if let ref {
+    guard let committed = files(at: ref, in: top) else {
+        FileHandle.standardError.write(Data("corta-license: cannot list \(ref) in \(top)\n".utf8))
+        exit(2)
+    }
+    paths = committed
+} else {
+    guard let listed = git(listArguments, in: top) else {
+        FileHandle.standardError.write(Data("corta-license: git ls-files failed in \(top)\n".utf8))
+        exit(2)
+    }
+    paths = listed.split(separator: "\0").map(String.init)
+        .filter { FileManager.default.fileExists(atPath: "\(top)/\($0)") }
 }
-var paths = listed.split(separator: "\0").map(String.init)
-    .filter { FileManager.default.fileExists(atPath: "\(top)/\($0)") }
 if !only.isEmpty {
     let wanted = Set(only.map { path -> String in
         let absolute = path.hasPrefix("/") ? path : "\(FileManager.default.currentDirectoryPath)/\(path)"
@@ -121,7 +148,9 @@ for path in paths.sorted() {
     }
     guard case .header(let style) = treatment else { continue }
     let url = URL(fileURLWithPath: "\(top)/\(path)")
-    guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+    let contents = ref.map { git(["cat-file", "blob", "\($0):\(path)"], in: top) }
+        ?? (try? String(contentsOf: url, encoding: .utf8))
+    guard let text = contents else {
         print("\(path): not readable as UTF-8")
         problems += 1
         continue

@@ -20,7 +20,7 @@ import Foundation
 
 let usage = """
     usage: corta-release-check check APP [--version V] [--archive DMG] [--appcast]
-                                         [--require-notarized] [--root DIR]
+                                         [--require-notarized] [--source-ref REF] [--root DIR]
            corta-release-check package APP VERSION [OUTPUT_DIRECTORY]
                                          [--require-notarized] [--rehearsal] [--root DIR]
     """

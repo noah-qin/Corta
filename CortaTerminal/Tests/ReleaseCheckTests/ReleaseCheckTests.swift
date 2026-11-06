@@ -198,4 +198,88 @@ struct DecoderSandboxSignatureTests {
             #expect(!ReleaseCheck.hasIndependentDecoderSandbox(inPlist: try encoded(invalid)))
         }
     }
+    // MARK: - The updater's settings in the artifact
+
+    private static var sparkleSource: [String: Any] { [
+        "SUFeedURL": "https://example.com/appcast.xml", "SUPublicEDKey": "key",
+        "SUScheduledCheckInterval": 86400, "SURequireSignedFeed": true,
+        "SUSignedFeedFailureExpirationInterval": 0, "SUVerifyUpdateBeforeExtraction": true,
+    ] }
+
+    @Test("an artifact carrying the source's updater settings passes, whatever else its plist holds")
+    func updaterSettingsThatAgree() {
+        var artifact = Self.sparkleSource
+        artifact["CFBundleVersion"] = "12"
+        #expect(ReleaseCheck.updaterSettingProblems(artifact: artifact, source: Self.sparkleSource).isEmpty)
+    }
+
+    @Test("a changed, missing or added updater setting in the artifact is named")
+    func updaterSettingsThatDisagree() {
+        var changed = Self.sparkleSource
+        changed["SURequireSignedFeed"] = false
+        #expect(ReleaseCheck.updaterSettingProblems(artifact: changed, source: Self.sparkleSource).count == 1)
+        var missing = Self.sparkleSource
+        missing["SUVerifyUpdateBeforeExtraction"] = nil
+        let named = ReleaseCheck.updaterSettingProblems(artifact: missing, source: Self.sparkleSource)
+        #expect(named.count == 1 && named[0].contains("SUVerifyUpdateBeforeExtraction"))
+        var added = Self.sparkleSource
+        added["SUAllowsAutomaticUpdates"] = true
+        #expect(ReleaseCheck.updaterSettingProblems(artifact: added, source: Self.sparkleSource).count == 1)
+    }
+
+    @Test("a source with no updater settings cannot be agreed with")
+    func updaterSettingsFromNothing() {
+        #expect(!ReleaseCheck.updaterSettingProblems(artifact: [:], source: [:]).isEmpty)
+        #expect(!ReleaseCheck.updaterSettingProblems(artifact: Self.sparkleSource, sourcePlist: nil).isEmpty)
+        let notAPlist = Data("no".utf8)
+        #expect(!ReleaseCheck.updaterSettingProblems(artifact: Self.sparkleSource, sourcePlist: notAPlist).isEmpty)
+    }
+
+    // MARK: - Reading the release's source
+
+    /// A repository whose tagged commit and work tree disagree: the shape of
+    /// `appcast.yml`, which stands on `main` and asks about an older tag.
+    private func repositoryWithTag() throws -> URL {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("corta-release-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        func git(_ arguments: String...) throws {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = ["-C", root.path, "-c", "user.name=t", "-c", "user.email=t@example.com",
+                                 "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"] + arguments
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            process.waitUntilExit()
+            #expect(process.terminationStatus == 0, "git \(arguments)")
+        }
+        let file = root.appendingPathComponent("CHANGELOG.md")
+        try git("init", "-q")
+        try Data("tagged".utf8).write(to: file)
+        try git("add", ".")
+        try git("commit", "-qm", "tagged")
+        try git("tag", "v1.0.0")
+        try Data("main".utf8).write(to: file)
+        try git("commit", "-qam", "later")
+        try Data("uncommitted".utf8).write(to: file)
+        return root
+    }
+
+    @Test("with a ref, a source file is that commit's blob, never the work tree")
+    func sourceFileAtARef() throws {
+        let root = try repositoryWithTag()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let tagged = ReleaseCheck.sourceFile("CHANGELOG.md", root: root.path, ref: "refs/tags/v1.0.0")
+        #expect(tagged.map { String(decoding: $0, as: UTF8.self) } == "tagged")
+        #expect(ReleaseCheck.sourceFile("missing.md", root: root.path, ref: "refs/tags/v1.0.0") == nil)
+        #expect(ReleaseCheck.sourceFile("CHANGELOG.md", root: root.path, ref: "refs/tags/nope") == nil)
+    }
+
+    @Test("without a ref, a source file is the work tree's")
+    func sourceFileInTheTree() throws {
+        let root = try repositoryWithTag()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let current = ReleaseCheck.sourceFile("CHANGELOG.md", root: root.path, ref: nil)
+        #expect(current.map { String(decoding: $0, as: UTF8.self) } == "uncommitted")
+    }
 }
