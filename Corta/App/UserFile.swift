@@ -113,9 +113,54 @@ nonisolated enum PrivateFile {
     /// Atomic: a `0600` temporary beside `url`, stripped of any ACL the
     /// folder hands down before a byte is written, renamed over it.
     static func write(_ data: Data, to url: URL) throws {
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try createDirectory(at: url.deletingLastPathComponent())
         try replace(at: url, with: data) { makeOwnerOnly(descriptor: $0) }
+    }
+
+    /// What the file holds, its permissions tightened first: one left by an
+    /// older build or a restored backup stays as it came until the next save.
+    /// Hardening, not a boundary: `~/Library` already keeps other accounts out.
+    /// Nothing is followed: a link here is no file of Corta's.
+    static func read(_ url: URL) throws -> Data {
+        let descriptor = open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
+        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var info = stat()
+        if fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG {
+            _ = makeOwnerOnly(descriptor: descriptor)
+        }
+        return try handle.readToEnd() ?? Data()
+    }
+
+    /// Owner-only, with the parents it needs: at the default umask a state
+    /// directory lists what it holds to anyone who can reach it.
+    static func createDirectory(at url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    }
+
+    /// The temporaries `replace` leaves when it dies between its write and
+    /// rename: a copy of a state file, which Clear History does not reach.
+    /// Nothing younger than `olderThan`, which may be another Corta's, mid-save.
+    static func removeAbandonedTemporaries(in directory: URL, olderThan age: TimeInterval, now: Date = Date()) {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return }
+        for name in names where isTemporaryName(name) {
+            let path = directory.appendingPathComponent(name).path
+            var info = stat()
+            guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
+                now.timeIntervalSince1970 - TimeInterval(info.st_mtimespec.tv_sec) > age
+            else { continue }
+            unlink(path)
+        }
+    }
+
+    /// `.<name>.<uuid>`, as `replace` makes them, and nothing else that starts
+    /// with a dot.
+    static func isTemporaryName(_ name: String) -> Bool {
+        guard name.hasPrefix("."), let dot = name.lastIndex(of: "."), dot != name.startIndex,
+            name[name.index(after: name.startIndex)..<dot].isEmpty == false
+        else { return false }
+        return UUID(uuidString: String(name[name.index(after: dot)...])) != nil
     }
 
     /// A temporary beside `url`, created `0600`, given its final permissions

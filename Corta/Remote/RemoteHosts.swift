@@ -310,7 +310,7 @@ final class RecentHostsStore {
     }
 
     private func load() {
-        guard let data = try? Data(contentsOf: fileURL),
+        guard let data = try? PrivateFile.read(fileURL),
             let persisted = try? JSONDecoder().decode(Persisted.self, from: data),
             persisted.version <= Persisted.currentVersion
         else { return }

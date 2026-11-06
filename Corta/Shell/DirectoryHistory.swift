@@ -234,7 +234,7 @@ final class DirectoryHistoryStore {
     }
 
     private func load() {
-        guard let data = try? Data(contentsOf: fileURL) else { return }
+        guard let data = try? PrivateFile.read(fileURL) else { return }
         // The version alone first: a newer version is usually a new shape,
         // which the full decode below would fail and then overwrite.
         if let version = try? JSONDecoder().decode(VersionProbe.self, from: data).version,

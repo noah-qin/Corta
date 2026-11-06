@@ -77,6 +77,10 @@ final class SplitViewController: NSViewController {
     /// the root pane spawns as the view loads.
     struct Setup {
         var restore: WindowState?
+        /// `restore`'s directories were checked just now, off the main thread
+        /// (`AppDelegate.openInitialWindows`): a pane spawning into one has no
+        /// reason to wait on it a second time.
+        var directoriesChecked = false
         var preset: Preset?
         /// The directory an App Intent asked for; ignored when `restore` or
         /// `preset` names one.
@@ -283,6 +287,8 @@ final class SplitViewController: NSViewController {
         pendingRestore = nil
         view.layoutSubtreeIfNeeded()
         self.restore(layout: restore.layout)
+        // Panes from here on open where the user is, which nobody has checked.
+        setup.directoriesChecked = false
     }
 
     override func viewDidLayout() {
@@ -359,6 +365,7 @@ final class SplitViewController: NSViewController {
         // Opens where the focused pane is (OSC 7), else home. The directory is
         // already host-filtered, so a remote path never reaches a local spawn.
         pane.inheritedWorkingDirectory = workingDirectory
+        pane.inheritedDirectoryChecked = setup.directoriesChecked
         pane.initialGridSize = initialGridSize
         pane.didSizeWindow = didSetUpWindow
         addChild(pane)
