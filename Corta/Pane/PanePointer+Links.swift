@@ -371,8 +371,9 @@ extension PanePointer {
         return true
     }
 
-    /// Opens what `detected` names, once a pending local check has answered;
-    /// `otherwise` runs when it names nothing that opens.
+    /// Opens what `detected` names. A pending local check may only open that
+    /// local file; failure or timeout abandons the action. `otherwise` runs
+    /// only when the initial lookup already names nothing that opens.
     func openDetected(
         _ detected: FileReferenceDetection.Reference?, otherwise: @escaping () -> Void = {}
     ) {
@@ -391,13 +392,8 @@ extension PanePointer {
                 guard self.session === asked,
                     Self.candidatePath(detected, directory: self.session.workingDirectory) == path
                 else { return }
-                if isFile {
-                    self.open(.local(Self.resolved(detected, at: path)))
-                } else if let remote = self.host?.remote.resolve(detected) {
-                    self.open(.remote(remote))
-                } else {
-                    otherwise()
-                }
+                guard isFile else { return }
+                self.open(.local(Self.resolved(detected, at: path)))
             }
         }
     }

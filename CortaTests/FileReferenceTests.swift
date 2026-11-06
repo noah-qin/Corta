@@ -251,6 +251,51 @@ struct OpenFileCommandTests {
         return true
     }
 
+    @Test("a failed or timed-out pending local probe cannot run an opening fallback", arguments: [false, true])
+    func pendingLocalProbeNeverFallsBack(timesOut: Bool) async throws {
+        let host = ReferenceTestHost()
+        host.terminalView = TerminalView(frame: .zero)
+        let script = #"printf '\033]7;file://%s/private/tmp\033\\' "$(hostname)"; sleep 60"#
+        let session = try TerminalSession(
+            executable: "/bin/sh", arguments: ["-c", script], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 4, columns: 80), workingDirectory: "/private/tmp")
+        defer { session.stop() }
+        host.session = session
+        session.start()
+        try #require(await waitUntilTrue(timeout: .seconds(5)) { session.workingDirectory != nil })
+        let pointer = PanePointer(host: host)
+        let resume = DispatchSemaphore(value: 0)
+        defer { resume.signal() }
+        pointer.fileProbe = FileReferenceProbe(check: { _ in
+            if timesOut { resume.wait() }
+            return false
+        }, timeout: .milliseconds(20))
+        let reference = FileReferenceDetection.Reference(
+            path: "unconfirmed.swift", line: 12,
+            range: SelectionRange(
+                anchor: SelectionPoint(row: 0, column: 0), head: SelectionPoint(row: 0, column: 5)))
+        guard case .pending = pointer.lookUpReference(reference) else {
+            Issue.record("expected an uncached local target")
+            return
+        }
+        var fallbackRan = false
+        pointer.openDetected(reference) { fallbackRan = true }
+        if timesOut {
+            try await Task.sleep(for: .milliseconds(100) * testTimeoutScale)
+            #expect(pointer.fileProbe.outstanding == 1)
+            #expect(pointer.fileProbe.cached("/private/tmp/unconfirmed.swift") == nil)
+        } else {
+            try #require(await waitUntilTrue(timeout: .seconds(5)) { pointer.fileProbe.outstanding == 0 })
+        }
+        #expect(!fallbackRan, "a pending local click must never become another opening action")
+        #expect(host.terminalView.toastLayer == nil)
+        if timesOut {
+            resume.signal()
+            try #require(await waitUntilTrue(timeout: .seconds(5)) { pointer.fileProbe.outstanding == 0 })
+            #expect(!fallbackRan, "a late answer cannot replay the click")
+        }
+    }
+
     /// The answer takes time, and the shell moves on in the meantime.
     @Test("a check that answers after a `cd` opens nothing, here or on the remote host")
     func probeOutlivedByADirectoryChange() async throws {

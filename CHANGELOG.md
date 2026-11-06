@@ -128,6 +128,9 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- A pending local file-reference check that fails or times out abandons the
+  click instead of opening an unconfirmed remote file or another fallback.
+
 - Hovering over empty or ordinary text keeps tracking the resting pointer, so a
   link that later appears there gets its tooltip without another mouse move.
 - An SFTP connection is not failed by a cancelled deadline that has just reached
