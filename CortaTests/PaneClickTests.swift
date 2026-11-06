@@ -57,6 +57,14 @@ struct PaneClickTests {
         #expect(window.firstResponder === view, "typing would otherwise go to the other pane")
     }
 
+    private func waitForDirectory(_ session: TerminalSession) async -> Bool {
+        let deadline = SuspendingClock.now + .seconds(10) * testTimeoutScale
+        while session.workingDirectory == nil, SuspendingClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return session.workingDirectory != nil
+    }
+
     /// `link-activation = click` is for URLs: a click also focuses a pane and
     /// clears a selection, and a `path:line` starts the configured editor.
     @Test("a plain click does not open a `path:line`, whatever link-activation says")
@@ -78,6 +86,10 @@ struct PaneClickTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let file = directory.appendingPathComponent("target.swift")
         try Data().write(to: file)
+        // A local directory reported, or no path counts as a file here at all.
+        session.write(Array("printf '\\033]7;file://%s%s\\033\\\\' \"$(hostname)\" '\(directory.path)'\n".utf8))
+        let reported = await waitForDirectory(session)
+        try #require(reported)
         session.write(Array("echo '\(file.path):3'\n".utf8))
 
         // Wherever the output landed, by asking the same detection a click uses.

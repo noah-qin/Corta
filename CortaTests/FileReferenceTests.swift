@@ -211,17 +211,20 @@ struct OpenFileCommandTests {
     /// The answer takes time, and the shell moves on in the meantime.
     @Test("a check that answers after a `cd` opens nothing, here or on the remote host")
     func probeOutlivedByADirectoryChange() async throws {
-        let root = FileManager.default.temporaryDirectory
+        // Real paths: the kernel's answer has to agree with the reported one.
+        let root = URL(fileURLWithPath: (NSTemporaryDirectory() as NSString).resolvingSymlinksInPath)
             .appendingPathComponent("corta-ref-\(UUID().uuidString)", isDirectory: true)
         let (first, second) = (root.appendingPathComponent("first"), root.appendingPathComponent("second"))
+        defer { try? FileManager.default.removeItem(at: root) }
         for directory in [first, second] {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try Data().write(to: directory.appendingPathComponent("file.swift"))
         }
-        defer { try? FileManager.default.removeItem(at: root) }
-        let script = "printf '\\033]7;file://$(hostname)\(first.path)\\033\\\\'; read -r _; "
-            + "printf '\\033]7;file://$(hostname)\(second.path)\\033\\\\'; cd '\(second.path)'; echo MOVED; sleep 60"
+        func report(_ path: String) -> String { #"printf '\033]7;file://%s%s\033\\' "$(hostname)" '"# + path + "'; " }
+        let script = report(first.path) + "read -r _; " + report(second.path) + "cd '\(second.path)'; echo MOVED; sleep 60"
         let host = ReferenceTestHost()
+        // With no editor configured, opening anything leaves a toast to find.
+        host.terminalView = TerminalView(frame: .zero)
         let session = try TerminalSession(
             executable: "/bin/sh", arguments: ["-c", script], environment: ChildEnvironment.default(),
             size: TerminalSize(rows: 10, columns: 80), workingDirectory: first.path)
@@ -244,14 +247,14 @@ struct OpenFileCommandTests {
         pointer.openDetected(reference) { nothingOpened = true }
         session.write(Array("\n".utf8))
         let moved = await waitUntilTrue(timeout: .seconds(5)) {
-            session.workingDirectory == second.path || session.workingDirectory?.hasSuffix("second") == true
+            session.workingDirectory == second.path
         }
         try #require(moved)
         resume.signal()
         try await Task.sleep(for: .milliseconds(100))
         // Gave up: neither `otherwise` nor an open, for any file.
         #expect(!nothingOpened)
-        #expect(host.terminalViewToasts == 0)
+        #expect(host.terminalView.toastLayer == nil)
     }
 
     @Test("a link opens, and is shown as, the URL the browser receives")
@@ -370,7 +373,6 @@ private final class ReferenceTestHost: PanePointerHost {
     let remote = PaneRemote()
     private let commandsHost = CommandsTestHost()
     var commands: PaneCommands { commandsHost.commands }
-    var terminalViewToasts = 0
     func invalidateDisplay() {}
 }
 
