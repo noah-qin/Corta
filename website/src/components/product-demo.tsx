@@ -42,12 +42,16 @@ export function ProductDemo({ src, poster, copy, overview }: Props) {
     let visible = false;
     function reconcile() {
       if (!video) return;
-      if (
+      const shouldPlay =
         visible &&
         !document.hidden &&
         !manualPause.current &&
-        (!motion.matches || optedIn.current)
-      ) {
+        (!motion.matches || optedIn.current);
+      video.autoplay = shouldPlay;
+      if (shouldPlay) {
+        // Set the media properties before assigning a source for native autoplay.
+        video.defaultMuted = true;
+        video.muted = true;
         if (!video.getAttribute("src")) video.src = src;
         void video.play().catch(() => {
           /* The explicit play button can retry. */
@@ -66,11 +70,14 @@ export function ProductDemo({ src, poster, copy, overview }: Props) {
       { threshold: 0.2 },
     );
     observer.observe(video);
+    video.addEventListener("canplay", reconcile);
     motion.addEventListener("change", preferenceChanged);
     document.addEventListener("visibilitychange", reconcile);
     setEnhanced(true);
     return () => {
       observer.disconnect();
+      video.removeEventListener("canplay", reconcile);
+      video.autoplay = false;
       motion.removeEventListener("change", preferenceChanged);
       document.removeEventListener("visibilitychange", reconcile);
       video.pause();
@@ -89,6 +96,7 @@ export function ProductDemo({ src, poster, copy, overview }: Props) {
       void video.play().catch(() => {});
     } else {
       manualPause.current = true;
+      video.autoplay = false;
       video.pause();
     }
   }
