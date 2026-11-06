@@ -143,7 +143,7 @@ export async function generate() {
         ) + suffix
       );
     }
-    if (image || /\.(png|gif|jpe?g|svg|webp|avif)$/i.test(target)) {
+    if (image || /\.(png|gif|jpe?g|svg|webp|avif|mp4)$/i.test(target)) {
       if (!exists(target)) throw Error(`Missing asset: ${target}`);
       const dest = path.join(assets, target);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -175,9 +175,30 @@ export async function generate() {
         if (n.url) n.url = convert(n.url, file, lang.code, n.type === "image");
         if (n.type === "html")
           n.value = n.value.replace(
-            /\b(src|href)=(['"])(.*?)\2/g,
-            (_, attr, q, url) =>
-              `${attr}=${q}${convert(url, file, lang.code, attr === "src")}${q}`,
+            /\b(src|href|srcset|poster)=(['"])(.*?)\2/g,
+            (_, attr, q, url) => {
+              const rewritten =
+                attr === "srcset"
+                  ? url
+                      .split(",")
+                      .map((candidate) => {
+                        const [source, ...descriptor] = candidate
+                          .trim()
+                          .split(/\s+/);
+                        return [
+                          convert(source, file, lang.code, true),
+                          ...descriptor,
+                        ].join(" ");
+                      })
+                      .join(", ")
+                  : convert(
+                      url,
+                      file,
+                      lang.code,
+                      attr === "src" || attr === "poster",
+                    );
+              return `${attr}=${q}${rewritten}${q}`;
+            },
           );
       });
       const key = `${lang.code}/${doc.slug}`;
@@ -232,6 +253,8 @@ export async function generate() {
               file,
               "CHANGELOG.md",
               "docs/brand/screenshot.png",
+              "docs/brand/interaction-demo-poster.png",
+              "docs/brand/interaction-demo.mp4",
               "docs/brand/corta-pangolin-mascot.png",
             ].map(dateFor);
             return dates.every(Boolean) ? dates.sort().at(-1) : undefined;
@@ -282,11 +305,13 @@ export async function generate() {
   for (const file of [
     "docs/brand/corta-pangolin-mascot.png",
     "docs/brand/screenshot.png",
+    "docs/brand/interaction-demo-poster.png",
+    "docs/brand/interaction-demo.mp4",
     "docs/brand/social-preview.png",
   ])
     convert(file, "README.md", "en", true);
   // Responsive derivatives are generated from the repository image, never edited by hand.
-  const screenshotFile = "docs/brand/screenshot.png";
+  const screenshotFile = "docs/brand/interaction-demo-poster.png";
   const screenshotPath = path.join(contentRoot, screenshotFile);
   const original = await sharp(screenshotPath).metadata();
   if (!original.width || !original.height)

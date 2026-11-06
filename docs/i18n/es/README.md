@@ -27,7 +27,10 @@ Renderizado con Metal 4 · Entrada CJK / IME nativa · SSH, SFTP y edición remo
 
 🇺🇸 [English](../../../README.md) · 🇨🇳 [简体中文](../zh-CN/README.md) · 🇭🇰 [繁體中文](../zh-Hant/README.md) · 🇯🇵 [日本語](../ja/README.md) · 🇰🇷 [한국어](../ko/README.md) · 🇩🇪 [Deutsch](../de/README.md) · 🇫🇷 [Français](../fr/README.md) · 🇪🇸 [Español](README.md) · 🇧🇷 [Português](../pt-BR/README.md)
 
-<img src="../../brand/screenshot.png" width="960" alt="Corta con tres paneles: un git log y una tabla de alineación con chino, japonés, coreano y emoji; la mascota pangolín mostrada como imagen en el terminal; y degradados de color de 24 bits">
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
+  <img src="../../brand/interaction-demo.gif" width="960" height="588" alt="Corta en acción: dividir paneles, mover sesiones activas y cambiar o reordenar pestañas">
+</picture>
 
 </div>
 

@@ -13,7 +13,10 @@ repository root.
 | `corta-pangolin-loop.gif`   | Looping mascot animation, 360 × 360                              |
 | `session-ended.png` | Ended session: the centered glass status panel over dimmed, retained output, from an isolated local-zsh UI fixture |
 | `native-tab-icon.png` | The tab strip in the titlebar row, with single-pane and split-pane program icons, from an isolated development build |
-| `screenshot.png`            | The README screenshot — light theme, a clean demo shell          |
+| `screenshot.png` | Static terminal reference — light theme, a clean demo shell |
+| `interaction-demo.gif` | README interaction loop, 960 × 588, 10 seconds |
+| `interaction-demo.mp4` | Website interaction loop, 1600 × 980, 60 fps, 12 seconds, no audio |
+| `interaction-demo-poster.png` | Still fallback for both interaction demos, 1600 × 980 |
 | `input-source-indicator.png` | Independent Chinese input-source badge, separated from toolbar action buttons, from an isolated demo shell |
 | `input-source-long-command.png` | Right-edge badge moved below a long command, without changing the grid |
 | `history-suggestions.png` | Local zsh history suffix, from the isolated history-suggestions UI fixture |
@@ -21,7 +24,7 @@ repository root.
 | `about.png`                 | About with separated links (development build)                   |
 | `social-preview.png`        | GitHub social preview card, 1280 × 640                            |
 
-The two scripts that make these images live in `scripts/brand/`:
+The scripts that make these images live in `scripts/brand/`:
 `compose-screenshot.swift` adds the shadow, margin and poster type to a
 window capture, and `social-preview.swift` renders the social preview card.
 
@@ -99,3 +102,11 @@ swiftc -O scripts/brand/compose-screenshot.swift -o /tmp/compose
 /tmp/compose overlay window.png palette.png 350 184 with-palette.png
 /tmp/compose poster with-palette.png card.png "Every command, one search away" "⇧⌘P opens the command palette"
 ```
+
+## Interaction demos
+
+The README and homepage use separate edits of an isolated light-theme development-build recording. They show pane splits, moving running sessions, and tab creation, switching and reordering. The website also shows detached windows. Pauses are shortened and the end returns to the beginning with a crossfade. There is no soundtrack, promotional introduction or caption overlay. These demos reflect the main development tree, including changes listed in Unreleased.
+
+`render-interaction-demo.swift` composes the video, static poster and raw GIF frames from an app-only recording and a clean window-button capture. `website/scripts/encode-interaction-gif.mjs` encodes the raw frames using the website's existing Sharp dependency. See each script's usage for the required inputs. Original recording coordinates are documented in the renderer; a different recording requires adjusting its source rectangles and edit timeline.
+
+The README selects the still for readers whose viewer supports `prefers-reduced-motion`. The homepage initially renders a responsive still and only loads the muted video when visible; it includes a pause/play button and respects reduced motion by default.

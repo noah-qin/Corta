@@ -27,7 +27,10 @@ Rendu Metal 4 · Saisie CJK / IME native · SSH, SFTP et édition à distance
 
 🇺🇸 [English](../../../README.md) · 🇨🇳 [简体中文](../zh-CN/README.md) · 🇭🇰 [繁體中文](../zh-Hant/README.md) · 🇯🇵 [日本語](../ja/README.md) · 🇰🇷 [한국어](../ko/README.md) · 🇩🇪 [Deutsch](../de/README.md) · 🇫🇷 [Français](README.md) · 🇪🇸 [Español](../es/README.md) · 🇧🇷 [Português](../pt-BR/README.md)
 
-<img src="../../brand/screenshot.png" width="960" alt="Corta avec trois volets : un git log et un tableau d’alignement chinois, japonais, coréen et emoji ; la mascotte pangolin affichée en image dans le terminal ; et des dégradés en couleurs 24 bits">
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
+  <img src="../../brand/interaction-demo.gif" width="960" height="588" alt="Corta en action : diviser les volets, déplacer les sessions actives et changer ou réordonner les onglets">
+</picture>
 
 </div>
 

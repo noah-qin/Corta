@@ -283,16 +283,87 @@ img {
   filter: drop-shadow(0 25px 25px #31513b16);
 }
 .product-shot {
+  max-width: 960px;
   margin-top: 25px;
 }
-.product-shot > img {
+.demo-stage {
+  position: relative;
+  display: grid;
+  aspect-ratio: 80 / 49;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--paper);
+  isolation: isolate;
+  /* Keep the rounded clip and native video on the same scrolling layer. */
+  transform: translateZ(0);
+}
+.demo-stage > img,
+.demo-stage > video {
+  grid-area: 1 / 1;
   display: block;
+  min-width: 0;
+  min-height: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.demo-stage > video {
+  opacity: 0;
+}
+.demo-stage > video.is-playing {
+  opacity: 1;
+}
+.demo-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  /* Blend the encoded video's background into the page without a hard seam. */
+  background:
+    linear-gradient(
+      to right,
+      var(--paper),
+      transparent 12px,
+      transparent calc(100% - 12px),
+      var(--paper)
+    ),
+    linear-gradient(
+      to bottom,
+      var(--paper),
+      transparent 12px,
+      transparent calc(100% - 12px),
+      var(--paper)
+    );
+}
+.demo-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
   border-radius: 5px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.demo-toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.demo-toggle:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+.product-shot figcaption > a {
+  margin-left: 0;
 }
 .product-shot figcaption {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 15px 0;

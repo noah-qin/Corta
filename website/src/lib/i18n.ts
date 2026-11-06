@@ -353,3 +353,66 @@ export const homepageTitles: Record<string, string> = {
   es: "Corta — Terminal nativo para macOS",
   "pt-BR": "Corta — Terminal nativo para macOS",
 };
+
+// UI labels for the shared, language-neutral product recording.
+export const interactionDemoCopy: Record<
+  string,
+  { description: string; play: string; pause: string; open: string }
+> = {
+  en: {
+    description: "Splits, running panes and tabs · main development tree",
+    play: "Play demo",
+    pause: "Pause demo",
+    open: "Open video",
+  },
+  "zh-CN": {
+    description: "分屏、运行中的窗格与标签 · main 开发树",
+    play: "播放演示",
+    pause: "暂停演示",
+    open: "打开视频",
+  },
+  "zh-Hant": {
+    description: "分割、執行中的窗格與分頁 · main 開發樹",
+    play: "播放示範",
+    pause: "暫停示範",
+    open: "開啟影片",
+  },
+  ja: {
+    description: "分割・実行中のペイン・タブ · main 開発版",
+    play: "デモを再生",
+    pause: "デモを一時停止",
+    open: "動画を開く",
+  },
+  ko: {
+    description: "분할, 실행 중인 페인과 탭 · main 개발 버전",
+    play: "데모 재생",
+    pause: "데모 일시 정지",
+    open: "동영상 열기",
+  },
+  de: {
+    description:
+      "Teilungen, laufende Bereiche und Tabs · main-Entwicklungsstand",
+    play: "Demo abspielen",
+    pause: "Demo pausieren",
+    open: "Video öffnen",
+  },
+  fr: {
+    description:
+      "Volets, sessions actives et onglets · version de développement main",
+    play: "Lire la démo",
+    pause: "Mettre en pause",
+    open: "Ouvrir la vidéo",
+  },
+  es: {
+    description: "Paneles, sesiones activas y pestañas · desarrollo en main",
+    play: "Reproducir demo",
+    pause: "Pausar demo",
+    open: "Abrir vídeo",
+  },
+  "pt-BR": {
+    description: "Painéis, sessões ativas e abas · desenvolvimento em main",
+    play: "Reproduzir demo",
+    pause: "Pausar demo",
+    open: "Abrir vídeo",
+  },
+};
