@@ -29,13 +29,14 @@ final class SplitTransition {
     private(set) var isRunning = false
 
     func start(node: NSSplitView, from start: CGFloat, to end: CGFloat,
-               revealing view: NSView? = nil, completion: @escaping () -> Void) {
+               revealing view: NSView? = nil, collapsing: Bool = false, completion: @escaping () -> Void) {
         finish()
         installReveal(on: view, vertical: node.isVertical)
         self.node = node
         destination = end
         self.completion = completion
         isRunning = true
+        let dividerThickness = node.dividerThickness
         let began = ProcessInfo.processInfo.systemUptime
         node.setPosition(start, ofDividerAt: 0)
         let timer = Timer(timeInterval: 1 / 120, repeats: true) { [weak self] timer in
@@ -48,8 +49,18 @@ final class SplitTransition {
                     self.finish()
                     return
                 }
-                // A damped spring with a single restrained overshoot.
-                let progress = 1 - exp(-18 * elapsed) * (cos(23 * elapsed) + 18 / 23 * sin(23 * elapsed))
+                let progress: Double
+                if collapsing {
+                    // A critically damped spring: overshooting a zero-sized
+                    // pane hits AppKit's clamp and then visibly bounces back.
+                    let response = 1 - exp(-24 * elapsed) * (1 + 24 * elapsed)
+                    let settled = 1 - exp(-24 * 0.36) * (1 + 24 * 0.36)
+                    progress = min(1, response / settled)
+                    (node as? PaneSplitView)?.transitionDividerThickness = dividerThickness * (1 - progress)
+                    node.needsDisplay = true
+                } else {
+                    progress = 1 - exp(-18 * elapsed) * (cos(23 * elapsed) + 18 / 23 * sin(23 * elapsed))
+                }
                 node.setPosition(start + (end - start) * progress, ofDividerAt: 0)
                 node.layoutSubtreeIfNeeded()
                 self.updateReveal(progress: progress, vertical: node.isVertical)
@@ -95,7 +106,11 @@ final class SplitTransition {
         guard isRunning else { return }
         timer?.invalidate()
         timer = nil
-        node?.setPosition(destination, ofDividerAt: 0)
+        let settledNode = node
+        if let split = settledNode as? PaneSplitView, split.transitionDividerThickness != nil {
+            split.transitionDividerThickness = 0
+        }
+        settledNode?.setPosition(destination, ofDividerAt: 0)
         node = nil
         if revealedView?.layer?.mask === revealMask { revealedView?.layer?.mask = nil }
         revealedView?.layer?.removeAnimation(forKey: "corta.split.enter")
@@ -105,5 +120,6 @@ final class SplitTransition {
         let callback = completion
         completion = nil
         callback?()
+        (settledNode as? PaneSplitView)?.transitionDividerThickness = nil
     }
 }

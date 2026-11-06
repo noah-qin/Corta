@@ -128,6 +128,15 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Closing a split pane smoothly collapses its gutter and prepares the final
+  terminal size before the transition, avoiding a second reflow at the end.
+- Opening and closing tabs moves and fades their entire terminal content,
+  including text, while preserving the existing tab-label animation.
+- Settings search has more space above the category list; sidebar width and
+  category text retain their original layout.
+- The pane-header zoom control appears on hover or keyboard focus, remains
+  available to VoiceOver, and is hidden when there is only one pane.
+
 - A pending local file-reference check that fails or times out abandons the
   click instead of opening an unconfirmed remote file or another fallback.
 
