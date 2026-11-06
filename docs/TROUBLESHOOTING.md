@@ -153,7 +153,9 @@ Corta only checks types while you hover. Releasing the drop requests the files;
 cloud files and promises from apps such as Photos or Mail may take time. A
 120-second deadline stops waiting and shows a warning. A partial reception uses
 only completed files; late results never fill additional paths. Retry missing
-files separately. No drop presses Return for you.
+files separately. No drop presses Return for you. A new drop on a pane replaces
+one still arriving there, and a warning says the earlier one was cancelled; drop
+it again once the new one has filled its paths.
 
 If the session or foreground process group changed during reception, Corta
 refuses to fill any paths. Wait for the intended prompt and drop again. Corta's

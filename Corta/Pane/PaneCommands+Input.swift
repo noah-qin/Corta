@@ -51,21 +51,28 @@ extension PaneCommands {
         }
     }
 
-    private func receiveFileDrop(_ pasteboard: NSPasteboard) -> Bool {
+    /// One reception per pane, the newest: two would fill their paths with
+    /// nothing between them, and a stalled provider must not hold the pane
+    /// until its deadline. A drop that cannot start replaces nothing.
+    func receiveFileDrop(_ pasteboard: NSPasteboard) -> Bool {
         guard let context = dropInputContext else {
             host?.terminalView?.showToast(L10n.text("drop.targetChanged"), kind: .warning)
             return false
         }
-        fileDropRequest?.cancel()
-        fileDropRequest = FileDropRequest.start(pasteboard) { [weak self] result in
+        let request = FileDropRequest.start(pasteboard) { [weak self] result in
             guard let self else { FileDropStorage.remove(result.directory); return }
             self.fileDropRequest = nil
             self.completeFileDrop(result, context: context)
         }
-        guard fileDropRequest != nil else {
+        guard let request else {
             host?.terminalView?.showToast(L10n.text("drop.failed"), kind: .warning)
             return false
         }
+        if let earlier = fileDropRequest {
+            earlier.cancel()
+            host?.terminalView?.showToast(L10n.text("drop.replaced"), kind: .warning)
+        }
+        fileDropRequest = request
         return true
     }
 

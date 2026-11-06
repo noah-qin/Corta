@@ -359,7 +359,7 @@ nonisolated private final class TestPromiseReceiver: NSFilePromiseReceiver {
 
 /// AppKit's real order: `fileNames` fills during the receive call, and a
 /// reader reaches the queue only when the test says its file has been written.
-nonisolated private final class LatePromiseReceiver: NSFilePromiseReceiver, @unchecked Sendable {
+nonisolated final class LatePromiseReceiver: NSFilePromiseReceiver, @unchecked Sendable {
     private struct Pending {
         var names: [String] = []
         var directory: URL?

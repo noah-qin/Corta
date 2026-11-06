@@ -238,6 +238,65 @@
         }
       }
     },
+    "drop.replaced": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The earlier drop was cancelled and this one replaced it. Drop the earlier files again once this one is done."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已取消上一次拖放，改为接收这一次。完成后请重新拖放上一次的文件。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已取消上一次拖放，改為接收這一次。完成後請重新拖放上一次的檔案。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "前のドロップをキャンセルし、今回のドロップに置き換えました。完了後に前のファイルをもう一度ドロップしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이전 드롭을 취소하고 이번 드롭으로 바꿨습니다. 완료되면 이전 파일을 다시 드롭해 주세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Das vorherige Ablegen wurde abgebrochen und durch dieses ersetzt. Die vorherigen Dateien danach bitte erneut ablegen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le dépôt précédent a été annulé et remplacé par celui-ci. Déposez à nouveau les fichiers précédents une fois celui-ci terminé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Se canceló la operación anterior y esta la reemplazó. Cuando termine, suelta de nuevo los archivos anteriores."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A operação anterior foi cancelada e substituída por esta. Quando terminar, solte novamente os arquivos anteriores."
+          }
+        }
+      }
+    },
     "drop.targetChanged": {
       "extractionState": "manual",
       "localizations": {
