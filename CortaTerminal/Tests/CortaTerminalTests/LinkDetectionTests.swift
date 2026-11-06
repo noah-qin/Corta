@@ -160,7 +160,7 @@ struct LinkDetectionTests {
         }
         let cases = [
             Case("src/main.rs:42:17: error: no", "src/main.rs", 42, 17),
-            Case("Corta/ViewController.swift:1209", "Corta/ViewController.swift", 1209, nil),
+            Case("Corta/TerminalPaneViewController.swift:1209", "Corta/TerminalPaneViewController.swift", 1209, nil),
             Case("/usr/include/stdio.h:100:", "/usr/include/stdio.h", 100, nil),
             Case("./build.sh:7: syntax", "./build.sh", 7, nil),
             Case("~/notes.md:3", "~/notes.md", 3, nil),

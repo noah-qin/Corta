@@ -17,7 +17,7 @@
 import AppKit
 
 /// Pure geometry: how the grid sits in its window. Not on the
-/// `@MainActor` `ViewController`, so nonisolated readers (mouse → cell)
+/// `@MainActor` `TerminalPaneViewController`, so nonisolated readers (mouse → cell)
 /// can use it.
 nonisolated enum TerminalLayout {
     /// Below the traffic lights; `.fullSizeContentView` runs the background
@@ -44,7 +44,7 @@ nonisolated enum TerminalLayout {
     static let statusRuleWidth: CGFloat = 2
 
     /// How much chrome overlaps a pane this far below the window top; zero
-    /// for lower and interior panes. Shared by `ViewController.topInset` and
+    /// for lower and interior panes. Shared by `TerminalPaneViewController.topInset` and
     /// `updateFocusRingLayout`, so the grid and focus ring agree.
     static func chromeOverlap(windowChrome: CGFloat, paneDistanceFromTop: CGFloat) -> CGFloat {
         max(0, windowChrome - titlebarOverlap - paneDistanceFromTop)

@@ -265,7 +265,7 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
 
     // MARK: - Remote references
 
-    /// The remote counterpart of `ViewController.ResolvedFileReference`.
+    /// The remote counterpart of `PanePointer.ResolvedFileReference`.
     nonisolated struct ResolvedReference: Equatable {
         var host: String
         var remotePath: String

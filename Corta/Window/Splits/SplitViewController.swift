@@ -1,0 +1,618 @@
+// Copyright 2026 Noah Qin
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
+
+import Cocoa
+import CortaTerminal
+
+/// The window's content controller: owns the split tree, one pane
+/// (`TerminalPaneViewController`, one `TerminalSession`) per leaf (D07), and the focus
+/// that routes input to one of them. Window-level setup lives here, since
+/// N panes still share one window.
+final class SplitViewController: NSViewController {
+    private(set) var tree: SplitTree!
+    /// The pane filling the window, or `nil`. Zoom is temporary: the tree,
+    /// the processes and the saved layout are untouched, which is why it is
+    /// one reference rather than a second tree.
+    private(set) var zoomedPane: TerminalPaneViewController?
+    /// The arrangement when the zoom began: what `windowState` saves while
+    /// zoomed, and what the dividers are restored from — AppKit re-halves a
+    /// split that loses a subview.
+    private(set) var layoutBeforeZoom: PaneLayout?
+    /// Where the zoomed pane's view came from, so unzoom restores its slot.
+    private var zoomOrigin: (superview: NSView, index: Int)?
+    /// Where the last closed pane was, for reopening; one deep
+    /// (`SplitViewController+Reopen.swift`).
+    var lastClosedPane: ClosedPane?
+    var contentMargin: CGFloat { PaneSurfaceView.margin }
+    private let systemStatusBar = SystemStatusBar(frame: .zero)
+    private var statusBarHeightConstraint: NSLayoutConstraint?
+    var statusBarHeight: CGFloat {
+        ConfigurationStore.shared.configuration.statusBar && !directPresentation.contains(.overlays)
+            ? SystemStatusBar.height : 0
+    }
+    /// What direct presentation changes right now (`updateDirectPresentation`).
+    var directPresentation: DirectFullScreen = []
+    /// The pane that receives input. Set by `noteFocus` from
+    /// `TerminalView.becomeFirstResponder`, so every route to focus funnels
+    /// through one place; `SplitViewController+Restore` sets it to rebuild a
+    /// saved layout through the same split path as ⌘D.
+    var focusedPane: TerminalPaneViewController?
+    /// A move is rearranging the tree: panes wait for the settled sizes rather
+    /// than resize to a step on the way (`SplitViewController+Moving.swift`).
+    var isRearrangingPanes = false
+    /// A saved layout is being rebuilt through `splitFocusedPane`: its dividers
+    /// are the user's, not a new pane's to rebalance.
+    var isRestoringLayout = false
+    /// The window is dressed and sized (`prepareWindow`); later split panes
+    /// take `didSizeWindow` from this.
+    private(set) var didSetUpWindow = false
+    /// The splits were rebuilt and first responder taken (`viewWillAppear`).
+    private var didAppear = false
+    /// The tab this split view is (D30); `nil` for a split a test hosts in a
+    /// bare window.
+    weak var tab: TerminalTab?
+    /// The chrome height at the last layout, for absorbing a change — the
+    /// toolbar shown or hidden — into the frame.
+    private var lastChromeHeight: CGFloat?
+    /// Whether this split is what its window shows.
+    var isSelectedTab: Bool { tab?.isSelected ?? true }
+
+    var panes: [TerminalPaneViewController] { children.compactMap { $0 as? TerminalPaneViewController } }
+    var hasMultiplePanes: Bool { panes.count > 1 }
+
+    /// What the window's root pane spawns as: given at construction, since
+    /// the root pane spawns as the view loads.
+    struct Setup {
+        var restore: WindowState?
+        /// `restore`'s directories were checked just now, off the main thread
+        /// (`AppDelegate.openInitialWindows`): a pane spawning into one has no
+        /// reason to wait on it a second time.
+        var directoriesChecked = false
+        var preset: Preset?
+        /// The directory an App Intent asked for; ignored when `restore` or
+        /// `preset` names one.
+        var workingDirectory: String?
+        /// A running pane from another tab, to be this tab's root in place of
+        /// a new one.
+        var adopting: TerminalPaneViewController?
+    }
+    let splitTransition = SplitTransition()
+    /// `adopting` is emptied once the view has taken the pane: a tab outlives
+    /// a pane that moves on or closes, and must not keep it alive.
+    private(set) var setup: Setup
+
+    /// The layout being restored: taken in `viewDidLoad` (the root pane needs
+    /// its directory at spawn), its frame in `prepareWindow`, its splits in
+    /// `viewWillAppear` (they need the final frame).
+    var pendingRestore: WindowState?
+
+    /// The preset the first pane spawned from.
+    var pendingPreset: Preset?
+
+    init(setup: Setup = Setup()) {
+        self.setup = setup
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func loadView() {
+        view = WindowContentView(frame: NSRect(x: 0, y: 0, width: 480, height: 270))
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // A value set on a hand-built controller before its view loads (tests
+        // do this) is kept unless the setup names one.
+        if let restore = setup.restore { pendingRestore = restore }
+        if let preset = setup.preset { pendingPreset = preset }
+        // Resolved by name against the current config, so a restored window gets
+        // its preset's shell and environment back; a preset renamed since degrades
+        // to directory-only.
+        let restoredPreset = pendingRestore?.layout.firstPresetName.flatMap { name in
+            ConfigurationStore.shared.configuration.presets.first { $0.name == name }
+        }
+        let pane: TerminalPaneViewController
+        if let adopted = setup.adopting {
+            addChild(adopted)
+            pane = adopted
+            setup.adopting = nil
+        } else {
+            pane = makePane(
+                workingDirectory: pendingRestore?.layout.firstDirectory ?? setup.workingDirectory,
+                initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
+        }
+        focusedPane = pane
+        tree = SplitTree(root: pane.view)
+        systemStatusBar.onVisibilityChange = { [weak self] in self?.updateStatusBarLayout() }
+        installRoot()
+    }
+
+    /// Dresses and sizes the window before it is first shown. Called by
+    /// `TerminalWindowController` once the content view — and with it the
+    /// root pane and its renderer — exists, so the frame is measured from the
+    /// pane's real cell metrics and the session is born at the size it keeps.
+    ///
+    /// The style mask is final from the window's creation, so the chrome
+    /// measured here is the chrome the window shows: no layout before or
+    /// after this runs at a transient size (what D15 used to gate).
+    func prepareWindow(_ window: NSWindow) {
+        guard !didSetUpWindow, let pane = focusedPane else { return }
+        didSetUpWindow = true
+        window.title = "Corta"
+        // Corta draws its own tabs (D30).
+        window.tabbingMode = .disallowed
+        // Chrome follows the system appearance; the terminal surface stays dark.
+        window.appearance = nil
+        // Its content is a live process, not a document. Left restorable, AppKit
+        // re-applied a stale saved frame after the sizing below.
+        window.isRestorable = false
+        // AppKit may expose areas outside the drawable after appearance/tab
+        // transitions. Back them with the same opaque canvas as the terminal.
+        (window.windowController as? TerminalWindowController)?.applyCanvasAppearance()
+        // A pane that failed to build (`PaneFailureView`) has no atlas; it is
+        // sized from estimated metrics and resizes freely.
+        if let metrics = pane.terminalRenderer?.pointMetrics {
+            window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        }
+        updateWindowMinSize()
+        if let restore = pendingRestore {
+            // The saved frame is authoritative; clamped to a display that
+            // exists now — see `Frame.onScreen`.
+            window.setFrame(restore.frame.onScreen(), display: false)
+        } else {
+            // The frame for the initial grid: cells, insets, the chrome the
+            // toolbar just set, and the status bar — centred on the main
+            // screen and kept inside its visible frame, so AppKit never
+            // shrinks it after the child has its size. The opener may
+            // cascade it from there (`AppDelegate.cascade`). The tab strip
+            // lives in the toolbar, already installed, so it is in the chrome
+            // measured here (D30).
+            var size = pane.initialWindowContentSize
+            size.height += statusBarHeight
+            let screen = NSScreen.main ?? NSScreen.screens.first
+            let visible = screen?.visibleFrame ?? NSRect(origin: .zero, size: size)
+            let centred = NSRect(
+                x: (visible.midX - size.width / 2).rounded(), y: (visible.midY - size.height / 2).rounded(),
+                width: size.width, height: size.height)
+            window.setFrame(
+                WindowState.Frame(centred).onScreen(preferredScreen: screen, minimumSize: .zero),
+                display: false)
+        }
+        pane.didSizeWindow = true
+        view.layoutSubtreeIfNeeded()
+    }
+
+    /// A tab added to a window that is already sized (D30): the window keeps
+    /// its frame, and the root pane, born at the configured grid, resizes
+    /// once to this tab's share of it.
+    func joinWindow(_ window: NSWindow) {
+        guard !didSetUpWindow, let pane = focusedPane else { return }
+        didSetUpWindow = true
+        if let metrics = pane.terminalRenderer?.pointMetrics {
+            window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        }
+        pane.didSizeWindow = true
+        view.frame = view.superview?.bounds ?? view.frame
+        view.layoutSubtreeIfNeeded()
+        pane.resizeSessionToFitView()
+        applyPendingRestore()
+        applyWindowTitle()
+    }
+
+    /// A running tab moved into `window` from another (D30, between
+    /// windows): it takes the new window's cell increments and minimum,
+    /// and each pane refits its grid to the space it now has.
+    func rejoinWindow(_ window: NSWindow) {
+        didSetUpWindow = true
+        if let metrics = focusedPane?.terminalRenderer?.pointMetrics {
+            window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        }
+        view.frame = view.superview?.bounds ?? view.frame
+        view.layoutSubtreeIfNeeded()
+        for pane in panes { pane.resizeSessionToFitView() }
+        applyWindowTitle()
+    }
+
+    /// The tab came to the front: its panes draw again and its focused pane
+    /// takes the toolbar's input-source slot.
+    func didBecomeSelectedTab() {
+        notePanesRearranged()
+        // The window's chrome as it is now: a change while this tab was in
+        // the background was absorbed by the tab in front, not owed again.
+        if let window = view.window, didSetUpWindow {
+            lastChromeHeight = window.frame.height - window.contentLayoutRect.height
+        }
+        // The window is shared, and this tab's font may be another size.
+        if let window = view.window, let metrics = focusedPane?.terminalRenderer?.pointMetrics {
+            window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
+        }
+        updateWindowMinSize()
+        view.layoutSubtreeIfNeeded()
+        for pane in panes {
+            pane.resizeSessionToFitView()
+            pane.invalidateDisplay()
+            pane.focus.applyAppearance()
+        }
+        if let focusedPane {
+            placeInputSourceIndicator(from: focusedPane, configuration: ConfigurationStore.shared.configuration)
+        }
+        updateDirectPresentation()
+    }
+
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        guard !didAppear, let window = view.window, let pane = focusedPane else { return }
+        didAppear = true
+        // A window not built by `TerminalWindowController` (tests) is prepared
+        // here instead.
+        prepareWindow(window)
+        // Nothing else claims first responder; without it keyDown never fires
+        // and First Responder menu actions (⌘V, ⌘=, ⌘D) dead-end. A tab
+        // restored behind another leaves the keyboard to the selected one.
+        if isSelectedTab { window.makeFirstResponder(pane.terminalView) }
+        // The first title, before any output: the root pane was focused at
+        // creation, so no focus change applies one, and a child that says
+        // nothing at first — an ssh still connecting — left "Corta" there.
+        applyWindowTitle()
+        // Ask for the first frame at the final size before the window shows;
+        // until it lands the layer shows the theme's background.
+        view.layoutSubtreeIfNeeded()
+        pane.terminalView?.drawNow()
+
+        // The splits go last: they halve the window's final frame.
+        applyPendingRestore()
+    }
+
+    /// Rebuilds a restored layout's splits. A selected tab does this as it
+    /// appears; a tab restored behind it as it joins the window (D30), since
+    /// AppKit delays a hidden view's `viewWillAppear` until it shows, and its
+    /// panes, and the saved layout, must not wait for that.
+    func applyPendingRestore() {
+        guard let restore = pendingRestore else { return }
+        pendingRestore = nil
+        view.layoutSubtreeIfNeeded()
+        self.restore(layout: restore.layout)
+        // Panes from here on open where the user is, which nobody has checked.
+        setup.directoriesChecked = false
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        absorbChromeChange()
+    }
+
+    /// A tab bar appearing or disappearing changes the chrome height; AppKit
+    /// would shrink the content area and cost every pane rows. Absorb the
+    /// delta into the frame instead (the window grows downward).
+    ///
+    /// Called from `viewDidLayout`, and from `AppDelegate.newTab` for the
+    /// window a new tab covers, which never lays out again on its own.
+    func absorbChromeChange() {
+        // Not before the window is sized and shown: until then there is no
+        // chrome to keep.
+        guard isSelectedTab, let window = view.window, didSetUpWindow, window.isVisible
+        else { return }
+        let chrome = window.frame.height - window.contentLayoutRect.height
+        let last = lastChromeHeight
+        // Recorded before `setFrame`, which lays out reentrantly and would
+        // otherwise absorb the same delta twice.
+        lastChromeHeight = chrome
+        guard let last, chrome != last, !window.inLiveResize,
+            !window.styleMask.contains(.fullScreen)
+        else { return }
+        var frame = window.frame
+        frame.origin.y -= chrome - last
+        frame.size.height += chrome - last
+        window.setFrame(frame, display: true)
+    }
+
+    /// With the window full screen and one pane, lets the window server
+    /// present the canvas directly (`DirectFullScreen`, #285): no corner mask,
+    /// frames presented by copy. On macOS 26 the classic-queue copy is also
+    /// used for ordinary windows (#380). Called on entering and leaving full
+    /// screen and when the root changes, when the pane count crosses one.
+    /// Anything AppKit draws over the canvas — the search bar, a split's
+    /// divider — brings composition back for as long as it shows; that is
+    /// the system's per-frame decision, not this one.
+    func updateDirectPresentation() {
+        let requested = DirectFullScreen.requested
+        let active = requested.active(
+            isFullScreen: view.window?.styleMask.contains(.fullScreen) ?? false,
+            paneCount: panes.count)
+        let previous = directPresentation
+        directPresentation = active
+        for pane in panes {
+            guard let terminalView = pane.terminalView else { continue }
+            terminalView.directPresentation = active
+            pane.terminalRenderer?.presentsByCopy = DirectFullScreen.presentsByCopy(active)
+        }
+        // Experimental only (Debug / Benchmark): hiding what draws over the canvas.
+        guard requested.contains(.overlays) else { return }
+        let hidesOverlays = active.contains(.overlays)
+        for pane in panes {
+            pane.terminalView?.shellOverlay.isHidden = hidesOverlays
+            if hidesOverlays { pane.inputSourceIndicator.view.isHidden = true }
+        }
+        systemStatusBar.isHidden = hidesOverlays || !ConfigurationStore.shared.configuration.statusBar
+        if active != previous { updateStatusBarLayout() }
+    }
+
+    // MARK: - Panes
+
+    /// Creates a pane and its session, force-loading the view so the shell
+    /// spawns at the target grid size and directory rather than reflowing.
+    func makePane(
+        workingDirectory: String?, initialGridSize: TerminalSize?, preset: Preset? = nil
+    ) -> TerminalPaneViewController {
+        let pane = TerminalPaneViewController()
+        // Before `pane.view` loads: the preset supplies spawn settings.
+        pane.preset = preset
+        // Opens where the focused pane is (OSC 7), else home. The directory is
+        // already host-filtered, so a remote path never reaches a local spawn.
+        pane.inheritedWorkingDirectory = workingDirectory
+        pane.inheritedDirectoryChecked = setup.directoriesChecked
+        pane.initialGridSize = initialGridSize
+        pane.didSizeWindow = didSetUpWindow
+        addChild(pane)
+        _ = pane.view
+        return pane
+    }
+
+    /// The terminal root changes identity on the first split and last collapse;
+    /// the optional status bar remains anchored beneath it.
+    func installRoot() {
+        // A zoomed pane fills the view; the tree stays intact, just detached.
+        let root = zoomedPane?.view ?? tree.root
+        guard root.superview !== view else { return }
+        view.subviews.filter { $0 !== systemStatusBar }.forEach { $0.removeFromSuperview() }
+        if systemStatusBar.superview == nil {
+            systemStatusBar.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(systemStatusBar)
+            let height = systemStatusBar.heightAnchor.constraint(equalToConstant: statusBarHeight)
+            statusBarHeightConstraint = height
+            NSLayoutConstraint.activate([
+                systemStatusBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                systemStatusBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                systemStatusBar.bottomAnchor.constraint(equalTo: view.bottomAnchor), height,
+            ])
+        }
+        root.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(root, positioned: .below, relativeTo: systemStatusBar)
+        NSLayoutConstraint.activate([
+            root.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: contentMargin),
+            root.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -contentMargin),
+            root.topAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.topAnchor,
+                constant: contentMargin - TerminalLayout.titlebarOverlap),
+            root.bottomAnchor.constraint(equalTo: systemStatusBar.topAnchor, constant: -contentMargin),
+        ])
+        updateDirectPresentation()
+    }
+
+    private func updateStatusBarLayout() {
+        statusBarHeightConstraint?.constant = statusBarHeight
+        updateWindowMinSize()
+        view.layoutSubtreeIfNeeded()
+        for pane in panes { pane.resizeSessionToFitView(); pane.invalidateDisplay() }
+    }
+
+    /// Marks the saved arrangement stale; `AppDelegate` debounces the write.
+    /// Divider drags arrive through the window's resize notification.
+    func noteLayoutChanged() {
+        notePanesRearranged()
+        (NSApp.delegate as? AppDelegate)?.noteLayoutChanged()
+    }
+}
+
+// MARK: - Zoom
+
+extension SplitViewController {
+    /// The split tree, never whatever is on screen.
+    var layoutRoot: NSView? { tree?.root }
+
+    var isPaneZoomed: Bool { zoomedPane != nil }
+
+    @objc func toggleZoomPane(_: Any?) {
+        if zoomedPane != nil {
+            unzoomPane()
+        } else {
+            zoomFocusedPane()
+        }
+    }
+
+    /// Fills the window with the focused pane; a no-op with one pane.
+    func zoomFocusedPane() {
+        splitTransition.finish()
+        guard hasMultiplePanes, let pane = focusedPane, zoomedPane == nil,
+            let superview = pane.view.superview,
+            let index = superview.subviews.firstIndex(of: pane.view)
+        else { return }
+        notePanesRearranged()
+        zoomedPane = pane
+        zoomOrigin = (superview, index)
+        layoutBeforeZoom = windowState(frame: view.window?.frame ?? view.frame)?.layout
+        // Detach first, so AppKit never holds the view in two places.
+        pane.view.removeFromSuperview()
+        installRoot()
+        // The other panes get their resize on the way back; hidden children
+        // still have a winsize.
+        view.layoutSubtreeIfNeeded()
+        resizeAllPanes()
+        applyFocusAppearance(to: pane)
+        takeFocus(pane)
+    }
+
+    func unzoomPane() {
+        splitTransition.finish()
+        guard let pane = zoomedPane else { return }
+        notePanesRearranged()
+        zoomedPane = nil
+        // Back into its own slot: the split lost this child on zoom, and
+        // re-adding only the root would orphan it.
+        pane.view.removeFromSuperview()
+        if let origin = zoomOrigin, origin.superview.subviews.count >= origin.index {
+            origin.superview.addSubview(
+                pane.view,
+                positioned: origin.index == 0 ? .below : .above,
+                relativeTo: origin.superview.subviews.first)
+        }
+        zoomOrigin = nil
+        installRoot()
+        if let layout = layoutBeforeZoom { reapplyDividerPositions(layout) }
+        layoutBeforeZoom = nil
+        view.layoutSubtreeIfNeeded()
+        resizeAllPanes()
+        applyFocusAppearance(to: pane)
+        takeFocus(pane)
+    }
+
+    /// Leaves zoom if `pane` is zoomed, so a close never leaves a removed
+    /// view on screen.
+    private func unzoomIfNeeded(closing pane: TerminalPaneViewController) {
+        guard zoomedPane === pane else { return }
+        // `SplitTree.close(leaf:)` can't remove a leaf that isn't in the tree.
+        unzoomPane()
+    }
+
+    /// Every pane re-reads its size; a zoom changes all of them at once.
+    private func resizeAllPanes() {
+        for pane in panes { pane.resizeSessionToFitView() }
+    }
+
+    private func applyFocusAppearance(to pane: TerminalPaneViewController) {
+        focusedPane = pane
+        for other in panes { other.focus.applyAppearance() }
+    }
+
+}
+
+// MARK: - Splitting and closing
+
+extension SplitViewController {
+
+    /// ⌘W closes the focused pane; with one pane left it closes the tab,
+    /// and the last tab is the window's own close.
+    @objc func performClose(_ sender: Any?) {
+        guard hasMultiplePanes, let focusedPane else {
+            // The tab or the window asks for confirmation; asking here would
+            // ask twice.
+            performCloseTab(sender)
+            return
+        }
+        guard view.window?.attachedSheet == nil else { return }
+        confirmClose(
+            of: focusedPane.session?.hasForegroundJob == true ? [focusedPane] : [],
+            scope: L10n.text("close.scope.pane"), in: view.window
+        ) { [weak self, weak focusedPane] confirmed in
+            // The pane may have exited while the sheet was up, or its sibling
+            // may have, leaving it the last: then it is the window that closes.
+            guard confirmed, let self, let focusedPane, self.panes.contains(focusedPane) else { return }
+            guard self.hasMultiplePanes else {
+                self.closeTabWithoutAsking()
+                return
+            }
+            self.closePane(focusedPane)
+        }
+    }
+
+    func closePane(_ pane: TerminalPaneViewController) {
+        splitTransition.finish()
+        // Finishing an earlier close may already have removed this pane.
+        guard pane.parent === self, !pane.didTeardown else { return }
+        unzoomIfNeeded(closing: pane)
+        noteClosing(pane)
+        pane.teardown()
+        guard let node = pane.view.superview as? NSSplitView,
+            let sibling = node.subviews.first(where: { $0 !== pane.view }),
+            isSelectedTab, view.window?.isVisible == true, !view.inLiveResize,
+            !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        else {
+            finishClosingPane(pane)
+            return
+        }
+        view.layoutSubtreeIfNeeded()
+        let first = node.subviews[0]
+        let start = node.isVertical ? first.frame.width : first.frame.height
+        let axis = node.isVertical ? node.bounds.width : node.bounds.height
+        let end = first === pane.view ? 0 : axis
+        // Only this disappearing node may pass the normal pane minimums.
+        node.delegate = nil
+        if let target = panes.first(where: {
+            $0.view === sibling || $0.view.isDescendant(of: sibling)
+        }) { takeFocus(target) }
+        prepareClosingGrid(node: node, start: start, end: end, closing: pane)
+        splitTransition.start(node: node, from: start, to: end, collapsing: true) { [weak self, weak pane] in
+            guard let self, let pane else { return }
+            self.finishClosingPane(pane)
+        }
+    }
+
+    private func finishClosingPane(_ pane: TerminalPaneViewController) {
+        guard pane.parent === self else { return }
+        let survivingSubtree = tree.close(leaf: pane.view)
+        pane.removeFromParent()
+        installRoot()
+        updateWindowMinSize()
+        balancePanesIfConfigured()
+        view.layoutSubtreeIfNeeded()
+        for child in panes { child.resizeSessionToFitView(coalesce: false) }
+        if let focusedPane, focusedPane.parent === self {
+            // A click during the animation already chose the next responder.
+            takeFocus(focusedPane)
+        } else if let subtree = survivingSubtree, let target = panes.first(where: {
+            $0.view === subtree || $0.view.isDescendant(of: subtree)
+        }) {
+            takeFocus(target)
+        } else {
+            invalidateRemainingPanes()
+        }
+        noteLayoutChanged()
+        (view.window?.windowController as? TerminalWindowController)?.refreshTabTitle()
+    }
+
+    /// Closes this tab, asking first when something runs in it.
+    func performCloseTab(_ sender: Any?) {
+        if let tab, let controller = tab.controller {
+            controller.performCloseTab(tab, sender: sender)
+        } else {
+            view.window?.performClose(sender)
+        }
+    }
+
+    /// Closes this tab; the caller already asked.
+    func closeTabWithoutAsking() {
+        if let tab, let controller = tab.controller {
+            controller.closeTab(tab)
+        } else {
+            view.window?.close()
+        }
+    }
+
+    private func invalidateRemainingPanes() {
+        for pane in panes { pane.invalidateDisplay() }
+    }
+
+    /// Whole-window teardown for closes that bypass `closePane` (red button,
+    /// tab close, ⌘Q). Idempotent per pane.
+    func teardown() {
+        splitTransition.finish()
+        systemStatusBar.stop()
+        for pane in panes { pane.teardown() }
+    }
+
+}

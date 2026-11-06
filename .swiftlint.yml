@@ -29,7 +29,7 @@ excluded:
   - CortaTerminal/.build
   # Generated from the Unicode Character Database and marked "do not edit
   # by hand": its length is the table's, and its layout is the generator's.
-  - CortaTerminal/Sources/CortaTerminal/CharacterWidth.swift
+  - CortaTerminal/Sources/CortaTerminal/Text/CharacterWidth.swift
 
 # A brace that follows a wrapped condition, signature or type header sits
 # on a line of its own, so the first statement of the body does not line

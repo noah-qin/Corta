@@ -659,7 +659,7 @@ Release application.
 
 **Decision.** The terminal is not wrapped in an `NSBackgroundExtensionView`.
 The titlebar stays opaque chrome, and the grid's top inset keeps following
-the measured chrome (`ViewController.windowChrome`).
+the measured chrome (`TerminalPaneViewController.windowChrome`).
 
 **Why.** Tried in a spike for #124 and captured through XCUITest, on a
 dark theme with coloured output in the first row (2026-10-06). Under the

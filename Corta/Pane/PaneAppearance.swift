@@ -66,7 +66,7 @@ final class PaneAppearance: NSObject {
     private var terminalView: TerminalView? { host?.terminalView ?? nil }
     private var terminalRenderer: TerminalRenderer? { host?.terminalRenderer ?? nil }
     private var fontSize: CGFloat {
-        get { host?.fontSize ?? ViewController.defaultFontSize }
+        get { host?.fontSize ?? TerminalPaneViewController.defaultFontSize }
         set { host?.fontSize = newValue }
     }
     private var fontStyle: FontStyle {

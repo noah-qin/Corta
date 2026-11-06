@@ -176,7 +176,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     }
 
     @objc func searchCommandHistory(_: Any?) {
-        guard isOperable, let pane = host as? ViewController else { return }
+        guard isOperable, let pane = host as? TerminalPaneViewController else { return }
         CommandHistoryController.shared.show(for: pane)
     }
 
@@ -467,8 +467,8 @@ extension PaneShellIntegration {
             y: content.minY + CGFloat(grid.cursor.row) * metrics.cellHeight,
             width: metrics.cellWidth, height: metrics.cellHeight)
         overlay.showCompletion(completion, history: history, anchor: anchor,
-            font: (host?.fontStyle ?? FontStyle()).font(ofSize: host?.fontSize ?? ViewController.defaultFontSize)
-                as NSFont,
+            font: (host?.fontStyle ?? FontStyle()).font(
+                ofSize: host?.fontSize ?? TerminalPaneViewController.defaultFontSize) as NSFont,
             baseline: metrics.baselineOffset, colors: canvas)
     }
 

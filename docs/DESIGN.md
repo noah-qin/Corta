@@ -87,7 +87,7 @@ Data flows one way: **bytes in → grid → pixels**. Input flows the other
 way: **key/IME → PTY → child**. Nothing else crosses those arrows.
 
 Windows are cheap composition: each window is a `SplitViewController`
-owning a binary split tree whose leaves are `ViewController` +
+owning a binary split tree whose leaves are `TerminalPaneViewController` +
 `TerminalSession` pairs (⌘N builds another `TerminalWindowController`;
 `AppDelegate` retains the window controllers until their windows close).
 Nothing is shared between windows — that is what D07 buys.
@@ -103,7 +103,7 @@ The two thread boundaries are the interesting part of this diagram:
 ### 3.1 Document coordinates
 
 Selection coordinates are document coordinates
-(`CortaTerminal/Sources/CortaTerminal/Selection.swift`):
+(`CortaTerminal/Sources/CortaTerminal/Text/Selection.swift`):
 row ≥ 0 is a live-screen row, row < 0 addresses the scrollback counting
 backwards from the screen boundary (row −1 is the newest history line).
 A selection therefore survives the user scrolling, and when output pushes
@@ -170,7 +170,7 @@ sets, so it is verified by launching the app and narrowing a window
 (`CONFORMANCE.md` §4.4).
 
 **`scrollOffset` is a document position, not a row count.**
-`ViewController.scrollAnchorTotalPushed` records `totalPushed` whenever the
+`TerminalPaneViewController.scrollAnchorTotalPushed` records `totalPushed` whenever the
 offset changes while off the bottom, and `prepareFrame` shifts the offset by
 the growth in that total on every output batch, so the text a person
 scrolled to stays under the pointer as output arrives; ring eviction still
@@ -235,16 +235,46 @@ links it once, statically, and its descriptor and argv helpers are
 environment is passed in by the app (the core's `ChildEnvironment`). Neither library may import AppKit or Metal
 (`PackageIsolationTests` and `ModuleBoundaryTests` hold those lines).
 
+### Source layout
+
+Directories within an app or SwiftPM target group related files; they do not
+introduce a module, change access control or change actor isolation. Keep a
+type and its extensions in the same directory. The app and test targets use
+Xcode filesystem-synchronized groups; SwiftPM discovers sources recursively.
+
+| Directory | Contents |
+| --- | --- |
+| `Corta/Window/Splits/` | Split tree, split controller, pane dragging and drop planning |
+| `Corta/Window/Tabs/` | Tabs, tab strip, tab icons and waiting-pane queue |
+| `Corta/Window/CommandPalette/`, `CommandHistory/`, `StatusBar/` | Palette and agent directory, history UI, system metrics and status UI |
+| `Corta/Window/` | Window controller, content composition, restore and shared window UI |
+| `Corta/Remote/Connection/`, `Authentication/` | Host selection, connection consent, SSH targets and askpass |
+| `Corta/Remote/Browser/`, `Transfers/`, `Editing/` | SFTP browser, transfer queue and managed remote-file editing |
+| `Corta/Settings/Configuration/` | Configuration values, keys, store, bell mode and presets |
+| `Corta/Settings/Pages/`, `Components/`, `Previews/` | Settings pages and model, shared controls and visual previews |
+| `Corta/Settings/Themes/`, `Shortcuts/` | Theme values and editor; keybindings, command metadata and shortcut UI |
+| `CortaTerminal/Sources/CortaTerminal/Parsing/` | VT and UTF-8 parsing, performer and dispatch extensions |
+| `CortaTerminal/Sources/CortaTerminal/Screen/` | Grid, cells, lines, scrollback, colours and screen side tables |
+| `CortaTerminal/Sources/CortaTerminal/Session/` | PTY, spawn, environment, session lifecycle and I/O |
+| `CortaTerminal/Sources/CortaTerminal/Text/`, `Graphics/` | Width tables, text lookup, selection and search; image protocols and budgets |
+| `CortaTerminal/Sources/CortaTerminal/Input/`, `ShellIntegration/`, `Support/` | Keyboard protocol; command records, history and remote context; duration and version helpers |
+| `CortaTests/` | `App`, `Window`, `Pane`, `TerminalView`, `Renderer`, `Remote`, `Settings` and `Shell` tests; shared helpers in `Support` |
+
+`TerminalPaneViewController.swift` is in `Corta/Pane/`, next to the pane's
+collaborators. Renderer reference PNGs live beside their tests in
+`CortaTests/Renderer/RenderReferences/`. `Support/TestPaths.swift` is the app
+tests' single locator for repository files and those source-tree fixtures.
+
 ### 4.1 A pane and its collaborators
 
-A pane is a `ViewController` that composes collaborators, each owning one
+A pane is a `TerminalPaneViewController` that composes collaborators, each owning one
 concern with its own state and tests; new behaviour is added as a
-collaborator, never as another `ViewController+X.swift` — there are
-none. The controller (one file, just under a thousand lines) keeps the session, the
+collaborator, never as another `TerminalPaneViewController+X.swift` — there are
+none. The controller stays in one file and keeps the session, the
 view, the renderer, sizing, teardown, the viewport's offset and the
 selection, and the wiring between its collaborators. Each reaches the pane
 through its own `Pane…Host` protocol, so its tests drive it with a stand-in
-host rather than a `ViewController`.
+host rather than a `TerminalPaneViewController`.
 
 | Collaborator      | Owns                                                                 |
 | ----------------- | -------------------------------------------------------------------- |
@@ -468,7 +498,7 @@ one safe to touch from more than one thread:
 | `Parser`, `Performer`, `Grid`, `Scrollback` | `nonisolated` | Pure value types / state machines; mutated only while `TerminalSession.state`'s lock is held. |
 | `TerminalSession` | `nonisolated`, `@unchecked Sendable` | `Synchronization.Mutex` around every mutable field (`State`, `Callbacks`, `PendingWrites`, `stopped`, `started`, `requestedResize`); no `@unchecked` is load-bearing on its own. |
 | `PTY` | `nonisolated`, `@unchecked Sendable` | A `Mutex<State>` around the exit/reaping/closed flags a descriptor's use depends on. |
-| AppKit shell (`ViewController`, `SplitViewController`, `AppDelegate`, `TaskNotifier`) | `@MainActor` (project default) | The Xcode target's `SWIFT_DEFAULT_ACTOR_ISOLATION`; see `DECISIONS.md` D04 for why the core opts out instead. |
+| AppKit shell (`TerminalPaneViewController`, `SplitViewController`, `AppDelegate`, `TaskNotifier`) | `@MainActor` (project default) | The Xcode target's `SWIFT_DEFAULT_ACTOR_ISOLATION`; see `DECISIONS.md` D04 for why the core opts out instead. |
 
 The PTY reader is a dedicated `Thread`, not a `Task` (`DECISIONS.md`
 D04, `PERFORMANCE.md` §2.1). It

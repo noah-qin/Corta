@@ -182,7 +182,7 @@ struct IndexedPaletteTests {
         #expect(palette.overridesGeneration == beforeNoOp)
         // updateDefaults (a theme reseed) never bumps this counter — the
         // render path already invalidates its cache for a theme change a
-        // different way (`ViewController.appearanceChanged`'s `invalidate()`).
+        // different way (`TerminalPaneViewController.appearanceChanged`'s `invalidate()`).
         let beforeDefaults = palette.overridesGeneration
         palette.updateDefaults(to: IndexedPalette.xtermDefaults())
         #expect(palette.overridesGeneration == beforeDefaults)

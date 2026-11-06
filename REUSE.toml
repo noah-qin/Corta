@@ -31,7 +31,7 @@ path = [
   "NOTICE",
   "CortaTerminal/Tests/CortaTerminalTests/Golden/**",
   "CortaTerminal/Tests/Fuzz/**",
-  "CortaTests/RenderReferences/**",
+  "CortaTests/Renderer/RenderReferences/**",
   "Corta.xcodeproj/**",
   "Corta/Assets.xcassets/**",
   "Corta/Localizable.xcstrings",

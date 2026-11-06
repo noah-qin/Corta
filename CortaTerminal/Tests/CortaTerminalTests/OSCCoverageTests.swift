@@ -42,7 +42,8 @@ struct OSCCoverageTests {
     }
     @Test func conformanceAndDispatcherAgreeInBothDirections() throws {
         let source = try String(
-            contentsOf: Self.root.appendingPathComponent("CortaTerminal/Sources/CortaTerminal/Performer+OSC.swift"),
+            contentsOf: Self.root.appendingPathComponent(
+                "CortaTerminal/Sources/CortaTerminal/Parsing/Performer+OSC.swift"),
             encoding: .utf8)
         let doc = try String(contentsOf: Self.root.appendingPathComponent("docs/CONFORMANCE.md"), encoding: .utf8)
         let handled = try Self.dispatchedCodes(source)

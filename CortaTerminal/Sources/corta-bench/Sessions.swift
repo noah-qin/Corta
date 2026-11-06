@@ -336,7 +336,7 @@ func benchmarkReaderProducer(priority: TerminalSession.ReaderPriority) {
 /// corta-exec has exec'd and reported back), (b) an exec floor —
 /// `/usr/bin/true` from spawn to child-exit, (c) `/bin/zsh -f`, zsh's own
 /// startup with no rc files, and (d) `/bin/zsh -l`, the login shell the app
-/// actually spawns (`ViewController` passes `-l`), so (d) minus (c) is the
+/// actually spawns (`TerminalPaneViewController` passes `-l`), so (d) minus (c) is the
 /// user's rc files, which Corta cannot improve but the user pays at every
 /// launch. (`/bin/true` is not a binary on macOS 26 — only `/usr/bin/true`
 /// exists; spawning the former fails with ENOENT.) Events are awaited on a semaphore signalled

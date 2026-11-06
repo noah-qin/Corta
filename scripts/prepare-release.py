@@ -27,7 +27,7 @@ import xml.etree.ElementTree as ET
 
 FILES = (
     "Corta.xcodeproj/project.pbxproj",
-    "CortaTerminal/Sources/CortaTerminal/Version.swift",
+    "CortaTerminal/Sources/CortaTerminal/Support/Version.swift",
     "CHANGELOG.md",
     "README.md",
 )

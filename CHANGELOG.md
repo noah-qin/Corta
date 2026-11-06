@@ -47,6 +47,10 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Contributor layout: group window, remote, settings, terminal-core sources
+  and app tests by responsibility; name the pane controller
+  `TerminalPaneViewController` and centralize app-test fixture paths.
+
 - Dropped-file copies clean themselves up instead of staying until removed by
   hand: a copy goes when its pane closes or Corta quits, and what a crash left goes
   at the next launch. **The first launch after updating removes every copy older

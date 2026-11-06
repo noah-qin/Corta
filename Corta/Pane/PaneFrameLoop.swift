@@ -88,7 +88,7 @@ final class PaneFrameLoop {
     private var feedback = GPUFrameFeedback()
     private var watchdog: DispatchWorkItem?
     /// The pane's top inset, which only a pane under the window's chrome
-    /// has (`ViewController.topInset`).
+    /// has (`TerminalPaneViewController.topInset`).
     var topInset: () -> CGFloat = { 0 }
 
     /// Starts drawing `session` with `renderer`, replacing any previous

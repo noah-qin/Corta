@@ -1,0 +1,245 @@
+// Copyright 2026 Noah Qin
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
+
+/// Mouse events the child subscribed to (`?1000`/`?1002`/`?1003`).
+public enum MouseTrackingMode: Int, Sendable {
+    case off = 0
+    case normal = 1000
+    case buttonEvent = 1002
+    case anyEvent = 1003
+}
+
+/// Terminal state that is not the grid, surfaced read-only through
+/// `Terminal` and `TerminalSession`.
+struct PerformerState: Sendable {
+    /// Query responses for the child. Fixed-format only — never text the
+    /// input stream supplied (`SECURITY.md` §2.1–2.2).
+    var outputBuffer: [UInt8] = []
+    var bracketedPasteEnabled = false
+    /// Independent of the wire encoding; the last mode enabled wins.
+    var mouseTrackingMode: MouseTrackingMode = .off
+    var sgrMouseEncodingEnabled = false
+    var synchronizedOutputEnabled = false
+    /// Bumped on every `?2026` rising edge, including one that shares a
+    /// batch with the previous episode's end — which a bool cannot show.
+    var synchronizedOutputEpisode = 0
+    var bellRequested = false
+    var programSignals = ProgramSignals()
+    /// Never reported back: the title query is a command-injection vector.
+    var windowTitle: String?
+    var iconName: String?
+    var windowTitleStack: [String?] = []
+    var iconNameStack: [String?] = []
+    static let titleStackCapacity = 10
+    var colorSchemeReportingEnabled = false
+    var isDark = true
+    var dynamicColorOverrides: Set<Int> = []
+    var dynamicColorDefaults = DynamicColors()
+    var selectionBackground: Color = .default
+    var selectionForeground: Color = .default
+    var directoryCompletion: DirectoryCompletion?
+    var historySuggestion: HistorySuggestion?
+    /// Local only; a report naming another host goes to `remoteContext`.
+    var workingDirectory: String?
+    /// This machine's names when the session started (`Performer.localHostnames`).
+    var hostnamesAtStart = Performer.localHostnames()
+    /// Informational only — nothing that spawns a process may read it.
+    var remoteContext: RemoteContext?
+    var focusReportingEnabled = false
+    /// `?1007`: on the alternate screen, with mouse reporting off, the wheel
+    /// sends arrow keys — the alternate screen has no scrollback of its own,
+    /// so `less`, `man` and `git log` would not scroll at all. On by
+    /// default, as in Terminal.app and iTerm2 (xterm's is off).
+    var alternateScrollEnabled = true
+    /// DECSCL; gates which sequences may answer (DECRQM above all).
+    var conformanceLevel = 65
+    /// LNM — implemented, or a program relying on it prints a staircase.
+    var newLineModeEnabled = false
+    var applicationCursorKeysEnabled = false
+    var applicationKeypadEnabled = false
+    /// The active screen's stack. kitty keeps one per screen: a program on
+    /// the alternate screen pushes onto its own, which is dropped when it
+    /// leaves, so one that exits with `?1049l` alone — legal — cannot leave
+    /// the shell's keys encoded as `CSI u` (Ctrl-C, Esc and all).
+    var keyboardProtocol = KeyboardProtocolStack()
+    /// The main screen's stack, parked while the alternate screen is up.
+    var parkedMainKeyboardProtocol: KeyboardProtocolStack?
+    var dynamicColors = DynamicColors()
+    var indexedPalette = IndexedPalette()
+    var specialColors = SpecialColors()
+    /// Absolute rows and columns from OSC 133, so a status lands on its
+    /// prompt however far output has scrolled since.
+    var promptRow: Int?
+    /// While the cursor still sits here, nothing has been typed — the gate
+    /// for an app-initiated `cd` (`TerminalPaneViewController.canChangeDirectorySafely`).
+    var promptEndColumn: Int?
+    var outputStartRow: Int?
+    var isCommandRunning = false
+    /// Set by the first `C`. Only a shell that marks where output begins can
+    /// be judged by a `C` missing; one that sends only `A` and `D` never will.
+    var shellMarksOutputStart = false
+    /// An ED 2 wiped the waiting prompt; its repaint's `B` says where it is now.
+    var promptAwaitsRepaint = false
+    /// This prompt's `B` has arrived: the shell is waiting for a command line.
+    var sawPromptEnd = false
+    /// Drained by `Terminal.takeFinishedCommand()`, so a notification fires
+    /// once per command, not once per frame.
+    var finishedCommandExitStatus: Int?
+    var commandExitStatus: Int?
+    /// An alternate-screen `D`'s exit status, applied only by the shell's next `A`.
+    var pendingAlternateScreenFinish: Int?
+    var commandRecords = CommandRecordStore()
+    /// OSC 52 writes only. The read form would hand the clipboard to the
+    /// child and stays unimplemented (`SECURITY.md` §6).
+    var pendingClipboardCopy: String?
+    var clipboardNeedsAcknowledgement = false
+    var pendingImageTransmission: PendingImageTransmission?
+    var itermImage: ITermImageTransfer?
+    var clipboardTransfer: [UInt8]?
+    var pointerMain = PointerShapeStack()
+    var pointerAlternate = PointerShapeStack()
+    var attention: ProgramAttention?
+    /// A finished transmission waiting for its decode outside the parse;
+    /// taken by `Terminal.takeDeferredImage()` before the lock is released.
+    var deferredImage: DeferredImageTransmission?
+    /// A taken `deferredImage`'s decoded size while its decode runs, so the
+    /// image budget does not lose sight of it in the pause.
+    var decodingImageBytes = 0
+    /// Image bytes this terminal may retain across both screens, from the
+    /// session's `ImageMemoryBudget`; unlimited (the pane cap alone) without one.
+    var imageByteAllowance = Int.max
+
+    init() {}
+}
+
+/// A Kitty graphics transmission across chunks, kept as base64 text: a
+/// chunk boundary need not fall on a 4-character boundary.
+struct PendingImageTransmission: Sendable {
+    var header: KittyGraphics.TransmitHeader
+    var display: KittyGraphics.DisplayHeader?
+    var base64: [UInt8]
+    var itermOptions: [String: String]?
+}
+
+/// OSC 10/11/12's colours, 8 bits per channel; reported by doubling each
+/// byte into xterm's 16-bit form.
+/// `TerminalSession.frameColors`: what a frame reads, taken together.
+public struct FrameColors: Sendable {
+    public var indexedPalette: IndexedPalette
+    public var dynamicColors: DynamicColors
+    public var selectionBackground: Color
+    public var selectionForeground: Color
+}
+
+public struct DynamicColors: Sendable, Equatable {
+    public var foreground: RGB
+    public var background: RGB
+    public var cursor: RGB
+    public var cursorText: Color = .default
+    public var selection: RGB = RGB(red: 142, green: 126, blue: 233)
+
+    public init(
+        foreground: RGB = RGB(red: 245, green: 245, blue: 245),
+        background: RGB = RGB(red: 35, green: 40, blue: 51),
+        cursor: RGB = RGB(red: 245, green: 245, blue: 245)
+    ) {
+        self.foreground = foreground
+        self.background = background
+        self.cursor = cursor
+    }
+
+    public static func == (lhs: DynamicColors, rhs: DynamicColors) -> Bool {
+        lhs.foreground == rhs.foreground && lhs.background == rhs.background
+            && lhs.cursor == rhs.cursor && lhs.selection == rhs.selection && lhs.cursorText == rhs.cursorText
+    }
+}
+
+/// Query responses (`CONFORMANCE.md` §1.2): an unanswered probe stalls or
+/// misdetects. Every answer is fixed bytes or numbers (`SECURITY.md` §2.2).
+extension Performer {
+    /// DA1, the VT220 form, claiming only what Corta honours (132 columns,
+    /// SGR colour) — claiming more invites probes that go unanswered.
+    private static let primaryDeviceAttributes = Array("\u{1B}[?62;1;22c".utf8)
+
+    /// DA2: VT220, no version — capability detection stays conservative.
+    private static let secondaryDeviceAttributes = Array("\u{1B}[>1;0;0c".utf8)
+
+    mutating func reportPrimaryDeviceAttributes() {
+        state.outputBuffer.append(contentsOf: Self.primaryDeviceAttributes)
+    }
+
+    mutating func reportSecondaryDeviceAttributes() {
+        state.outputBuffer.append(contentsOf: Self.secondaryDeviceAttributes)
+    }
+
+    /// DSR 5 (status) and 6 (cursor position, 1-based).
+    mutating func reportDeviceStatus(_ parameters: Parameters) {
+        switch parameters.value(0, default: 0) {
+        case 5:
+            // Silence reads as "the terminal is dead".
+            state.outputBuffer.append(contentsOf: Array("\u{1B}[0n".utf8))
+        case 6:
+            state.outputBuffer.append(
+                contentsOf: Array("\u{1B}[\(grid.reportedCursorRow);\(grid.cursor.column + 1)R".utf8)
+            )
+        default:
+            break
+        }
+    }
+
+    /// DECXCPR (`CSI ? 6 n`); the page is always 1.
+    mutating func reportExtendedCursorPosition(_ parameters: Parameters) {
+        if parameters.value(0, default: 0) == 996 { reportColorScheme(); return }
+        guard parameters.value(0, default: 0) == 6 else { return }
+        state.outputBuffer.append(
+            contentsOf: Array(
+                "\u{1B}[?\(grid.reportedCursorRow);\(grid.cursor.column + 1);1R".utf8)
+        )
+    }
+
+    /// `CSI 18 t` only — the text-area size esctest asks for. The title
+    /// report (21) is a command-injection vector and never implemented.
+    mutating func reportWindowManipulation(_ parameters: Parameters) {
+        let operation = parameters.value(0, default: 0)
+        if operation == 22 || operation == 23 {
+            let target = parameters.value(1, default: 0)
+            guard target <= 2 else { return }
+            let save = operation == 22
+            if target == 0 || target == 1 {
+                Self.saveOrRestore(&state.iconName, on: &state.iconNameStack, save: save)
+            }
+            if target == 0 || target == 2 {
+                Self.saveOrRestore(&state.windowTitle, on: &state.windowTitleStack, save: save)
+            }
+            return
+        }
+        guard operation == 18 else { return }
+        state.outputBuffer.append(
+            contentsOf: Array("\u{1B}[8;\(grid.rows);\(grid.columns)t".utf8)
+        )
+    }
+
+    /// XTWINOPS 22 saves a title, 23 restores it; the stack is bounded and
+    /// drops its oldest entry when full.
+    private static func saveOrRestore<Title>(_ title: inout Title, on stack: inout [Title], save: Bool) {
+        if save {
+            if stack.count == PerformerState.titleStackCapacity { stack.removeFirst() }
+            stack.append(title)
+        } else if !stack.isEmpty {
+            title = stack.removeLast()
+        }
+    }
+}

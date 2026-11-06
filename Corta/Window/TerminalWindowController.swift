@@ -23,7 +23,7 @@ import Cocoa
 final class TerminalWindowController: NSWindowController, NSWindowDelegate {
     /// The mask every terminal window has from creation. Content runs under
     /// the titlebar; the grid's top inset follows the chrome
-    /// (`ViewController.windowChrome`).
+    /// (`TerminalPaneViewController.windowChrome`).
     static let styleMask: NSWindow.StyleMask = [
         .titled, .closable, .miniaturizable, .resizable, .fullSizeContentView,
     ]
