@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-06
+
 ### Added
 
 - Jump to Next Waiting Pane (⌥⌘J), in Window and the command palette, cycles
@@ -2599,7 +2601,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.5.1...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.6.0...main
+[1.6.0]: https://github.com/noah-qin/Corta/releases/tag/v1.6.0
 [1.5.1]: https://github.com/noah-qin/Corta/releases/tag/v1.5.1
 [1.5.0]: https://github.com/noah-qin/Corta/releases/tag/v1.5.0
 [1.4.0]: https://github.com/noah-qin/Corta/releases/tag/v1.4.0
