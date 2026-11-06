@@ -571,7 +571,10 @@ extension SplitViewController {
         balancePanesIfConfigured()
         view.layoutSubtreeIfNeeded()
         for child in panes { child.resizeSessionToFitView(coalesce: false) }
-        if let subtree = survivingSubtree, let target = panes.first(where: {
+        if let focusedPane, focusedPane.parent === self {
+            // A click during the animation already chose the next responder.
+            takeFocus(focusedPane)
+        } else if let subtree = survivingSubtree, let target = panes.first(where: {
             $0.view === subtree || $0.view.isDescendant(of: subtree)
         }) {
             takeFocus(target)

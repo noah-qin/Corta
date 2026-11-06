@@ -73,6 +73,7 @@ final class TabContainerViewController: NSViewController {
     func remove(_ split: SplitViewController) {
         if held === split { held = nil }
         if shown === split { shown = nil }
+        cancelFade(split.view)
         contentView?.inert.remove(split.view)
         split.view.layer?.removeAllAnimations()
         split.view.alphaValue = 1
@@ -83,6 +84,10 @@ final class TabContainerViewController: NSViewController {
     private var contentView: WindowContentView? { viewIfLoaded as? WindowContentView }
 
     private func setHidden(_ hidden: Bool, _ split: SplitViewController) {
+        if hidden {
+            cancelFade(split.view)
+            contentView?.inert.remove(split.view)
+        }
         guard split.view.isHidden != hidden else { return }
         split.view.isHidden = hidden
         // A tab going behind has no window event to say so; its reader's
@@ -92,6 +97,7 @@ final class TabContainerViewController: NSViewController {
 
     private weak var shown: SplitViewController?
     private var revealsAfterClose = false
+    private var fadeGenerations: [ObjectIdentifier: UUID] = [:]
     /// The tab that stays drawn over a new one until the new one has drawn
     /// its shell's first output.
     private weak var held: SplitViewController?
@@ -110,7 +116,7 @@ final class TabContainerViewController: NSViewController {
         contentView?.inert.remove(split.view)
         split.view.frame = view.bounds
         split.view.layer?.removeAnimation(forKey: "corta.tab.content.enter")
-        split.view.layer?.removeAnimation(forKey: "corta.tab.content.leave")
+        cancelFade(split.view)
         if revealsAfterClose {
             revealsAfterClose = false
             Self.reveal(split.view)
@@ -152,7 +158,7 @@ final class TabContainerViewController: NSViewController {
             return
         }
         if let shown { Self.reveal(shown.view) }
-        Self.fadeOut(held.view) { [weak self, weak held] in
+        fadeOut(held.view) { [weak self, weak held] in
             // Only while it is still this window's: a tab moved away during
             // the fade is another window's to show or hide.
             guard let self, let held, held.parent === self else { return }
@@ -176,7 +182,7 @@ final class TabContainerViewController: NSViewController {
         view.addSubview(content, positioned: .above, relativeTo: nil)
         contentView?.inert.add(content)
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.firstFrameDelay) {
-            Self.fadeOut(content) { content.removeFromSuperview() }
+            self.fadeOut(content) { content.removeFromSuperview() }
         }
     }
 
@@ -203,7 +209,12 @@ final class TabContainerViewController: NSViewController {
         content.layer?.add(group, forKey: "corta.tab.content.enter")
     }
 
-    private static func fadeOut(_ content: NSView, completion: @escaping @MainActor () -> Void) {
+    private func cancelFade(_ content: NSView) {
+        fadeGenerations.removeValue(forKey: ObjectIdentifier(content))
+        content.layer?.removeAnimation(forKey: "corta.tab.content.leave")
+    }
+
+    private func fadeOut(_ content: NSView, completion: @escaping @MainActor () -> Void) {
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             completion()
             return
@@ -218,13 +229,18 @@ final class TabContainerViewController: NSViewController {
         fade.toValue = 0
         let group = CAAnimationGroup()
         group.animations = [slide, fade]
-        group.duration = fadeDuration
+        group.duration = Self.fadeDuration
         group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         group.fillMode = .forwards
         group.isRemovedOnCompletion = false
+        let id = ObjectIdentifier(content)
+        let generation = UUID()
+        fadeGenerations[id] = generation
         CATransaction.begin()
-        CATransaction.setCompletionBlock {
+        CATransaction.setCompletionBlock { [weak self] in
             MainActor.assumeIsolated {
+                guard let self, self.fadeGenerations[id] == generation else { return }
+                self.fadeGenerations.removeValue(forKey: id)
                 completion()
                 layer.removeAnimation(forKey: "corta.tab.content.leave")
             }
