@@ -105,7 +105,7 @@ export function ProductDemo({ src, poster, copy, overview }: Props) {
   }
 
   return (
-    <figure className="product-shot wrap">
+    <figure id="demo" className="product-shot wrap">
       <div className="demo-stage">
         <img
           src={poster.src}

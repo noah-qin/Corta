@@ -27,10 +27,9 @@ Metal-4-Rendering · Native CJK-Eingabe / IME · SSH, SFTP und Bearbeiten aus de
 
 🇺🇸 [English](../../../README.md) · 🇨🇳 [简体中文](../zh-CN/README.md) · 🇭🇰 [繁體中文](../zh-Hant/README.md) · 🇯🇵 [日本語](../ja/README.md) · 🇰🇷 [한국어](../ko/README.md) · 🇩🇪 [Deutsch](README.md) · 🇫🇷 [Français](../fr/README.md) · 🇪🇸 [Español](../es/README.md) · 🇧🇷 [Português](../pt-BR/README.md)
 
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
-  <img src="../../brand/interaction-demo@2x.gif" width="960" alt="Corta in Aktion: Bereiche teilen, laufende Sitzungen verschieben und Tabs wechseln oder sortieren">
-</picture>
+<a href="https://corta.noahqin.dev/de/#demo">
+  <img src="../../brand/screenshot.png" width="960" alt="Corta mit drei geteilten Bereichen: ein git log und eine Ausrichtungstabelle mit Chinesisch, Japanisch, Koreanisch und Emoji; das Schuppentier-Maskottchen als Bild im Terminal; und 24-Bit-Farbverläufe">
+</a>
 
 </div>
 

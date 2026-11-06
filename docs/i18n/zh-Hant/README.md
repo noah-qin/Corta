@@ -27,10 +27,9 @@ Metal 4 算繪 · 原生中日韓輸入法 · SSH、SFTP 與遠端編輯
 
 🇺🇸 [English](../../../README.md) · 🇨🇳 [简体中文](../zh-CN/README.md) · 🇭🇰 [繁體中文](README.md) · 🇯🇵 [日本語](../ja/README.md) · 🇰🇷 [한국어](../ko/README.md) · 🇩🇪 [Deutsch](../de/README.md) · 🇫🇷 [Français](../fr/README.md) · 🇪🇸 [Español](../es/README.md) · 🇧🇷 [Português](../pt-BR/README.md)
 
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
-  <img src="../../brand/interaction-demo@2x.gif" width="960" alt="Corta 互動示範：分割窗格、重排執行中的工作階段，以及切換和排序分頁">
-</picture>
+<a href="https://corta.noahqin.dev/zh-Hant/#demo">
+  <img src="../../brand/screenshot.png" width="960" alt="Corta 的三個分割窗格：git log 與中日韓及 emoji 對齊表、在終端機中顯示的穿山甲圖片、24 位元色彩漸層">
+</a>
 
 </div>
 

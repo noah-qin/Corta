@@ -27,10 +27,9 @@ Metal 4 レンダリング · ネイティブな CJK / IME · SSH、SFTP、リ�
 
 🇺🇸 [English](../../../README.md) · 🇨🇳 [简体中文](../zh-CN/README.md) · 🇭🇰 [繁體中文](../zh-Hant/README.md) · 🇯🇵 [日本語](README.md) · 🇰🇷 [한국어](../ko/README.md) · 🇩🇪 [Deutsch](../de/README.md) · 🇫🇷 [Français](../fr/README.md) · 🇪🇸 [Español](../es/README.md) · 🇧🇷 [Português](../pt-BR/README.md)
 
-<picture>
-  <source media="(prefers-reduced-motion: reduce)" srcset="../../brand/interaction-demo-poster.png 1600w">
-  <img src="../../brand/interaction-demo@2x.gif" width="960" alt="Corta の操作デモ：ペインの分割、実行中のセッションの移動、タブの切り替えと並べ替え">
-</picture>
+<a href="https://corta.noahqin.dev/ja/#demo">
+  <img src="../../brand/screenshot.png" width="960" alt="3 つに分割された Corta のペイン：git log と中日韓・絵文字の揃い表、ターミナル内に表示されたセンザンコウの画像、24 ビットカラーのグラデーション">
+</a>
 
 </div>
 

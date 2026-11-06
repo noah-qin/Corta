@@ -29,8 +29,8 @@ Versioning for compatibility changes.
   adds Split Pane Along Longer Side. In Settings; ⌘D and ⇧⌘D do not change.
 - Corta has a website, https://corta.noahqin.dev, with the user guide,
   the documentation and the changelog in all nine languages the
-  repository is translated into. The README and homepage include dedicated
-  silent interaction loops, with still-image fallbacks and a homepage pause control.
+  repository is translated into. Each README has a sharp, static screenshot
+  linking to its language's homepage video, with a still-image fallback and pause control.
 - Kill and Reconnect to Host…, in Shell ▸ Terminal and Connection and the
   command palette, ends an `ssh` or `mosh` that has hung rather than exited and
   runs the same command again as a new connection, once you confirm. Rebindable
@@ -129,8 +129,8 @@ Versioning for compatibility changes.
 
 ### Fixed
 
-- The README demo keeps its aspect ratio in narrow GitHub columns and uses
-  a Retina-resolution GIF for sharper text.
+- README screenshots keep their aspect ratio in narrow GitHub columns and
+  use the original high-resolution PNG for crisp text.
 
 - Closing a split pane smoothly collapses its gutter and prepares the final
   terminal size before the transition, avoiding a second reflow at the end.

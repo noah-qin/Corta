@@ -225,6 +225,10 @@ for (const language of manifest.languages) {
       const video = elements(html, "video")[0];
       assert.ok(video, `${lang}: product video missing`);
       assert.ok(
+        elements(html, "figure").some((figure) => figure.id === "demo"),
+        `${lang}: homepage demo anchor missing`,
+      );
+      assert.ok(
         Object.hasOwn(video, "muted") &&
           Object.hasOwn(video, "loop") &&
           Object.hasOwn(video, "playsinline"),
@@ -244,10 +248,16 @@ for (const language of manifest.languages) {
     }
     if (slug === "overview") {
       const demo = elements(html, "img").find((image) =>
-        image.src?.endsWith("interaction-demo@2x.gif"),
+        image.src?.endsWith("/docs/brand/screenshot.png"),
       );
-      assert.ok(demo, `${lang}: README interaction demo missing`);
+      assert.ok(demo, `${lang}: README static screenshot missing`);
       assert.equal(demo.width, "960", `${lang}: README display width`);
+      assert.ok(
+        elements(html, "a").some(
+          (link) => link.href === `https://corta.noahqin.dev/${lang}/#demo`,
+        ),
+        `${lang}: README screenshot must link to the localized website demo`,
+      );
       assert.equal(
         demo.height,
         undefined,
@@ -316,12 +326,18 @@ for (const variant of manifest.images.screenshot.variants) {
   assert.equal(image.width, variant.width);
   assert.equal(image.format, "webp");
 }
-const readmeDemo = await sharp(
-  path.join(root, "content-assets/docs/brand/interaction-demo@2x.gif"),
-  { animated: true, limitInputPixels: 1920 * 1176 * 150 },
+const readmeScreenshot = await sharp(
+  path.join(root, "content-assets/docs/brand/screenshot.png"),
 ).metadata();
-assert.equal(readmeDemo.width, 1920, "README demo must have Retina resolution");
-assert.equal(readmeDemo.pageHeight, 1176, "README demo intrinsic aspect ratio");
+assert.equal(
+  readmeScreenshot.format,
+  "png",
+  "README screenshot must be lossless",
+);
+assert.ok(
+  readmeScreenshot.width >= 1920,
+  "README screenshot must support Retina display",
+);
 console.log(
   `Verified SEO metadata, ${sitemapEntries.length} canonical sitemap URLs, committed-source dates, and responsive WebP assets.`,
 );
