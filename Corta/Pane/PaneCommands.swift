@@ -49,7 +49,7 @@ protocol PaneCommandsHost: AnyObject {
 /// Services and Look Up, the Finder actions, app-initiated `cd`, and
 /// Clear Screen, Clear History and Reset Terminal.
 ///
-/// The pane forwards its actions here (`ViewController.forwardingTarget`),
+/// The pane forwards its actions here (`TerminalPaneViewController.forwardingTarget`),
 /// and its `validateMenuItem` asks this one for the items it owns.
 final class PaneCommands: NSObject, NSMenuItemValidation {
     weak var host: PaneCommandsHost?
@@ -139,7 +139,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         let clickedCommand = event.flatMap(command(under:))
         let commandID = clickedCommand?.id
         contextItem(in: menu, key: "context.copyCommandOutput", enabled: clickedCommand != nil) { [weak self] in
-            guard let self, let pane = self.host as? ViewController, let commandID,
+            guard let self, let pane = self.host as? TerminalPaneViewController, let commandID,
                 let record = pane.session?.commandRecords.records.first(where: { $0.id == commandID })
             else { return }
             pane.shell.copyCommandOutput(for: record, pasteboard: self.pasteboard)

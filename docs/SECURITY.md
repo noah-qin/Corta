@@ -155,7 +155,7 @@ text back to the child — output the terminal received. A dropped path is
 a user action naming a file the user chose, which is what typing is.
 
 **As implemented (S04, 2026-09-06).** Drops and Services-returned text go
-through the exact funnel a ⌘V paste uses (`ViewController.insertAsPaste`):
+through the exact funnel a ⌘V paste uses (`PaneCommands.insertAsPaste`):
 each dropped path is stripped of ESC and C0 control characters *before*
 quoting (`Paste.sanitized`), and the payload gets the §2.3 newline warning
 when the child has not enabled bracketed paste. A filename can contain a

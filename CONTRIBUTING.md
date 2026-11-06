@@ -40,13 +40,14 @@ first so contributors do not duplicate effort.
 
 | Path | Responsibility |
 | :--- | :--- |
-| `Corta/` | AppKit shell, input, configuration, fonts and Metal renderer |
-| `CortaTerminal/Sources/CortaTerminal/` | Parser, grid, PTY, search and terminal protocols |
+| `Corta/` | AppKit shell, input, configuration, fonts and Metal renderer; [source layout](docs/DESIGN.md#source-layout) lists the feature subdirectories |
+| `CortaTerminal/Sources/CortaTerminal/` | `Parsing`, `Screen`, `Session`, `Text`, `Graphics`, `Input`, `ShellIntegration` and `Support` within the core target |
 | `CortaTerminal/Sources/CortaSFTP/` | SFTP protocol, transport and transfer engine; an independent sibling of the terminal core |
 | `CortaTerminal/Sources/CortaPOSIX/` | Descriptor, spawn and exit-status code the core and the SFTP client share |
 | `CortaTerminal/Tests/` | Core, SFTP and release-rule tests, golden fixtures and fuzz corpus |
 | `CortaTerminal/Sources/corta-*` | `corta-exec` and `corta-image-decoder`, the helpers the app embeds, and the repository's tools: `corta-release-check` (the one packaging check), `corta-license`, `corta-fuzz`, `corta-bench`, `corta-dump` |
-| `CortaTests/`, `CortaUITests/`, `CortaPerformanceTests/` | App-hosted tests, interactive UI tests, and the Release measurements |
+| `CortaTests/` | App-hosted tests grouped by source area; shared helpers and repository/fixture paths in `Support/` |
+| `CortaUITests/`, `CortaPerformanceTests/` | Interactive UI tests and the Release measurements |
 | `docs/` | User guides, configuration, architecture, decisions and the numbers that measure them; dated evidence goes in pull requests |
 | `website/` | The website, https://corta.noahqin.dev: a static Next.js export built with Bun that renders the documents above (D31) |
 | `TestPlans/` | `Unit` (the default), `UI` (interactive sessions only) and `Release` (the Release measurements) |

@@ -272,12 +272,18 @@ Layout:
 - `Corta/` — AppKit shell, Metal renderer, font stack, in subfolders by
   area: `App`, `Window`, `Pane`, `TerminalView`, `Renderer`, `Shell`,
   `Remote`, `Settings` (synchronized groups: a moved file needs no
-  `project.pbxproj` edit)
+  `project.pbxproj` edit); `docs/DESIGN.md` "Source layout" lists the
+  feature subdirectories in `Window`, `Remote` and `Settings`.
+  `Pane/TerminalPaneViewController.swift` composes the pane collaborators
 - `CortaTerminal/` — the terminal core as a local SwiftPM package, with
   its own tests, golden fixtures, fuzz corpus and DocC catalogs; its
   `CortaPOSIX` target holds the descriptor, spawn and exit-status code the
-  core and the SFTP client share
-- `CortaTests/`, `CortaUITests/` — app-hosted test targets;
+  core and the SFTP client share; the core target groups sources under
+  `Parsing`, `Screen`, `Session`, `Text`, `Graphics`, `Input`,
+  `ShellIntegration` and `Support`
+- `CortaTests/` — app-hosted tests grouped by source area, with shared
+  helpers and the repository/fixture locator `TestPaths` in `Support`;
+  `CortaUITests/` — interactive UI tests;
   `CortaPerformanceTests/` — the Release measurements, without `@testable`
 - `Corta.xcodeproj/` — build settings live in `project.pbxproj`
 - `scripts/` — every helper, one directory: the Swift scripts CI runs

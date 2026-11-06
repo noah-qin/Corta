@@ -19,7 +19,7 @@
 set -euo pipefail
 
 branch="chore/release-${GITHUB_RUN_ID}"
-files=(Corta.xcodeproj/project.pbxproj CortaTerminal/Sources/CortaTerminal/Version.swift CHANGELOG.md README.md)
+files=(Corta.xcodeproj/project.pbxproj CortaTerminal/Sources/CortaTerminal/Support/Version.swift CHANGELOG.md README.md)
 
 if [ "${DRY_RUN:-false}" = true ]; then
   metadata=$(python3 scripts/prepare-release.py --bump "${BUMP:-patch}")

@@ -44,7 +44,7 @@ final class TerminalView: NSView, CALayerDelegate {
     // Accessibility (`TerminalView+Accessibility.swift`); extensions cannot
     // add storage.
 
-    /// Text, cursor and selection, flattened; installed by `ViewController` so
+    /// Text, cursor and selection, flattened; installed by `TerminalPaneViewController` so
     /// the view needs no knowledge of `Grid`.
     var accessibilitySnapshotProvider: (() -> TerminalAccessibilitySnapshot?)?
     /// One cell's rect in view coordinates, for VoiceOver's cursor.
@@ -157,9 +157,9 @@ final class TerminalView: NSView, CALayerDelegate {
 
     /// The pane's controller, via the responder chain — with splits it is not
     /// the window's `contentViewController`.
-    var paneController: ViewController? {
+    var paneController: TerminalPaneViewController? {
         sequence(first: self as NSResponder, next: { $0.nextResponder })
-            .first { $0 is ViewController } as? ViewController
+            .first { $0 is TerminalPaneViewController } as? TerminalPaneViewController
     }
 
     override func becomeFirstResponder() -> Bool {

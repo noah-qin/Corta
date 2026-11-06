@@ -134,7 +134,7 @@ extension ShellIntegrationTests {
 
     // MARK: - Command text recovery
 
-    /// `promptEndColumn` is what `ViewController.commandLineText(grid:
+    /// `promptEndColumn` is what `PaneShellIntegration.commandLineText(grid:
     /// record:)` reads a historic command's own text back from — it has to
     /// land on the record itself, not just the live `PerformerState`, or a
     /// command already scrolled off the current prompt would have nowhere

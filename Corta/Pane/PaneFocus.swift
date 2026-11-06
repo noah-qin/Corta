@@ -87,7 +87,7 @@ final class PaneFocus: NSObject {
             }
             pendingCursorLayer = nil
             idleCursorLayer = layer
-            (host as? ViewController)?.terminalView?.layer?.addSublayer(layer.layer)
+            (host as? TerminalPaneViewController)?.terminalView?.layer?.addSublayer(layer.layer)
             _ = layer.startBlink(beginTime: cursorOffAt ?? CACurrentMediaTime())
         } else {
             idleCursorLayer?.layer.removeFromSuperlayer()
@@ -95,7 +95,7 @@ final class PaneFocus: NSObject {
         }
     }
     private func makeIdleCursorLayer(capture: TerminalRenderer.CursorImage? = nil) -> CursorLayerPresentation? {
-        guard let pane = host as? ViewController, let grid = lastCursorGrid,
+        guard let pane = host as? TerminalPaneViewController, let grid = lastCursorGrid,
             let renderer = pane.terminalRenderer, let view = pane.terminalView,
             !view.hasMarkedText(), pane.selection == nil,
             pane.search.highlights.isEmpty, pane.pointer.hoveredLink == nil,
@@ -157,7 +157,7 @@ final class PaneFocus: NSObject {
             if let layer = makeIdleCursorLayer() { installIdleCursorLayer(layer) }
             return
         }
-        guard let pane = host as? ViewController, let renderer = pane.terminalRenderer,
+        guard let pane = host as? TerminalPaneViewController, let renderer = pane.terminalRenderer,
             let grid = lastCursorGrid else { return }
         let generation = cursorCaptureGeneration
         let revision = lastCursorOutputRevision
@@ -384,7 +384,7 @@ extension PaneFocus {
 
     @objc private func windowFocusChanged(_ note: Notification) {
         guard let window = note.object as? NSWindow, window === host?.view.window else { return }
-        (host as? ViewController)?.updateReaderPriority()
+        (host as? TerminalPaneViewController)?.updateReaderPriority()
         reportIfNeeded()
         // Cmd-Tab drops the ring even though the focused pane doesn't change.
         applyAppearance()

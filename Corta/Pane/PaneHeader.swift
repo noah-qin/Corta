@@ -21,7 +21,7 @@ import AppKit
 /// another terminal was the first responder at the time of the click.
 final class PaneHeader: NSView {
     static let height: CGFloat = 28
-    weak var pane: ViewController?
+    weak var pane: TerminalPaneViewController?
     private let title = NSTextField(labelWithString: "")
     private let icon = NSImageView()
     private var displayedProgram: ProgramIcon?
@@ -36,7 +36,7 @@ final class PaneHeader: NSView {
         var identifier: String
     }
 
-    init(pane: ViewController) {
+    init(pane: TerminalPaneViewController) {
         self.pane = pane
         super.init(frame: NSRect(x: 0, y: 0, width: 230, height: Self.height))
         icon.image = NSImage(systemSymbolName: "terminal", accessibilityDescription: nil)

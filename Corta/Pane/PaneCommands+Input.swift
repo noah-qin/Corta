@@ -283,7 +283,7 @@ extension PaneCommands {
         // Nothing warns here, by choice: nothing was judged, so nothing to keep to.
         let bracketed = delivery.warns ? delivery.bracketed : live
         delivery.onSent?()
-        (host as? ViewController)?.updateReaderPriority(input: true)
+        (host as? TerminalPaneViewController)?.updateReaderPriority(input: true)
         host.pointer.returnToBottomOnInput()
         sendPaste(sanitized, bracketed: bracketed, to: delivery.session)
     }
@@ -369,7 +369,7 @@ extension PaneCommands {
     /// Queues a sanitised paste whole, or not at all — admitted part-way, a
     /// backlog stopped it after `ESC[200~` and before `ESC[201~`, and the
     /// shell stayed in paste mode, taking every later Return as pasted text.
-    /// Once queued, Ctrl-C may drop the rest (`ViewController.onKeyBytes`);
+    /// Once queued, Ctrl-C may drop the rest (`TerminalView.onKeyBytes`);
     /// a paste the child started reading is then closed with `ESC[201~`.
     /// Saying so when the child is not reading, rather than dropping it
     /// without a word.

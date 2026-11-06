@@ -78,6 +78,7 @@ struct LicenseHeaderRuleTests {
             ("docs/USER-GUIDE.md", .reuse),
             ("CortaTerminal/Tests/CortaTerminalTests/Golden/sgr.in", .reuse),
             ("CortaTerminal/Tests/Fuzz/corpus/seed-1.bin", .reuse),
+            ("CortaTests/Renderer/RenderReferences/quads.png", .reuse),
             ("docs/brand/corta-pangolin-mascot.png", .reuse),
             ("docs/brand/interaction-demo.mp4", .reuse),
             ("scripts/brand/social-preview.swift", .header(.slashes)),

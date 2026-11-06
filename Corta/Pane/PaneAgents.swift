@@ -23,7 +23,7 @@ import Darwin
 /// facts; silence is deliberately not interpreted with a polling timer.
 @MainActor
 final class PaneAgents {
-    weak var host: ViewController?
+    weak var host: TerminalPaneViewController?
     private(set) var status: ProgramStatus?
     private(set) var progress: ProgramProgress?
     private var fallback: ProgramStatus?
@@ -35,7 +35,7 @@ final class PaneAgents {
     private var attentionRequest: Int?
     private var processRefresh: DispatchWorkItem?
 
-    init(host: ViewController) { self.host = host }
+    init(host: TerminalPaneViewController) { self.host = host }
 
     var visible: Bool {
         guard let host, let window = host.view.window else { return false }

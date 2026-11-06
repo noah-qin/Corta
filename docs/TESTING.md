@@ -273,6 +273,15 @@ ceiling is a hang guard, not a throughput figure.
 
 ## App tests
 
+`CortaTests/` mirrors the app's areas: `App`, `Window`, `Pane`,
+`TerminalView`, `Renderer`, `Remote`, `Settings` and `Shell`. Put shared
+fixtures and helpers in `Support/`; use `TestPaths.repositoryRoot` for
+repository files and `TestPaths.renderReferences` for the PNG references
+beside the renderer tests. Do not derive paths by counting parent directories
+from an individual test file. Suite names and `-only-testing:` identifiers
+are independent of these folders, so existing focused commands still apply.
+
+
 The tests are hosted inside the app. A local ad-hoc signature lets a contributor
 run them without the maintainer's signing identity:
 
@@ -663,7 +672,7 @@ keep a second backend alive.
 complete frames — the synthetic quad scene, an empty frame's clear, and a
 terminal frame with a Kitty image, a selection, current and other search
 matches, a hovered link and each cursor shape — with the PNGs in
-`CortaTests/RenderReferences/`. They were recorded from the classic Metal
+`CortaTests/Renderer/RenderReferences/`. They were recorded from the classic Metal
 path before #109 removed it, so they are the before/after comparison that
 replaced comparing two live backends: one code value per channel is
 blend rounding, anything more fails with both images attached.
@@ -681,7 +690,7 @@ reaching one means something is genuinely wrong, which stops being true on
 a saturated runner: `childExitOnItsOwnShowsAToast` waited ten seconds for a
 toast and did not get one on a run where nothing was broken.
 
-`CortaTests/TestTimeout.swift`'s `testTimeoutScale` multiplies every such
+`CortaTests/Support/TestTimeout.swift`'s `testTimeoutScale` multiplies every such
 ceiling. CI sets `TEST_RUNNER_CORTA_TEST_TIMEOUT_SCALE=3`, which
 `xcodebuild` delivers to the test host as `CORTA_TEST_TIMEOUT_SCALE`;
 nothing else sets it, so a local run keeps the written number and a genuine

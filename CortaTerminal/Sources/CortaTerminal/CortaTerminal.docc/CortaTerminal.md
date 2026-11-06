@@ -25,6 +25,13 @@ never writes stream-supplied text back to the child. The fuzz harness
 Start with <doc:Pipeline> to see where a byte goes, then read the symbols
 in the order the pipeline names them.
 
+## Source layout
+
+The target groups related files in `Parsing/`, `Screen/`, `Session/`,
+`Text/`, `Graphics/`, `Input/`, `ShellIntegration/` and `Support/`.
+These are source directories within the same module; they keep the core's
+nonisolated execution and existing API boundaries.
+
 ## Try the core
 
 Create a terminal, feed bytes, and inspect its grid without starting a child

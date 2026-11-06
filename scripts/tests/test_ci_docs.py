@@ -156,7 +156,7 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(scope["languages"], ["swift"])
 
     def test_core_change_also_checks_the_app(self):
-        scope = ci.scope_for_paths(["CortaTerminal/Sources/CortaTerminal/Parser.swift"])
+        scope = ci.scope_for_paths(["CortaTerminal/Sources/CortaTerminal/Parsing/Parser.swift"])
         self.assertTrue(all(scope[name] for name in ("core", "app", "ssh", "fuzz")))
         self.assertEqual(scope["languages"], ["swift"])
 
@@ -212,7 +212,7 @@ class CodeQLBaselineTests(DiffTests):
     def test_analysed_inputs_by_language(self):
         cases = {
             "Corta/App.swift": {"swift"},
-            "CortaTerminal/Sources/CortaTerminal/Parser.swift": {"swift"},
+            "CortaTerminal/Sources/CortaTerminal/Parsing/Parser.swift": {"swift"},
             "CortaTerminal/Tests/CortaTerminalTests/ParserTests.swift": set(),
             "CortaTests/AppTests.swift": set(),
             "Corta/Shim/shim.c": {"c-cpp"},
@@ -312,7 +312,7 @@ class CodeQLBaselineTests(DiffTests):
         self.assertTrue(ci.changes_analysis_pipeline([".github/actions/select-xcode/action.yml"]))
         self.assertTrue(ci.changes_analysis_pipeline(["Corta.xcodeproj/project.pbxproj"]))
         self.assertTrue(ci.changes_analysis_pipeline(["CortaTerminal/Package.resolved"]))
-        self.assertFalse(ci.changes_analysis_pipeline(["Corta/Pane/ViewController.swift", "README.md"]))
+        self.assertFalse(ci.changes_analysis_pipeline(["Corta/Pane/TerminalPaneViewController.swift", "README.md"]))
 
     def test_main_push_rescans_changed_inputs_only(self):
         reusable = {"swift": 1, "c-cpp": 2, "python": 3}

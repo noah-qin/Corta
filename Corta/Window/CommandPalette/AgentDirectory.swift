@@ -1,0 +1,264 @@
+// Copyright 2026 Noah Qin
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
+
+import AppKit
+import CortaTerminal
+
+/// The app's live panes are the directory; no retained pane or transcript.
+@MainActor
+final class AgentDirectory: NSObject, NSMenuDelegate {
+    static let shared = AgentDirectory()
+    private(set) var waiting = WaitingPaneQueue()
+    private var configurationObserver: NSObjectProtocol?
+    private var dockView: AgentDockView?
+    /// What the Dock tile last drew: a redraw is a cross-process call, and a
+    /// program streaming progress changes `status` on most output signals.
+    private var drawnBadge: String?
+    private var drawnDockPercent: Int?
+    static let didChange = Notification.Name("dev.noahqin.Corta.agentsDidChange")
+
+    struct Entry: Equatable {
+        var id: UUID
+        var title: String
+    }
+
+    static var panes: [TerminalPaneViewController] {
+        NSApp.windows.flatMap(\.terminalSplits).flatMap(\.panes)
+    }
+    static var entries: [Entry] { entries(of: panes) }
+
+    /// Waiting panes lead, so the list answers "who needs me" first.
+    static func entries(of panes: [TerminalPaneViewController]) -> [Entry] {
+        guard ConfigurationStore.shared.configuration.agentStatus else { return [] }
+        let listed = panes.compactMap { pane -> (entry: Entry, urgency: Int)? in
+            guard let status = pane.agents.status else { return nil }
+            return (entry(id: pane.taskNotifier.paneID,
+                paneName: pane.windowTitle.notificationTitle, status: status), status.urgency)
+        }
+        return ordered(listed, waiting: shared.waiting.paneIDs)
+    }
+
+    /// Queued panes first, in the order they began waiting: the order the jump
+    /// walks, and not by reported kind, which is the program's own claim
+    /// (`SECURITY.md` §2.9). Then the most urgent; a tie keeps the given order,
+    /// so equal rows do not trade places as the list is rebuilt.
+    static func ordered(_ listed: [(entry: Entry, urgency: Int)], waiting: [UUID]) -> [Entry] {
+        let arrival = Dictionary(uniqueKeysWithValues: waiting.enumerated().map { ($0.element, $0.offset) })
+        return listed.enumerated().sorted { left, right in
+            let leftArrival = arrival[left.element.entry.id] ?? .max
+            let rightArrival = arrival[right.element.entry.id] ?? .max
+            if leftArrival != rightArrival { return leftArrival < rightArrival }
+            if left.element.urgency != right.element.urgency { return left.element.urgency > right.element.urgency }
+            return left.offset < right.offset
+        }.map(\.element.entry)
+    }
+
+    /// Shared by menus and palette: no program-supplied display text.
+    static func entry(id: UUID, paneName: String, status: ProgramStatus) -> Entry {
+        let details = [L10n.text("agent.state." + status.state.rawValue),
+            status.kind.map { L10n.text("agent.kind." + $0.rawValue) } ?? ""]
+            .filter { !$0.isEmpty }.joined(separator: " · ")
+        return Entry(id: id, title: paneName + " — " + details)
+    }
+
+    static func focus(_ id: UUID) {
+        guard let pane = panes.first(where: { $0.taskNotifier.paneID == id }),
+              let split = pane.splitController,
+              let window = split.tab?.window ?? split.view.window else { return }
+        if let tab = split.tab { tab.controller?.selectTab(tab) }
+        if split.isPaneZoomed, split.zoomedPane !== pane { split.unzoomPane() }
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        split.takeFocus(pane)
+    }
+
+    @discardableResult
+    static func updateWaiting(_ id: UUID, blocked: Bool) -> Bool {
+        shared.waiting.update(id, blocked: blocked)
+    }
+
+    static var canJumpToNextWaitingPane: Bool {
+        shared.waiting.isEnabled(agentStatus: ConfigurationStore.shared.configuration.agentStatus)
+    }
+
+    static func jumpToNextWaitingPane() {
+        // A panel over a terminal window (the command palette) is key without
+        // being main: the pane to advance from is still the one beneath it.
+        let split = NSApp.keyWindow?.terminalSplit ?? NSApp.mainWindow?.terminalSplit
+        let current = split?.focusedPane?.taskNotifier.paneID
+        if let id = shared.waiting.next(after: current,
+            agentStatus: ConfigurationStore.shared.configuration.agentStatus) {
+            focus(id)
+        }
+    }
+
+    static func refresh() {
+        let directory = shared
+        if directory.configurationObserver == nil {
+            directory.configurationObserver = NotificationCenter.default.addObserver(
+                forName: ConfigurationStore.didChange, object: nil, queue: .main
+            ) { _ in
+                MainActor.assumeIsolated {
+                    for pane in Self.panes { pane.agents.readOutput() }
+                    refresh()
+                }
+            }
+        }
+        let enabled = ConfigurationStore.shared.configuration.agentStatus
+        refreshTabs(enabled: enabled)
+        refreshDock(enabled: enabled, directory: directory)
+        NotificationCenter.default.post(name: didChange, object: nil)
+    }
+
+    /// Each tab shows its most urgent pane status, or its progress, in the
+    /// strip (D30).
+    private static func refreshTabs(enabled: Bool) {
+        for window in NSApp.windows {
+            guard let controller = window.windowController as? TerminalWindowController else { continue }
+            var changed = false
+            for tab in controller.tabs {
+                let panes = tab.split.panes
+                let statuses = enabled ? panes.compactMap { $0.agents.status } : []
+                let status = statuses.max { $0.urgency < $1.urgency }
+                let progress = enabled ? panes.compactMap { $0.agents.progress }.first : nil
+                if tab.agentStatus != status || tab.agentProgress != progress {
+                    tab.agentStatus = status
+                    tab.agentProgress = progress
+                    changed = true
+                }
+            }
+            if changed { controller.refreshTabStrip() }
+        }
+    }
+
+    /// The Dock badge counts the panes waiting on the user; the Dock tile
+    /// shows the panes' mean progress. Redrawn only when either changes.
+    private static func refreshDock(enabled: Bool, directory: AgentDirectory) {
+        var waiting = 0
+        var values: [Double] = []
+        if enabled {
+            for pane in panes {
+                if pane.agents.status?.state == .blocked { waiting += 1 }
+                if let progress = pane.agents.progress {
+                    values.append(Double(progress.value ?? 0) / 100)
+                }
+            }
+        }
+        let badge = waiting > 0 ? String(waiting) : nil
+        let progress = values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
+        let percent = progress.map { Int(($0 * 100).rounded()) }
+        guard badge != directory.drawnBadge || percent != directory.drawnDockPercent else { return }
+        directory.drawnBadge = badge
+        directory.drawnDockPercent = percent
+        NSApp.dockTile.badgeLabel = badge
+        if let progress {
+            let view = directory.dockView ?? AgentDockView(frame: NSRect(origin: .zero, size: NSApp.dockTile.size))
+            directory.dockView = view
+            view.progress = progress
+            NSApp.dockTile.contentView = view
+        } else {
+            NSApp.dockTile.contentView = nil
+            directory.dockView = nil
+        }
+        NSApp.dockTile.display()
+    }
+
+    static func menu() -> NSMenu {
+        let menu = NSMenu(title: L10n.text("agent.list"))
+        menu.delegate = shared
+        return menu
+    }
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        populate(menu, entries: Self.entries)
+    }
+    func populate(_ menu: NSMenu, entries: [Entry]) {
+        menu.removeAllItems()
+        for entry in entries {
+            let item = NSMenuItem(title: entry.title, action: #selector(jump(_:)), keyEquivalent: "")
+            item.target = self; item.representedObject = entry.id
+            menu.addItem(item)
+        }
+        if menu.items.isEmpty {
+            let item = NSMenuItem(title: L10n.text("agent.empty"), action: nil, keyEquivalent: "")
+            item.isEnabled = false; menu.addItem(item)
+        }
+    }
+    @objc private func jump(_ sender: NSMenuItem) {
+        if let id = sender.representedObject as? UUID { Self.focus(id) }
+    }
+}
+
+final class AgentTabView: NSView {
+    var status: ProgramStatus?
+    var progress: ProgramProgress?
+    override var intrinsicContentSize: NSSize { NSSize(width: 20, height: 20) }
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.image)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func draw(_ dirtyRect: NSRect) {
+        let stateColor: NSColor = switch status?.state {
+        case .blocked: .systemOrange
+        case .error: .systemRed
+        case .done: .systemGreen
+        case .idle, .unknown: .secondaryLabelColor
+        default: .controlAccentColor
+        }
+        let color = Self.reportedColor(status?.color)
+            ?? (progress?.state == .error ? .systemRed
+                : progress?.state == .paused ? .systemOrange : stateColor)
+        // AppKit can resize a native tab accessory for its tab-strip metrics.
+        // Center in the actual bounds, including a nonzero bounds origin.
+        let center = NSPoint(x: bounds.midX, y: bounds.midY)
+        color.setFill()
+        let dot = NSBezierPath(ovalIn: NSRect(x: center.x - 3, y: center.y - 3, width: 6, height: 6))
+        if status?.state == .unknown {
+            color.setStroke()
+            dot.lineWidth = 1.5
+            dot.stroke()
+        } else { dot.fill() }
+        if let progress {
+            color.setStroke()
+            let path = NSBezierPath()
+            path.appendArc(withCenter: center, radius: 7,
+                startAngle: 90, endAngle: 90 - 360 * CGFloat(progress.value ?? 25) / 100, clockwise: true)
+            path.lineWidth = 2; path.stroke()
+        }
+    }
+
+    private static func reportedColor(_ text: String?) -> NSColor? {
+        guard let text, text.hasPrefix("#"), text.utf8.count == 7,
+              let rgb = UInt32(text.dropFirst(), radix: 16) else { return nil }
+        return NSColor(srgbRed: CGFloat((rgb >> 16) & 255) / 255,
+            green: CGFloat((rgb >> 8) & 255) / 255, blue: CGFloat(rgb & 255) / 255, alpha: 1)
+    }
+}
+
+private final class AgentDockView: NSView {
+    var progress = 0.0
+    override func draw(_ dirtyRect: NSRect) {
+        NSApp.applicationIconImage.draw(in: bounds)
+        let track = NSRect(x: bounds.width * 0.15, y: bounds.height * 0.12,
+                           width: bounds.width * 0.7, height: bounds.height * 0.08)
+        NSColor.black.withAlphaComponent(0.65).setFill()
+        NSBezierPath(roundedRect: track, xRadius: 4, yRadius: 4).fill()
+        var fill = track.insetBy(dx: 2, dy: 2); fill.size.width *= progress
+        NSColor.controlAccentColor.setFill()
+        NSBezierPath(roundedRect: fill, xRadius: 3, yRadius: 3).fill()
+    }
+}

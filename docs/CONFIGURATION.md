@@ -272,7 +272,7 @@ belongs to a different machine.
 
 An app-initiated directory change (`PaneCommands.changeDirectory(to:)`)
 writes `cd '<path>'` to the child only when
-`ViewController.canChangeDirectorySafely` holds: shell integration is
+`PaneCommands.canChangeDirectorySafely` holds: shell integration is
 active, no command is currently running, and the cursor is still exactly
 where the prompt finished drawing — so a directory a person picked from
 history never lands on a busy shell, a TUI holding the
