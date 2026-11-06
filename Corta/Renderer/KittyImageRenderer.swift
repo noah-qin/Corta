@@ -98,7 +98,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     }
     private let imagesReady = Mutex<(@Sendable () -> Void)?>(nil)
 
-    private let lock = NSLock()
+    let lock = NSLock()
     private var textures: [KittyGraphics.ImageID: MTLTexture] = [:]
     /// Cached texture sizes (`width * height * 4`).
     private var textureBytes: [KittyGraphics.ImageID: Int] = [:]
