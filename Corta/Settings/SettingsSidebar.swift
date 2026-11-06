@@ -66,7 +66,7 @@ struct SettingsSidebar: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 16) {
             HStack(spacing: 7) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(colorScheme == .dark ? Color(white: 0.65) : Color(white: 0.45))

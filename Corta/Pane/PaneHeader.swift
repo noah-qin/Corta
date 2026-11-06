@@ -27,6 +27,7 @@ final class PaneHeader: NSView {
     private var displayedProgram: ProgramIcon?
     private var displayedZoom: Bool?
     private var buttons: [NSButton] = []
+    private var hovering = false
 
     private struct Command {
         var symbol: String
@@ -64,6 +65,9 @@ final class PaneHeader: NSView {
             controls.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
         setAccessibilityElement(false)
+        addTrackingArea(NSTrackingArea(
+            rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self, userInfo: nil))
     }
 
     @available(*, unavailable)
@@ -85,8 +89,13 @@ final class PaneHeader: NSView {
         ]
         for command in actions {
             let label = command.label
-            let button = NSButton(image: NSImage(systemSymbolName: command.symbol, accessibilityDescription: label)!,
+            let buttonType: NSButton.Type = command.identifier == "pane.zoom" ? PaneZoomButton.self : NSButton.self
+            let image = NSImage(systemSymbolName: command.symbol, accessibilityDescription: label)!
+            let button = buttonType.init(image: image,
                                   target: self, action: command.action)
+            if let zoom = button as? PaneZoomButton {
+                zoom.onFocusChange = { [weak self] in self?.refreshZoomVisibility() }
+            }
             button.setAccessibilityIdentifier(command.identifier)
             button.isBordered = false
             button.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
@@ -130,6 +139,7 @@ final class PaneHeader: NSView {
         let textColor: NSColor = pane.isFocusedPane ? .labelColor : .secondaryLabelColor
         if title.textColor != textColor { title.textColor = textColor }
         if buttons[2].isEnabled != split.hasMultiplePanes { buttons[2].isEnabled = split.hasMultiplePanes }
+        refreshZoomVisibility()
         let zoomed = split.zoomedPane === pane
         guard displayedZoom != zoomed else { return }
         displayedZoom = zoomed
@@ -139,6 +149,27 @@ final class PaneHeader: NSView {
             accessibilityDescription: label)
         buttons[2].toolTip = label
         buttons[2].setAccessibilityLabel(label)
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        hovering = true
+        refreshZoomVisibility()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        hovering = false
+        refreshZoomVisibility()
+    }
+
+    private func refreshZoomVisibility() {
+        guard buttons.count > 2, let split = pane?.splitController else { return }
+        let button = buttons[2]
+        button.isHidden = !split.hasMultiplePanes
+        // Preserve the slot while hovering so the adjacent controls stay put.
+        // Keyboard focus and VoiceOver keep the same control discoverable.
+        let visible = hovering || (button as? PaneZoomButton)?.hasKeyboardFocus == true
+            || NSWorkspace.shared.isVoiceOverEnabled
+        button.alphaValue = visible ? 0.6 : 0
     }
 
     private func perform(_ action: (SplitViewController) -> Void) {
@@ -161,5 +192,33 @@ final class PaneHeader: NSView {
         perform { _ in }
         guard let pane, !pane.didTeardown, let controller = pane.splitController?.tab?.controller else { return }
         PaneDragSession(pane: pane, controller: controller)?.track(from: event)
+    }
+}
+
+/// An invisible hover affordance must not intercept a click on the header.
+private final class PaneZoomButton: NSButton {
+    var onFocusChange: (() -> Void)?
+    private(set) var hasKeyboardFocus = false
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        alphaValue > 0 ? super.hitTest(point) : nil
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted {
+            hasKeyboardFocus = true
+            onFocusChange?()
+        }
+        return accepted
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let accepted = super.resignFirstResponder()
+        if accepted {
+            hasKeyboardFocus = false
+            onFocusChange?()
+        }
+        return accepted
     }
 }

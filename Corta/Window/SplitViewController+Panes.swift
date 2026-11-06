@@ -182,3 +182,29 @@ extension SplitViewController {
         }
     }
 }
+
+extension SplitViewController {
+    /// Resize once to the settled geometry before revealing it. Keeping the
+    /// old grid throughout the animation caused a second visible reflow at
+    /// its end, especially at the right and bottom edges.
+    func prepareClosingGrid(node: NSSplitView, start: CGFloat, end: CGFloat, closing: ViewController) {
+        let split = node as? PaneSplitView
+        let thickness = node.dividerThickness
+        isRearrangingPanes = true
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        split?.transitionDividerThickness = 0
+        node.setPosition(end, ofDividerAt: 0)
+        view.layoutSubtreeIfNeeded()
+        isRearrangingPanes = false
+        for child in panes where child !== closing { child.resizeSessionToFitView(coalesce: false) }
+        isRearrangingPanes = true
+        split?.transitionDividerThickness = thickness
+        node.setPosition(start, ofDividerAt: 0)
+        view.layoutSubtreeIfNeeded()
+        CATransaction.commit()
+        // start() sets isRunning before the next layout can request a resize.
+        isRearrangingPanes = false
+    }
+
+}

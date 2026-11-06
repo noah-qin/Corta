@@ -219,7 +219,9 @@ final class PaneSplitView: NSSplitView {
     /// The user placed this divider, by dragging or from the keyboard;
     /// `auto-balance-panes` leaves it where it is. Equalize Panes clears it.
     var isUserPositioned = false
-    override var dividerThickness: CGFloat { PaneSurfaceView.gap }
+    /// A closing pane takes its gutter with it, avoiding a final layout jump.
+    var transitionDividerThickness: CGFloat?
+    override var dividerThickness: CGFloat { transitionDividerThickness ?? PaneSurfaceView.gap }
 
     override func mouseDown(with event: NSEvent) {
         onDividerInteraction?()

@@ -532,26 +532,57 @@ extension SplitViewController {
 
     func closePane(_ pane: ViewController) {
         splitTransition.finish()
-        defer {
-            noteLayoutChanged()
-            (view.window?.windowController as? TerminalWindowController)?.refreshTabTitle()
-        }
+        // Finishing an earlier close may already have removed this pane.
+        guard pane.parent === self, !pane.didTeardown else { return }
         unzoomIfNeeded(closing: pane)
-        // Before the tree changes, while its split still exists.
         noteClosing(pane)
         pane.teardown()
+        guard let node = pane.view.superview as? NSSplitView,
+            let sibling = node.subviews.first(where: { $0 !== pane.view }),
+            isSelectedTab, view.window?.isVisible == true, !view.inLiveResize,
+            !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        else {
+            finishClosingPane(pane)
+            return
+        }
+        view.layoutSubtreeIfNeeded()
+        let first = node.subviews[0]
+        let start = node.isVertical ? first.frame.width : first.frame.height
+        let axis = node.isVertical ? node.bounds.width : node.bounds.height
+        let end = first === pane.view ? 0 : axis
+        // Only this disappearing node may pass the normal pane minimums.
+        node.delegate = nil
+        if let target = panes.first(where: {
+            $0.view === sibling || $0.view.isDescendant(of: sibling)
+        }) { takeFocus(target) }
+        prepareClosingGrid(node: node, start: start, end: end, closing: pane)
+        splitTransition.start(node: node, from: start, to: end, collapsing: true) { [weak self, weak pane] in
+            guard let self, let pane else { return }
+            self.finishClosingPane(pane)
+        }
+    }
+
+    private func finishClosingPane(_ pane: ViewController) {
+        guard pane.parent === self else { return }
         let survivingSubtree = tree.close(leaf: pane.view)
         pane.removeFromParent()
         installRoot()
         updateWindowMinSize()
         balancePanesIfConfigured()
-        if let subtree = survivingSubtree, let target = panes.first(where: {
+        view.layoutSubtreeIfNeeded()
+        for child in panes { child.resizeSessionToFitView(coalesce: false) }
+        if let focusedPane, focusedPane.parent === self {
+            // A click during the animation already chose the next responder.
+            takeFocus(focusedPane)
+        } else if let subtree = survivingSubtree, let target = panes.first(where: {
             $0.view === subtree || $0.view.isDescendant(of: subtree)
         }) {
             takeFocus(target)
         } else {
             invalidateRemainingPanes()
         }
+        noteLayoutChanged()
+        (view.window?.windowController as? TerminalWindowController)?.refreshTabTitle()
     }
 
     /// Closes this tab, asking first when something runs in it.

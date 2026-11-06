@@ -73,6 +73,7 @@ final class TabContainerViewController: NSViewController {
     func remove(_ split: SplitViewController) {
         if held === split { held = nil }
         if shown === split { shown = nil }
+        cancelFade(split.view)
         contentView?.inert.remove(split.view)
         split.view.layer?.removeAllAnimations()
         split.view.alphaValue = 1
@@ -83,6 +84,10 @@ final class TabContainerViewController: NSViewController {
     private var contentView: WindowContentView? { viewIfLoaded as? WindowContentView }
 
     private func setHidden(_ hidden: Bool, _ split: SplitViewController) {
+        if hidden {
+            cancelFade(split.view)
+            contentView?.inert.remove(split.view)
+        }
         guard split.view.isHidden != hidden else { return }
         split.view.isHidden = hidden
         // A tab going behind has no window event to say so; its reader's
@@ -91,6 +96,8 @@ final class TabContainerViewController: NSViewController {
     }
 
     private weak var shown: SplitViewController?
+    private var revealsAfterClose = false
+    private var fadeGenerations: [ObjectIdentifier: UUID] = [:]
     /// The tab that stays drawn over a new one until the new one has drawn
     /// its shell's first output.
     private weak var held: SplitViewController?
@@ -108,6 +115,12 @@ final class TabContainerViewController: NSViewController {
         }
         contentView?.inert.remove(split.view)
         split.view.frame = view.bounds
+        split.view.layer?.removeAnimation(forKey: "corta.tab.content.enter")
+        cancelFade(split.view)
+        if revealsAfterClose {
+            revealsAfterClose = false
+            Self.reveal(split.view)
+        }
         guard let holding else { return }
         held = holding
         // Still drawn, but no longer the tab: a click belongs to the one
@@ -144,7 +157,8 @@ final class TabContainerViewController: NSViewController {
             contentView?.inert.remove(held.view)
             return
         }
-        Self.fadeOut(held.view) { [weak self, weak held] in
+        if let shown { Self.reveal(shown.view) }
+        fadeOut(held.view) { [weak self, weak held] in
             // Only while it is still this window's: a tab moved away during
             // the fade is another window's to show or hide.
             guard let self, let held, held.parent === self else { return }
@@ -163,33 +177,76 @@ final class TabContainerViewController: NSViewController {
             content.removeFromSuperview()
             return
         }
+        revealsAfterClose = true
         content.isHidden = false
         view.addSubview(content, positioned: .above, relativeTo: nil)
         contentView?.inert.add(content)
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.firstFrameDelay) {
-            Self.fadeOut(content) { content.removeFromSuperview() }
+            self.fadeOut(content) { content.removeFromSuperview() }
         }
     }
 
     /// About two frames: the newly shown tab's first one is presented.
     static let firstFrameDelay: TimeInterval = 0.034
-    static let fadeDuration: TimeInterval = 0.15
+    static let fadeDuration: TimeInterval = 0.24
 
-    private static func fadeOut(_ content: NSView, completion: @escaping @MainActor () -> Void) {
+    /// Move the whole composited terminal surface, including its Metal text,
+    /// without resizing the grid or scaling glyphs. Run after the first-frame
+    /// hold, so shell startup cannot consume the visible transition.
+    private static func reveal(_ content: NSView) {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        content.wantsLayer = true
+        let slide = CABasicAnimation(keyPath: "transform.translation.x")
+        slide.fromValue = 18
+        slide.toValue = 0
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.7
+        fade.toValue = 1
+        let group = CAAnimationGroup()
+        group.animations = [slide, fade]
+        group.duration = fadeDuration
+        group.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        content.layer?.add(group, forKey: "corta.tab.content.enter")
+    }
+
+    private func cancelFade(_ content: NSView) {
+        fadeGenerations.removeValue(forKey: ObjectIdentifier(content))
+        content.layer?.removeAnimation(forKey: "corta.tab.content.leave")
+    }
+
+    private func fadeOut(_ content: NSView, completion: @escaping @MainActor () -> Void) {
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             completion()
             return
         }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = fadeDuration
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            content.animator().alphaValue = 0
-        } completionHandler: {
+        content.wantsLayer = true
+        guard let layer = content.layer else { completion(); return }
+        let slide = CABasicAnimation(keyPath: "transform.translation.x")
+        slide.fromValue = 0
+        slide.toValue = -18
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+        let group = CAAnimationGroup()
+        group.animations = [slide, fade]
+        group.duration = Self.fadeDuration
+        group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        group.fillMode = .forwards
+        group.isRemovedOnCompletion = false
+        let id = ObjectIdentifier(content)
+        let generation = UUID()
+        fadeGenerations[id] = generation
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
             MainActor.assumeIsolated {
-                content.alphaValue = 1
+                guard let self, self.fadeGenerations[id] == generation else { return }
+                self.fadeGenerations.removeValue(forKey: id)
                 completion()
+                layer.removeAnimation(forKey: "corta.tab.content.leave")
             }
         }
+        layer.add(group, forKey: "corta.tab.content.leave")
+        CATransaction.commit()
     }
 }
 
