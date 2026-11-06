@@ -2,6 +2,242 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "settings.status.configTimedOut": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The configuration file did not answer in time. Its location may be on a disk that stopped responding; changes aren’t saved until it does."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "配置文件未及时响应。它可能位于已无响应的磁盘上；恢复响应前不会保存更改。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "設定檔未及時回應。它可能位於已無回應的磁碟上；恢復回應前不會儲存變更。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "設定ファイルが時間内に応答しませんでした。応答しないディスク上にある可能性があります。応答するまで変更は保存されません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "구성 파일이 제때 응답하지 않았습니다. 응답하지 않는 디스크에 있을 수 있으며, 응답할 때까지 변경 사항은 저장되지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Konfigurationsdatei hat nicht rechtzeitig geantwortet. Sie liegt möglicherweise auf einem Datenträger, der nicht mehr reagiert; bis dahin werden Änderungen nicht gesichert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le fichier de configuration n’a pas répondu à temps. Il se trouve peut-être sur un disque qui ne répond plus ; les modifications ne sont pas enregistrées d’ici là."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El archivo de configuración no respondió a tiempo. Puede estar en un disco que dejó de responder; los cambios no se guardan hasta que responda."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O arquivo de configuração não respondeu a tempo. Ele pode estar em um disco que parou de responder; as alterações não são salvas até que responda."
+          }
+        }
+      }
+    },
+    "toast.settingNotSaved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t save that setting. Settings has the reason."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法保存该设置。原因见“设置”。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "無法儲存該設定。原因請見「設定」。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "設定を保存できませんでした。理由は設定画面に表示されています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "설정을 저장하지 못했습니다. 이유는 설정에서 확인하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Einstellung konnte nicht gesichert werden. Der Grund steht in den Einstellungen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Impossible d’enregistrer ce réglage. La raison figure dans les Réglages."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pudo guardar el ajuste. El motivo aparece en Ajustes."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não foi possível salvar o ajuste. O motivo aparece em Ajustes."
+          }
+        }
+      }
+    },
+    "toast.pasteChecking": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking the pasted text…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在检查粘贴的文本…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在檢查貼上的文字…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "貼り付けるテキストを確認しています…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "붙여넣을 텍스트를 확인하는 중…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Eingefügter Text wird geprüft …"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Vérification du texte collé…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Comprobando el texto pegado…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verificando o texto colado…"
+          }
+        }
+      }
+    },
+    "toast.pasteTooLarge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not pasted — that’s more than 64 MiB of text."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未粘贴——文本超过 64 MiB。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未貼上——文字超過 64 MiB。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "貼り付けませんでした—テキストが 64 MiB を超えています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "붙여넣지 않았습니다 — 텍스트가 64MiB를 초과합니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nicht eingefügt – der Text ist größer als 64 MiB."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Non collé — le texte dépasse 64 Mio."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se pegó: el texto supera los 64 MiB."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não colado — o texto tem mais de 64 MiB."
+          }
+        }
+      }
+    },
     "drop.connectionChanged": {
       "extractionState": "manual",
       "localizations": {

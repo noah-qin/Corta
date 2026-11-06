@@ -168,15 +168,38 @@ nonisolated enum ImageDecoderProcess {
         _ bytes: [UInt8], helper: String? = ImageDecoderProcess.bundledHelper,
         timeout: Duration = ImageDecoderProcess.timeout, alignment: Int = 256, allowGIF: Bool = false
     ) -> Decoded? {
-        guard let helper, bytes.count <= KittyGraphics.maximumImageBytes,
+        guard case .decoded(let decoded) = decodeOutcome(
+            bytes, helper: helper, timeout: timeout, alignment: alignment, allowGIF: allowGIF)
+        else { return nil }
+        return decoded
+    }
+
+    /// How a decode ended: `refused` is the bytes' doing (past the caps, or the
+    /// helper ran and would not have them); `unavailable` is the machine's (no
+    /// memory to map, no helper, no descriptors, out of time).
+    enum Outcome {
+        case decoded(Decoded)
+        case refused
+        case unavailable
+    }
+
+    static func decodeOutcome(
+        _ bytes: [UInt8], helper: String? = ImageDecoderProcess.bundledHelper,
+        timeout: Duration = ImageDecoderProcess.timeout, alignment: Int = 256, allowGIF: Bool = false
+    ) -> Outcome {
+        guard bytes.count <= KittyGraphics.maximumImageBytes,
             let dimensions = allowGIF ? KittyGraphics.encodedDimensions(bytes) : pngDimensions(bytes),
-            KittyGraphics.dimensionsFit(width: dimensions.width, height: dimensions.height),
+            KittyGraphics.dimensionsFit(width: dimensions.width, height: dimensions.height)
+        else {
+            return .refused
+        }
+        guard let helper,
             let pixels = SharedPixels(
                 width: dimensions.width, height: dimensions.height, alignment: alignment)
         else {
-            return nil
+            return .unavailable
         }
-        guard let pipes = makePipes() else { return nil }
+        guard let pipes = makePipes() else { return .unavailable }
         let toChild = pipes.toChild
         let fromChild = pipes.fromChild
         let spawned = spawn(helper, stdin: toChild[0], stdout: fromChild[1], pixels: pixels.descriptor)
@@ -185,7 +208,7 @@ nonisolated enum ImageDecoderProcess {
         guard let pid = spawned else {
             close(toChild[1])
             close(fromChild[0])
-            return nil
+            return .unavailable
         }
 
         var input = [UInt8]()
@@ -199,11 +222,14 @@ nonisolated enum ImageDecoderProcess {
             input: input, writeTo: toChild[1], readFrom: fromChild[0],
             limit: 8, deadline: deadline)
         if output == nil { kill(pid, SIGKILL) }
-        guard let status = reap(pid, deadline: deadline), let output, status == 0 else { return nil }
-        guard let reported = parse(output), reported.width == dimensions.width,
+        // Killed or out of time says nothing of the bytes; a clean nonzero exit
+        // is the helper turning them down. Hostile bytes that hang it are retried
+        // a bounded few times (`maximumTransientRetries`).
+        guard let status = reap(pid, deadline: deadline), let output else { return .unavailable }
+        guard status == 0, let reported = parse(output), reported.width == dimensions.width,
             reported.height == dimensions.height
-        else { return nil }
-        return Decoded(width: reported.width, height: reported.height, pixels: pixels)
+        else { return .refused }
+        return .decoded(Decoded(width: reported.width, height: reported.height, pixels: pixels))
     }
 
 }

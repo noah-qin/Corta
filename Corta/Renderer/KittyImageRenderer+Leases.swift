@@ -48,6 +48,13 @@ nonisolated extension KittyImageRenderer {
     }
 
     /// Scheduler abandonment and renderer teardown return admission too.
+    /// A decode that failed for want of something that may come back.
+    struct TransientFailure {
+        var generation: UInt64
+        var attempts: Int
+        var retryAt: TimeInterval
+    }
+
     final class DecodePermit: Sendable {
         private let released = Atomic<Bool>(false)
         func release() {

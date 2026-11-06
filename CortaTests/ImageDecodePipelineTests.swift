@@ -29,6 +29,117 @@ import Testing
 /// when the last placement disappears.
 @Suite("Image decode pipeline", .serialized, .metalSerialized)
 struct ImageDecodePipelineTests {
+    /// The client was told OK long ago: a decode that failed for a reason of
+    /// the moment must not lose the image for good.
+    @Test("a decode that failed for want of resources is tried again, then given up on")
+    func transientDecodeFailureRetries() throws {
+        let device = try #require(Self.makeDevice())
+        let attempts = Mutex(0)
+        let renderer = KittyImageRenderer(
+            device: device,
+            decodeOutcome: { data in
+                attempts.withLock { $0 += 1 }
+                _ = data
+                return .unavailable
+            },
+            transientRetryDelay: 0,
+            decodeScheduler: { $0() })
+        var terminal = Terminal(rows: 10, columns: 40)
+        Self.placeRGBA(&terminal, id: 1, byte: 255)
+        let viewport = KittyImageRenderer.ImageViewport(
+            rows: 10, offset: 0, scrollbackTotalPushed: 0, cellWidth: 8, cellHeight: 16)
+        for _ in 0..<10 { renderer.update(table: Self.table(of: terminal), viewport: viewport) }
+        // The first try and every retry, and not one more.
+        #expect(attempts.withLock { $0 } == KittyImageRenderer.maximumTransientRetries + 1)
+    }
+
+    @Test("a decode that recovers installs its image")
+    func transientDecodeFailureRecovers() throws {
+        let device = try #require(Self.makeDevice())
+        let attempts = Mutex(0)
+        let renderer = KittyImageRenderer(
+            device: device,
+            decodeOutcome: { data in
+                let attempt = attempts.withLock { $0 += 1; return $0 }
+                guard attempt > 1, let image = KittyImageRenderer.decode(data) else { return .unavailable }
+                return .decoded(image)
+            },
+            transientRetryDelay: 0,
+            decodeScheduler: { $0() },
+            makeTexture: { device.makeTexture(descriptor: $0) })
+        var terminal = Terminal(rows: 10, columns: 40)
+        Self.placeRGBA(&terminal, id: 1, byte: 255)
+        let viewport = KittyImageRenderer.ImageViewport(
+            rows: 10, offset: 0, scrollbackTotalPushed: 0, cellWidth: 8, cellHeight: 16)
+        renderer.update(table: Self.table(of: terminal), viewport: viewport)
+        #expect(renderer.textureCount == 0)
+        renderer.update(table: Self.table(of: terminal), viewport: viewport)
+        #expect(renderer.textureCount == 1)
+    }
+
+    /// Ten seconds of waiting on a GPU that has stopped: on a decode permit,
+    /// two of those stopped every pane's images.
+    @Test("an upload waiting on the GPU holds no decode permit")
+    func uploadWaitReleasesItsPermit() throws {
+        let device = try #require(Self.makeDevice())
+        let waiting = DispatchSemaphore(value: 0)
+        let finish = DispatchSemaphore(value: 0)
+        defer { finish.signal() }
+        let held = Mutex<Int?>(nil)
+        let renderer = KittyImageRenderer(
+            device: device,
+            decodeScheduler: { work in
+                let thread = Thread(block: work)
+                thread.start()
+            },
+            uploadWaitGate: {
+                held.withLock { $0 = KittyImageRenderer.decodeBudget.reservedBytes }
+                waiting.signal()
+                finish.wait()
+            })
+        var terminal = Terminal(rows: 10, columns: 40)
+        Self.placeRGBA(&terminal, id: 1, byte: 255)
+        renderer.update(
+            table: Self.table(of: terminal),
+            viewport: KittyImageRenderer.ImageViewport(
+                rows: 10, offset: 0, scrollbackTotalPushed: 0, cellWidth: 8, cellHeight: 16))
+        let reached = waiting.wait(timeout: .now() + .seconds(10 * testTimeoutScale))
+        try #require(reached == .success)
+        #expect(held.withLock { $0 } == 0)
+    }
+
+    @Test("bytes that are no image are refused once")
+    func refusedDecodeIsNotRetried() throws {
+        let device = try #require(Self.makeDevice())
+        let attempts = Mutex(0)
+        let renderer = KittyImageRenderer(
+            device: device,
+            decodeOutcome: { _ in attempts.withLock { $0 += 1 }; return .refused },
+            transientRetryDelay: 0,
+            decodeScheduler: { $0() })
+        var terminal = Terminal(rows: 10, columns: 40)
+        Self.placeRGBA(&terminal, id: 1, byte: 255)
+        let viewport = KittyImageRenderer.ImageViewport(
+            rows: 10, offset: 0, scrollbackTotalPushed: 0, cellWidth: 8, cellHeight: 16)
+        for _ in 0..<4 { renderer.update(table: Self.table(of: terminal), viewport: viewport) }
+        #expect(attempts.withLock { $0 } == 1)
+    }
+
+    @Test("a helper that cannot start is the machine's fault; a clean refusal is the bytes'")
+    func decoderOutcomes() throws {
+        let png = Array(Data(base64Encoded:
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAEBgIApD5fRAAAAABJRU5ErkJggg==")!)
+        if case .unavailable = ImageDecoderProcess.decodeOutcome(png, helper: "/nonexistent") {} else {
+            Issue.record("a helper that will not start says nothing of the bytes")
+        }
+        if case .unavailable = ImageDecoderProcess.decodeOutcome(png, helper: nil) {} else {
+            Issue.record("no helper says nothing of the bytes")
+        }
+        if case .refused = ImageDecoderProcess.decodeOutcome(Array("not a png".utf8)) {} else {
+            Issue.record("bytes without a header are refused outright")
+        }
+    }
+
     @Test("a slow GPU upload cannot block the frame's cache lookups")
     func cacheLookupDoesNotWaitForUpload() throws {
         let device = try #require(Self.makeDevice())

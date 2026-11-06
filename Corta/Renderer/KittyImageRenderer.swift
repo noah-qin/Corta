@@ -70,12 +70,19 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// never shows an image never owns a queue.
     private var uploadQueue: MTLCommandQueue?
     private let makeTextureImpl: (MTLTextureDescriptor) -> MTLTexture?
-    private let decodeImageImpl: (KittyGraphics.ImageData) -> DecodedImage?
+    private let decodeImageImpl: (KittyGraphics.ImageData) -> DecodeOutcome
+    private let transientRetryDelay: TimeInterval
+    /// Runs as an upload begins its wait for the GPU, for tests to look then.
+    private let uploadWaitGate: (@Sendable () -> Void)?
     private let decodeScheduler: (@escaping @Sendable () -> Void) -> Void
     private let textureByteBudget: Int
     private let globalBudget: GlobalTextureBudget
     private let paneBudget: GlobalTextureBudget
     static let decodeBudget = GlobalTextureBudget(limit: 2)
+    /// Uploads waiting on the GPU without a decode permit. Past it one keeps
+    /// its permit, so a GPU that stopped answering costs this many threads and
+    /// then slows the decodes behind it, rather than taking a thread per image.
+    static let uploadWaitBudget = GlobalTextureBudget(limit: 8)
     static let decodeFinished = Notification.Name("Corta.imageDecodeFinished")
     private var decodeObserver: NSObjectProtocol?
     final class TextureLeaseKey: Sendable {}
@@ -105,6 +112,10 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// Decode or allocation failures by store generation, so a broken image
     /// isn't retried every frame but a re-transmission is.
     private var failedGenerations: [KittyGraphics.ImageID: UInt64] = [:]
+    /// Decodes that failed for want of something that may come back — room in
+    /// the mapping budget, a descriptor, the helper — which the image's own
+    /// bytes had no part in: tried again later, a few times (`DecodeOutcome`).
+    private var transientFailures: [KittyGraphics.ImageID: TransientFailure] = [:]
     /// Images skipped for a full global budget, with the budget generation
     /// seen; retried once it moves, since another pane's release is otherwise
     /// invisible here.
@@ -151,7 +162,10 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         textureByteBudget: Int = KittyGraphics.maximumPaneTextureBytes,
         globalBudget: GlobalTextureBudget = .shared,
         decodeImage: ((KittyGraphics.ImageData) -> DecodedImage?)? = nil,
+        decodeOutcome: ((KittyGraphics.ImageData) -> DecodeOutcome)? = nil,
+        transientRetryDelay: TimeInterval = KittyImageRenderer.transientRetryDelay,
         decodeScheduler: ((@escaping @Sendable () -> Void) -> Void)? = nil,
+        uploadWaitGate: (@Sendable () -> Void)? = nil,
         // Last, so a trailing closure binds here.
         makeTexture: ((MTLTextureDescriptor) -> MTLTexture?)? = nil
     ) {
@@ -161,9 +175,13 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         self.globalBudget = globalBudget
         self.paneBudget = GlobalTextureBudget(limit: textureByteBudget)
         self.makeTextureImpl = makeTexture ?? { device.makeTexture(descriptor: $0) }
-        self.decodeImageImpl = decodeImage ?? { data in
-                Self.decode(data, alignment: device.minimumLinearTextureAlignment(for: .bgra8Unorm))
-            }
+        self.transientRetryDelay = transientRetryDelay
+        self.uploadWaitGate = uploadWaitGate
+        self.decodeImageImpl = decodeOutcome ?? decodeImage.map { decode in
+            { data in decode(data).map(DecodeOutcome.decoded) ?? .refused }
+        } ?? { data in
+            Self.decodeOutcome(data, alignment: device.minimumLinearTextureAlignment(for: .bgra8Unorm))
+        }
         self.decodeScheduler = decodeScheduler ?? {
             DispatchQueue.global(qos: .userInitiated).async(execute: $0)
         }
@@ -200,7 +218,7 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
         for job in toSchedule {
             decodeScheduler { [weak self] in
                 defer { job.permit.release() }
-                self?.decodeAndInstall(id: job.id, generation: job.generation, data: job.data)
+                self?.decodeAndInstall(id: job.id, generation: job.generation, data: job.data, permit: job.permit)
             }
         }
     }
@@ -232,6 +250,7 @@ nonisolated extension KittyImageRenderer {
             releaseTextureLocked(id)
         }
         failedGenerations = failedGenerations.filter { liveIDs.contains($0.key) }
+        transientFailures = transientFailures.filter { liveIDs.contains($0.key) }
         budgetBlocked = budgetBlocked.filter { liveIDs.contains($0.key) }
         desiredGenerations = Dictionary(uniqueKeysWithValues: liveIDs.compactMap { id in
             table.storeGeneration(for: id).map { (id, $0) }
@@ -269,6 +288,13 @@ nonisolated extension KittyImageRenderer {
             releaseTextureLocked(id)
         }
         guard failedGenerations[id] != generation else { return nil }
+        if let failure = transientFailures[id] {
+            if failure.generation != generation {
+                transientFailures[id] = nil
+            } else if ProcessInfo.processInfo.systemUptime < failure.retryAt {
+                return nil
+            }
+        }
         // A replacement cannot orphan an actual queued/running job.
         guard inFlight[id] == nil else { return nil }
         guard !isBudgetBlockedLocked(id, generation: generation), visible.contains(id) else { return nil }
@@ -348,7 +374,8 @@ nonisolated extension KittyImageRenderer {
     /// The decode, allocation and upload, on `decodeScheduler` (or inline for
     /// the test seam).
     private func decodeAndInstall(
-        id: KittyGraphics.ImageID, generation: UInt64, data: KittyGraphics.ImageData
+        id: KittyGraphics.ImageID, generation: UInt64, data: KittyGraphics.ImageData,
+        permit: DecodePermit? = nil
     ) {
         if generation != 0 {
             let relevant = lock.withLock {
@@ -358,12 +385,29 @@ nonisolated extension KittyImageRenderer {
             }
             guard relevant else { return }
         }
-        let decoded = decodeImageImpl(data)
+        let outcome = decodeImageImpl(data)
+        var decoded: DecodedImage?
+        if case .decoded(let image) = outcome { decoded = image }
+        let retryDelay: TimeInterval? = lock.withLock {
+            guard case .unavailable = outcome, isRelevantLocked(id: id, generation: generation) else { return nil }
+            return noteTransientFailureLocked(id: id, generation: generation)
+        }
+        if let retryDelay {
+            // Nothing else would ask: no budget or visibility change is coming.
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + retryDelay) { [weak self] in
+                self?.onImagesReady?()
+            }
+        }
         let lease: TextureLease? = lock.withLock {
             guard isRelevantLocked(id: id, generation: generation) else {
                 if inFlight[id] == generation { inFlight[id] = nil }
                 return nil
             }
+            if case .unavailable = outcome {
+                if inFlight[id] == generation { inFlight[id] = nil }
+                return nil
+            }
+            transientFailures[id] = nil
             let lease = reserveLocked(id: id, generation: generation, decoded: decoded)
             if lease == nil, inFlight[id] == generation { inFlight[id] = nil }
             return lease
@@ -371,7 +415,7 @@ nonisolated extension KittyImageRenderer {
         guard let decoded, let lease else { return }
         // Allocation and GPU completion must never hold the cache lock: a
         // hung upload cannot stall the main thread or bounded teardown.
-        let made = makeTexture(from: decoded, lease: lease)
+        let made = makeTexture(from: decoded, lease: lease, permit: permit)
         let installed = lock.withLock {
             let stillRelevant = isRelevantLocked(id: id, generation: generation)
             if inFlight[id] == generation { inFlight[id] = nil }
@@ -513,7 +557,26 @@ nonisolated extension KittyImageRenderer {
         return uploadQueue
     }
 
-    private func makeTexture(from decoded: DecodedImage, lease: TextureLease) -> TextureUpload {
+    /// The delay before `id` is tried again, or nil once it has failed too many
+    /// times to be worth asking: then it is failed for good, like a bad image.
+    /// Caller holds `lock`.
+    private func noteTransientFailureLocked(id: KittyGraphics.ImageID, generation: UInt64) -> TimeInterval? {
+        let attempts = transientFailures[id].map { $0.generation == generation ? $0.attempts : 0 } ?? 0
+        guard attempts < Self.maximumTransientRetries else {
+            transientFailures[id] = nil
+            failedGenerations[id] = generation
+            return nil
+        }
+        let delay = transientRetryDelay * Double(1 << attempts)
+        transientFailures[id] = TransientFailure(
+            generation: generation, attempts: attempts + 1,
+            retryAt: ProcessInfo.processInfo.systemUptime + delay)
+        return delay
+    }
+
+    private func makeTexture(
+        from decoded: DecodedImage, lease: TextureLease, permit: DecodePermit? = nil
+    ) -> TextureUpload {
         if usesSharedPixels, let pixels = decoded.pixels {
             guard
                 let linear = pixels.texture(
@@ -545,6 +608,12 @@ nonisolated extension KittyImageRenderer {
                 finished.signal()
             }
             command.commit()
+            // Up to ten seconds of nothing but waiting, so not on a decode
+            // permit: two uploads on a stuck GPU stopped every pane's images.
+            let holdsWaitSlot = Self.uploadWaitBudget.tryReserve(1)
+            defer { if holdsWaitSlot { Self.uploadWaitBudget.release(1) } }
+            if holdsWaitSlot { permit?.release() }
+            uploadWaitGate?()
             guard finished.wait(timeout: .now() + 10) == .success,
                 success.load(ordering: .acquiring)
             else { return .gpuBusy }

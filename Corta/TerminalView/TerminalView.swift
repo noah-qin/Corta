@@ -268,6 +268,8 @@ final class TerminalView: NSView, CALayerDelegate {
     /// without this the link stays on the main run loop, and the run loop
     /// keeps the layer, this view and the whole pane alive.
     var isRendering: Bool { frameScheduler.isAttached }
+    /// No tick is coming until something asks for one.
+    var isFrameLinkPaused: Bool { frameScheduler.isPaused }
 
     func stopRendering() {
         for observer in inputGeometryObservers { NotificationCenter.default.removeObserver(observer) }
