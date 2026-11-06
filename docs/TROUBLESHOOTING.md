@@ -134,6 +134,14 @@ the config file overrides this per pane.
 Settings ▸ General. A restore that crashed the app is not retried: the
 saved arrangement is dropped and one fresh window opens.
 
+### Settings says the configuration file did not answer in time
+
+The file, or the folder it is linked into, is on a disk that has stopped
+responding, often a network mount. Corta waits at most a second, keeps the
+settings it already has, refuses to save rather than write over a file it could
+not read, and tries again every few seconds; a menu change says it could not be
+saved. Once the disk answers, this clears by itself.
+
 ### Settings says it can't read the config file
 
 `~/.config/corta/config` exists but is not UTF-8 text — usually a byte
@@ -292,6 +300,18 @@ hooks get the bundled version when a new shell starts.
 ---
 
 ## Behaviour that differs from other terminals
+
+### Clicking a link did nothing
+
+Output changed the text under the pointer after the tooltip appeared. A click
+opens only what the tooltip names, so the tooltip was brought up to date
+instead. Read it and click again.
+
+### A paste says "Not pasted — that's more than 64 MiB"
+
+The limit is fixed, and nothing was sent. Write the text to a file and have the
+program read that, or paste it in parts. A paste this size through a terminal
+takes seconds even when it is allowed.
 
 ### Copying happens as soon as I finish selecting
 

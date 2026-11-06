@@ -399,7 +399,12 @@ own error text is under **Details**.
   These are conservative patterns, not a shell
   parser or a guarantee that other text is safe. A large
   paste the shell is still working through can be cancelled with ⌃C: the
-  part not yet sent is dropped and the interrupt goes straight through.
+  part not yet sent is dropped and the interrupt goes straight through. A
+  paste over 64 KiB is checked in the background, so the window stays usable;
+  paste again and the new text replaces it. Over 64 MiB, nothing is pasted and
+  Corta says so. A program can turn bracketed paste on without anything behind
+  it understanding it; if you paste into remote or old programs and want the
+  line-break warning every time, use `paste-warning = always`.
 - **Dropping files.** Drop files or promised files from another app on a pane
   to fill their quoted paths through the paste channel, without pressing Return.
   Hovering never starts a download. Receiving happens asynchronously and stops
@@ -454,9 +459,12 @@ own error text is under **Details**.
   with a plain click instead. Hold ⌘ over a link — including one a program
   marks explicitly (OSC 8, as `ls --hyperlink` prints) — to underline it
   and see its real target as a tooltip before you click; the click itself
-  opens it at once.
+  opens it at once. A click opens only what the tooltip names: if output has
+  changed the text under the pointer, the tooltip updates and the click does
+  nothing, so click again.
 - **File references.** A `path:line:column` in program output — a compiler
-  error, a test failure — opens in your editor with ⌘-click. Tell Corta
+  error, a test failure — opens in your editor with ⌘-click, under either
+  `link-activation` setting. Tell Corta
   which editor with `open-file-command`, starting with the editor's full
   path, for example
   `open-file-command = /usr/local/bin/code --goto {file}:{line}:{column}`

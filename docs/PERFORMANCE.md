@@ -1256,6 +1256,10 @@ Metal 4 blocker, every run and what was not verified.
 
 ### 5.18 Search and reflow without per-cell work (2026-10-02)
 
+Since 2026-11-06 a reflow runs outside the session's lock, so these figures are
+how long `SIGWINCH` and the reader wait, not how long a frame does; frames draw
+the old size meanwhile (§5.22).
+
 An ASCII query keeps a cell-based path for scalars whose case folding
 cannot match ASCII; combining and format scalars, and ASCII folds, keep the
 full Unicode match. Reflow reserves row capacity and reuses its scratch
@@ -1386,3 +1390,22 @@ A page now appears over about 80 ms rather than after one long frame; a 4 ms
 budget doubled that for a stall a dropped frame already hides. Holding ⌘= over
 CJK text resets the atlas each step, so each step fills in rather than
 stalling. Apple M5, macOS 27.0.1 (26A434), Xcode 27.1 (27A9275).
+
+### 5.22 Paste, reflow and image peaks off the main path (2026-11-06)
+
+Apple M5, Xcode 27.2, release core probes, before and after on the same run with
+other builds running beside them (load average 25–65): compare within a row, and
+do not quote them as absolutes.
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| Paste risks, sanitise and chunk: 1 / 4 / 16 MiB of plain log | 1.12 / 4.72 / 20.8 s, on the main thread | 0.011 / 0.042 / 0.188 s, off it |
+| The same, text with `\|`, `sh`, `sudo` and `rm` in every line | 1.44 / 5.99 / 18.7 s, on the main thread | 0.26 / 1.11 / 4.93 s, off it |
+| Frame snapshot during a 100k-line reflow, p95 / p99 / longest | 154 / 219 / 417 ms | 0.006 / 0.014 / 1.2 ms |
+| Process peak across those resizes | 501–585 MiB | 503–543 MiB |
+| Process peak decoding a 61 MiB raw image through a session | 313 MiB (5.1×) | 150 MiB (2.5×) |
+| 4 MiB of OSC 133 prompts at `command-history-limit` 512 / 10000 | 0.62 / 12.1 s | 0.12 / 0.12 s |
+
+The snapshot row is 60 resizes 100 ms apart with a snapshot every 8 ms, as a frame
+would ask; `SIGWINCH` still waits for the reflow. A loop snapshotting with no gap
+holds so many old grids alive that it showed 1106 MiB, which no frame does.

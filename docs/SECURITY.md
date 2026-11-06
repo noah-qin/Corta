@@ -92,7 +92,25 @@ Copying a command from a web page where a hidden element appended
   not prove other text safe. There is no network or model lookup.
 - Strip `ESC` and other C0 control characters from pasted text — a paste
   is data, never a command stream — and DEL and the C1 range with them:
-  DEL is a line editor's backspace, and C1 holds CSI and ST.
+  DEL is a line editor's backspace, and C1 holds CSI and ST. Text an input
+  method or a text replacement commits is held to the same: controls come off,
+  and committed lines take this warning; one lone Return is the key.
+- `?2004` is read once per paste: the warning is judged by that reading and
+  the bytes are encoded by it. A warning takes time, and output can change the
+  mode meanwhile, so if text judged under `?2004h` is about to go with the mode
+  now off and it holds a newline, it is asked about again; it never goes
+  unmarked unasked. The window between that last look and the child reading
+  the bytes cannot be closed from here.
+- **Known limit.** `?2004` is set by output, and Corta cannot see who reads the
+  bytes. A remote host or program can print `ESC[?2004h` with nothing behind it
+  that understands the markers, such as an old line editor beyond `ssh`; a
+  multiline paste then takes no newline warning, and its newlines still run.
+  Warning on every multiline paste in a foreground program instead would ask
+  each time in Claude Code, vim and the like, whose bracketing is real, so it is
+  the user's choice: `paste-warning = always` warns on every multiline paste.
+- A paste, like any other input, is bound to the session it was asked for. If
+  that session has stopped, or the pane has a new one, by the time the warning
+  is answered or the scan finishes, nothing is sent.
 
 ### 2.4 URLs and hyperlinks
 
@@ -341,9 +359,10 @@ allocating without bound. These caps are asserted in the fuzz harness
 | iTerm2 image OSC | File: base64 of at most 64 MiB decoded data plus 4100 header bytes, and never more than the pane/process image allowance left when the sequence begins (the parser asks before buffering); FilePart: 1 MiB per packet. A placement spans at most 4096 cells each way, as kitty's `c=`/`r=` do. Multipart total: at most 64 MiB decoded and the pane/process allowance. Unrelated OSC/CSI/APC abandons it; malformed base64, declared-size mismatch and oversized dimensions are dropped. The parser releases large string capacity after dispatch. Large base64 decoding uses the existing decode pause outside the session lock |
 | Extended clipboard / pointer stack | OSC 5522: 8192-byte packet cap, 3072 decoded bytes per text transaction, publish only at end; any invalid part discards it. OSC 22: 16 fixed names per screen; oldest evicted, RIS clears both |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
-| Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size; 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) |
+| Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size; 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant) | A decode outside the session's lock is charged its whole peak while it runs — text and decoded bytes, or decoded bytes and the inflate ceiling — and refused with `ENOSPC` when that does not fit, even if the image alone would. A 61 MiB raw image peaks at about 2.5× its size, down from 5.1× (`PERFORMANCE.md` §5.22)
 | Kitty PNG / iTerm2 PNG and GIF-first-frame decoding | `corta-image-decoder`, a process of its own under the independent App Sandbox (no access to host user files or network entitlements), 10 s, a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor inside its sandbox, so decoded pixels never travel over stdout |
 | Compressed Kitty image (`o=z`) | Inflates to exactly its declared pixels (RGB, RGBA) or at most the 64 MB image cap (PNG); the stream stops at the ceiling and the image is refused, so the expansion is never allocated. The zlib header and Adler-32 must check out; any other `o=` value is refused |
+| Pasted text | 64 MiB of UTF-8, refused before it is sanitised or scanned, with a notice. Scanned on the main thread below 64 KiB and off it above, where a newer paste replaces it. The write queue's 4 MiB is a back-pressure cap: it refuses a paste while a backlog is over it, and admits one paste whole |
 | CSI parameter count        | 16 (xterm's limit); ignore the remainder               |
 | CSI parameter value        | Clamp to a sane maximum before use                     |
 | Repeat counts (e.g. `REP`) | Clamp to the screen or scrollback dimension            |
@@ -555,6 +574,17 @@ can save selected text, command output, or the whole terminal through a
 Save panel. The file is written owner-only (`0600`); the destination and any
 later sharing are the user's choice.
 
+**A save that dies leaves a copy.** State files are replaced atomically
+through a temporary beside them, `.<name>.<uuid>`, owner-only. A crash or power
+loss between its write and its rename leaves that temporary, holding what the
+file held, where Clear History does not reach it. At launch, off the main
+thread, those older than five minutes are removed from Application Support and
+the RemoteEdit folder; only that exact name shape, only regular files.
+
+**State directories and files are owner-only** as hardening: `~/Library` already
+keeps other accounts out. Directories Corta creates for state are `0700`, and a
+state file an older build left wider is tightened, its ACL cleared, as it loads.
+
 **Custom session restoration saves plaintext metadata, not terminal text.**
 `restore-windows` defaults to `true`. `state.json` can contain window geometry,
 split layout, focused pane, working directories, preset identifiers and
@@ -704,6 +734,13 @@ when a limit is exhausted. A per-frame limit does not bound accumulated
 state. Charge retained resources until release; return reservations on
 failure, cancellation, replacement and owner teardown. Test both rejection
 and recovery, including work finishing after cancellation.
+
+OSC 133 prompts need no token and cost 18 bytes a pair, and each opens a
+command record, so a flood is priced in records. Evicting one past
+`command-history-limit` moves an index, amortized constant time at any limit: it
+used to move the array, for 5.22 s of CPU per 4 MiB at the 10000 limit and
+0.23 s at the default 512, against 0.03 s of plain text. That was CPU
+amplification, not a frozen window; a snapshot waited 3.9 ms at most.
 
 Program status has a per-session cap of one main slot plus 32 subtask slots,
 matching Claude Code 2.1.310's maximum emitted set; past it the least recently

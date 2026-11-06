@@ -34,7 +34,8 @@ the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
   pressure lower it otherwise.
 - An idle blinking cursor is animated by Core Animation; an idle shell causes
   no periodic wakeups; a hidden pane's reader runs at background priority
-  after two seconds; an occluded window does not draw.
+  after two seconds; an occluded window, or a tab behind another, does not
+  draw, even under steady output, and draws what it missed when shown.
 - Glyph atlases and GPU instance buffers sized to what is on screen: a
   24-byte quad, atlases that grow on demand.
 - iTerm2 `imgcat` inline PNG and animated GIF's first frame (OSC 1337),
