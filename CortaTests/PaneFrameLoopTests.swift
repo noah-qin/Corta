@@ -80,7 +80,7 @@ struct PaneFrameLoopTests {
         var signals = 0
         rig.loop.onOutputSignal = { signals += 1 }
         rig.session.write(Array("hidden-output\n".utf8))
-        let deadline = SuspendingClock.now + .seconds(5)
+        let deadline = SuspendingClock.now + .seconds(5 * testTimeoutScale)
         while signals == 0 && SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(20))
         }

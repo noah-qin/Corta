@@ -124,7 +124,7 @@ struct PaneWindowTitleTests {
         })
         defer { release.signal() }
         title.probeRepresentedDirectory("/slow-mount")
-        let deadline = SuspendingClock.now + .seconds(3)
+        let deadline = SuspendingClock.now + .seconds(3 * testTimeoutScale)
         while !entered.withLock({ $0 }), SuspendingClock.now < deadline {
             await Task.yield()
         }

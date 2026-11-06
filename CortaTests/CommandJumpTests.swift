@@ -38,7 +38,7 @@ struct CommandJumpTests {
         let marker = UUID().uuidString
         pane.session.write(Array(("\u{1B}]1337;SetMark\u{1B}\\mark\n" + String(repeating: "x\n", count: 30)
             + "\u{1B}]2;" + marker + "\u{1B}\\\n").utf8))
-        let deadline = SuspendingClock.now + .seconds(5)
+        let deadline = SuspendingClock.now + .seconds(5 * testTimeoutScale)
         while pane.session.windowTitle != marker, SuspendingClock.now < deadline {
             try await Task.sleep(for: .milliseconds(20))
         }

@@ -355,13 +355,12 @@ extension RemoteWorkflowUITests {
         let terminal = app.windows.firstMatch
         XCTAssertTrue(waitUntil(timeout: 10) { terminal.title.contains("Remote: fakebox") })
         terminal.click()
-        app.typeText("printf '%s' ")
         askHostThenConnect(app, stage: stage)
         let readme = checkListing(app, stage: stage)
         let browser = connectedBrowserWindow(app)
         let title = browser.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
             .withOffset(CGVector(dx: 0, dy: 12))
-        title.press(forDuration: 0.1, thenDragTo: title.withOffset(CGVector(dx: 20 - browser.frame.minX, dy: 0)))
+        title.click(forDuration: 0.1, thenDragTo: title.withOffset(CGVector(dx: 20 - browser.frame.minX, dy: 0)))
 
         let downloads = stage.appendingPathComponent("downloads")
         XCTAssertTrue(NSWorkspace.shared.open(downloads))
@@ -372,14 +371,14 @@ extension RemoteWorkflowUITests {
         let finderTitle = destination.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
             .withOffset(CGVector(dx: 0, dy: 12))
         let screenWidth = try XCTUnwrap(NSScreen.main).frame.width
-        finderTitle.press(
+        finderTitle.click(
             forDuration: 0.1,
             thenDragTo: finderTitle.withOffset(CGVector(dx: screenWidth - 650 - destination.frame.minX, dy: 0)))
         app.activate()
 
         let dropPoint = destination.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.7))
         readme.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.2, thenDragTo: dropPoint, withVelocity: .default, thenHoldForDuration: 3)
+            .click(forDuration: 0.2, thenDragTo: dropPoint, withVelocity: .default, thenHoldForDuration: 3)
         let downloaded = downloads.appendingPathComponent("README.md")
         XCTAssertTrue(waitUntil(timeout: 15) {
             (try? String(contentsOf: downloaded, encoding: .utf8)) == "hello\n"
@@ -388,6 +387,7 @@ extension RemoteWorkflowUITests {
         browser.buttons[XCUIIdentifierCloseWindow].click()
         terminal.click()
         app.typeText("rm -rf '\(stage.path)'\n")
-        XCTAssertTrue(waitUntil(timeout: 10) { !FileManager.default.fileExists(atPath: stage.path) })
+        XCTAssertTrue(waitUntil(timeout: 10) { !FileManager.default.fileExists(atPath: stage.path) },
+            "left in the stage: \((try? FileManager.default.subpathsOfDirectory(atPath: stage.path)) ?? [])")
     }
 }

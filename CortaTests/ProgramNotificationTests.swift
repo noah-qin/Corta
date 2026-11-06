@@ -230,7 +230,7 @@ struct ProgramNotificationTests {
 
 extension ProgramNotificationTests {
     private func settle(_ condition: () -> Bool) async -> Bool {
-        let deadline = SuspendingClock.now + .seconds(3)
+        let deadline = SuspendingClock.now + .seconds(3 * testTimeoutScale)
         while !condition(), SuspendingClock.now < deadline { try? await Task.sleep(for: .milliseconds(10)) }
         return condition()
     }

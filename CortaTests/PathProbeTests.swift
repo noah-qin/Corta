@@ -29,7 +29,7 @@ struct PathProbeTests {
     private final class Gate: Sendable {
         let released = Mutex(false)
         func wait() {
-            let deadline = SuspendingClock.now + .seconds(5)
+            let deadline = SuspendingClock.now + .seconds(5 * testTimeoutScale)
             while !released.withLock({ $0 }), SuspendingClock.now < deadline {
                 Thread.sleep(forTimeInterval: 0.005)
             }
