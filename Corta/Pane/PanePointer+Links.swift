@@ -190,6 +190,8 @@ extension PanePointer {
         } else {
             resetLinkHover(terminalView)
             hoverState = .shown(nil)
+            // Still inside the view: output can put a link under this pointer.
+            lastPointerEvent = (event, terminalView)
         }
     }
 

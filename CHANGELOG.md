@@ -128,6 +128,10 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Hovering over empty or ordinary text keeps tracking the resting pointer, so a
+  link that later appears there gets its tooltip without another mouse move.
+- An SFTP connection is not failed by a cancelled deadline that has just reached
+  its last tick, including when a successful answer cancels it at that boundary.
 - A new shell prompt now ends a pane's reported Working and Waiting states, also in
   the Agents list, the Dock count and ⌥⌘J's queue, even when the shell sent no
   command-finished mark. Done and Failed stay.

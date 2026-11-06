@@ -131,7 +131,8 @@ extension SFTPBrowserModel {
             do {
                 try await ConnectionDeadline.wait(timeout) { self?.isAskingHost(shown) ?? false }
             } catch { return }
-            guard let self, generation == self.connectionGeneration else { return }
+            // Cancellation may arrive after wait's last sleep has returned.
+            guard !Task.isCancelled, let self, generation == self.connectionGeneration else { return }
             // Past this, whatever the abandoned attempt comes back with is
             // nobody's: its generation is gone.
             self.connectionGeneration += 1

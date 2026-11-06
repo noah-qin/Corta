@@ -176,6 +176,29 @@ struct SFTPDropDestinationTests {
 
 @MainActor
 struct SFTPConnectFailureTests {
+    @Test("a deadline cancelled as its last tick finishes cannot fail the connection")
+    func aCancelledFinalTickCannotFailTheConnection() async {
+        let fake = FakeSFTPClient()
+        fake.connectHangs = true
+        let model = SFTPBrowserModel(host: "slow-box", startDirectory: nil) { _ in fake }
+        defer { model.disconnect() }
+        model.connectTimeout = .milliseconds(20)
+        var cancelledAtTheDeadline = false
+        model.isAskingHost = { [weak model] _ in
+            // The last tick's clock has elapsed, but wait has not returned
+            // yet. Completion/re-arming can cancel the task at this boundary.
+            cancelledAtTheDeadline = true
+            model?.connectDeadline?.cancel()
+            return false
+        }
+        model.connect()
+        await waitUntil("the last deadline tick") { cancelledAtTheDeadline }
+        await model.connectDeadline?.value
+        #expect(model.connectionState == .connecting)
+        #expect(model.connectFailure == nil)
+        #expect(!fake.closed)
+    }
+
     @Test("each kind of failure has its own sentence, and ssh's words go to Details")
     func classified() {
         let auth = SFTPBrowserModel.connectFailure(

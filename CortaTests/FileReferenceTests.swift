@@ -15,7 +15,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import CoreText
 import CortaTerminal
+import Metal
 import Testing
 
 @testable import Corta
@@ -28,6 +30,47 @@ import Testing
 /// an `ssh` would open a different file that happens to share a name.
 @MainActor
 struct FileReferenceResolutionTests {
+    @Test(.metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aRestingPointerFindsALinkAppearingUnderIt() async throws {
+        let host = ReferenceTestHost()
+        let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 500))
+        host.terminalView = view
+        let window = NSWindow(contentRect: view.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = view
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        host.terminalRenderer = try TerminalRenderer(
+            device: device, font: CTFontCreateWithName("Menlo" as CFString, 12, nil), scale: 1)
+        let script = #"printf '\033[2J\033[Hplain'; read -r _; printf '\033[2J\033[Hhttps://hover.example/'; sleep 60"#
+        let session = try TerminalSession(
+            executable: "/bin/sh", arguments: ["-c", script], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 4, columns: 80), workingDirectory: "/")
+        host.session = session
+        let pointer = PanePointer(host: host)
+        defer { pointer.reset(); session.stop(); window.close() }
+        session.start()
+        try #require(await waitUntilTrue(timeout: .seconds(5)) {
+            session.snapshot().logicalLine(containing: 0).text == "plain"
+        })
+        let metrics = host.terminalRenderer.pointMetrics
+        let point = CGPoint(x: TerminalLayout.insets.left + metrics.cellWidth * 2, y: metrics.cellHeight / 2)
+        let event = try #require(NSEvent.mouseEvent(
+            with: .mouseMoved, location: view.convert(point, to: nil), modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0))
+        pointer.handleLinkHover(event, in: view)
+        #expect(view.toolTip == nil)
+        session.write(Array("\n".utf8))
+        try #require(await waitUntilTrue(timeout: .seconds(5)) {
+            session.snapshot().logicalLine(containing: 0).text == "https://hover.example/"
+        })
+        // No second mouse event: output alone must refresh the target.
+        pointer.noteGridChanged()
+        #expect(view.toolTip?.contains("https://hover.example/") == true)
+        #expect(PanePointer.clickOpens(.url("https://hover.example/"), shown: pointer.hoverState))
+        pointer.resetLinkHover(view)
+        #expect(pointer.lastPointerEvent == nil, "leaving must stop further refreshes")
+    }
+
     @Test("local output references require an editor, including executable handler files")
     func localReferenceNeverFallsBackToDefaultHandler() {
         for path in ["/tmp/attack.command", "/tmp/attack.terminal", "/tmp/ordinary.txt"] {
