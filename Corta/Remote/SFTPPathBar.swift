@@ -49,11 +49,15 @@ struct SFTPPathBar: View {
             let ancestor = components[components.count - kept - 1]
             result.append(Crumb(title: "…", path: String(path[..<ancestor.endIndex])))
             for component in components.suffix(kept) {
-                result.append(Crumb(title: String(component), path: String(path[..<component.endIndex])))
+                result.append(Crumb(
+                    title: SFTPBrowserModel.displayName(String(component)),
+                    path: String(path[..<component.endIndex])))
             }
         } else {
             for component in components {
-                result.append(Crumb(title: String(component), path: String(path[..<component.endIndex])))
+                result.append(Crumb(
+                    title: SFTPBrowserModel.displayName(String(component)),
+                    path: String(path[..<component.endIndex])))
             }
         }
         return result

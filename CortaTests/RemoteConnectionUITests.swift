@@ -213,6 +213,69 @@ struct SFTPConnectFailureTests {
 
     /// The password dialog's Cancel ends the connection's ssh; the window
     /// goes back to its host field rather than reporting a failure.
+    /// No answer from a host that swallows packets: ssh would wait out the
+    /// kernel's own timeout with the window saying Connecting.
+    @Test("a connection that does not answer fails in time, and can be retried")
+    func connectingHasADeadline() async {
+        let first = FakeSFTPClient()
+        first.connectHangs = true
+        let second = FakeSFTPClient()
+        second.listings["/home/tester"] = []
+        let clients = Guarded(wrappedValue: [first, second])
+        let model = SFTPBrowserModel(host: "slow-box", startDirectory: nil) { _ in
+            clients.mutate { $0.removeFirst() }
+        }
+        model.connectTimeout = .milliseconds(50)
+        model.connect()
+        await waitUntil("failed") { model.isFailed }
+        #expect(first.closed)
+        #expect(model.client == nil)
+        #expect(model.connectFailure?.title == L10n.format("sftp.failure.unreachable.title", "slow-box"))
+        model.retry()
+        await waitUntil("reconnected") { model.connectionState == .connected }
+        model.disconnect()
+    }
+
+    /// Typing a password must not be what disconnects the user: the time a
+    /// question is on screen is not the server's to answer for.
+    @Test("a question on screen stops the connection's clock")
+    func theDeadlineWaitsForAnAnswer() async throws {
+        let fake = FakeSFTPClient()
+        fake.connectHangs = true
+        let model = SFTPBrowserModel(host: "deploy@slow-box:2222", startDirectory: nil) { _ in fake }
+        model.connectTimeout = .milliseconds(100)
+        let asking = Guarded(wrappedValue: true)
+        let asked = Guarded(wrappedValue: [String]())
+        model.isAskingHost = { host in
+            asked.mutate { $0.append(host) }
+            return asking.wrappedValue
+        }
+        model.connect()
+        await waitUntil("the clock running") { !asked.wrappedValue.isEmpty }
+        #expect(asked.wrappedValue.first == "deploy@slow-box:2222", "by the name the dialog carries")
+        // Many times the deadline, with the question up.
+        try await Task.sleep(for: .milliseconds(600))
+        #expect(model.connectionState == .connecting)
+        asking.wrappedValue = false
+        await waitUntil("failed once answered") { model.isFailed }
+        model.disconnect()
+    }
+
+    @Test("a late answer from a connection given up on changes nothing")
+    func aLateConnectIsIgnored() async {
+        let fake = FakeSFTPClient()
+        fake.connectHangs = true
+        let model = SFTPBrowserModel(host: "slow-box", startDirectory: nil) { _ in fake }
+        model.connectTimeout = .milliseconds(30)
+        model.connect()
+        await waitUntil("failed") { model.isFailed }
+        let failure = model.connectFailure
+        // `close` lets the hung connect end, with an error of its own.
+        fake.closed = true
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(model.connectFailure == failure)
+    }
+
     @Test("a refused password returns to the host field, for that host only")
     func refusedPassword() {
         let fake = FakeSFTPClient()
@@ -240,24 +303,102 @@ struct AskpassWordingTests {
             == L10n.text("askpass.placeholder.answer"))
     }
 
-    /// The prompt names the host already; the dialog says it once more in
-    /// its title, not twice more.
-    @Test("a password dialog says Cancel ends the connection")
+    /// A password prompt is usually the local ssh's and a keyboard-interactive
+    /// one the server's, and the app cannot tell which it holds: the line under
+    /// it says either may have written it.
+    @Test("a password dialog says who may have asked, and Cancel ends the connection")
     func cancelSaysWhatItDoes() {
-        let alert = SSHAskpassPrompter.makeAlert(.secret, host: "deploy@box", prompt: "deploy@box's password:")
+        let alert = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
+            question: .secret, host: "deploy@box", prompt: "deploy@box's password:",
+            refusalEndsConnection: true))
         #expect(alert.buttons.map(\.title) == [
             L10n.text("askpass.continue"), L10n.text("askpass.cancelConnection"),
         ])
-        #expect(alert.informativeText.contains(L10n.text("askpass.source.short")))
-        #expect(!alert.informativeText.contains(L10n.text("askpass.source")))
+        #expect(alert.informativeText.contains(L10n.text("askpass.source")))
         #expect((alert.accessoryView as? NSSecureTextField)?.placeholderString
             == L10n.text("askpass.placeholder.password"))
         // A passphrase's Cancel skips the key; it says only Cancel.
-        let passphrase = SSHAskpassPrompter.makeAlert(
-            .secret, host: "box", prompt: "Enter passphrase for key '/k':")
+        let passphrase = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
+            question: .secret, host: "box", prompt: "Enter passphrase for key '/k':"))
         #expect(passphrase.buttons.last?.title == L10n.text("common.cancel"))
         #expect(!SSHAskpass.refusalEndsConnection(kind: .secret, prompt: "Enter passphrase for key '/k':"))
         #expect(SSHAskpass.refusalEndsConnection(kind: .secret, prompt: "Verification code:"))
         #expect(!SSHAskpass.refusalEndsConnection(kind: .confirm, prompt: "Allow use of key?"))
+    }
+
+    /// What the dialog does is what the broker decided, never read back out
+    /// of the text it shows.
+    @Test("Cancel's wording follows the broker's decision, not the prompt")
+    func cancelFollowsTheBroker() {
+        let ends = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
+            question: .secret, host: "box", prompt: "Enter passphrase", refusalEndsConnection: true))
+        #expect(ends.buttons.last?.title == L10n.text("askpass.cancelConnection"))
+        let skips = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
+            question: .secret, host: "box", prompt: "Password:", refusalEndsConnection: false))
+        #expect(skips.buttons.last?.title == L10n.text("common.cancel"))
+    }
+
+    /// `ProxyJump bastion`: bastion's inner ssh asks, and the connection's
+    /// destination is prod. Nothing Corta writes may call that prod's question.
+    @Test("a question from below the connection's ssh does not name the destination as asking")
+    func anIntermediateStepIsSaidToBeOne() {
+        let asking = { (question: SSHAskpass.Question, prompt: String) in
+            SSHAskpass.Asking(
+                question: question, host: "deploy@prod", prompt: prompt, isIntermediateStep: true,
+                refusalEndsConnection: question == .secret)
+        }
+        let secret = SSHAskpassPrompter.makeAlert(asking(.secret, "bastion's password:"))
+        #expect(secret.messageText == L10n.format("askpass.secret.title.intermediate", "deploy@prod"))
+        #expect(secret.messageText != L10n.format("askpass.secret.title", "deploy@prod"))
+        #expect(secret.informativeText.contains("bastion's password:"))
+        #expect(secret.informativeText.contains(L10n.format("askpass.source.intermediate", "deploy@prod")))
+        #expect((secret.accessoryView as? NSSecureTextField)?.accessibilityLabel() == secret.messageText)
+
+        let hostKey = SSHAskpassPrompter.makeAlert(asking(.hostKey, "bastion's fingerprint (yes/no)?"))
+        #expect(hostKey.messageText == L10n.format("askpass.hostKey.title.intermediate", "deploy@prod"))
+        #expect(hostKey.informativeText.contains(L10n.format("askpass.hostKey.advice.intermediate", "deploy@prod")))
+        #expect(!hostKey.informativeText.contains(L10n.text("askpass.hostKey.advice")))
+        // Return must not trust a key unread, here above all.
+        #expect(hostKey.buttons.map(\.title) == [L10n.text("common.cancel"), L10n.text("askpass.hostKey.trust")])
+        #expect(SSHAskpassPrompter.acceptResponse(.hostKey) == .alertSecondButtonReturn)
+
+        #expect(SSHAskpassPrompter.makeAlert(asking(.confirm, "Allow?")).messageText
+            == L10n.format("askpass.confirm.title.intermediate", "deploy@prod"))
+        #expect(SSHAskpassPrompter.makeAlert(asking(.notify, "Touch")).messageText
+            == L10n.format("askpass.notify.title.intermediate", "deploy@prod"))
+    }
+
+    @Test("the connection's own ssh asks in the destination's name")
+    func aDirectQuestionNamesTheDestination() {
+        let direct = { (question: SSHAskpass.Question) in
+            SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(question: question, host: "prod", prompt: "?"))
+        }
+        #expect(direct(.secret).messageText == L10n.format("askpass.secret.title", "prod"))
+        #expect(direct(.hostKey).messageText == L10n.format("askpass.hostKey.title", "prod"))
+        #expect(direct(.hostKey).informativeText.contains(L10n.text("askpass.hostKey.advice")))
+        #expect(direct(.hostKey).buttons.first?.title == L10n.text("common.cancel"))
+    }
+
+    /// Whether AppKit ends a sheet when its parent is closed from under it is
+    /// not something it promises, and ssh would wait on that sheet for ever.
+    @Test("a question ends when the window it hangs on is closed")
+    func theSheetFollowsItsWindow() async throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 200), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.orderBack(nil)
+        let alert = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(question: .hostKey, host: "box", prompt: "?"))
+        let answered = Guarded(wrappedValue: false)
+        let answer = Task { @MainActor in
+            let result = await SSHAskpassPrompter.answer(alert, field: nil, question: .hostKey, on: window)
+            answered.wrappedValue = true
+            return result
+        }
+        await waitUntil("sheet up") { window.attachedSheet != nil }
+        window.close()
+        await waitUntil("answered") { answered.wrappedValue }
+        // Awaited only once answered: unanswered, this would hang the suite.
+        if answered.wrappedValue { #expect(await answer.value == nil) }
     }
 }

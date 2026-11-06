@@ -73,7 +73,10 @@ extension SFTPBrowserModel {
         listingError = nil
         directoryGeneration += 1
         let generation = directoryGeneration
-        Task {
+        // The answer it waits for no longer matters; on a slow or hung server
+        // the request would otherwise hold a place in the window until it came.
+        loadTask?.cancel()
+        loadTask = Task {
             do {
                 let listing = try await client.listDirectory(path: path)
                 guard generation == directoryGeneration else { return }
@@ -164,6 +167,19 @@ extension SFTPBrowserModel {
         replacingConcealedScalars(in: name, with: "\u{FFFD}")
     }
 
+    /// What a dialog or an error line shows of the far end's words — a STATUS
+    /// message, a file name, a path: `displayName`'s rule, and bounded, in
+    /// scalars, since a frame can carry a megabyte of them and combining marks
+    /// make one character as long as anyone likes. Never for a name that will
+    /// be sent back.
+    nonisolated static let peerTextLimit = 2048
+
+    nonisolated static func peerText(_ text: String, limit: Int = peerTextLimit) -> String {
+        let cleaned = replacingConcealedScalars(in: text, with: "\u{FFFD}")
+        guard cleaned.unicodeScalars.count > limit else { return cleaned }
+        return String(String.UnicodeScalarView(cleaned.unicodeScalars.prefix(limit))) + "…"
+    }
+
     /// A remote name as a local file is called: the same scalars become `_`,
     /// so Finder never shows a reordered or hidden extension either.
     nonisolated static func localFileName(_ name: String) -> String {
@@ -171,8 +187,9 @@ extension SFTPBrowserModel {
     }
 
     /// Server text with controls and concealing scalars replaced — names
-    /// here, sign-in prompts in `SSHAskpass.displayPrompt`, one rule for
-    /// both. `keepingNewlines` leaves line feeds for text shown as lines.
+    /// here, sign-in prompts in `SSHAskpass.displayPrompt`, dialogs and error
+    /// lines in `peerText`, one rule for all. `keepingNewlines` leaves line
+    /// feeds for text shown as lines.
     nonisolated static func replacingConcealedScalars(
         in name: String, with replacement: Unicode.Scalar, keepingNewlines: Bool = false
     ) -> String {

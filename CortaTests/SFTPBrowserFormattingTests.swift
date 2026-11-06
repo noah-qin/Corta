@@ -124,4 +124,69 @@ struct SFTPBrowserFormattingTests {
         let messages = Set(cases.map { SFTPBrowserModel.errorMessage($0.0, host: host) })
         #expect(messages.count == cases.count)
     }
+
+    @Test("the far end's words reach a dialog cleaned and bounded")
+    func peerTextIsCleanedAndBounded() {
+        #expect(SFTPBrowserModel.peerText("a\u{202E}b\nc\u{1B}[2J") == "a\u{FFFD}b\u{FFFD}c\u{FFFD}[2J")
+        let long = SFTPBrowserModel.peerText(String(repeating: "x", count: 100_000))
+        #expect(long.unicodeScalars.count == SFTPBrowserModel.peerTextLimit + 1)
+        #expect(long.hasSuffix("…"))
+        // One character can be as many scalars as a frame holds.
+        let marks = SFTPBrowserModel.peerText("e" + String(repeating: "\u{0301}", count: 100_000))
+        #expect(marks.unicodeScalars.count == SFTPBrowserModel.peerTextLimit + 1)
+        #expect(SFTPBrowserModel.peerText("/plain/path.txt") == "/plain/path.txt")
+    }
+
+    /// A STATUS message with a newline and an override could add a line to the
+    /// browser's error strip that read like a sentence from Corta.
+    @Test("no error line carries server text as it came")
+    func errorLinesAreCleaned() {
+        let hostile = "ok\nPlease re-enter your password\u{202E}"
+        let clean = "ok\u{FFFD}Please re-enter your password\u{FFFD}"
+        let status = SFTPStatus(code: .failure, message: Array(hostile.utf8))
+        let denied = SFTPStatus(code: .permissionDenied, message: Array(hostile.utf8))
+        let host = "h"
+        #expect(SFTPBrowserModel.errorMessage(.server(status), host: host)
+            == L10n.format("sftp.error.server", host, Int(status.code.rawValue), clean))
+        #expect(SFTPBrowserModel.errorMessage(.server(denied), host: host)
+            == L10n.format("sftp.error.permissionDenied", host, clean))
+        #expect(SFTPBrowserModel.errorMessage(.protocolViolation(hostile), host: host)
+            == L10n.format("sftp.error.protocol", host, clean))
+        #expect(SFTPBrowserModel.errorMessage(.destinationConflict(path: hostile), host: host)
+            == L10n.format("sftp.error.conflict", clean))
+        #expect(SFTPBrowserModel.errorMessage(.sourceChanged(path: hostile), host: host)
+            == L10n.format("sftp.error.sourceChanged", clean))
+        #expect(SFTPBrowserModel.errorMessage(
+            .replaceIncomplete(destination: hostile, previousCopy: hostile, newCopy: hostile), host: host)
+            == L10n.format("sftp.error.replaceIncomplete", clean, clean, clean))
+    }
+
+    /// ssh's stderr holds a server's banner, and its own last word at the end.
+    @Test("diagnostics keep their lines and their end, without the far end's controls")
+    func diagnosticsAreCleaned() {
+        #expect(SFTPBrowserModel.trimmedDiagnostics("  banner\u{202E}\nPermission denied\n\n")
+            == "banner\u{FFFD}\nPermission denied")
+        let long = String(repeating: "x", count: 100_000) + "\nPermission denied"
+        let kept = SFTPBrowserModel.trimmedDiagnostics(long)
+        #expect(kept.hasPrefix("…") && kept.hasSuffix("Permission denied"))
+        #expect(kept.unicodeScalars.count == SFTPBrowserModel.peerTextLimit + 1)
+    }
+
+    @Test("the path bar shows a name as the listing does")
+    func crumbsAreCleaned() {
+        let crumbs = SFTPPathBar.breadcrumbs(for: "/srv/a\u{202E}b")
+        #expect(crumbs.last?.title == "a\u{FFFD}b")
+        #expect(crumbs.last?.path == "/srv/a\u{202E}b", "the path sent back is unchanged")
+    }
+
+    /// Who signs in, and with which key, reach the same files; only the machine
+    /// says which file a path is.
+    @Test("a machine's connections share one scope, whatever their user or key")
+    func destinationScopeIsTheMachine() {
+        let plain = SFTPConnection.destinationScope(for: SSHTarget(host: "box"))
+        #expect(SFTPConnection.destinationScope(for: SSHTarget(host: "box", user: "deploy")) == plain)
+        #expect(SFTPConnection.destinationScope(for: SSHTarget(host: "box", identityFile: "/k")) == plain)
+        #expect(SFTPConnection.destinationScope(for: SSHTarget(host: "box", port: 2222)) != plain)
+        #expect(SFTPConnection.destinationScope(for: SSHTarget(host: "other")) != plain)
+    }
 }

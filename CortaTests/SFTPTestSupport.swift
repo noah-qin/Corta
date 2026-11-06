@@ -71,6 +71,12 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
     @Guarded var onTransfer: ((TransferCall, SFTPTransferEngine.ProgressHandler?) async throws -> Void)?
     @Guarded var closed = false
     @Guarded var lstatHangs = false
+    /// `lstat`s suspended by `lstatHangs`, and whether one has been cancelled.
+    @Guarded var lstatsWaiting = 0
+    @Guarded var lstatCancelled = false
+    /// Listings suspended until cancelled or closed, by path.
+    @Guarded var hangingListings: Set<String> = []
+    @Guarded var cancelledListings: [String] = []
 
     @Guarded var capabilities: SFTPServerCapabilities?
 
@@ -95,6 +101,14 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
     func realPath(path: String) async throws(SFTPError) -> String { realPathResult }
 
     func listDirectory(path: String) async throws(SFTPError) -> [SFTPEntry] {
+        if hangingListings.contains(path) {
+            while !closed, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(5))
+            }
+            guard Task.isCancelled else { throw .transport(.closed) }
+            $cancelledListings.mutate { $0.append(path) }
+            throw .cancelled
+        }
         if let error = listingErrors[path] { throw error }
         return listings[path] ?? []
     }
@@ -109,8 +123,15 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
 
     func lstat(path: String) async throws(SFTPError) -> SFTPAttributes {
         if lstatHangs {
+            $lstatsWaiting.mutate { $0 += 1 }
+            defer { $lstatsWaiting.mutate { $0 -= 1 } }
             while !closed {
-                do { try await Task.sleep(for: .milliseconds(5)) } catch { throw .cancelled }
+                do {
+                    try await Task.sleep(for: .milliseconds(5))
+                } catch {
+                    lstatCancelled = true
+                    throw .cancelled
+                }
             }
             throw .transport(.closed)
         }
@@ -180,6 +201,8 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
         var policy: String
     }
     @Guarded var directoryCalls: [DirectoryCall] = []
+    /// Names a directory transfer's receipt says it skipped.
+    @Guarded var directorySkipped: [String] = []
     @Guarded var onDirectoryTransfer:
         ((DirectoryCall, SFTPTransferEngine.DirectoryProgressHandler?) async throws -> Void)?
 
@@ -229,7 +252,8 @@ final class FakeSFTPClient: SFTPClient, @unchecked Sendable {
                 .init(filesCompleted: 2, filesTotal: 2, completedBytes: 300, totalBytes: 300))
         }
         return SFTPTransferEngine.DirectoryTransferReceipt(
-            filesTransferred: 2, directoriesCreated: 1, bytesTransferred: 300, skipped: [])
+            filesTransferred: 2, directoriesCreated: 1, bytesTransferred: 300,
+            skipped: directorySkipped.map { .init(relativePath: $0, reason: .symbolicLink) })
     }
 
     private static func policyName(_ policy: SFTPTransferEngine.ConflictPolicy) -> String {
@@ -260,14 +284,23 @@ func waitUntil(
 ) async {
     // A passing wait returns the moment the condition holds; the ceiling
     // only decides how long a failing one takes to say so, and scales on CI
-    // like every other wait in this target (`testTimeoutScale`).
-    let deadline = SuspendingClock.now + .seconds(15) * testTimeoutScale
+    // like every other wait in this target (`testTimeoutScale`). It counts
+    // what this loop saw, a tick at a time: another test blocking the main
+    // actor for seconds is not this condition failing to come true, and the
+    // work it waits for may be queued right behind this check.
+    let ceiling = .seconds(15) * testTimeoutScale
+    let clock = SuspendingClock()
+    var waited = Duration.zero
+    var last = clock.now
     while !condition() {
-        if SuspendingClock.now > deadline {
+        if waited > ceiling {
             Issue.record("timed out waiting for \(description)", sourceLocation: sourceLocation)
             return
         }
         try? await Task.sleep(for: .milliseconds(5))
+        let now = clock.now
+        waited += min(last.duration(to: now), .milliseconds(50))
+        last = now
     }
 }
 

@@ -29,7 +29,7 @@ extension RemoteEditCoordinator.RemoteEditPresenter {
                 let alert = NSAlert()
                 alert.messageText = L10n.text("remoteEdit.changed.title")
                 alert.informativeText = L10n.format(
-                    "remoteEdit.changed.message", SFTPBrowserModel.displayName(pending.copy.remotePath),
+                    "remoteEdit.changed.message", SFTPBrowserModel.peerText(pending.copy.remotePath),
                     pending.copy.host)
                 alert.addButton(withTitle: L10n.text("remoteEdit.upload"))
                 alert.addButton(withTitle: L10n.text("remoteEdit.dismiss"))
@@ -52,7 +52,7 @@ extension RemoteEditCoordinator.RemoteEditPresenter {
                 let alert = NSAlert()
                 alert.messageText = L10n.format("remoteEdit.connect.title", host)
                 alert.informativeText = L10n.format(
-                    "remoteEdit.connect.message", SFTPBrowserModel.displayName(remotePath), host)
+                    "remoteEdit.connect.message", SFTPBrowserModel.peerText(remotePath), host)
                 alert.addButton(withTitle: L10n.text("sftp.host.connect"))
                 alert.addButton(withTitle: L10n.text("common.cancel"))
                 return alert.runModal() == .alertFirstButtonReturn
@@ -70,11 +70,11 @@ extension RemoteEditCoordinator.RemoteEditPresenter {
             conflict.remoteDeleted
             ? L10n.format(
                 "remoteEdit.conflict.deletedMessage",
-                SFTPBrowserModel.displayName(conflict.copy.remotePath), conflict.copy.host,
+                SFTPBrowserModel.peerText(conflict.copy.remotePath), conflict.copy.host,
                 conflict.atDownloadDescription)
             : L10n.format(
                 "remoteEdit.conflict.message",
-                SFTPBrowserModel.displayName(conflict.copy.remotePath), conflict.copy.host,
+                SFTPBrowserModel.peerText(conflict.copy.remotePath), conflict.copy.host,
                 conflict.atDownloadDescription, conflict.remoteDescription)
         alert.addButton(withTitle: L10n.text("remoteEdit.conflict.uploadAnyway"))
         let redownload = alert.addButton(

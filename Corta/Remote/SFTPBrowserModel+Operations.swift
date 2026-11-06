@@ -28,7 +28,7 @@ extension SFTPBrowserModel {
             action: .newDirectory,
             directory: currentPath, connection: connectionGeneration,
             title: L10n.text("sftp.newDirectory.title"),
-            message: L10n.format("sftp.newDirectory.message", currentPath),
+            message: L10n.format("sftp.newDirectory.message", Self.peerText(currentPath)),
             initialText: "")
     }
 
@@ -38,7 +38,7 @@ extension SFTPBrowserModel {
             action: .rename(entry),
             directory: currentPath, connection: connectionGeneration,
             title: L10n.text("sftp.rename.title"),
-            message: L10n.format("sftp.rename.message", entry.name),
+            message: L10n.format("sftp.rename.message", Self.peerText(entry.name)),
             initialText: entry.name)
     }
 
@@ -94,7 +94,7 @@ extension SFTPBrowserModel {
             let title = L10n.format("sftp.delete.title", host)
             let message: String
             if entries.count == 1, let entry = entries.first {
-                let path = Self.joinPath(directory, entry.name)
+                let path = Self.peerText(Self.joinPath(directory, entry.name))
                 message =
                     entry.kind == .directory
                     ? L10n.format("sftp.delete.message.directory", path, host, contained)
@@ -157,17 +157,13 @@ extension SFTPBrowserModel {
         let target = directory ?? currentPath
         var queued = false
         for url in urls where url.isFileURL {
-            // A chosen folder is a directory transfer — the whole tree,
-            // one atomic file at a time, symbolic links skipped and
-            // reported (`SFTPTransferEngine.uploadDirectory`).
-            let isDirectory =
-                (try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]))
-                .map { $0.isDirectory == true && $0.isSymbolicLink != true } ?? false
             let name = url.lastPathComponent
             guard Self.isPlainEntryName(name) else { continue }
+            // Whether it is a folder is the queue's first question: it may be
+            // on a volume that does not answer (`SFTPLocalChecks`).
             transferQueue.enqueue(
                 SFTPTransferQueue.Plan(
-                    isUpload: true, isDirectory: isDirectory,
+                    isUpload: true,
                     remotePath: Self.joinPath(target, name),
                     localURL: url))
             queued = true

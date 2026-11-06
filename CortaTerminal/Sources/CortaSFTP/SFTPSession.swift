@@ -302,22 +302,8 @@ extension SFTPSession {
         let overflowed = Mutex(false)
         let admitted = await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-                // Re-checked here: room may have opened since the fast path,
-                // and a frame draining finds no waiter to admit until this
-                // one is queued.
-                let outcome = state.withLock { state -> Bool? in
-                    guard state.closed == nil, !Task.isCancelled else { return false }
-                    if admits(state) {
-                        state.windowUsed += 1
-                        state.unwrittenFrames += 1
-                        return true
-                    }
-                    guard state.windowWaiters.count < max(1, configuration.maxWindowWaiters) else {
-                        overflowed.withLock { $0 = true }
-                        return false
-                    }
-                    state.windowWaiters.append((token: token, continuation: continuation))
-                    return nil
+                let outcome = state.withLock { state in
+                    enqueueOrAdmit(&state, token: token, continuation: continuation, overflowed: overflowed)
                 }
                 if let outcome { continuation.resume(returning: outcome) }
             }
@@ -330,10 +316,34 @@ extension SFTPSession {
         }
         guard admitted else {
             if let closed = state.withLock({ $0.closed }) { throw closed }
-            if overflowed.withLock({ $0 }) { throw .localIOFailed(operation: "wait for a free request slot", code: EAGAIN) }
+            if overflowed.withLock({ $0 }) {
+                throw .localIOFailed(operation: "wait for a free request slot", code: EAGAIN)
+            }
             throw .cancelled
         }
         return state.withLock { $0.ids.allocate() }
+    }
+
+    /// Under the lock: true when the window admits the sender now, false when
+    /// it is refused, nil once it is queued. Room may have opened since the
+    /// fast path, and a frame draining finds no waiter to admit until this one
+    /// is queued, so both are checked again here.
+    private func enqueueOrAdmit(
+        _ state: inout State, token: UInt64, continuation: CheckedContinuation<Bool, Never>,
+        overflowed: borrowing Mutex<Bool>
+    ) -> Bool? {
+        guard state.closed == nil, !Task.isCancelled else { return false }
+        if admits(state) {
+            state.windowUsed += 1
+            state.unwrittenFrames += 1
+            return true
+        }
+        guard state.windowWaiters.count < max(1, configuration.maxWindowWaiters) else {
+            overflowed.withLock { $0 = true }
+            return false
+        }
+        state.windowWaiters.append((token: token, continuation: continuation))
+        return nil
     }
 
     /// The task running `request` was cancelled: resume its waiter with

@@ -245,3 +245,91 @@ extension SFTPBrowserModelTests {
         #expect(model.conflictPrompts.isEmpty)
     }
 }
+
+extension SFTPBrowserModelTests {
+    /// A hung server answers neither: the old request would hold a place in
+    /// the window, and one more every time the user tried somewhere else.
+    @Test("a new navigation cancels the listing it replaces")
+    func navigationCancelsTheOldLoad() async throws {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = []
+        fake.listings["/fast"] = [makeEntry("here.txt")]
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect() }
+        fake.hangingListings = ["/hung"]
+        model.navigate(to: "/hung")
+        #expect(model.isLoading)
+        model.navigate(to: "/fast")
+        await waitUntil("the old request stopped") { fake.cancelledListings == ["/hung"] }
+        await waitUntil("the new one landed") { model.currentPath == "/fast" && !model.isLoading }
+        #expect(model.listingError == nil, "being replaced is not an error")
+    }
+
+    @Test("closing the window cancels the listing in flight")
+    func disconnectCancelsTheLoad() async throws {
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = []
+        let model = await connectedModel(fake: fake)
+        fake.hangingListings = ["/hung"]
+        model.navigate(to: "/hung")
+        model.disconnect()
+        await waitUntil("stopped") { fake.cancelledListings == ["/hung"] }
+    }
+}
+
+extension SFTPBrowserModelTests {
+    /// The sheet's line and the row the user clicked must read the same.
+    @Test("rename and delete dialogs name an entry as the listing shows it")
+    func dialogsNameEntriesCleaned() async throws {
+        let hostile = "invoice\u{202E}fdp.sh"
+        let shown = "invoice\u{FFFD}fdp.sh"
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = [makeEntry(hostile)]
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect() }
+        let entry = try #require(model.entries.first)
+        model.requestRename(entry)
+        #expect(model.textPrompt?.message == L10n.format("sftp.rename.message", shown))
+        // The name itself goes back to the server unchanged.
+        #expect(model.textPrompt?.initialText == hostile)
+        model.textPrompt = nil
+        model.requestDelete([entry])
+        await waitUntil("confirmation") { model.deleteConfirmation != nil }
+        #expect(model.deleteConfirmation?.message
+            == L10n.format("sftp.delete.message.file", "/srv/app/" + shown, "build-box"))
+        model.confirmDelete()
+        await waitUntil("removed") { fake.removed == ["/srv/app/" + hostile] }
+    }
+
+    @Test("what a directory transfer skipped is named cleaned and bounded")
+    func skippedLineIsCleaned() async throws {
+        let directory = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/app"] = [makeEntry("src", permissions: 0o040755, size: nil)]
+        fake.directorySkipped = ["bad\n\u{202E}name"]
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect() }
+        model.selection = ["src"]
+        model.pickDownloadDestination = { _ in .directory(directory) }
+        model.requestDownload()
+        await waitUntil("said") { model.listingError != nil }
+        #expect(model.listingError == L10n.format("sftp.directory.skipped", 1, "bad\u{FFFD}\u{FFFD}name"))
+    }
+
+    @Test("a conflict names the destination cleaned")
+    func conflictPathIsCleaned() async throws {
+        let directory = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("up.txt")
+        try "outgoing".write(to: source, atomically: true, encoding: .utf8)
+        let fake = FakeSFTPClient()
+        fake.listings["/srv/a\u{202E}b"] = []
+        fake.lstatResults["/srv/a\u{202E}b/up.txt"] = SFTPAttributes(size: 1, permissions: 0o100644)
+        let model = await connectedModel(fake: fake)
+        defer { model.disconnect() }
+        #expect(model.upload([source], into: "/srv/a\u{202E}b"))
+        await waitUntil("conflict") { !model.conflictPrompts.isEmpty }
+        #expect(model.conflictPrompts.first?.path == "/srv/a\u{FFFD}b/up.txt")
+    }
+}

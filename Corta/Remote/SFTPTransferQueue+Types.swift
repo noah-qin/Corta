@@ -61,6 +61,19 @@ extension SFTPTransferQueue {
         /// The last sample the rate was taken from.
         var sampleTime: TimeInterval?
         var sampleBytes: UInt64 = 0
+        /// The file stays where the row says. Not a drag's, whose copy goes
+        /// once it has been handed over.
+        var revealsInFinder = true
+
+        /// Whether Retry applies: a failure a fresh attempt could get past,
+        /// or a cancelled run that left a partial to continue from.
+        var canRetry: Bool {
+            switch state {
+            case .failed(_, let retryable): return retryable
+            case .cancelled(let partialKept): return partialKept
+            default: return false
+            }
+        }
 
         /// Seconds left at the current rate, when both the total and a rate
         /// are known.
@@ -149,7 +162,8 @@ extension SFTPTransferQueue {
         /// A whole tree (`SFTPTransferEngine.uploadDirectory`/
         /// `downloadDirectory`) rather than one file. Directories merge and
         /// the conflict policy applies per file inside, so the pre-flight
-        /// only asks whether the destination directory already exists.
+        /// only asks whether the destination directory already exists. An
+        /// upload's is found out there, too, from the source.
         var isDirectory = false
         var remotePath: String
         var localURL: URL
