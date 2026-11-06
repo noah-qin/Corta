@@ -439,7 +439,9 @@ screenshot, or a skipped opt-in test is not a passing result. Do not run the
 billable/foreground checks without the user's authorization; background-only
 work must report them as unverified.
 
-Remove both printed directories once the development app has exited.
+Remove both printed directories once the development app has exited, and prepare
+fresh ones for each run: a test leaves its settings in them, and
+`SystemStatusAndThemeEditorUITests` then fails on the second run.
 Build into the default derived data, not a `-derivedDataPath` under a
 private temporary directory: the fixture launcher starts the app by URL
 from the test bundle's products, and from there the launch never gets a

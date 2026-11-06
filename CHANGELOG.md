@@ -119,6 +119,8 @@ Versioning for compatibility changes.
   are listed in `docs/CONFORMANCE.md`.
 - ⌘Q no longer hangs after an SFTP row has been dragged. On the way out the app
   waited for a file promise nobody could keep.
+- An edit to the config file is picked up within about a second even while something
+  keeps writing in the folder that holds it. Each write used to put the reload off again.
 - An SFTP row dragged out leaves nothing behind once its file is handed over, and a
   failed one no longer offers a Retry that could only fail.
 - Holding an SFTP row over Finder no longer freezes Finder. Merely hovering

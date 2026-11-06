@@ -48,6 +48,8 @@ final class ConfigurationStore {
 
     private var fileSource: DispatchSourceFileSystemObject?
     private var directorySource: DispatchSourceFileSystemObject?
+    private var pendingReloadSince: TimeInterval = 0
+    private static let longestReloadDelay: TimeInterval = 1
     /// Our last written text, so the watcher tells our own write from an
     /// external edit by content; a time window swallowed editor saves.
     private var lastWrittenText: String?
@@ -250,9 +252,17 @@ final class ConfigurationStore {
                 // An external edit owns the file now.
                 self.lastWrittenText = nil
             }
-            // Coalesce, or a multi-event save is read mid-rewrite.
+            // Coalesce, or a multi-event save is read mid-rewrite. Up to a limit:
+            // the folder's events count too, and steady writes beside the file
+            // would otherwise put the reload off for as long as they last.
+            let now = ProcessInfo.processInfo.systemUptime
+            if self.pendingReload != nil, now - self.pendingReloadSince >= Self.longestReloadDelay { return }
+            if self.pendingReload == nil { self.pendingReloadSince = now }
             self.pendingReload?.cancel()
-            let work = DispatchWorkItem { [weak self] in self?.reloadFromWatcher() }
+            let work = DispatchWorkItem { [weak self] in
+                self?.pendingReload = nil
+                self?.reloadFromWatcher()
+            }
             self.pendingReload = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
         }
