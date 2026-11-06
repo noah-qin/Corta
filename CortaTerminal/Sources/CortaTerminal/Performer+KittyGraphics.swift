@@ -28,6 +28,11 @@ extension Performer {
         case .display(let display):
             placeAtCursor(display)
         case .delete(let target):
+            // "If an image is being loaded in chunks and the upload is not
+            // complete when any delete command is received, the partial
+            // upload must be aborted." Other output between chunks ends
+            // nothing: what it leaves held is charged to the budget.
+            state.pendingImageTransmission = nil
             grid.imagePlacements.delete(target)
         case .query(let header):
             respondToQuery(header)
