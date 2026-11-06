@@ -18,6 +18,67 @@ import XCTest
 import AppKit
 
 final class TerminalRecoveryUITests: XCTestCase {
+    @MainActor func testConnectUsesCurrentPaneWithoutAddingATabOrWindow() throws {
+        continueAfterFailure = false
+        let originalInputSource = LatinInputSource.select()
+        addTeardownBlock { LatinInputSource.restore(originalInputSource) }
+        let app = UIFixtures.app(stage: try UIFixtures.stage("connection-placement"), runner: Self.self,
+                                 usingTestTarget: true)
+        app.launch()
+        defer { app.terminate() }
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
+        let strip = window.tabGroups["tab-strip"]
+        XCTAssertEqual(strip.radioButtons.count, 1)
+        app.buttons["Connect…"].firstMatch.click()
+        let recent = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "127.0.0.1")).firstMatch
+        XCTAssertTrue(recent.waitForExistence(timeout: 5))
+        recent.click()
+        XCTAssertEqual(app.checkBoxes["connect-new-window"].value as? Int, 0)
+        app.buttons["Connect"].click()
+        // A real OpenSSH child against a closed loopback port: no server,
+        // credentials, or external host is needed to prove session placement.
+        expectation(for: NSPredicate { _, _ in
+            ((window.textViews.firstMatch.value as? String) ?? "").contains("127.0.0.1")
+        }, evaluatedWith: window)
+        waitForExpectations(timeout: 10)
+        XCTAssertEqual(app.windows.count, 1)
+        XCTAssertEqual(strip.radioButtons.count, 1)
+        XCTAssertFalse((window.textViews.firstMatch.value as? String)?.contains("demo ❯") == true)
+        let screenshot = XCTAttachment(screenshot: window.screenshot())
+        screenshot.name = "ssh-connected-in-original-pane"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    @MainActor func testConnectionSheetWindowOptionAndButtonShapes() throws {
+        continueAfterFailure = false
+        let stage = try UIFixtures.stage("connection-sheet")
+        let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        UIFixtures.requireFixturePrompt(in: app)
+        app.buttons["Connect…"].firstMatch.click()
+        let option = app.checkBoxes["connect-new-window"]
+        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        XCTAssertEqual(option.value as? Int, 0)
+        option.click()
+        XCTAssertEqual(option.value as? Int, 1)
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "staging.example")).firstMatch.click()
+        let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        screenshot.name = "connection-sheet-capsule-buttons"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        app.buttons["Cancel"].click()
+        app.buttons["Connect…"].firstMatch.click()
+        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        XCTAssertEqual(option.value as? Int, 0)
+        app.buttons["Cancel"].click()
+        XCTAssertEqual(app.windows.count, 1)
+    }
+
     @MainActor func testClearScreenKeepsPromptAndEditingCursor() throws {
         continueAfterFailure = false
         let original = LatinInputSource.select()

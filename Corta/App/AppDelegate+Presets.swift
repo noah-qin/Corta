@@ -156,4 +156,25 @@ extension AppDelegate {
         controller.showWindow(self)
         controller.window?.makeKeyAndOrderFront(self)
     }
+
+    /// SSH connections replace the focused pane in the window that opened the form.
+    /// A closed source or a menu with no terminal window opens a new window.
+    @discardableResult
+    func launchConnection(
+        _ preset: Preset, from source: NSWindow?, inNewWindow: Bool
+    ) -> TerminalWindowController {
+        if !inNewWindow, let source, source.isVisible,
+            let owner = source.windowController as? TerminalWindowController,
+            let pane = owner.selectedTab?.split.focusedPane
+        {
+            pane.connect(using: preset)
+            source.makeKeyAndOrderFront(self)
+            return owner
+        }
+        let controller = makeWindowController(setup: .init(preset: preset))
+        cascade(controller)
+        controller.showWindow(self)
+        controller.window?.makeKeyAndOrderFront(self)
+        return controller
+    }
 }

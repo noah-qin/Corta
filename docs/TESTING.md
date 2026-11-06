@@ -297,6 +297,19 @@ xcodebuild test \
 
 Use a fresh result-bundle path for each run. Add
 `-only-testing:CortaTests/ConfigurationTests` to focus a suite.
+For SSH connection placement, run `RemoteConnectWindowTests`,
+`SSHDestinationTests` and `WindowTabsTests`. These check the initiating
+window even after focus changes, replacement of the current pane’s session
+without adding tabs, the explicit new-window option, fallback without an available source window,
+and the dialog's default resetting each time. Routing fixtures use a local
+shell and do not connect to a server. The UI test
+`TerminalRecoveryUITests/testConnectionSheetWindowOptionAndButtonShapes`
+checks the option resets after closing the sheet and captures the selected
+recent host and capsule buttons using the `connection-sheet` fixture.
+`testConnectUsesCurrentPaneWithoutAddingATabOrWindow` clicks Connect against
+the `connection-placement` fixture’s recent host on loopback port 1 with
+real OpenSSH and checks the original window still has
+one tab and shows the new session's output instead of the fixture prompt.
 
 Three test plans under `TestPlans/` say what runs where:
 

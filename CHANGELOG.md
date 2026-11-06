@@ -47,6 +47,12 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- SSH connections now use the current pane in the initiating terminal window,
+  replacing its session without adding a tab. Choose Connect in a new window
+  for a separate window; a
+  connection with no available terminal window creates one. Recent host selection
+  uses a blue highlight with the same corner radius as its card, and connection
+  buttons have capsule borders.
 - Contributor layout: group window, remote, settings, terminal-core sources
   and app tests by responsibility; name the pane controller
   `TerminalPaneViewController` and centralize app-test fixture paths.

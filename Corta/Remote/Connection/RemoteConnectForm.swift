@@ -28,6 +28,7 @@ struct RemoteConnectForm: View {
     var modeSelection: Binding<RemoteConnectMode>?
     @Binding var fields: SSHTargetFields
     var paneFiles: RemoteConnectPaneFiles?
+    var inNewWindow: Binding<Bool>?
     /// A line above the fields — where a prefilled name came from.
     var notice: String?
     var error: String?
@@ -109,6 +110,10 @@ struct RemoteConnectForm: View {
                 }
                 hostField
                 advanced
+                if mode == .ssh, let inNewWindow {
+                    Toggle(L10n.text("ui.connect.inNewWindow"), isOn: inNewWindow)
+                        .accessibilityIdentifier("connect-new-window")
+                }
                 if let error {
                     // Said in words with a symbol, never by colour alone.
                     Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -124,7 +129,8 @@ struct RemoteConnectForm: View {
                         picked: pickedIsCurrent ? picked : nil, onPick: pick, onConnect: onConnect,
                         onForget: forget)
                 }
-                HStack(spacing: 10) {
+                // Keep the actions beyond the glass container's merge distance.
+                HStack(spacing: 20) {
                     Spacer()
                     if let onCancel {
                         Button(action: onCancel) {
@@ -142,6 +148,7 @@ struct RemoteConnectForm: View {
                     .disabled(fields.isEmpty && !(paneFiles != nil && mode == .sftp))
                 }
                 .controlSize(.large)
+                .buttonBorderShape(.capsule)
                 .padding(.top, 4)
             }
             .padding(24)
