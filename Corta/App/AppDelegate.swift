@@ -48,6 +48,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     var terminalTabs: [TerminalTab] { terminalWindowControllers.flatMap(\.tabs) }
     /// The debounced arrangement write; see `noteLayoutChanged`.
     var pendingLayoutSave: DispatchWorkItem?
+    private let layoutWrites = DispatchQueue(label: "Corta.WindowLayout", qos: .utility)
+    private var layoutPersistenceSuspended = false
     /// Set at quit, so closing windows don't save an empty arrangement over
     /// the one just flushed.
     private var isTerminating = false
@@ -271,6 +273,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         DispatchQueue.global(qos: .utility).async { ZshBootstrap.removeStaleFolders() }
         DispatchQueue.global(qos: .utility).async { FileDropStorage.cleanUpAtLaunch() }
         DispatchQueue.global(qos: .utility).async { AppPaths.removeAbandonedStateFiles() }
+        DispatchQueue.global(qos: .utility).async { SSHAskpassBroker.pruneAbandoned() }
         openInitialWindows()
         // A notification click jumps back to its command
         // (`AppDelegate+Notifications.swift`).
@@ -307,35 +310,67 @@ extension AppDelegate {
             return
         }
         let store = SessionRestore.standard
-        let saved: [WindowState]
-        switch store.decideRestore(loading: store.loadUnchecked) {
-        case .skipAfterFailure:
-            // The marker survives only a launch that died mid-restore; that layout
-            // is the suspect, so drop it.
-            store.clear()
-            store.endRestore()
-            openWindow(workingDirectory: nil)
-            finishOpeningInitialWindows()
-            return
-        case .nothingToRestore:
-            openWindow(workingDirectory: nil)
-            finishOpeningInitialWindows()
-            return
-        case .restore(let states):
-            saved = states
-        }
-        // A Dock click in the wait must not open a window beside these.
         isWaitingForRestore = true
-        PathProbe.directories(
-            among: saved.flatMap { $0.layout.validated().directories },
-            timeout: SessionRestore.directoryCheckTimeout
-        ) { [weak self] existing in
-            guard let self else { return }
-            self.isWaitingForRestore = false
-            let states = SessionRestore.droppingMissingDirectories(saved, existing: existing)
-            if !self.restoreWindows(states) { self.openWindow(workingDirectory: nil) }
-            self.finishOpeningInitialWindows()
+        PathProbe.run { [weak self] in
+            let decision = PathProbe.answer(timeout: SessionRestore.directoryCheckTimeout) {
+                try? store.readRestoreDecision()
+            } ?? nil
+            Task { @MainActor [weak self] in self?.finishInitialRestore(decision, store: store) }
         }
+    }
+
+    private func finishInitialRestore(_ decision: SessionRestore.RestoreDecision?, store: SessionRestore) {
+        switch decision {
+        case nil:
+            layoutPersistenceSuspended = true
+            openFreshInitialWindow()
+        case .skipAfterFailure:
+            layoutPersistenceSuspended = true
+            let controller = openFreshInitialWindow()
+            layoutWrites.async { [weak self, weak controller] in
+                let archived = (try? store.setAsideFailedRestore()) != nil
+                Task { @MainActor [weak self, weak controller] in
+                    guard let self else { return }
+                    self.layoutPersistenceSuspended = !archived
+                    self.noteLayoutChanged()
+                    guard let window = controller?.window, window.isVisible else { return }
+                    let alert = NSAlert()
+                    alert.messageText = L10n.text("restore.failed.title")
+                    let message = archived ? "restore.failed.archived" : "restore.failed.preserved"
+                    let path = archived ? store.failedRestoreURL.path : store.fileURL.path
+                    alert.informativeText = L10n.format(message, path)
+                    alert.present(for: window) { _ in }
+                }
+            }
+        case .nothingToRestore:
+            openFreshInitialWindow()
+        case .restore(let saved):
+            PathProbe.directories(
+                among: saved.flatMap { $0.layout.validated().directories },
+                timeout: SessionRestore.directoryCheckTimeout
+            ) { [weak self] existing in
+                guard let self else { return }
+                let states = SessionRestore.droppingMissingDirectories(saved, existing: existing)
+                self.layoutWrites.async { [weak self] in
+                    store.beginRestore()
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        self.isWaitingForRestore = false
+                        if !self.restoreWindows(states) { self.openWindow(workingDirectory: nil) }
+                        self.layoutWrites.async { store.endRestore() }
+                        self.finishOpeningInitialWindows()
+                    }
+                }
+            }
+        }
+    }
+
+    @discardableResult
+    private func openFreshInitialWindow() -> TerminalWindowController? {
+        isWaitingForRestore = false
+        let controller = openWindow(workingDirectory: nil)
+        finishOpeningInitialWindows()
+        return controller
     }
 
     /// What a launch does once its first windows are up.
@@ -372,11 +407,6 @@ extension AppDelegate {
     /// Reopens these windows and splits; false when nothing was. Their
     /// directories have been checked, so no pane checks one again at its spawn.
     private func restoreWindows(_ states: [WindowState]) -> Bool {
-        SessionRestore.standard.beginRestore()
-        // Keep the state file: `noteLayoutChanged` rewrites it, so a later
-        // crash still has a last-known-good layout.
-        defer { SessionRestore.standard.endRestore() }
-
         var opened = 0
         for ordered in Self.restoredWindows(states) {
             guard let first = ordered.first else { continue }
@@ -424,13 +454,15 @@ extension AppDelegate {
         return windows.map { members in members.sorted { ($0.tabIndex ?? 0) < ($1.tabIndex ?? 0) } }
     }
 
-    private func saveWindowStates() {
+    private func saveWindowStates(completion: DispatchGroup? = nil) {
+        guard !layoutPersistenceSuspended, !isWaitingForRestore else { return }
+        let store = SessionRestore.standard
         guard Self.isRestoreEnabled else {
-            SessionRestore.standard.clear()
+            layoutWrites.async(group: completion) { store.clear() }
             return
         }
-        SessionRestore.standard.save(
-            windowControllers.flatMap { ($0 as? TerminalWindowController)?.restorableStates ?? [] })
+        let states = terminalWindowControllers.flatMap(\.restorableStates)
+        layoutWrites.async(group: completion) { store.save(states) }
     }
 
     // MARK: - Keeping the arrangement current
@@ -457,7 +489,9 @@ extension AppDelegate {
     private func flushLayoutSave() {
         pendingLayoutSave?.cancel()
         pendingLayoutSave = nil
-        saveWindowStates()
+        let completion = DispatchGroup()
+        saveWindowStates(completion: completion)
+        _ = completion.wait(timeout: .now() + .seconds(1))
     }
 
     /// Confirms ⌘Q with something running; quitting bypasses
@@ -471,7 +505,7 @@ extension AppDelegate {
         // promise costs nothing if the quit is cancelled: its drag is over.
         NSPasteboard(name: .drag).clearContents()
         let running = windowControllers.flatMap { $0.window?.terminalSplits ?? [] }
-            .flatMap(\.panes).filter { $0.session?.hasForegroundJob == true }
+            .flatMap(\.panes).filter(\.hasSessionRequiringCloseConfirmation)
         guard let split = windowControllers.first?.window?.terminalSplit,
             split.needsCloseConfirmation(for: running)
         else { return .terminateNow }
@@ -503,6 +537,7 @@ extension AppDelegate {
         isTerminating = true
         flushLayoutSave()
         DirectoryHistoryStore.shared.flush()
+        RemoteEditStore.flushSharedAtQuit()
         ZshBootstrap.removeGeneratedFiles()
         // The askpass socket and its directory.
         SSHAskpassBroker.shared.stop()

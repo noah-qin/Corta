@@ -18,6 +18,7 @@ import AppKit
 import CortaSFTP
 import CortaTerminal
 import Foundation
+import Synchronization
 
 /// Remote editing — the orchestration: download-or-reuse a managed
 /// copy, open the editor on it, watch the copy, and require an explicit
@@ -119,6 +120,10 @@ final class RemoteEditCoordinator {
     var presenter: RemoteEditPresenter
 
     private var clients: [String: any SFTPClient] = [:]
+    private var activeClientUses: [ObjectIdentifier: Int] = [:]
+    private var idleClients: [(host: String, timeout: Task<Void, Never>)] = []
+    private let maximumIdleClients = 4
+    private let clientIdleTime: Duration = .seconds(600)
     /// One connection being made to a host, shared by every operation that
     /// needs that host meanwhile. Each of them waits on a continuation of
     /// its own, so one that is cancelled stops waiting at once; the attempt
@@ -166,6 +171,7 @@ final class RemoteEditCoordinator {
     var pendingChecks: [String: DispatchWorkItem] = [:]
     var uploadsInFlight: Set<String> = []
     var approvedSnapshots: [String: URL] = [:]
+    nonisolated let recentDigests = Mutex<[URL: (DigestStamp, String)]>([:])
 
     init(
         store: RemoteEditStore = RemoteEditStore.shared,
@@ -181,7 +187,8 @@ final class RemoteEditCoordinator {
         self.makeClient =
             makeClient ?? {
                 SFTPConnection.forApp(
-                    key: $0, maximumDownloadBytes: RemoteEditCoordinator.maximumCopyBytes)
+                    key: $0, maximumDownloadBytes: RemoteEditCoordinator.maximumCopyBytes,
+                    restartsManagedDownloadPartials: true)
         }
         self.opener = opener ?? PanePointer.openRemoteFileAt(url:line:column:)
         self.presenter = presenter ?? RemoteEditPresenter(
@@ -190,6 +197,9 @@ final class RemoteEditCoordinator {
         // which only exists fully-formed at this point.
         if presenter == nil {
             self.presenter = RemoteEditPresenter.alerter(coordinator: self)
+        }
+        store.onManifestWriteFailure = { [weak self] error in
+            self?.presenter.showError(L10n.format("settings.status.writeFailed", error.localizedDescription))
         }
     }
 
@@ -203,6 +213,7 @@ final class RemoteEditCoordinator {
             for (_, waiter) in connection.waiters { waiter.resume(throwing: SFTPError.cancelled) }
         }
         for (_, client) in clients { client.close() }
+        for entry in idleClients { entry.timeout.cancel() }
         for (_, url) in approvedSnapshots { try? FileManager.default.removeItem(at: url) }
     }
 
@@ -278,6 +289,10 @@ extension RemoteEditCoordinator {
     {
         await store.finishMaintenance()
         guard !Task.isCancelled else { throw .cancelled }
+        if let error = store.manifestReadError {
+            presenter.showError(L10n.format("settings.status.writeFailed", error.localizedDescription))
+            throw .cancelled
+        }
         if let copy = try existingCopy(host: host, remotePath: remotePath) { return copy }
         // Records from a newer Corta name copies this build cannot see; its
         // downloads would set them aside and write where they live.
@@ -295,7 +310,7 @@ extension RemoteEditCoordinator {
         }
         let copy: RemoteEditStore.RemoteCopy
         do {
-            copy = try await withClient(for: host) { client in
+            copy = try await withTransferClient(for: host) { client, progress in
             let attributes = try await client.lstat(path: remotePath)
             let relative = RemoteEditStore.localRelativePath(host: host, remotePath: remotePath)
             let url = store.rootURL.appendingPathComponent(relative)
@@ -308,7 +323,7 @@ extension RemoteEditCoordinator {
             try store.secureCopy(at: url)
             try await client.download(
                 remotePath: remotePath, to: url,
-                policy: .fail, partialDisposition: .remove, progress: nil)
+                policy: .fail, partialDisposition: .remove, progress: progress)
             let digest = await readDigest(at: url)
             let copy = store.recordDownload(
                 host: host, remotePath: remotePath,
@@ -423,33 +438,54 @@ extension RemoteEditCoordinator {
         for host: String,
         operation: (any SFTPClient) async throws -> T
     ) async throws(SFTPError) -> T {
+        try await withTransferClient(for: host) { client, _ in try await operation(client) }
+    }
+
+    func withTransferClient<T>(
+        for host: String,
+        operation: (any SFTPClient, SFTPTransferEngine.ProgressHandler?) async throws -> T
+    ) async throws(SFTPError) -> T {
         let client = try await client(for: host)
+        if let idle = idleClients.firstIndex(where: { $0.host == host }) {
+            idleClients.remove(at: idle).timeout.cancel()
+        }
+        let id = ObjectIdentifier(client)
+        activeClientUses[id, default: 0] += 1
+        defer {
+            let remaining = activeClientUses[id, default: 1] - 1
+            activeClientUses[id] = remaining == 0 ? nil : remaining
+            if remaining == 0, clients[host] === client { parkClient(host: host) }
+        }
+        let progressCount = Mutex(UInt64(0))
         var timedOut = false
         let timeout = operationTimeout
         let shown = SSHTarget.displayName(forKey: host)
         let deadline = Task { @MainActor [weak self] in
-            // An operation can reconnect, and a reconnect can ask for a password.
+            var lastProgress: UInt64 = 0
             do {
-                try await ConnectionDeadline.wait(timeout) { self?.isAskingHost(shown) ?? false }
+                try await ConnectionDeadline.wait(timeout) {
+                    let progress = progressCount.withLock { $0 }
+                    let advanced = progress != lastProgress
+                    lastProgress = progress
+                    return advanced || (self?.isAskingHost(shown) ?? false)
+                }
             } catch { return }
+            guard !Task.isCancelled else { return }
             timedOut = true
             if self?.clients[host] === client { self?.clients[host] = nil }
             // close resumes in-flight protocol requests, including cleanup.
             client.close()
         }
         defer { deadline.cancel() }
-        func timeoutError() -> SFTPError {
-            .transport(
-                .hostUnreachable(
-                    diagnostics:
-                        "no completed SFTP operation within \(timeout.components.seconds) seconds"))
-        }
+        let timeoutError = SFTPError.transport(.operationTimedOut)
         do {
-            let result = try await operation(client)
-            guard !timedOut else { throw timeoutError() }
+            let result = try await operation(client) { progress in
+                progressCount.withLock { $0 = max($0, progress.completedBytes) }
+            }
+            guard !timedOut else { throw timeoutError }
             return result
         } catch {
-            let error = timedOut ? timeoutError() : Self.sftpError(error)
+            let error = timedOut ? timeoutError : Self.sftpError(error)
             switch error {
             case .transport, .protocolViolation:
                 if clients[host] === client {
@@ -460,6 +496,22 @@ extension RemoteEditCoordinator {
             }
             throw error
         }
+    }
+
+    private func parkClient(host: String) {
+        let delay = clientIdleTime
+        idleClients.append((host, Task { [weak self] in
+            do { try await Task.sleep(for: delay) } catch { return }
+            guard !Task.isCancelled else { return }
+            self?.retireIdleClient(host: host)
+        }))
+        if idleClients.count > maximumIdleClients { retireIdleClient(host: idleClients[0].host) }
+    }
+
+    private func retireIdleClient(host: String) {
+        guard let index = idleClients.firstIndex(where: { $0.host == host }) else { return }
+        idleClients.remove(at: index).timeout.cancel()
+        clients.removeValue(forKey: host)?.close()
     }
 
 }

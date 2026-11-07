@@ -33,7 +33,9 @@ extension SFTPTransferEngine {
         let conflict = downloadConflict(
             destinationPath: destinationPath, partialPath: partialPath, partial: partialInfo,
             source: sourceAttributes, ownedPartial: ownedPartial.withLock { $0 })
-        let resolution = try resolve(policy: transfer.policy, conflict: conflict, destinationPath: destinationPath)
+        let resolution = try resolve(
+            policy: transfer.policy, conflict: conflict, destinationPath: destinationPath,
+            permitsExistingPartial: configuration.restartsManagedDownloadPartials)
         let offset =
             resolution == .resume
             ? Self.downloadResumeOffset(partial: partialInfo, source: sourceAttributes) : 0

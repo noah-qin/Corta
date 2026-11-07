@@ -310,6 +310,9 @@ recent host and capsule buttons using the `connection-sheet` fixture.
 the `connection-placement` fixture’s recent host on loopback port 1 with
 real OpenSSH and checks the original window still has
 one tab and shows the new session's output instead of the fixture prompt.
+The hosted regressions also check that a directly launched SSH session
+requires close confirmation, cancelling a replacement leaves it alive,
+and a second Close during a split collapse reaches the tab close path.
 
 Three test plans under `TestPlans/` say what runs where:
 
@@ -885,7 +888,9 @@ measurement and staging seams, deliberately not config keys (D10): a
 launch that sets none behaves as shipped. Set one on the launch you
 control — or as `TEST_RUNNER_<name>` in front of `xcodebuild test`, which
 hands it to the test host — never through `launchctl setenv` (D13). None
-reaches a shell: `ChildEnvironment` strips every `CORTA_` name, and
+of these diagnostics switches reaches a shell: `ChildEnvironment` strips
+inherited `CORTA_` names. The zsh bootstrap adds its own two temporary
+`CORTA_USER_ZDOTDIR` variables to restore the user's startup paths.
 `DiagnosticsEnvironmentTests` holds this table, that stripping and the
 single reader to the code.
 
@@ -897,7 +902,7 @@ single reader to the code.
 | `CORTA_FRAME_DRIVER` | `displaylink` (default), `ondemand` | all | Experimental echo presentation with separate CADisplayLink pacing; immediate acquisition only while paused; the unaccepted no-sync experiment was removed, so both retained drivers use display synchronization |
 | `CORTA_FRAME_LATENCY` | number ≥ 1 | all | The display link's `preferredFrameLatency` (default 2; `PERFORMANCE.md` §5.7) |
 | `CORTA_MAX_DRAWABLES` | `2` or `3` | all | The Metal layer's drawable count (default 3), for a double-buffering A/B |
-| `CORTA_RENDER_METRICS` | any; an absolute path also writes there | all | Frame-timing percentiles to the `render-metrics` log category, and to the file |
+| `CORTA_RENDER_METRICS` | any; an absolute path also writes there | all | Frame-timing percentiles to the `render-metrics` log category, and to the file until it reaches 16 MiB |
 | `CORTA_RENDER_METRICS_FRAMES` | integer 1–6000 | all | Frames per CPU/GPU summary (default 600); `1` makes idle-cursor frame cessation observable |
 | `CORTA_RENDER_METRICS_KEYSTROKES` | integer > 0 | all | Keystrokes per keypress-to-present summary (default 200) |
 | `CORTA_RESTORE_WINDOWS` | `0` | all | Skips reopening last run's windows |

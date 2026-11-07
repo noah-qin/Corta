@@ -234,6 +234,18 @@ public enum Search {
             var found: [SelectionRange] = []
             let already = result.matches.count
             var timedOut = false
+            var character = text.startIndex
+            var characterOffset = 0
+            var nextUTF16Offset = 0
+            func position(containingUTF16Offset offset: Int) -> Int {
+                while nextUTF16Offset <= offset, character < text.endIndex {
+                    let next = text.index(after: character)
+                    nextUTF16Offset += text[character..<next].utf16.count
+                    character = next
+                    characterOffset += 1
+                }
+                return characterOffset - 1
+            }
             regex.enumerateMatches(
                 in: text, options: [.reportProgress], range: NSRange(location: 0, length: nsText.length)
             ) { match, _, stop in
@@ -249,11 +261,10 @@ public enum Search {
                     return
                 }
                 guard let match, match.range.length > 0 else { return }
-                // NSRange is UTF-16; the position table is by character.
-                let prefix = nsText.substring(to: match.range.location)
-                let body = nsText.substring(with: match.range)
-                let startOffset = prefix.count
-                let endOffset = startOffset + body.count - 1
+                // Regex reports disjoint ranges in text order. Walk each
+                // grapheme once, including matches inside a grapheme cluster.
+                let startOffset = position(containingUTF16Offset: match.range.location)
+                let endOffset = position(containingUTF16Offset: NSMaxRange(match.range) - 1)
                 if let startPosition = logicalLine.position(at: startOffset),
                     let endPosition = logicalLine.position(at: endOffset)
                 {

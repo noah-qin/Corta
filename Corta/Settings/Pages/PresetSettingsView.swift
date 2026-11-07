@@ -99,7 +99,7 @@ private struct PresetEditor: View {
     @State private var directory: String
     @State private var arguments: String
     @State private var environment: String
-    @State private var error = false
+    @State private var error: String?
 
     init(model: SettingsModel, draft: PresetDraft) {
         self.model = model
@@ -146,7 +146,7 @@ private struct PresetEditor: View {
                             .accessibilityLabel(L10n.text("ui.presets.environment"))
                     }
                 }
-                if error { Text(L10n.text("ui.presets.invalid")).foregroundStyle(.red).font(.callout) }
+                if let error { Text(error).foregroundStyle(.red).font(.callout) }
             }
             Divider()
             HStack {
@@ -165,7 +165,7 @@ private struct PresetEditor: View {
             !directory.contains(where: { $0.isNewline || $0 == "\0" }),
             !arguments.contains(where: { $0.isNewline || $0 == "\0" })
         else {
-            error = true
+            error = L10n.text("ui.presets.invalid")
             return
         }
         preset.shell = shell.isEmpty ? nil : shell
@@ -173,17 +173,21 @@ private struct PresetEditor: View {
         preset.arguments = arguments.split(separator: " ").map(String.init)
         for line in environment.split(separator: "\n") {
             guard let separator = line.firstIndex(of: "="), separator != line.startIndex else {
-                error = true
+                error = L10n.text("ui.presets.invalid")
                 return
             }
             let key = String(line[..<separator])
             let value = String(line[line.index(after: separator)...])
             guard !key.contains(where: { $0.isWhitespace || $0 == "\0" }), !value.contains("\0") else {
-                error = true
+                error = L10n.text("ui.presets.invalid")
                 return
             }
             preset.environment[key] = value
         }
-        if model.savePreset(preset, replacing: draft.originalName) { dismiss() } else { error = true }
+        switch model.savePreset(preset, replacing: draft.originalName) {
+        case .saved: dismiss()
+        case .invalid: error = L10n.text("ui.presets.invalid")
+        case .writeFailed(let message): error = message
+        }
     }
 }

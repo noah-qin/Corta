@@ -66,12 +66,23 @@ public struct CommandRecordStore: Sendable, Equatable {
     private var storage: [CommandRecord] = []
     private var head = 0
     private var nextID = 0
+    /// Changes when the row-to-exit-status index needs rebuilding.
+    public private(set) var statusRevision: UInt64 = 0
 
     public init(capacity: Int = defaultCapacity) {
         self.capacity = max(0, capacity)
     }
 
     public var last: CommandRecord? { head < storage.count ? storage.last : nil }
+
+    public var recordsInOrder: ArraySlice<CommandRecord> { storage[head...] }
+
+    mutating func clear() {
+        storage.removeAll()
+        head = 0
+        nextID = 0
+        statusRevision &+= 1
+    }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.capacity == rhs.capacity && lhs.nextID == rhs.nextID
@@ -88,6 +99,7 @@ public struct CommandRecordStore: Sendable, Equatable {
         nextID += 1
         storage.append(record)
         if storage.count - head > capacity {
+            statusRevision &+= 1
             head += 1
             // Half a capacity of dead records: two moves per insert at worst.
             if head >= max(16, capacity / 2) || head == storage.count {
@@ -123,6 +135,7 @@ public struct CommandRecordStore: Sendable, Equatable {
 
     mutating func finish(exitStatus: Int, endRow: Int, at date: Date) {
         guard head < storage.count else { return }
+        statusRevision &+= 1
         let last = storage.count - 1
         storage[last].exitStatus = exitStatus
         storage[last].endRow = endRow
@@ -130,6 +143,7 @@ public struct CommandRecordStore: Sendable, Equatable {
     }
 
     mutating func remapRows(_ remap: RowRemap) {
+        statusRevision &+= 1
         for index in head..<storage.count {
             let oldPromptRow = storage[index].promptRow
             storage[index].promptRow = remap.map(oldPromptRow)

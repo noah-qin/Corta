@@ -290,7 +290,7 @@ scrolled-back panes do not blink.
 | Multiple windows (⌘N), each its own session             | P1   | Landed at M3; composition, not new mechanism |
 | PTY lifecycle: spawn, read/write, `TIOCSWINSZ`, `SIGCHLD` | P0 | Resize must be reported or remote `vim` and `htop` desynchronise |
 | Resize debouncing                                       | P1   | A live window drag otherwise hammers the child |
-| Tabs                                                    | P1   | Native window tabs; a restored group keeps its order and selection (§4.4 item 6) |
+| Tabs                                                    | P1   | Corta tabs in the title bar; a restored group keeps its order and selection (§4.4 item 6) |
 | Split panes (layout tree + focus routing)               | P1   | Renderer and input are multi-viewport from M1 |
 | Search scrollback (⌘F)                                  | P1   | Must match across soft-wrapped lines          |
 | Scrolling (wheel, ⌘↑↓, page)                            | P0   | ⌘↑↓ jump between commands once shell integration reports them; ⇧Page/Home/End scroll |

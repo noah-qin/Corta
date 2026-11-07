@@ -37,7 +37,7 @@ final class SearchTestHost: PaneSearchHost {
     private(set) lazy var search = PaneSearch(host: self)
 
     func snapshot() -> Grid? { terminal.grid }
-    func selectedText() -> String? { selection }
+    func selectedTextForFind() async -> String? { selection?.split(separator: "\n").first.map(String.init) }
     func invalidateDisplay() { redraws += 1 }
 
     /// Lines as a program would print them.
@@ -424,7 +424,7 @@ extension PaneSearchTests {
         defer { host.search.close() }
         host.selection = "P04MARKER\nsecond line"
         host.search.useSelectionForFind()
-        #expect(host.search.field?.stringValue == "P04MARKER")
+        #expect(await waitUpTo(5) { host.search.field?.stringValue == "P04MARKER" })
         #expect(await waitUpTo(5) { !host.search.matches.isEmpty })
     }
 

@@ -79,6 +79,7 @@ final class SettingsModel {
     var saveStatus = RowStatus()
     var fontStatus = RowStatus()
     var shellIntegrationStatus = RowStatus()
+    var isCheckingShellIntegration = false
     var directoryHistoryStatus = RowStatus()
     var recentHostsStatus = RowStatus()
     var droppedCopiesStatus = RowStatus()
@@ -342,7 +343,8 @@ extension SettingsModel {
     /// One write path for every setter: mutate, re-read the whole page so a
     /// clamped or rejected value shows what the file actually says, then
     /// report what happened.
-    private func commit(_ mutate: (inout Configuration) -> String?) {
+    @discardableResult
+    private func commit(_ mutate: (inout Configuration) -> String?) -> Bool {
         var message: String?
         let saved = ConfigurationStore.shared.update { configuration in
             message = mutate(&configuration)
@@ -355,6 +357,7 @@ extension SettingsModel {
         } else {
             setSaveStatus(RowStatus(kind: .saved, message: L10n.text("settings.status.saved")))
         }
+        return saved
     }
 
     /// A success or a clamp clears itself after a few seconds — it is a
@@ -505,7 +508,10 @@ extension SettingsModel {
     func setShortcut(_ value: Shortcut?, for command: TerminalCommand) {
         commit { configuration in
             if let value,
-                TerminalCommand.allCases.contains(where: { $0 != command && configuration.keybindings[$0] == value })
+                AppDelegate.hasFixedMenuShortcut(value)
+                    || TerminalCommand.allCases.contains(where: {
+                        $0 != command && configuration.keybindings[$0] == value
+                    })
             {
                 return L10n.text("ui.shortcut.conflict")
             }
@@ -516,17 +522,26 @@ extension SettingsModel {
     func resetShortcut(_ command: TerminalCommand) {
         commit { $0.keybindings.reset(command); return nil }
     }
-    func savePreset(_ preset: Preset, replacing originalName: String?) -> Bool {
-        guard Self.validPresetName(preset.name), preset.isUsable,
-            !configuration.presets.contains(where: { $0.name == preset.name && $0.name != originalName })
-        else { return false }
-        commit { configuration in
+    enum PresetSaveResult: Equatable {
+        case saved, invalid, writeFailed(String)
+    }
+
+    func savePreset(_ preset: Preset, replacing originalName: String?) -> PresetSaveResult {
+        guard Self.validPresetName(preset.name), preset.isUsable else { return .invalid }
+        var duplicate = false
+        let saved = commit { configuration in
+            guard !configuration.presets.contains(where: { $0.name == preset.name && $0.name != originalName })
+            else {
+                duplicate = true
+                return L10n.text("ui.presets.invalid")
+            }
             if let index = configuration.presets.firstIndex(where: { $0.name == originalName }) {
                 configuration.presets[index] = preset
             } else { configuration.presets.append(preset) }
             return nil
         }
-        return configuration.presets.contains(preset)
+        if duplicate { return .invalid }
+        return saved ? .saved : .writeFailed(saveStatus.message)
     }
     nonisolated static func validPresetName(_ name: String) -> Bool {
         !name.isEmpty

@@ -115,6 +115,7 @@ struct PerformerState: Sendable {
     /// A finished transmission waiting for its decode outside the parse;
     /// taken by `Terminal.takeDeferredImage()` before the lock is released.
     var deferredImage: DeferredImageTransmission?
+    var deferredAlternateScreenExit = false
     /// A taken `deferredImage`'s decoded size while its decode runs, so the
     /// image budget does not lose sight of it in the pause.
     var decodingImageBytes = 0

@@ -41,7 +41,8 @@ extension SFTPTransferEngine {
     func resolve(
         policy: ConflictPolicy,
         conflict: SFTPConflict,
-        destinationPath: String
+        destinationPath: String,
+        permitsExistingPartial: Bool = false
     ) throws(SFTPError) -> ConflictResolution {
         let resolution: ConflictResolution
         switch policy {
@@ -59,7 +60,7 @@ extension SFTPTransferEngine {
         }
         // A suffix alone does not prove a file is our interrupted transfer.
         // Only an explicit overwrite/resume decision may reuse one.
-        if resolution == .fail, conflict.partialSize != nil {
+        if resolution == .fail, conflict.partialSize != nil, !permitsExistingPartial {
             throw .destinationConflict(path: Self.partialPath(for: destinationPath))
         }
         return resolution

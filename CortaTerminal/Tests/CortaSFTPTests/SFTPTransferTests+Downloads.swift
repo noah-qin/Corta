@@ -177,6 +177,21 @@ extension SFTPTransferTests {
         #expect(!FileManager.default.fileExists(atPath: rig.directory.appendingPathComponent("out").path))
     }
 
+    @Test("managed downloads replace a stale partial without replacing a complete destination")
+    func managedPartialRecovery() async throws {
+        let rig = try await makeRig(configureEngine: { $0.restartsManagedDownloadPartials = true })
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/remote", data: [1, 2, 3])
+        let partial = try localFile(rig, "out.corta-part", contents: [9])
+        let destination = rig.directory.appendingPathComponent("out")
+        try await rig.engine.download(remotePath: "/remote", to: destination)
+        #expect(localContents(destination) == [1, 2, 3])
+        #expect(!FileManager.default.fileExists(atPath: partial.path))
+        await #expect(throws: SFTPError.destinationConflict(path: destination.path)) {
+            try await rig.engine.download(remotePath: "/remote", to: destination)
+        }
+    }
+
     @Test("colliding remote tree names are rejected before any local file is changed")
     func directoryRejectsPartialNamespaceCollisions() async throws {
         let rig = try await makeRig()

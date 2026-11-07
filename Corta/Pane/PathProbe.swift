@@ -89,9 +89,13 @@ nonisolated enum PathProbe {
     static func answer<Answer: Sendable>(
         timeout: DispatchTimeInterval, budget: Budget = PathProbe.sharedBudget,
         abandoned: @escaping @Sendable (Answer) -> Void = { _ in },
+        onBudgetExhausted: () -> Void = {},
         _ body: @escaping @Sendable () -> Answer
     ) -> Answer? {
-        guard budget.take() else { return nil }
+        guard budget.take() else {
+            onBudgetExhausted()
+            return nil
+        }
         let slot = Mutex<(answer: Answer?, waiting: Bool)>((nil, true))
         let done = DispatchSemaphore(value: 0)
         run {

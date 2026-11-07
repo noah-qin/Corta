@@ -64,7 +64,19 @@ final class RemoteEditStore {
         }
     }
 
-    static let shared = RemoteEditStore(rootURL: RemoteEditStore.defaultRootURL)
+    static let shared: RemoteEditStore = {
+        let store = RemoteEditStore(rootURL: RemoteEditStore.defaultRootURL)
+        activeShared = store
+        return store
+    }()
+    private static weak var activeShared: RemoteEditStore?
+
+    static func flushSharedAtQuit() {
+        guard let queue = activeShared?.manifestWrites else { return }
+        let drained = DispatchSemaphore(value: 0)
+        queue.async { drained.signal() }
+        _ = drained.wait(timeout: .now() + .seconds(1))
+    }
 
     /// The store's root — injected so tests point at a temporary directory
     /// instead of the user's real Application Support.
@@ -76,9 +88,13 @@ final class RemoteEditStore {
     /// never written, or this build's next save would drop every copy it
     /// does not know.
     private(set) var preservesNewerManifest = false
+    private(set) var manifestReadError: (any Error)?
+    private(set) var manifestWriteError: (any Error)?
+    private let manifestWrites = DispatchQueue(label: "Corta.RemoteEditManifest", qos: .utility)
+    var onManifestWriteFailure: ((any Error) -> Void)?
 
     /// Where approved-upload snapshots and pre-upload probes are written.
-    var approvalsURL: URL { rootURL.appendingPathComponent("Approvals", isDirectory: true) }
+    let approvalsURL: URL
 
     static var defaultRootURL: URL {
         AppPaths.applicationSupportDirectory.appendingPathComponent("RemoteEdit", isDirectory: true)
@@ -88,16 +104,11 @@ final class RemoteEditStore {
 
     init(rootURL: URL) {
         self.rootURL = rootURL
-        // Approval snapshots and content probes belong to one run: the
-        // decisions they back are in memory and do not survive a relaunch,
-        // so whatever a quit left behind is only a stale copy of a file.
-        let abandoned = rootURL.appendingPathComponent("Abandoned-" + UUID().uuidString)
-        let moved = (try? FileManager.default.moveItem(at: approvalsURL, to: abandoned)) != nil
+        approvalsURL = rootURL.appendingPathComponent(".approvals-\(getpid())-\(UUID().uuidString)", isDirectory: true)
         load()
-        try? secureCopy(at: manifestURL)
-        let candidates = Array(copies.values)
+        let candidates = copies.values.shuffled()
         maintenanceTask = Task { [weak self] in
-            if moved { await Self.removeAbandonedApprovals(at: abandoned) }
+            await Self.removeAbandonedApprovals(in: rootURL)
             await self?.pruneStaleCopies(candidates: candidates)
         }
         // Reused copies are tightened on materialize, rather than walking
@@ -116,8 +127,26 @@ final class RemoteEditStore {
     }
 
     @concurrent
-    private static func removeAbandonedApprovals(at url: URL) async {
-        try? FileManager.default.removeItem(at: url)
+    private static func removeAbandonedApprovals(in root: URL) async {
+        let manager = FileManager.default
+        guard let children = try? manager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return }
+        for child in children {
+            let name = child.lastPathComponent
+            if name.hasPrefix(".approvals-"),
+                let separator = name.dropFirst(".approvals-".count).firstIndex(of: "-"),
+                let pid = Int32(name[name.index(name.startIndex, offsetBy: ".approvals-".count)..<separator]),
+                UUID(uuidString: String(name[name.index(after: separator)...])) != nil,
+                pid > 0, kill(pid, 0) == -1, errno == ESRCH
+            {
+                try? manager.removeItem(at: child)
+            } else if name.hasPrefix("Abandoned-"),
+                UUID(uuidString: String(name.dropFirst("Abandoned-".count))) != nil,
+                let files = try? manager.contentsOfDirectory(atPath: child.path),
+                files.allSatisfy({ UUID(uuidString: $0.replacingOccurrences(of: ".corta-part", with: "")) != nil })
+            {
+                try? manager.removeItem(at: child)
+            }
+        }
     }
 
     /// Retire only unchanged, approved copies past retention. Bound maintenance
@@ -131,6 +160,7 @@ final class RemoteEditStore {
             guard !Task.isCancelled, checked < 32, remainingBytes > 0 else { break }
             checked += 1
             let url = localURL(for: copy)
+            guard Self.contains(url, in: rootURL) else { continue }
             let result = await Self.staleCopy(
                 copy, at: url, now: now, byteLimit: remainingBytes)
             remainingBytes -= result.bytesRead
@@ -142,6 +172,11 @@ final class RemoteEditStore {
             guard (try? FileManager.default.removeItem(at: url)) != nil else { continue }
             copies[copy.id] = nil
             pruned = true
+            let parent = url.deletingLastPathComponent()
+            if parent.standardizedFileURL != rootURL.standardizedFileURL, rmdir(parent.path) == 0 {
+                let host = parent.deletingLastPathComponent()
+                if host.standardizedFileURL != rootURL.standardizedFileURL { rmdir(host.path) }
+            }
         }
         if pruned { save() }
     }
@@ -290,6 +325,7 @@ final class RemoteEditStore {
     }
 
     nonisolated static func secureCopy(at url: URL, rootURL: URL) throws {
+        guard contains(url, in: rootURL) else { throw POSIXError(.EACCES) }
         var directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700])
@@ -306,13 +342,19 @@ final class RemoteEditStore {
         }
     }
 
+    nonisolated private static func contains(_ url: URL, in root: URL) -> Bool {
+        let rootPath = root.resolvingSymlinksInPath().standardizedFileURL.path
+        return url.standardizedFileURL.path.hasPrefix(root.standardizedFileURL.path + "/")
+            && url.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(rootPath + "/")
+    }
+
     nonisolated private static func removeACL(at url: URL) -> Bool {
         clearExtendedACL(path: url.path) == 0
     }
 
     // MARK: - Persistence
 
-    private struct Persisted: Codable {
+    private nonisolated struct Persisted: Codable, Sendable {
         static let currentVersion = 1
         // periphery:ignore - the manifest's format version, written for a later reader
         var version: Int
@@ -320,7 +362,14 @@ final class RemoteEditStore {
     }
 
     private func load() {
-        guard let data = try? PrivateFile.read(manifestURL) else { return }
+        let data: Data
+        do {
+            guard let loaded = try PrivateFile.readBounded(manifestURL) else { return }
+            data = loaded
+        } catch {
+            manifestReadError = error
+            return
+        }
         if let version = try? JSONDecoder().decode(VersionProbe.self, from: data).version,
             version > Persisted.currentVersion
         {
@@ -328,8 +377,11 @@ final class RemoteEditStore {
             return
         }
         guard let persisted = try? JSONDecoder().decode(Persisted.self, from: data) else { return }
+        let prefix = rootURL.standardizedFileURL.path + "/"
         copies = Dictionary(
-            persisted.copies.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            persisted.copies.filter { localURL(for: $0).standardizedFileURL.path.hasPrefix(prefix) }
+                .map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first })
     }
 
     private var manifestURL: URL {
@@ -363,12 +415,30 @@ final class RemoteEditStore {
     }
 
     private func save() {
-        guard !preservesNewerManifest else { return }
+        guard !preservesNewerManifest, manifestReadError == nil else { return }
         let persisted = Persisted(version: Persisted.currentVersion, copies: Array(copies.values))
-        guard let data = try? JSONEncoder().encode(persisted) else { return }
         // The manifest names hosts and paths: owner-only from its first
         // byte, not `chmod`ed after an `.atomic` write at the umask.
-        try? secureCopy(at: manifestURL)
-        try? PrivateFile.write(data, to: manifestURL)
+        let url = manifestURL
+        manifestWrites.async { [weak self] in
+            let result = Result { try PrivateFile.write(JSONEncoder().encode(persisted), to: url) }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    try result.get()
+                    self.manifestWriteError = nil
+                } catch {
+                    let firstFailure = self.manifestWriteError == nil
+                    self.manifestWriteError = error
+                    if firstFailure { self.onManifestWriteFailure?(error) }
+                }
+            }
+        }
+    }
+
+    func finishManifestWrites() async {
+        await withCheckedContinuation { continuation in
+            manifestWrites.async { continuation.resume() }
+        }
     }
 }

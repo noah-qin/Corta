@@ -44,8 +44,9 @@ key = value        # comment to end of line
   are not being saved, until the file reads again.
 - Numeric values outside the documented range are **clamped** and written
   back in their clamped form. Invalid numbers, unsupported enum values and
-  malformed shortcuts keep the default for that key when loading the file;
-  their original lines are preserved on a settings round trip.
+  malformed shortcuts keep the default for that key when loading the file.
+  Invalid scalar values are preserved on a settings round trip. Invalid
+  values for known shortcut keys are discarded the next time Settings writes.
 
 Three families of key are structured rather than scalar, and all use a
 dotted prefix so the flat format needs no nesting: `theme.<name>.…`
@@ -81,7 +82,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | `columns` | 20–500 | `120` | The grid a **new** window opens with, in cells. |
 | `rows` | 5–300 | `30` | As above. The window's size in pixels is this grid times the font's cell metrics plus the pane insets — so two terminals showing the same `columns × rows` are still different sizes on screen if their fonts differ. |
 | `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. |
-| `confirm-close` | boolean | `true` | Ask before closing a pane, window or the app while a shell still has a foreground job. |
+| `confirm-close` | boolean | `true` | Ask before closing or replacing a session with a foreground job or a live SSH connection. Closing a tab, window or the app checks every affected pane. |
 | `auto-balance-panes` | boolean | `false` | Share the room equally as panes open and close. A divider you dragged or moved from the keyboard stays where you put it until Equalize Panes; a restored divider away from its balanced place counts as yours. Off, a new pane halves the focused one and a closed pane's room goes to its neighbours, as ever. |
 | `focus-follows-mouse` | boolean | `false` | The pointer entering a pane focuses it. Not while the window is inactive, a button is held, a menu, sheet or modal window is up, a search field or tab rename holds the keyboard, or an input method is composing inline. An input method that composes only in its own panel cannot be seen, so a pointer entering a pane can still end that composition. |
 | `best-fit-split` | boolean | `false` | Turns on the Split Pane Along Longer Side command (`bind.best-fit-split`), which splits the focused pane across its longer side. ⌘D and ⇧⌘D do not change either way. |
@@ -823,11 +824,11 @@ managed remote-edit copies. Their contents are not configuration keys.
 | `Configuration` | `~/.config/corta/config` (this file) | Appearance, terminal behaviour, notifications, shell integration and history *toggles*, updates | **Global preference** — applies to every window and pane until changed again |
 | `Configuration.columns`/`.rows` | same file | The grid a *new* window opens with | **Window-launch default** — read once, at the moment a window is created; changing it does nothing to windows already open |
 | `Configuration.presets` | same file | Named shell/directory/environment combinations | **Pane-launch configuration** — read once, at the moment a pane spawns from that preset; never re-applied afterwards (`docs/CONFIGURATION.md` §4a) |
-| `SessionRestore` | `state.json` | Window frames and split arrangement, restored on the next launch | **Window/session state** — describes *this run's* windows, not a preference about future ones |
+| `SessionRestore` | `state.json`, `state.failed-restore.json` after an interrupted restore | Window frames and split arrangement | **Window/session state** — the most recent failed arrangement is kept separately for recovery |
 | `DirectoryHistoryStore` | `directory-history.json` | Ranked recent directories | **Temporary interaction history** — gated by `directory-history`; clear it in Privacy & Security ▸ History |
 | `RecentHostsStore` | `recent-hosts.json` | Recently connected SSH/SFTP hosts | **Connection history** — clear it in Privacy & Security ▸ Recent hosts |
 | `FileDropStorage` | `DroppedFiles/` and `SFTPDragStaging/` | Temporary copies of files dropped from other apps and of SFTP rows being dragged out | **Temporary copies** — no setting; removed with their pane or at quit, and shown with **Clean Now…** in Privacy & Security ▸ Local Data |
-| `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — preserve undecided edits before deleting app data; used copies are pruned after 30 days unless edits are pending |
+| `RemoteEditStore` | `RemoteEdit/manifest.json` and managed copies beneath `RemoteEdit/` | Remote baselines, local edits and approved-upload snapshots | **Managed editing state** — unchanged, approved copies become eligible for bounded cleanup after 30 days. Preserve undecided edits before deleting app data. |
 
 Why separate stores: `Configuration` is line-oriented text
 specifically so a person can open it in `$EDITOR`, diff it, and understand

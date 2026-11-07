@@ -661,6 +661,7 @@ extension TerminalPaneViewController {
         pointer.install(on: view)
         installInputSourceIndicator(on: view)
         view.onCompletionKey = { [weak self] event in self?.shell.handleDirectoryCompletionKey(event) ?? false }
+        view.onEndedSessionKey = { [weak self] event in self?.sessionEnd.focusActions(event) ?? false }
         // `view` weakly too: the closure is stored on it, and a strong capture
         // kept every closed pane's view — and its drawables — alive.
         view.onKeyBytes = { [weak self, weak view] bytes in
@@ -897,7 +898,8 @@ extension TerminalPaneViewController {
                 scrollOffset: scrollOffset,
                 cellSize: CGSize(width: metrics.cellWidth, height: metrics.cellHeight),
                 topInset: topInset, compositionRect: terminalView.inputCompositionRect,
-                blockedRects: terminalView.shellOverlay.occupiedRects + (search.bar.map { [$0.frame] } ?? []))
+                blockedRects: configuration.inputSourceIndicatorPosition == .toolbar ? [] :
+                    terminalView.shellOverlay.occupiedRects + (search.bar.map { [$0.frame] } ?? []))
             inputSourceIndicator.update(frame, configuration: configuration, canvas: canvas)
         } else if !inputSourceIndicator.view.isHidden { inputSourceIndicator.view.isHidden = true }
         if hasOutput, scrollOffset > 0, let anchor = scrollAnchorTotalPushed {
@@ -1015,8 +1017,17 @@ extension TerminalPaneViewController {
         session?.snapshot()
     }
 
-    func selectedText() -> String? {
-        commands.selectedText()
+    func selectedTextForFind() async -> String? {
+        guard let session, let (grid, range) = commands.selectionSnapshot() else { return nil }
+        let task = Task.detached(priority: .userInitiated) {
+            Selection.firstNonemptyLine(of: range, in: grid)
+        }
+        let result = await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        return !Task.isCancelled && self.session === session && !didTeardown ? result : nil
     }
 
     func setFontSize(_ newSize: CGFloat, settle: Bool = true) {
@@ -1088,6 +1099,13 @@ extension TerminalPaneViewController {
         failure.onOpenSettings = { SettingsWindowController.shared.show(nil) }
         failure.present(in: view, takesFocus: takesFocus)
         failureView = failure
+    }
+
+    /// A direct remote launcher owns the PTY itself, so it has no separate
+    /// foreground job even when closing it would end a live connection.
+    var hasSessionRequiringCloseConfirmation: Bool {
+        guard let session, !session.isStopped, session.pty.exitStatus == nil else { return false }
+        return session.hasForegroundJob || remote.childIsLiveLauncher
     }
 
     /// Connect replaces this pane's session with the chosen destination.

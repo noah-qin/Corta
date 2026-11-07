@@ -100,6 +100,7 @@ final class TerminalView: NSView, CALayerDelegate {
     /// was handled. ⌘G / ⇧⌘G are fixed menu items with no `bind.` key.
     var onSearchKey: ((NSEvent) -> Bool)?
     var onCompletionKey: ((NSEvent) -> Bool)?
+    var onEndedSessionKey: ((NSEvent) -> Bool)?
     let shellOverlay = ShellOverlayView()
     var onInputContextChange: (() -> Void)?
     var inputCompositionRect: CGRect?
@@ -140,6 +141,7 @@ final class TerminalView: NSView, CALayerDelegate {
     var onLookUp: ((CGPoint) -> (String, CGPoint)?)?
     /// The selection as text for the Services menu.
     var onServicesSelection: (() -> String?)?
+    var canProvideServicesSelection: (() -> Bool)?
     /// Text a service returned, sent like a sanitised paste.
     var onServicesInsert: ((String) -> Void)?
 

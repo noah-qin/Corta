@@ -93,6 +93,7 @@ struct TabsBetweenWindowsTests {
         #expect(moving.controller === target)
         #expect(moving.split.focusedPane?.session === session, "its shell runs on")
         #expect(moving.split.view.window === target.window)
+        #expect(target.window?.firstResponder === moving.split.focusedPane?.terminalView)
         // Dressed as a window born with its tab: no title text over the strip.
         #expect(target.window?.titleVisibility == .hidden)
         #expect(target.window?.titlebarAppearsTransparent == true)

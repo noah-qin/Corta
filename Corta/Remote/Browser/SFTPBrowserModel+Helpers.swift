@@ -207,6 +207,8 @@ extension SFTPBrowserModel {
                 return L10n.format("sftp.error.channel", host, code)
             case .closed, .connectionLost:
                 return L10n.format("sftp.error.connectionLost", host)
+            case .operationTimedOut:
+                return L10n.format("sftp.error.operationTimedOut", host)
             }
         case .protocolViolation(let detail):
             return L10n.format("sftp.error.protocol", host, peerText(detail))
@@ -254,6 +256,9 @@ extension SFTPBrowserModel {
                          body: L10n.format("sftp.failure.subprocess.body", Int(code)), details: details)
         case .transport(.closed), .transport(.connectionLost):
             return .init(symbol: "network.slash", title: L10n.format("failure.title.connectionLost.host", host),
+                         body: L10n.text("sftp.failure.lost.body"), details: details)
+        case .transport(.operationTimedOut):
+            return .init(symbol: "clock", title: details,
                          body: L10n.text("sftp.failure.lost.body"), details: details)
         case .transport(.spawnFailed), .transport(.executablePathNotAbsolute):
             return .init(symbol: "exclamationmark.triangle", title: L10n.text("sftp.failure.spawn.title"),

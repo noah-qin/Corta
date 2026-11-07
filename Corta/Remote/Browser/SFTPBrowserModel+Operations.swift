@@ -69,7 +69,7 @@ extension SFTPBrowserModel {
                 refresh()
             } catch {
                 guard prompt.connection == connectionGeneration else { return }
-                listingError = Self.errorMessage(Self.sftpError(error), host: host)
+                reportOperationError(Self.sftpError(error), client: client, host: host)
             }
         }
     }
@@ -117,6 +117,7 @@ extension SFTPBrowserModel {
         let directory = confirmation.directory
         Task {
             for entry in confirmation.entries {
+                guard confirmation.connection == connectionGeneration else { return }
                 do {
                     let path = Self.joinPath(directory, entry.name)
                     if entry.kind == .directory {
@@ -125,10 +126,20 @@ extension SFTPBrowserModel {
                         try await client.remove(path: path)
                     }
                 } catch {
-                    listingError = Self.errorMessage(Self.sftpError(error), host: host)
+                    guard confirmation.connection == connectionGeneration else { return }
+                    reportOperationError(Self.sftpError(error), client: client, host: host)
                 }
             }
             refresh()
+        }
+    }
+
+    private func reportOperationError(_ error: SFTPError, client: any SFTPClient, host: String) {
+        switch error {
+        case .transport, .protocolViolation:
+            lostConnection(error, client: client)
+        default:
+            listingError = Self.errorMessage(error, host: host)
         }
     }
 

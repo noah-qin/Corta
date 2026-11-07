@@ -86,6 +86,7 @@ struct SSHPresetPaneTests {
         // foreground job ever stands in front of it, and the spawn record
         // is what says the pane is remote.
         #expect(!session.hasForegroundJob)
+        #expect(pane.hasSessionRequiringCloseConfirmation)
         #expect(session.remoteContext == nil)
         #expect(pane.remote.state == .remoteUnknown(provenance: .spawnedLauncher))
 

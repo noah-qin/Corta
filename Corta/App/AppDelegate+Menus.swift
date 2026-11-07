@@ -386,6 +386,21 @@ extension AppDelegate {
         return item
     }
 
+    static func hasFixedMenuShortcut(_ shortcut: Shortcut) -> Bool {
+        func contains(_ menu: NSMenu) -> Bool {
+            menu.items.contains { item in
+                if let submenu = item.submenu { return contains(submenu) }
+                guard item.keyEquivalent == shortcut.menuKeyEquivalent,
+                    item.keyEquivalentModifierMask == shortcut.menuModifierMask
+                else { return false }
+                return !TerminalCommand.allCases.contains { command in
+                    item.action == command.action && (command.menuTag == nil || command.menuTag == item.tag)
+                }
+            }
+        }
+        return NSApp.mainMenu.map(contains) ?? false
+    }
+
     /// Applies every command's shortcut to its menu items, at launch and on
     /// each config change, so an unbind clears the menu too.
     @objc func applyKeybindings() {

@@ -361,6 +361,9 @@ could not reach the host and offers Retry; **Cancel** stops it sooner. The time
 a sign-in dialog is on screen does not count, so a slow password is not the
 cause. A host that takes longer than that needs a look at the network or VPN:
 `ssh -v` with the same user and port in a terminal shows where it stops.
+If a directory load stops answering after connection, the browser retires
+that connection and shows **Try Again**. Ordinary server errors such as a
+directory that was removed stay in the browser as an inline message.
 
 ### A transfer failed saying the disk did not answer
 
@@ -368,6 +371,9 @@ Before a transfer starts, Corta reads the local file's details on a thread of
 its own and waits five seconds. This means the file is on a volume that did not
 answer in that time, usually a network share whose server has gone. The window
 stays usable. Reconnect the volume, then use the row's Retry button.
+If earlier filesystem calls are all still blocked, a new check may be
+skipped until a slot frees up. The row explains that the disk could not be
+checked.
 
 ### Browse Remote Files… says authentication failed, but `ssh` works in the pane
 

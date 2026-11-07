@@ -285,8 +285,7 @@ nonisolated extension PaneLayout: Codable {
 /// Reads and writes the saved arrangement in Application Support, not the
 /// config file: it is state, not settings, and would churn the file on
 /// every move. `restore-windows = false` stops reads and writes alike.
-@MainActor
-struct SessionRestore {
+nonisolated struct SessionRestore: Sendable {
     /// Where the state lives: Application Support for the app, a temporary
     /// directory for a test.
     let directory: URL
@@ -295,6 +294,7 @@ struct SessionRestore {
     static let standard = SessionRestore(directory: AppPaths.applicationSupportDirectory)
 
     var fileURL: URL { directory.appendingPathComponent("state.json") }
+    var failedRestoreURL: URL { directory.appendingPathComponent("state.failed-restore.json") }
 
     /// How long a launch waits for the saved directories to answer; one that
     /// has not is restored as the home directory.
@@ -315,9 +315,17 @@ struct SessionRestore {
     /// The saved windows of a format this build reads, their directories not
     /// yet checked. The file is Corta's own, in Application Support.
     func loadUnchecked() -> [WindowState] {
-        guard let data = try? PrivateFile.read(fileURL),
-            let states = try? JSONDecoder().decode([WindowState].self, from: data)
-        else { return [] }
+        (try? readLayout()) ?? []
+    }
+
+    private func readLayout() throws -> [WindowState] {
+        let data: Data
+        do {
+            data = try PrivateFile.read(fileURL)
+        } catch let error as POSIXError where error.code == .ENOENT {
+            return []
+        }
+        guard let states = try? JSONDecoder().decode([WindowState].self, from: data) else { return [] }
         // Skip windows from a newer format rather than guess.
         return states.filter { $0.version <= WindowState.currentVersion }
     }
@@ -357,7 +365,7 @@ struct SessionRestore {
 
     /// What a launch does with the saved arrangement; separate from
     /// `AppDelegate` so a leftover marker can be tested as a file.
-    enum RestoreDecision: Equatable {
+    enum RestoreDecision: Equatable, Sendable {
         case skipAfterFailure
         case nothingToRestore
         case restore([WindowState])
@@ -366,6 +374,12 @@ struct SessionRestore {
     func decideRestore(loading load: (() -> [WindowState])? = nil) -> RestoreDecision {
         if previousRestoreFailed { return .skipAfterFailure }
         let states = load?() ?? self.load()
+        return states.isEmpty ? .nothingToRestore : .restore(states)
+    }
+
+    func readRestoreDecision() throws -> RestoreDecision {
+        if previousRestoreFailed { return .skipAfterFailure }
+        let states = try readLayout()
         return states.isEmpty ? .nothingToRestore : .restore(states)
     }
 
@@ -394,5 +408,14 @@ struct SessionRestore {
 
     func clear() {
         try? FileManager.default.removeItem(at: fileURL)
+    }
+
+    /// Keep the most recent failed arrangement for manual recovery. The
+    /// marker is cleared only after moving the layout out of the restore path.
+    func setAsideFailedRestore() throws {
+        if rename(fileURL.path, failedRestoreURL.path) != 0, errno != ENOENT {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        endRestore()
     }
 }

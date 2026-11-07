@@ -89,9 +89,9 @@ extension RemoteEditCoordinator {
                 let probe = store.approvalsURL.appendingPathComponent(UUID().uuidString)
                 try store.secureCopy(at: probe)
                 defer { try? FileManager.default.removeItem(at: probe) }
-                _ = try await withClient(for: copy.host) { client in
+                _ = try await withTransferClient(for: copy.host) { client, progress in
                     try await client.download(remotePath: copy.remotePath, to: probe,
-                        policy: .fail, partialDisposition: .remove, progress: nil)
+                        policy: .fail, partialDisposition: .remove, progress: progress)
                 }
                 matchesContent = await readDigest(at: probe) == baseline
             } else {
@@ -278,10 +278,10 @@ extension RemoteEditCoordinator {
             // updated); `.remove` means a failed upload leaves no partial
             // next to it — the remote holds either the old file or the new
             // one, never a fragment.
-            _ = try await withClient(for: copy.host) { client in
+            _ = try await withTransferClient(for: copy.host) { client, progress in
                 try await client.upload(
                     from: url, to: copy.remotePath,
-                    policy: .overwrite, partialDisposition: .remove, progress: nil)
+                    policy: .overwrite, partialDisposition: .remove, progress: progress)
             }
             let stamp = try? await withClient(for: copy.host) { client in
                 try await client.lstat(path: copy.remotePath)
@@ -337,11 +337,11 @@ extension RemoteEditCoordinator {
         let attributes: SFTPAttributes
         do {
             try store.secureCopy(at: incoming)
-            attributes = try await withClient(for: copy.host) { client in
+            attributes = try await withTransferClient(for: copy.host) { client, progress in
                 let attributes = try await client.lstat(path: copy.remotePath)
                 try await client.download(
                     remotePath: copy.remotePath, to: incoming,
-                    policy: .fail, partialDisposition: .remove, progress: nil)
+                    policy: .fail, partialDisposition: .remove, progress: progress)
                 return attributes
             }
             try store.secureCopy(at: incoming)

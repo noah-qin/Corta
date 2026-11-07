@@ -238,6 +238,23 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
         window?.makeKeyAndOrderFront(nil)
     }
 
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard model.transfers.contains(where: { !$0.isFinished }) else { return true }
+        guard sender.attachedSheet == nil else { return false }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = L10n.text("sftp.close.running")
+        alert.addButton(withTitle: L10n.text("close.running.closeAnyway"))
+        alert.addButton(withTitle: L10n.text("common.cancel"))
+        alert.buttons.first?.hasDestructiveAction = true
+        alert.buttons.first?.keyEquivalent = ""
+        alert.buttons.last?.keyEquivalent = "\r"
+        alert.present(for: sender) { [weak sender] response in
+            if response == .alertFirstButtonReturn { sender?.close() }
+        }
+        return false
+    }
+
     func windowWillClose(_ notification: Notification) {
         if let refusalObserver { NotificationCenter.default.removeObserver(refusalObserver) }
         refusalObserver = nil

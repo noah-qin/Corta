@@ -92,12 +92,12 @@ extension SplitViewController {
     // MARK: - Closing with something still running
 
     var panesWithRunningJobs: [TerminalPaneViewController] {
-        panes.filter { $0.session?.hasForegroundJob == true }
+        panes.filter(\.hasSessionRequiringCloseConfirmation)
     }
 
     /// Whether closing `running` asks first: something is running and
-    /// `confirm-close` is on. Checks the pty's foreground process group, not
-    /// output, so a bare prompt never asks.
+    /// `confirm-close` is on. Foreground jobs and direct remote launchers
+    /// count; a bare local shell prompt does not.
     func needsCloseConfirmation(for running: [TerminalPaneViewController]) -> Bool {
         ConfigurationStore.shared.configuration.confirmClose && !running.isEmpty
     }
@@ -107,29 +107,40 @@ extension SplitViewController {
     /// `window` nil asks app-modally.
     func confirmClose(
         of running: [TerminalPaneViewController], scope: String, in window: NSWindow?,
+        replacingSession: Bool = false,
         completion: @escaping @MainActor (Bool) -> Void
     ) {
         guard needsCloseConfirmation(for: running) else {
             completion(true)
             return
         }
-        closeAlert(for: running, scope: scope).present(for: window) { response in
-            completion(response == .alertFirstButtonReturn)
-        }
+        closeAlert(for: running, scope: scope, replacingSession: replacingSession)
+            .present(for: window) { response in
+                completion(response == .alertFirstButtonReturn)
+            }
     }
 
     /// The "still running" alert; Return is Cancel.
-    func closeAlert(for running: [TerminalPaneViewController], scope: String) -> NSAlert {
-        let names = running.compactMap { $0.session?.foregroundProcessName }
+    func closeAlert(
+        for running: [TerminalPaneViewController], scope: String, replacingSession: Bool = false
+    ) -> NSAlert {
+        let names = running.compactMap { pane in
+            pane.session?.foregroundProcessName
+                ?? (pane.remote.childIsLiveLauncher
+                    ? pane.launchedCommand.map { ($0.executable as NSString).lastPathComponent }
+                    : nil)
+        }
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = L10n.format("close.running.title", scope)
+        alert.messageText = replacingSession
+            ? L10n.text("connect.replaceRunning.title") : L10n.format("close.running.title", scope)
         alert.informativeText =
             names.isEmpty
             ? L10n.text("close.running.single")
             : L10n.format(
                 "close.running.multiple", ListFormatter.localizedString(byJoining: Array(Set(names)).sorted()))
-        alert.addButton(withTitle: L10n.text("close.running.closeAnyway"))
+        let action = replacingSession ? "connect.replaceRunning.button" : "close.running.closeAnyway"
+        alert.addButton(withTitle: L10n.text(action))
         alert.addButton(withTitle: L10n.text("common.cancel"))
         // Keep the destructive action explicit; Return defaults to Cancel.
         alert.buttons.first?.hasDestructiveAction = true

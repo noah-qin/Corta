@@ -40,12 +40,13 @@ struct Performer: ParserPerformer, Sendable {
     /// Large image transmissions stop the parse instead of decoding in it
     /// (`DeferredImageTransmission`); set only for the session's feed.
     var defersLargeImageDecoding = false
+    var defersAlternateScreenReflow = false
 
     /// Bumped by RIS, so a decode finished after a reset is dropped rather
     /// than placed on the screen the reset cleared.
     var resetCount = 0
 
-    var requestsStopAfterAPC: Bool { state.deferredImage != nil }
+    var requestsStopAfterAPC: Bool { state.deferredImage != nil || state.deferredAlternateScreenExit }
 
     init(grid: Grid) {
         self.grid = grid

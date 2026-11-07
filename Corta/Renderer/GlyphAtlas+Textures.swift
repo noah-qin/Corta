@@ -31,8 +31,12 @@ nonisolated extension GlyphAtlas {
         if texturesInUse() {
             // The page's texels are about to be overwritten. The other
             // grayscale page shares the texture, so its texels come along.
-            let kind: TextureKind = page === colorPage ? .color : .grayscale
-            replaceTexture(kind, copying: true)
+            if page === colorPage {
+                replaceTexture(.color, copying: false)
+            } else {
+                let preserved = page === asciiPage ? shapedPage.usedRows : asciiPage.usedRows
+                replaceTexture(.grayscale, copying: true, preservingRows: preserved)
+            }
         }
     }
 
@@ -54,7 +58,10 @@ nonisolated extension GlyphAtlas {
     }
 
     @discardableResult
-    func replaceTexture(_ kind: TextureKind, copying: Bool, height: Int? = nil, width: Int? = nil) -> Bool {
+    func replaceTexture(
+        _ kind: TextureKind, copying: Bool, height: Int? = nil, width: Int? = nil,
+        preservingRows: Range<Int>? = nil
+    ) -> Bool {
         let old = kind == .color ? colorTexture : texture
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: old.pixelFormat, width: width ?? old.width, height: height ?? old.height, mipmapped: false)
@@ -67,16 +74,24 @@ nonisolated extension GlyphAtlas {
             return false
         }
         if copying {
-            let bytesPerRow = old.width * (old.pixelFormat == .bgra8Unorm ? 4 : 1)
-            let region = MTLRegionMake2D(0, 0, old.width, old.height)
-            var bytes = [UInt8](repeating: 0, count: bytesPerRow * old.height)
-            bytes.withUnsafeMutableBytes { raw in
-                guard let base = raw.baseAddress else { return }
-                old.getBytes(base, bytesPerRow: bytesPerRow, from: region, mipmapLevel: 0)
+            let rows = (preservingRows ?? 0..<old.height).clamped(to: 0..<old.height)
+            if !rows.isEmpty {
+                let bytesPerRow = old.width * (old.pixelFormat == .bgra8Unorm ? 4 : 1)
+                let region = MTLRegionMake2D(0, rows.lowerBound, old.width, rows.count)
+                var bytes = [UInt8](repeating: 0, count: bytesPerRow * rows.count)
+                bytes.withUnsafeMutableBytes { raw in
+                    guard let base = raw.baseAddress else { return }
+                    old.getBytes(base, bytesPerRow: bytesPerRow, from: region, mipmapLevel: 0)
+                }
+                bytes.withUnsafeBytes { raw in
+                    guard let base = raw.baseAddress else { return }
+                    fresh.replace(region: region, mipmapLevel: 0, withBytes: base, bytesPerRow: bytesPerRow)
+                }
             }
-            bytes.withUnsafeBytes { raw in
-                guard let base = raw.baseAddress else { return }
-                fresh.replace(region: region, mipmapLevel: 0, withBytes: base, bytesPerRow: bytesPerRow)
+            if kind == .grayscale, !rows.contains(0) {
+                var white: UInt8 = 255
+                fresh.replace(
+                    region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &white, bytesPerRow: 1)
             }
         }
         switch kind {

@@ -21,6 +21,26 @@ import Testing
 /// The alternate screen (`?1049`), driven through the grid API.
 @Suite("Alternate screen")
 struct AlternateScreenTests {
+    @Test("a deferred alternate-screen exit consumes no bytes after DECRST")
+    func sessionFeedStopsBeforeReturningToMain() {
+        var terminal = Terminal(rows: 3, columns: 12)
+        terminal.feed(Array("main\u{1B}[?1049h".utf8))
+        terminal.resize(rows: 3, columns: 8)
+        let control = Array("\u{1B}[?1049l".utf8)
+        let bytes = control + Array("tail".utf8)
+        let consumed = terminal.feedDeferringImageDecode(bytes[...])
+        #expect(consumed == control.count)
+        #expect(terminal.grid.isAlternateScreenActive)
+        #expect(terminal.hasDeferredAlternateScreenExit)
+        var prepared = terminal.grid
+        prepared.exitAlternateScreen()
+        terminal.completeDeferredAlternateScreenExit(prepared)
+        terminal.feed(bytes[consumed...])
+        #expect(!terminal.hasDeferredAlternateScreenExit)
+        #expect(!terminal.grid.isAlternateScreenActive)
+        #expect(terminal.grid[0, 4].scalar == 0x74)
+    }
+
     private func write(_ text: String, to grid: inout Grid) {
         for scalar in text.unicodeScalars { grid.write(scalar.value) }
     }

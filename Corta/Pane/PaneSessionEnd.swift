@@ -61,6 +61,10 @@ final class PaneSessionEnd {
                 isPrimary: true
             ) { [weak self] in self?.startAgain(isConnection: isConnection) },
         ])
+        if let first = panel.buttons.first, let last = panel.buttons.last {
+            first.nextKeyView = last
+            last.nextKeyView = first
+        }
         // Found by UI tests and Accessibility as before.
         panel.identifier = NSUserInterfaceItemIdentifier("Corta.SessionEnded")
         let overlay = PaneStatusOverlay(panel: panel, backdrop: .dim)
@@ -80,6 +84,15 @@ final class PaneSessionEnd {
         }
         // No caret: nothing typed here goes anywhere.
         host.invalidateDisplay()
+    }
+
+    func focusActions(_ event: NSEvent) -> Bool {
+        guard event.keyCode == 48, let overlay else { return false }
+        let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        guard modifiers.isEmpty || modifiers == .shift else { return false }
+        let buttons = overlay.panel.buttons
+        guard let button = modifiers == .shift ? buttons.last : buttons.first else { return false }
+        return button.window?.makeFirstResponder(button) == true
     }
 
     func dismiss() {

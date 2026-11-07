@@ -21,6 +21,28 @@ import Testing
 @testable import Corta
 
 extension SFTPBrowserModelTests {
+    @Test("a hung listing retires the connection and allows Retry")
+    func hungNavigationCanReconnect() async {
+        let stalled = FakeSFTPClient()
+        stalled.hangingListings = ["/hung"]
+        let replacement = FakeSFTPClient()
+        let model = SFTPBrowserModel(host: "build-box", startDirectory: "/srv") { _ in
+            stalled.closed ? replacement : stalled
+        }
+        defer { model.disconnect() }
+        model.connect()
+        await waitUntil("initial listing") { model.connectionState == .connected }
+        model.connectTimeout = .milliseconds(100)
+        model.navigate(to: "/hung")
+        await waitUntil("timed out") { model.isFailed }
+        #expect(stalled.closed)
+        #expect(!model.isLoading)
+        #expect(model.connectFailure?.details == L10n.format("sftp.error.operationTimedOut", "build-box"))
+        model.connectTimeout = .seconds(5)
+        model.retry()
+        await waitUntil("a fresh connection") { model.client === replacement && model.connectionState == .connected }
+    }
+
     /// What macOS's `sftp-server` reports for an APFS volume: counts in
     /// 4 KiB fragments, beside a 1 MiB block size that is not their unit.
     @Test("free space is counted in fragments, not blocks")

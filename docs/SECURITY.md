@@ -488,10 +488,10 @@ window and focus a window. Neither accepts text for a child's stdin, and neither
 ever will: an automation assembled from a shared Shortcut or a web page is no
 more trusted than escape sequences off the PTY. The one parameter an intent
 takes is a directory, checked to exist and handed to `spawn` as its working
-directory. Windows are addressed by an identity minted at creation
-(`TerminalWindowController.windowID`), never by title — titles are written by
-the child process — and a stale identity fails with an error rather than
-resolving to whichever window is nearest. Terminal transcripts are never
+directory. An intent targets a stable tab identity. It selects that tab
+and brings its current window forward, including after the tab has moved.
+Titles come from child processes and are used only for display. An identity
+that no longer resolves fails with an error. Terminal transcripts are never
 indexed for Spotlight.
 
 ### 4.7 The update feed is signed, and its key sits in the release environment
@@ -686,8 +686,11 @@ are restricted to mode 0700 and files to 0600; reused copies are tightened
 when opened. A copy whose content still matches its approved digest and that
 nobody opened or changed for 30 days is eligible for background cleanup when
 the store loads; an undecided edit is kept. Each run checks at most 32 copies
-and hashes at most 256 MiB (plus an EOF probe per file); excess copies wait for
-a later run. Opening a remote copy awaits that maintenance asynchronously. A ⌘-click or Edit copies at most 64 MB. Downloads create partials with 0600 and refuse a partial-file
+and hashes at most 256 MiB (plus an EOF probe per file). Copies without an
+approved digest, or larger than a full run's byte budget, are kept. Approval
+snapshots belong to a process-specific directory. Opening a remote copy
+awaits maintenance asynchronously. A ⌘-click or Edit copies at most 64 MiB.
+Downloads create partials with 0600 and refuse a partial-file
 symlink. Download files and managed directories/files have inherited ACLs
 cleared before use. This does not exclude administrators or backups; parent
 storage policy and intentionally shared export destinations still matter.
@@ -753,11 +756,11 @@ HOME and SSH_AUTH_SOCK. Tests needing isolated authentication use temporary
 keys, an explicit SSH configuration, `IdentityAgent none`, no forwarding,
 and a separate known_hosts; never alter the user's SSH files.
 
-After connection establishment, each remote-edit SFTP operation has a 120-second
-deadline. Expiry closes that connection, unwinds pending requests and offers the
-upload decision again; other operations sharing that connection also fail and
-must reconnect. This is an operation deadline, including a transfer, rather
-than a throughput guarantee.
+After connection establishment, a remote-edit SFTP operation can go 120 seconds
+without progress. An advancing transfer or a sign-in question resets the wait.
+Expiry closes that connection, unwinds pending requests and offers the upload
+decision again. Other operations sharing the connection also fail and must
+reconnect. At most four idle clients are kept, for up to ten minutes each.
 
 Remote editing requires an explicit `open-file-command`. Managed downloads,
 including reused copies, never use LaunchServices' default file handler:
@@ -847,6 +850,8 @@ answer has 30 seconds per step, not counting a sign-in question on screen, and a
 local file check before a transfer has five seconds on a thread of its own, with
 at most eight left blocked per window; a mount that never answers costs those
 threads and fails those rows, never the main thread.
+Connected-browser directory listings and capacity queries use the same
+30-second wait and retire the unresponsive connection on expiry.
 Remote path breadcrumbs retain at most eight items (root, a folded ancestor,
 and six trailing components), constructing only those prefixes. Slash trimming
 walks the path once. Progress fractions sum peer sizes as floating point rather

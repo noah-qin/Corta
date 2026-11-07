@@ -68,7 +68,7 @@ extension TerminalWindowController {
         }
         controller.showWindow(nil)
         controller.window?.makeKeyAndOrderFront(nil)
-        tab.split.didBecomeSelectedTab()
+        controller.selectTab(tab)
         delegate.noteLayoutChanged()
         return controller
     }

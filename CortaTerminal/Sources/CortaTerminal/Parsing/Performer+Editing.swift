@@ -110,7 +110,8 @@ extension Performer {
         // The user's `command-history-limit`, not terminal state: a fresh
         // store at the default capacity recorded commands again for someone
         // who had set it to 0. The records go, with the rows they point at.
-        let historyCapacity = state.commandRecords.capacity
+        var history = state.commandRecords
+        history.clear()
         // Recovery timers identify episodes across RIS. Reusing an identity
         // can hide a new begin in the same parse slice or match a stale timer.
         let synchronizedOutputEpisode = state.synchronizedOutputEpisode
@@ -127,7 +128,7 @@ extension Performer {
         state.programSignals.blockedEpisode = blockedEpisode
         state.imageByteAllowance = imageByteAllowance
         state.hostnamesAtStart = hostnames
-        state.commandRecords = CommandRecordStore(capacity: historyCapacity)
+        state.commandRecords = history
         state.dynamicColors = colors
         state.dynamicColorDefaults = colors
         state.isDark = isDark

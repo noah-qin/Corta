@@ -183,6 +183,24 @@ nonisolated final class SSHAskpassBroker: @unchecked Sendable {
         if let directory { rmdir(directory) }
     }
 
+    nonisolated static func pruneAbandoned() {
+        let directory = NSTemporaryDirectory()
+        let manager = FileManager.default
+        let prefix = "corta-askpass."
+        for name in (try? manager.contentsOfDirectory(atPath: directory)) ?? [] where name.hasPrefix(prefix) {
+            let parts = name.dropFirst(prefix.count).split(separator: ".", maxSplits: 1)
+            guard parts.count == 2, parts[1].count == 6,
+                let pid = Int32(parts[0]), pid > 0, kill(pid, 0) == -1, errno == ESRCH
+            else { continue }
+            let path = (directory as NSString).appendingPathComponent(name)
+            var info = stat()
+            guard lstat(path, &info) == 0, info.st_uid == getuid(), info.st_mode & S_IFMT == S_IFDIR
+            else { continue }
+            unlink((path as NSString).appendingPathComponent("s"))
+            rmdir(path)
+        }
+    }
+
 }
 
 // MARK: - Listening
@@ -195,7 +213,7 @@ nonisolated extension SSHAskpassBroker {
             // A fresh 0700 directory in the per-user temporary folder: no
             // other user can reach the socket, and nothing stale is reused.
             let template = (NSTemporaryDirectory() as NSString)
-                .appendingPathComponent("corta-askpass.XXXXXX")
+                .appendingPathComponent("corta-askpass.\(getpid()).XXXXXX")
             var buffer = Array(template.utf8CString)
             guard let made = mkdtemp(&buffer) else { state.closed = true; return nil }
             let directory = String(cString: made)

@@ -205,6 +205,18 @@ struct RecentHostsStoreTests {
         #expect(!FileManager.default.fileExists(atPath: url.path))
     }
 
+    @Test("recording a host after downgrade preserves the newer history file")
+    func preservesFutureFormat() throws {
+        let url = temporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let bytes = Data(#"{"version":42,"destinations":[]}"#.utf8)
+        try PrivateFile.write(bytes, to: url)
+        let store = RecentHostsStore(fileURL: url)
+        store.record(try target("build-box"))
+        #expect(store.preservesNewerFile)
+        #expect(try PrivateFile.read(url) == bytes)
+    }
+
     @Test("typing narrows the suggestions, case-insensitively")
     func filtering() {
         let names: [RemoteConnectForm.Suggestion] = [.alias("Build-Box"), .alias("web")]

@@ -172,8 +172,12 @@ nonisolated enum RenderMetrics {
         }
         guard let handle = try? FileHandle(forWritingTo: file) else { return }
         defer { try? handle.close() }
-        _ = try? handle.seekToEnd()
-        try? handle.write(contentsOf: Data(line.utf8))
+        let bytes = Data(line.utf8)
+        let maximumBytes: UInt64 = 16 * 1024 * 1024
+        guard bytes.count <= maximumBytes, let offset = try? handle.seekToEnd(),
+            offset <= maximumBytes - UInt64(bytes.count)
+        else { return }
+        try? handle.write(contentsOf: bytes)
     }
 
     /// Registered only when a ready image texture is encoded into this frame.

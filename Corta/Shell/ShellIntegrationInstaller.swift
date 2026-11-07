@@ -17,7 +17,7 @@
 import Foundation
 
 /// The shells Corta can install its integration snippet into.
-enum ShellKind: String, CaseIterable {
+nonisolated enum ShellKind: String, CaseIterable, Sendable {
     case zsh, bash, fish
 
     /// From `$SHELL`'s last component; unknown or missing means `zsh`.
@@ -80,7 +80,7 @@ enum ShellKind: String, CaseIterable {
 
 /// Shell integration across every file a shell needs it in: one
 /// installer per file, reported and changed as one.
-struct ShellIntegration {
+nonisolated struct ShellIntegration: Sendable {
     /// Where the hooks go now (`ShellKind.rcFileURLs`).
     let targets: [ShellIntegrationInstaller]
     /// Where an earlier install may have put them (`otherRCFileURLs`).
@@ -161,7 +161,7 @@ struct ShellIntegration {
 }
 
 /// Whether Corta's block is in the rc file.
-enum ShellIntegrationStatus: Equatable {
+nonisolated enum ShellIntegrationStatus: Equatable, Sendable {
     case notInstalled
     /// The Corta block is present.
     case installed
@@ -185,7 +185,7 @@ enum ShellIntegrationStatus: Equatable {
 /// Everything sits between two marker comments in the user's own rc file,
 /// in the clear; `uninstall()` removes exactly that block, and the unique
 /// markers let `status()` tell it from look-alikes.
-struct ShellIntegrationInstaller {
+nonisolated struct ShellIntegrationInstaller: Sendable {
     /// Which shell's hooks and rc file this targets.
     let shell: ShellKind
 
@@ -222,7 +222,7 @@ struct ShellIntegrationInstaller {
     /// but cannot be read `.unreadable`.
     func status() -> ShellIntegrationStatus {
         let text: String
-        switch UserFile.readText(at: rcFileURL) {
+        switch UserFile.readTextBounded(at: rcFileURL) {
         case .missing: return .notInstalled
         case .unreadable: return .unreadable(displayPath)
         case .text(let contents): text = contents

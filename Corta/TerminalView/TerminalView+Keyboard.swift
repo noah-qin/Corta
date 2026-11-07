@@ -36,6 +36,7 @@ extension TerminalView {
     }
 
     override func keyDown(with event: NSEvent) {
+        if onEndedSessionKey?(event) == true { return }
         // From the bindings, never a literal: a literal fired exactly when the
         // menu stopped claiming the key, i.e. after a rebind or unbind.
         let bindings = keybindings?() ?? Keybindings()

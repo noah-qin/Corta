@@ -25,6 +25,21 @@ import Testing
 /// host-filtered can still carry a remote machine's path, and a directory on
 /// a volume that has gone away is just as unusable.
 struct SessionRestoreTests {
+    @Test("failed restore preserves the layout separately before clearing its marker")
+    func failedRestoreIsArchived() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SessionRestore(directory: root)
+        let saved = Data("original arrangement".utf8)
+        try PrivateFile.write(saved, to: store.fileURL)
+        store.beginRestore()
+        #expect(store.decideRestore() == .skipAfterFailure)
+        try store.setAsideFailedRestore()
+        #expect(try PrivateFile.read(store.failedRestoreURL) == saved)
+        #expect(!store.previousRestoreFailed)
+        #expect(!FileManager.default.fileExists(atPath: store.fileURL.path))
+    }
+
     @Test("a pane directory that exists locally is kept")
     func existingDirectoryIsKept() {
         let layout = PaneLayout.pane(directory: "/tmp")

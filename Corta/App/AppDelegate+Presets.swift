@@ -165,10 +165,19 @@ extension AppDelegate {
     ) -> TerminalWindowController {
         if !inNewWindow, let source, source.isVisible,
             let owner = source.windowController as? TerminalWindowController,
-            let pane = owner.selectedTab?.split.focusedPane
+            let split = owner.selectedTab?.split, let pane = split.focusedPane
         {
-            pane.connect(using: preset)
-            source.makeKeyAndOrderFront(self)
+            let session = pane.session
+            split.confirmClose(
+                of: pane.hasSessionRequiringCloseConfirmation ? [pane] : [],
+                scope: L10n.text("close.scope.pane"), in: source, replacingSession: true
+            ) { [weak source, weak pane] confirmed in
+                guard confirmed, let source, let pane, !pane.didTeardown,
+                    pane.view.window === source, pane.session === session
+                else { return }
+                pane.connect(using: preset)
+                source.makeKeyAndOrderFront(self)
+            }
             return owner
         }
         let controller = makeWindowController(setup: .init(preset: preset))

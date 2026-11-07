@@ -522,6 +522,9 @@ extension Parser {
                 final: final
             )
         )
+        // DECRST can leave the alternate screen and reflow the parked
+        // document. Give a session's reader the same stop point as an image.
+        if privateMarker == 0x3F, final == 0x6C { dispatchedAPC = true }
         state = .ground
         clear()
     }

@@ -43,6 +43,7 @@ public enum SFTPTransportError: Error, Equatable {
     /// The descriptor number may already belong to another file.
     case closed
     case connectionLost
+    case operationTimedOut
     case authenticationFailed(diagnostics: String)
     case hostUnreachable(diagnostics: String)
     /// Unknown or changed host key, not accepted.
