@@ -158,7 +158,7 @@ extension FileDropTests {
     @Test("a reception's notice stays through a failed navigation and ends on arriving elsewhere")
     func receptionNoticeFollowsTheListing() async throws {
         let fake = FakeSFTPClient()
-        fake.listingErrors["/missing"] = .transport(.closed)
+        fake.listingErrors["/missing"] = .server(SFTPStatus(code: .noSuchFile))
         fake.listings["/elsewhere"] = []
         let model = await connectedModel(fake: fake)
         defer { model.disconnect() }

@@ -16,6 +16,7 @@
 
 import AppKit
 import Foundation
+import Synchronization
 
 /// The one place the config file is read, written and watched (D10).
 /// Changes write the file and apply what reads back, so a click and a
@@ -50,9 +51,6 @@ final class ConfigurationStore {
     private var directorySource: DispatchSourceFileSystemObject?
     private var pendingReloadSince: TimeInterval = 0
     private static let longestReloadDelay: TimeInterval = 1
-    /// Our last written text, so the watcher tells our own write from an
-    /// external edit by content; a time window swallowed editor saves.
-    private var lastWrittenText: String?
     private var pendingReload: DispatchWorkItem?
     /// The file's text as this store last read or wrote it; nil when it was
     /// absent. A write compares the file with it first, so an edit the
@@ -77,6 +75,8 @@ final class ConfigurationStore {
     private let fileAccessTimeout: DispatchTimeInterval
     private let retryDelay: TimeInterval
     private var retry: DispatchWorkItem?
+    private var watchGeneration = 0
+    private var writePending = false
 
     init(
         fileURL: URL, readFile: @escaping @Sendable (URL) -> UserFile.ReadResult = UserFile.readText(at:),
@@ -88,7 +88,7 @@ final class ConfigurationStore {
         self.fileAccessTimeout = fileAccessTimeout
         self.retryDelay = retryDelay
         reload()
-        startWatching()
+        if !(readError is TimedOutError) { startWatching() }
     }
 
     /// The file did not answer in time: no more known than an unreadable one,
@@ -203,6 +203,7 @@ final class ConfigurationStore {
     /// at the same instant are not serialised: the file has no lock.
     @discardableResult
     func update(_ mutate: (inout Configuration) -> Void) -> Bool {
+        guard !writePending else { return false }
         syncWithFile()
         var updated = configuration
         mutate(&updated)
@@ -221,6 +222,7 @@ final class ConfigurationStore {
     /// discoverable first launch.
     @discardableResult
     func write() -> Bool {
+        guard !writePending else { return false }
         // Read again first: a fix that leaves no write event — a `chmod` —
         // would otherwise keep writes refused until the next launch, and an
         // edit not yet delivered would be written over.
@@ -249,14 +251,31 @@ final class ConfigurationStore {
         }
         let url = fileURL
         let text = configuration.serialized(preserving: unknownKeys)
-        do {
-            // Through a symlink, so a dotfiles repository's copy stays the copy.
-            try UserFile.write(text, to: url)
-        } catch {
+        let mayCommit = Mutex(true)
+        var started = true
+        let result = PathProbe.answer(timeout: fileAccessTimeout, budget: accessBudget, abandoned: {
+            [weak self] (late: Result<Void, any Error>) in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.writePending = false
+                if case .success = late { self.noteWriteResult(nil) }
+                // If rename was already in progress when the wait expired,
+                // reload whichever file the filesystem actually committed.
+                self.startWatching()
+            }
+        }, onBudgetExhausted: { started = false }) {
+            Result { try UserFile.write(text, to: url) { mayCommit.withLock { $0 } } }
+        }
+        guard let result else {
+            mayCommit.withLock { $0 = false }
+            writePending = started
+            noteWriteResult(TimedOutError())
+            return false
+        }
+        if case .failure(let error) = result {
             noteWriteResult(error)
             return false
         }
-        lastWrittenText = text
         syncedText = text
         noteWriteResult(nil)
         // The atomic write replaced the inode; re-watch.
@@ -282,28 +301,53 @@ final class ConfigurationStore {
         // Off the main thread, like the read: `open` and the walk up the path
         // block on a mount that has stopped answering. Late descriptors close.
         let (file, directory) = (fileURL, fileURL.deletingLastPathComponent())
-        let opened = PathProbe.answer(
-            timeout: fileAccessTimeout, budget: accessBudget,
-            abandoned: { (late: WatchDescriptors) in
-                if late.file >= 0 { close(late.file) }
-                if late.directory >= 0 { close(late.directory) }
-            }, {
+        let timeout = fileAccessTimeout
+        let budget = accessBudget
+        watchGeneration += 1
+        let generation = watchGeneration
+        PathProbe.run { [weak self] in
+            let opened = PathProbe.answer(timeout: timeout, budget: budget, abandoned: { $0.closeBoth() }) {
                 WatchDescriptors(
                     file: open(file.path, O_EVTONLY | O_CLOEXEC),
                     directory: open(Self.deepestExistingDirectory(under: directory).path, O_EVTONLY | O_CLOEXEC))
-            })
-        guard let opened else {
-            scheduleRetry()
-            return
+            }
+            Task { @MainActor [weak self] in
+                guard let self, self.watchGeneration == generation else {
+                    opened?.closeBoth()
+                    return
+                }
+                guard let opened else {
+                    self.scheduleRetry()
+                    return
+                }
+                self.fileSource = self.watch(opened.file, mask: [.write, .extend, .delete, .rename, .attrib])
+                self.directorySource = self.watch(opened.directory, mask: [.write, .delete, .rename])
+                // Catch an edit in the gap between the first read and the
+                // watcher opening, after the watchers can observe new edits.
+                self.reloadAfterWatchInstallation(generation: generation)
+            }
         }
-        // `.attrib` too: a `chmod` that makes an unreadable file readable.
-        fileSource = watch(opened.file, mask: [.write, .extend, .delete, .rename, .attrib])
-        directorySource = watch(opened.directory, mask: [.write, .delete, .rename])
+    }
+
+    private func reloadAfterWatchInstallation(generation: Int) {
+        let (url, read, timeout, budget) = (fileURL, readFile, fileAccessTimeout, accessBudget)
+        PathProbe.run { [weak self] in
+            let result = PathProbe.answer(timeout: timeout, budget: budget) { read(url) }
+            Task { @MainActor [weak self] in
+                guard let self, self.watchGeneration == generation else { return }
+                self.apply(result ?? .unreadable(TimedOutError()))
+            }
+        }
     }
 
     private struct WatchDescriptors: Sendable {
         let file: Int32
         let directory: Int32
+
+        nonisolated func closeBoth() {
+            if file >= 0 { close(file) }
+            if directory >= 0 { close(directory) }
+        }
     }
 
     /// The nearest existing ancestor, whose write event announces the
@@ -326,13 +370,6 @@ final class ConfigurationStore {
             fileDescriptor: descriptor, eventMask: mask, queue: .main)
         source.setEventHandler { [weak self] in
             guard let self else { return }
-            // Our own write needs no reload; compared by content so an external
-            // edit right after it isn't swallowed.
-            if let written = self.lastWrittenText {
-                if case .text(written) = self.readFileBounded() { return }
-                // An external edit owns the file now.
-                self.lastWrittenText = nil
-            }
             // Coalesce, or a multi-event save is read mid-rewrite. Up to a limit:
             // the folder's events count too, and steady writes beside the file
             // would otherwise put the reload off for as long as they last.
@@ -353,8 +390,8 @@ final class ConfigurationStore {
     }
 
     private func reloadFromWatcher() {
-        // Re-watch before reading: an atomic save replaced the inode.
+        // Re-watch before reading: an atomic save replaced the inode. The
+        // read happens off the main actor after the replacement is watching.
         startWatching()
-        reload()
     }
 }

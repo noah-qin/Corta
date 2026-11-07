@@ -47,6 +47,9 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     /// so `effectiveCommand` never targets a command scrolled out of view.
     /// `jumpToCommand` sets it after its own scroll.
     var selectedCommandID: Int?
+    private weak var statusSession: TerminalSession?
+    private var statusRevision: UInt64 = 0
+    private var statusByRow: [Int: Int] = [:]
 
     init(host: PaneShellIntegrationHost? = nil) {
         self.host = host
@@ -429,20 +432,24 @@ extension PaneShellIntegration {
         let content = PaneFrameLoop.contentRect(in: terminalView.bounds.size, scale: 1,
             gridHeight: CGFloat(grid.rows) * metrics.cellHeight, topInset: topInset)
         let config = ConfigurationStore.shared.configuration
-        let records = session.commandRecords.records
         var rows: [ShellOverlayView.Status] = []
         // The tooltips for the rules the renderer draws (`TerminalRenderer.rebuildMarks`).
         if config.commandStatusMarks && !grid.isAlternateScreenActive {
-            let byRow = Dictionary(records.compactMap { record -> (Int, Int)? in
-                guard let code = record.exitStatus else { return nil }
-                return (record.promptRow, code)
-            }, uniquingKeysWith: { _, last in last })
+            let records = session.commandRecords
+            if statusSession !== session || statusRevision != records.statusRevision {
+                statusSession = session
+                statusRevision = records.statusRevision
+                statusByRow.removeAll(keepingCapacity: true)
+                for record in records.recordsInOrder {
+                    if let status = record.exitStatus { statusByRow[record.promptRow] = status }
+                }
+            }
             let firstAbsolute = grid.scrollback.totalPushed - scrollOffset
             for row in 0..<grid.rows {
                 let absolute = firstAbsolute + row
                 guard let line = grid.line(atAbsoluteRow: absolute), line.mark.hasOutcome else { continue }
                 let code =
-                    byRow[absolute] ?? (line.mark == .promptSucceeded ? 0 : line.mark == .promptInterrupted ? 130 : 1)
+                    statusByRow[absolute] ?? (line.mark == .promptSucceeded ? 0 : line.mark == .promptInterrupted ? 130 : 1)
                 let text =
                     code == 0
                     ? L10n.text("commandStatus.succeeded")

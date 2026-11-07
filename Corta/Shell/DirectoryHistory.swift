@@ -168,6 +168,9 @@ final class DirectoryHistoryStore {
     private var pendingSave: DispatchWorkItem?
     /// The file on disk is from a newer Corta; it is left alone.
     private(set) var preservesNewerFile = false
+    private var preservesUnreadableFile = false
+    private(set) var persistenceError: (any Error)?
+    private var persistenceGeneration = 0
     /// Serial, so an in-flight write can't undo a clear.
     private let writeQueue = DispatchQueue(label: "Corta.DirectoryHistoryStore", qos: .utility)
 
@@ -190,22 +193,30 @@ final class DirectoryHistoryStore {
 
     /// Removes the history and its file, after any in-flight write.
     func clear() {
+        guard !preservesNewerFile, !preservesUnreadableFile else { return }
         pendingSave?.cancel()
         pendingSave = nil
-        history.clear()
+        persistenceGeneration += 1
         let fileURL = fileURL
-        writeQueue.sync {
-            try? FileManager.default.removeItem(at: fileURL)
+        do {
+            try writeQueue.sync { try PrivateFile.removeIfPresent(fileURL) }
+            history.clear()
+            persistenceError = nil
+        } catch {
+            persistenceError = error
         }
     }
 
     /// Writes a pending save now and waits, for quit.
     func flush() {
-        guard pendingSave != nil else { return }
-        pendingSave?.cancel()
-        pendingSave = nil
-        save()
-        writeQueue.sync {}
+        if let pendingSave {
+            pendingSave.cancel()
+            self.pendingSave = nil
+            save()
+        }
+        let drained = DispatchSemaphore(value: 0)
+        writeQueue.async { drained.signal() }
+        _ = drained.wait(timeout: .now() + .seconds(1))
     }
 
     /// A save is scheduled and has not run.
@@ -234,7 +245,15 @@ final class DirectoryHistoryStore {
     }
 
     private func load() {
-        guard let data = try? PrivateFile.read(fileURL) else { return }
+        let data: Data
+        do {
+            guard let loaded = try PrivateFile.readBounded(fileURL) else { return }
+            data = loaded
+        } catch {
+            preservesUnreadableFile = true
+            persistenceError = error
+            return
+        }
         // The version alone first: a newer version is usually a new shape,
         // which the full decode below would fail and then overwrite.
         if let version = try? JSONDecoder().decode(VersionProbe.self, from: data).version,
@@ -262,14 +281,23 @@ final class DirectoryHistoryStore {
 
     /// Snapshots on the main actor; encodes and writes on `writeQueue`.
     private func save() {
-        guard !preservesNewerFile else { return }
+        guard !preservesNewerFile, !preservesUnreadableFile else { return }
         let persisted = Persisted(
             version: Persisted.currentVersion, entries: Array(history.entries.values))
         let fileURL = fileURL
-        writeQueue.async {
-            guard let data = try? JSONEncoder().encode(persisted) else { return }
-            // Owner-only, as `recent-hosts.json`: directories say where you work.
-            try? PrivateFile.write(data, to: fileURL)
+        persistenceGeneration += 1
+        let generation = persistenceGeneration
+        writeQueue.async { [weak self] in
+            let result = Result {
+                try PrivateFile.write(JSONEncoder().encode(persisted), to: fileURL)
+            }
+            Task { @MainActor [weak self] in
+                guard let self, generation == self.persistenceGeneration else { return }
+                do {
+                    try result.get()
+                    self.persistenceError = nil
+                } catch { self.persistenceError = error }
+            }
         }
     }
 }

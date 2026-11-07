@@ -28,12 +28,15 @@ extension SFTPConnection {
     /// `maximumDownloadBytes` bounds each download: remote editing passes
     /// one, since a server choosing what a ⌘-click fetches could otherwise
     /// fill the disk with no progress row to cancel from.
-    static func forApp(key: String, maximumDownloadBytes: UInt64? = nil) -> SFTPConnection {
+    static func forApp(
+        key: String, maximumDownloadBytes: UInt64? = nil, restartsManagedDownloadPartials: Bool = false
+    ) -> SFTPConnection {
         var environment = ChildEnvironment.default()
         // Remote bytes landing on this Mac get Gatekeeper's first-open check.
         var engine = SFTPTransferEngine.Configuration()
         engine.quarantinesDownloads = true
         engine.maximumDownloadBytes = maximumDownloadBytes
+        engine.restartsManagedDownloadPartials = restartsManagedDownloadPartials
         // `key` (`SSHTarget.key`) carries the user, port and key the
         // connection is made with. Callers have already checked it.
         let target = SSHTarget(key: key) ?? SSHTarget(host: key)

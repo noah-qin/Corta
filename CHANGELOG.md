@@ -10,6 +10,27 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Closing a pane, tab, window, or the app asks before ending a live SSH
+  connection when close confirmation is enabled. Connect asks before replacing
+  a session with running work.
+- A second Close during a split collapse closes the tab or window normally.
+  Moving a tab into a new window keeps keyboard focus in its terminal.
+- An SFTP directory that stops answering now offers a fresh connection.
+  Closing a browser with active transfers asks before cancelling them.
+  Remote Edit restarts an interrupted managed download and distinguishes
+  a stalled transfer from an unreachable host.
+- Corta keeps the previous window arrangement after a failed restore and
+  shows where it was saved. Layout writes run outside the UI thread.
+- Settings reports preset write failures and denied program notifications.
+  Shortcut recording checks conflicts with fixed menu keys.
+- The terminal draws search highlights and command status marks without
+  scanning every offscreen result on each frame. Live resizing reuses
+  Metal copy textures across small size changes.
+- VoiceOver announces terminal feedback. Tab and Shift-Tab can reach the
+  buttons on an ended session.
+
 ## [1.6.0] - 2026-11-06
 
 ### Added

@@ -32,7 +32,7 @@ protocol PaneSearchHost: AnyObject {
     /// The grid now, or nil without a session.
     func snapshot() -> Grid?
     /// The selected text, for ⌘E.
-    func selectedText() -> String?
+    func selectedTextForFind() async -> String?
     /// For changes that produce no output: highlights, the viewport.
     func invalidateDisplay()
 }
@@ -74,6 +74,7 @@ final class PaneSearch: NSObject {
     var status: SweepOutcome.Status = .complete
     var matchesTruncated = false
     var task: Task<Void, Never>?
+    private var selectionTask: Task<Void, Never>?
     /// Paired scroll position and scrollback anchor, restored when search closes.
     var previousScrollOffset: Int?
     var previousTotalPushed: Int?
@@ -284,6 +285,8 @@ final class PaneSearch: NSObject {
 
     /// Dismisses the bar and restores the viewport.
     func close() {
+        selectionTask?.cancel()
+        selectionTask = nil
         bar?.removeFromSuperview()
         topConstraint = nil
         bottomConstraint = nil
@@ -477,13 +480,16 @@ extension PaneSearch {
 
     /// ⌘E: the selection's first line becomes the query.
     func useSelectionForFind() {
-        guard let text = host?.selectedText() else { return }
-        guard let firstLine = text.split(separator: "\n").first.map(String.init),
-            !firstLine.isEmpty
-        else { return }
-        show()
-        field?.stringValue = firstLine
-        updateResults(scrollsToMatch: true)
+        selectionTask?.cancel()
+        let originalQuery = field?.stringValue
+        selectionTask = Task { [weak self] in
+            guard let line = await self?.host?.selectedTextForFind(), !line.isEmpty,
+                !Task.isCancelled, let self, self.field?.stringValue == originalQuery
+            else { return }
+            self.show()
+            self.field?.stringValue = line
+            self.updateResults(scrollsToMatch: true)
+        }
     }
 
     private func stepCurrentMatch(by delta: Int) {

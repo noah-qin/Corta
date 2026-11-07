@@ -31,8 +31,10 @@ nonisolated extension KittyImageRenderer {
         backend: Metal4Backend, drawable: MTLDrawable? = nil
     ) {
         forEachVisiblePlacement(table: table, viewport: viewport) { instance, texture, sourceUVRect, receivedAt in
+            singleQuad.removeAll(keepingCapacity: true)
+            singleQuad.append(instance)
             backend.drawColorQuads(
-                [instance], atlas: texture, rect: rect, drawableSize: drawableSize, imageUVRect: sourceUVRect,
+                singleQuad, atlas: texture, rect: rect, drawableSize: drawableSize, imageUVRect: sourceUVRect,
                 transient: true)
             if RenderMetrics.isEnabled, let receivedAt, let drawable {
                 RenderMetrics.noteImagePresent(of: drawable, receivedAt: receivedAt)
@@ -47,7 +49,8 @@ nonisolated extension KittyImageRenderer {
     ) {
         let cellWidth = viewport.cellWidth
         let cellHeight = viewport.cellHeight
-        let placements = table.orderedPlacements().sorted { $0.zIndex < $1.zIndex }
+        refreshPlacements(table)
+        let placements = frameDrawPlacements
         guard !placements.isEmpty else { return }
 
         for placement in placements {

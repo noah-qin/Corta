@@ -664,6 +664,8 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   Hosts clears them all.
   SSH connects in the focused terminal pane of the window that opened the
   sheet, replacing that pane’s session and clearing its previous output.
+  With close confirmation enabled, Corta asks before replacing a session
+  with a running job or a live SSH connection.
   Select **Connect in a new window** for a separate
   window; without an available terminal window, a new window opens.
 - **This pane's files.** Opened from a pane connected to another machine,
@@ -697,9 +699,10 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   changes is a separate, explicit step, and Corta
   checks first whether the remote file changed meanwhile. Files over 64 MiB
   are not copied this way; download them from the browser, which shows
-  progress and can cancel. A copy nobody has opened or changed for 30 days is
-  removed the next time remote editing is used; one with changes you have not
-  uploaded or dismissed stays.
+  progress and can cancel. A copy that still matches its approved content
+  becomes eligible for bounded background cleanup after 30 days without an
+  open or change. Undecided edits stay. Edit restarts an interrupted managed
+  download from the beginning.
 - **Names.** A remote name holding control, right-to-left or zero-width
   characters shows them as `�`, and a download saves them as `_`, so a name
   cannot pass for another one.
@@ -725,12 +728,14 @@ not accepted, the host did not answer, its host key is unknown or changed,
 the server offers no SFTP — with ssh's own words under **Details**, and
 offers **Try Again** or **Edit Connection**. A host that says nothing is given
 up on after 30 seconds per step of connecting; the time a sign-in dialog is on
-screen does not count.
+screen does not count. After connecting, directory loads and capacity checks
+also time out and offer a fresh connection when the server stops answering.
 
 A transfer's row can be cancelled at any point, including while it is still
 looking at the destination. Cancelling a resumed transfer keeps its partial
 file, and the row's **Retry** continues from there. A row whose local disk does
 not answer within five seconds fails with **Retry**, and the window stays usable.
+Closing the browser while transfers are active asks whether to cancel them.
 
 Remote-edit uploads compare remote content as well as size and modification
 time and send the private snapshot you approved. If you save another local

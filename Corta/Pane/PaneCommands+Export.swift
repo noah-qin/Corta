@@ -77,7 +77,9 @@ extension PaneCommands {
         range.start.row -= shift
         range.end.row -= shift
         var rects: [CGRect] = []
-        for row in range.start.row...range.end.row {
+        let firstVisible = max(range.start.row, -host.scrollOffset)
+        let lastVisible = min(range.end.row, grid.rows - 1 - host.scrollOffset)
+        for row in firstVisible..<(max(firstVisible, lastVisible + 1)) {
             let screenRow = row + host.scrollOffset
             guard screenRow >= 0, screenRow < grid.rows else { continue }
             let first = row == range.start.row ? range.start.column : 0
@@ -91,6 +93,7 @@ extension PaneCommands {
         if rects.isEmpty {
             terminalView.showToast(L10n.text("toast.copied"))
         } else {
+            terminalView.announceFeedback(L10n.text("toast.copied"))
             CopyGlintView.show(over: terminalView, rects: rects)
         }
     }

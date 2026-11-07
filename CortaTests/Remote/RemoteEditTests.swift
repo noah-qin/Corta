@@ -60,6 +60,7 @@ struct RemoteEditStoreTests {
             host: "build-box", remotePath: "/srv/app/main.rs",
             remoteSize: 1234, remoteMTime: 1_789_000_000)
         store.recordOpen(copy, at: Date(timeIntervalSince1970: 1_789_000_100))
+        await store.finishManifestWrites()
 
         // The file itself carries the version (JSONEncoder is compact).
         let raw = try String(
@@ -105,6 +106,7 @@ struct RemoteEditStoreTests {
         #expect(FileManager.default.fileExists(atPath: store.localURL(for: undecided).path))
         #expect(store.copies[recent.id] != nil)
         // The manifest on disk agrees.
+        await store.finishManifestWrites()
         #expect(RemoteEditStore(rootURL: root).copies[stale.id] == nil)
     }
 

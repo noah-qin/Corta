@@ -270,10 +270,10 @@ extension SettingsModelTests {
         preset.arguments = ["-l"]
         preset.environment = ["EDITOR": "vim"]
         defer { model.removePreset(preset.name) }
-        #expect(model.savePreset(preset, replacing: nil))
-        #expect(!model.savePreset(preset, replacing: nil))
+        #expect(model.savePreset(preset, replacing: nil) == .saved)
+        #expect(model.savePreset(preset, replacing: nil) == .invalid)
         preset.directory = "/tmp"
-        #expect(model.savePreset(preset, replacing: preset.name))
+        #expect(model.savePreset(preset, replacing: preset.name) == .saved)
         #expect(model.presets.first { $0.name == preset.name } == preset)
         #expect(!SettingsModel.validPresetName("a.b"))
         #expect(!SettingsModel.validPresetName("a b"))

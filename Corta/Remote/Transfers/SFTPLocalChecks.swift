@@ -43,6 +43,10 @@ final class SFTPLocalChecks {
     private let beforeCheck: @Sendable () -> Void
     private var tail: Task<Void, Never>?
 
+    enum Failure: Error, Equatable {
+        case timedOut, budgetExhausted, cancelled
+    }
+
     init(
         timeout: DispatchTimeInterval = SFTPLocalChecks.timeout,
         budget: PathProbe.Budget = PathProbe.Budget(limit: SFTPLocalChecks.maximumOutstanding),
@@ -55,20 +59,24 @@ final class SFTPLocalChecks {
 
     /// `body`'s answer, or nil when it was late, there was no room for it, or
     /// the caller was cancelled before its turn.
-    func answer<Answer: Sendable>(_ body: @escaping @Sendable () -> Answer) async -> Answer? {
+    func answer<Answer: Sendable>(_ body: @escaping @Sendable () -> Answer) async -> Result<Answer, Failure> {
         let previous = tail
         let timeout = timeout, budget = budget, beforeCheck = beforeCheck
-        let work = Task<Answer?, Never> {
+        let work = Task<Result<Answer, Failure>, Never> {
             await previous?.value
-            guard !Task.isCancelled else { return nil }
+            guard !Task.isCancelled else { return .failure(.cancelled) }
             // `answer` waits for its thread, so it waits on one too: this is
             // neither the main actor nor the cooperative pool.
             return await withCheckedContinuation { continuation in
                 PathProbe.run {
-                    continuation.resume(returning: PathProbe.answer(timeout: timeout, budget: budget) {
+                    var failure = Failure.timedOut
+                    let value = PathProbe.answer(timeout: timeout, budget: budget, onBudgetExhausted: {
+                        failure = .budgetExhausted
+                    }) {
                         beforeCheck()
                         return body()
-                    })
+                    }
+                    continuation.resume(returning: value.map(Result.success) ?? .failure(failure))
                 }
             }
         }

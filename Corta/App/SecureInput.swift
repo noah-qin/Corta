@@ -85,10 +85,11 @@ final class SecureInput {
             center.addObserver(
                 forName: NSWindow.didResignKeyNotification, object: nil, queue: .main
             ) { [weak self] note in
-                // Only a terminal window resigning changes whether one is key.
-                guard Self.isTerminalWindow(note.object) else { return }
+                guard let window = note.object as? NSWindow else { return }
+                let resigning = ObjectIdentifier(window)
                 MainActor.assumeIsolated {
-                    self?.terminalWindowIsKey = false
+                    let key = NSApp.keyWindow
+                    self?.terminalWindowIsKey = key.map(ObjectIdentifier.init) != resigning && Self.isTerminalWindow(key)
                     self?.reconcile()
                 }
             },
@@ -103,7 +104,8 @@ final class SecureInput {
         applySetting()
     }
 
-    /// Settings, About and the SFTP browser don't hold prompt passwords.
+    /// Terminal canvases need explicit protection. AppKit protects the
+    /// secure text fields used for SFTP sign-in separately.
     nonisolated private static func isTerminalWindow(_ object: Any?) -> Bool {
         guard let window = object as? NSWindow else { return false }
         // Window notifications arrive on the main thread.

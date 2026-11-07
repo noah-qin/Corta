@@ -178,10 +178,20 @@ public enum Selection {
     /// produced the character — and a cell interning a grapheme cluster
     /// yields the whole cluster, so combining marks survive a copy.
     public static func text(of range: SelectionRange, in grid: Grid) -> String {
+        text(of: range, in: grid, firstLineOnly: false)
+    }
+
+    /// The first nonempty logical line, including its soft-wrapped rows.
+    public static func firstNonemptyLine(of range: SelectionRange, in grid: Grid) -> String {
+        text(of: range, in: grid, firstLineOnly: true)
+    }
+
+    private static func text(of range: SelectionRange, in grid: Grid, firstLineOnly: Bool) -> String {
         guard range.start <= range.end else { return "" }
         var text = ""
         var row = range.start.row
         while row <= range.end.row {
+            if firstLineOnly, Task.isCancelled { return "" }
             let line = line(at: row, in: grid)
             let firstColumn = row == range.start.row ? range.start.column : 0
             let lastColumn = row == range.end.row ? range.end.column : grid.columns - 1
@@ -192,7 +202,10 @@ public enum Selection {
                 while rowText.last == " " { rowText.removeLast() }
             }
             text += rowText
-            if row != range.end.row, !continues { text += "\n" }
+            if !continues {
+                if firstLineOnly, !text.isEmpty { return text }
+                if !firstLineOnly, row != range.end.row { text += "\n" }
+            }
             row += 1
         }
         return text

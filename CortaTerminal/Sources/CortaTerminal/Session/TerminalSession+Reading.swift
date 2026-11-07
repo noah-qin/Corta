@@ -85,6 +85,7 @@ extension TerminalSession {
         var compress: Bool
         var consumed: Int
         var deferred: DeferredImageTransmission?
+        var deferredScreenExit: Bool
     }
 
     private func apply(_ batch: [UInt8]) {
@@ -116,6 +117,7 @@ extension TerminalSession {
             // one `read(2)` away, sooner than a waiter's wake, so a flood
             // of one-slice batches would never leave a gap.
             yieldToStateWaiters()
+            if applied.deferredScreenExit { finishAlternateScreenExit() }
             // Out of the outcome, so the decode can free the text as it goes.
             var deferred = applied.deferred
             applied.deferred = nil
@@ -154,12 +156,39 @@ extension TerminalSession {
             guard episodeAfter != episodeBefore else {
                 return SliceOutcome(
                     responses: sliceResponses, episode: nil, compress: compress, consumed: consumed,
-                    deferred: deferred)
+                    deferred: deferred, deferredScreenExit: current.terminal.hasDeferredAlternateScreenExit)
             }
             current.synchronizedOutputEpisode = episodeAfter
             return SliceOutcome(
                 responses: sliceResponses, episode: episodeAfter, compress: compress, consumed: consumed,
-                deferred: deferred)
+                deferred: deferred, deferredScreenExit: current.terminal.hasDeferredAlternateScreenExit)
+        }
+    }
+
+    /// Rebuild the parked main screen off-lock before applying any byte
+    /// after DECRST. A resize or reset during preparation invalidates it.
+    private func finishAlternateScreenExit() {
+        while !isStopped, waitOutResize() {
+            let work = state.withLock { current in
+                (current.terminal.hasDeferredAlternateScreenExit, current.terminal.grid,
+                 current.terminal.gridGeneration)
+            }
+            guard work.0 else { return }
+            var grid = work.1
+            grid.exitAlternateScreen()
+            let prepared = grid
+            let committed = registerStateWaiter {
+                state.withLock { current in
+                    guard !current.isResizing, current.terminal.gridGeneration == work.2 else { return false }
+                    current.terminal.completeDeferredAlternateScreenExit(prepared)
+                    reportImageBytes(current.terminal)
+                    return true
+                }
+            }
+            if committed {
+                scheduleCompression()
+                return
+            }
         }
     }
 

@@ -29,21 +29,17 @@ nonisolated enum UserFile {
     /// Writes atomically to the final target, creating its directory and
     /// keeping permissions. A dangling link's target is created, and the link
     /// stays.
-    static func write(_ text: String, to url: URL) throws {
+    static func write(_ text: String, to url: URL, shouldCommit: () -> Bool = { true }) throws {
         let target = resolvingLinks(url)
         let manager = FileManager.default
         let permissions = (try? manager.attributesOfItem(atPath: target.path))?[.posixPermissions] as? Int
         try manager.createDirectory(
             at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard let permissions else {
-            try text.write(to: target, atomically: true, encoding: .utf8)
-            return
-        }
         // The kept mode from the first byte: an `.atomic` write at the umask
         // and a `chmod` after left a `0600` rc file holding exported tokens
         // world-readable in between, and for good if the `chmod` failed.
-        let mode = mode_t(permissions & 0o777)
-        try PrivateFile.replace(at: target, with: Data(text.utf8)) { descriptor in
+        let mode = mode_t((permissions ?? 0o600) & 0o777)
+        try PrivateFile.replace(at: target, with: Data(text.utf8), shouldCommit: shouldCommit) { descriptor in
             fchmod(descriptor, mode) == 0 ? 0 : errno
         }
     }
@@ -51,7 +47,7 @@ nonisolated enum UserFile {
     /// What reading a user's text file found. `unreadable` — permissions, or
     /// bytes that are not UTF-8 — is never the same as `missing`: a caller
     /// that wrote "defaults" or "just our block" over such a file erased it.
-    enum ReadResult {
+    enum ReadResult: Sendable {
         case missing
         case unreadable(any Error)
         case text(String)
@@ -80,6 +76,10 @@ nonisolated enum UserFile {
             ]))
         }
         return .text(text)
+    }
+
+    static func readTextBounded(at url: URL) -> ReadResult {
+        PathProbe.answer(timeout: .seconds(1)) { readText(at: url) } ?? .unreadable(POSIXError(.ETIMEDOUT))
     }
 
     /// Follows links, resolving relative targets against the link's
@@ -126,10 +126,30 @@ nonisolated enum PrivateFile {
         guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         var info = stat()
-        if fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG {
-            _ = makeOwnerOnly(descriptor: descriptor)
+        guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
+            throw POSIXError(.EINVAL)
         }
+        _ = makeOwnerOnly(descriptor: descriptor)
         return try handle.readToEnd() ?? Data()
+    }
+
+    /// A missing file is a normal empty store. An unanswered or unreadable
+    /// file is different: the caller must not replace its unseen contents.
+    static func readBounded(_ url: URL) throws -> Data? {
+        guard let result = PathProbe.answer(timeout: .seconds(1), { Result { try read(url) } }) else {
+            throw POSIXError(.ETIMEDOUT)
+        }
+        do {
+            return try result.get()
+        } catch let error as POSIXError where error.code == .ENOENT {
+            return nil
+        }
+    }
+
+    static func removeIfPresent(_ url: URL) throws {
+        if unlink(url.path) != 0, errno != ENOENT {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
     }
 
     /// Owner-only, with the parents it needs: at the default umask a state
@@ -166,7 +186,9 @@ nonisolated enum PrivateFile {
     /// A temporary beside `url`, created `0600`, given its final permissions
     /// by `prepare` (0 or an `errno`) before a byte is written, renamed over
     /// `url`.
-    static func replace(at url: URL, with data: Data, prepare: (Int32) -> Int32) throws {
+    static func replace(
+        at url: URL, with data: Data, shouldCommit: () -> Bool = { true }, prepare: (Int32) -> Int32
+    ) throws {
         let directory = url.deletingLastPathComponent()
         let temporary = directory.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString)")
         let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
@@ -176,13 +198,22 @@ nonisolated enum PrivateFile {
             let code = prepare(descriptor)
             guard code == 0 else { throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO) }
             try handle.write(contentsOf: data)
+            try handle.synchronize()
             try handle.close()
+            guard shouldCommit() else { throw POSIXError(.ECANCELED) }
             guard rename(temporary.path, url.path) == 0 else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
         } catch {
             unlink(temporary.path)
             throw error
+        }
+        // The rename already committed. Report failures only before that
+        // point, so a caller never rolls back memory after changing disk.
+        let parent = open(url.deletingLastPathComponent().path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        if parent >= 0 {
+            _ = fsync(parent)
+            close(parent)
         }
     }
 }

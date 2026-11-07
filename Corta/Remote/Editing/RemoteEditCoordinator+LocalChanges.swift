@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Foundation
+import Synchronization
 
 // MARK: - Local change detection
 
@@ -120,7 +121,40 @@ extension RemoteEditCoordinator {
     /// File content I/O never inherits the UI actor, even with approachable
     /// concurrency enabled.
     @concurrent nonisolated func readDigest(at url: URL) async -> String? {
-        RemoteEditStore.sha256Hex(ofFile: url)
+        guard let before = DigestStamp(url) else { return nil }
+        if let cached = recentDigests.withLock({ $0[url] }), cached.0 == before {
+            return cached.1
+        }
+        guard let digest = RemoteEditStore.sha256Hex(ofFile: url) else { return nil }
+        if DigestStamp(url) == before {
+            recentDigests.withLock {
+                if $0.count >= 64 { $0.removeAll(keepingCapacity: true) }
+                $0[url] = (before, digest)
+            }
+        }
+        return digest
+    }
+
+    nonisolated struct DigestStamp: Equatable {
+        let device: dev_t
+        let inode: ino_t
+        let size: off_t
+        let modifiedSeconds: Int
+        let modifiedNanoseconds: Int
+        let changedSeconds: Int
+        let changedNanoseconds: Int
+
+        init?(_ url: URL) {
+            var info = stat()
+            guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return nil }
+            device = info.st_dev
+            inode = info.st_ino
+            size = info.st_size
+            modifiedSeconds = info.st_mtimespec.tv_sec
+            modifiedNanoseconds = info.st_mtimespec.tv_nsec
+            changedSeconds = info.st_ctimespec.tv_sec
+            changedNanoseconds = info.st_ctimespec.tv_nsec
+        }
     }
 
     func setDigest(_ digest: String?, for copyID: String) {

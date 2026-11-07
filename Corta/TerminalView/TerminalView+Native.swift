@@ -63,7 +63,7 @@ extension TerminalView {
         forSendType sendType: NSPasteboard.PasteboardType?,
         returnType: NSPasteboard.PasteboardType?
     ) -> Any? {
-        let canSend = sendType == nil || (sendType == .string && onServicesSelection?() != nil)
+        let canSend = sendType == nil || (sendType == .string && canProvideServicesSelection?() == true)
         // Returned text is a paste, sent as ⌘V would.
         let canReturn = returnType == nil || returnType == .string
         if canSend && canReturn { return self }

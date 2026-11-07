@@ -43,8 +43,13 @@ extension PaneCommands {
         view.onLookUp = { [weak self] point in
             self?.wordForLookUp(at: point)
         }
+        view.canProvideServicesSelection = { [weak self] in
+            self?.selectionForServices() != nil
+        }
         view.onServicesSelection = { [weak self] in
-            self?.selectedText()
+            guard let (grid, range) = self?.selectionForServices() else { return nil }
+            let text = Selection.text(of: range, in: grid)
+            return text.isEmpty ? nil : text
         }
         view.onServicesInsert = { [weak self] text in
             self?.insertAsPaste(text)
@@ -328,12 +333,26 @@ extension PaneCommands {
 
     /// The selection's text, or nil when there is none or it is empty.
     func selectedText() -> String? {
+        guard let (grid, range) = selectionSnapshot() else { return nil }
+        let text = Selection.text(of: range, in: grid)
+        return text.isEmpty ? nil : text
+    }
+
+    func selectionSnapshot() -> (Grid, SelectionRange)? {
         guard let host, host.selection != nil, let session = host.session else { return nil }
         let grid = session.snapshot()
         host.pointer.dropSelectionIfRewritten(in: grid)
         guard let selection = host.selection else { return nil }
-        let text = Selection.text(of: host.pointer.selectionRange(for: selection, in: grid), in: grid)
-        return text.isEmpty ? nil : text
+        return (grid, host.pointer.selectionRange(for: selection, in: grid))
+    }
+
+    private func selectionForServices() -> (Grid, SelectionRange)? {
+        guard let (grid, range) = selectionSnapshot() else { return nil }
+        // AppKit requests Services text synchronously. Bound the work here;
+        // Copy and Export can build a larger selection in the background.
+        let rows = range.end.row - range.start.row
+        let cells = rows * grid.columns + range.end.column - range.start.column + 1
+        return cells <= 16_384 ? (grid, range) : nil
     }
 
     /// The word under a force touch, anchored at the cell's origin so the

@@ -148,13 +148,19 @@ public nonisolated final class Metal4Backend {
     private var copyTarget: MTLTexture?
 
     private func copyStagingTexture(like target: MTLTexture) -> MTLTexture? {
-        if let copyStaging, copyStaging.width == target.width,
-            copyStaging.height == target.height, copyStaging.pixelFormat == target.pixelFormat
+        let bucket = 128
+        if let copyStaging, (target.width...max(bucket, target.width * 2)).contains(copyStaging.width),
+            (target.height...max(bucket, target.height * 2)).contains(copyStaging.height),
+            copyStaging.pixelFormat == target.pixelFormat
         {
             return copyStaging
         }
+        // Drawable sizes move a pixel at a time during a drag. Reuse a
+        // slightly larger staging texture and blit only the drawable area.
+        let width = (target.width + bucket - 1) / bucket * bucket
+        let height = (target.height + bucket - 1) / bucket * bucket
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: target.pixelFormat, width: target.width, height: target.height, mipmapped: false)
+            pixelFormat: target.pixelFormat, width: width, height: height, mipmapped: false)
         descriptor.usage = [.renderTarget]
         descriptor.storageMode = .private
         guard let fresh = device.makeTexture(descriptor: descriptor) else { return nil }
@@ -564,7 +570,10 @@ nonisolated extension Metal4Backend {
         // Before any encoder: a wait cannot be encoded while one is open.
         copy.encodeWaitForEvent(copyRendered, value: copyFrame)
         let blit = copy.makeBlitCommandEncoder()
-        blit?.copy(from: staging, to: target)
+        blit?.copy(
+            from: staging, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(),
+            sourceSize: MTLSize(width: target.width, height: target.height, depth: 1),
+            to: target, destinationSlice: 0, destinationLevel: 0, destinationOrigin: MTLOrigin())
         blit?.endEncoding()
         copy.encodeSignalEvent(copyCompleted, value: copyFrame)
         if let drawable {

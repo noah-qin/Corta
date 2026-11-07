@@ -88,6 +88,7 @@ extension TerminalView {
     }
 
     func showToast(_ text: String, kind: ToastKind = .confirmation) {
+        announceFeedback(text)
         toastDismissal?.cancel()
         toastLayer?.removeFromSuperlayer()
 
@@ -130,6 +131,13 @@ extension TerminalView {
         let dismissal = DispatchWorkItem { [weak self] in self?.dismissToast() }
         toastDismissal = dismissal
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.toastDuration, execute: dismissal)
+    }
+
+    func announceFeedback(_ text: String) {
+        guard NSWorkspace.shared.isVoiceOverEnabled else { return }
+        NSAccessibility.post(
+            element: NSApp as Any, notification: .announcementRequested,
+            userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.medium.rawValue])
     }
 
     private func dismissToast() {

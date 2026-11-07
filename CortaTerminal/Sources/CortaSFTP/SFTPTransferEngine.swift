@@ -116,6 +116,11 @@ public final class SFTPTransferEngine: @unchecked Sendable {
         /// OPEN, and bytes past it end the transfer, whatever was stated.
         public var maximumDownloadBytes: UInt64?
 
+        /// Only for private managed destinations. A leftover partial may be
+        /// discarded under the destination lock, while an existing complete
+        /// file still conflicts with `.fail`.
+        public var restartsManagedDownloadPartials = false
+
         /// What makes a remote path unique across engines: the machine the
         /// session reaches. Two engines with the same scope never transfer
         /// to the same remote path at once (`SFTPDestinationLocks`); `nil`

@@ -83,6 +83,9 @@ child blocks in `write`, and the terminal becomes the reason a training
 job runs slowly. This is the classic cause of "my terminal slows down my
 program" — draining must not be coupled to rendering, to the main thread,
 or to any lock the renderer can hold for long.
+During resize, the reader pauses at a parse-slice boundary until the resized
+grid can accept output. The alternate-screen exit reflows the parked main
+screen outside the render snapshot lock and resumes parsing after it commits.
 
 **Cap the work in one parse batch.** Give a batch a byte budget (roughly
 1 MB) and yield afterwards. Without a cap, a single enormous burst
@@ -779,6 +782,11 @@ not observe the continuous animation, so physical temporal tearing remains
 unconfirmed. No experimental default or acceptance completion is claimed.
 
 ### 5.8 The frame-CPU baseline, under Release (D17)
+
+The November 7, 2026 stability pass measured a 120 × 40 full rebuild over
+60 iterations in the Release-equivalent Benchmark configuration. Frame CPU
+was 0.360 ms mean, 0.288 ms p50, 0.570 ms p95, and 2.525 ms p99. The
+large-grid gate, copy presentation, and allocation tests also passed.
 
 D17's number is a Release number. One command produces it:
 

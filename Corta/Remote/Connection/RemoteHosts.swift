@@ -247,6 +247,9 @@ final class RecentHostsStore {
     /// Injected so tests use a temporary file.
     let fileURL: URL
     private(set) var targets: [SSHTarget] = []
+    private(set) var preservesNewerFile = false
+    private(set) var persistenceError: (any Error)?
+    private var preservesUnreadableFile = false
     /// When each was last connected to, by `displayName`; absent in a file
     /// an older build wrote.
     private var lastUsed: [String: Date] = [:]
@@ -281,9 +284,13 @@ final class RecentHostsStore {
 
     /// Forgets every host and deletes the file.
     func clear() {
-        targets.removeAll()
-        lastUsed.removeAll()
-        try? FileManager.default.removeItem(at: fileURL)
+        guard !preservesNewerFile, !preservesUnreadableFile else { return }
+        do {
+            try PrivateFile.removeIfPresent(fileURL)
+            targets.removeAll()
+            lastUsed.removeAll()
+            persistenceError = nil
+        } catch { persistenceError = error }
     }
 
     /// The rules a typed connection passes, re-applied to a stored one: an
@@ -310,7 +317,23 @@ final class RecentHostsStore {
     }
 
     private func load() {
-        guard let data = try? PrivateFile.read(fileURL),
+        struct VersionProbe: Decodable { let version: Int }
+        let data: Data
+        do {
+            guard let loaded = try PrivateFile.readBounded(fileURL) else { return }
+            data = loaded
+        } catch {
+            preservesUnreadableFile = true
+            persistenceError = error
+            return
+        }
+        if let probe = try? JSONDecoder().decode(VersionProbe.self, from: data),
+            probe.version > Persisted.currentVersion
+        {
+            preservesNewerFile = true
+            return
+        }
+        guard
             let persisted = try? JSONDecoder().decode(Persisted.self, from: data),
             persisted.version <= Persisted.currentVersion
         else { return }
@@ -328,6 +351,7 @@ final class RecentHostsStore {
     /// enough to write in place. Owner-only, since host names and key paths
     /// say where you work.
     private func save() {
+        guard !preservesNewerFile, !preservesUnreadableFile else { return }
         // A host with a port is left out of `hosts`: an older build would
         // read `host:port` as a host name.
         let hosts = targets.filter { $0.port == nil }
@@ -338,6 +362,9 @@ final class RecentHostsStore {
                     version: Persisted.currentVersion, hosts: hosts, targets: targets,
                     used: lastUsed.mapValues(\.timeIntervalSince1970)))
         else { return }
-        try? PrivateFile.write(data, to: fileURL)
+        do {
+            try PrivateFile.write(data, to: fileURL)
+            persistenceError = nil
+        } catch { persistenceError = error }
     }
 }

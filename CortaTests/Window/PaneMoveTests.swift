@@ -40,6 +40,20 @@ struct PaneMoveTests {
         controller.window?.close()
     }
 
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func secondCloseDuringCollapseClosesTheTab() throws {
+        let controller = makeWindow()
+        defer { close(controller) }
+        let split = try #require(controller.selectedTab?.split)
+        let other = controller.addTab()
+        let closing = try #require(controller.tabs.first)
+        controller.selectTab(closing)
+        split.performClose(nil)
+        split.performClose(nil)
+        #expect(controller.tabs.count == 1)
+        #expect(controller.selectedTab === other)
+    }
+
     /// `pane` is alive, focused, parented where it is shown, and has the keyboard.
     private func expectFocused(
         _ pane: TerminalPaneViewController, session: TerminalSession?, in split: SplitViewController,

@@ -42,12 +42,11 @@ nonisolated extension TerminalRenderer {
                     selection, grid: grid, offset: offset, cell: cell, color: frameOverlay.selection))
         }
         // After the selection, before the cursor, which stays on top.
-        for (index, match) in overlay.searchMatches.enumerated() {
-            overlayScratch.append(
-                contentsOf: selectionQuads(
-                    match, grid: grid, offset: offset, cell: cell,
-                    color: index == overlay.currentSearchMatchIndex
-                        ? frameOverlay.currentSearchMatch : frameOverlay.searchMatch))
+        for index in visibleSearchMatches(overlay.searchMatches, grid: grid, offset: offset) {
+            Self.appendSelectionQuads(
+                overlay.searchMatches[index], grid: grid, offset: offset, cell: cell,
+                color: index == overlay.currentSearchMatchIndex
+                    ? frameOverlay.currentSearchMatch : frameOverlay.searchMatch, into: &overlayScratch)
         }
         // A rule, not a fill: it must read as a link and not fight the
         // selection.
@@ -170,8 +169,17 @@ nonisolated extension TerminalRenderer {
     private func selectionQuads(
         _ selection: TerminalSelection, grid: Grid, offset: Int, cell: SIMD2<Float>, color: SIMD4<Float>
     ) -> ContiguousArray<QuadInstance> {
+        var quads: ContiguousArray<QuadInstance> = []
+        Self.appendSelectionQuads(selection, grid: grid, offset: offset, cell: cell, color: color, into: &quads)
+        return quads
+    }
+
+    private static func appendSelectionQuads(
+        _ selection: TerminalSelection, grid: Grid, offset: Int, cell: SIMD2<Float>,
+        color: SIMD4<Float>, into quads: inout ContiguousArray<QuadInstance>
+    ) {
         let (cellWidth, cellHeight) = (cell.x, cell.y)
-        guard selection.start.row <= selection.end.row else { return [] }
+        guard selection.start.row <= selection.end.row else { return }
         // `totalPushed`, as the copy path uses — `.count` let the highlight and
         // the copied text disagree once the ring filled.
         let firstRow =
@@ -182,8 +190,7 @@ nonisolated extension TerminalRenderer {
             ScrollbackCoordinates.reanchoredRow(
                 selection.end.row, from: selection.baseScrollbackTotal,
                 to: grid.scrollback.totalPushed) + offset
-        guard lastRow >= 0, firstRow < grid.rows else { return [] }
-        var quads: ContiguousArray<QuadInstance> = []
+        guard lastRow >= 0, firstRow < grid.rows else { return }
         for row in max(0, firstRow)...min(grid.rows - 1, lastRow) {
             let startColumn =
                 row == firstRow ? min(max(0, selection.start.column), grid.columns) : 0
@@ -196,6 +203,5 @@ nonisolated extension TerminalRenderer {
                     size: .init(Float(endColumn - startColumn) * cellWidth, cellHeight),
                     color: color))
         }
-        return quads
     }
 }

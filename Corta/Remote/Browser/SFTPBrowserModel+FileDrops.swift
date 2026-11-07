@@ -58,9 +58,26 @@ extension SFTPBrowserModel {
             guard transfer.isUpload, case .done = transfer.state else { return nil }
             return transfer.localURL
         })
+        removeDropCopies(done)
+    }
+
+    func clearFinishedTransfers() {
+        let candidates = Set(transfers.filter { $0.isUpload && $0.isFinished }.map(\.localURL))
+        transferQueue.clearFinished()
+        removeDropCopies(candidates)
+    }
+
+    private func removeDropCopies(_ candidates: Set<URL>) {
+        let retained = Set(transfers.compactMap { transfer -> URL? in
+            guard transfer.isUpload else { return nil }
+            if !transfer.isFinished { return transfer.localURL }
+            if case .failed(_, true) = transfer.state { return transfer.localURL }
+            return nil
+        })
+        let removable = candidates.subtracting(retained)
         for (directory, urls) in receivedDropDirectories {
-            for url in urls.intersection(done) { FileDropStorage.remove(url) }
-            let remaining = urls.subtracting(done)
+            for url in urls.intersection(removable) { FileDropStorage.remove(url) }
+            let remaining = urls.subtracting(removable)
             if remaining.isEmpty {
                 FileDropStorage.remove(directory)
                 receivedDropDirectories[directory] = nil

@@ -29,6 +29,7 @@ struct ReopenClosedPaneTests {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 560),
             styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
         window.contentViewController = split
         _ = split.view
         split.view.layoutSubtreeIfNeeded()

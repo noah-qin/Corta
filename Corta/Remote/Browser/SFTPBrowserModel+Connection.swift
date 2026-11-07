@@ -141,14 +141,41 @@ extension SFTPBrowserModel {
         }
     }
 
+    /// Bounds one step after sign-in as well. A new navigation cancels its
+    /// own timer along with the request; neither can retire a newer session.
+    func directoryDeadline(client: any SFTPClient, directory: Int) -> Task<Void, Never> {
+        let connection = connectionGeneration
+        let timeout = connectTimeout
+        let name = host ?? ""
+        let shown = SSHTarget.displayName(forKey: name)
+        return Task { [weak self] in
+            do {
+                try await ConnectionDeadline.wait(timeout) { self?.isAskingHost(shown) ?? false }
+            } catch { return }
+            guard !Task.isCancelled, let self, connection == self.connectionGeneration,
+                directory == self.directoryGeneration
+            else { return }
+            self.lostConnection(.transport(.operationTimedOut), client: client)
+        }
+    }
+
+    func lostConnection(_ error: SFTPError, client: any SFTPClient) {
+        guard self.client === client, let host else { return }
+        disconnect()
+        connectionFailed(error, client: client, host: host)
+        updateTitle()
+    }
+
     private func connectionFailed(_ error: SFTPError, client: any SFTPClient, host name: String) {
         connectFailure = Self.connectFailure(error, host: name)
         connectionState = .failed(message: Self.errorMessage(error, host: name))
         // Left in the fields, so the destination that failed can be
         // corrected.
         fill(from: name)
-        client.close()
-        self.client = nil
+        if self.client === client {
+            client.close()
+            self.client = nil
+        }
     }
 
     /// Closes the session and abandons every transfer. Called by the

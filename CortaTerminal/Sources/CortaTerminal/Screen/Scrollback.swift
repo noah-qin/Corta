@@ -86,8 +86,22 @@ public struct Scrollback: Sendable {
         static let entryLimit = 4
         static let cellByteLimit = 8 << 20
         static let planeByteLimit = 32 << 20
+        static let processByteLimit = 128 << 20
+        private static let retainedBytes = Mutex(0)
         let identity = UUID()
         let state = Mutex(State())
+
+        private static func claim(_ bytes: Int) -> Bool {
+            retainedBytes.withLock {
+                guard bytes <= processByteLimit - $0 else { return false }
+                $0 += bytes
+                return true
+            }
+        }
+
+        private static func release(_ bytes: Int) {
+            retainedBytes.withLock { $0 -= bytes }
+        }
         func cells(id: Int, decode: () -> ContiguousArray<Cell>) -> ContiguousArray<Cell> {
             if let hit = state.withLock({ locked -> ContiguousArray<Cell>? in
                 guard let index = locked.entries.firstIndex(where: { $0.id == id }) else { return nil }
@@ -101,11 +115,14 @@ public struct Scrollback: Sendable {
                 let bytes = cells.count * MemoryLayout<Cell>.stride
                 guard locked.valid, bytes <= Self.cellByteLimit else { return }
                 if locked.entries.contains(where: { $0.id == id }) { return }
+                while locked.entries.count >= Self.entryLimit || locked.entryBytes + bytes > Self.cellByteLimit {
+                    let removed = locked.entries.removeFirst().cells.count * MemoryLayout<Cell>.stride
+                    locked.entryBytes -= removed
+                    Self.release(removed)
+                }
+                guard Self.claim(bytes) else { return }
                 locked.entries.append((id, cells))
                 locked.entryBytes += bytes
-                while locked.entries.count > Self.entryLimit || locked.entryBytes > Self.cellByteLimit {
-                    locked.entryBytes -= locked.entries.removeFirst().cells.count * MemoryLayout<Cell>.stride
-                }
             }
             return cells
         }
@@ -113,28 +130,47 @@ public struct Scrollback: Sendable {
             if let hit = state.withLock({ $0.planes[id] }) { return hit }
             let plane = build()
             state.withLock { locked in
-                guard locked.valid, locked.planes[id] == nil else { return }
-                locked.planes[id] = plane; locked.planeOrder.append(id); locked.planeBytes += plane.byteCost
-                while locked.planeBytes > Self.planeByteLimit {
+                let bytes = plane.byteCost
+                guard locked.valid, locked.planes[id] == nil, bytes <= Self.planeByteLimit else { return }
+                while locked.planeBytes + bytes > Self.planeByteLimit {
                     let id = locked.planeOrder.removeFirst()
-                    if let removed = locked.planes.removeValue(forKey: id) { locked.planeBytes -= removed.byteCost }
+                    if let removed = locked.planes.removeValue(forKey: id) {
+                        locked.planeBytes -= removed.byteCost
+                        Self.release(removed.byteCost)
+                    }
                 }
+                guard Self.claim(bytes) else { return }
+                locked.planes[id] = plane
+                locked.planeOrder.append(id)
+                locked.planeBytes += bytes
             }
             return plane
         }
         func remove(id: Int) {
             state.withLock { locked in
-                locked.entries.removeAll { $0.id == id }
-                if let removed = locked.planes.removeValue(forKey: id) { locked.planeBytes -= removed.byteCost }
+                if let index = locked.entries.firstIndex(where: { $0.id == id }) {
+                    let bytes = locked.entries.remove(at: index).cells.count * MemoryLayout<Cell>.stride
+                    locked.entryBytes -= bytes
+                    Self.release(bytes)
+                }
+                if let removed = locked.planes.removeValue(forKey: id) {
+                    locked.planeBytes -= removed.byteCost
+                    Self.release(removed.byteCost)
+                }
                 locked.planeOrder.removeAll { $0 == id }
             }
         }
         func invalidate() {
             state.withLock {
+                Self.release($0.entryBytes + $0.planeBytes)
+                $0.entryBytes = 0
+                $0.planeBytes = 0
                 $0.valid = false; $0.entries.removeAll()
                 $0.planes.removeAll(); $0.planeOrder.removeAll(); $0.planeBytes = 0
             }
         }
+
+        deinit { invalidate() }
     }
     private var cache = Cache()
     /// First batch not yet attempted; each sealed batch is visited once.

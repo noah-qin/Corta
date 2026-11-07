@@ -67,7 +67,7 @@ struct SFTPTransfersList: View {
             HStack {
                 Text(L10n.text("sftp.transfers.title")).font(.headline)
                 Spacer()
-                Button(L10n.text("sftp.transfers.clear")) { model.transferQueue.clearFinished() }
+                Button(L10n.text("sftp.transfers.clear")) { model.clearFinishedTransfers() }
                     .disabled(!model.transfers.contains(where: \.isFinished))
             }
             .padding(.horizontal, 14).padding(.vertical, 10)

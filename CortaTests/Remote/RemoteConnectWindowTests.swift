@@ -74,6 +74,36 @@ struct RemoteConnectWindowTests {
     }
 
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func cancellingReplacementKeepsTheLiveSSHSession() async throws {
+        let delegate = AppDelegate()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let launcher = directory.appendingPathComponent("ssh")
+        try FileManager.default.createSymbolicLink(at: launcher, withDestinationURL: URL(fileURLWithPath: "/bin/sh"))
+        var remote = localPreset
+        remote.shell = launcher.path
+        let source = delegate.makeWindowController(setup: .init(preset: remote))
+        source.showWindow(nil)
+        defer { close(source) }
+        let window = try #require(source.window)
+        let pane = try #require(source.selectedTab?.split.focusedPane)
+        let session = try #require(pane.session)
+        try #require(ConfigurationStore.shared.configuration.confirmClose)
+        #expect(!source.windowShouldClose(window))
+        let closeSheet = try #require(window.attachedSheet)
+        window.endSheet(closeSheet, returnCode: .alertSecondButtonReturn)
+        await waitUntil("the close confirmation ends") { window.attachedSheet == nil }
+        delegate.launchConnection(localPreset, from: window, inNewWindow: false)
+        let replaceSheet = try #require(window.attachedSheet)
+        #expect(pane.session === session)
+        window.endSheet(replaceSheet, returnCode: .alertSecondButtonReturn)
+        await waitUntil("the replacement confirmation ends") { window.attachedSheet == nil }
+        #expect(pane.session === session)
+        #expect(!session.isStopped)
+    }
+
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func explicitWindowAndMissingOrClosedSourcesCreateWindows() throws {
         let delegate = AppDelegate()
         let source = delegate.makeWindowController()

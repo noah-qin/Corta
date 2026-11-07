@@ -104,16 +104,27 @@ extension Performer {
                 state.historySuggestion = nil
                 grid.enterAlternateScreen()
             } else {
-                if let main = state.parkedMainKeyboardProtocol {
-                    state.keyboardProtocol = main
-                    state.parkedMainKeyboardProtocol = nil
+                if defersAlternateScreenReflow, let main = grid.suspendedMain?.grid,
+                    main.columns != grid.columns
+                {
+                    state.deferredAlternateScreenExit = true
+                } else {
+                    completeAlternateScreenExit()
                 }
-                state.pendingAlternateScreenFinish = nil
-                grid.exitAlternateScreen()
-                applyRowRemaps()
             }
             handled = true
         }
         return handled
+    }
+
+    mutating func completeAlternateScreenExit(prepared: Grid? = nil) {
+        if let main = state.parkedMainKeyboardProtocol {
+            state.keyboardProtocol = main
+            state.parkedMainKeyboardProtocol = nil
+        }
+        state.pendingAlternateScreenFinish = nil
+        state.deferredAlternateScreenExit = false
+        if let prepared { grid = prepared } else { grid.exitAlternateScreen() }
+        applyRowRemaps()
     }
 }

@@ -123,10 +123,8 @@ extension SFTPTransferQueue {
         // Partials belong to the files, not the tree.
         if plan.isUpload {
             let url = plan.localURL
-            guard let source = await localChecks.answer({ SFTPLocalFacts.source(url) }) else {
-                localCheckFailed(id, path: url.path)
-                return
-            }
+            let result = await localChecks.answer { SFTPLocalFacts.source(url) }
+            guard let source = checked(result, id: id, path: url.path) else { return }
             plan.isDirectory = plan.isDirectory || source.isDirectory
             if let index = transfers.firstIndex(where: { $0.id == id }) {
                 transfers[index].isDirectory = plan.isDirectory
@@ -140,10 +138,8 @@ extension SFTPTransferQueue {
             }
         } else {
             let path = plan.localURL.path
-            guard let found = await localChecks.answer({ SFTPLocalFacts.destination(atPath: path) }) else {
-                localCheckFailed(id, path: path)
-                return
-            }
+            let result = await localChecks.answer { SFTPLocalFacts.destination(atPath: path) }
+            guard let found = checked(result, id: id, path: path) else { return }
             plan.destinationExists = found.destination.exists
             if !plan.isDirectory {
                 // The source's size and mtime arrive with the listing the
@@ -204,14 +200,21 @@ extension SFTPTransferQueue {
 
     /// The disk did not answer. Unless the row was cancelled meanwhile, it
     /// fails — Retry asks again — and the rest of the queue goes on.
-    private func localCheckFailed(_ id: UUID, path: String) {
-        guard !Task.isCancelled, jobs[id] != nil else { return }
-        jobs[id]?.preparation = nil
-        setState(
-            id,
-            .failed(
-                message: L10n.format("sftp.transfer.localCheckTimedOut", SFTPBrowserModel.peerText(path)),
-                retryable: finishHandlers[id] == nil))
+    private func checked<T>(_ result: Result<T, SFTPLocalChecks.Failure>, id: UUID, path: String) -> T? {
+        guard !Task.isCancelled, jobs[id] != nil else { return nil }
+        switch result {
+        case .success(let value):
+            return value
+        case .failure(.cancelled):
+            return nil
+        case .failure(let failure):
+            jobs[id]?.preparation = nil
+            let key = failure == .budgetExhausted
+                ? "sftp.transfer.localCheckUnavailable" : "sftp.transfer.localCheckTimedOut"
+            setState(id, .failed(
+                message: L10n.format(key, SFTPBrowserModel.peerText(path)), retryable: finishHandlers[id] == nil))
+            return nil
+        }
     }
 
     /// The conflict sheet's answer, mapped onto engine policy (see the
@@ -244,26 +247,36 @@ extension SFTPTransferQueue {
         let attempts = 1000
         var candidate: String?
         if plan.isUpload {
-            for attempt in 1...attempts {
+            let remotePath = plan.remotePath
+            for first in stride(from: 1, through: attempts, by: 8) {
                 guard !Task.isCancelled, jobs[id] != nil else { return }
-                let name = SFTPBrowserModel.keepBothCandidate(plan.remotePath, attempt: attempt)
-                let destinationTaken = (try? await client.lstat(path: name)) != nil
-                let partialTaken =
-                    (try? await client.lstat(
-                        path: SFTPTransferEngine.partialPath(for: name))) != nil
-                if !destinationTaken && !partialTaken {
-                    candidate = name
+                let free = await withTaskGroup(of: Int?.self) { group in
+                    for attempt in first...min(attempts, first + 7) {
+                        group.addTask {
+                            let name = SFTPBrowserModel.keepBothCandidate(remotePath, attempt: attempt)
+                            async let destination = try? client.lstat(path: name)
+                            async let partial = try? client.lstat(path: SFTPTransferEngine.partialPath(for: name))
+                            let (file, fragment) = await (destination, partial)
+                            return file == nil && fragment == nil ? attempt : nil
+                        }
+                    }
+                    var earliest: Int?
+                    for await result in group {
+                        if let result { earliest = min(earliest ?? result, result) }
+                    }
+                    return earliest
+                }
+                if let free {
+                    candidate = SFTPBrowserModel.keepBothCandidate(remotePath, attempt: free)
                     break
                 }
             }
         } else {
             let path = plan.localURL.path
-            guard let answer = await localChecks.answer({
+            let result = await localChecks.answer {
                 SFTPLocalFacts.firstFreeCandidate(for: path, attempts: attempts)
-            }) else {
-                localCheckFailed(id, path: path)
-                return
             }
+            guard let answer = checked(result, id: id, path: path) else { return }
             candidate = answer
         }
         guard !Task.isCancelled, jobs[id] != nil else { return }

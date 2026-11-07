@@ -70,8 +70,7 @@ public struct Terminal: Sendable {
     /// Independent of `reset()`, as clearing directory history is of clearing
     /// the scrollback.
     public mutating func clearCommandRecords() {
-        performer.state.commandRecords = CommandRecordStore(
-            capacity: performer.state.commandRecords.capacity)
+        performer.state.commandRecords.clear()
     }
 
     /// A grid resized through this setter (`terminal.grid.resize(…)`) has its
@@ -137,8 +136,19 @@ public struct Terminal: Sendable {
     mutating func feedDeferringImageDecode(_ bytes: ArraySlice<UInt8>) -> Int {
         gridGeneration &+= 1
         performer.defersLargeImageDecoding = true
-        defer { performer.defersLargeImageDecoding = false }
+        performer.defersAlternateScreenReflow = true
+        defer {
+            performer.defersLargeImageDecoding = false
+            performer.defersAlternateScreenReflow = false
+        }
         return parser.parse(bytes, performer: &performer, stoppingAfterAPC: true)
+    }
+
+    var hasDeferredAlternateScreenExit: Bool { performer.state.deferredAlternateScreenExit }
+
+    mutating func completeDeferredAlternateScreenExit(_ prepared: Grid) {
+        gridGeneration &+= 1
+        performer.completeAlternateScreenExit(prepared: prepared)
     }
 
     mutating func takeDeferredImage() -> DeferredImageTransmission? {

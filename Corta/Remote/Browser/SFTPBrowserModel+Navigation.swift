@@ -77,8 +77,11 @@ extension SFTPBrowserModel {
         // the request would otherwise hold a place in the window until it came.
         loadTask?.cancel()
         loadTask = Task {
+            let deadline = directoryDeadline(client: client, directory: generation)
+            defer { deadline.cancel() }
             do {
                 let listing = try await client.listDirectory(path: path)
+                deadline.cancel()
                 guard generation == directoryGeneration else { return }
                 await applyEntries(listing) {
                     let destination = Self.normalized(path: path)
@@ -110,7 +113,14 @@ extension SFTPBrowserModel {
                 await refreshVolume()
             } catch {
                 guard generation == directoryGeneration else { return }
-                listingError = Self.errorMessage(Self.sftpError(error), host: host ?? "")
+                let failure = Self.sftpError(error)
+                switch failure {
+                case .transport, .protocolViolation:
+                    lostConnection(failure, client: client)
+                    return
+                default:
+                    listingError = Self.errorMessage(failure, host: host ?? "")
+                }
                 // A step that no longer opens (deleted, or its permissions
                 // changed) is dropped, so Back and Forward do not stick on it
                 // and what lies beyond stays reachable.
@@ -127,6 +137,8 @@ extension SFTPBrowserModel {
         guard let client else { return }
         let connection = connectionGeneration
         let directory = directoryGeneration
+        let deadline = directoryDeadline(client: client, directory: directory)
+        defer { deadline.cancel() }
         do {
             let info = try await client.volumeInfo(path: currentPath)
             guard connection == connectionGeneration, directory == directoryGeneration else { return }
@@ -137,6 +149,11 @@ extension SFTPBrowserModel {
             }
         } catch {
             guard connection == connectionGeneration, directory == directoryGeneration else { return }
+            let failure = Self.sftpError(error)
+            if failure.isRetryableTransportFailure {
+                lostConnection(failure, client: client)
+                return
+            }
             // Capacity is a nicety, not the listing: a failed statvfs
             // leaves the status line silent rather than replacing the
             // directory with an error.

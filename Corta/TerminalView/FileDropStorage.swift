@@ -182,13 +182,20 @@ nonisolated enum FileDropStorage {
     /// A quit: this run's copies, for at most `timeout`, so a slow disk cannot
     /// hold up the exit. Whatever is left goes at the next launch.
     static func removeThisRun(in roots: [URL]? = nil, timeout: TimeInterval = 1.5) {
-        for root in roots ?? [root, dragRoot] {
-            for child in children(of: root)
-            where child.lastPathComponent.hasPrefix(".removing-") || owner(of: child) == .thisRun {
-                remove(child, qos: .userInitiated)
+        let directories = roots ?? [root, dragRoot]
+        let done = DispatchSemaphore(value: 0)
+        let deadline = DispatchTime.now() + timeout
+        DispatchQueue.global(qos: .userInitiated).async {
+            for root in directories {
+                for child in children(of: root)
+                where child.lastPathComponent.hasPrefix(".removing-") || owner(of: child) == .thisRun {
+                    remove(child, qos: .userInitiated)
+                }
             }
+            _ = removals.wait(timeout: deadline)
+            done.signal()
         }
-        _ = removals.wait(timeout: .now() + timeout)
+        _ = done.wait(timeout: deadline)
     }
 
     /// Clean Now: this run's finished copies and anything nobody owns. What is
@@ -236,19 +243,28 @@ nonisolated enum FileDropStorage {
         guard url.isFileURL, url.standardizedFileURL.path.hasPrefix(prefix),
             url.resolvingSymlinksInPath().path == url.standardizedFileURL.path
         else { throw CocoaError(.fileReadNoPermission) }
-        try secureTree(url)
+        var remaining = 100_000
+        try secureTree(url, depth: 0, remaining: &remaining)
     }
 
-    private static func secureTree(_ url: URL) throws {
+    private static func secureTree(_ url: URL, depth: Int, remaining: inout Int) throws {
+        guard depth <= 128, remaining > 0 else { throw POSIXError(.EFBIG) }
+        remaining -= 1
         var info = stat()
         guard lstat(url.path, &info) == 0 else { throw CocoaError(.fileReadNoSuchFile) }
         switch info.st_mode & S_IFMT {
         case S_IFDIR:
             guard clearExtendedACL(path: url.path) == 0, chmod(url.path, 0o700) == 0
             else { throw CocoaError(.fileWriteNoPermission) }
-            for child in try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) {
-                try secureTree(child)
+            var enumerationError: (any Error)?
+            guard let children = FileManager.default.enumerator(
+                at: url, includingPropertiesForKeys: [], options: [.skipsSubdirectoryDescendants],
+                errorHandler: { _, error in enumerationError = error; return false }
+            ) else { throw CocoaError(.fileReadUnknown) }
+            for case let child as URL in children {
+                try secureTree(child, depth: depth + 1, remaining: &remaining)
             }
+            if let enumerationError { throw enumerationError }
         case S_IFREG:
             let descriptor = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
             guard descriptor >= 0 else { throw CocoaError(.fileReadNoPermission) }

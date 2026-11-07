@@ -17,7 +17,7 @@
 /// The snippets `ShellIntegrationInstaller` writes, one per shell. String
 /// constants, not resources: the file that writes and removes them is
 /// their single source of truth.
-enum ShellIntegrationScript {
+nonisolated enum ShellIntegrationScript {
     /// Each emits FinalTerm A/B/C/D plus OSC 7 through the shell's own hooks.
     static func script(for shell: ShellKind) -> String {
         switch shell {
@@ -225,7 +225,7 @@ enum ShellIntegrationScript {
 // MARK: - Directory completion
 
 extension ShellIntegrationScript {
-    static let zshDirectoryCompletion = #"""
+    nonisolated static let zshDirectoryCompletion = #"""
         if [[ -o interactive && $TERM_PROGRAM == Corta && -z $__corta_cd_installed ]]; then
           typeset -g __corta_cd_installed=1 __corta_cd_revision=0 __corta_cd_index=1
           typeset -g __corta_cd_buffer='' __corta_cd_dismissed=''

@@ -187,11 +187,16 @@ public nonisolated enum QuadPipelineCache {
             let entries = try? FileManager.default.contentsOfDirectory(
                 at: directory, includingPropertiesForKeys: nil)
         else { return }
-        for entry in entries
-        where entry.pathExtension == "metallib-archive"
-            && entry.lastPathComponent.hasPrefix("QuadPipelines-")
-        {
-            try? FileManager.default.removeItem(at: entry)
+        for entry in entries {
+            if entry.pathExtension == "metallib-archive", entry.lastPathComponent.hasPrefix("QuadPipelines-") {
+                try? FileManager.default.removeItem(at: entry)
+            } else if entry.pathExtension == "tmp",
+                UUID(uuidString: entry.deletingPathExtension().lastPathComponent) != nil,
+                let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+                Date().timeIntervalSince(modified) > 24 * 3600
+            {
+                try? FileManager.default.removeItem(at: entry)
+            }
         }
     }
 

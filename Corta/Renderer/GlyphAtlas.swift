@@ -132,6 +132,7 @@ nonisolated final class GlyphAtlas {
         var clusterCache: [ClusterKey: GlyphInfo] = [:]
         private var nextOrigin: (x: Int, y: Int)
         private var rowHeight: Int
+        var usedRows: Range<Int> { regionOrigin.y..<(nextOrigin.y + rowHeight) }
 
         /// - Parameter regionOrigin: the page's corner in the atlas texture.
         /// - Parameter regionSize: the page's extent in texels.
@@ -231,7 +232,7 @@ nonisolated final class GlyphAtlas {
     /// with the page.
     let asciiTable: UnsafeMutableBufferPointer<GlyphInfo?>
     /// Shaped region below the ASCII shelves.
-    private var shapedPage: AtlasPage
+    var shapedPage: AtlasPage
     /// The whole color texture.
     var colorPage: AtlasPage
 

@@ -508,6 +508,7 @@ extension SplitViewController {
     /// ⌘W closes the focused pane; with one pane left it closes the tab,
     /// and the last tab is the window's own close.
     @objc func performClose(_ sender: Any?) {
+        splitTransition.finish()
         guard hasMultiplePanes, let focusedPane else {
             // The tab or the window asks for confirmation; asking here would
             // ask twice.
@@ -516,7 +517,7 @@ extension SplitViewController {
         }
         guard view.window?.attachedSheet == nil else { return }
         confirmClose(
-            of: focusedPane.session?.hasForegroundJob == true ? [focusedPane] : [],
+            of: focusedPane.hasSessionRequiringCloseConfirmation ? [focusedPane] : [],
             scope: L10n.text("close.scope.pane"), in: view.window
         ) { [weak self, weak focusedPane] confirmed in
             // The pane may have exited while the sheet was up, or its sibling
@@ -534,6 +535,11 @@ extension SplitViewController {
         splitTransition.finish()
         // Finishing an earlier close may already have removed this pane.
         guard pane.parent === self, !pane.didTeardown else { return }
+        guard hasMultiplePanes else {
+            lastClosedPane = nil
+            closeTabWithoutAsking()
+            return
+        }
         unzoomIfNeeded(closing: pane)
         noteClosing(pane)
         pane.teardown()

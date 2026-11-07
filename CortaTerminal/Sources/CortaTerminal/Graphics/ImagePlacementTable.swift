@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Foundation
+
 /// Kitty graphics placements, off `Cell`: a cell has no spare bits (D05), and
 /// one picture would repeat its reference across thousands of cells. Rows
 /// are relative to `baseScrollbackTotal`, like a selection.
@@ -83,6 +85,7 @@ public struct ImagePlacementTable: Sendable {
 
     /// An image delete changes no cell, so line damage alone would miss it.
     public private(set) var revision: UInt64 = 0
+    public let identity = UUID()
 
     public init() {}
 

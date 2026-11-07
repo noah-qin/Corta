@@ -206,17 +206,22 @@ extension RemoteEditCoordinatorTests {
     }
 
     @Test("approval snapshots a quit left behind are removed when the store opens")
-    func staleApprovalSnapshotsAreRemoved() throws {
+    func staleApprovalSnapshotsAreRemoved() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("corta-remote-edit-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
-        let approvals = root.appendingPathComponent("Approvals")
+        let approvals = root.appendingPathComponent(".approvals-2147483647-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: approvals, withIntermediateDirectories: true)
         try Data("a whole copy of a remote file".utf8)
             .write(to: approvals.appendingPathComponent(UUID().uuidString))
         let store = RemoteEditStore(rootURL: root)
-        #expect(store.approvalsURL.standardizedFileURL.path == approvals.standardizedFileURL.path)
+        let sibling = RemoteEditStore(rootURL: root)
+        #expect(store.approvalsURL != sibling.approvalsURL)
+        try FileManager.default.createDirectory(at: store.approvalsURL, withIntermediateDirectories: true)
+        await store.finishMaintenance()
+        await sibling.finishMaintenance()
         #expect(!FileManager.default.fileExists(atPath: approvals.path))
+        #expect(FileManager.default.fileExists(atPath: store.approvalsURL.path))
     }
 
     @Test("an edit after the prompt requires a fresh approval")
@@ -334,6 +339,7 @@ extension RemoteEditCoordinatorTests {
             host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         try "edited, never uploaded".write(
             to: fixture.localCopyURL, atomically: true, encoding: .utf8)
+        await fixture.coordinator.store.finishManifestWrites()
 
         // A fresh run: a new coordinator over the same store.
         let recorder = Recorder()
@@ -361,6 +367,7 @@ extension RemoteEditCoordinatorTests {
         try "edited, then dismissed".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
         await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         fixture.coordinator.dismissUpload(try #require(fixture.recorder.uploads.first))
+        await fixture.coordinator.store.finishManifestWrites()
 
         let recorder = Recorder()
         let coordinator = RemoteEditCoordinator(
@@ -417,6 +424,7 @@ extension RemoteEditCoordinatorTests {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         _ = try await fixture.coordinator.open(host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+        await fixture.coordinator.store.finishManifestWrites()
         for url in [fixture.localCopyURL, fixture.root.appendingPathComponent("manifest.json")] {
             let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
             #expect(mode?.intValue == 0o600)

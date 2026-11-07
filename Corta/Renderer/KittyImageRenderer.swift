@@ -203,8 +203,9 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
     /// inline): prunes unreferenced textures, drops re-transmitted ones, and
     /// schedules decodes for new or newly visible placements.
     func update(table: ImagePlacementTable, viewport: ImageViewport) {
-        let placements = table.orderedPlacements()
-        let liveIDs = Set(placements.map(\.imageID))
+        refreshPlacements(table)
+        let placements = framePlacements
+        let liveIDs = frameLiveIDs
         let toSchedule: [DecodeJob] = lock.withLock {
             pruneLocked(keeping: liveIDs, table: table)
             let visible = visibleImagesLocked(placements, table: table, viewport: viewport)
@@ -224,6 +225,22 @@ nonisolated final class KittyImageRenderer: @unchecked Sendable {
                 self?.decodeAndInstall(id: job.id, generation: job.generation, data: job.data, permit: job.permit)
             }
         }
+    }
+
+    private var frameTableIdentity: UUID?
+    private var frameTableRevision: UInt64 = 0
+    private var framePlacements: [KittyGraphics.Placement] = []
+    var frameDrawPlacements: [KittyGraphics.Placement] = []
+    private var frameLiveIDs: Set<KittyGraphics.ImageID> = []
+    var singleQuad: ContiguousArray<QuadInstance> = []
+
+    func refreshPlacements(_ table: ImagePlacementTable) {
+        guard frameTableIdentity != table.identity || frameTableRevision != table.revision else { return }
+        frameTableIdentity = table.identity
+        frameTableRevision = table.revision
+        framePlacements = table.orderedPlacements()
+        frameDrawPlacements = framePlacements.sorted { $0.zIndex < $1.zIndex }
+        frameLiveIDs = Set(framePlacements.map(\.imageID))
     }
 
 }

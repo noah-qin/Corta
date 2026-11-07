@@ -29,8 +29,11 @@ extension SettingsModel {
     /// page, the ground truth here is the shell's startup files — two for
     /// bash — which the user can edit outside Corta at any time.
     func refreshShellIntegrationStatus() {
-        let integration = ShellIntegration.current
-        switch integration.status() {
+        checkShellIntegration { _ in [] }
+    }
+
+    private func applyShellIntegrationStatus(_ status: ShellIntegrationStatus, path: String, needsUpdate: String) {
+        switch status {
         case .notInstalled:
             shellIntegrationStatus = RowStatus(
                 kind: .adjusted,
@@ -45,7 +48,7 @@ extension SettingsModel {
             shellIntegrationStatus = RowStatus(
                 kind: .adjusted,
                 message: L10n.format(
-                    "settings.status.shellIntegrationInstalled", integration.displayPath),
+                    "settings.status.shellIntegrationInstalled", path),
                 actionTitle: L10n.text("settings.action.remove"))
         case .unreadable(let path):
             shellIntegrationStatus = RowStatus(
@@ -55,7 +58,7 @@ extension SettingsModel {
             shellIntegrationStatus = RowStatus(
                 kind: .adjusted,
                 message: L10n.format(
-                    "settings.status.shellIntegrationOutdated", integration.pathsNeedingUpdate),
+                    "settings.status.shellIntegrationOutdated", needsUpdate),
                 actionTitle: L10n.text("settings.action.update"),
                 // Removing must not first require writing the new hooks in.
                 secondaryActionTitle: L10n.text("settings.action.remove"))
@@ -65,29 +68,42 @@ extension SettingsModel {
     /// One dispatch point for the row's first button, whichever state put
     /// it there.
     func toggleShellIntegration() {
-        let integration = ShellIntegration.current
-        switch integration.status() {
-        case .notInstalled, .conflicting, .outdated: applyShellIntegration(integration.install())
-        case .installed: applyShellIntegration(integration.uninstall())
-        case .unreadable: refreshShellIntegrationStatus()
+        checkShellIntegration { integration in
+            switch integration.status() {
+            case .notInstalled, .conflicting, .outdated: integration.install()
+            case .installed: integration.uninstall()
+            case .unreadable: []
+            }
         }
     }
 
     /// The second button, offered only beside Update.
     func removeShellIntegration() {
-        applyShellIntegration(ShellIntegration.current.uninstall())
+        checkShellIntegration { $0.uninstall() }
     }
 
-    /// - Parameter failures: the files that could not be written.
-    private func applyShellIntegration(_ failures: [String]) {
-        guard failures.isEmpty else {
-            shellIntegrationStatus = RowStatus(
-                kind: .failed,
-                message: L10n.format(
-                    "settings.status.shellIntegrationWriteFailed", failures.joined(separator: ", ")))
-            return
+    private func checkShellIntegration(_ action: @escaping @Sendable (ShellIntegration) -> [String]) {
+        guard !isCheckingShellIntegration else { return }
+        isCheckingShellIntegration = true
+        PathProbe.run { [weak self] in
+            let integration = ShellIntegration.current
+            let failures = action(integration)
+            let status = integration.status()
+            let path = integration.displayPath
+            let needsUpdate = status == .outdated ? integration.pathsNeedingUpdate : ""
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.isCheckingShellIntegration = false
+                if failures.isEmpty {
+                    self.applyShellIntegrationStatus(status, path: path, needsUpdate: needsUpdate)
+                } else {
+                    self.shellIntegrationStatus = RowStatus(
+                        kind: .failed,
+                        message: L10n.format(
+                            "settings.status.shellIntegrationWriteFailed", failures.joined(separator: ", ")))
+                }
+            }
         }
-        refreshShellIntegrationStatus()
     }
 
     // MARK: - Dropped copies
@@ -131,7 +147,14 @@ extension SettingsModel {
     /// as `refreshShellIntegrationStatus`: this is app-managed state, not
     /// something this window owns a copy of.
     func refreshDirectoryHistoryStatus() {
-        let count = DirectoryHistoryStore.shared.history.entries.count
+        let store = DirectoryHistoryStore.shared
+        let count = store.history.entries.count
+        if let error = store.persistenceError {
+            directoryHistoryStatus = RowStatus(
+                kind: .failed, message: L10n.format("settings.status.writeFailed", error.localizedDescription),
+                actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)
+            return
+        }
         directoryHistoryStatus = RowStatus(
             kind: .adjusted, message: L10n.format("settings.status.directoryHistoryCount", count),
             actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)
@@ -147,7 +170,14 @@ extension SettingsModel {
     /// How many hosts the connect dialogs remember, with a Clear action —
     /// app state like the directory history, re-read on every refresh.
     func refreshRecentHostsStatus() {
-        let count = RecentHostsStore.shared.targets.count
+        let store = RecentHostsStore.shared
+        let count = store.targets.count
+        if let error = store.persistenceError {
+            recentHostsStatus = RowStatus(
+                kind: .failed, message: L10n.format("settings.status.writeFailed", error.localizedDescription),
+                actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)
+            return
+        }
         recentHostsStatus = RowStatus(
             kind: .adjusted, message: L10n.format("settings.recentHosts.count", count),
             actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)
@@ -165,7 +195,7 @@ extension SettingsModel {
     /// not the truth.
     func refreshNotificationPermissionNotice() {
         let denied = TaskNotifier.permission == .denied
-        guard configuration.notifyOnLongTask && denied else {
+        guard denied, configuration.notifyOnLongTask || configuration.notifyFromPrograms else {
             notificationPermissionNotice = RowStatus()
             return
         }
