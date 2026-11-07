@@ -30,6 +30,14 @@ Versioning for compatibility changes.
   Metal copy textures across small size changes.
 - VoiceOver announces terminal feedback. Tab and Shift-Tab can reach the
   buttons on an ended session.
+- After an unexpected quit, Corta cleans up its unfinished terminal exports
+  and Remote Edit local copies on the next launch. Completed exports stay
+  in place.
+- Saving recent SSH hosts and clearing recent hosts or directory history no
+  longer block the interface on disk writes. Connections and directory
+  visits made during a clear are kept.
+- The SFTP browser pages through large directories so opening and leaving
+  them keeps the interface responsive. Sorting still covers the whole directory.
 
 ## [1.6.0] - 2026-11-06
 

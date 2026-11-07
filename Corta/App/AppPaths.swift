@@ -128,6 +128,7 @@ nonisolated enum AppPaths {
         for directory in [support, support.appendingPathComponent("RemoteEdit", isDirectory: true)] {
             PrivateFile.removeAbandonedTemporaries(in: directory, olderThan: abandonedStateFileAge)
         }
+        ExportStaging.removeAbandoned()
     }
 
     /// Past any save in progress, in this Corta or another using the same stage.

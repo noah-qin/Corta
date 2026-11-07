@@ -170,15 +170,43 @@ final class SFTPBrowserModel {
     /// failure, ssh's own words behind Details. Nil for a failure of the
     /// typed fields, which the form shows beside them.
     var connectFailure: ConnectFailure?
-    var currentPath = "/"
+    var currentPath = "/" {
+        didSet {
+            if currentPath != oldValue { listingPage = 0 }
+        }
+    }
     /// The path field's text, kept in sync with `currentPath` on every
     /// successful navigation; only its commit navigates, so half-typed
     /// paths never fire listings.
     var pathField = "/"
-    /// Every entry the server listed, in listing order; `entries` is what
-    /// the table shows.
+    /// Every entry the server listed, in listing order. `entries` is the
+    /// sorted, filtered directory and `listedEntries` is one table page.
     var allEntries: [Entry] = []
     var entries: [Entry] = []
+    static let listingPageSize = 2_000
+    private(set) var listingPage = 0
+
+    var listingPageCount: Int {
+        max(1, (entries.count + Self.listingPageSize - 1) / Self.listingPageSize)
+    }
+
+    var listedEntries: ArraySlice<Entry> {
+        let start = min(entries.count, listingPage * Self.listingPageSize)
+        let end = min(entries.count, start + Self.listingPageSize)
+        return entries[start..<end]
+    }
+
+    func showListingPage(_ page: Int) {
+        guard page != listingPage, (0..<listingPageCount).contains(page) else { return }
+        selection.removeAll()
+        listingPage = page
+    }
+
+    func publishListing(_ entries: [Entry]) {
+        self.entries = entries
+        listingPage = min(listingPage, listingPageCount - 1)
+        if !selection.isEmpty { selection.formIntersection(listedEntries.lazy.map(\.id)) }
+    }
     @ObservationIgnored var entryPreparation: Task<Void, Never>?
     @ObservationIgnored var entryGeneration = 0
     var hiddenEntries = 0

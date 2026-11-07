@@ -152,17 +152,22 @@ extension SettingsModel {
         if let error = store.persistenceError {
             directoryHistoryStatus = RowStatus(
                 kind: .failed, message: L10n.format("settings.status.writeFailed", error.localizedDescription),
-                actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)
+                actionTitle: count > 0 && !store.isClearing ? L10n.text("settings.action.clear") : nil)
             return
         }
         directoryHistoryStatus = RowStatus(
             kind: .adjusted, message: L10n.format("settings.status.directoryHistoryCount", count),
-            actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)
+            actionTitle: count > 0 && !store.isClearing ? L10n.text("settings.action.clear") : nil)
     }
 
     func clearDirectoryHistory() {
-        DirectoryHistoryStore.shared.clear()
-        refreshDirectoryHistoryStatus()
+        Task { [weak self] in
+            let store = DirectoryHistoryStore.shared
+            guard !store.isClearing else { return }
+            self?.directoryHistoryStatus.actionTitle = nil
+            await store.clear()
+            self?.refreshDirectoryHistoryStatus()
+        }
     }
 
     // MARK: - Recent hosts
@@ -175,17 +180,22 @@ extension SettingsModel {
         if let error = store.persistenceError {
             recentHostsStatus = RowStatus(
                 kind: .failed, message: L10n.format("settings.status.writeFailed", error.localizedDescription),
-                actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)
+                actionTitle: count > 0 && !store.isClearing ? L10n.text("settings.action.clear") : nil)
             return
         }
         recentHostsStatus = RowStatus(
             kind: .adjusted, message: L10n.format("settings.recentHosts.count", count),
-            actionTitle: count > 0 ? L10n.text("settings.action.clear") : nil)
+            actionTitle: count > 0 && !store.isClearing ? L10n.text("settings.action.clear") : nil)
     }
 
     func clearRecentHosts() {
-        RecentHostsStore.shared.clear()
-        refreshRecentHostsStatus()
+        Task { [weak self] in
+            let store = RecentHostsStore.shared
+            guard !store.isClearing else { return }
+            self?.recentHostsStatus.actionTitle = nil
+            await store.clear()
+            self?.refreshRecentHostsStatus()
+        }
     }
 
     // MARK: - Notification permission
