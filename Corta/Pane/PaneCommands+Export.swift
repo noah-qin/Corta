@@ -244,9 +244,14 @@ extension PaneCommands {
     /// newline, which grep, less and diff expect. Owner-only, like every file
     /// Corta writes from the terminal: scrollback holds tokens, and the umask's
     /// `0644` let any account that can reach the folder read the transcript.
-    nonisolated static func write(_ text: String, to url: URL) throws {
+    nonisolated static func write(
+        _ text: String, to url: URL, journal: URL = ExportStaging.journalDirectory
+    ) throws {
         let payload = text.hasSuffix("\n") ? text : text + "\n"
-        try PrivateFile.write(Data(payload.utf8), to: url)
+        try PrivateFile.createDirectory(at: url.deletingLastPathComponent())
+        try ExportStaging.replace(url, journal: journal) {
+            try PrivateFile.writeExclusively(Data(payload.utf8), at: $0)
+        }
     }
 
     /// The selection or the whole document; pure, for tests.

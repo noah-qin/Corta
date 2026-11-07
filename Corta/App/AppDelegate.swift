@@ -537,6 +537,7 @@ extension AppDelegate {
         isTerminating = true
         flushLayoutSave()
         DirectoryHistoryStore.shared.flush()
+        RecentHostsStore.flushSharedAtQuit()
         RemoteEditStore.flushSharedAtQuit()
         ZshBootstrap.removeGeneratedFiles()
         // The askpass socket and its directory.

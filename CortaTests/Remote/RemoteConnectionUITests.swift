@@ -102,15 +102,17 @@ struct RecentHostTimeTests {
     }
 
     @Test("when a host was last used is kept, read back, and forgotten with it")
-    func lastUsedPersists() throws {
+    func lastUsedPersists() async throws {
         let url = temporaryStoreURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let store = RecentHostsStore(fileURL: url)
         let box = try SSHTarget.parse(host: "box", user: "deploy", port: "").get()
         let when = Date(timeIntervalSince1970: 1_800_000_000)
         store.record(box, at: when)
+        await store.waitForWrites()
         #expect(RecentHostsStore(fileURL: url).lastUsed(box) == when)
         store.remove(box)
+        await store.waitForWrites()
         #expect(RecentHostsStore(fileURL: url).lastUsed(box) == nil)
     }
 

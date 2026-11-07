@@ -114,7 +114,7 @@ struct RecentHostsStoreTests {
     }
 
     @Test("newest first, no duplicates, trimmed to the limit, persisted owner-only")
-    func recordAndPersist() throws {
+    func recordAndPersist() async throws {
         let url = temporaryStoreURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let store = RecentHostsStore(fileURL: url)
@@ -124,13 +124,14 @@ struct RecentHostsStoreTests {
         #expect(store.targets.first?.displayName == "host-3")
         #expect(store.targets.filter { $0.displayName == "host-3" }.count == 1)
 
+        await store.waitForWrites()
         let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
         #expect(mode == 0o600)
         #expect(RecentHostsStore(fileURL: url).targets == store.targets, "read back after a relaunch")
     }
 
     @Test("a connection is remembered with the user, port and key it was made with")
-    func recordsTheFields() throws {
+    func recordsTheFields() async throws {
         let url = temporaryStoreURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let store = RecentHostsStore(fileURL: url)
@@ -138,10 +139,12 @@ struct RecentHostsStoreTests {
         // A key that has moved since is kept: connecting says it is missing.
         made.identityFile = "/nonexistent/id_ed25519"
         store.record(made)
+        await store.waitForWrites()
         #expect(RecentHostsStore(fileURL: url).targets == [made])
         // Again with another key: one entry, the newer key.
         made.identityFile = "/nonexistent/id_rsa"
         store.record(made)
+        await store.waitForWrites()
         #expect(store.targets == [made])
     }
 
@@ -168,12 +171,13 @@ struct RecentHostsStoreTests {
     /// An older build reads only `hosts`, and must neither find the file
     /// unreadable nor be handed `host:port` as a host name.
     @Test("the file stays readable by a build that knows only host names")
-    func olderBuildsStillReadTheFile() throws {
+    func olderBuildsStillReadTheFile() async throws {
         let url = temporaryStoreURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let store = RecentHostsStore(fileURL: url)
         store.record(SSHTarget(host: "plain", user: "deploy", identityFile: "/k"))
         store.record(SSHTarget(host: "ported", port: 2222))
+        await store.waitForWrites()
         let object = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
         #expect(object?["version"] as? Int == 1)
         #expect(object?["hosts"] as? [String] == ["deploy@plain"])
@@ -192,7 +196,7 @@ struct RecentHostsStoreTests {
     }
 
     @Test("remove forgets one; clear forgets all and deletes the file")
-    func removeAndClear() throws {
+    func removeAndClear() async throws {
         let url = temporaryStoreURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let store = RecentHostsStore(fileURL: url)
@@ -200,9 +204,54 @@ struct RecentHostsStoreTests {
         store.record(try target("b-box"))
         store.remove(try target("a-box"))
         #expect(store.targets.map(\.displayName) == ["b-box"])
-        store.clear()
+        await store.clear()
         #expect(store.targets.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test("a blocked write or clear stays responsive and quit saves later connections")
+    func clearWhileWritesAreQueued() async throws {
+        let url = temporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let queue = DispatchQueue(label: "RecentHostsStoreTests.blockedIO")
+        let store = RecentHostsStore(fileURL: url, writeQueue: queue)
+        let old = try target("old-box")
+        let new = try target("new-box")
+        let connectedAt = Date(timeIntervalSince1970: 1_234)
+
+        queue.suspend()
+        store.record(old)
+        #expect(store.targets == [old])
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        let clear = Task { await store.clear() }
+        await waitUntil("the recent hosts clear is queued") { store.isClearing }
+        store.record(new, at: connectedAt)
+        queue.resume()
+        store.flush()
+        #expect(!store.isClearing)
+
+        let reloaded = RecentHostsStore(fileURL: url)
+        #expect(store.targets == [new])
+        #expect(reloaded.targets == [new])
+        #expect(reloaded.lastUsed(new) == connectedAt)
+        await clear.value
+    }
+
+    @Test("a failed recent-host clear leaves the in-memory history available")
+    func clearFailureKeepsHistory() async throws {
+        let url = temporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let store = RecentHostsStore(fileURL: url)
+        let host = try target("build-box")
+        store.record(host)
+        await store.waitForWrites()
+        try FileManager.default.removeItem(at: url)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+
+        await store.clear()
+
+        #expect(store.targets == [host])
+        #expect(store.persistenceError != nil)
     }
 
     @Test("recording a host after downgrade preserves the newer history file")

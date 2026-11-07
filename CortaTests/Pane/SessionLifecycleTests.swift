@@ -194,6 +194,7 @@ struct SessionLifecycleTests {
         if records {
             #expect(await waitUntilTrue(timeout: .seconds(5)) { !store.targets.isEmpty })
             #expect(store.targets.map(\.displayName) == ["deploy@box"])
+            await store.waitForWrites()
         } else {
             try await Task.sleep(for: .milliseconds(2500))
             #expect(store.targets.isEmpty)

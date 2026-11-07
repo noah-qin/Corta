@@ -191,15 +191,8 @@ nonisolated enum PrivateFile {
     ) throws {
         let directory = url.deletingLastPathComponent()
         let temporary = directory.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString)")
-        let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
-        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        try writeExclusively(data, at: temporary, prepare: prepare)
         do {
-            let code = prepare(descriptor)
-            guard code == 0 else { throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO) }
-            try handle.write(contentsOf: data)
-            try handle.synchronize()
-            try handle.close()
             guard shouldCommit() else { throw POSIXError(.ECANCELED) }
             guard rename(temporary.path, url.path) == 0 else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
@@ -210,10 +203,29 @@ nonisolated enum PrivateFile {
         }
         // The rename already committed. Report failures only before that
         // point, so a caller never rolls back memory after changing disk.
-        let parent = open(url.deletingLastPathComponent().path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        let parent = open(directory.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
         if parent >= 0 {
             _ = fsync(parent)
             close(parent)
+        }
+    }
+
+    /// Writes at a path that must not exist, with final permissions set before the first byte.
+    static func writeExclusively(
+        _ data: Data, at url: URL, prepare: (Int32) -> Int32 = { makeOwnerOnly(descriptor: $0) }
+    ) throws {
+        let descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+        guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        do {
+            let code = prepare(descriptor)
+            guard code == 0 else { throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO) }
+            try handle.write(contentsOf: data)
+            try handle.synchronize()
+            try handle.close()
+        } catch {
+            unlink(url.path)
+            throw error
         }
     }
 }

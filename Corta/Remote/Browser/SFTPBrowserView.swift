@@ -214,7 +214,13 @@ extension SFTPBrowserView {
 
     private var browser: some View {
         VStack(spacing: 0) {
-            listing
+            // Reuse the bounded table. Jump to the top when opening another
+            // directory or page, even if its first row shares the same name.
+            ScrollViewReader { proxy in
+                listing.onChange(of: ListingPosition(path: model.currentPath, page: model.listingPage)) { _, _ in
+                    if let first = model.listedEntries.first { proxy.scrollTo(first.id, anchor: .top) }
+                }
+            }
             if let notice = model.receptionNotice {
                 Divider()
                 Label(notice, systemImage: "exclamationmark.triangle.fill")
@@ -326,6 +332,11 @@ extension SFTPBrowserView {
 
     // MARK: - Listing
 
+    private struct ListingPosition: Equatable {
+        let path: String
+        let page: Int
+    }
+
     private var listing: some View {
         Table(of: SFTPBrowserModel.Entry.self, selection: $model.selection, sortOrder: $sortOrder) {
             TableColumn(L10n.text("sftp.column.name"), value: \.name) { entry in
@@ -367,14 +378,11 @@ extension SFTPBrowserView {
             }
             .width(min: 120, ideal: 170, max: 240)
         } rows: {
-            ForEach(model.entries) { entry in
-                if entry.kind == .file {
-                    // Dragged to Finder, a file is downloaded where it lands.
-                    TableRow(entry)
-                        .itemProvider { model.dragItem(for: entry).itemProvider() }
-                } else {
-                    TableRow(entry)
-                }
+            ForEach(model.listedEntries) { entry in
+                // Keep one row shape for the table. Files publish a promise
+                // that downloads only when dropped, while folders have no provider.
+                TableRow(entry)
+                    .itemProvider(entry.kind == .file ? { model.dragItem(for: entry).itemProvider() } : nil)
             }
         }
         .alternatingRowBackgrounds(.enabled)
@@ -387,7 +395,7 @@ extension SFTPBrowserView {
         .contextMenu(forSelectionType: SFTPBrowserModel.Entry.ID.self) { ids in
             rowMenu(for: ids)
         } primaryAction: { ids in
-            guard ids.count == 1, let entry = model.entries.first(where: { ids.contains($0.id) })
+            guard ids.count == 1, let entry = model.listedEntries.first(where: { ids.contains($0.id) })
             else { return }
             model.navigateInto(entry)
         }
@@ -406,7 +414,7 @@ extension SFTPBrowserView {
     /// selection selects what was clicked first, as Finder does.
     @ViewBuilder
     private func rowMenu(for ids: Set<SFTPBrowserModel.Entry.ID>) -> some View {
-        let entries = model.entries.filter { ids.contains($0.id) }
+        let entries = model.listedEntries.filter { ids.contains($0.id) }
         if entries.isEmpty {
             Button(L10n.text("sftp.action.newDirectory")) { model.requestNewDirectory() }
             Button(L10n.text("sftp.action.upload")) { model.requestUpload() }
@@ -458,6 +466,7 @@ extension SFTPBrowserView {
             #if DEBUG
             if model.isDevelopmentPreview { Text(verbatim: "· DEBUG").help(L10n.text("ui.demo.hint")) }
             #endif
+            if model.listingPageCount > 1 { SFTPListingPagination(model: model) }
             Spacer()
             volumeText
         }

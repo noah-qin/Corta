@@ -260,9 +260,8 @@ extension SFTPBrowserModel {
             entryGeneration &+= 1
             allEntries = converted.entries
             hiddenEntries = converted.hiddenCount
-            entries = result.entries
-            selection.formIntersection(result.names)
             commit()
+            publishListing(result)
             return
         }
     }
@@ -306,8 +305,7 @@ extension SFTPBrowserModel {
                     source, hidden: hidden, column: column, ascending: ascending),
                 !Task.isCancelled, let self, generation == self.entryGeneration
             else { return }
-            self.entries = result.entries
-            self.selection.formIntersection(result.names)
+            self.publishListing(result)
             self.entryPreparation = nil
         }
     }
@@ -315,13 +313,10 @@ extension SFTPBrowserModel {
     @concurrent
     private static func prepareVisibleEntries(
         _ entries: [Entry], hidden: Bool, column: SortColumn, ascending: Bool
-    ) async throws -> (entries: [Entry], names: Set<String>) {
+    ) async throws -> [Entry] {
         try Task.checkCancellation()
         let visible = hidden ? entries : entries.filter { !$0.isHidden }
-        let sorted = try Self.sorted(
-            visible, by: column, ascending: ascending, checkCancellation: true)
-        try Task.checkCancellation()
-        return (sorted, Set(sorted.map(\.id)))
+        return try Self.sorted(visible, by: column, ascending: ascending, checkCancellation: true)
     }
 
     /// Folders first, then the column; ties fall back to the name, so the

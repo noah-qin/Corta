@@ -236,26 +236,30 @@ extension RemoteEditCoordinator {
     /// failure — a missing source, a full disk, no permission — leaves the
     /// existing file exactly as it was. The destination being the source
     /// itself is already the requested state.
-    nonisolated static func copyReplacing(_ source: URL, at destination: URL) throws {
+    nonisolated static func copyReplacing(
+        _ source: URL, at destination: URL, journal: URL = ExportStaging.journalDirectory
+    ) throws {
+        let input = Darwin.open(source.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
+        guard input >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        defer { close(input) }
         var sourceInfo = Darwin.stat()
+        guard fstat(input, &sourceInfo) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        guard sourceInfo.st_mode & S_IFMT == S_IFREG else { throw POSIXError(.EINVAL) }
+
         var destinationInfo = Darwin.stat()
-        if fstatat(AT_FDCWD, source.path, &sourceInfo, 0) == 0,
-            fstatat(AT_FDCWD, destination.path, &destinationInfo, 0) == 0,
+        if fstatat(AT_FDCWD, destination.path, &destinationInfo, 0) == 0,
             sourceInfo.st_dev == destinationInfo.st_dev,
             sourceInfo.st_ino == destinationInfo.st_ino
         {
             return
         }
-        let temporary = destination.deletingLastPathComponent().appendingPathComponent(
-            ".\(destination.lastPathComponent).corta-save-\(UUID().uuidString)")
-        do {
-            try FileManager.default.copyItem(at: source, to: temporary)
-            guard Darwin.rename(temporary.path, destination.path) == 0 else {
+        try ExportStaging.replace(destination, journal: journal) { temporary in
+            let output = Darwin.open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+            guard output >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            defer { close(output) }
+            guard fcopyfile(input, output, nil, copyfile_flags_t(COPYFILE_ALL)) == 0, fsync(output) == 0 else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
-        } catch {
-            try? FileManager.default.removeItem(at: temporary)
-            throw error
         }
     }
 
