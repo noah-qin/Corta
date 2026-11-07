@@ -219,7 +219,7 @@ extension SFTPBrowserModel {
     }
 
     var selectedEntries: [Entry] {
-        entries.filter { selection.contains($0.id) }
+        listedEntries.filter { selection.contains($0.id) }
     }
 
     /// Whether Download has anything it can act on: files and directories

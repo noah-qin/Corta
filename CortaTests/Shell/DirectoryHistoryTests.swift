@@ -193,13 +193,13 @@ struct DirectoryHistoryStoreTests {
     }
 
     @Test("clear removes the file as well as the in-memory history")
-    func clearRemovesTheFile() {
+    func clearRemovesTheFile() async {
         defer { removeDirectory() }
         let store = DirectoryHistoryStore(fileURL: file)
         store.record("/tmp")
         store.flush()
         #expect(FileManager.default.fileExists(atPath: file.path))
-        store.clear()
+        await store.clear()
         #expect(!FileManager.default.fileExists(atPath: file.path))
         #expect(store.history.entries.isEmpty)
     }
@@ -232,10 +232,50 @@ struct DirectoryHistoryStoreTests {
         defer { removeDirectory() }
         let store = DirectoryHistoryStore(fileURL: file)
         store.record("/tmp")
-        store.clear()
+        await store.clear()
         #expect(!store.hasPendingSave)
         try await Task.sleep(for: .seconds(DirectoryHistoryStore.defaultSaveDelay + 0.5))
         #expect(!FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test("visits during a blocked clear survive quit with a fresh visit count")
+    func clearKeepsLaterVisits() async {
+        defer { removeDirectory() }
+        let queue = DispatchQueue(label: "DirectoryHistoryStoreTests.blockedIO")
+        let store = DirectoryHistoryStore(fileURL: file, saveDelay: 3600, writeQueue: queue)
+        store.record("/tmp")
+        store.record("/var")
+        store.flush()
+        #expect(FileManager.default.fileExists(atPath: file.path))
+
+        queue.suspend()
+        let clear = Task { await store.clear() }
+        await waitUntil("the directory history clear is queued") { store.isClearing }
+        store.record("/tmp")
+        queue.resume()
+        store.flush()
+        #expect(!store.isClearing)
+
+        let reloaded = DirectoryHistoryStore(fileURL: file)
+        #expect(store.history.entries.keys.sorted() == ["/tmp"])
+        #expect(reloaded.history.entries.keys.sorted() == ["/tmp"])
+        #expect(reloaded.history.entries["/tmp"]?.visitCount == 1)
+        await clear.value
+    }
+
+    @Test("a failed directory-history clear leaves the in-memory history available")
+    func clearFailureKeepsHistory() async throws {
+        defer { removeDirectory() }
+        let store = DirectoryHistoryStore(fileURL: file, saveDelay: 3600)
+        store.record("/tmp")
+        store.flush()
+        try FileManager.default.removeItem(at: file)
+        try FileManager.default.createDirectory(at: file, withIntermediateDirectories: false)
+
+        await store.clear()
+
+        #expect(store.history.entries["/tmp"]?.visitCount == 1)
+        #expect(store.persistenceError != nil)
     }
 
     @Test("an absent file starts with an empty history, not an error")

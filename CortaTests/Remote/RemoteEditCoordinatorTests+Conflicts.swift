@@ -183,26 +183,31 @@ extension RemoteEditCoordinatorTests {
     func saveElsewhereFailureKeepsExistingFile() throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
+        let journal = root.appendingPathComponent("journal")
         let existing = root.appendingPathComponent("backup.rs")
         try "USER-BACKUP".write(to: existing, atomically: true, encoding: .utf8)
 
         #expect(throws: (any Error).self) {
             try RemoteEditCoordinator.copyReplacing(
-                root.appendingPathComponent("deleted.rs"), at: existing)
+                root.appendingPathComponent("deleted.rs"), at: existing, journal: journal)
         }
         #expect((try? String(contentsOf: existing, encoding: .utf8)) == "USER-BACKUP")
         #expect((try? FileManager.default.contentsOfDirectory(atPath: root.path)) == ["backup.rs"])
 
         let edit = root.appendingPathComponent("edit.rs")
         try "EDIT".write(to: edit, atomically: true, encoding: .utf8)
-        try RemoteEditCoordinator.copyReplacing(edit, at: existing)
+        try FileManager.default.setAttributes([.posixPermissions: 0o640], ofItemAtPath: edit.path)
+        try RemoteEditCoordinator.copyReplacing(edit, at: existing, journal: journal)
         #expect((try? String(contentsOf: existing, encoding: .utf8)) == "EDIT")
+        let mode = try FileManager.default.attributesOfItem(atPath: existing.path)[.posixPermissions] as? Int
+        #expect(mode == 0o640)
         // The same file as its own destination is already saved.
-        try RemoteEditCoordinator.copyReplacing(existing, at: existing)
+        try RemoteEditCoordinator.copyReplacing(existing, at: existing, journal: journal)
         #expect((try? String(contentsOf: existing, encoding: .utf8)) == "EDIT")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: journal.path).isEmpty)
         #expect(
             (try? FileManager.default.contentsOfDirectory(atPath: root.path).sorted())
-                == ["backup.rs", "edit.rs"])
+                == ["backup.rs", "edit.rs", "journal"])
     }
 
     @Test("approval snapshots a quit left behind are removed when the store opens")

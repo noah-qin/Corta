@@ -880,6 +880,20 @@ view with read-only fixtures and example transfer rows. Navigate `/home/demo`,
 credentials, or local file staging is used. The preview menu and fixture
 client are excluded from Release builds.
 
+### SFTP browser large-directory benchmark
+
+Run `SFTPLargeDirectoryBenchmark` in the macOS Unit test plan with
+`TEST_RUNNER_CORTA_SFTP_DIRECTORY_BENCHMARK=1` in the `xcodebuild`
+environment. It hosts the real browser view in a window and feeds it
+local fixtures of 10,000, 50,000 and 100,000 entries. Each size runs three
+times and reports time to the first native table row, 12 scroll jumps
+with a frame between inputs, a return to the parent directory after
+scrolling, and a separate jump to the last listing page.
+The `gap` field reports the largest interval observed by an 8 ms
+main-run-loop timer during each action. Use the same build configuration
+and machine for comparisons. These timings exclude network latency and
+are diagnostic rather than test thresholds.
+
 ### Environment switches
 
 The app reads these from its own launch environment, and only through

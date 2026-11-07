@@ -154,16 +154,15 @@ struct ExportTextTests {
 /// in doubt; the encoding and the trailing newline are ours.
 @MainActor
 struct ExportWriteTests {
-    private func temporaryURL() -> URL {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("corta-export-\(UUID().uuidString).txt")
-    }
+    private let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("corta-export-\(UUID().uuidString)", isDirectory: true)
+    private var journal: URL { root.appendingPathComponent("journal") }
+    private var url: URL { root.appendingPathComponent("History.txt") }
 
     @Test("the file is UTF-8 and reads back byte for byte")
     func writesUTF8() throws {
-        let url = temporaryURL()
-        defer { try? FileManager.default.removeItem(at: url) }
-        try PaneCommands.write("héllo 中文 🙂\nsecond line\n", to: url)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try PaneCommands.write("héllo 中文 🙂\nsecond line\n", to: url, journal: journal)
         let read = try String(contentsOf: url, encoding: .utf8)
         #expect(read == "héllo 中文 🙂\nsecond line\n")
     }
@@ -172,32 +171,27 @@ struct ExportWriteTests {
     /// malformed, and terminal output routinely ends mid-line.
     @Test("a missing final newline is added, and an existing one is not doubled")
     func trailingNewline() throws {
-        let url = temporaryURL()
-        defer { try? FileManager.default.removeItem(at: url) }
-        try PaneCommands.write("no newline", to: url)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try PaneCommands.write("no newline", to: url, journal: journal)
         #expect(try String(contentsOf: url, encoding: .utf8) == "no newline\n")
-        try PaneCommands.write("has newline\n", to: url)
+        try PaneCommands.write("has newline\n", to: url, journal: journal)
         #expect(try String(contentsOf: url, encoding: .utf8) == "has newline\n")
     }
 
     @Test("an export is readable by its owner only")
     func ownerOnly() throws {
-        let url = temporaryURL()
-        defer { try? FileManager.default.removeItem(at: url) }
-        try PaneCommands.write("TOKEN=fake\n", to: url)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try PaneCommands.write("TOKEN=fake\n", to: url, journal: journal)
         let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
         #expect(mode == 0o600)
     }
 
     @Test("an export into a folder with an inherited read ACL stays private")
     func exportDropsInheritedACL() throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("corta-export-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: directory) }
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try OpenFileCommandTests.grantInheritedRead(on: directory)
-        let url = directory.appendingPathComponent("History.txt")
-        try PaneCommands.write("TOKEN=fake\n", to: url)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try OpenFileCommandTests.grantInheritedRead(on: root)
+        try PaneCommands.write("TOKEN=fake\n", to: url, journal: journal)
         #expect(OpenFileCommandTests.hasExtendedACL(url) == false)
     }
 
@@ -206,17 +200,18 @@ struct ExportWriteTests {
     /// already keeps.
     @Test("writing over an existing file replaces it whole")
     func atomicReplacement() throws {
-        let url = temporaryURL()
-        defer { try? FileManager.default.removeItem(at: url) }
-        try PaneCommands.write("first\n", to: url)
-        try PaneCommands.write("second\n", to: url)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try PaneCommands.write("first\n", to: url, journal: journal)
+        try PaneCommands.write("second\n", to: url, journal: journal)
         #expect(try String(contentsOf: url, encoding: .utf8) == "second\n")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: journal.path).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).sorted() == ["History.txt", "journal"])
     }
 
     @Test("a write to an unwritable location throws rather than failing silently")
     func unwritableLocationThrows() {
         #expect(throws: (any Error).self) {
-            try PaneCommands.write("x\n", to: URL(fileURLWithPath: "/no/such/dir/x.txt"))
+            try PaneCommands.write("x\n", to: URL(fileURLWithPath: "/no/such/dir/x.txt"), journal: journal)
         }
     }
 }

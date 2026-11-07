@@ -691,6 +691,10 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   browser closes. Drag a file out to Finder to download it; the download starts
   when you drop, not while you hover, with a row under Transfers. Transfers are under
   the toolbar's arrows button, with speed, time left and Show in Finder.
+  Directories with more than 2,000 visible items are split into pages. Use
+  the arrows or the page number at the bottom to jump between pages. Sorting
+  applies to the whole directory. Selection and Select All apply to the
+  current page.
 - **Editing a remote file.** **Edit** in the browser — or ⌘-clicking a
   `path:line` in a remote pane — downloads a copy and opens it in your
   editor. Set **Settings ▸ Terminal ▸ Open File Command** first, using an

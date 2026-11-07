@@ -236,7 +236,16 @@ nonisolated enum SSHConfigHosts {
 /// reported is not. Cleared from Settings ▸ Privacy & Security.
 @MainActor
 final class RecentHostsStore {
-    static let shared = RecentHostsStore(fileURL: RecentHostsStore.defaultFileURL)
+    static let shared: RecentHostsStore = {
+        let store = RecentHostsStore(fileURL: defaultFileURL)
+        activeShared = store
+        return store
+    }()
+    private static weak var activeShared: RecentHostsStore?
+
+    static func flushSharedAtQuit() {
+        activeShared?.flush()
+    }
 
     static let limit = 8
 
@@ -246,16 +255,46 @@ final class RecentHostsStore {
 
     /// Injected so tests use a temporary file.
     let fileURL: URL
-    private(set) var targets: [SSHTarget] = []
+    var targets: [SSHTarget] { history.targets }
     private(set) var preservesNewerFile = false
     private(set) var persistenceError: (any Error)?
     private var preservesUnreadableFile = false
-    /// When each was last connected to, by `displayName`; absent in a file
-    /// an older build wrote.
-    private var lastUsed: [String: Date] = [:]
+    private let writeQueue: DispatchQueue
+    private var persistenceGeneration = 0
+    private var history = History()
+    /// Keep changes made after a clear started separately until deletion succeeds.
+    private var clearing: Clearing?
 
-    init(fileURL: URL) {
+    private struct Clearing {
+        let deletion: HistoryFileDeletion
+        var history = History()
+        var changed = false
+    }
+
+    var isClearing: Bool { clearing != nil }
+
+    private struct History {
+        var targets: [SSHTarget] = []
+        /// By displayName; absent in a file an older build wrote.
+        var lastUsed: [String: Date] = [:]
+
+        mutating func record(_ target: SSHTarget, at date: Date) {
+            targets.removeAll { $0.displayName == target.displayName }
+            targets.insert(target, at: 0)
+            if targets.count > RecentHostsStore.limit { targets.removeLast(targets.count - RecentHostsStore.limit) }
+            lastUsed[target.displayName] = date
+            lastUsed = lastUsed.filter { name, _ in targets.contains { $0.displayName == name } }
+        }
+
+        mutating func remove(_ target: SSHTarget) {
+            targets.removeAll { $0.displayName == target.displayName }
+            lastUsed[target.displayName] = nil
+        }
+    }
+
+    init(fileURL: URL, writeQueue: DispatchQueue = DispatchQueue(label: "Corta.RecentHostsStore", qos: .utility)) {
         self.fileURL = fileURL
+        self.writeQueue = writeQueue
         load()
     }
 
@@ -264,33 +303,70 @@ final class RecentHostsStore {
     /// replaces the key remembered.
     func record(_ target: SSHTarget, at date: Date = Date()) {
         guard let target = Self.checked(target) else { return }
-        targets.removeAll { $0.displayName == target.displayName }
-        targets.insert(target, at: 0)
-        if targets.count > Self.limit { targets.removeLast(targets.count - Self.limit) }
-        lastUsed[target.displayName] = date
-        lastUsed = lastUsed.filter { name, _ in targets.contains { $0.displayName == name } }
-        save()
+        history.record(target, at: date)
+        clearing?.history.record(target, at: date)
+        noteChange()
     }
 
     func remove(_ target: SSHTarget) {
-        targets.removeAll { $0.displayName == target.displayName }
-        lastUsed[target.displayName] = nil
-        save()
+        history.remove(target)
+        clearing?.history.remove(target)
+        noteChange()
     }
 
     func lastUsed(_ target: SSHTarget) -> Date? {
-        lastUsed[target.displayName]
+        history.lastUsed[target.displayName]
     }
 
-    /// Forgets every host and deletes the file.
-    func clear() {
-        guard !preservesNewerFile, !preservesUnreadableFile else { return }
-        do {
-            try PrivateFile.removeIfPresent(fileURL)
-            targets.removeAll()
-            lastUsed.removeAll()
+    /// Deletes the file after earlier writes, keeping connections made while it was being deleted.
+    func clear() async {
+        guard !preservesNewerFile, !preservesUnreadableFile, !isClearing else { return }
+        let deletion = HistoryFileDeletion(fileURL, on: writeQueue)
+        clearing = Clearing(deletion: deletion)
+        persistenceGeneration += 1
+        await deletion.wait()
+        finishClear(deletion)
+    }
+
+    private func finishClear(_ deletion: HistoryFileDeletion) {
+        guard let clearing, clearing.deletion === deletion, let result = deletion.result else { return }
+        self.clearing = nil
+        switch result {
+        case .success:
+            history = clearing.history
             persistenceError = nil
-        } catch { persistenceError = error }
+            if !history.targets.isEmpty { save() }
+        case .failure(let error):
+            persistenceError = error
+            if clearing.changed { save(reportSuccess: false) }
+        }
+    }
+
+    private func noteChange() {
+        if isClearing {
+            clearing?.changed = true
+        } else {
+            save()
+        }
+    }
+
+    /// Finishes queued work within the quit deadline.
+    func flush() {
+        let deadline = DispatchTime.now() + .seconds(1)
+        if let deletion = clearing?.deletion {
+            deletion.wait(until: deadline)
+            finishClear(deletion)
+        }
+        let drained = DispatchSemaphore(value: 0)
+        writeQueue.async { drained.signal() }
+        _ = drained.wait(timeout: deadline)
+    }
+
+    /// Waits for writes already scheduled, without blocking the caller.
+    func waitForWrites() async {
+        await withCheckedContinuation { continuation in
+            writeQueue.async { continuation.resume() }
+        }
     }
 
     /// The rules a typed connection passes, re-applied to a stored one: an
@@ -307,7 +383,7 @@ final class RecentHostsStore {
     /// `hosts` is what every build reads: `host` or `user@host`. `targets`,
     /// added beside it, carries the fields; an older build ignores it and
     /// still finds the hosts a port does not change the meaning of.
-    private nonisolated struct Persisted: Codable {
+    private nonisolated struct Persisted: Codable, Sendable {
         static let currentVersion = 1
         var version: Int
         var hosts: [String]
@@ -339,32 +415,38 @@ final class RecentHostsStore {
         else { return }
         let stored = persisted.targets ?? persisted.hosts.compactMap(SSHTarget.named)
         var seen = Set<String>()
-        targets = Array(
+        history.targets = Array(
             stored.compactMap(Self.checked).filter { seen.insert($0.displayName).inserted }
                 .prefix(Self.limit))
-        lastUsed = (persisted.used ?? [:])
+        history.lastUsed = (persisted.used ?? [:])
             .filter { name, _ in seen.contains(name) }
             .mapValues { Date(timeIntervalSince1970: $0) }
     }
 
-    /// A handful of entries, written at most once per connection: small
-    /// enough to write in place. Owner-only, since host names and key paths
-    /// say where you work.
-    private func save() {
+    /// Snapshots on the main actor, encodes and writes on the serial queue.
+    private func save(reportSuccess: Bool = true) {
         guard !preservesNewerFile, !preservesUnreadableFile else { return }
         // A host with a port is left out of `hosts`: an older build would
         // read `host:port` as a host name.
         let hosts = targets.filter { $0.port == nil }
             .map { SSHTarget(host: $0.host, user: $0.user).displayName }
-        guard
-            let data = try? JSONEncoder().encode(
-                Persisted(
-                    version: Persisted.currentVersion, hosts: hosts, targets: targets,
-                    used: lastUsed.mapValues(\.timeIntervalSince1970)))
-        else { return }
-        do {
-            try PrivateFile.write(data, to: fileURL)
-            persistenceError = nil
-        } catch { persistenceError = error }
+        let persisted = Persisted(
+            version: Persisted.currentVersion, hosts: hosts, targets: targets,
+            used: history.lastUsed.mapValues(\.timeIntervalSince1970))
+        let fileURL = fileURL
+        persistenceGeneration += 1
+        let generation = persistenceGeneration
+        writeQueue.async { [weak self] in
+            let result = Result { try PrivateFile.write(JSONEncoder().encode(persisted), to: fileURL) }
+            Task { @MainActor [weak self] in
+                guard let self, generation == self.persistenceGeneration else { return }
+                switch result {
+                case .success:
+                    if reportSuccess { self.persistenceError = nil }
+                case .failure(let error):
+                    self.persistenceError = error
+                }
+            }
+        }
     }
 }

@@ -46,9 +46,12 @@ nonisolated enum SFTPDropDestination: Equatable {
     /// A folder row: the folder's path and its name.
     case folder(path: String, name: String)
 
-    static func resolve(row: Int?, entries: [SFTPBrowserModel.Entry], currentPath: String) -> Self {
-        if let row, entries.indices.contains(row), entries[row].kind == .directory {
-            let entry = entries[row]
+    static func resolve(
+        row: Int?, entries: some RandomAccessCollection<SFTPBrowserModel.Entry>, currentPath: String
+    ) -> Self {
+        if let row, row >= 0, row < entries.count {
+            let entry = entries[entries.index(entries.startIndex, offsetBy: row)]
+            guard entry.kind == .directory else { return .current(path: currentPath) }
             return .folder(path: SFTPBrowserModel.joinPath(currentPath, entry.name), name: entry.displayName)
         }
         return .current(path: currentPath)
@@ -135,7 +138,7 @@ final class SFTPDropTargetView: NSView {
         let count = sender.draggingPasteboard.pasteboardItems?.count ?? 1
         let row = tableRow(at: sender.draggingLocation)
         let resolved = SFTPDropDestination.resolve(
-            row: row, entries: model.entries, currentPath: model.currentPath)
+            row: row, entries: model.listedEntries, currentPath: model.currentPath)
         let rowShown: Int? = if case .folder = resolved { row } else { nil }
         if resolved != destination || rowShown != highlightedRow || count != itemCount {
             destination = resolved

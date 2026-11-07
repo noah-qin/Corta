@@ -172,15 +172,28 @@ final class DirectoryHistoryStore {
     private(set) var persistenceError: (any Error)?
     private var persistenceGeneration = 0
     /// Serial, so an in-flight write can't undo a clear.
-    private let writeQueue = DispatchQueue(label: "Corta.DirectoryHistoryStore", qos: .utility)
+    private let writeQueue: DispatchQueue
+    private var clearing: Clearing?
+
+    private struct Clearing {
+        let deletion: HistoryFileDeletion
+        var history = DirectoryHistory()
+        let wasPending: Bool
+    }
+
+    var isClearing: Bool { clearing != nil }
 
     static var defaultFileURL: URL {
         AppPaths.applicationSupportDirectory.appendingPathComponent("directory-history.json")
     }
 
-    init(fileURL: URL, saveDelay: TimeInterval = DirectoryHistoryStore.defaultSaveDelay) {
+    init(
+        fileURL: URL, saveDelay: TimeInterval = DirectoryHistoryStore.defaultSaveDelay,
+        writeQueue: DispatchQueue = DispatchQueue(label: "Corta.DirectoryHistoryStore", qos: .utility)
+    ) {
         self.fileURL = fileURL
         self.saveDelay = saveDelay
+        self.writeQueue = writeQueue
         load()
     }
 
@@ -188,27 +201,46 @@ final class DirectoryHistoryStore {
     func record(_ path: String) {
         guard ConfigurationStore.shared.configuration.directoryHistory else { return }
         history.record(path)
-        scheduleSave()
+        if isClearing {
+            clearing?.history.record(path)
+        } else {
+            scheduleSave()
+        }
     }
 
     /// Removes the history and its file, after any in-flight write.
-    func clear() {
-        guard !preservesNewerFile, !preservesUnreadableFile else { return }
+    func clear() async {
+        guard !preservesNewerFile, !preservesUnreadableFile, !isClearing else { return }
+        let deletion = HistoryFileDeletion(fileURL, on: writeQueue)
+        clearing = Clearing(deletion: deletion, wasPending: pendingSave != nil)
         pendingSave?.cancel()
         pendingSave = nil
         persistenceGeneration += 1
-        let fileURL = fileURL
-        do {
-            try writeQueue.sync { try PrivateFile.removeIfPresent(fileURL) }
-            history.clear()
+        await deletion.wait()
+        finishClear(deletion)
+    }
+
+    private func finishClear(_ deletion: HistoryFileDeletion) {
+        guard let clearing, clearing.deletion === deletion, let result = deletion.result else { return }
+        self.clearing = nil
+        switch result {
+        case .success:
+            history = clearing.history
             persistenceError = nil
-        } catch {
+            if !history.entries.isEmpty { scheduleSave() }
+        case .failure(let error):
             persistenceError = error
+            if clearing.wasPending || !clearing.history.entries.isEmpty { save(reportSuccess: false) }
         }
     }
 
     /// Writes a pending save now and waits, for quit.
     func flush() {
+        let deadline = DispatchTime.now() + .seconds(1)
+        if let deletion = clearing?.deletion {
+            deletion.wait(until: deadline)
+            finishClear(deletion)
+        }
         if let pendingSave {
             pendingSave.cancel()
             self.pendingSave = nil
@@ -216,7 +248,7 @@ final class DirectoryHistoryStore {
         }
         let drained = DispatchSemaphore(value: 0)
         writeQueue.async { drained.signal() }
-        _ = drained.wait(timeout: .now() + .seconds(1))
+        _ = drained.wait(timeout: deadline)
     }
 
     /// A save is scheduled and has not run.
@@ -280,7 +312,7 @@ final class DirectoryHistoryStore {
     }
 
     /// Snapshots on the main actor; encodes and writes on `writeQueue`.
-    private func save() {
+    private func save(reportSuccess: Bool = true) {
         guard !preservesNewerFile, !preservesUnreadableFile else { return }
         let persisted = Persisted(
             version: Persisted.currentVersion, entries: Array(history.entries.values))
@@ -293,10 +325,12 @@ final class DirectoryHistoryStore {
             }
             Task { @MainActor [weak self] in
                 guard let self, generation == self.persistenceGeneration else { return }
-                do {
-                    try result.get()
-                    self.persistenceError = nil
-                } catch { self.persistenceError = error }
+                switch result {
+                case .success:
+                    if reportSuccess { self.persistenceError = nil }
+                case .failure(let error):
+                    self.persistenceError = error
+                }
             }
         }
     }

@@ -21,6 +21,43 @@ import Testing
 @testable import Corta
 
 extension SFTPBrowserModelTests {
+    @Test("large folders keep the full sort order while selection and drops follow the visible page")
+    func listingPages() async {
+        let fake = FakeSFTPClient()
+        let size = SFTPBrowserModel.listingPageSize
+        fake.listings["/srv"] = (0..<size + 1).reversed().map { makeEntry("folder-\($0)", permissions: 0o040755) }
+        fake.listings["/srv/folder-\(size)"] = [makeEntry("readme")]
+        let model = SFTPBrowserModel(host: "build-box", startDirectory: "/srv") { _ in fake }
+        defer { model.disconnect() }
+        model.connect()
+        await waitUntil("the large directory opened") { model.connectionState == .connected }
+
+        #expect(model.listingPageCount == 2)
+        #expect(model.entries.count == size + 1)
+        #expect(model.listedEntries.count == size)
+        #expect(model.listedEntries.first?.name == "folder-0")
+        model.selection = ["folder-0"]
+        model.showListingPage(1)
+        #expect(model.selection.isEmpty)
+        #expect(model.listedEntries.map(\.name) == ["folder-\(size)"])
+        #expect(SFTPDropDestination.resolve(row: 0, entries: model.listedEntries, currentPath: "/srv")
+            == .folder(path: "/srv/folder-\(size)", name: "folder-\(size)"))
+        model.selection = ["folder-\(size)"]
+        model.sortAscending = false
+        await model.entryPreparation?.value
+        #expect(model.listedEntries.map(\.name) == ["folder-0"])
+        #expect(model.selection.isEmpty)
+
+        model.navigate(to: "/srv/folder-\(size)")
+        await waitUntil("the next directory opened") { !model.isLoading }
+        #expect(model.listingPage == 0)
+        #expect(model.listedEntries.map(\.name) == ["readme"])
+        model.navigateBack()
+        await waitUntil("the original directory reopened") { !model.isLoading }
+        #expect(model.listingPage == 0)
+        #expect(model.listedEntries.first?.name == "folder-\(size)")
+    }
+
     @Test("a hung listing retires the connection and allows Retry")
     func hungNavigationCanReconnect() async {
         let stalled = FakeSFTPClient()
