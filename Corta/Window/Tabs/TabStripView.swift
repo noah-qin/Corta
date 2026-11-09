@@ -83,7 +83,7 @@ final class TabStripView: NSView {
     /// choosing another tab slides it there rather than lighting one tab
     /// as another goes dark. Above the track and its hairlines, below the
     /// tabs.
-    private let selection = NSView()
+    let selection = NSView()
     private var separators: [NSView] = []
     /// A tab opened or closed since the last layout: the others glide.
     private var reflowsNextLayout = false

@@ -379,9 +379,9 @@ extension WindowTabsTests {
         let items = (0..<2).map {
             TabStripItem(id: "\($0)", programs: [], name: "zsh", context: "", toolTip: "", status: nil, progress: nil)
         }
+        // The pill is the strip's, one view that slides to the selected tab.
         func pillRed() throws -> CGFloat {
-            let view = try #require(strip.subviews.compactMap { $0 as? TabItemView }.last)
-            let fill = try #require(view.layer?.backgroundColor.flatMap { NSColor(cgColor: $0) })
+            let fill = try #require(strip.selection.layer?.backgroundColor.flatMap { NSColor(cgColor: $0) })
             return try #require(fill.usingColorSpace(.sRGB)).redComponent
         }
         for (variant, light) in [(Theme.corta.dark, false), (Theme.corta.light, true), (Theme.mono.dark, false)] {
