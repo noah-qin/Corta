@@ -101,10 +101,15 @@ final class PaneSearch: NSObject {
     var matchRect: CGRect?
 
     struct MatchRectKey: Equatable {
+        // periphery:ignore - read by the synthesised ==
         var index: Int
+        // periphery:ignore - read by the synthesised ==
         var matchesTotalPushed: Int
+        // periphery:ignore - read by the synthesised ==
         var matchesGeneration: Int
+        // periphery:ignore - read by the synthesised ==
         var scrollOffset: Int
+        // periphery:ignore - read by the synthesised ==
         var cursor: CGRect?
     }
 

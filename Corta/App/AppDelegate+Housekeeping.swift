@@ -128,7 +128,7 @@ extension AppDelegate {
     /// Leftovers of earlier runs, off the main thread; a folder given up on
     /// is reported once.
     func sweepAbandonedStateFiles() {
-        DispatchQueue.global(qos: .utility).async {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
             let stranded = AppPaths.removeAbandonedStateFiles()
             guard !stranded.isEmpty else { return }
             Task { @MainActor [weak self] in self?.reportStrandedExports(stranded) }

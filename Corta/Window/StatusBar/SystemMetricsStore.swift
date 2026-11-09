@@ -29,7 +29,7 @@ import AppKit
     init(
         store: ConfigurationStore = .shared,
         sample: @escaping @Sendable (SystemMetricsSampler, Set<SystemMetrics.Item>, String) async -> SystemMetrics = {
-            await $0.sample(items: $1, interface: $2)
+            $0.sample(items: $1, interface: $2)
         }
     ) {
         self.store = store

@@ -136,12 +136,19 @@ extension RemoteEditCoordinator {
     }
 
     nonisolated struct DigestStamp: Equatable {
+        // periphery:ignore - read by the synthesised ==
         let device: dev_t
+        // periphery:ignore - read by the synthesised ==
         let inode: ino_t
+        // periphery:ignore - read by the synthesised ==
         let size: off_t
+        // periphery:ignore - read by the synthesised ==
         let modifiedSeconds: Int
+        // periphery:ignore - read by the synthesised ==
         let modifiedNanoseconds: Int
+        // periphery:ignore - read by the synthesised ==
         let changedSeconds: Int
+        // periphery:ignore - read by the synthesised ==
         let changedNanoseconds: Int
 
         init?(_ url: URL) {

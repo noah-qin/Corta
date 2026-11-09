@@ -30,7 +30,7 @@ struct SFTPChannelLifecycleTests {
         var channel: SFTPSubprocessChannel? = try .spawn(
             host: "unused", executable: "/bin/cat", arguments: [], environment: [:])
         let source = try #require(channel?.stderrSource)
-        weak var released = channel
+        weak let released = channel
         if explicitClose { channel?.close() }
         channel = nil
         let deadline = SuspendingClock.now + .seconds(5)

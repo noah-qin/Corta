@@ -115,17 +115,6 @@ extension TerminalSession {
         }
     }
 
-    /// Every colour a frame resolves cells with, under one lock per frame.
-    public var frameColors: FrameColors {
-        registerStateWaiter {
-            state.withLock {
-                FrameColors(
-                    indexedPalette: $0.terminal.indexedPalette, dynamicColors: $0.terminal.dynamicColors,
-                    selectionBackground: $0.terminal.selectionBackground,
-                    selectionForeground: $0.terminal.selectionForeground)
-            }
-        }
-    }
     public func updateTheme(colors: DynamicColors, isDark: Bool) {
         registerStateWaiter {
             // Enqueue under the state lock: a later query cannot overtake a change report.

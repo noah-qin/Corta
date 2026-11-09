@@ -139,7 +139,7 @@ struct PendingImageTransmission: Sendable {
 
 /// OSC 10/11/12's colours, 8 bits per channel; reported by doubling each
 /// byte into xterm's 16-bit form.
-/// `TerminalSession.frameColors`: what a frame reads, taken together.
+/// `TerminalSession.takeFrameState()`'s colours: what a frame reads, taken together.
 public struct FrameColors: Sendable {
     public var indexedPalette: IndexedPalette
     public var dynamicColors: DynamicColors

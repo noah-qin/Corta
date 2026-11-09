@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import Synchronization
 import Testing
 
 @testable import Corta
@@ -93,19 +94,23 @@ struct SystemStatusBarTests {
         fixed.cpuPercent = 12
         let constant = fixed
         let metrics = SystemMetricsStore(store: config) { _, _, _ in constant }
-        var posts = 0
+        final class Posts: Sendable { let count = Mutex(0) }
+        let posts = Posts()
         let observer = NotificationCenter.default.addObserver(
-            forName: SystemMetricsStore.didChange, object: metrics, queue: nil) { _ in posts += 1 }
+            forName: SystemMetricsStore.didChange, object: metrics, queue: nil
+        ) { _ in posts.count.withLock { $0 += 1 } }
         defer { NotificationCenter.default.removeObserver(observer) }
         let client = UUID()
         metrics.setActive(true, client: client)
         let deadline = SuspendingClock.now + .seconds(5)
-        while posts == 0, SuspendingClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
-        #expect(posts == 1)
+        while posts.count.withLock({ $0 }) == 0, SuspendingClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(posts.count.withLock { $0 } == 1)
         metrics.setActive(false, client: client)
         metrics.setActive(true, client: client)
         try await Task.sleep(for: .milliseconds(300))
-        #expect(posts == 1)
+        #expect(posts.count.withLock { $0 } == 1)
         metrics.setActive(false, client: client)
     }
 

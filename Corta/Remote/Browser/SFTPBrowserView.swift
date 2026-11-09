@@ -333,7 +333,9 @@ extension SFTPBrowserView {
     // MARK: - Listing
 
     private struct ListingPosition: Equatable {
+        // periphery:ignore - read by the synthesised ==
         let path: String
+        // periphery:ignore - read by the synthesised ==
         let page: Int
     }
 

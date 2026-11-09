@@ -360,7 +360,7 @@ private final class DirectoryCandidateRowView: NSView {
         context.setStrokeColor(border.copy(alpha: border.alpha * 0.5) ?? border)
         context.setLineWidth(0.5)
         context.drawPath(using: .fillStroke)
-        drawMark(in: context)
+        drawMark()
         let textX = Self.textInset(for: font)
         let full = CTLineCreateWithAttributedString(content)
         let ellipsis = CTLineCreateWithAttributedString(token)
@@ -408,7 +408,7 @@ private final class DirectoryCandidateRowView: NSView {
     }
 
     /// A folder outline in the candidates' colour, centred on the row.
-    private func drawMark(in context: CGContext) {
+    private func drawMark() {
         let size = Self.markSize(for: font)
         guard let symbol = Self.folderSymbol(size: size * 0.8, color: mark) else { return }
         let fitted = symbol.size
