@@ -268,8 +268,15 @@ public struct Scrollback: Sendable {
         (0..<count).map { self[$0] }
     }
 
+    /// With no room (`limit == 0`: the alternate screen, `scrollback = 0`)
+    /// nothing is kept, but the line still counts, as one evicted at once:
+    /// every absolute-row anchor (marks, command records, selection, images)
+    /// then moves with the scroll exactly as it does with history.
     public mutating func push(_ line: Line) {
-        guard limit > 0 else { return }
+        guard limit > 0 else {
+            totalPushed += 1
+            return
+        }
         let length = line.trimmedCount
 
         if batches.isEmpty || batches[batches.count - 1].rows.count >= batchSize {

@@ -97,12 +97,12 @@ extension Grid {
         let count = min(max(0, count), marginBottom - marginTop + 1)
         guard count > 0 else { return }
         if marginTop == 0 && marginBottom == rows - 1 {
-            if scrollback.limit > 0 {
-                for row in 0..<count { scrollback.push(lines[row]) }
-            } else {
-                // No history (the alternate screen, `scrollback = 0`): no push
-                // advances the image anchors, so move and clip them here.
-                imagePlacements.scrollRegion(top: 0, bottom: rows - 1, delta: count,
+            for row in 0..<count { scrollback.push(lines[row]) }
+            if scrollback.limit == 0, imagePlacements.placementCount > 0 {
+                // Nothing is kept, so an image that has left the screen
+                // whole can never be seen again; one still partly on it
+                // stays, anchored like any other.
+                imagePlacements.removePlacementsWhollyInScrollback(
                     scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
             }
             // The ring's O(count) rotation either way, not the region's O(rows).

@@ -52,6 +52,23 @@ struct SelectionContentTests {
     }
 
     @Test(
+        "with no history, a selection scrolls with its text and goes once it leaves the screen",
+        arguments: [false, true])
+    func scrollingWithoutHistoryFollowsTheText(alternate: Bool) {
+        var terminal = Terminal(rows: 6, columns: 20, scrollbackLimit: alternate ? 100 : 0)
+        if alternate { terminal.feed(Array("\u{1B}[?1049h".utf8)) }
+        terminal.feed(Array((0..<10).map { "\($0)" }.joined(separator: "\r\n").utf8))
+        let range = SelectionRange(
+            start: SelectionPoint(row: 2, column: 0), end: SelectionPoint(row: 2, column: 5))
+        let content = Selection.content(of: range, in: terminal.grid)
+        terminal.feed(Array("\r\nmore".utf8))
+        #expect(Selection.isUnchanged(content, in: terminal.grid))
+        #expect(terminal.grid.rowText(1).hasPrefix("6"))
+        terminal.feed(Array("\r\nx\r\ny".utf8))
+        #expect(!Selection.isUnchanged(content, in: terminal.grid), "scrolled off with nothing to keep it")
+    }
+
+    @Test(
         "a write, erase, insert or delete on the selected row drops it",
         arguments: [
             "z",  // a printed character
