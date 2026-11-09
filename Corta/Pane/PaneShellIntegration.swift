@@ -410,16 +410,18 @@ extension PaneShellIntegration {
     /// Puts OSC 52 text on the pasteboard if the user allows it. Called per
     /// output batch from the damage pass; the policy lives here because the
     /// core has no pasteboard and no user.
+    /// Every queued write, oldest first, each answered on its own.
     func drainClipboardRequests() {
-        guard let request = session.takeClipboardCopyRequest() else { return }
-        guard ConfigurationStore.shared.configuration.allowClipboardWrite else {
-            if !request.refusal.isEmpty { session.write(request.refusal) }
-            return
+        while let request = session.takeClipboardCopyRequest() {
+            guard ConfigurationStore.shared.configuration.allowClipboardWrite else {
+                if !request.refusal.isEmpty { session.write(request.refusal) }
+                continue
+            }
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            let reply = pasteboard.setString(request.text, forType: .string) ? request.acknowledgement : request.failure
+            if !reply.isEmpty { session.write(reply) }
         }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        let reply = pasteboard.setString(request.text, forType: .string) ? request.acknowledgement : request.failure
-        if !reply.isEmpty { session.write(reply) }
     }
 
     // MARK: - Status marks and directory completion

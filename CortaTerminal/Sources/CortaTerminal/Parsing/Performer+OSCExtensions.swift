@@ -146,6 +146,20 @@ extension Performer {
 
     private static let emptyClipboardWriteStatus = Array("\u{1B}]5522;type=write:status=EIO\u{1B}\\".utf8)
 
+    /// Writes waiting for the app: a stream can finish many before one
+    /// frame drains them, and holding each is bounded by the text cap.
+    static let maximumPendingClipboardCopies = 8
+
+    /// Queues a write; past the cap the oldest gives way, and if a client
+    /// waits on it, it hears `EIO` — the write never reached the pasteboard.
+    mutating func queueClipboardCopy(_ text: String, acknowledged: Bool) {
+        if state.pendingClipboardCopies.count >= Self.maximumPendingClipboardCopies {
+            let dropped = state.pendingClipboardCopies.removeFirst()
+            if dropped.acknowledged { state.outputBuffer.append(contentsOf: Self.emptyClipboardWriteStatus) }
+        }
+        state.pendingClipboardCopies.append(PendingClipboardCopy(text: text, acknowledged: acknowledged))
+    }
+
     /// OSC 5522 is a transaction: publish once at the terminator. This text
     /// subset deliberately keeps OSC 52's smaller cap rather than advertising
     /// the full protocol's 64 MiB minimum or MIME/paste-event support.
@@ -170,8 +184,7 @@ extension Performer {
                     state.outputBuffer.append(contentsOf: Self.emptyClipboardWriteStatus)
                     return
                 }
-                state.pendingClipboardCopy = text
-                state.clipboardNeedsAcknowledgement = true
+                queueClipboardCopy(text, acknowledged: true)
                 return
             }
             guard metadata["mime"] == "dGV4dC9wbGFpbg==", parts.count == 2,
