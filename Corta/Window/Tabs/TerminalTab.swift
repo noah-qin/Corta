@@ -97,6 +97,10 @@ final class TabContainerViewController: NSViewController {
 
     private weak var shown: SplitViewController?
     private var revealsAfterClose = false
+    /// Which way the canvas moves: 1 toward a tab further along the row,
+    /// the new one coming in from the right; -1 back toward the start, the
+    /// way a closing tab hands over, so a close reads as an open undone.
+    private var direction: CGFloat = 1
     private var fadeGenerations: [ObjectIdentifier: UUID] = [:]
     /// The tab that stays drawn over a new one until the new one has drawn
     /// its shell's first output.
@@ -106,8 +110,10 @@ final class TabContainerViewController: NSViewController {
     /// `releaseHeld()` or a short timeout, so a new tab never flashes an
     /// empty canvas before its prompt arrives. `split` draws beneath it
     /// meanwhile and already has the keyboard.
-    func show(_ split: SplitViewController, holding previous: SplitViewController? = nil) {
+    func show(_ split: SplitViewController, holding previous: SplitViewController? = nil,
+              direction: CGFloat = 1) {
         releaseHeld(animated: false)
+        if !revealsAfterClose { self.direction = direction }
         shown = split
         let holding = previous.flatMap { $0 !== split && $0.parent === self ? $0 : nil }
         for case let child as SplitViewController in children {
@@ -119,7 +125,7 @@ final class TabContainerViewController: NSViewController {
         cancelFade(split.view)
         if revealsAfterClose {
             revealsAfterClose = false
-            Self.reveal(split.view)
+            Self.reveal(split.view, from: self.direction)
         }
         guard let holding else { return }
         held = holding
@@ -157,7 +163,7 @@ final class TabContainerViewController: NSViewController {
             contentView?.inert.remove(held.view)
             return
         }
-        if let shown { Self.reveal(shown.view) }
+        if let shown { Self.reveal(shown.view, from: direction) }
         fadeOut(held.view) { [weak self, weak held] in
             // Only while it is still this window's: a tab moved away during
             // the fade is another window's to show or hide.
@@ -178,6 +184,7 @@ final class TabContainerViewController: NSViewController {
             return
         }
         revealsAfterClose = true
+        direction = -1
         content.isHidden = false
         view.addSubview(content, positioned: .above, relativeTo: nil)
         contentView?.inert.add(content)
@@ -193,11 +200,11 @@ final class TabContainerViewController: NSViewController {
     /// Move the whole composited terminal surface, including its Metal text,
     /// without resizing the grid or scaling glyphs. Run after the first-frame
     /// hold, so shell startup cannot consume the visible transition.
-    private static func reveal(_ content: NSView) {
+    private static func reveal(_ content: NSView, from direction: CGFloat) {
         guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
         content.wantsLayer = true
         let slide = CABasicAnimation(keyPath: "transform.translation.x")
-        slide.fromValue = 18
+        slide.fromValue = 18 * direction
         slide.toValue = 0
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 0.7
@@ -223,7 +230,7 @@ final class TabContainerViewController: NSViewController {
         guard let layer = content.layer else { completion(); return }
         let slide = CABasicAnimation(keyPath: "transform.translation.x")
         slide.fromValue = 0
-        slide.toValue = -18
+        slide.toValue = -18 * direction
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 1
         fade.toValue = 0

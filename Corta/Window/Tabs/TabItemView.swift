@@ -95,7 +95,7 @@ final class TabItemView: NSView, NSTextFieldDelegate {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     func configure(_ item: TabStripItem, selected: Bool) {
-        // Every pass, not only on a change: the fill follows the canvas,
+        // Every pass, not only on a change: the tint follows the canvas,
         // which a theme switch moves with the same item and selection.
         defer { updateChrome() }
         guard item != self.item || selected != self.selected else { return }
@@ -136,21 +136,18 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         updateChrome()
     }
 
+    /// The selected tab's raised pill is the strip's, not the tab's: one
+    /// pill that slides from tab to tab (`TabStripView.selection`). A tab
+    /// draws only the faint tint under the pointer.
     private func updateChrome() {
         // A layer takes a resolved colour: resolve it in this view's
         // appearance, which the strip sets from the canvas, not in
         // whatever appearance happens to be current.
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = selected ? strip.selectedFill.cgColor
-                : hovering ? NSColor.labelColor.withAlphaComponent(0.06).cgColor : nil
-            // A hairline keeps a lone white pill visible on a white band.
-            layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.1).cgColor
+            layer?.backgroundColor = !selected && hovering ? NSColor.labelColor.withAlphaComponent(0.06).cgColor : nil
         }
-        layer?.shadowOpacity = selected ? 0.12 : 0
-        layer?.borderWidth = selected ? 0.5 : 0
-        layer?.shadowRadius = 2
-        layer?.shadowOffset = CGSize(width: 0, height: -0.5)
-        layer?.masksToBounds = false
+        // Clipped to its pill: a tab growing open shows only what fits.
+        layer?.masksToBounds = true
         // Only under the pointer: a row of × marks is clutter.
         closeButton.isHidden = !hovering || editor != nil
     }
@@ -163,6 +160,8 @@ final class TabItemView: NSView, NSTextFieldDelegate {
 
     override func layout() {
         super.layout()
+        // A closing tab keeps the layout it had while it is wiped away.
+        guard !isLeaving else { return }
         let height = bounds.height
         let image = TabIcon.image(for: item?.programs ?? [])
         if icon.image !== image { icon.image = image }

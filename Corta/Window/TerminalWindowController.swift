@@ -170,8 +170,11 @@ extension TerminalWindowController {
         guard let window, tabs.contains(where: { $0 === tab }) else { return }
         let changed = selectedTab !== tab
         let leaving = selectedTab
+        // Back toward the start of the row, the canvas moves the other way.
+        let from = tabs.firstIndex { $0 === leaving }, to = tabs.firstIndex { $0 === tab }
+        let backward = from.flatMap { from in to.map { $0 < from } } ?? false
         selectedTab = tab
-        container.show(tab.split, holding: previous)
+        container.show(tab.split, holding: previous, direction: backward ? -1 : 1)
         tab.split.didBecomeSelectedTab()
         if window.isKeyWindow || !window.isVisible || changed {
             window.makeFirstResponder(tab.split.focusedPane?.terminalView)

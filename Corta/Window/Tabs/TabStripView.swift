@@ -79,10 +79,18 @@ final class TabStripView: NSView {
     /// The capsule behind two or more tabs, and the hairlines between
     /// unselected neighbours: views, so they move with the tabs' animations.
     private let track = NSView()
+    /// The raised pill under the selected tab: one view for the strip, so
+    /// choosing another tab slides it there rather than lighting one tab
+    /// as another goes dark. Above the track and its hairlines, below the
+    /// tabs.
+    private let selection = NSView()
     private var separators: [NSView] = []
     /// A tab opened or closed since the last layout: the others glide.
     private var reflowsNextLayout = false
-    /// Tabs added to a strip already on screen: they spring in at the next
+    /// How long the next layout's movement takes: a close is given a
+    /// little longer than an open, so the tab is seen to go.
+    private var motionNextLayout = TabStripView.motion
+    /// Tabs added to a strip already on screen: they open at the next
     /// layout, once they have their frame.
     private var arriving: [TabItemView] = []
     /// How far the row is scrolled when its tabs, at their minimum width,
@@ -98,6 +106,13 @@ final class TabStripView: NSView {
         track.wantsLayer = true
         track.isHidden = true
         addSubview(track)
+        selection.wantsLayer = true
+        selection.layer?.masksToBounds = false
+        selection.layer?.borderWidth = 0.5
+        selection.layer?.shadowOpacity = 0.12
+        selection.layer?.shadowRadius = 2
+        selection.layer?.shadowOffset = CGSize(width: 0, height: -0.5)
+        addSubview(selection, positioned: .above, relativeTo: track)
         setAccessibilityElement(true)
         setAccessibilityRole(.tabGroup)
         setAccessibilityLabel(L10n.text("tabs.strip"))
@@ -131,6 +146,7 @@ final class TabStripView: NSView {
         let name: NSAppearance.Name = isLightCanvas ? .aqua : .darkAqua
         if appearance?.name != name { appearance = NSAppearance(named: name) }
         let changed = items != self.items || selectedIndex != self.selectedIndex
+        let selectionMoved = selectedIndex != self.selectedIndex
         if selectedIndex != self.selectedIndex || items.count != self.items.count { revealsSelection = true }
         // A tab closed under a drag: the dragged view no longer means the
         // same index. Drop the drag; the tabs settle where they are.
@@ -141,6 +157,7 @@ final class TabStripView: NSView {
         let animates = !views.isEmpty && window?.isVisible == true
             && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         reconcileViews(with: items, animates: animates)
+        if animates, selectionMoved { reflowsNextLayout = true }
         for (index, view) in views.enumerated() {
             view.index = index
             view.configure(items[index], selected: index == selectedIndex)
@@ -170,7 +187,12 @@ final class TabStripView: NSView {
         for view in byID.values {
             arriving.removeAll { $0 === view }
             view.cancelRename()
-            if animates { leave(view) } else { view.removeFromSuperview() }
+            if animates {
+                motionNextLayout = Self.closeMotion
+                leave(view)
+            } else {
+                view.removeFromSuperview()
+            }
         }
         if animates, next.count != views.count { reflowsNextLayout = true }
         views = next
@@ -214,11 +236,18 @@ final class TabStripView: NSView {
     private func updateTrackColors() {
         var trackFill: CGColor?
         var separatorFill: CGColor?
+        var pillFill: CGColor?
+        var pillEdge: CGColor?
         effectiveAppearance.performAsCurrentDrawingAppearance {
             trackFill = trackColor.cgColor
             separatorFill = NSColor.separatorColor.cgColor
+            pillFill = selectedFill.cgColor
+            // A hairline keeps a lone white pill visible on a white band.
+            pillEdge = NSColor.labelColor.withAlphaComponent(0.1).cgColor
         }
         track.layer?.backgroundColor = trackFill
+        selection.layer?.backgroundColor = pillFill
+        selection.layer?.borderColor = pillEdge
         for separator in separators { separator.layer?.backgroundColor = separatorFill }
     }
 
@@ -253,24 +282,45 @@ final class TabStripView: NSView {
         // not jump; a scroll to the selected tab glides.
         let reflow = !arriving.isEmpty || scrolled || reflowsNextLayout
         reflowsNextLayout = false
+        let duration = motionNextLayout
+        motionNextLayout = Self.motion
         func place(_ view: NSView, _ frame: NSRect) {
-            guard view.frame != frame else { return }
-            if reflow, !arriving.contains(where: { $0 === view }) {
+            // A new tab opens from nothing at its leading edge, growing as
+            // the track grows to hold it; its contents fade in as it does.
+            if arriving.contains(where: { $0 === view }) {
+                view.frame = NSRect(x: frame.minX, y: frame.minY, width: 0, height: frame.height)
+                view.alphaValue = 0
+            }
+            guard view.frame != frame || view.alphaValue < 1 else { return }
+            if reflow {
                 NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.2
-                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    context.duration = duration
+                    context.timingFunction = Self.curve
                     view.animator().frame = frame
+                    if arriving.contains(where: { $0 === view }) { view.animator().alphaValue = 1 }
                 }
             } else {
                 view.frame = frame
             }
         }
+        func slot(_ index: Int) -> NSRect {
+            NSRect(x: CGFloat(index) * width - offset, y: 0, width: width, height: bounds.height).integral
+        }
         let held = drag.flatMap { $0.moved && !$0.tornOff ? $0.index : nil }
         for (index, view) in views.enumerated() where index != held {
-            place(view, NSRect(x: CGFloat(index) * width - offset, y: 0, width: width, height: bounds.height).integral)
+            place(view, slot(index))
         }
-        layoutTrack(width: width, place: place)
-        for view in arriving where view.superview === self { springIn(view) }
+        layoutTrack(width: width, duration: reflow ? duration : nil, place: place)
+        // The pill goes where the selected tab goes; under a tab being
+        // dragged it is carried along with it, not animated after it.
+        selection.isHidden = !views.indices.contains(selectedIndex)
+        selection.layer?.cornerRadius = bounds.height / 2
+        if let held, held == selectedIndex {
+            selection.frame = views[held].frame
+        } else if views.indices.contains(selectedIndex) {
+            place(selection, slot(selectedIndex))
+        }
+        selection.alphaValue = drag?.tornOff == true ? 0.35 : 1
         arriving.removeAll()
         updateFadeMask()
     }
@@ -283,7 +333,7 @@ extension TabStripView {
     /// The capsule spans the tabs, not the row; a lone tab is a pill on its
     /// own and the track appears with the second. Hairlines part two
     /// unselected neighbours, as a segmented control's do.
-    private func layoutTrack(width: CGFloat, place: (NSView, NSRect) -> Void) {
+    private func layoutTrack(width: CGFloat, duration: TimeInterval?, place: (NSView, NSRect) -> Void) {
         track.isHidden = views.count < 2
         track.layer?.cornerRadius = bounds.height / 2
         place(track, NSRect(x: -offset, y: 0, width: contentWidth, height: bounds.height))
@@ -298,39 +348,52 @@ extension TabStripView {
         updateTrackColors()
         for (gap, separator) in separators.enumerated() {
             let index = gap + 1
-            separator.isHidden = index == selectedIndex || index - 1 == selectedIndex
+            // Beside the pill a hairline would show at its edge; it fades
+            // as the pill slides up to it, and back as the pill moves on.
+            let alpha: CGFloat = index == selectedIndex || index - 1 == selectedIndex ? 0 : 1
+            if separator.alphaValue != alpha {
+                if let duration {
+                    NSAnimationContext.runAnimationGroup { context in
+                        context.duration = duration
+                        context.timingFunction = Self.curve
+                        separator.animator().alphaValue = alpha
+                    }
+                } else {
+                    separator.alphaValue = alpha
+                }
+            }
             place(separator, NSRect(x: CGFloat(index) * width - offset - 0.5, y: (bounds.height * 0.3).rounded(),
                                     width: 1, height: (bounds.height * 0.4).rounded()))
         }
     }
 
-    /// A closing tab shrinks and fades where it stood while the others close
-    /// the gap; it leaves the strip once the animation is done.
+    /// One duration and one curve for every movement in the strip: a tab
+    /// opening or closing, its neighbours making room, the track growing or
+    /// shrinking and the selection moving all start and land together.
+    static let motion: TimeInterval = 0.3
+    static let closeMotion: TimeInterval = 0.38
+    /// Quick to leave, slow to land: the pill is under way the moment the
+    /// tab is chosen and settles softly, with no overshoot.
+    static let curve = CAMediaTimingFunction(controlPoints: 0.2, 0.8, 0.2, 1)
+
+    /// A closing tab is the opening run backwards: its trailing edge
+    /// draws back to its leading one, erasing it right to left over a name
+    /// that holds still, and the tab after it follows that edge into the
+    /// space. It leaves the strip once that is done.
     private func leave(_ view: TabItemView) {
         view.isLeaving = true
-        guard let layer = view.layer else {
-            view.removeFromSuperview()
-            return
-        }
-        let (midX, midY) = (view.bounds.midX, view.bounds.midY)
-        var end = CATransform3DMakeTranslation(midX, midY, 0)
-        end = CATransform3DScale(end, 0.7, 0.7, 1)
-        end = CATransform3DTranslate(end, -midX, -midY, 0)
-        let shrink = CABasicAnimation(keyPath: "transform")
-        shrink.fromValue = NSValue(caTransform3D: CATransform3DIdentity)
-        shrink.toValue = NSValue(caTransform3D: end)
-        shrink.duration = 0.15
-        shrink.fillMode = .forwards
-        shrink.isRemovedOnCompletion = false
-        layer.add(shrink, forKey: "leave")
+        // Under the tabs that close the gap, above the selection pill.
+        addSubview(view, positioned: .above, relativeTo: selection)
+        var end = view.frame
+        end.size.width = 0
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.15
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            context.duration = Self.closeMotion
+            context.timingFunction = Self.curve
+            view.animator().frame = end
             view.animator().alphaValue = 0
         } completionHandler: {
             MainActor.assumeIsolated {
                 view.removeFromSuperview()
-                view.layer?.removeAnimation(forKey: "leave")
                 view.alphaValue = 1
             }
         }
@@ -373,30 +436,6 @@ extension TabStripView {
         guard next != offset else { return }
         offset = next
         needsLayout = true
-    }
-
-    /// A new tab grows from its centre with a little overshoot. The
-    /// animation is presentation only: the layer's own transform stays
-    /// identity, so nothing AppKit sets later fights it.
-    private func springIn(_ view: TabItemView) {
-        guard let layer = view.layer else { return }
-        let (midX, midY) = (view.bounds.midX, view.bounds.midY)
-        var start = CATransform3DMakeTranslation(midX, midY, 0)
-        start = CATransform3DScale(start, 0.6, 0.6, 1)
-        start = CATransform3DTranslate(start, -midX, -midY, 0)
-        let spring = CASpringAnimation(keyPath: "transform")
-        spring.fromValue = NSValue(caTransform3D: start)
-        spring.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        spring.mass = 1
-        spring.stiffness = 320
-        spring.damping = 17
-        spring.duration = spring.settlingDuration
-        layer.add(spring, forKey: "arrive")
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0
-        fade.toValue = 1
-        fade.duration = 0.12
-        layer.add(fade, forKey: "arrive.fade")
     }
 
     // MARK: - Interaction, routed from the tab views
