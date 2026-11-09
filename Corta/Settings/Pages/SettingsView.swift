@@ -97,7 +97,7 @@ struct SettingsView: View {
                     get: { navigation.showHostDetails }, set: { navigation.showHostDetails = $0 })
             ) {
                 VStack {
-                    SystemStatusDetails(metrics: SystemMetricsStore.shared.snapshot, showMetrics: false)
+                    SystemStatusDetails(metrics: SystemMetricsStore.shared.snapshot, showMetrics: false, info: LocalHostInfo.read())
                     Button(L10n.text("common.close")) { navigation.showHostDetails = false }
                         .keyboardShortcut(.cancelAction)
                 }.padding(.bottom, 16)

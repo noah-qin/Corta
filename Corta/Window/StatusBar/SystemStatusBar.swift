@@ -112,8 +112,11 @@ final class SystemStatusBar: NSView {
         SystemMetricsStore.shared.setActive(
             config.statusBar && window?.occlusionState.contains(.visible) == true, client: client)
         if wasHidden != isHidden { onVisibilityChange?() }
-        if let controller = popover?.contentViewController as? NSHostingController<SystemStatusDetails> {
-            controller.rootView = SystemStatusDetails(metrics: metrics)
+        if popover?.isShown == true,
+            let controller = popover?.contentViewController as? NSHostingController<SystemStatusDetails>,
+            controller.rootView.metrics != metrics
+        {
+            controller.rootView = SystemStatusDetails(metrics: metrics, info: controller.rootView.info)
         }
     }
 
@@ -121,8 +124,10 @@ final class SystemStatusBar: NSView {
         if popover?.isShown == true { popover?.close(); return }
         let popover = NSPopover()
         popover.behavior = .transient
+        // The host's name, system and chip, read once per opening rather
+        // than on every metrics update while it is open.
         popover.contentViewController = NSHostingController(
-            rootView: SystemStatusDetails(metrics: SystemMetricsStore.shared.snapshot))
+            rootView: SystemStatusDetails(metrics: SystemMetricsStore.shared.snapshot, info: LocalHostInfo.read()))
         self.popover = popover
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
     }
@@ -334,7 +339,9 @@ enum SystemStatusFormat {
 struct SystemStatusDetails: View {
     let metrics: SystemMetrics
     var showMetrics = true
-    private let info = LocalHostInfo.read()
+    /// Read by whoever opens the details: a view rebuilt per update read it
+    /// again each time.
+    let info: LocalHostInfo
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(L10n.text("status.details")).font(.headline)
