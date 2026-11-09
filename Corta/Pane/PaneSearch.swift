@@ -461,6 +461,31 @@ extension PaneSearch {
         }
     }
 
+    /// The grid the matches were found in is gone: cleared, reset, or
+    /// reflowed at a new width, where rows renumber in ways `totalPushed`
+    /// does not track. Drops the matches, highlights and count at once,
+    /// supersedes a sweep in flight, and — with the bar open — sweeps the
+    /// grid as it is now, without waiting out the refresh pacing.
+    func invalidateResults() {
+        task?.cancel()
+        task = nil
+        pacingWake?.cancel()
+        pacingWake = nil
+        needsRefresh = false
+        lastSweepLanded = nil
+        generation &+= 1
+        setMatches([], totalPushed: 0)
+        matchesTruncated = false
+        currentMatchIndex = nil
+        currentMatchAnchor = nil
+        status = .complete
+        host?.invalidateDisplay()
+        guard bar != nil else { return }
+        barModel.countText = ""
+        placeClearOfContent()
+        scheduleBackgroundRefresh()
+    }
+
     private func noteCurrentMatchAnchor(totalPushed: Int) {
         guard let index = currentMatchIndex, matches.indices.contains(index) else {
             currentMatchAnchor = nil

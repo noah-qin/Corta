@@ -136,6 +136,49 @@ struct PaneSearchTests {
         #expect(host.redraws > 0)
     }
 
+    /// Clear, reset, a reflow or a new session: the matches named rows that
+    /// are gone, so they go at once and the grid is swept again unpaced.
+    @Test("invalidating drops the matches at once and sweeps the grid as it is now")
+    func invalidatingDropsMatchesAndSweepsAgain() async throws {
+        let host = makeHost()
+        defer { host.search.close() }
+        host.search.show()
+        let field = try #require(host.search.field)
+        field.stringValue = "P04MARKER"
+        host.search.updateResults(scrollsToMatch: true)
+        #expect(await waitUpTo(5) { !host.search.matches.isEmpty && host.search.task == nil })
+        let generation = host.search.generation
+
+        host.terminal.feed(Array("\u{1B}[2J\u{1B}[3J".utf8))
+        host.search.invalidateResults()
+        #expect(host.search.matches.isEmpty)
+        #expect(host.search.highlights.isEmpty)
+        #expect(host.search.currentMatchIndex == nil)
+        #expect(host.search.generation != generation)
+        #expect(host.search.task != nil, "swept again without waiting out the pacing")
+        #expect(await waitUpTo(5) { host.search.task == nil })
+        #expect(host.search.matches.isEmpty)
+        #expect(host.search.barModel.countText == L10n.text("search.noResults"))
+    }
+
+    @Test("a sweep in flight when the results are invalidated lands nowhere")
+    func invalidatingSupersedesASweepInFlight() async throws {
+        let host = makeHost()
+        defer { host.search.close() }
+        host.search.show()
+        let field = try #require(host.search.field)
+        field.stringValue = "P04MARKER"
+        host.search.updateResults(scrollsToMatch: true)
+        let stale = host.search.generation
+        host.search.invalidateResults()
+        // The old sweep's result, arriving late, is refused.
+        host.search.applyResults(
+            .init(matches: [SelectionRange(start: .init(row: 0, column: 0), end: .init(row: 0, column: 8))],
+                status: .complete),
+            generation: stale, scrollsToMatch: false, totalPushed: 0)
+        #expect(host.search.matches.isEmpty)
+    }
+
     /// The highlights are built once per sweep, anchored to the scrollback
     /// the sweep read. Stamped with each frame's own total instead, output
     /// between sweeps drew every highlight that many rows off its text.

@@ -42,6 +42,8 @@ protocol PaneCommandsHost: AnyObject {
     func settleFontChange()
     /// Selection geometry and the viewport's return to the live screen.
     var pointer: PanePointer { get }
+    /// Whose matches a clear or reset invalidates.
+    var search: PaneSearch { get }
 }
 
 /// The commands a pane answers from the menu, the palette and its own
@@ -390,6 +392,8 @@ extension PaneCommands {
         guard let host, host.isOperable else { return }
         host.session.apply(command)
         host.pointer.clearSelection()
+        // The matches named rows that are now blank or gone.
+        host.search.invalidateResults()
         host.scrollOffset = 0
         host.invalidateDisplay()
         host.terminalView?.noteAccessibilityValueChanged()

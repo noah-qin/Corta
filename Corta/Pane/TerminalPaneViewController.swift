@@ -144,6 +144,8 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
     /// (`resizeSessionToFitView`).
     var didSizeWindow = false
     private var resizeDebouncer: ResizeDebouncer!
+    /// The size the debouncer last handed the session, to tell a reflow.
+    private var lastCommittedSize: TerminalSize?
 
     /// ⌘+/⌘− re-fit the window to keep this grid size.
     var lastRequestedSize: TerminalSize?
@@ -585,8 +587,15 @@ extension TerminalPaneViewController {
     }
 
     private func installSessionCallbacks() {
+        lastCommittedSize = nil
         resizeDebouncer = ResizeDebouncer { [weak self] size in
-            self?.session?.resize(to: size)
+            guard let self, let session = self.session else { return }
+            let columnsChanged = self.lastCommittedSize.map { $0.columns != size.columns } ?? false
+            self.lastCommittedSize = size
+            session.resize(to: size)
+            // A reflow renumbers rows; matches found before it would be
+            // drawn over the wrong text until the next paced sweep.
+            if columnsChanged { self.search.invalidateResults() }
         }
         // Each is idempotent: a retry's second setup observes nothing twice.
         focus.observeWindows()
@@ -1138,6 +1147,8 @@ extension TerminalPaneViewController {
         terminalView?.stopRendering()
         readerDemotion?.cancel()
         readerDemotion = nil
+        // Its matches and any sweep in flight read the old session's grid.
+        search.close()
         frameLoop.detach()
         session?.stop()
         session = nil
