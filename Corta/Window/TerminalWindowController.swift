@@ -191,7 +191,11 @@ extension TerminalWindowController {
         selectedTab = tab
         container.show(tab.split, holding: previous, direction: backward ? -1 : 1)
         tab.split.didBecomeSelectedTab()
-        if window.isKeyWindow || !window.isVisible || changed {
+        // Choosing the tab already shown leaves the keyboard where it is in
+        // it — a search field, a rename — rather than taking it back to the
+        // terminal.
+        let responderInTab = (window.firstResponder as? NSView)?.isDescendant(of: tab.split.view) == true
+        if changed || ((window.isKeyWindow || !window.isVisible) && !responderInTab) {
             window.makeFirstResponder(tab.split.focusedPane?.terminalView)
         }
         tab.split.applyWindowTitle()

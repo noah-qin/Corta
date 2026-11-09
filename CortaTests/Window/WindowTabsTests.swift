@@ -94,6 +94,24 @@ struct WindowTabsTests {
         #expect(window.contentResizeIncrements == increments)
     }
 
+    /// Choosing the tab already shown took the keyboard from its search
+    /// field back to the terminal.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func selectingTheShownTabKeepsItsSearchFieldFocused() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        let tab = try #require(controller.selectedTab)
+        let window = try #require(controller.window)
+        // Hidden, the old rule took the keyboard whatever held it.
+        window.orderOut(nil)
+        let pane = try #require(tab.split.focusedPane)
+        pane.search.show()
+        #expect(pane.search.hasKeyboardFocus)
+        controller.selectTab(tab)
+        #expect(pane.search.hasKeyboardFocus)
+        pane.search.close()
+    }
+
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func addingSelectingAndClosingTabs() throws {
         let controller = try makeWindow()
