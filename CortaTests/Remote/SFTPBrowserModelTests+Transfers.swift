@@ -293,4 +293,15 @@ extension SFTPBrowserModelTests {
         try await Task.sleep(for: .milliseconds(100))
         #expect(fake.transferCalls.count == 1, "no retry for a definitive answer")
     }
+
+    /// A folder that first ran under `.fail` was retried under `.fail`, and
+    /// the first file it had already written failed the retry at once.
+    @Test("a folder transfer that ran with nothing to conflict with retries as Resume")
+    func directoryRetryResumes() {
+        #expect(SFTPTransferQueue.retryResolution(.fail, isDirectory: true) == .resume)
+        #expect(SFTPTransferQueue.retryResolution(.fail, isDirectory: false) == .fail)
+        #expect(SFTPTransferQueue.retryResolution(.overwrite, isDirectory: true) == .overwrite)
+        #expect(SFTPTransferQueue.retryResolution(.resume, isDirectory: true) == .resume)
+    }
+
 }
