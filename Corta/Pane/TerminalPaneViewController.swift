@@ -1035,6 +1035,8 @@ extension TerminalPaneViewController {
         session?.snapshot()
     }
 
+    func liveTotalPushed() -> Int? { session?.scrollbackTotalPushed }
+
     func selectedTextForFind() async -> String? {
         guard let session, let (grid, range) = commands.selectionSnapshot() else { return nil }
         let task = Task.detached(priority: .userInitiated) {

@@ -41,6 +41,7 @@ final class SearchTestHost: PaneSearchHost {
         snapshots += 1
         return terminal.grid
     }
+    func liveTotalPushed() -> Int? { terminal.grid.scrollback.totalPushed }
     func selectedTextForFind() async -> String? { selection?.split(separator: "\n").first.map(String.init) }
     func invalidateDisplay() { redraws += 1 }
 

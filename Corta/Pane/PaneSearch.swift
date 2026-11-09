@@ -31,6 +31,8 @@ protocol PaneSearchHost: AnyObject {
     var scrollOffset: Int { get set }
     /// The grid now, or nil without a session.
     func snapshot() -> Grid?
+    /// `Scrollback.totalPushed` now, without taking the grid.
+    func liveTotalPushed() -> Int?
     /// The selected text, for ⌘E.
     func selectedTextForFind() async -> String?
     /// For changes that produce no output: highlights, the viewport.
@@ -111,6 +113,10 @@ final class PaneSearch: NSObject {
         var scrollOffset: Int
         // periphery:ignore - read by the synthesised ==
         var cursor: CGRect?
+        // Output since the sweep moves the match even when the cursor
+        // stays put on the bottom row.
+        // periphery:ignore - read by the synthesised ==
+        var liveTotalPushed: Int?
     }
 
     init(host: PaneSearchHost? = nil) {

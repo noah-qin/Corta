@@ -90,7 +90,7 @@ extension PaneSearch {
         if let index = currentMatchIndex {
             let key = MatchRectKey(
                 index: index, matchesTotalPushed: matchesTotalPushed, matchesGeneration: generation,
-                scrollOffset: host.scrollOffset, cursor: cursor)
+                scrollOffset: host.scrollOffset, cursor: cursor, liveTotalPushed: host.liveTotalPushed())
             if key != matchRectKey {
                 matchRectKey = key
                 matchRect = currentMatchRect(in: terminalView, host: host)
