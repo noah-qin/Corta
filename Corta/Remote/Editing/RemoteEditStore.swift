@@ -131,31 +131,6 @@ final class RemoteEditStore {
         removeAbandonedApprovalsNow(in: root)
     }
 
-    /// Dead processes' approval snapshots and abandoned downloads. Also run
-    /// at launch (`AppPaths.removeAbandonedStateFiles`): the store loads only
-    /// when Remote Edit is first used, and until then they stayed on disk.
-    nonisolated static func removeAbandonedApprovalsNow(in root: URL) {
-        let manager = FileManager.default
-        guard let children = try? manager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return }
-        for child in children {
-            let name = child.lastPathComponent
-            if name.hasPrefix(".approvals-"),
-                let separator = name.dropFirst(".approvals-".count).firstIndex(of: "-"),
-                let pid = Int32(name[name.index(name.startIndex, offsetBy: ".approvals-".count)..<separator]),
-                UUID(uuidString: String(name[name.index(after: separator)...])) != nil,
-                pid > 0, kill(pid, 0) == -1, errno == ESRCH
-            {
-                try? manager.removeItem(at: child)
-            } else if name.hasPrefix("Abandoned-"),
-                UUID(uuidString: String(name.dropFirst("Abandoned-".count))) != nil,
-                let files = try? manager.contentsOfDirectory(atPath: child.path),
-                files.allSatisfy({ UUID(uuidString: $0.replacingOccurrences(of: ".corta-part", with: "")) != nil })
-            {
-                try? manager.removeItem(at: child)
-            }
-        }
-    }
-
     /// Retire only unchanged, approved copies past retention. Bound maintenance
     /// to 32 candidates and 256 MiB; undecided edits and excess work stay.
     func pruneStaleCopies(now: Date = Date(), candidates: [RemoteCopy]? = nil) async {
@@ -200,67 +175,6 @@ final class RemoteEditStore {
         else { return (nil, 0) }
         let result = Self.hashFile(at: url, byteLimit: byteLimit)
         return (result.digest == baseline ? modified : nil, result.bytesRead)
-    }
-
-    // MARK: - Naming (pure)
-
-    /// The deterministic relative path for a host+remotePath pair. The
-    /// digest directory is what makes the mapping injective in practice;
-    /// the basename is for the human who opens the folder in Finder.
-    nonisolated static func localRelativePath(host: String, remotePath: String) -> String {
-        let digest = sha256Hex(Data((host + "\u{0}" + remotePath).utf8)).prefix(16)
-        // Named as the browser names a download: the editor and Finder show
-        // this name, and the server chose it.
-        var name = SFTPBrowserModel.localFileName((remotePath as NSString).lastPathComponent)
-        // A trailing "/.." or "/" makes the basename a path instruction or
-        // empty; the copy must stay inside its digest directory.
-        if name.isEmpty || name == "." || name == ".." { name = "file" }
-        return "\(hostDirectoryName(host))/\(digest)/\(name)"
-    }
-
-    /// The per-host directory: hostnames are near-safe already, and this
-    /// replaces everything that is not, so a hostile `~/.ssh/config` alias
-    /// cannot escape the store root with a `../`.
-    nonisolated static func hostDirectoryName(_ host: String) -> String {
-        let safe = host.unicodeScalars.map {
-            CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "." || $0 == "_"
-                ? Character($0) : "_"
-        }
-        let name = String(safe)
-        // A lone "." or ".." is still a path instruction, scalars or not.
-        guard name != ".", name != ".." else { return "_" }
-        return name.isEmpty ? "_" : name
-    }
-
-    nonisolated static func sha256Hex(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-    }
-
-    /// The digest of a file's contents, or `nil` if it cannot be read.
-    /// This is the local-change signal: compared against the digest
-    /// approved at download/upload time, a difference is an edit.
-    nonisolated static func sha256Hex(ofFile url: URL, byteLimit: Int = .max) -> String? {
-        hashFile(at: url, byteLimit: byteLimit).digest
-    }
-
-    nonisolated private static func hashFile(at url: URL, byteLimit: Int)
-        -> (digest: String?, bytesRead: Int)
-    {
-        guard byteLimit >= 0, let handle = try? FileHandle(forReadingFrom: url) else { return (nil, 0) }
-        defer { try? handle.close() }
-        var hash = SHA256()
-        var remaining = byteLimit
-        do {
-            // One extra byte distinguishes exact EOF from a file that grew
-            // past its stat size. Charge actual reads, not that stale size.
-            while let chunk = try handle.read(upToCount: min(64 * 1024, max(1, remaining))), !chunk.isEmpty {
-                guard chunk.count <= remaining else { return (nil, byteLimit) }
-                remaining -= chunk.count
-                guard !Task.isCancelled else { return (nil, byteLimit - remaining) }
-                hash.update(data: chunk)
-            }
-            return (hash.finalize().map { String(format: "%02x", $0) }.joined(), byteLimit - remaining)
-        } catch { return (nil, byteLimit - remaining) }
     }
 
     // MARK: - Queries and updates
@@ -447,5 +361,95 @@ final class RemoteEditStore {
         await withCheckedContinuation { continuation in
             manifestWrites.async { continuation.resume() }
         }
+    }
+}
+
+extension RemoteEditStore {
+    /// Dead processes' approval snapshots and abandoned downloads. Also run
+    /// at launch (`AppPaths.removeAbandonedStateFiles`): the store loads only
+    /// when Remote Edit is first used, and until then they stayed on disk.
+    nonisolated static func removeAbandonedApprovalsNow(in root: URL) {
+        let manager = FileManager.default
+        guard let children = try? manager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return }
+        for child in children {
+            let name = child.lastPathComponent
+            if name.hasPrefix(".approvals-"),
+                let separator = name.dropFirst(".approvals-".count).firstIndex(of: "-"),
+                let pid = Int32(name[name.index(name.startIndex, offsetBy: ".approvals-".count)..<separator]),
+                UUID(uuidString: String(name[name.index(after: separator)...])) != nil,
+                pid > 0, kill(pid, 0) == -1, errno == ESRCH
+            {
+                try? manager.removeItem(at: child)
+            } else if name.hasPrefix("Abandoned-"),
+                UUID(uuidString: String(name.dropFirst("Abandoned-".count))) != nil,
+                let files = try? manager.contentsOfDirectory(atPath: child.path),
+                files.allSatisfy({ UUID(uuidString: $0.replacingOccurrences(of: ".corta-part", with: "")) != nil })
+            {
+                try? manager.removeItem(at: child)
+            }
+        }
+    }
+}
+
+extension RemoteEditStore {
+    // MARK: - Naming (pure)
+
+    /// The deterministic relative path for a host+remotePath pair. The
+    /// digest directory is what makes the mapping injective in practice;
+    /// the basename is for the human who opens the folder in Finder.
+    nonisolated static func localRelativePath(host: String, remotePath: String) -> String {
+        let digest = sha256Hex(Data((host + "\u{0}" + remotePath).utf8)).prefix(16)
+        // Named as the browser names a download: the editor and Finder show
+        // this name, and the server chose it.
+        var name = SFTPBrowserModel.localFileName((remotePath as NSString).lastPathComponent)
+        // A trailing "/.." or "/" makes the basename a path instruction or
+        // empty; the copy must stay inside its digest directory.
+        if name.isEmpty || name == "." || name == ".." { name = "file" }
+        return "\(hostDirectoryName(host))/\(digest)/\(name)"
+    }
+
+    /// The per-host directory: hostnames are near-safe already, and this
+    /// replaces everything that is not, so a hostile `~/.ssh/config` alias
+    /// cannot escape the store root with a `../`.
+    nonisolated static func hostDirectoryName(_ host: String) -> String {
+        let safe = host.unicodeScalars.map {
+            CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "." || $0 == "_"
+                ? Character($0) : "_"
+        }
+        let name = String(safe)
+        // A lone "." or ".." is still a path instruction, scalars or not.
+        guard name != ".", name != ".." else { return "_" }
+        return name.isEmpty ? "_" : name
+    }
+
+    nonisolated static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The digest of a file's contents, or `nil` if it cannot be read.
+    /// This is the local-change signal: compared against the digest
+    /// approved at download/upload time, a difference is an edit.
+    nonisolated static func sha256Hex(ofFile url: URL, byteLimit: Int = .max) -> String? {
+        hashFile(at: url, byteLimit: byteLimit).digest
+    }
+
+    nonisolated private static func hashFile(at url: URL, byteLimit: Int)
+        -> (digest: String?, bytesRead: Int)
+    {
+        guard byteLimit >= 0, let handle = try? FileHandle(forReadingFrom: url) else { return (nil, 0) }
+        defer { try? handle.close() }
+        var hash = SHA256()
+        var remaining = byteLimit
+        do {
+            // One extra byte distinguishes exact EOF from a file that grew
+            // past its stat size. Charge actual reads, not that stale size.
+            while let chunk = try handle.read(upToCount: min(64 * 1024, max(1, remaining))), !chunk.isEmpty {
+                guard chunk.count <= remaining else { return (nil, byteLimit) }
+                remaining -= chunk.count
+                guard !Task.isCancelled else { return (nil, byteLimit - remaining) }
+                hash.update(data: chunk)
+            }
+            return (hash.finalize().map { String(format: "%02x", $0) }.joined(), byteLimit - remaining)
+        } catch { return (nil, byteLimit - remaining) }
     }
 }

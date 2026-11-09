@@ -21,21 +21,6 @@ import Foundation
 import Metal
 import Synchronization
 
-/// A document position; negative rows are scrollback. Never a viewport row:
-/// scrolling translates, it does not move the selection.
-nonisolated struct GridPosition: Equatable {
-    var row: Int
-    var column: Int
-}
-
-public nonisolated struct TerminalSelection: Equatable, Sendable {
-    var start: GridPosition
-    var end: GridPosition
-    /// `totalPushed` when recorded; the renderer shifts rows by the growth.
-    /// Not `.count`, which saturates and let the highlight drift.
-    var baseScrollbackTotal: Int = 0
-}
-
 /// A `Grid` snapshot as instanced quads, drawn into a rect: background,
 /// glyphs, and color emoji when present.
 ///
@@ -128,8 +113,8 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
     var invalidRows: [Bool] = []
     private var cachedCursor: Cursor?
     /// The overlay the last frame built; nil until the first.
-    private var cachedOverlay: OverlayInputs?
-    private var searchMatchesOrdered = true
+    private(set) var cachedOverlay: OverlayInputs?
+    var searchMatchesOrdered = true
     private var needsFullRebuild = true
     /// The atlas generation the frame's last row build began with.
     private var lastBuildAtlasGeneration = 0
@@ -535,31 +520,6 @@ nonisolated extension TerminalRenderer {
             || cached.searchMatches != overlay.searchMatches
             || cached.currentSearchMatchIndex != overlay.currentSearchMatchIndex
             || !Self.selectionsEqual(cached.hoveredLink, overlay.hoveredLink)
-    }
-
-    // Search produces ordered document ranges. Validate only on a new set
-    // so a renderer caller supplying an arbitrary range list still works.
-    func visibleSearchMatches(_ matches: [TerminalSelection], grid: Grid, offset: Int) -> Range<Int> {
-        if cachedOverlay?.searchMatches != matches {
-            searchMatchesOrdered = zip(matches, matches.dropFirst()).allSatisfy { earlier, later in
-                earlier.start.row + earlier.baseScrollbackTotal <= later.start.row + later.baseScrollbackTotal
-                    && earlier.end.row + earlier.baseScrollbackTotal <= later.end.row + later.baseScrollbackTotal
-            }
-        }
-        guard searchMatchesOrdered else { return matches.indices }
-        let top = grid.scrollback.totalPushed - offset
-        func firstIndex(where predicate: (TerminalSelection) -> Bool) -> Int {
-            var low = 0
-            var high = matches.count
-            while low < high {
-                let middle = low + (high - low) / 2
-                if predicate(matches[middle]) { high = middle } else { low = middle + 1 }
-            }
-            return low
-        }
-        let first = firstIndex { $0.end.row + $0.baseScrollbackTotal >= top }
-        let end = firstIndex { $0.start.row + $0.baseScrollbackTotal >= top + grid.rows }
-        return first..<max(first, end)
     }
 
     /// What the next frame's diff compares against.

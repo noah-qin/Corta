@@ -89,9 +89,12 @@ final class FileDropRequest {
             // state folder can sit on a volume that stopped answering, and
             // AppKit needs the destination before this returns. One that
             // comes back late is removed; this drop reports failure.
-            let made = PathProbe.answer(timeout: directoryTimeout, abandoned: { late in
+            let removeLate: @Sendable (Swift.Result<URL, any Error>) -> Void = { late in
                 if case .success(let directory) = late { FileDropStorage.remove(directory) }
-            }) { Swift.Result { try FileDropStorage.makeDirectory() } }
+            }
+            let made = PathProbe.answer(timeout: directoryTimeout, abandoned: removeLate) {
+                Swift.Result { try FileDropStorage.makeDirectory() }
+            }
             guard case .success(let created) = made else { return nil }
             directory = created
         } else {

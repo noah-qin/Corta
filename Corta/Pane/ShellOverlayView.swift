@@ -293,22 +293,8 @@ private final class DirectoryCandidateRowView: NSView {
         mark = colors.candidate
         // Room for both ends cut: "…" and a gap before, a gap and "+N" after.
         let available = max(0, bounds.width - Self.textInset(for: font) - 12 - width("…" + gap + gap + "+999"))
-        var start = state.selectedIndex
-        var end = start + 1
-        var used = width(state.candidates[start])
-        // Keep the selection visible as arrows move through more candidates.
-        while start > 0 && end - start < 5 {
-            let extra = width(gap + state.candidates[start - 1])
-            guard used + extra <= available else { break }
-            used += extra
-            start -= 1
-        }
-        while end < state.candidates.count && end - start < 5 {
-            let extra = width(gap + state.candidates[end])
-            guard used + extra <= available else { break }
-            used += extra
-            end += 1
-        }
+        let shown = Self.shownCandidates(state, available: available) { width(gap + $0) }
+        let (start, end) = (shown.lowerBound, shown.upperBound)
         let muted: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.candidate]
         let faint: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.muted]
         let result = NSMutableAttributedString(string: start > 0 ? "…" + gap : "", attributes: faint)
@@ -335,6 +321,30 @@ private final class DirectoryCandidateRowView: NSView {
         // Truncation is not part of the selection, even beside it.
         token = NSAttributedString(string: "…", attributes: muted)
         visibleText = result.string
+    }
+
+    /// The candidates around the selection that fit `available`, five at
+    /// most: the selection stays visible as the arrows move past the rest.
+    /// `width` measures one with the gap before it.
+    private static func shownCandidates(
+        _ state: DirectoryCompletion, available: CGFloat, width: (String) -> CGFloat
+    ) -> Range<Int> {
+        var start = state.selectedIndex
+        var end = start + 1
+        var used = width(state.candidates[start])
+        while start > 0 && end - start < 5 {
+            let extra = width(state.candidates[start - 1])
+            guard used + extra <= available else { break }
+            used += extra
+            start -= 1
+        }
+        while end < state.candidates.count && end - start < 5 {
+            let extra = width(state.candidates[end])
+            guard used + extra <= available else { break }
+            used += extra
+            end += 1
+        }
+        return start..<end
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -382,13 +392,18 @@ private final class DirectoryCandidateRowView: NSView {
 
     /// The configured folder symbol, rebuilt only when its size or colour
     /// changes, not on every draw as the selection moves.
-    private static var folderCache: (size: CGFloat, color: CGColor, image: NSImage)?
+    private struct FolderCache {
+        let size: CGFloat
+        let color: CGColor
+        let image: NSImage
+    }
+    private static var folderCache: FolderCache?
     private static func folderSymbol(size: CGFloat, color: CGColor) -> NSImage? {
         if let cache = folderCache, cache.size == size, cache.color == color { return cache.image }
         guard let image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: size, weight: .regular)
                 .applying(.init(paletteColors: [NSColor(cgColor: color) ?? .secondaryLabelColor]))) else { return nil }
-        folderCache = (size, color, image)
+        folderCache = FolderCache(size: size, color: color, image: image)
         return image
     }
 

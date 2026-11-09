@@ -183,20 +183,6 @@ final class ConfigurationStore {
         var errorDescription: String? { L10n.format("settings.status.configUnreadable", path) }
     }
 
-    /// Reported through the write status, which Settings shows: a change
-    /// there is what the refusal stops.
-    private func setReadError(_ error: Error?) {
-        let wasUnreadable = readError != nil
-        readError = error
-        if let error = error as? UserFile.TooLargeError {
-            noteWriteResult(error)
-        } else if error != nil {
-            noteWriteResult(UnreadableFileError(path: fileURL.path))
-        } else if wasUnreadable {
-            noteWriteResult(nil)
-        }
-    }
-
     // MARK: - Writing
 
     /// Writes a change and reads it back; nothing sets `configuration`
@@ -240,19 +226,6 @@ final class ConfigurationStore {
         return persist()
     }
 
-    /// Creates the file with current values when there is none, for a
-    /// discoverable first launch; an existing file is left as written.
-    /// Opening Settings used to rewrite it every time, which rearranged a
-    /// hand-made file even when nothing was changed.
-    @discardableResult
-    func createIfMissing() -> Bool {
-        guard !writePending else { return false }
-        syncWithFile()
-        guard readError == nil else { return false }
-        guard syncedText == nil else { return true }
-        return persist()
-    }
-
     /// Reads in the file if it differs from what this store last read or
     /// wrote, or could not be read then. One read, so one wait at most.
     private func syncWithFile() {
@@ -276,8 +249,7 @@ final class ConfigurationStore {
         let text = configuration.serialized(preserving: unknownKeys)
         let mayCommit = Mutex(true)
         var started = true
-        let result = PathProbe.answer(timeout: fileAccessTimeout, budget: accessBudget, abandoned: {
-            [weak self] (late: Result<Void, any Error>) in
+        let abandoned: @Sendable (Result<Void, any Error>) -> Void = { [weak self] late in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.writePending = false
@@ -286,9 +258,13 @@ final class ConfigurationStore {
                 // reload whichever file the filesystem actually committed.
                 self.startWatching()
             }
-        }, onBudgetExhausted: { started = false }) {
+        }
+        let write: @Sendable () -> Result<Void, any Error> = {
             Result { try UserFile.write(text, to: url) { mayCommit.withLock { $0 } } }
         }
+        let result = PathProbe.answer(
+            timeout: fileAccessTimeout, budget: accessBudget, abandoned: abandoned,
+            onBudgetExhausted: { started = false }, write)
         guard let result else {
             mayCommit.withLock { $0 = false }
             writePending = started
@@ -306,6 +282,36 @@ final class ConfigurationStore {
         return true
     }
 
+}
+
+extension ConfigurationStore {
+    /// Creates the file with current values when there is none, for a
+    /// discoverable first launch; an existing file is left as written.
+    /// Opening Settings used to rewrite it every time, which rearranged a
+    /// hand-made file even when nothing was changed.
+    @discardableResult
+    func createIfMissing() -> Bool {
+        guard !writePending else { return false }
+        syncWithFile()
+        guard readError == nil else { return false }
+        guard syncedText == nil else { return true }
+        return persist()
+    }
+
+    /// Reported through the write status, which Settings shows: a change
+    /// there is what the refusal stops.
+    private func setReadError(_ error: Error?) {
+        let wasUnreadable = readError != nil
+        readError = error
+        if let error = error as? UserFile.TooLargeError {
+            noteWriteResult(error)
+        } else if error != nil {
+            noteWriteResult(UnreadableFileError(path: fileURL.path))
+        } else if wasUnreadable {
+            noteWriteResult(nil)
+        }
+    }
+
     /// Posts only on a transition, not per successful keystroke.
     private func noteWriteResult(_ error: Error?) {
         let wasFailing = lastWriteError != nil
@@ -313,7 +319,9 @@ final class ConfigurationStore {
         guard wasFailing != (error != nil) else { return }
         NotificationCenter.default.post(name: Self.writeStatusDidChange, object: nil)
     }
+}
 
+extension ConfigurationStore {
     // MARK: - Watching
 
     private func startWatching() {
@@ -329,7 +337,8 @@ final class ConfigurationStore {
         watchGeneration += 1
         let generation = watchGeneration
         PathProbe.run { [weak self] in
-            let opened = PathProbe.answer(timeout: timeout, budget: budget, abandoned: { $0.closeBoth() }) {
+            let closeLate: @Sendable (WatchDescriptors) -> Void = { $0.closeBoth() }
+            let opened = PathProbe.answer(timeout: timeout, budget: budget, abandoned: closeLate) {
                 WatchDescriptors(
                     file: open(file.path, O_EVTONLY | O_CLOEXEC),
                     directory: open(Self.deepestExistingDirectory(under: directory).path, O_EVTONLY | O_CLOEXEC))

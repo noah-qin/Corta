@@ -38,7 +38,7 @@ public struct Scrollback: Sendable {
     /// so a small scrollback still rotates instead of growing one arena.
     private let batchSize: Int
 
-    fileprivate struct RowSpan: Sendable {
+    struct RowSpan: Sendable {
         var start: Int32
         var length: Int32
         var wrapped: Bool
@@ -46,7 +46,7 @@ public struct Scrollback: Sendable {
         var mark: LineMark = .none
     }
 
-    private struct Batch: Sendable {
+    struct Batch: Sendable {
         var id: Int
         var arena: ContiguousArray<Cell> = []
         var compressed: (bytes: ContiguousArray<UInt8>, cellCount: Int)?
@@ -57,7 +57,7 @@ public struct Scrollback: Sendable {
         var rowUnderlineColors: [Int: Set<UInt16>] = [:]
     }
 
-    fileprivate struct ASCIIPlane: Sendable {
+    struct ASCIIPlane: Sendable {
         var bytes: ContiguousArray<UInt8>
         var nonASCII: [[UInt32]]
         var unsupported: [Bool]
@@ -74,7 +74,7 @@ public struct Scrollback: Sendable {
 
     /// Shared only for immutable decoded arenas. Count AND byte limits keep
     /// very wide histories from turning a four-batch cache into a large one.
-    private final class Cache: Sendable {
+    final class Cache: Sendable {
         struct State: Sendable {
             var valid = true
             var entries: [(id: Int, cells: ContiguousArray<Cell>)] = []
@@ -172,12 +172,12 @@ public struct Scrollback: Sendable {
 
         deinit { invalidate() }
     }
-    private var cache = Cache()
+    var cache = Cache()
     /// First batch not yet attempted; each sealed batch is visited once.
-    private var compressionCursor = 0
+    var compressionCursor = 0
 
     /// Oldest first; small enough (`limit / batchSize`) to be a plain FIFO.
-    private var batches: ContiguousArray<Batch> = []
+    var batches: ContiguousArray<Batch> = []
 
     /// Rows already evicted from the oldest (`batches.first`) batch.
     private var headSkip = 0
@@ -273,10 +273,7 @@ public struct Scrollback: Sendable {
     /// every absolute-row anchor (marks, command records, selection, images)
     /// then moves with the scroll exactly as it does with history.
     public mutating func push(_ line: Line) {
-        guard limit > 0 else {
-            totalPushed += 1
-            return
-        }
+        guard limit > 0 else { totalPushed += 1; return }
         let length = line.trimmedCount
 
         if batches.isEmpty || batches[batches.count - 1].rows.count >= batchSize {
@@ -324,7 +321,7 @@ public struct Scrollback: Sendable {
 extension Scrollback {
     /// `cached: false` for a one-pass sweep (reflow), which would only push
     /// the hot batches out of the shared cache.
-    private func arena(_ batch: Batch, cached: Bool = true) -> ContiguousArray<Cell> {
+    func arena(_ batch: Batch, cached: Bool = true) -> ContiguousArray<Cell> {
         guard let compressed = batch.compressed else { return batch.arena }
         let decode = {
             var cells = ContiguousArray<Cell>(repeating: .blank, count: compressed.cellCount)
@@ -426,105 +423,4 @@ extension Scrollback {
         }
         return ids
     }
-}
-
-// MARK: - Compression
-
-extension Scrollback {
-    /// A stable immutable arena taken under the session lock. Encoding is
-    /// outside it; installation checks the namespace and batch identity.
-    public struct CompressionWork: Sendable {
-        fileprivate let id: Int
-        fileprivate let namespace: UUID
-        fileprivate let cells: ContiguousArray<Cell>
-        fileprivate let rows: ContiguousArray<RowSpan>
-        public func compress() -> CompressionResult {
-            let rawCount = cells.count * MemoryLayout<Cell>.stride
-            // Kept only under half the raw size, so the encoder gets no more
-            // room than that: past it LZ4 returns 0, the same refusal, and
-            // nothing is zero-filled or copied twice.
-            let capacity = max(0, rawCount / 2 - 1)
-            let bytes = ContiguousArray<UInt8>(unsafeUninitializedCapacity: capacity) { dst, initialized in
-                initialized = cells.withUnsafeBytes { src in
-                    guard let base = src.baseAddress, !src.isEmpty, let out = dst.baseAddress else { return 0 }
-                    return compression_encode_buffer(out, dst.count,
-                        base.assumingMemoryBound(to: UInt8.self), src.count, nil, COMPRESSION_LZ4)
-                }
-            }
-            var rowHyperlinks: [Int: Set<HyperlinkID>] = [:], rowGraphemes: [Int: Set<GraphemeID>] = [:]
-            var rowUnderlineColors: [Int: Set<UInt16>] = [:]
-            if !bytes.isEmpty {
-                for (index, row) in rows.enumerated() {
-                    var links: Set<HyperlinkID> = [], clusters: Set<GraphemeID> = []
-                    var underlineColors: Set<UInt16> = []
-                    for cell in cells[Int(row.start)..<(Int(row.start) + Int(row.length))] {
-                        if !cell.hyperlink.isNone { links.insert(cell.hyperlink) }
-                        if !cell.grapheme.isNone { clusters.insert(cell.grapheme) }
-                        if cell.underlineColorID != 0 { underlineColors.insert(cell.underlineColorID) }
-                    }
-                    if !links.isEmpty { rowHyperlinks[index] = links }
-                    if !clusters.isEmpty { rowGraphemes[index] = clusters }
-                    if !underlineColors.isEmpty { rowUnderlineColors[index] = underlineColors }
-                }
-            }
-            return CompressionResult(id: id, namespace: namespace, bytes: bytes, cellCount: cells.count,
-                rowHyperlinks: rowHyperlinks, rowGraphemes: rowGraphemes, rowUnderlineColors: rowUnderlineColors)
-        }
-    }
-    public struct CompressionResult: Sendable {
-        fileprivate let id: Int
-        fileprivate let namespace: UUID
-        fileprivate let bytes: ContiguousArray<UInt8>
-        fileprivate let cellCount: Int
-        fileprivate let rowHyperlinks: [Int: Set<HyperlinkID>]
-        fileprivate let rowGraphemes: [Int: Set<GraphemeID>]
-        fileprivate let rowUnderlineColors: [Int: Set<UInt16>]
-    }
-
-    /// Four sealed batches plus the mutable tail remain hot.
-    static let hotBatchCount = 5
-
-    /// An integer compare, for asking under the session lock whether a
-    /// compression pass is owed at all.
-    var hasCompressionWork: Bool { compressionCursor < batches.count - Self.hotBatchCount }
-
-    public func nextCompressionWork() -> CompressionWork? {
-        guard hasCompressionWork else { return nil }
-        let batch = batches[compressionCursor]
-        return CompressionWork(id: batch.id, namespace: cache.identity, cells: batch.arena, rows: batch.rows)
-    }
-
-    @discardableResult
-    public mutating func installCompression(_ result: CompressionResult) -> Bool {
-        guard result.namespace == cache.identity,
-              let index = batches.firstIndex(where: { $0.id == result.id }),
-              index < batches.count - Self.hotBatchCount, !batches[index].attempted,
-              batches[index].compressed == nil else { return false }
-        batches[index].attempted = true
-        while compressionCursor < batches.count, batches[compressionCursor].attempted {
-            compressionCursor += 1
-        }
-        if !result.bytes.isEmpty {
-            batches[index].compressed = (result.bytes, result.cellCount)
-            batches[index].arena = []
-            batches[index].rowHyperlinks = result.rowHyperlinks
-            batches[index].rowGraphemes = result.rowGraphemes
-            batches[index].rowUnderlineColors = result.rowUnderlineColors
-        }
-        return true
-    }
-    public mutating func compressColdBatches() {
-        while let work = nextCompressionWork() { _ = installCompression(work.compress()) }
-    }
-    /// Representation bytes only; excludes allocator slack, indexes and cache.
-    public var storedCellBytes: Int {
-        batches.reduce(0) { $0 + ($1.compressed?.bytes.count ?? ($1.arena.count * MemoryLayout<Cell>.stride)) }
-    }
-    public var retainedCellCapacityBytes: Int {
-        batches.reduce(0) { $0 + ($1.compressed?.bytes.capacity ?? ($1.arena.capacity * MemoryLayout<Cell>.stride)) }
-    }
-    public func withCellBatches(_ body: (UnsafeBufferPointer<Cell>) -> Void) {
-        for batch in batches { arena(batch).withUnsafeBufferPointer(body) }
-    }
-    public var compressedBatchCount: Int { batches.filter { $0.compressed != nil }.count }
 }

@@ -192,7 +192,8 @@ public nonisolated enum QuadPipelineCache {
                 try? FileManager.default.removeItem(at: entry)
             } else if entry.pathExtension == "tmp",
                 UUID(uuidString: entry.deletingPathExtension().lastPathComponent) != nil,
-                let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+                let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate,
                 Date().timeIntervalSince(modified) > 24 * 3600
             {
                 try? FileManager.default.removeItem(at: entry)

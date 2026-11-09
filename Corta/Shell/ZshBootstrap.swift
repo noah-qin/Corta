@@ -83,9 +83,10 @@ enum ZshBootstrap {
         // files and a folder on the main thread, per pane, at every spawn.
         // A folder that comes too late is removed, and the shell starts
         // without the integration rather than the pane waiting.
-        let written = PathProbe.answer(timeout: writeTimeout, abandoned: { (late: Bool) in
+        let removeLate: @Sendable (Bool) -> Void = { late in
             if late { try? FileManager.default.removeItem(at: folder) }
-        }) {
+        }
+        let written = PathProbe.answer(timeout: writeTimeout, abandoned: removeLate) {
             writeFolder(
                 folder, token: token, directoryCompletion: directoryCompletion,
                 historySuggestions: historySuggestions)

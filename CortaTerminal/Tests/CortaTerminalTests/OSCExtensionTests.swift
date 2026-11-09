@@ -169,46 +169,6 @@ struct OSCExtensionTests {
         #expect(terminal.takeOutput().isEmpty)
     }
 
-    /// Two writes completed in one batch each get their own status; the
-    /// first was written over, and its client never heard back.
-    @Test("each OSC 5522 write completed before a drain is queued with its own status")
-    func clipboardWritesQueueWithTheirOwnStatus() {
-        var terminal = Terminal()
-        for word in ["one", "two"] {
-            terminal.feed(Self.osc("5522;type=write"))
-            terminal.feed(Self.osc("5522;type=wdata:mime=dGV4dC9wbGFpbg==;" + Data(word.utf8).base64EncodedString()))
-            terminal.feed(Self.osc("5522;type=wdata"))
-        }
-        terminal.feed(Self.osc("52;c;" + Data("three".utf8).base64EncodedString()))
-        let first = terminal.takeClipboardCopyRequest()
-        let second = terminal.takeClipboardCopyRequest()
-        let third = terminal.takeClipboardCopyRequest()
-        #expect(first?.text == "one")
-        #expect(second?.text == "two")
-        #expect(third?.text == "three")
-        let done = Array("\u{1B}]5522;type=write:status=DONE\u{1B}\\".utf8)
-        #expect(first?.acknowledgement == done)
-        #expect(second?.acknowledgement == done)
-        #expect(third?.acknowledgement.isEmpty == true, "OSC 52 has no status")
-        #expect(terminal.takeClipboardCopyRequest() == nil)
-    }
-
-    @Test("past the queue's cap the oldest write gives way and its client hears EIO")
-    func clipboardQueueIsBounded() {
-        var terminal = Terminal()
-        for index in 0..<(Performer.maximumPendingClipboardCopies + 1) {
-            terminal.feed(Self.osc("5522;type=write"))
-            terminal.feed(Self.osc(
-                "5522;type=wdata:mime=dGV4dC9wbGFpbg==;" + Data("w\(index)".utf8).base64EncodedString()))
-            terminal.feed(Self.osc("5522;type=wdata"))
-        }
-        #expect(terminal.takeOutput() == Array("\u{1B}]5522;type=write:status=EIO\u{1B}\\".utf8))
-        var texts: [String] = []
-        while let request = terminal.takeClipboardCopyRequest() { texts.append(request.text) }
-        #expect(texts.count == Performer.maximumPendingClipboardCopies)
-        #expect(texts.first == "w1")
-    }
-
     @Test func clipboardTransactionsSanitiseAndFailClosed() {
         var terminal = Terminal()
         terminal.feed(Self.osc("1337;Copy=:aGVsbG8="))
@@ -418,5 +378,47 @@ extension OSCExtensionTests {
         #expect(vscodeRecords.map(\.promptEndColumn) == nativeRecords.map(\.promptEndColumn))
         #expect(vscodeRecords.map(\.endRow) == nativeRecords.map(\.endRow))
         #expect(vscodeRecords.first?.exitStatus == 0)
+    }
+}
+
+extension OSCExtensionTests {
+    /// Two writes completed in one batch each get their own status; the
+    /// first was written over, and its client never heard back.
+    @Test("each OSC 5522 write completed before a drain is queued with its own status")
+    func clipboardWritesQueueWithTheirOwnStatus() {
+        var terminal = Terminal()
+        for word in ["one", "two"] {
+            terminal.feed(Self.osc("5522;type=write"))
+            terminal.feed(Self.osc("5522;type=wdata:mime=dGV4dC9wbGFpbg==;" + Data(word.utf8).base64EncodedString()))
+            terminal.feed(Self.osc("5522;type=wdata"))
+        }
+        terminal.feed(Self.osc("52;c;" + Data("three".utf8).base64EncodedString()))
+        let first = terminal.takeClipboardCopyRequest()
+        let second = terminal.takeClipboardCopyRequest()
+        let third = terminal.takeClipboardCopyRequest()
+        #expect(first?.text == "one")
+        #expect(second?.text == "two")
+        #expect(third?.text == "three")
+        let done = Array("\u{1B}]5522;type=write:status=DONE\u{1B}\\".utf8)
+        #expect(first?.acknowledgement == done)
+        #expect(second?.acknowledgement == done)
+        #expect(third?.acknowledgement.isEmpty == true, "OSC 52 has no status")
+        #expect(terminal.takeClipboardCopyRequest() == nil)
+    }
+
+    @Test("past the queue's cap the oldest write gives way and its client hears EIO")
+    func clipboardQueueIsBounded() {
+        var terminal = Terminal()
+        for index in 0..<(Performer.maximumPendingClipboardCopies + 1) {
+            terminal.feed(Self.osc("5522;type=write"))
+            terminal.feed(Self.osc(
+                "5522;type=wdata:mime=dGV4dC9wbGFpbg==;" + Data("w\(index)".utf8).base64EncodedString()))
+            terminal.feed(Self.osc("5522;type=wdata"))
+        }
+        #expect(terminal.takeOutput() == Array("\u{1B}]5522;type=write:status=EIO\u{1B}\\".utf8))
+        var texts: [String] = []
+        while let request = terminal.takeClipboardCopyRequest() { texts.append(request.text) }
+        #expect(texts.count == Performer.maximumPendingClipboardCopies)
+        #expect(texts.first == "w1")
     }
 }

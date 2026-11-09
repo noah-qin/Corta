@@ -99,50 +99,6 @@ final class PaneFocus: NSObject {
             idleCursorLayer = nil
         }
     }
-    private func makeIdleCursorLayer(capture: TerminalRenderer.CursorImage? = nil) -> CursorLayerPresentation? {
-        guard let pane = host as? TerminalPaneViewController, let cursor = lastBlinkCursor,
-            let renderer = pane.terminalRenderer, let view = pane.terminalView,
-            !view.hasMarkedText(), pane.selection == nil,
-            pane.search.highlights.isEmpty, pane.pointer.hoveredLink == nil,
-            !lastCursorHasImages
-        else { return nil }
-        let metrics = renderer.pointMetrics
-        let scale = renderer.scale
-        let style = lastBlinkStyle ?? .block
-        var column = cursor.column
-        var columns = 1
-        let layer = CALayer()
-        layer.actions = ["opacity": NSNull(), "position": NSNull(), "bounds": NSNull()]
-        layer.contentsScale = scale
-        layer.opacity = 0
-        layer.backgroundColor =
-            NSColor(
-                srgbRed: CGFloat(TerminalColorPalette.activeVariant.cursor.x),
-                green: CGFloat(TerminalColorPalette.activeVariant.cursor.y),
-                blue: CGFloat(TerminalColorPalette.activeVariant.cursor.z), alpha: 1
-            ).cgColor
-        if style == .blinkingBlock {
-            guard let capture else { return nil }
-            column = capture.column
-            columns = capture.columns
-            layer.contents = capture.image
-        }
-        let content = PaneFrameLoop.contentRect(
-            in: view.bounds.size, scale: 1,
-            gridHeight: CGFloat(lastCursorRows) * metrics.cellHeight, topInset: pane.topInset)
-        var frame = CGRect(
-            x: content.minX + CGFloat(column) * metrics.cellWidth,
-            y: content.minY + CGFloat(cursor.row) * metrics.cellHeight,
-            width: metrics.cellWidth * CGFloat(columns), height: metrics.cellHeight)
-        let stroke = max(2, floor(metrics.cellHeight * scale / 8)) / scale
-        if style == .blinkingBar { frame.size.width = stroke }
-        if style == .blinkingUnderline {
-            frame.origin.y += frame.height - stroke
-            frame.size.height = stroke
-        }
-        layer.frame = frame
-        return CursorLayerPresentation(layer: layer)
-    }
 
     private var cursorCaptureTask: Task<Void, Never>?
     private var cursorCaptureGeneration: UInt64 = 0
@@ -484,4 +440,53 @@ extension PaneFocus {
 /// Input falls through to the terminal view.
 private final class PassthroughView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+// MARK: - The idle cursor layer
+
+extension PaneFocus {
+    fileprivate func makeIdleCursorLayer(capture: TerminalRenderer.CursorImage? = nil) -> CursorLayerPresentation? {
+        guard let pane = host as? TerminalPaneViewController, let cursor = lastBlinkCursor,
+            let renderer = pane.terminalRenderer, let view = pane.terminalView,
+            !view.hasMarkedText(), pane.selection == nil,
+            pane.search.highlights.isEmpty, pane.pointer.hoveredLink == nil,
+            !lastCursorHasImages
+        else { return nil }
+        let metrics = renderer.pointMetrics
+        let scale = renderer.scale
+        let style = lastBlinkStyle ?? .block
+        var column = cursor.column
+        var columns = 1
+        let layer = CALayer()
+        layer.actions = ["opacity": NSNull(), "position": NSNull(), "bounds": NSNull()]
+        layer.contentsScale = scale
+        layer.opacity = 0
+        layer.backgroundColor =
+            NSColor(
+                srgbRed: CGFloat(TerminalColorPalette.activeVariant.cursor.x),
+                green: CGFloat(TerminalColorPalette.activeVariant.cursor.y),
+                blue: CGFloat(TerminalColorPalette.activeVariant.cursor.z), alpha: 1
+            ).cgColor
+        if style == .blinkingBlock {
+            guard let capture else { return nil }
+            column = capture.column
+            columns = capture.columns
+            layer.contents = capture.image
+        }
+        let content = PaneFrameLoop.contentRect(
+            in: view.bounds.size, scale: 1,
+            gridHeight: CGFloat(lastCursorRows) * metrics.cellHeight, topInset: pane.topInset)
+        var frame = CGRect(
+            x: content.minX + CGFloat(column) * metrics.cellWidth,
+            y: content.minY + CGFloat(cursor.row) * metrics.cellHeight,
+            width: metrics.cellWidth * CGFloat(columns), height: metrics.cellHeight)
+        let stroke = max(2, floor(metrics.cellHeight * scale / 8)) / scale
+        if style == .blinkingBar { frame.size.width = stroke }
+        if style == .blinkingUnderline {
+            frame.origin.y += frame.height - stroke
+            frame.size.height = stroke
+        }
+        layer.frame = frame
+        return CursorLayerPresentation(layer: layer)
+    }
 }

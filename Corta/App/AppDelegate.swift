@@ -38,7 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// Nothing else retains a window controller, and dropping one takes its
     /// window and session down.
-    private var windowControllers: [NSWindowController] = []
+    var windowControllers: [NSWindowController] = []
     /// The windows an App Intent may name, in opening order.
     var terminalWindowControllers: [TerminalWindowController] {
         windowControllers.compactMap { $0 as? TerminalWindowController }
@@ -48,13 +48,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     var terminalTabs: [TerminalTab] { terminalWindowControllers.flatMap(\.tabs) }
     /// The debounced arrangement write; see `noteLayoutChanged`.
     var pendingLayoutSave: DispatchWorkItem?
-    private let layoutWrites = DispatchQueue(label: "Corta.WindowLayout", qos: .utility)
-    private var layoutPersistenceSuspended = false
+    let layoutWrites = DispatchQueue(label: "Corta.WindowLayout", qos: .utility)
+    var layoutPersistenceSuspended = false
     /// Set at quit, so closing windows don't save an empty arrangement over
     /// the one just flushed.
-    private var isTerminating = false
+    var isTerminating = false
     /// A quit confirmation sheet is up; see `applicationShouldTerminate`.
-    private var isAskingToTerminate = false
+    var isAskingToTerminate = false
 
     /// File > New Window (⌘N).
     @objc func newDocument(_: Any?) {
@@ -255,7 +255,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ApplicationsFolderMover.promptIfNeeded()
     }
 
-    private var stallTimer: Timer?
+    var stallTimer: Timer?
     /// Saved windows are about to open (`openInitialWindows`).
     var isWaitingForRestore = false
     func applicationDidFinishLaunching(_ aNotification: Notification) {
@@ -272,11 +272,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // Off the main thread: a listing of the temporary directory.
         DispatchQueue.global(qos: .utility).async { ZshBootstrap.removeStaleFolders() }
         DispatchQueue.global(qos: .utility).async { FileDropStorage.cleanUpAtLaunch() }
-        DispatchQueue.global(qos: .utility).async {
-            let stranded = AppPaths.removeAbandonedStateFiles()
-            guard !stranded.isEmpty else { return }
-            Task { @MainActor [weak self] in self?.reportStrandedExports(stranded) }
-        }
+        sweepAbandonedStateFiles()
         DispatchQueue.global(qos: .utility).async { SSHAskpassBroker.pruneAbandoned() }
         openInitialWindows()
         // A notification click jumps back to its command
@@ -372,78 +368,6 @@ extension AppDelegate {
         }
     }
 
-    /// What a launch whose saved arrangement could not be read does once
-    /// a later read answers.
-    enum LayoutPersistenceResumption: Equatable {
-        /// Still unknown: ask again later.
-        case retry
-        /// No arrangement on disk: this launch's may be written.
-        case resume
-        /// An arrangement this launch did not open: set aside, as a failed
-        /// restore's is, before this launch's is written in its place.
-        case setAsideThenResume
-    }
-
-    static func layoutPersistenceResumption(
-        after decision: SessionRestore.RestoreDecision?
-    ) -> LayoutPersistenceResumption {
-        switch decision {
-        case nil: .retry
-        case .nothingToRestore: .resume
-        case .restore, .skipAfterFailure: .setAsideThenResume
-        }
-    }
-
-    /// Reads attempted after a launch read nothing, before saving stays off
-    /// for the rest of the run.
-    static let restoreDecisionRereads = 6
-    static let restoreDecisionRereadDelay: TimeInterval = 10
-
-    /// The arrangement could not be read at launch (a mount that stopped
-    /// answering, a file the read refused): saving stayed off for the whole
-    /// run. It is read again, a few times, off the main thread; once its
-    /// state is known saving resumes.
-    private func rereadRestoreDecision(store: SessionRestore, attempt: Int) {
-        guard attempt <= Self.restoreDecisionRereads else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.restoreDecisionRereadDelay) { [weak self] in
-            guard self != nil else { return }
-            PathProbe.run { [weak self] in
-                let decision = PathProbe.answer(timeout: SessionRestore.directoryCheckTimeout) {
-                    try? store.readRestoreDecision()
-                } ?? nil
-                Task { @MainActor [weak self] in
-                    self?.resumeLayoutPersistence(after: decision, store: store, attempt: attempt)
-                }
-            }
-        }
-    }
-
-    private func resumeLayoutPersistence(
-        after decision: SessionRestore.RestoreDecision?, store: SessionRestore, attempt: Int
-    ) {
-        guard layoutPersistenceSuspended else { return }
-        switch Self.layoutPersistenceResumption(after: decision) {
-        case .retry:
-            rereadRestoreDecision(store: store, attempt: attempt + 1)
-        case .resume:
-            layoutPersistenceSuspended = false
-            noteLayoutChanged()
-        case .setAsideThenResume:
-            layoutWrites.async { [weak self] in
-                let archived = (try? store.setAsideFailedRestore()) != nil
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    if archived {
-                        self.layoutPersistenceSuspended = false
-                        self.noteLayoutChanged()
-                    } else {
-                        self.rereadRestoreDecision(store: store, attempt: attempt + 1)
-                    }
-                }
-            }
-        }
-    }
-
     @discardableResult
     private func openFreshInitialWindow() -> TerminalWindowController? {
         isWaitingForRestore = false
@@ -533,7 +457,7 @@ extension AppDelegate {
         return windows.map { members in members.sorted { ($0.tabIndex ?? 0) < ($1.tabIndex ?? 0) } }
     }
 
-    private func saveWindowStates(completion: DispatchGroup? = nil) {
+    func saveWindowStates(completion: DispatchGroup? = nil) {
         guard !layoutPersistenceSuspended, !isWaitingForRestore else { return }
         let store = SessionRestore.standard
         guard Self.isRestoreEnabled else {
@@ -563,100 +487,6 @@ extension AppDelegate {
         pendingLayoutSave = item
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.layoutSaveDelay, execute: item)
     }
-
-
-    /// Confirms ⌘Q with something running; quitting bypasses
-    /// `windowShouldClose`. A sheet on the key terminal window (or the first
-    /// visible one), answered later; app-modal, answered now, when none is
-    /// visible.
-    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        // On the way out AppKit resolves what this app still promises on any
-        // pasteboard, and a dragged SFTP row's file is a promise nobody can keep
-        // by then: that wait never ended, and the app never quit. Dropping the
-        // promise costs nothing if the quit is cancelled: its drag is over.
-        NSPasteboard(name: .drag).clearContents()
-        let running = windowControllers.flatMap { $0.window?.terminalSplits ?? [] }
-            .flatMap(\.panes).filter(\.hasSessionRequiringCloseConfirmation)
-        guard let split = windowControllers.first?.window?.terminalSplit,
-            split.needsCloseConfirmation(for: running)
-        else { return .terminateNow }
-        // Already asking: that sheet answers this quit too.
-        guard !isAskingToTerminate else { return .terminateCancel }
-        // A window is already asking whether to close what runs in it: a
-        // second, app-wide question on top would ask the same thing twice.
-        // Its sheet comes forward and answers first.
-        if let asking = Self.windowAskingToClose(among: windowControllers.compactMap(\.window)) {
-            NSApp.activate()
-            asking.makeKeyAndOrderFront(nil)
-            asking.attachedSheet?.makeKeyAndOrderFront(nil)
-            return .terminateCancel
-        }
-        // Only terminal windows with room to present a confirmation sheet.
-        let windows = windowControllers.compactMap { controller -> NSWindow? in
-            guard let terminal = controller as? TerminalWindowController
-            else { return nil }
-            return terminal.window
-        }.filter { NSAlert.canPresentSheet(on: $0) }
-        guard let window = windows.first(where: \.isKeyWindow) ?? windows.first,
-            let presenter = window.terminalSplit
-        else {
-            let alert = split.closeAlert(for: running, scope: L10n.text("close.scope.app"))
-            return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
-        }
-        isAskingToTerminate = true
-        presenter.confirmClose(of: running, scope: L10n.text("close.scope.app"), in: window) { [weak self] in
-            self?.isAskingToTerminate = false
-            NSApp.reply(toApplicationShouldTerminate: $0)
-        }
-        return .terminateLater
-    }
-
-    /// Once: the record is gone after this, so the same folder is not named
-    /// again.
-    private func reportStrandedExports(_ folders: [String]) {
-        let alert = NSAlert()
-        alert.messageText = L10n.text("export.stranded.title")
-        alert.informativeText = L10n.format(
-            "export.stranded.detail", Set(folders).sorted().joined(separator: "\n"))
-        alert.present(for: terminalWindowControllers.first?.window) { _ in }
-    }
-
-    /// The first of `windows` showing a close confirmation as a sheet.
-    static func windowAskingToClose(among windows: [NSWindow]) -> NSWindow? {
-        windows.first { $0.attachedSheet?.identifier == SplitViewController.closeConfirmationIdentifier }
-    }
-
-    func applicationWillTerminate(_ aNotification: Notification) {
-        stallTimer?.invalidate()
-        stallTimer = nil
-        isTerminating = true
-        // Every store's last write at once, under one deadline: one after
-        // another, a slow disk could spend each its own second in turn.
-        let writes = DispatchGroup()
-        let deadline = DispatchTime.now() + Self.quitFlushDeadline
-        pendingLayoutSave?.cancel()
-        pendingLayoutSave = nil
-        saveWindowStates(completion: writes)
-        DirectoryHistoryStore.shared.flush(into: writes, deadline: deadline)
-        RecentHostsStore.flushSharedAtQuit(into: writes, deadline: deadline)
-        RemoteEditStore.flushSharedAtQuit(into: writes)
-        ZshBootstrap.removeGeneratedFiles()
-        // The askpass socket and its directory.
-        SSHAskpassBroker.shared.stop()
-        // The secure-input count must reach zero before exit.
-        SecureInput.shared.disengage()
-        // Not every quit path reaches `windowWillClose`; tear down explicitly
-        // rather than leave children to SIGHUP.
-        for controller in windowControllers {
-            for split in controller.window?.terminalSplits ?? [] { split.teardown() }
-        }
-        // Not left to the panes' background removals: the process is ending.
-        FileDropStorage.removeThisRun(into: writes, deadline: deadline)
-        _ = writes.wait(timeout: deadline)
-    }
-
-    /// How long a quit waits for the last writes, all of them together.
-    static let quitFlushDeadline: DispatchTimeInterval = .milliseconds(1500)
 
     /// AppKit restoration is off: a live process isn't a document.
     /// `SessionRestore` saves the arrangement instead.

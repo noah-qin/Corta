@@ -107,6 +107,26 @@ import Testing
         #expect(commentedTheme.dark.background == Theme.color("#101018"))
     }
 
+    @Test("a misspelt theme key makes no theme and is written back as written")
+    func misspeltThemeKeyMakesNoTheme() {
+        let (parsed, unknown) = Configuration.parse("theme.foo.nmae = x")
+        #expect(parsed.customThemes.isEmpty)
+        let written = parsed.serialized(preserving: unknown)
+        let themeLines = written.split(separator: "\n").filter { $0.hasPrefix("theme.") }
+        #expect(themeLines == ["theme.foo.nmae = x"])
+    }
+
+    @Test("a theme with one good key and one misspelt one is still that theme")
+    func themeKeepsGoodKeysBesideATypo() {
+        let (parsed, unknown) = Configuration.parse(
+            """
+            theme.mine.dark.backgrund = #000000
+            theme.mine.dark.background = #101010
+            """)
+        #expect(parsed.customThemes.map(\.name) == ["mine"])
+        #expect(unknown.map(\.0) == ["theme.mine.dark.backgrund"])
+    }
+
     /// A half-typed theme must still render — a config file is hand-edited,
     /// and a bad colour must not black out the terminal. With no field that
     /// applies there is no theme by that name, so the default draws, and the

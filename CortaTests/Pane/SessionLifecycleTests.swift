@@ -183,7 +183,9 @@ struct SessionLifecycleTests {
     func closingAPaneFreesItsHistory() async throws {
         var preset = Preset(name: "history")
         preset.shell = "/bin/sh"
-        preset.arguments = ["-c", "trap '' HUP; i=0; while [ $i -lt 300 ]; do echo line $i; i=$((i+1)); done; exec /bin/cat"]
+        preset.arguments = [
+            "-c", "trap '' HUP; i=0; while [ $i -lt 300 ]; do echo line $i; i=$((i+1)); done; exec /bin/cat",
+        ]
         let pane = makePane(preset: preset)
         let session = try #require(pane.session)
         #expect(await waitUntilTrue(timeout: .seconds(10)) { session.snapshot().scrollback.count > 100 })
@@ -199,7 +201,8 @@ struct SessionLifecycleTests {
     func statusTooltipsFollowAClear() async throws {
         var preset = Preset(name: "marks")
         preset.shell = "/bin/sh"
-        preset.arguments = ["-c", #"printf '\033]133;A\007$ false\r\n\033]133;C\007\033]133;D;1\007\033]133;A\007$ '; exec /bin/cat"#]
+        let marks = #"printf '\033]133;A\007$ false\r\n\033]133;C\007\033]133;D;1\007\033]133;A\007$ '"#
+        preset.arguments = ["-c", marks + "; exec /bin/cat"]
         let pane = makePane(preset: preset)
         defer { pane.teardown() }
         let session = try #require(pane.session)

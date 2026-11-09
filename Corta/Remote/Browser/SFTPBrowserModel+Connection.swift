@@ -92,40 +92,15 @@ extension SFTPBrowserModel {
         do {
             armConnectDeadline(client: client, host: name, generation: generation)
             _ = try await client.connect()
-            // Back where the failure left the user, when that folder is still
-            // there; else the pane's reported directory when there is one;
-            // otherwise the session's own starting directory, canonicalised
-            // by the server — never a guess at "~".
-            var path = ""
-            var resumed: [SFTPEntry]?
-            if let resumePath {
-                armConnectDeadline(client: client, host: name, generation: generation)
-                if let listing = try? await client.listDirectory(path: resumePath) {
-                    path = resumePath
-                    resumed = listing
-                }
-            }
-            if resumed == nil {
-                if let startDirectory {
-                    path = startDirectory
-                } else {
-                    armConnectDeadline(client: client, host: name, generation: generation)
-                    path = try await client.realPath(path: ".")
-                }
-            }
-            armConnectDeadline(client: client, host: name, generation: generation)
-            let listing: [SFTPEntry]
-            if let resumed {
-                listing = resumed
-            } else {
-                listing = try await client.listDirectory(path: path)
-            }
+            let opened = try await firstListing(
+                client: client, host: name, generation: generation, resumePath: resumePath)
+            let (path, listing) = (opened.path, opened.listing)
             guard generation == connectionGeneration else {
                 client.close()
                 return
             }
             connectDeadline?.cancel()
-            let keepsHistory = resumed != nil
+            let keepsHistory = opened.resumed
             await applyEntries(listing) {
                 // Publish the directory and its rows together.
                 if !keepsHistory {
@@ -144,6 +119,36 @@ extension SFTPBrowserModel {
             connectionFailed(Self.sftpError(error), client: client, host: name)
         }
         updateTitle()
+    }
+
+    /// The folder a connection opens on, listed: back where the failure left
+    /// the user when that folder is still there (`resumed`); else the pane's
+    /// reported directory when there is one; otherwise the session's own
+    /// starting directory, canonicalised by the server — never a guess at "~".
+    private func firstListing(
+        client: any SFTPClient, host name: String, generation: Int, resumePath: String?
+    ) async throws -> FirstListing {
+        if let resumePath {
+            armConnectDeadline(client: client, host: name, generation: generation)
+            if let listing = try? await client.listDirectory(path: resumePath) {
+                return FirstListing(path: resumePath, listing: listing, resumed: true)
+            }
+        }
+        let path: String
+        if let startDirectory {
+            path = startDirectory
+        } else {
+            armConnectDeadline(client: client, host: name, generation: generation)
+            path = try await client.realPath(path: ".")
+        }
+        armConnectDeadline(client: client, host: name, generation: generation)
+        return FirstListing(path: path, listing: try await client.listDirectory(path: path), resumed: false)
+    }
+
+    private struct FirstListing {
+        let path: String
+        let listing: [SFTPEntry]
+        let resumed: Bool
     }
 
     /// Starts the time for one step of connecting, over again: a server that

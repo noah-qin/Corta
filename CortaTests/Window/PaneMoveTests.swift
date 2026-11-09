@@ -298,44 +298,6 @@ struct PaneMoveTests {
         #expect(editor?.delegate === field, "the field keeps the keyboard")
     }
 
-    /// The tab can outlive the pane it was made for: the setup must not keep
-    /// a pane that has moved on or closed, with its scrollback, alive.
-    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
-    func aNewTabDoesNotHoldOnToThePaneItAdopted() throws {
-        let controller = makeWindow()
-        defer { close(controller) }
-        let split = try #require(controller.selectedTab?.split)
-        let pane = try #require(split.focusedPane)
-
-        split.movePaneToNewTab(nil)
-
-        let adopter = try #require(pane.splitController)
-        #expect(adopter !== split)
-        #expect(adopter.setup.adopting == nil)
-    }
-
-    /// Nodes made by a move answer divider drags like a split's.
-    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
-    func nodesMadeByAMoveAreWired() throws {
-        let controller = makeWindow()
-        defer { close(controller) }
-        let split = try #require(controller.selectedTab?.split)
-        split.movePaneUp(nil)
-        #expect(split.tree.nodes.allSatisfy { $0.delegate === split })
-    }
-
-    @Test func thePaletteOffersTheOtherTabsByName() {
-        let target = CommandPaletteModel.PaneMoveTarget(id: "tab-1", title: "build")
-        var moved: String?
-        let model = CommandPaletteModel(agents: { [] }, paneMoveTargets: { [target] })
-        model.onMovePane = { moved = $0 }
-        model.query = "move pane to tab"
-        let row = model.rows.first { $0.id == "move-pane-tab-1" }
-        #expect(row != nil)
-        model.select(row!)
-        model.runSelected()
-        #expect(moved == "tab-1")
-    }
 }
 
 /// Moves to another tab that cannot happen.
@@ -485,5 +447,46 @@ extension PaneMoveTests {
         #expect(controller.selectedTab?.split.panes.contains(pane) == true)
         pane.teardown()
         #expect(!FileManager.default.fileExists(atPath: directory.path))
+    }
+}
+
+extension PaneMoveTests {
+    /// The tab can outlive the pane it was made for: the setup must not keep
+    /// a pane that has moved on or closed, with its scrollback, alive.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aNewTabDoesNotHoldOnToThePaneItAdopted() throws {
+        let controller = makeWindow()
+        defer { close(controller) }
+        let split = try #require(controller.selectedTab?.split)
+        let pane = try #require(split.focusedPane)
+
+        split.movePaneToNewTab(nil)
+
+        let adopter = try #require(pane.splitController)
+        #expect(adopter !== split)
+        #expect(adopter.setup.adopting == nil)
+    }
+
+    /// Nodes made by a move answer divider drags like a split's.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func nodesMadeByAMoveAreWired() throws {
+        let controller = makeWindow()
+        defer { close(controller) }
+        let split = try #require(controller.selectedTab?.split)
+        split.movePaneUp(nil)
+        #expect(split.tree.nodes.allSatisfy { $0.delegate === split })
+    }
+
+    @Test func thePaletteOffersTheOtherTabsByName() {
+        let target = CommandPaletteModel.PaneMoveTarget(id: "tab-1", title: "build")
+        var moved: String?
+        let model = CommandPaletteModel(agents: { [] }, paneMoveTargets: { [target] })
+        model.onMovePane = { moved = $0 }
+        model.query = "move pane to tab"
+        let row = model.rows.first { $0.id == "move-pane-tab-1" }
+        #expect(row != nil)
+        model.select(row!)
+        model.runSelected()
+        #expect(moved == "tab-1")
     }
 }

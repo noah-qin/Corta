@@ -322,18 +322,28 @@ nonisolated struct Configuration: Equatable, Sendable {
             }
         }
         configuration.customThemes = themeOrder.compactMap { themeDrafts[$0]?.resolved() }
-        // An empty preset, or one with a relative shell or directory, is a typo
-        // that would fail at spawn: not offered, but its lines survive a save
-        // for the user to fix, as an unknown key's do.
-        for name in presetOrder {
-            guard let preset = presetDrafts[name] else { continue }
+        let presets = resolvePresets(presetOrder.compactMap { presetDrafts[$0] }, lines: presetLines)
+        configuration.presets = presets.usable
+        unknown.append(contentsOf: presets.keptLines)
+        return (configuration, unknown)
+    }
+
+    /// An empty preset, or one with a relative shell or directory, is a typo
+    /// that would fail at spawn: not offered, but its lines survive a save
+    /// for the user to fix, as an unknown key's do.
+    private static func resolvePresets(
+        _ drafts: [Preset], lines: [String: [(String, String)]]
+    ) -> (usable: [Preset], keptLines: [(String, String)]) {
+        var usable: [Preset] = []
+        var kept: [(String, String)] = []
+        for preset in drafts {
             if preset.isUsable {
-                configuration.presets.append(preset)
+                usable.append(preset)
             } else {
-                unknown.append(contentsOf: presetLines[name] ?? [])
+                kept.append(contentsOf: lines[preset.name] ?? [])
             }
         }
-        return (configuration, unknown)
+        return (usable, kept)
     }
 
     /// A `key = value` line's two sides, its trailing comment dropped; nil

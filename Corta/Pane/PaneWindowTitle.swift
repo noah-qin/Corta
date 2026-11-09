@@ -214,10 +214,12 @@ final class PaneWindowTitle {
     /// Panes refused a probe while the budget was spent, newest last, each
     /// with the path and generation it was refused for. A probe's end wakes
     /// the newest still current; none polls.
-    private static var probeWaiters: [(pane: Weak, path: String, generation: Int)] = []
+    private static var probeWaiters: [ProbeWaiter] = []
 
-    struct Weak {
+    private struct ProbeWaiter {
         weak var title: PaneWindowTitle?
+        let path: String
+        let generation: Int
     }
 
     /// One probe's slot came free: the newest waiter still asking for the
@@ -225,7 +227,7 @@ final class PaneWindowTitle {
     /// out as they are met.
     private static func wakeNextProbeWaiter() {
         while let waiter = probeWaiters.popLast() {
-            guard let title = waiter.pane.title, !title.isStopped,
+            guard let title = waiter.title, !title.isStopped,
                 waiter.generation == title.directoryProbeGeneration
             else { continue }
             title.probeRepresentedDirectory(waiter.path)
@@ -250,8 +252,8 @@ final class PaneWindowTitle {
         // next `cd` — or ask again every two seconds while the mount stays
         // dead; a newer path in the meantime supersedes the wait.
         guard admitted else {
-            Self.probeWaiters.removeAll { $0.pane.title === self || $0.pane.title == nil }
-            Self.probeWaiters.append((Weak(title: self), path, generation))
+            Self.probeWaiters.removeAll { $0.title === self || $0.title == nil }
+            Self.probeWaiters.append(ProbeWaiter(title: self, path: path, generation: generation))
             return
         }
         let isDirectory = isDirectory

@@ -124,14 +124,8 @@ extension SFTPTransferQueue {
         if plan.isUpload {
             let url = plan.localURL
             let result = await localChecks.answer { SFTPLocalFacts.source(url) }
-            guard let source = checked(result, id: id, path: url.path) else { return }
-            guard !source.isSpecial else {
-                jobs[id]?.preparation = nil
-                setState(id, .failed(
-                    message: L10n.format("sftp.transfer.notAFile", SFTPBrowserModel.peerText(url.path)),
-                    retryable: false))
-                return
-            }
+            guard let source = checked(result, id: id, path: url.path), accepts(source, id: id, url: url)
+            else { return }
             plan.isDirectory = plan.isDirectory || source.isDirectory
             if let index = transfers.firstIndex(where: { $0.id == id }) {
                 transfers[index].isDirectory = plan.isDirectory
@@ -207,6 +201,16 @@ extension SFTPTransferQueue {
 
     /// The disk did not answer. Unless the row was cancelled meanwhile, it
     /// fails — Retry asks again — and the rest of the queue goes on.
+    /// A pipe, socket or device is refused before anything runs.
+    private func accepts(_ source: SFTPLocalFacts.Source, id: UUID, url: URL) -> Bool {
+        guard source.isSpecial else { return true }
+        jobs[id]?.preparation = nil
+        setState(id, .failed(
+            message: L10n.format("sftp.transfer.notAFile", SFTPBrowserModel.peerText(url.path)),
+            retryable: false))
+        return false
+    }
+
     private func checked<T>(_ result: Result<T, SFTPLocalChecks.Failure>, id: UUID, path: String) -> T? {
         guard !Task.isCancelled, jobs[id] != nil else { return nil }
         switch result {
@@ -249,35 +253,43 @@ extension SFTPTransferQueue {
     /// Finds a `name 2.ext`-style destination that collides with neither a
     /// destination nor a partial, repoints the plan and row at it, and
     /// starts under `.fail`.
+    /// The first Keep Both name free on the server, neither a file nor a
+    /// partial there, checked eight at a time; nil when none is, or when
+    /// `stillWanted` says the row has gone.
+    private static func freeRemoteCandidate(
+        for remotePath: String, attempts: Int, client: any SFTPClient, stillWanted: () -> Bool
+    ) async -> String? {
+        for first in stride(from: 1, through: attempts, by: 8) {
+            guard stillWanted() else { return nil }
+            let free = await withTaskGroup(of: Int?.self) { group in
+                for attempt in first...min(attempts, first + 7) {
+                    group.addTask {
+                        let name = SFTPBrowserModel.keepBothCandidate(remotePath, attempt: attempt)
+                        async let destination = try? client.lstat(path: name)
+                        async let partial = try? client.lstat(path: SFTPTransferEngine.partialPath(for: name))
+                        let (file, fragment) = await (destination, partial)
+                        return file == nil && fragment == nil ? attempt : nil
+                    }
+                }
+                var earliest: Int?
+                for await result in group {
+                    if let result { earliest = min(earliest ?? result, result) }
+                }
+                return earliest
+            }
+            if let free { return SFTPBrowserModel.keepBothCandidate(remotePath, attempt: free) }
+        }
+        return nil
+    }
+
     private func keepBoth(id: UUID) async {
         guard var plan = jobs[id]?.plan, let client else { return }
         let attempts = 1000
-        var candidate: String?
+        let candidate: String?
         if plan.isUpload {
-            let remotePath = plan.remotePath
-            for first in stride(from: 1, through: attempts, by: 8) {
-                guard !Task.isCancelled, jobs[id] != nil else { return }
-                let free = await withTaskGroup(of: Int?.self) { group in
-                    for attempt in first...min(attempts, first + 7) {
-                        group.addTask {
-                            let name = SFTPBrowserModel.keepBothCandidate(remotePath, attempt: attempt)
-                            async let destination = try? client.lstat(path: name)
-                            async let partial = try? client.lstat(path: SFTPTransferEngine.partialPath(for: name))
-                            let (file, fragment) = await (destination, partial)
-                            return file == nil && fragment == nil ? attempt : nil
-                        }
-                    }
-                    var earliest: Int?
-                    for await result in group {
-                        if let result { earliest = min(earliest ?? result, result) }
-                    }
-                    return earliest
-                }
-                if let free {
-                    candidate = SFTPBrowserModel.keepBothCandidate(remotePath, attempt: free)
-                    break
-                }
-            }
+            let stillWanted = { [weak self] in !Task.isCancelled && self?.jobs[id] != nil }
+            candidate = await Self.freeRemoteCandidate(
+                for: plan.remotePath, attempts: attempts, client: client, stillWanted: stillWanted)
         } else {
             let path = plan.localURL.path
             let result = await localChecks.answer {

@@ -66,6 +66,15 @@ extension SplitViewController {
     @objc func moveFocusUp(_: Any?) { moveFocus(.up) }
     @objc func moveFocusDown(_: Any?) { moveFocus(.down) }
 
+    /// Leaves zoom before the tree changes: `SplitTree.close(leaf:)` can't
+    /// remove a leaf that isn't in it, and `zoomOrigin` names a slot in the
+    /// tree as it stood.
+    func unzoomIfZoomed() {
+        guard isPaneZoomed else { return }
+        unzoomPane()
+        view.layoutSubtreeIfNeeded()
+    }
+
     /// From a zoomed pane, zoom ends first, as in other terminals: the
     /// neighbour is found in the whole tree, and focusing a pane the zoom
     /// hides would send typing to something off screen.

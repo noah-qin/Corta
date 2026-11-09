@@ -57,7 +57,8 @@ struct ExportStagingTests {
         let moved = root.appendingPathComponent("renamed", isDirectory: true)
         try FileManager.default.moveItem(at: parent, to: moved)
         ExportStaging.removeAbandoned(in: journal)
-        #expect(!FileManager.default.fileExists(atPath: moved.appendingPathComponent(abandoned.folder.lastPathComponent).path))
+        let left = moved.appendingPathComponent(abandoned.folder.lastPathComponent)
+        #expect(!FileManager.default.fileExists(atPath: left.path))
         #expect(!FileManager.default.fileExists(atPath: abandoned.entry.path))
     }
 

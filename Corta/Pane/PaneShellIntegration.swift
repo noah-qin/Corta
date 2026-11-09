@@ -47,9 +47,9 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     /// so `effectiveCommand` never targets a command scrolled out of view.
     /// `jumpToCommand` sets it after its own scroll.
     var selectedCommandID: Int?
-    private weak var statusSession: TerminalSession?
-    private var statusRevision: UInt64 = 0
-    private var statusByRow: [Int: Int] = [:]
+    weak var statusSession: TerminalSession?
+    var statusRevision: UInt64 = 0
+    var statusByRow: [Int: Int] = [:]
     /// The command store's `statusRevision` and running flag as the last
     /// output batch found them (`noteCommandState`): they change only with
     /// output, so a frame need not lock the session to read them again.
@@ -57,7 +57,7 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     private(set) var knownCommandRunning = false
     /// What the status tooltips were last built from; the same key builds
     /// the same rows, so a frame that changes none of it builds none.
-    private var statusOverlayKey: Int?
+    var statusOverlayKey: Int?
 
     /// From the output batch's one read of the session's command state.
     func noteCommandState(statusRevision: UInt64, isCommandRunning: Bool) {
@@ -71,13 +71,13 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
 
     // The pane's state, read and written where the code that uses it reads
     // it best.
-    private var session: TerminalSession! { host?.session ?? nil }
+    var session: TerminalSession! { host?.session ?? nil }
     private var isOperable: Bool { host?.isOperable ?? false }
-    private var terminalView: TerminalView? { host?.terminalView ?? nil }
-    private var terminalRenderer: TerminalRenderer? { host?.terminalRenderer ?? nil }
-    private var isFocusedPane: Bool { host?.isFocusedPane ?? false }
-    private var topInset: CGFloat { host?.topInset ?? 0 }
-    private var scrollOffset: Int {
+    var terminalView: TerminalView? { host?.terminalView ?? nil }
+    var terminalRenderer: TerminalRenderer? { host?.terminalRenderer ?? nil }
+    var isFocusedPane: Bool { host?.isFocusedPane ?? false }
+    var topInset: CGFloat { host?.topInset ?? 0 }
+    var scrollOffset: Int {
         get { host?.scrollOffset ?? 0 }
         set { host?.scrollOffset = newValue }
     }
@@ -451,96 +451,6 @@ extension PaneShellIntegration {
     }
 
     // MARK: - Status marks and directory completion
-
-    func updateShellOverlay(grid: Grid, canvas: CanvasTextColors) {
-        guard let terminalView, let terminalRenderer else { return }
-        let overlay = terminalView.shellOverlay
-        if overlay.frame != terminalView.bounds { overlay.frame = terminalView.bounds }
-        let metrics = terminalRenderer.pointMetrics
-        let content = PaneFrameLoop.contentRect(in: terminalView.bounds.size, scale: 1,
-            gridHeight: CGFloat(grid.rows) * metrics.cellHeight, topInset: topInset)
-        let config = ConfigurationStore.shared.configuration
-        // Everything the tooltip rows depend on. Rows' marks change only
-        // with their lines, which `lineRevision` counts; history rows never
-        // change, and `totalPushed` and `scrollOffset` place the window.
-        var key = Hasher()
-        key.combine(ObjectIdentifier(session))
-        key.combine(knownStatusRevision)
-        key.combine(config.commandStatusMarks)
-        key.combine(grid.isAlternateScreenActive)
-        key.combine(grid.scrollback.totalPushed)
-        key.combine(grid.scrollback.count)
-        key.combine(scrollOffset)
-        key.combine(grid.rows)
-        key.combine(grid.linesGeneration)
-        key.combine(content.minX)
-        key.combine(content.minY)
-        key.combine(metrics.cellHeight)
-        for row in 0..<grid.rows { key.combine(grid.lineRevision(row)) }
-        let overlayKey = key.finalize()
-        if overlayKey != statusOverlayKey {
-            statusOverlayKey = overlayKey
-            overlay.updateStatuses(statusRows(grid: grid, config: config, content: content, metrics: metrics))
-        }
-        showSuggestions(grid: grid, config: config, content: content, metrics: metrics, canvas: canvas)
-    }
-
-    /// The tooltips for the rules the renderer draws (`TerminalRenderer.rebuildMarks`).
-    private func statusRows(
-        grid: Grid, config: Configuration, content: CGRect, metrics: CellMetrics
-    ) -> [ShellOverlayView.Status] {
-        var rows: [ShellOverlayView.Status] = []
-        if config.commandStatusMarks && !grid.isAlternateScreenActive {
-            if statusSession !== session || statusRevision != knownStatusRevision {
-                let records = session.commandRecords
-                statusSession = session
-                statusRevision = knownStatusRevision
-                statusByRow.removeAll(keepingCapacity: true)
-                for record in records.recordsInOrder {
-                    if let status = record.exitStatus { statusByRow[record.promptRow] = status }
-                }
-            }
-            let firstAbsolute = grid.scrollback.totalPushed - scrollOffset
-            for row in 0..<grid.rows {
-                let absolute = firstAbsolute + row
-                guard let line = grid.line(atAbsoluteRow: absolute), line.mark.hasOutcome else { continue }
-                let code =
-                    statusByRow[absolute] ?? (line.mark == .promptSucceeded ? 0 : line.mark == .promptInterrupted ? 130 : 1)
-                let text =
-                    code == 0
-                    ? L10n.text("commandStatus.succeeded")
-                    : code == 130
-                        ? L10n.text("commandHistory.statusInterrupted")
-                        : L10n.format("commandHistory.statusFailed", code)
-                rows.append(.init(
-                    rect: CGRect(
-                        x: content.minX - TerminalLayout.statusRuleOffset,
-                        y: content.minY + CGFloat(row) * metrics.cellHeight,
-                        width: TerminalLayout.statusRuleWidth, height: metrics.cellHeight),
-                    description: text))
-            }
-        }
-        return rows
-    }
-
-    private func showSuggestions(
-        grid: Grid, config: Configuration, content: CGRect, metrics: CellMetrics, canvas: CanvasTextColors
-    ) {
-        guard let terminalView else { return }
-        let overlay = terminalView.shellOverlay
-        let canSuggest =
-            isFocusedPane && scrollOffset == 0 && host?.search.bar == nil && !knownCommandRunning
-            && !grid.isAlternateScreenActive
-        let completion = canSuggest && config.directoryCompletion ? session.directoryCompletion : nil
-        let history = canSuggest && config.historySuggestions ? session.historySuggestion : nil
-        let anchor = CGRect(x: content.minX + CGFloat(grid.cursor.column) * metrics.cellWidth,
-            y: content.minY + CGFloat(grid.cursor.row) * metrics.cellHeight,
-            width: metrics.cellWidth, height: metrics.cellHeight)
-        overlay.showCompletion(completion, history: history, anchor: anchor,
-            font: (host?.fontStyle ?? FontStyle()).font(
-                ofSize: host?.fontSize ?? TerminalPaneViewController.defaultFontSize) as NSFont,
-            baseline: metrics.baselineOffset, colors: canvas)
-    }
 
     func handleDirectoryCompletionKey(_ event: NSEvent) -> Bool {
         if let terminalView, terminalView.shellOverlay.historySuggestion != nil {

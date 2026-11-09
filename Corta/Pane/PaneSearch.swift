@@ -85,8 +85,8 @@ final class PaneSearch: NSObject {
     /// back to `refreshPacing` after it. With the bar open over a stream of
     /// output, sweeps used to run back to back — a core busy for as long as
     /// the bar stayed open.
-    private var lastSweepLanded: ContinuousClock.Instant?
-    private var pacingWake: Task<Void, Never>?
+    var lastSweepLanded: ContinuousClock.Instant?
+    var pacingWake: Task<Void, Never>?
     /// The least time from one output-driven sweep landing to the next one
     /// starting. A typed query is never held back.
     static let refreshPacing: Duration = .milliseconds(250)
@@ -476,31 +476,6 @@ extension PaneSearch {
         }
     }
 
-    /// The grid the matches were found in is gone: cleared, reset, or
-    /// reflowed at a new width, where rows renumber in ways `totalPushed`
-    /// does not track. Drops the matches, highlights and count at once,
-    /// supersedes a sweep in flight, and — with the bar open — sweeps the
-    /// grid as it is now, without waiting out the refresh pacing.
-    func invalidateResults() {
-        task?.cancel()
-        task = nil
-        pacingWake?.cancel()
-        pacingWake = nil
-        needsRefresh = false
-        lastSweepLanded = nil
-        generation &+= 1
-        setMatches([], totalPushed: 0)
-        matchesTruncated = false
-        currentMatchIndex = nil
-        currentMatchAnchor = nil
-        status = .complete
-        host?.invalidateDisplay()
-        guard bar != nil else { return }
-        barModel.countText = ""
-        placeClearOfContent()
-        scheduleBackgroundRefresh()
-    }
-
     private func noteCurrentMatchAnchor(totalPushed: Int) {
         guard let index = currentMatchIndex, matches.indices.contains(index) else {
             currentMatchAnchor = nil
@@ -557,7 +532,7 @@ extension PaneSearch {
             : min(grid.scrollback.count, max(0, grid.rows / 2 - row))
     }
 
-    private func setMatches(_ found: [SelectionRange], totalPushed: Int) {
+    func setMatches(_ found: [SelectionRange], totalPushed: Int) {
         matches = found
         matchesTotalPushed = totalPushed
         highlights = found.map { TerminalSelection($0, baseScrollbackTotal: totalPushed) }
@@ -586,29 +561,4 @@ extension PaneSearch {
         }
     }
 
-    /// Flips this pane's case sensitivity and saves it as the default for
-    /// bars opened later; other open bars keep theirs.
-    func toggleSearchCase() {
-        caseSensitive.toggle()
-        if !ConfigurationStore.shared.update({ $0.searchCaseSensitive = self.caseSensitive }) {
-            // A failed write rolls the config back; match it.
-            caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
-        }
-        barModel.caseSensitive = caseSensitive
-        // The list changes; re-find the place rather than keep it.
-        currentMatchAnchor = nil
-        updateResults(scrollsToMatch: true)
-    }
-
-    /// As `toggleSearchCase`, for regex mode.
-    func toggleSearchRegex() {
-        regex.toggle()
-        if !ConfigurationStore.shared.update({ $0.searchRegex = self.regex }) {
-            // See `toggleSearchCase`.
-            regex = ConfigurationStore.shared.configuration.searchRegex
-        }
-        barModel.regex = regex
-        currentMatchAnchor = nil
-        updateResults(scrollsToMatch: true)
-    }
 }

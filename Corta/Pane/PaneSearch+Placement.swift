@@ -53,28 +53,7 @@ extension PaneSearch {
         let bottomFrame = frame(
             distanceFromTop: bounds.height - Self.bottomMargin - size.height)
 
-        var obstacles: [CGRect] = []
-        let cursor = host.scrollOffset == 0 ? terminalView.cursorRectProvider?() : nil
-        if let cursor {
-            obstacles.append(terminalView.convert(cursor, to: view))
-        }
-        // Found again only when the match, the viewport or the cursor moved:
-        // output that moves none of them leaves the rect where it was.
-        if let index = currentMatchIndex {
-            let key = MatchRectKey(
-                index: index, matchesTotalPushed: matchesTotalPushed, matchesGeneration: generation,
-                scrollOffset: host.scrollOffset, cursor: cursor)
-            if key != matchRectKey {
-                matchRectKey = key
-                matchRect = currentMatchRect(in: terminalView, host: host)
-            }
-        } else {
-            matchRectKey = nil
-            matchRect = nil
-        }
-        if let match = matchRect {
-            obstacles.append(terminalView.convert(match, to: view))
-        }
+        let obstacles = obstacleRects(in: view, terminalView: terminalView, host: host)
         func isClear(_ frame: CGRect) -> Bool {
             // A little slack, so a row brushing the pill's shadow counts.
             let padded = frame.insetBy(dx: -4, dy: -4)
@@ -97,6 +76,33 @@ extension PaneSearch {
             context.duration = SystemAccessibility.duration(0.15)
             container.animator().alphaValue = 1
         }
+    }
+
+    /// The cursor and the current match, in `view`'s coordinates.
+    private func obstacleRects(in view: NSView, terminalView: TerminalView, host: PaneSearchHost) -> [CGRect] {
+        var obstacles: [CGRect] = []
+        let cursor = host.scrollOffset == 0 ? terminalView.cursorRectProvider?() : nil
+        if let cursor {
+            obstacles.append(terminalView.convert(cursor, to: view))
+        }
+        // Found again only when the match, the viewport or the cursor moved:
+        // output that moves none of them leaves the rect where it was.
+        if let index = currentMatchIndex {
+            let key = MatchRectKey(
+                index: index, matchesTotalPushed: matchesTotalPushed, matchesGeneration: generation,
+                scrollOffset: host.scrollOffset, cursor: cursor)
+            if key != matchRectKey {
+                matchRectKey = key
+                matchRect = currentMatchRect(in: terminalView, host: host)
+            }
+        } else {
+            matchRectKey = nil
+            matchRect = nil
+        }
+        if let match = matchRect {
+            obstacles.append(terminalView.convert(match, to: view))
+        }
+        return obstacles
     }
 
     /// The current match's first visible row, in terminal-view coordinates;

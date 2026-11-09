@@ -47,11 +47,8 @@ extension Grid {
             // Counted even with no history (`Scrollback.push`), so images and
             // marks anchored below keep their rows.
             for row in 0..<fromTop { scrollback.push(lines[row]) }
-            if fromTop > 0, scrollback.limit == 0, imagePlacements.placementCount > 0 {
-                imagePlacements.removePlacementsWhollyInScrollback(
-                    scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
-            }
             if fromTop > 0 {
+                dropImagesLeftWithoutHistory()
                 lines.removeFirst(fromTop)
                 cursor.row -= fromTop
             }

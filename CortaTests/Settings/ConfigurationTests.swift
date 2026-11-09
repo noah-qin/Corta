@@ -121,26 +121,6 @@ struct ConfigurationTests {
         #expect(written.contains("future-setting = 7"))
     }
 
-    @Test("a misspelt theme key makes no theme and is written back as written")
-    func misspeltThemeKeyMakesNoTheme() {
-        let (parsed, unknown) = Configuration.parse("theme.foo.nmae = x")
-        #expect(parsed.customThemes.isEmpty)
-        let written = parsed.serialized(preserving: unknown)
-        let themeLines = written.split(separator: "\n").filter { $0.hasPrefix("theme.") }
-        #expect(themeLines == ["theme.foo.nmae = x"])
-    }
-
-    @Test("a theme with one good key and one misspelt one is still that theme")
-    func themeKeepsGoodKeysBesideATypo() {
-        let (parsed, unknown) = Configuration.parse(
-            """
-            theme.mine.dark.backgrund = #000000
-            theme.mine.dark.background = #101010
-            """)
-        #expect(parsed.customThemes.map(\.name) == ["mine"])
-        #expect(unknown.map(\.0) == ["theme.mine.dark.backgrund"])
-    }
-
     @Test("booleans accept the spellings a hand-editor would use")
     func booleanSpellings() {
         for value in ["true", "yes", "on", "1"] {
@@ -252,15 +232,15 @@ struct ThemeTests {
 @MainActor
 @Suite(.serialized)
 struct ConfigurationStoreTests {
-    private let directory = FileManager.default.temporaryDirectory
+    let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("corta-config-tests-\(UUID().uuidString)")
-    private var file: URL { directory.appendingPathComponent("config") }
+    var file: URL { directory.appendingPathComponent("config") }
 
-    private func removeDirectory() {
+    func removeDirectory() {
         try? FileManager.default.removeItem(at: directory)
     }
 
-    private func writeFile(_ text: String) throws {
+    func writeFile(_ text: String) throws {
         try FileManager.default.createDirectory(
             at: directory, withIntermediateDirectories: true)
         try text.write(to: file, atomically: true, encoding: .utf8)
@@ -372,28 +352,6 @@ struct ConfigurationStoreTests {
         let text = try String(contentsOf: file, encoding: .utf8)
         #expect(text.contains("font-size = banana"))
         #expect(store.configuration.fontSize == Configuration().fontSize)
-    }
-
-    @Test("opening Settings leaves an existing file as written and keeps a relative preset through a change")
-    func openingSettingsDoesNotRewriteTheFile() async throws {
-        defer { removeDirectory() }
-        let original = "# mine\npreset.work.shell = zsh\nfont-size = 14\n"
-        try writeFile(original)
-        let store = ConfigurationStore(fileURL: file)
-        #expect(store.createIfMissing())
-        #expect(try String(contentsOf: file, encoding: .utf8) == original)
-        #expect(store.update { $0.bell = .audible })
-        let text = try String(contentsOf: file, encoding: .utf8)
-        #expect(text.contains("preset.work.shell = zsh"))
-    }
-
-    @Test("opening Settings creates a missing file")
-    func openingSettingsCreatesAMissingFile() async throws {
-        defer { removeDirectory() }
-        let store = ConfigurationStore(fileURL: file)
-        #expect(!FileManager.default.fileExists(atPath: file.path))
-        #expect(store.createIfMissing())
-        #expect(FileManager.default.fileExists(atPath: file.path))
     }
 
     /// The watcher delivers an editor's save a moment after it lands. A

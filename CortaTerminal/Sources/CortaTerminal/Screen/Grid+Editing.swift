@@ -98,13 +98,7 @@ extension Grid {
         guard count > 0 else { return }
         if marginTop == 0 && marginBottom == rows - 1 {
             for row in 0..<count { scrollback.push(lines[row]) }
-            if scrollback.limit == 0, imagePlacements.placementCount > 0 {
-                // Nothing is kept, so an image that has left the screen
-                // whole can never be seen again; one still partly on it
-                // stays, anchored like any other.
-                imagePlacements.removePlacementsWhollyInScrollback(
-                    scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
-            }
+            dropImagesLeftWithoutHistory()
             // The ring's O(count) rotation either way, not the region's O(rows).
             lines.rotateUp(count)
             return
@@ -112,6 +106,15 @@ extension Grid {
         imagePlacements.scrollRegion(top: marginTop, bottom: marginBottom, delta: count,
             scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
         lines.rotate(top: marginTop, bottom: marginBottom, by: count)
+    }
+
+    /// With no history (`scrollback = 0`, the alternate screen) nothing is
+    /// kept, so an image that has left the screen whole can never be seen
+    /// again; one still partly on it stays, anchored like any other.
+    mutating func dropImagesLeftWithoutHistory() {
+        guard scrollback.limit == 0, imagePlacements.placementCount > 0 else { return }
+        imagePlacements.removePlacementsWhollyInScrollback(
+            scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
     }
 
     /// SD: nothing enters scrollback — scrolling down creates no history.

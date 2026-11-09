@@ -89,7 +89,8 @@ final class SecureInput {
                 let resigning = ObjectIdentifier(window)
                 MainActor.assumeIsolated {
                     let key = NSApp.keyWindow
-                    self?.terminalWindowIsKey = key.map(ObjectIdentifier.init) != resigning && Self.isTerminalWindow(key)
+                    let isOther = key.map(ObjectIdentifier.init) != resigning
+                    self?.terminalWindowIsKey = isOther && Self.isTerminalWindow(key)
                     self?.reconcile()
                 }
             },

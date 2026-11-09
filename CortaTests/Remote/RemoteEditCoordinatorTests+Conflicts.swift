@@ -238,7 +238,9 @@ extension RemoteEditCoordinatorTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let dead = root.appendingPathComponent(".approvals-2147483647-\(UUID().uuidString)")
         let live = root.appendingPathComponent(".approvals-\(getpid())-\(UUID().uuidString)")
-        for folder in [dead, live] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+        for folder in [dead, live] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
         RemoteEditStore.removeAbandonedApprovalsNow(in: root)
         #expect(!FileManager.default.fileExists(atPath: dead.path))
         #expect(FileManager.default.fileExists(atPath: live.path))

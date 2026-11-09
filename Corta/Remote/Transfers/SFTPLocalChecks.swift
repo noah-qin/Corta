@@ -70,12 +70,12 @@ final class SFTPLocalChecks {
             return await withCheckedContinuation { continuation in
                 PathProbe.run {
                     var failure = Failure.timedOut
-                    let value = PathProbe.answer(timeout: timeout, budget: budget, onBudgetExhausted: {
-                        failure = .budgetExhausted
-                    }) {
+                    let check: @Sendable () -> Answer = {
                         beforeCheck()
                         return body()
                     }
+                    let value = PathProbe.answer(
+                        timeout: timeout, budget: budget, onBudgetExhausted: { failure = .budgetExhausted }, check)
                     continuation.resume(returning: value.map(Result.success) ?? .failure(failure))
                 }
             }

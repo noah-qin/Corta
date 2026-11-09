@@ -117,8 +117,9 @@ enum RepeatShape {
         }
         return nil
     }
+}
 
-    // MARK: - Parsing
+extension RepeatShape {
 
     private static func parseAlternatives(_ body: [Character]) -> [[Atom]] {
         var alternatives: [[Atom]] = [[]]
@@ -140,26 +141,7 @@ enum RepeatShape {
         let character = body[index]
         switch character {
         case "\\":
-            let escaped = index + 1 < body.count ? body[index + 1] : "\\"
-            index += 2
-            switch escaped {
-            case "d", "w", "s":
-                let set = CharacterSet(classes: [escaped])
-                return Atom(set: set, first: set)
-            case "b", "B", "A", "z", "Z", "G":
-                return Atom(set: CharacterSet(), first: CharacterSet(), isZeroWidth: true)
-            case "n": return literal("\n")
-            case "t": return literal("\t")
-            case "r": return literal("\r")
-            default:
-                // A letter or digit escape is a class, a property or a
-                // backreference this does not read; punctuation is itself.
-                if escaped.isLetter || escaped.isNumber {
-                    if index < body.count, body[index] == "{" { skipBraces(body, at: &index) }
-                    return Atom(set: .any, first: .any)
-                }
-                return literal(escaped)
-            }
+            return parseEscape(body, at: &index)
         case "[":
             return parseClass(body, at: &index)
         case "(":
@@ -177,6 +159,29 @@ enum RepeatShape {
         default:
             index += 1
             return literal(character)
+        }
+    }
+
+    private static func parseEscape(_ body: [Character], at index: inout Int) -> Atom {
+        let escaped = index + 1 < body.count ? body[index + 1] : "\\"
+        index += 2
+        switch escaped {
+        case "d", "w", "s":
+            let set = CharacterSet(classes: [escaped])
+            return Atom(set: set, first: set)
+        case "b", "B", "A", "z", "Z", "G":
+            return Atom(set: CharacterSet(), first: CharacterSet(), isZeroWidth: true)
+        case "n": return literal("\n")
+        case "t": return literal("\t")
+        case "r": return literal("\r")
+        default:
+            // A letter or digit escape is a class, a property or a
+            // backreference this does not read; punctuation is itself.
+            if escaped.isLetter || escaped.isNumber {
+                if index < body.count, body[index] == "{" { skipBraces(body, at: &index) }
+                return Atom(set: .any, first: .any)
+            }
+            return literal(escaped)
         }
     }
 
@@ -199,29 +204,13 @@ enum RepeatShape {
             isFirst = false
             let character = body[index]
             if character == "\\", index + 1 < body.count {
-                let escaped = body[index + 1]
-                if "dws".contains(escaped) {
-                    set.classes.insert(escaped)
-                } else if escaped.isLetter || escaped.isNumber {
-                    set = .any
-                } else {
-                    set.characters.insert(escaped)
-                }
+                addClassEscape(body[index + 1], to: &set)
                 previous = nil
                 index += 2
                 continue
             }
             if character == "-", let low = previous, index + 1 < body.count, body[index + 1] != "]" {
-                let high = body[index + 1]
-                if let lowValue = low.unicodeScalars.first?.value, let highValue = high.unicodeScalars.first?.value,
-                    lowValue <= highValue, highValue - lowValue <= 256
-                {
-                    for value in lowValue...highValue {
-                        if let scalar = Unicode.Scalar(value) { set.characters.insert(Character(scalar)) }
-                    }
-                } else {
-                    set = .any
-                }
+                addRange(from: low, to: body[index + 1], to: &set)
                 previous = nil
                 index += 2
                 continue
@@ -240,11 +229,33 @@ enum RepeatShape {
         return Atom(set: folded, first: folded)
     }
 
-    private static func parseGroup(_ body: [Character], at index: inout Int) -> Atom {
-        let open = index
+    private static func addClassEscape(_ escaped: Character, to set: inout CharacterSet) {
+        if "dws".contains(escaped) {
+            set.classes.insert(escaped)
+        } else if escaped.isLetter || escaped.isNumber {
+            set = .any
+        } else {
+            set.characters.insert(escaped)
+        }
+    }
+
+    /// `a-z`, spelt out when short; a long or reversed range is any.
+    private static func addRange(from low: Character, to high: Character, to set: inout CharacterSet) {
+        guard let lowValue = low.unicodeScalars.first?.value, let highValue = high.unicodeScalars.first?.value,
+            lowValue <= highValue, highValue - lowValue <= 256
+        else {
+            set = .any
+            return
+        }
+        for value in lowValue...highValue {
+            if let scalar = Unicode.Scalar(value) { set.characters.insert(Character(scalar)) }
+        }
+    }
+
+    /// Where the group opening at `open` closes, or the body's end.
+    private static func groupClose(_ body: [Character], from open: Int) -> Int {
         var depth = 0
-        var close = body.count
-        var scan = index
+        var scan = open
         while scan < body.count {
             let character = body[scan]
             if character == "\\" {
@@ -260,29 +271,32 @@ enum RepeatShape {
             if character == "(" { depth += 1 }
             if character == ")" {
                 depth -= 1
-                if depth == 0 {
-                    close = scan
-                    break
-                }
+                if depth == 0 { return scan }
             }
             scan += 1
         }
-        index = min(body.count, close + 1)
-        var inner = Array(body[(open + 1)..<min(close, body.count)])
-        if inner.first == "?" {
-            let marker = inner.dropFirst().prefix(2)
-            if marker.first == "=" || marker.first == "!" || marker == ["<", "="] || marker == ["<", "!"] {
-                return Atom(set: CharacterSet(), first: CharacterSet(), isZeroWidth: true)
-            }
-            if marker.first == ":" {
-                inner = Array(inner.dropFirst(2))
-            } else if marker.first == "<", let end = inner.firstIndex(of: ">") {
-                inner = Array(inner[(end + 1)...])
-            } else {
-                // Flags and the rest: not read.
-                return Atom(set: .any, first: .any)
-            }
+        return body.count
+    }
+
+    /// A group's body past its `(?…` marker; nil for a lookaround (matches
+    /// nothing) and `.any` for flags and the rest, which this does not read.
+    private static func groupBody(_ inner: [Character]) -> (body: [Character]?, atom: Atom?) {
+        guard inner.first == "?" else { return (inner, nil) }
+        let marker = inner.dropFirst().prefix(2)
+        if marker.first == "=" || marker.first == "!" || marker == ["<", "="] || marker == ["<", "!"] {
+            return (nil, Atom(set: CharacterSet(), first: CharacterSet(), isZeroWidth: true))
         }
+        if marker.first == ":" { return (Array(inner.dropFirst(2)), nil) }
+        if marker.first == "<", let end = inner.firstIndex(of: ">") { return (Array(inner[(end + 1)...]), nil) }
+        return (nil, Atom(set: .any, first: .any))
+    }
+
+    private static func parseGroup(_ body: [Character], at index: inout Int) -> Atom {
+        let open = index
+        let close = groupClose(body, from: index)
+        index = min(body.count, close + 1)
+        let parsed = groupBody(Array(body[(open + 1)..<min(close, body.count)]))
+        guard let inner = parsed.body else { return parsed.atom ?? Atom(set: .any, first: .any) }
         let alternatives = parseAlternatives(inner)
         var set = CharacterSet()
         var first = CharacterSet()

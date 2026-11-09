@@ -198,7 +198,8 @@ nonisolated enum PrivateFile {
     /// A missing file is a normal empty store. An unanswered or unreadable
     /// file is different: the caller must not replace its unseen contents.
     static func readBounded(_ url: URL, maximumBytes: Int = .max) throws -> Data? {
-        guard let result = PathProbe.answer(timeout: .seconds(1), { Result { try read(url, maximumBytes: maximumBytes) } }) else {
+        let result = PathProbe.answer(timeout: .seconds(1)) { Result { try read(url, maximumBytes: maximumBytes) } }
+        guard let result else {
             throw POSIXError(.ETIMEDOUT)
         }
         do {
