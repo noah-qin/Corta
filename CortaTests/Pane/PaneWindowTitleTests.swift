@@ -92,7 +92,7 @@ struct PaneWindowTitleTests {
     /// Two probes stuck on a slow mount fill the admission; a third pane's
     /// probe is retried once there is room rather than dropped, so the pane
     /// gets its proxy icon without waiting for its next `cd`.
-    @Test("a probe refused while two are stuck is retried, not dropped")
+    @Test("a probe refused while two are stuck runs when one ends, not dropped")
     func refusedProbeIsRetried() async {
         let release = DispatchSemaphore(value: 0)
         let entered = Mutex(0)
@@ -121,8 +121,8 @@ struct PaneWindowTitleTests {
 
         release.signal()
         release.signal()
-        deadline = SuspendingClock.now
-            + .seconds(PaneWindowTitle.directoryProbeRetryDelay + 3) * testTimeoutScale
+        // Woken by a probe's end, not a timer: well inside a second.
+        deadline = SuspendingClock.now + .seconds(1) * testTimeoutScale
         while !asked.withLock({ $0 }), SuspendingClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(20))
         }

@@ -205,7 +205,27 @@ final class PaneWindowTitle {
         }
     }
 
-    static let directoryProbeRetryDelay: TimeInterval = 2
+    /// Panes refused a probe while the budget was spent, newest last, each
+    /// with the path and generation it was refused for. A probe's end wakes
+    /// the newest still current; none polls.
+    private static var probeWaiters: [(pane: Weak, path: String, generation: Int)] = []
+
+    struct Weak {
+        weak var title: PaneWindowTitle?
+    }
+
+    /// One probe's slot came free: the newest waiter still asking for the
+    /// path it was refused takes it. Stopped panes and superseded paths drop
+    /// out as they are met.
+    private static func wakeNextProbeWaiter() {
+        while let waiter = probeWaiters.popLast() {
+            guard let title = waiter.pane.title, !title.isStopped,
+                waiter.generation == title.directoryProbeGeneration
+            else { continue }
+            title.probeRepresentedDirectory(waiter.path)
+            return
+        }
+    }
 
     /// OSC 7 paths can point at an unresponsive network mount. Never stat on
     /// the main actor, and never publish a result for a superseded path.
@@ -219,15 +239,13 @@ final class PaneWindowTitle {
             active += 1
             return true
         }
-        // Two probes are already stuck on a slow mount. Try again shortly,
-        // rather than leave this pane without its proxy icon until the next
-        // `cd`; a newer path in the meantime supersedes the retry.
+        // Two probes are already stuck on a slow mount. Wait for one to
+        // end, rather than leave this pane without its proxy icon until the
+        // next `cd` — or ask again every two seconds while the mount stays
+        // dead; a newer path in the meantime supersedes the wait.
         guard admitted else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.directoryProbeRetryDelay) { [weak self] in
-                guard let self, !self.isStopped, generation == self.directoryProbeGeneration
-                else { return }
-                self.probeRepresentedDirectory(path)
-            }
+            Self.probeWaiters.removeAll { $0.pane.title === self || $0.pane.title == nil }
+            Self.probeWaiters.append((Weak(title: self), path, generation))
             return
         }
         let isDirectory = isDirectory
@@ -237,6 +255,7 @@ final class PaneWindowTitle {
             let exists = isDirectory(path)
             Self.directoryProbes.withLock { $0 -= 1 }
             Task { @MainActor [weak self] in
+                Self.wakeNextProbeWaiter()
                 guard let self, !self.isStopped,
                     generation == self.directoryProbeGeneration else { return }
                 self.representedDirectory = exists ? URL(fileURLWithPath: path) : nil
