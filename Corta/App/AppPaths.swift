@@ -135,7 +135,10 @@ nonisolated enum AppPaths {
         }
         // The user's files Corta writes atomically leave theirs beside them.
         UserFile.removeAbandonedTemporaries(besides: userFileTargets, olderThan: abandonedStateFileAge)
-        RemoteEditStore.removeAbandonedApprovalsNow(in: support.appendingPathComponent("RemoteEdit", isDirectory: true))
+        let remoteEdit = support.appendingPathComponent("RemoteEdit", isDirectory: true)
+        RemoteEditStore.removeAbandonedApprovalsNow(in: remoteEdit)
+        // The manifest too, read ahead off the main thread for the store.
+        RemoteEditStore.prefetchShared(rootURL: remoteEdit)
         return ExportStaging.removeAbandoned()
     }
 

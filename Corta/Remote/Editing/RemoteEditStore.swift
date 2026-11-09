@@ -18,6 +18,7 @@ import CortaPOSIX
 import CryptoKit
 import Darwin
 import Foundation
+import Synchronization
 
 /// Remote editing — the managed local copies of remote files, and the
 /// manifest that remembers what each copy is a copy *of*.
@@ -283,26 +284,21 @@ final class RemoteEditStore {
     }
 
     private func load() {
-        let data: Data
-        do {
-            guard let loaded = try PrivateFile.readBounded(manifestURL) else { return }
-            data = loaded
-        } catch {
+        let outcome = Self.takePrefetched(for: manifestURL) ?? Self.read(manifestURL)
+        switch outcome {
+        case .nothing:
+            return
+        case .unreadable(let error):
             manifestReadError = error
-            return
-        }
-        if let version = try? JSONDecoder().decode(VersionProbe.self, from: data).version,
-            version > Persisted.currentVersion
-        {
+        case .newer:
             preservesNewerManifest = true
-            return
+        case .copies(let stored):
+            let prefix = rootURL.standardizedFileURL.path + "/"
+            copies = Dictionary(
+                stored.filter { localURL(for: $0).standardizedFileURL.path.hasPrefix(prefix) }
+                    .map { ($0.id, $0) },
+                uniquingKeysWith: { first, _ in first })
         }
-        guard let persisted = try? JSONDecoder().decode(Persisted.self, from: data) else { return }
-        let prefix = rootURL.standardizedFileURL.path + "/"
-        copies = Dictionary(
-            persisted.copies.filter { localURL(for: $0).standardizedFileURL.path.hasPrefix(prefix) }
-                .map { ($0.id, $0) },
-            uniquingKeysWith: { first, _ in first })
     }
 
     private var manifestURL: URL {
@@ -310,7 +306,7 @@ final class RemoteEditStore {
     }
 
     /// Only the version, so a newer shape is recognised as newer.
-    private struct VersionProbe: Decodable {
+    private nonisolated struct VersionProbe: Decodable {
         var version: Int
     }
 
@@ -451,5 +447,82 @@ extension RemoteEditStore {
             }
             return (hash.finalize().map { String(format: "%02x", $0) }.joined(), byteLimit - remaining)
         } catch { return (nil, byteLimit - remaining) }
+    }
+}
+
+// MARK: - Reading the manifest ahead
+
+extension RemoteEditStore {
+    /// What reading the manifest found; read anywhere, applied on the main actor.
+    nonisolated enum LoadOutcome: Sendable {
+        case nothing
+        case unreadable(any Error)
+        case newer
+        case copies([RemoteCopy])
+    }
+
+    nonisolated static func read(_ manifestURL: URL) -> LoadOutcome {
+        let data: Data
+        do {
+            guard let loaded = try PrivateFile.readBounded(manifestURL) else { return .nothing }
+            data = loaded
+        } catch {
+            return .unreadable(error)
+        }
+        if let version = try? JSONDecoder().decode(VersionProbe.self, from: data).version,
+            version > Persisted.currentVersion
+        {
+            return .newer
+        }
+        guard let persisted = try? JSONDecoder().decode(Persisted.self, from: data) else { return .nothing }
+        return .copies(persisted.copies)
+    }
+
+    /// A manifest read ahead, with the file's identity when it was read.
+    private nonisolated struct Prefetched: Sendable {
+        let url: URL
+        let stamp: FileStamp?
+        let outcome: LoadOutcome
+    }
+
+    private nonisolated struct FileStamp: Equatable, Sendable {
+        // periphery:ignore - read by the synthesised ==
+        let size: off_t
+        // periphery:ignore - read by the synthesised ==
+        let seconds: Int
+        // periphery:ignore - read by the synthesised ==
+        let nanoseconds: Int
+
+        init?(_ url: URL) {
+            var info = stat()
+            guard lstat(url.path, &info) == 0 else { return nil }
+            size = info.st_size
+            seconds = info.st_mtimespec.tv_sec
+            nanoseconds = info.st_mtimespec.tv_nsec
+        }
+    }
+
+    private nonisolated static let prefetched = Mutex<Prefetched?>(nil)
+
+    /// Reads and decodes the shared store's manifest off the main thread at
+    /// launch: the store itself is made on the main actor the first time
+    /// Remote Edit is used, and read the file there. Used only if the file
+    /// has not changed since (`takePrefetched`).
+    nonisolated static func prefetchShared(rootURL: URL) {
+        let url = rootURL.appendingPathComponent("manifest.json")
+        let stamp = FileStamp(url)
+        let outcome = read(url)
+        prefetched.withLock { $0 = Prefetched(url: url, stamp: stamp, outcome: outcome) }
+    }
+
+    /// The read-ahead answer for `url`, once, when the file is as it was
+    /// then; nil sends the caller to read it itself.
+    private nonisolated static func takePrefetched(for url: URL) -> LoadOutcome? {
+        guard let taken = prefetched.withLock({ value -> Prefetched? in
+            guard value?.url == url else { return nil }
+            defer { value = nil }
+            return value
+        }), taken.stamp == FileStamp(url) else { return nil }
+        return taken.outcome
     }
 }
