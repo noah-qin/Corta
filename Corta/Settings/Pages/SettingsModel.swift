@@ -80,6 +80,9 @@ final class SettingsModel {
     var fontStatus = RowStatus()
     var shellIntegrationStatus = RowStatus()
     var isCheckingShellIntegration = false
+    /// What the row's Retry button repeats: the action that failed or did
+    /// not finish in time. Nil while the row offers its ordinary action.
+    var shellIntegrationRetry: (@Sendable (ShellIntegration) -> [String])?
     var directoryHistoryStatus = RowStatus()
     var recentHostsStatus = RowStatus()
     var droppedCopiesStatus = RowStatus()

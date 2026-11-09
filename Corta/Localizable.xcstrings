@@ -49493,6 +49493,65 @@
           }
         }
       }
+    },
+    "settings.status.shellIntegrationTimedOut": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The shell’s startup files did not answer in time. They may be on a disk that stopped responding."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Shell 启动文件未及时响应。它们可能位于已无响应的磁盘上。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Shell 啟動檔案未及時回應。它們可能位於已無回應的磁碟上。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "シェルの起動ファイルが時間内に応答しませんでした。応答しないディスク上にある可能性があります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "셸 시작 파일이 제때 응답하지 않았습니다. 응답하지 않는 디스크에 있을 수 있습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Startdateien der Shell haben nicht rechtzeitig geantwortet. Sie liegen möglicherweise auf einem Datenträger, der nicht mehr reagiert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Les fichiers de démarrage du shell n’ont pas répondu à temps. Ils se trouvent peut-être sur un disque qui ne répond plus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Los archivos de inicio del shell no respondieron a tiempo. Pueden estar en un disco que dejó de responder."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Os arquivos de inicialização do shell não responderam a tempo. Eles podem estar em um disco que parou de responder."
+          }
+        }
+      }
     }
   }
 }

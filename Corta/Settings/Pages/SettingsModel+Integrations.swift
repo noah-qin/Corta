@@ -66,8 +66,12 @@ extension SettingsModel {
     }
 
     /// One dispatch point for the row's first button, whichever state put
-    /// it there.
+    /// it there — Retry included, which repeats the action that failed.
     func toggleShellIntegration() {
+        if let retry = shellIntegrationRetry {
+            checkShellIntegration(retry)
+            return
+        }
         checkShellIntegration { integration in
             switch integration.status() {
             case .notInstalled, .conflicting, .outdated: integration.install()
@@ -82,27 +86,61 @@ extension SettingsModel {
         checkShellIntegration { $0.uninstall() }
     }
 
-    private func checkShellIntegration(_ action: @escaping @Sendable (ShellIntegration) -> [String]) {
+    /// The longest the row waits for an action and the check after it. Each
+    /// read is bounded already; this bounds the whole, writes included, so a
+    /// startup file on a mount that stopped answering cannot leave the row
+    /// busy for good.
+    static let shellIntegrationTimeout: DispatchTimeInterval = .seconds(10)
+
+    private struct ShellIntegrationOutcome: Sendable {
+        let failures: [String]
+        let status: ShellIntegrationStatus
+        let path: String
+        let needsUpdate: String
+    }
+
+    func checkShellIntegration(
+        timeout: DispatchTimeInterval = SettingsModel.shellIntegrationTimeout,
+        _ action: @escaping @Sendable (ShellIntegration) -> [String]
+    ) {
         guard !isCheckingShellIntegration else { return }
         isCheckingShellIntegration = true
         PathProbe.run { [weak self] in
-            let integration = ShellIntegration.current
-            let failures = action(integration)
-            let status = integration.status()
-            let path = integration.displayPath
-            let needsUpdate = status == .outdated ? integration.pathsNeedingUpdate : ""
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.isCheckingShellIntegration = false
-                if failures.isEmpty {
-                    self.applyShellIntegrationStatus(status, path: path, needsUpdate: needsUpdate)
-                } else {
-                    self.shellIntegrationStatus = RowStatus(
-                        kind: .failed,
-                        message: L10n.format(
-                            "settings.status.shellIntegrationWriteFailed", failures.joined(separator: ", ")))
-                }
+            let outcome = PathProbe.answer(timeout: timeout) {
+                let integration = ShellIntegration.current
+                let failures = action(integration)
+                let status = integration.status()
+                return ShellIntegrationOutcome(
+                    failures: failures, status: status, path: integration.displayPath,
+                    needsUpdate: status == .outdated ? integration.pathsNeedingUpdate : "")
             }
+            Task { @MainActor [weak self] in
+                self?.finishShellIntegrationCheck(outcome, action: action)
+            }
+        }
+    }
+
+    private func finishShellIntegrationCheck(
+        _ outcome: ShellIntegrationOutcome?, action: @escaping @Sendable (ShellIntegration) -> [String]
+    ) {
+        isCheckingShellIntegration = false
+        guard let outcome else {
+            shellIntegrationRetry = action
+            shellIntegrationStatus = RowStatus(
+                kind: .failed, message: L10n.text("settings.status.shellIntegrationTimedOut"),
+                actionTitle: L10n.text("settings.status.retry"))
+            return
+        }
+        if outcome.failures.isEmpty {
+            shellIntegrationRetry = nil
+            applyShellIntegrationStatus(outcome.status, path: outcome.path, needsUpdate: outcome.needsUpdate)
+        } else {
+            shellIntegrationRetry = action
+            shellIntegrationStatus = RowStatus(
+                kind: .failed,
+                message: L10n.format(
+                    "settings.status.shellIntegrationWriteFailed", outcome.failures.joined(separator: ", ")),
+                actionTitle: L10n.text("settings.status.retry"))
         }
     }
 
