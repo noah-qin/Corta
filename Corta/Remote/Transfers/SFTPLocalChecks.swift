@@ -103,6 +103,9 @@ nonisolated enum SFTPLocalFacts {
     /// (`SFTPTransferEngine.uploadDirectory`) — and a link to one is not.
     struct Source: Sendable {
         var isDirectory = false
+        /// There, but neither a regular file nor a directory once links are
+        /// followed: a FIFO, a socket, a device. Never uploaded.
+        var isSpecial = false
         var attributes = Attributes()
     }
 
@@ -117,8 +120,11 @@ nonisolated enum SFTPLocalFacts {
 
     static func source(_ url: URL) -> Source {
         let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        var info = stat()
+        let kind = stat(url.path, &info) == 0 ? info.st_mode & S_IFMT : nil
         return Source(
             isDirectory: values?.isDirectory == true && values?.isSymbolicLink != true,
+            isSpecial: kind.map { $0 != S_IFREG && $0 != S_IFDIR } ?? false,
             attributes: attributes(atPath: url.path))
     }
 

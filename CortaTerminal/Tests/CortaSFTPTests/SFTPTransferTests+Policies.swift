@@ -270,4 +270,22 @@ extension SFTPTransferTests {
         #expect(rig.fileSystem.file("/dest/up.bin")?.data == contents)
         #expect(!rig.fileSystem.exists(partialPath))
     }
+
+    /// A FIFO's open waited for a writer that never came, holding the
+    /// transfer for good.
+    @Test("an upload from a FIFO fails at once rather than waiting for a writer")
+    func uploadFromAFIFOFailsAtOnce() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        let regular = try localFile(rig, "regular.bin", contents: [1])
+        let fifo = regular.deletingLastPathComponent().appendingPathComponent("pipe")
+        #expect(mkfifo(fifo.path, 0o600) == 0)
+        let start = SuspendingClock.now
+        await #expect(throws: SFTPError.self) {
+            try await rig.engine.upload(from: fifo, to: "/dest/pipe", policy: .overwrite)
+        }
+        #expect(SuspendingClock.now - start < .seconds(5))
+        #expect(!rig.fileSystem.exists("/dest/pipe"))
+    }
+
 }

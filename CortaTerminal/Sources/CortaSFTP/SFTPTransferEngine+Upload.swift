@@ -237,8 +237,12 @@ extension SFTPTransferEngine {
         var stamp: LocalSourceStamp
     }
 
+    /// Only a regular file: a FIFO's open waits for a writer and a device's
+    /// read never ends, either of which held the transfer for good. Opened
+    /// non-blocking so the open itself cannot wait, checked, then made
+    /// blocking for the reads. A link is followed — the user chose it.
     private static func openUploadSource(_ path: String) throws(SFTPError) -> UploadSource {
-        let descriptor = Darwin.open(path, O_RDONLY | O_CLOEXEC)
+        let descriptor = Darwin.open(path, O_RDONLY | O_CLOEXEC | O_NONBLOCK)
         guard descriptor >= 0 else {
             let code = errno
             throw .localIOFailed(operation: code == ENOENT ? "stat" : "open", code: code)
@@ -248,6 +252,16 @@ extension SFTPTransferEngine {
             let code = errno
             Darwin.close(descriptor)
             throw .localIOFailed(operation: "fstat", code: code)
+        }
+        guard openedStat.st_mode & S_IFMT == S_IFREG else {
+            Darwin.close(descriptor)
+            throw .localIOFailed(operation: "open", code: EINVAL)
+        }
+        let flags = fcntl(descriptor, F_GETFL)
+        guard flags >= 0, fcntl(descriptor, F_SETFL, flags & ~O_NONBLOCK) == 0 else {
+            let code = errno
+            Darwin.close(descriptor)
+            throw .localIOFailed(operation: "fcntl", code: code)
         }
         return UploadSource(
             descriptor: descriptor, identity: LocalSourceIdentity(openedStat), stamp: LocalSourceStamp(openedStat))

@@ -49611,6 +49611,65 @@
           }
         }
       }
+    },
+    "sftp.transfer.notAFile": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is not a file or folder (a pipe, socket or device), so it can’t be uploaded."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ 不是文件或文件夹（而是管道、套接字或设备），无法上传。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ 不是檔案或檔案夾（而是管道、通訊端或裝置），無法上傳。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ はファイルでもフォルダでもない（パイプ、ソケット、デバイス）ため、アップロードできません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@은(는) 파일이나 폴더가 아니어서(파이프, 소켓 또는 장치) 업로드할 수 없습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ ist weder Datei noch Ordner (eine Pipe, ein Socket oder ein Gerät) und kann nicht hochgeladen werden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ n’est ni un fichier ni un dossier (un tube, une socket ou un périphérique) et ne peut pas être envoyé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ no es un archivo ni una carpeta (una tubería, un socket o un dispositivo), así que no se puede subir."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ não é um arquivo nem uma pasta (um pipe, socket ou dispositivo), então não pode ser enviado."
+          }
+        }
+      }
     }
   }
 }

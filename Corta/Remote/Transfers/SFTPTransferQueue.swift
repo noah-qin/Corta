@@ -125,6 +125,13 @@ extension SFTPTransferQueue {
             let url = plan.localURL
             let result = await localChecks.answer { SFTPLocalFacts.source(url) }
             guard let source = checked(result, id: id, path: url.path) else { return }
+            guard !source.isSpecial else {
+                jobs[id]?.preparation = nil
+                setState(id, .failed(
+                    message: L10n.format("sftp.transfer.notAFile", SFTPBrowserModel.peerText(url.path)),
+                    retryable: false))
+                return
+            }
             plan.isDirectory = plan.isDirectory || source.isDirectory
             if let index = transfers.firstIndex(where: { $0.id == id }) {
                 transfers[index].isDirectory = plan.isDirectory
