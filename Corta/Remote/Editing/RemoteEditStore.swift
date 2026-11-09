@@ -128,6 +128,13 @@ final class RemoteEditStore {
 
     @concurrent
     private static func removeAbandonedApprovals(in root: URL) async {
+        removeAbandonedApprovalsNow(in: root)
+    }
+
+    /// Dead processes' approval snapshots and abandoned downloads. Also run
+    /// at launch (`AppPaths.removeAbandonedStateFiles`): the store loads only
+    /// when Remote Edit is first used, and until then they stayed on disk.
+    nonisolated static func removeAbandonedApprovalsNow(in root: URL) {
         let manager = FileManager.default
         guard let children = try? manager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return }
         for child in children {

@@ -133,7 +133,16 @@ nonisolated enum AppPaths {
         for directory in [support, support.appendingPathComponent("RemoteEdit", isDirectory: true)] {
             PrivateFile.removeAbandonedTemporaries(in: directory, olderThan: abandonedStateFileAge)
         }
+        // The user's files Corta writes atomically leave theirs beside them.
+        UserFile.removeAbandonedTemporaries(besides: userFileTargets, olderThan: abandonedStateFileAge)
+        RemoteEditStore.removeAbandonedApprovalsNow(in: support.appendingPathComponent("RemoteEdit", isDirectory: true))
         return ExportStaging.removeAbandoned()
+    }
+
+    /// Every user file `UserFile.write` may write: the config file and each
+    /// shell's startup files.
+    nonisolated static var userFileTargets: [URL] {
+        [configFileURL] + ShellKind.allCases.flatMap { $0.rcFileURLs + $0.otherRCFileURLs }
     }
 
     /// An older build created the state folder at the default umask (0755),

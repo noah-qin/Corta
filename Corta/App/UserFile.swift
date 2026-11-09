@@ -112,6 +112,33 @@ nonisolated enum UserFile {
         PathProbe.answer(timeout: .seconds(1)) { readText(at: url) } ?? .unreadable(POSIXError(.ETIMEDOUT))
     }
 
+    /// The `.<name>.<uuid>` temporaries `write` leaves beside `targets` when
+    /// it dies between write and rename — a config or rc file's copy in the
+    /// user's home or config folder. Only that exact name for each target,
+    /// a regular file this user owns, older than `age`: never another dot
+    /// file of the home folder.
+    static func removeAbandonedTemporaries(
+        besides targets: [URL], olderThan age: TimeInterval, now: Date = Date()
+    ) {
+        let resolved = Set(targets.map { resolvingLinks($0) })
+        let byDirectory = Dictionary(grouping: resolved) { $0.deletingLastPathComponent() }
+        for (directory, files) in byDirectory {
+            let prefixes = files.map { "." + $0.lastPathComponent + "." }
+            guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { continue }
+            for name in names {
+                guard let prefix = prefixes.first(where: { name.hasPrefix($0) }),
+                    UUID(uuidString: String(name.dropFirst(prefix.count))) != nil
+                else { continue }
+                let path = directory.appendingPathComponent(name).path
+                var info = stat()
+                guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_uid == getuid(),
+                    now.timeIntervalSince1970 - TimeInterval(info.st_mtimespec.tv_sec) > age
+                else { continue }
+                unlink(path)
+            }
+        }
+    }
+
     /// Follows links, resolving relative targets against the link's
     /// directory; unlike `resolvingSymlinksInPath()` it follows a link to a
     /// missing file.
