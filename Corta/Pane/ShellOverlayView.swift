@@ -291,7 +291,8 @@ private final class DirectoryCandidateRowView: NSView {
         border = colors.border
         chip = colors.selected.copy(alpha: 0.1) ?? colors.border
         mark = colors.candidate
-        let available = max(0, bounds.width - Self.textInset(for: font) - 12 - width("…   +999"))
+        // Room for both ends cut: "…" and a gap before, a gap and "+N" after.
+        let available = max(0, bounds.width - Self.textInset(for: font) - 12 - width("…" + gap + gap + "+999"))
         var start = state.selectedIndex
         var end = start + 1
         var used = width(state.candidates[start])
@@ -360,7 +361,8 @@ private final class DirectoryCandidateRowView: NSView {
             let end = CTLineGetOffsetForStringIndex(full, selectedRange.location + selectedRange.length, nil)
             let rect = CGRect(x: textX + start - Self.chipPadding, y: 3,
                               width: end - start + 2 * Self.chipPadding, height: bounds.height - 6)
-                .intersection(bounds.insetBy(dx: 3, dy: 0))
+                .intersection(CGRect(x: textX - Self.chipPadding, y: 0,
+                                     width: room + 2 * Self.chipPadding, height: bounds.height))
             if !rect.isNull {
                 context.addPath(CGPath(roundedRect: rect, cornerWidth: rect.height / 2,
                                        cornerHeight: rect.height / 2, transform: nil))
@@ -378,12 +380,22 @@ private final class DirectoryCandidateRowView: NSView {
         context.restoreGState()
     }
 
+    /// The configured folder symbol, rebuilt only when its size or colour
+    /// changes, not on every draw as the selection moves.
+    private static var folderCache: (size: CGFloat, color: CGColor, image: NSImage)?
+    private static func folderSymbol(size: CGFloat, color: CGColor) -> NSImage? {
+        if let cache = folderCache, cache.size == size, cache.color == color { return cache.image }
+        guard let image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: size, weight: .regular)
+                .applying(.init(paletteColors: [NSColor(cgColor: color) ?? .secondaryLabelColor]))) else { return nil }
+        folderCache = (size, color, image)
+        return image
+    }
+
     /// A folder outline in the candidates' colour, centred on the row.
     private func drawMark(in context: CGContext) {
         let size = Self.markSize(for: font)
-        guard let symbol = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: size * 0.8, weight: .regular)
-                .applying(.init(paletteColors: [NSColor(cgColor: mark) ?? .secondaryLabelColor]))) else { return }
+        guard let symbol = Self.folderSymbol(size: size * 0.8, color: mark) else { return }
         let fitted = symbol.size
         let rect = CGRect(x: Self.inset + (size - fitted.width) / 2, y: (bounds.height - fitted.height) / 2,
                           width: fitted.width, height: fitted.height).integral

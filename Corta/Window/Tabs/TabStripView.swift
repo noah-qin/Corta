@@ -137,10 +137,7 @@ final class TabStripView: NSView {
 
     /// Light or dark follows the terminal canvas, whose colour the
     /// titlebar band shows (D24, amended), not the system's appearance.
-    private var isLightCanvas: Bool {
-        let color = TerminalColorPalette.defaultBackground
-        return color.x * 0.2126 + color.y * 0.7152 + color.z * 0.0722 >= 0.5
-    }
+    private var isLightCanvas: Bool { PaneSurfaceView.isLightCanvas }
 
     func update(items: [TabStripItem], selectedIndex: Int) {
         let name: NSAppearance.Name = isLightCanvas ? .aqua : .darkAqua

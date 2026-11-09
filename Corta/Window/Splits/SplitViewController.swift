@@ -312,13 +312,29 @@ final class SplitViewController: NSViewController {
         // Recorded before `setFrame`, which lays out reentrantly and would
         // otherwise absorb the same delta twice.
         lastChromeHeight = chrome
-        guard let last, chrome != last, !window.inLiveResize,
-            !window.styleMask.contains(.fullScreen)
-        else { return }
+        guard let last, chrome != last else { return }
+        growWindow(by: chrome - last, needsRoom: false)
+    }
+
+    /// Grows the window downward by `delta` (or gives it back), so the
+    /// panes keep their size. Only the selected tab's window, once it is
+    /// sized and shown, not while the user drags it or in full screen.
+    /// With `needsRoom`, only where the grown window still fits the screen.
+    /// Returns whether the window moved.
+    @discardableResult
+    func growWindow(by delta: CGFloat, needsRoom: Bool) -> Bool {
+        guard delta != 0, isSelectedTab, let window = view.window, didSetUpWindow, window.isVisible,
+            !window.inLiveResize, !window.styleMask.contains(.fullScreen) else { return false }
         var frame = window.frame
-        frame.origin.y -= chrome - last
-        frame.size.height += chrome - last
+        frame.origin.y -= delta
+        frame.size.height += delta
+        if needsRoom {
+            guard let visible = window.screen?.visibleFrame else { return false }
+            if frame.minY < visible.minY { frame.origin.y = visible.minY }
+            guard frame.maxY <= visible.maxY, frame.height <= visible.height else { return false }
+        }
         window.setFrame(frame, display: true)
+        return true
     }
 
     /// With the window full screen and one pane, lets the window server
@@ -413,22 +429,11 @@ final class SplitViewController: NSViewController {
         // no canvas flashing at a new size. Only the tab in front moves the
         // window; where it cannot move (full screen, or no room on the
         // screen), the panes make the room as before.
-        if delta != 0, let window = view.window, window.terminalSplit === self,
-           !window.styleMask.contains(.fullScreen), let screen = window.screen {
-            var frame = window.frame
-            frame.size.height += delta
-            frame.origin.y -= delta
-            let visible = screen.visibleFrame
-            if frame.minY < visible.minY { frame.origin.y = visible.minY }
-            if frame.maxY <= visible.maxY, frame.height <= visible.height {
-                window.setFrame(frame, display: true)
-                return
-            }
-        }
+        if growWindow(by: delta, needsRoom: true) { return }
         // A tab behind is laid out with the window, after the tab in front
         // has moved it: laying it out now would shrink its panes only for
         // the window to give them their height back.
-        guard view.window == nil || view.window?.terminalSplit === self else {
+        guard view.window == nil || isSelectedTab else {
             view.needsLayout = true
             return
         }

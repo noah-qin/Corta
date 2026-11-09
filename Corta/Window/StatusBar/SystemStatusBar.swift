@@ -26,6 +26,9 @@ final class SystemStatusBar: NSView {
     private static let observedNotifications = [
         ConfigurationStore.didChange, SystemMetricsStore.didChange,
         NSWindow.didChangeOcclusionStateNotification, AppearanceController.didChange,
+        // Each step of a theme or appearance blend, so the bar's ground
+        // fades with the window's rather than snapping at the end.
+        AppearanceController.paletteDidStep,
     ]
 
     override init(frame: NSRect) {
@@ -66,7 +69,15 @@ final class SystemStatusBar: NSView {
         super.layout()
         guard button.bounds.width != laidOutWidth else { return }
         laidOutWidth = button.bounds.width
-        refresh()
+        updateLine()
+    }
+
+    /// The visible line alone, from the last sample: what a width change
+    /// needs, without the side effects of a full `refresh`.
+    private func updateLine() {
+        let items = SystemMetrics.Item.allCases.filter { ConfigurationStore.shared.configuration.statusItems.contains($0) }
+        button.attributedTitle = SystemStatusFormat.compactLine(
+            items, metrics: SystemMetricsStore.shared.snapshot, width: button.bounds.width)
     }
     @objc private func changed() { refresh() }
 
@@ -88,15 +99,13 @@ final class SystemStatusBar: NSView {
         // The window's own ground, the colour the pane cards sit on, with
         // no rule of its own: the bar is the window's bottom margin, not a
         // panel. Light or dark follows the canvas, as the tab strip does.
-        let canvas = PaneSurfaceView.canvasColor
-        let light = canvas.redComponent + canvas.greenComponent + canvas.blueComponent > 1.5
-        let name: NSAppearance.Name = light ? .aqua : .darkAqua
+        let name: NSAppearance.Name = PaneSurfaceView.isLightCanvas ? .aqua : .darkAqua
         if appearance?.name != name { appearance = NSAppearance(named: name) }
         layer?.backgroundColor = PaneSurfaceView.gutterColor.cgColor
         let metrics = SystemMetricsStore.shared.snapshot
         let items = SystemMetrics.Item.allCases.filter { config.statusItems.contains($0) }
         let full = [L10n.text("status.local")] + items.map { SystemStatusFormat.text($0, metrics: metrics) }
-        button.attributedTitle = SystemStatusFormat.compactLine(items, metrics: metrics, width: button.bounds.width)
+        updateLine()
         let accessible = full.joined(separator: " · ")
         button.setAccessibilityValue(accessible)
         button.toolTip = accessible + "\n" + L10n.text("status.help")
@@ -171,7 +180,7 @@ enum SystemStatusFormat {
         switch item {
         case .cpu:
             let value = metrics.cpuPercent.map { ($0 / 100).formatted(.percent.precision(.fractionLength(0))) }
-            return Compact(label: label, value: value ?? "—", template: "100%",
+            return Compact(label: label, value: value ?? "—", template: (1.0).formatted(.percent.precision(.fractionLength(0))),
                            fraction: metrics.cpuPercent.map { $0 / 100 })
         case .load:
             // The one-minute figure; all three are in the details.
@@ -181,11 +190,11 @@ enum SystemStatusFormat {
             let total = compactBytes(Int64(metrics.memoryTotal))
             let fraction = metrics.memoryUsed.map { Double($0) / Double(max(1, metrics.memoryTotal)) }
             return Compact(label: label, value: compactBytes(metrics.memoryUsed.map(Int64.init)) + " / " + total,
-                           template: "00.0 GB / " + total, fraction: fraction)
+                           template: "000.0 GB / " + total, fraction: fraction)
         case .network:
             // The arrows say what it is; the interface is in the details.
             return Compact(label: "", value: "↓ \(rate(metrics.downloadRate))  ↑ \(rate(metrics.uploadRate))",
-                           template: "↓ 00.0 KB/s  ↑ 00.0 KB/s")
+                           template: "↓ 000.0 KB/s  ↑ 000.0 KB/s")
         case .disk:
             return Compact(label: label, value: compactBytes(metrics.diskAvailable), template: "000.0 GB")
         case .thermal:
@@ -202,6 +211,11 @@ enum SystemStatusFormat {
     /// The bar's line: Local, then each metric in a column of its own
     /// width, so a value that gains a digit does not push the rest along.
     /// With no width yet, the columns sit at the narrowest gap.
+    /// Looked up once; its palette colour resolves when the bar draws.
+    private static let hostSymbol = NSImage(systemSymbolName: "laptopcomputer", accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 11, weight: .regular)
+            .applying(.init(paletteColors: [.secondaryLabelColor])))
+
     static func compactLine(_ items: [SystemMetrics.Item], metrics: SystemMetrics,
                             width: CGFloat = 0) -> NSAttributedString {
         let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
@@ -209,9 +223,7 @@ enum SystemStatusFormat {
         let valueAttributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.secondaryLabelColor]
         let space = NSAttributedString(string: " ", attributes: valueAttributes)
         let line = NSMutableAttributedString()
-        if let host = NSImage(systemSymbolName: "laptopcomputer", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 11, weight: .regular)
-                .applying(.init(paletteColors: [.secondaryLabelColor]))) {
+        if let host = hostSymbol {
             let attachment = NSTextAttachment()
             attachment.image = host
             attachment.bounds = NSRect(x: 0, y: (font.capHeight - host.size.height) / 2,
@@ -222,7 +234,10 @@ enum SystemStatusFormat {
         line.append(NSAttributedString(string: L10n.text("status.local"), attributes: [
             .font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.secondaryLabelColor,
         ]))
-        var cells: [(text: NSAttributedString, width: CGFloat)] = []
+        // `reserved` is the column's template width, which sets the gap,
+        // so the gap does not move as values change; `width` is what it
+        // takes now, which only a value outgrowing its template exceeds.
+        var cells: [(text: NSAttributedString, reserved: CGFloat, width: CGFloat)] = []
         for item in items {
             guard let part = compact(item, metrics: metrics) else { continue }
             let cell = NSMutableAttributedString()
@@ -241,7 +256,8 @@ enum SystemStatusFormat {
             cell.append(NSAttributedString(string: part.value, attributes: attributes))
             let prefix = part.label.isEmpty ? "" : part.label + " "
             let template = NSAttributedString(string: prefix + part.template, attributes: valueAttributes)
-            cells.append((cell, max(template.size().width + meterWidth, cell.size().width)))
+            let reserved = template.size().width + meterWidth
+            cells.append((cell, reserved, max(reserved, cell.size().width)))
         }
         // One even gap between every column, Local included, so the line
         // spans the bar whichever metrics are on: Local at the leading
@@ -250,7 +266,7 @@ enum SystemStatusFormat {
         // the line is cut at its end. A few points in: the button's cell
         // insets its text.
         let minimumGap: CGFloat = 16
-        let used = line.size().width + cells.reduce(0) { $0 + $1.width }
+        let used = line.size().width + cells.reduce(0) { $0 + $1.reserved }
         let even = cells.isEmpty ? 0 : (width - 4 - used) / CGFloat(cells.count)
         let gap = max(minimumGap, even)
         var x = line.size().width
