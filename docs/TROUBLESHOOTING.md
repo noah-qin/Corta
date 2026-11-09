@@ -145,7 +145,8 @@ saved. Once the disk answers, this clears by itself.
 ### Settings says it can't read the config file
 
 `~/.config/corta/config` exists but is not UTF-8 text — usually a byte
-saved by an editor in another encoding — or you cannot read it. Corta keeps
+saved by an editor in another encoding — is larger than 1 MiB, or you
+cannot read it. Corta keeps
 the settings it has and refuses to write the file, because writing would
 replace everything in it. Re-save the file as UTF-8 (or remove the bad
 line); Corta picks it up as soon as it reads again. Shell integration does

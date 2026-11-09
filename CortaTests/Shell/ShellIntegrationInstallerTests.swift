@@ -106,6 +106,32 @@ struct ShellIntegrationInstallerTests {
         }
     }
 
+    @Test("a file over the reader's limit is unreadable, not read")
+    func readTextRefusesAnOversizedFile() throws {
+        defer { removeDirectory() }
+        try writeFile(String(repeating: "x", count: 2048))
+        guard case .unreadable(let error) = UserFile.readText(at: file, maximumBytes: 1024) else {
+            Issue.record("a file over the limit is unreadable")
+            return
+        }
+        #expect(error is UserFile.TooLargeError)
+        guard case .text = UserFile.readText(at: file, maximumBytes: 2048) else {
+            Issue.record("a file at the limit is read")
+            return
+        }
+    }
+
+    @Test("a FIFO is unreadable at once rather than a read that waits for a writer")
+    func readTextRefusesAFIFO() throws {
+        defer { removeDirectory() }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        #expect(mkfifo(file.path, 0o600) == 0)
+        guard case .unreadable = UserFile.readText(at: file) else {
+            Issue.record("a FIFO is unreadable")
+            return
+        }
+    }
+
     @Test("installing into an absent rc file creates it with the block")
     func installCreatesTheFile() throws {
         defer { removeDirectory() }

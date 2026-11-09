@@ -53,22 +53,52 @@ nonisolated enum UserFile {
         case text(String)
     }
 
+    /// The most `readText` takes by default: far past any startup file a
+    /// person writes, short of one that would stall whoever parses it.
+    static let defaultMaximumBytes = 16 << 20
+
+    /// A file larger than its reader accepts, never read.
+    struct TooLargeError: LocalizedError {
+        let path: String
+        let maximumBytes: Int
+        var errorDescription: String? {
+            L10n.format(
+                "file.tooLarge", path,
+                ByteCountFormatter.string(fromByteCount: Int64(maximumBytes), countStyle: .binary))
+        }
+    }
+
     /// Reads `url` as UTF-8, telling a missing file from one that exists but
-    /// cannot be read or decoded.
-    static func readText(at url: URL) -> ReadResult {
+    /// cannot be read or decoded. Links are followed — a dotfiles config is
+    /// one. A file over `maximumBytes`, or one that is not a regular file (a
+    /// FIFO would block the read), is unreadable and never read.
+    static func readText(at url: URL, maximumBytes: Int = defaultMaximumBytes) -> ReadResult {
+        // Non-blocking only for the open, so a FIFO cannot hold it.
+        let descriptor = open(url.path, O_RDONLY | O_CLOEXEC | O_NONBLOCK)
+        guard descriptor >= 0 else {
+            let code = errno
+            // A dangling symlink is missing too: writing creates its target.
+            if code == ENOENT { return .missing }
+            return .unreadable(POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO))
+        }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var info = stat()
+        guard fstat(descriptor, &info) == 0 else {
+            return .unreadable(POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO))
+        }
+        guard info.st_mode & S_IFMT == S_IFREG else { return .unreadable(POSIXError(.EINVAL)) }
+        guard info.st_size <= maximumBytes else {
+            return .unreadable(TooLargeError(path: url.path, maximumBytes: maximumBytes))
+        }
         let data: Data
         do {
-            data = try Data(contentsOf: url)
+            // One past the cap, in case the file grew since the `fstat`.
+            data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
         } catch {
-            let nsError = error as NSError
-            let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
-            if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileReadNoSuchFileError
-                || underlying?.domain == NSPOSIXErrorDomain && underlying?.code == Int(ENOENT)
-            {
-                // A dangling symlink is missing too: writing creates its target.
-                return .missing
-            }
             return .unreadable(error)
+        }
+        guard data.count <= maximumBytes else {
+            return .unreadable(TooLargeError(path: url.path, maximumBytes: maximumBytes))
         }
         guard let text = String(data: data, encoding: .utf8) else {
             return .unreadable(CocoaError(.fileReadInapplicableStringEncoding, userInfo: [

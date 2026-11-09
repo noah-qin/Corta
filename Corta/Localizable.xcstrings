@@ -49552,6 +49552,65 @@
           }
         }
       }
+    },
+    "file.tooLarge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is larger than %2$@ and was not read. Changes aren’t saved until it is smaller."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ 大于 %2$@，未读取。文件变小之前不会保存更改。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ 大於 %2$@，未讀取。檔案變小之前不會儲存變更。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ は %2$@ を超えているため読み込まれませんでした。小さくなるまで変更は保存されません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ 파일이 %2$@보다 커서 읽지 않았습니다. 더 작아질 때까지 변경 사항은 저장되지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ ist größer als %2$@ und wurde nicht gelesen. Bis sie kleiner ist, werden Änderungen nicht gesichert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ dépasse %2$@ et n’a pas été lu. Les modifications ne sont pas enregistrées tant qu’il n’est pas plus petit."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ supera %2$@ y no se leyó. Los cambios no se guardan hasta que sea más pequeño."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ é maior que %2$@ e não foi lido. As alterações não são salvas até que fique menor."
+          }
+        }
+      }
     }
   }
 }

@@ -41,7 +41,13 @@ key = value        # comment to end of line
   not cost you every other setting, and the terminal has to start.
 - A file that exists but is not UTF-8 text, or cannot be read, is never
   written: Corta keeps its current settings and Settings says why changes
-  are not being saved, until the file reads again.
+  are not being saved, until the file reads again. A file larger than
+  **1 MiB** counts as one that cannot be read; a complete configuration is
+  a few kilobytes.
+- An unusable preset (§4a) or a theme key that names no known field (§4)
+  is not applied, and its lines are kept in the file as written. Opening
+  Settings creates the file when there is none and otherwise leaves it as
+  it is; only a change rewrites it.
 - Numeric values outside the documented range are **clamped** and written
   back in their clamped form. Invalid numbers, unsupported enum values and
   malformed shortcuts keep the default for that key when loading the file.

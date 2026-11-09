@@ -63,6 +63,11 @@ final class ConfigurationStore {
     /// `~/.config/corta/config`, unless a staged launch moved it (`AppPaths`).
     static var fileURL: URL { AppPaths.configFileURL }
 
+    /// The largest file read: the file is parsed on the main thread, and a
+    /// complete one is a few kilobytes. Larger is treated as unreadable —
+    /// kept, reported, writes refused (`CONFIGURATION.md`).
+    nonisolated static let maximumFileBytes = 1 << 20
+
     /// How long the main thread waits for the file. A dotfiles symlink can put
     /// it on a mount that stops answering, and `read` then blocks for minutes.
     static let fileAccessTimeout: DispatchTimeInterval = .seconds(1)
@@ -79,7 +84,10 @@ final class ConfigurationStore {
     private var writePending = false
 
     init(
-        fileURL: URL, readFile: @escaping @Sendable (URL) -> UserFile.ReadResult = UserFile.readText(at:),
+        fileURL: URL,
+        readFile: @escaping @Sendable (URL) -> UserFile.ReadResult = {
+            UserFile.readText(at: $0, maximumBytes: ConfigurationStore.maximumFileBytes)
+        },
         fileAccessTimeout: DispatchTimeInterval = ConfigurationStore.fileAccessTimeout,
         retryDelay: TimeInterval = ConfigurationStore.retryAfterTimeout
     ) {
@@ -180,7 +188,9 @@ final class ConfigurationStore {
     private func setReadError(_ error: Error?) {
         let wasUnreadable = readError != nil
         readError = error
-        if error != nil {
+        if let error = error as? UserFile.TooLargeError {
+            noteWriteResult(error)
+        } else if error != nil {
             noteWriteResult(UnreadableFileError(path: fileURL.path))
         } else if wasUnreadable {
             noteWriteResult(nil)
@@ -259,7 +269,7 @@ final class ConfigurationStore {
     /// Serialises the configuration in memory over the file.
     private func persist() -> Bool {
         guard readError == nil else {
-            noteWriteResult(UnreadableFileError(path: fileURL.path))
+            noteWriteResult(readError as? UserFile.TooLargeError ?? UnreadableFileError(path: fileURL.path))
             return false
         }
         let url = fileURL
