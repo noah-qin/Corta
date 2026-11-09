@@ -10,6 +10,33 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Changed
+
+- The status bar is lower and sits on the window's own ground without a
+  rule. Local lines up with the terminal text and the metrics share the
+  bar's width in steady, evenly spaced columns, whichever are turned on.
+  CPU and memory carry a small meter that turns orange and red as they
+  fill, labels are quieter than values, network rates drop the interface
+  name, and the thermal state appears only when it is not normal.
+- A new tab grows open from the end of the row as the track lengthens,
+  instead of popping up from its centre, and the selected pill slides to
+  it; closing runs that backwards, right to left and a little more slowly,
+  and choosing another tab slides the pill there.
+- The terminal canvas moves with the tab order: a new tab, or one further
+  along, comes in from the right; closing a tab, or going back to an
+  earlier one, comes in from the left.
+- The `cd` folder suggestions sit on a lighter capsule with a hairline
+  instead of a frame, behind a folder mark; the chosen folder is held in a
+  soft chip rather than underlined, trailing slashes fade, and a count such
+  as +3 says how many more there are.
+
+### Fixed
+
+- Turning the status bar on or off grows or shrinks the window by the bar's
+  height rather than resizing the panes, so the canvas no longer flashes
+  and running programs are not resized; in full screen, or without room on
+  the screen, the panes still make the room.
+
 ## [1.6.1] - 2026-11-07
 
 ### Fixed
