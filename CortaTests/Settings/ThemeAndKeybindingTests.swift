@@ -293,6 +293,37 @@ extension ThemeAndKeybindingTests {
         #expect(visited == commandRows.map(\.id), "each step lands on the next command row")
     }
 
+    /// A command its window would refuse ran anyway and failed silently.
+    @Test("a command the window would refuse is listed disabled and cannot run")
+    @MainActor func paletteDisablesUnavailableCommands() throws {
+        let model = CommandPaletteModel()
+        model.isCommandAvailable = { $0 != .newTab }
+        model.reset()
+        model.query = TerminalCommand.newTab.rawValue
+        let row = try #require(model.rows.first { $0.command == .newTab })
+        #expect(!row.selectable)
+        var ran: [TerminalCommand] = []
+        model.onRun = { ran.append($0) }
+        model.select(row)
+        model.runSelected()
+        #expect(!ran.contains(.newTab))
+    }
+
+    /// Availability is read from the window behind the palette: the palette,
+    /// key while it is up, answers `performClose:` itself.
+    @Test("availability follows the window's responder chain and its validation")
+    @MainActor func paletteAvailabilityUsesTheWindowsChain() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled, .closable],
+            backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        #expect(CommandPaletteController.isAvailable(#selector(NSWindow.performClose(_:)), in: window))
+        #expect(!CommandPaletteController.isAvailable(NSSelectorFromString("noSuchCortaAction:"), in: window))
+        #expect(!CommandPaletteController.isAvailable(#selector(NSWindow.performClose(_:)), in: nil)
+            || NSApp.responds(to: #selector(NSWindow.performClose(_:))))
+    }
+
     @Test("a cleared query selects the top row, not a copy further down")
     @MainActor func paletteClearedQuerySelectsTheTop() throws {
         let model = CommandPaletteModel()

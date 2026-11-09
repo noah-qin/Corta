@@ -51,11 +51,21 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         super.init(window: panel)
         panel.delegate = self
         panel.contentView = Self.buildContentView(model: model)
+        model.isCommandAvailable = { [weak self] command in
+            Self.isAvailable(command.action, in: self?.invokingWindow ?? NSApp.mainWindow)
+        }
         model.onRun = { [weak self] command in
             self?.close()
-            // Once the terminal window is key again.
+            // Once the terminal window is key again. Something may have
+            // changed since the list was built: refused or unanswered, it
+            // beeps, as a disabled menu item's key does.
             DispatchQueue.main.async {
-                NSApp.sendAction(command.action, to: nil, from: nil)
+                guard Self.isAvailable(command.action, in: NSApp.keyWindow),
+                    NSApp.sendAction(command.action, to: nil, from: nil)
+                else {
+                    NSSound.beep()
+                    return
+                }
             }
         }
         model.onAgent = { [weak self] id in
@@ -112,6 +122,32 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
     func windowDidResignKey(_ notification: Notification) {
         window?.orderOut(nil)
         invokingWindow = nil
+    }
+
+    // MARK: - Availability
+
+    /// Whether `action` sent from `window` reaches something that accepts it:
+    /// its target found along the window's own responder chain — not the
+    /// palette's, which is key while it is up — then the window's delegate,
+    /// the application and its delegate, and that target's menu validation.
+    static func isAvailable(_ action: Selector, in window: NSWindow?) -> Bool {
+        guard let target = target(for: action, in: window) else { return false }
+        let item = NSMenuItem(title: "", action: action, keyEquivalent: "")
+        if let validator = target as? NSMenuItemValidation { return validator.validateMenuItem(item) }
+        if let validator = target as? NSUserInterfaceValidations { return validator.validateUserInterfaceItem(item) }
+        return true
+    }
+
+    private static func target(for action: Selector, in window: NSWindow?) -> AnyObject? {
+        var responder: NSResponder? = window?.firstResponder ?? window
+        while let current = responder {
+            if current.responds(to: action) { return current }
+            responder = current.nextResponder
+        }
+        if let delegate = window?.delegate, delegate.responds(to: action) { return delegate }
+        if NSApp.responds(to: action) { return NSApp }
+        if let delegate = NSApp.delegate, delegate.responds(to: action) { return delegate }
+        return nil
     }
 
     // MARK: - Layout
