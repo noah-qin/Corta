@@ -287,6 +287,9 @@ nonisolated struct Configuration: Equatable, Sendable {
         var themeOrder: [String] = []
         var presetDrafts: [String: Preset] = [:]
         var presetOrder: [String] = []
+        // Each preset's applied lines, as written: a preset that turns out
+        // unusable is kept in the file verbatim, not dropped by the next save.
+        var presetLines: [String: [(String, String)]] = [:]
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
             guard let line = keyAndValue(of: rawLine) else { continue }
             let key = line.key
@@ -298,7 +301,8 @@ nonisolated struct Configuration: Equatable, Sendable {
                 }
                 unknown.append((key, value))
             } else if key.hasPrefix("preset.") {
-                if applyPresetKey(key, value: value, drafts: &presetDrafts, order: &presetOrder) {
+                if let name = applyPresetKey(key, value: value, drafts: &presetDrafts, order: &presetOrder) {
+                    presetLines[name, default: []].append((key, value))
                     continue
                 }
                 unknown.append((key, value))
@@ -319,8 +323,16 @@ nonisolated struct Configuration: Equatable, Sendable {
         }
         configuration.customThemes = themeOrder.compactMap { themeDrafts[$0]?.resolved() }
         // An empty preset, or one with a relative shell or directory, is a typo
-        // that would fail at spawn.
-        configuration.presets = presetOrder.compactMap { presetDrafts[$0] }.filter(\.isUsable)
+        // that would fail at spawn: not offered, but its lines survive a save
+        // for the user to fix, as an unknown key's do.
+        for name in presetOrder {
+            guard let preset = presetDrafts[name] else { continue }
+            if preset.isUsable {
+                configuration.presets.append(preset)
+            } else {
+                unknown.append(contentsOf: presetLines[name] ?? [])
+            }
+        }
         return (configuration, unknown)
     }
 
@@ -387,21 +399,22 @@ nonisolated extension Configuration {
         }
     }
 
-    /// `preset.<name>.<field>`. Unknown fields are returned false and
-    /// survive the write, as theme keys do.
+    /// `preset.<name>.<field>`: the preset's name when the field applied.
+    /// Unknown fields return nil and survive the write, as theme keys do;
+    /// a name only ever given unknown fields makes no preset.
     private static func applyPresetKey(
         _ key: String, value: String, drafts: inout [String: Preset], order: inout [String]
-    ) -> Bool {
+    ) -> String? {
         let rest = key.dropFirst("preset.".count)
-        guard let dot = rest.firstIndex(of: ".") else { return false }
+        guard let dot = rest.firstIndex(of: ".") else { return nil }
         let name = String(rest[rest.startIndex..<dot])
         let field = String(rest[rest.index(after: dot)...])
-        guard !name.isEmpty, !field.isEmpty else { return false }
-        if drafts[name] == nil {
-            drafts[name] = Preset(name: name)
-            order.append(name)
-        }
-        return drafts[name]!.apply(field: field, value: value)
+        guard !name.isEmpty, !field.isEmpty else { return nil }
+        var draft = drafts[name] ?? Preset(name: name)
+        guard draft.apply(field: field, value: value) else { return nil }
+        if drafts[name] == nil { order.append(name) }
+        drafts[name] = draft
+        return name
     }
 
     /// `theme.<name>.<field>` and `theme.<name>.<dark|light>.<field>`;
@@ -413,31 +426,33 @@ nonisolated extension Configuration {
         guard parts.count >= 3 else { return false }
         let name = parts[1]
         guard !name.isEmpty else { return false }
-        if drafts[name] == nil {
-            drafts[name] = ThemeDraft(name: name)
-            order.append(name)
-        }
-
+        // Registered only once a field applies: a misspelt key made a theme
+        // of its own, written out in full by the next save.
+        var draft = drafts[name] ?? ThemeDraft(name: name)
+        let applied: Bool
         if parts.count == 3 {
             switch parts[2] {
             case "name":
-                drafts[name]?.displayName = value
-                return true
+                draft.displayName = value
+                applied = true
             case "inherit":
-                drafts[name]?.inherit = value
-                return true
+                draft.inherit = value
+                applied = true
             default:
-                return false
+                applied = false
             }
+        } else if parts.count == 4, let isDark = variantIsDark(parts[2]) {
+            applied =
+                isDark
+                ? applyVariantField(parts[3], value: value, into: &draft.dark)
+                : applyVariantField(parts[3], value: value, into: &draft.light)
+        } else {
+            applied = false
         }
-        guard parts.count == 4, let isDark = variantIsDark(parts[2]), var draft = drafts[name]
-        else { return false }
-        let applied =
-            isDark
-            ? applyVariantField(parts[3], value: value, into: &draft.dark)
-            : applyVariantField(parts[3], value: value, into: &draft.light)
+        guard applied else { return false }
+        if drafts[name] == nil { order.append(name) }
         drafts[name] = draft
-        return applied
+        return true
     }
 
     /// Where a trailing comment starts. A `#` that opens the value or

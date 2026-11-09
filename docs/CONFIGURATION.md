@@ -473,7 +473,8 @@ splitting the focused pane.
 Every field is optional. `shell` and `directory` must be **absolute** — a
 relative path would resolve against whatever Corta was launched from, which on
 a Finder launch is `/` — and a preset that names neither an absolute path nor
-any setting at all is ignored rather than offered.
+any setting at all is ignored rather than offered. Its lines stay in the file
+as you wrote them, so a save from Settings never deletes it.
 
 `env.*` variables are added on top of the sanitised inherited environment
 (`SECURITY.md` §4.3): a preset can add and override, never remove. A preset

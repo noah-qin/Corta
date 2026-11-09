@@ -108,12 +108,18 @@ import Testing
     }
 
     /// A half-typed theme must still render — a config file is hand-edited,
-    /// and a bad colour must not black out the terminal.
+    /// and a bad colour must not black out the terminal. With no field that
+    /// applies there is no theme by that name, so the default draws, and the
+    /// line waits in the file to be fixed.
     @Test("a malformed colour is preserved, not applied")
     func malformedColourIsKeptAsUnknown() throws {
         let (parsed, unknown) = Configuration.parse("theme.x.dark.background = mauve")
         #expect(unknown.count == 1)
-        let theme = try #require(Theme.named("x", in: parsed))
+        #expect(Theme.named("x", in: parsed) == nil)
+        let (mixed, mixedUnknown) = Configuration.parse(
+            "theme.x.dark.background = mauve\ntheme.x.dark.foreground = #ffffff")
+        #expect(mixedUnknown.count == 1)
+        let theme = try #require(Theme.named("x", in: mixed))
         #expect(theme.dark.background == Theme.corta.dark.background)
     }
 
