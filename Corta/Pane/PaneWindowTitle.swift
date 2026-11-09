@@ -83,6 +83,8 @@ final class PaneWindowTitle {
     private var isShowingTransientSize = false
     private var transientSizeReset: DispatchWorkItem?
     private var isStopped = false
+    /// Output arrived while the window was covered (`noteOutput`).
+    private(set) var refreshWhenVisible = false
 
     /// A new session: its facts are unknown, and it starts local.
     func reset(session: TerminalSession) {
@@ -190,6 +192,10 @@ final class PaneWindowTitle {
     /// path here to offer a drag of.
     func apply(fromOutput: Bool = false) {
         guard let window = window() else { return }
+        if fromOutput, !window.occlusionState.contains(.visible) {
+            refreshWhenVisible = true
+            return
+        }
         let tab = tab()
         let controller = window.windowController as? TerminalWindowController
         if let tab, !tab.isSelected {
@@ -345,7 +351,22 @@ final class PaneWindowTitle {
     /// the interval has passed, so a program that quits inside it does not
     /// leave its icon and name on a background tab or an unfocused pane.
     func noteOutput() {
+        // A window nobody can see shows no title or tab: its process facts
+        // (`tcgetpgrp`, `proc_name`, `proc_pidinfo`) wait until it shows.
+        if let window = window(), !window.occlusionState.contains(.visible) {
+            refreshWhenVisible = true
+            return
+        }
         scheduleTrailingTitleRefresh(after: Self.processFactsInterval)
+    }
+
+    /// Output came while the window was covered: read the facts now that it
+    /// shows. From the pane's occlusion observer.
+    func windowVisibilityChanged() {
+        guard refreshWhenVisible, let window = window(), window.occlusionState.contains(.visible) else { return }
+        refreshWhenVisible = false
+        invalidateProcessFacts()
+        scheduleTrailingTitleRefresh(after: 0)
     }
 
     /// On focus and command boundaries, where waiting out the interval would

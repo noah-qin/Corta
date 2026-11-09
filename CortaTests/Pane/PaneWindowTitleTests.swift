@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import AppKit
 import Foundation
 import Synchronization
 import Testing
@@ -170,4 +171,24 @@ extension PaneWindowTitleTests {
         _ = title.composed
         #expect(title.hasTrailingRefresh)
     }
+
+    /// A covered window shows no title: output there leaves the process
+    /// facts unread until the window shows again.
+    @Test("output in a covered window defers the title refresh until it shows")
+    func coveredWindowDefersTheRefresh() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let title = PaneWindowTitle(isDirectory: { _ in true })
+        title.window = { window }
+        defer { title.stop() }
+        // Never ordered in: not visible.
+        #expect(!window.occlusionState.contains(.visible))
+        title.noteOutput()
+        #expect(title.refreshWhenVisible)
+        #expect(!title.hasTrailingRefresh)
+    }
+
 }

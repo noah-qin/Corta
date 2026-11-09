@@ -395,6 +395,7 @@ extension PaneFocus {
     @objc private func windowFocusChanged(_ note: Notification) {
         guard let window = note.object as? NSWindow, window === host?.view.window else { return }
         (host as? TerminalPaneViewController)?.updateReaderPriority()
+        (host as? TerminalPaneViewController)?.windowTitle.windowVisibilityChanged()
         reportIfNeeded()
         // Cmd-Tab drops the ring even though the focused pane doesn't change.
         applyAppearance()
