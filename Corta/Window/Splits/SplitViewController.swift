@@ -511,12 +511,13 @@ extension SplitViewController {
         takeFocus(pane)
     }
 
-    /// Leaves zoom if `pane` is zoomed, so a close never leaves a removed
-    /// view on screen.
-    private func unzoomIfNeeded(closing pane: TerminalPaneViewController) {
-        guard zoomedPane === pane else { return }
-        // `SplitTree.close(leaf:)` can't remove a leaf that isn't in the tree.
+    /// Leaves zoom before the tree changes: `SplitTree.close(leaf:)` can't
+    /// remove a leaf that isn't in it, and `zoomOrigin` names a slot in the
+    /// tree as it stood.
+    func unzoomIfZoomed() {
+        guard zoomedPane != nil else { return }
         unzoomPane()
+        view.layoutSubtreeIfNeeded()
     }
 
     /// Every pane re-reads its size; a zoom changes all of them at once.
@@ -570,7 +571,10 @@ extension SplitViewController {
             closeTabWithoutAsking()
             return
         }
-        unzoomIfNeeded(closing: pane)
+        // Out of zoom whichever pane closes: the tree changes under the
+        // zoomed pane's saved slot otherwise, and unzooming put it back into
+        // a node that was no longer there.
+        unzoomIfZoomed()
         noteClosing(pane)
         pane.teardown()
         guard let node = pane.view.superview as? NSSplitView,

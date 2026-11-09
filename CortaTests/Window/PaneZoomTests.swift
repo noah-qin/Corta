@@ -71,6 +71,41 @@ struct PaneZoomTests {
         _ = window
     }
 
+    /// Moving focus from a zoomed pane used to focus a pane the zoom hid,
+    /// so typing went somewhere off screen. Zoom ends first.
+    @Test("moving focus while zoomed ends the zoom and focuses the neighbour")
+    func movingFocusWhileZoomedUnzooms() throws {
+        let (split, window) = makeSplit(panes: 2)
+        defer { split.teardown() }
+        let right = try #require(split.focusedPane)
+        split.toggleZoomPane(nil)
+        #expect(split.isPaneZoomed)
+        split.moveFocusLeft(nil)
+        #expect(!split.isPaneZoomed)
+        let left = try #require(split.focusedPane)
+        #expect(left !== right)
+        #expect(split.panes.allSatisfy { $0.view.window === window })
+    }
+
+    /// Closing a pane the zoom hides changed the tree under the zoomed
+    /// pane's saved slot; unzooming afterwards put it into a node that was
+    /// gone.
+    @Test("closing another pane while zoomed ends the zoom and keeps the zoomed pane in the tree")
+    func closingAHiddenPaneWhileZoomed() throws {
+        let (split, window) = makeSplit(panes: 3)
+        defer { split.teardown() }
+        let zoomed = try #require(split.focusedPane)
+        let hidden = try #require(split.panes.first { $0 !== zoomed })
+        split.toggleZoomPane(nil)
+        split.closePane(hidden)
+        split.splitTransition.finish()
+        #expect(!split.isPaneZoomed)
+        #expect(split.panes.count == 2)
+        let root = try #require(split.layoutRoot)
+        #expect(zoomed.view === root || zoomed.view.isDescendant(of: root))
+        #expect(split.panes.allSatisfy { $0.view.window === window })
+    }
+
     /// Zoom is temporary and changes nothing: both panes are still there,
     /// both children are still running, and the saved arrangement still
     /// describes the split rather than the zoom.

@@ -66,7 +66,12 @@ extension SplitViewController {
     @objc func moveFocusUp(_: Any?) { moveFocus(.up) }
     @objc func moveFocusDown(_: Any?) { moveFocus(.down) }
 
+    /// From a zoomed pane, zoom ends first, as in other terminals: the
+    /// neighbour is found in the whole tree, and focusing a pane the zoom
+    /// hides would send typing to something off screen.
     private func moveFocus(_ direction: SplitMoveDirection) {
+        splitTransition.finish()
+        unzoomIfZoomed()
         guard let focusedPane,
             let leaf = tree.leaf(from: focusedPane.view, direction: direction, inContainer: view),
             let target = pane(forLeaf: leaf)
