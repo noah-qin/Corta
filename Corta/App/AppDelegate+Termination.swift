@@ -81,7 +81,10 @@ extension AppDelegate {
             for split in controller.window?.terminalSplits ?? [] { split.teardown() }
         }
         // Not left to the panes' background removals: the process is ending.
-        FileDropStorage.removeThisRun(into: writes, deadline: deadline)
-        _ = writes.wait(timeout: deadline)
+        // The wait starts now, after the teardown, so the time it took does
+        // not come out of what the writes are given.
+        let waitDeadline = max(deadline, DispatchTime.now() + Self.quitFlushDeadline)
+        FileDropStorage.removeThisRun(into: writes, deadline: waitDeadline)
+        _ = writes.wait(timeout: waitDeadline)
     }
 }
