@@ -374,6 +374,28 @@ struct ConfigurationStoreTests {
         #expect(store.configuration.fontSize == Configuration().fontSize)
     }
 
+    @Test("opening Settings leaves an existing file as written and keeps a relative preset through a change")
+    func openingSettingsDoesNotRewriteTheFile() async throws {
+        defer { removeDirectory() }
+        let original = "# mine\npreset.work.shell = zsh\nfont-size = 14\n"
+        try writeFile(original)
+        let store = ConfigurationStore(fileURL: file)
+        #expect(store.createIfMissing())
+        #expect(try String(contentsOf: file, encoding: .utf8) == original)
+        #expect(store.update { $0.bell = .audible })
+        let text = try String(contentsOf: file, encoding: .utf8)
+        #expect(text.contains("preset.work.shell = zsh"))
+    }
+
+    @Test("opening Settings creates a missing file")
+    func openingSettingsCreatesAMissingFile() async throws {
+        defer { removeDirectory() }
+        let store = ConfigurationStore(fileURL: file)
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+        #expect(store.createIfMissing())
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
+
     /// The watcher delivers an editor's save a moment after it lands. A
     /// settings change in that moment serialised the copy in memory and
     /// wrote the editor's change back out.

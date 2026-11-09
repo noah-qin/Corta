@@ -230,6 +230,19 @@ final class ConfigurationStore {
         return persist()
     }
 
+    /// Creates the file with current values when there is none, for a
+    /// discoverable first launch; an existing file is left as written.
+    /// Opening Settings used to rewrite it every time, which rearranged a
+    /// hand-made file even when nothing was changed.
+    @discardableResult
+    func createIfMissing() -> Bool {
+        guard !writePending else { return false }
+        syncWithFile()
+        guard readError == nil else { return false }
+        guard syncedText == nil else { return true }
+        return persist()
+    }
+
     /// Reads in the file if it differs from what this store last read or
     /// wrote, or could not be read then. One read, so one wait at most.
     private func syncWithFile() {
