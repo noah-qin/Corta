@@ -49,6 +49,32 @@ struct ExportStagingTests {
         #expect(try String(contentsOf: final, encoding: .utf8) == "previous export")
     }
 
+    @Test("a folder renamed since the export is found by its device and inode")
+    func recoversAfterTheFolderMoved() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        try PrivateFile.createDirectory(at: parent)
+        let abandoned = try makeStaging(pid: .max)
+        let moved = root.appendingPathComponent("renamed", isDirectory: true)
+        try FileManager.default.moveItem(at: parent, to: moved)
+        ExportStaging.removeAbandoned(in: journal)
+        #expect(!FileManager.default.fileExists(atPath: moved.appendingPathComponent(abandoned.folder.lastPathComponent).path))
+        #expect(!FileManager.default.fileExists(atPath: abandoned.entry.path))
+    }
+
+    @Test("a record that cannot be acted on for 30 days is dropped and reported once")
+    func expiredRecordsAreReportedOnce() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        try PrivateFile.createDirectory(at: parent)
+        let kept = try makeStaging(pid: .max, wrongInode: true)
+        #expect(ExportStaging.removeAbandoned(in: journal).isEmpty)
+        #expect(FileManager.default.fileExists(atPath: kept.entry.path))
+        let later = Date().addingTimeInterval(ExportStaging.recordLifetime + 60)
+        let reported = ExportStaging.removeAbandoned(in: journal, now: later)
+        #expect(reported == [parent.resolvingSymlinksInPath().path])
+        #expect(!FileManager.default.fileExists(atPath: kept.entry.path))
+        #expect(ExportStaging.removeAbandoned(in: journal, now: later).isEmpty)
+    }
+
     @Test("failed preparation discards the partial export and keeps the destination")
     func cleansUpFailedExport() throws {
         defer { try? FileManager.default.removeItem(at: root) }

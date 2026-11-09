@@ -123,13 +123,17 @@ nonisolated enum AppPaths {
 
     /// `.<name>.<uuid>` left in the state directories by a save that died before
     /// its rename (`PrivateFile.replace`). Off the main thread, at launch.
-    nonisolated static func removeAbandonedStateFiles() {
+    /// Returns the folders where an unfinished export's staging directory
+    /// could not be removed and has stopped being tried
+    /// (`ExportStaging.removeAbandoned`), for a one-time notice.
+    @discardableResult
+    nonisolated static func removeAbandonedStateFiles() -> [String] {
         let support = applicationSupportDirectory
         makeOwnerOnly(directory: support)
         for directory in [support, support.appendingPathComponent("RemoteEdit", isDirectory: true)] {
             PrivateFile.removeAbandonedTemporaries(in: directory, olderThan: abandonedStateFileAge)
         }
-        ExportStaging.removeAbandoned()
+        return ExportStaging.removeAbandoned()
     }
 
     /// An older build created the state folder at the default umask (0755),

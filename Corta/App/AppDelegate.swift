@@ -272,7 +272,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // Off the main thread: a listing of the temporary directory.
         DispatchQueue.global(qos: .utility).async { ZshBootstrap.removeStaleFolders() }
         DispatchQueue.global(qos: .utility).async { FileDropStorage.cleanUpAtLaunch() }
-        DispatchQueue.global(qos: .utility).async { AppPaths.removeAbandonedStateFiles() }
+        DispatchQueue.global(qos: .utility).async {
+            let stranded = AppPaths.removeAbandonedStateFiles()
+            guard !stranded.isEmpty else { return }
+            Task { @MainActor [weak self] in self?.reportStrandedExports(stranded) }
+        }
         DispatchQueue.global(qos: .utility).async { SSHAskpassBroker.pruneAbandoned() }
         openInitialWindows()
         // A notification click jumps back to its command
@@ -613,6 +617,16 @@ extension AppDelegate {
             NSApp.reply(toApplicationShouldTerminate: $0)
         }
         return .terminateLater
+    }
+
+    /// Once: the record is gone after this, so the same folder is not named
+    /// again.
+    private func reportStrandedExports(_ folders: [String]) {
+        let alert = NSAlert()
+        alert.messageText = L10n.text("export.stranded.title")
+        alert.informativeText = L10n.format(
+            "export.stranded.detail", Set(folders).sorted().joined(separator: "\n"))
+        alert.present(for: terminalWindowControllers.first?.window) { _ in }
     }
 
     /// The first of `windows` showing a close confirmation as a sheet.

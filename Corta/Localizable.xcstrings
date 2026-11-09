@@ -49670,6 +49670,124 @@
           }
         }
       }
+    },
+    "export.stranded.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An unfinished export left a temporary folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未完成的导出留下了临时文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未完成的匯出留下了暫存檔案夾"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "完了しなかった書き出しが一時フォルダを残しました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "완료되지 않은 내보내기가 임시 폴더를 남겼습니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ein abgebrochener Export hat einen temporären Ordner hinterlassen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Une exportation inachevée a laissé un dossier temporaire"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Una exportación sin terminar dejó una carpeta temporal"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Uma exportação não concluída deixou uma pasta temporária"
+          }
+        }
+      }
+    },
+    "export.stranded.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta could not remove a hidden folder named “.corta-export-…” in:\n%@\n\nIt holds only the unfinished export and can be deleted. Corta will not mention it again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 无法删除以下位置中名为“.corta-export-…”的隐藏文件夹：\n%@\n\n它只包含未完成的导出内容，可以删除。Corta 不会再提示。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 無法刪除以下位置中名為「.corta-export-…」的隱藏檔案夾：\n%@\n\n它只包含未完成的匯出內容，可以刪除。Corta 不會再提示。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta は次の場所にある「.corta-export-…」という隠しフォルダを削除できませんでした：\n%@\n\n未完成の書き出しだけが入っており、削除してかまいません。今後この通知は表示されません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta가 다음 위치의 “.corta-export-…” 숨김 폴더를 제거하지 못했습니다:\n%@\n\n완료되지 않은 내보내기만 들어 있으므로 삭제해도 됩니다. 다시 알리지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta konnte einen verborgenen Ordner „.corta-export-…“ hier nicht entfernen:\n%@\n\nEr enthält nur den abgebrochenen Export und kann gelöscht werden. Corta weist nicht erneut darauf hin."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta n’a pas pu supprimer un dossier masqué nommé « .corta-export-… » dans :\n%@\n\nIl ne contient que l’exportation inachevée et peut être supprimé. Corta ne le signalera plus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta no pudo eliminar una carpeta oculta llamada «.corta-export-…» en:\n%@\n\nSolo contiene la exportación sin terminar y se puede borrar. Corta no volverá a avisar."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O Corta não conseguiu remover uma pasta oculta chamada “.corta-export-…” em:\n%@\n\nEla contém apenas a exportação não concluída e pode ser apagada. O Corta não avisará de novo."
+          }
+        }
+      }
     }
   }
 }
