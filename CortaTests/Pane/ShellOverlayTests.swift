@@ -184,7 +184,8 @@ import Testing
         let row = try #require(overlay.subviews.first {
             $0.accessibilityIdentifier() == "directory-completion-candidates" })
         #expect(row.frame.minY >= anchor.maxY)
-        #expect(row.frame.minX == anchor.minX - 12)
+        // The names start under the input, past the capsule's folder mark.
+        #expect(row.frame.minX < anchor.minX - 20 && row.frame.minX > anchor.minX - 40)
         #expect(row.frame.width < overlay.bounds.width / 2)
         let originalFrame = row.frame
         overlay.showCompletion(completion, anchor: anchor.offsetBy(dx: 20, dy: 17))

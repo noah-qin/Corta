@@ -29,6 +29,13 @@ final class PaneSurfaceView: NSView {
                        blue: CGFloat(color.z), alpha: 1)
     }
 
+    /// Whether the canvas is light, by luminance: what the titlebar band
+    /// and the status bar choose their light or dark appearance by.
+    static var isLightCanvas: Bool {
+        let color = TerminalColorPalette.defaultBackground
+        return color.x * 0.2126 + color.y * 0.7152 + color.z * 0.0722 >= 0.5
+    }
+
     static var gutterColor: NSColor {
         let color = canvasColor
         let light = color.redComponent + color.greenComponent + color.blueComponent > 1.5

@@ -42,8 +42,40 @@ struct SystemStatusBarTests {
         for name in [
             ConfigurationStore.didChange, SystemMetricsStore.didChange,
             NSWindow.didChangeOcclusionStateNotification, AppearanceController.didChange,
+            AppearanceController.paletteDidStep,
         ] {
             #expect(!refreshes(bar, on: name), "still observing \(name.rawValue) after stop")
+        }
+    }
+
+    @Test("a normal thermal state says nothing; a serious one is coloured")
+    func thermalShowsOnlyWhenItMatters() {
+        var metrics = SystemMetrics()
+        metrics.thermal = .nominal
+        #expect(SystemStatusFormat.compact(.thermal, metrics: metrics) == nil)
+        metrics.thermal = .serious
+        #expect(SystemStatusFormat.compact(.thermal, metrics: metrics)?.warning == .systemOrange)
+    }
+
+    @Test("a value gaining digits leaves the columns after it where they were")
+    func columnsHoldTheirPlace() {
+        func stops(cpu: Double, rate: Double, width: CGFloat) -> [CGFloat] {
+            var metrics = SystemMetrics()
+            metrics.cpuPercent = cpu
+            metrics.memoryUsed = 1 << 30
+            metrics.downloadRate = rate
+            metrics.uploadRate = rate
+            let line = SystemStatusFormat.compactLine(
+                [.cpu, .load, .memory, .network, .disk], metrics: metrics, width: width)
+            let style = line.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+            return style?.tabStops.map(\.location) ?? []
+        }
+        // At the narrowest and at a real bar's width, where the gaps spread.
+        for width in [0, 900] as [CGFloat] {
+            let quiet = stops(cpu: 3, rate: 900, width: width)
+            #expect(quiet.count == 5)
+            let busy = stops(cpu: 100, rate: 900 * 1024, width: width)
+            #expect(quiet == busy, "\(quiet) vs \(busy)")
         }
     }
 }
