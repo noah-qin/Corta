@@ -23,8 +23,18 @@ import AppKit
     private(set) var snapshot = SystemMetrics()
     private let sampler = SystemMetricsSampler()
     private let store: ConfigurationStore
+    /// The sample a poll takes; injected by tests.
+    private let sample: @Sendable (SystemMetricsSampler, Set<SystemMetrics.Item>, String) async -> SystemMetrics
 
-    init(store: ConfigurationStore = .shared) { self.store = store }
+    init(
+        store: ConfigurationStore = .shared,
+        sample: @escaping @Sendable (SystemMetricsSampler, Set<SystemMetrics.Item>, String) async -> SystemMetrics = {
+            await $0.sample(items: $1, interface: $2)
+        }
+    ) {
+        self.store = store
+        self.sample = sample
+    }
     isolated deinit { timer?.invalidate(); task?.cancel() }
     private var clients: Set<UUID> = []
     private var timer: Timer?
@@ -58,12 +68,15 @@ import AppKit
         guard task == nil, timer != nil else { return }
         let config = store.configuration
         let generation = generation
-        task = Task { [weak self, sampler] in
-            let value = await sampler.sample(items: config.statusItems, interface: config.statusNetworkInterface)
+        task = Task { [weak self, sampler, sample] in
+            let value = await sample(sampler, config.statusItems, config.statusNetworkInterface)
             guard !Task.isCancelled, let self, self.generation == generation else { return }
             self.task = nil
+            // Every bar redraws on the notification: a sample that reads the
+            // same as the last (an idle machine, most items) is no news.
+            guard value != self.snapshot else { return }
             self.snapshot = value
-            NotificationCenter.default.post(name: Self.didChange, object: nil)
+            NotificationCenter.default.post(name: Self.didChange, object: self)
         }
     }
 }
