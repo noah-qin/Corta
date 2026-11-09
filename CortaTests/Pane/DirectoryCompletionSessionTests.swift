@@ -43,6 +43,27 @@ struct DirectoryCompletionSessionTests {
     /// A home of folders to complete — plain, nested, linked, with spaces,
     /// a quote and a leading dash — a file, and a `.zshrc` that must not
     /// change.
+    /// Written off the main thread now: the folder, its files and their
+    /// owner-only mode must come out exactly as before, with a token of
+    /// the session's own in `.zshrc`.
+    @Test func bootstrapFolderIsPrivateAndCarriesTheSessionToken() throws {
+        let prepared = ZshBootstrap.prepare(["HOME": NSHomeDirectory()], executable: "/bin/zsh", arguments: ["-l"])
+        let folder = try #require(prepared.folder)
+        defer { ZshBootstrap.remove(folder) }
+        let token = try #require(prepared.token)
+        let mode = try FileManager.default.attributesOfItem(atPath: folder.path)[.posixPermissions] as? Int
+        #expect(mode == 0o700)
+        for file in [".zshenv", ".zprofile", ".zshrc", "corta.zsh"] {
+            #expect(FileManager.default.fileExists(atPath: folder.appendingPathComponent(file).path))
+        }
+        let zshrc = try String(contentsOf: folder.appendingPathComponent(".zshrc"), encoding: .utf8)
+        #expect(zshrc.contains("__corta_cd_token=\(token)"))
+        #expect(prepared.environment["ZDOTDIR"] == folder.path)
+        let other = ZshBootstrap.prepare(["HOME": NSHomeDirectory()], executable: "/bin/zsh", arguments: ["-l"])
+        defer { other.folder.map(ZshBootstrap.remove) }
+        #expect(other.token != token)
+    }
+
     private static func makeCompletionHome() throws -> URL {
         let fileManager = FileManager.default
         let home = fileManager.temporaryDirectory.appendingPathComponent("corta-cd-session-\(UUID().uuidString)")
