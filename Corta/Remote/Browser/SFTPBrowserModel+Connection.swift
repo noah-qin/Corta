@@ -27,7 +27,9 @@ extension SFTPBrowserModel {
     /// first frame), and `.failed` clears the client, which is what makes
     /// Retry work. A live or in-flight connection is returned to as-is —
     /// re-presenting an open window must not spawn a second session.
-    func connect() {
+    /// `resumingAt`: Retry after a failure on the same connection, which
+    /// goes back to the folder that was open, keeping Back and Forward.
+    func connect(resumingAt resumePath: String? = nil) {
         guard client == nil else { return }
         // A problem with the fields is shown beside them, not as a failure.
         connectFailure = nil
@@ -78,35 +80,58 @@ extension SFTPBrowserModel {
         transferQueue.onListingError = { [weak self] in self?.listingError = $0 }
         connectionGeneration += 1
         let generation = connectionGeneration
-        Task { await self.performConnect(client: client, host: name, generation: generation) }
+        Task {
+            await self.performConnect(client: client, host: name, generation: generation, resumePath: resumePath)
+        }
     }
 
-    private func performConnect(client: any SFTPClient, host name: String, generation: Int) async {
+    private func performConnect(
+        client: any SFTPClient, host name: String, generation: Int, resumePath: String? = nil
+    ) async {
         defer { if generation == connectionGeneration { connectDeadline?.cancel() } }
         do {
             armConnectDeadline(client: client, host: name, generation: generation)
             _ = try await client.connect()
-            // The pane's reported directory when there is one; otherwise
-            // the session's own starting directory, canonicalised by the
-            // server — never a guess at "~".
-            let path: String
-            if let startDirectory {
-                path = startDirectory
-            } else {
+            // Back where the failure left the user, when that folder is still
+            // there; else the pane's reported directory when there is one;
+            // otherwise the session's own starting directory, canonicalised
+            // by the server — never a guess at "~".
+            var path = ""
+            var resumed: [SFTPEntry]?
+            if let resumePath {
                 armConnectDeadline(client: client, host: name, generation: generation)
-                path = try await client.realPath(path: ".")
+                if let listing = try? await client.listDirectory(path: resumePath) {
+                    path = resumePath
+                    resumed = listing
+                }
+            }
+            if resumed == nil {
+                if let startDirectory {
+                    path = startDirectory
+                } else {
+                    armConnectDeadline(client: client, host: name, generation: generation)
+                    path = try await client.realPath(path: ".")
+                }
             }
             armConnectDeadline(client: client, host: name, generation: generation)
-            let listing = try await client.listDirectory(path: path)
+            let listing: [SFTPEntry]
+            if let resumed {
+                listing = resumed
+            } else {
+                listing = try await client.listDirectory(path: path)
+            }
             guard generation == connectionGeneration else {
                 client.close()
                 return
             }
             connectDeadline?.cancel()
+            let keepsHistory = resumed != nil
             await applyEntries(listing) {
                 // Publish the directory and its rows together.
-                backStack.removeAll()
-                forwardStack.removeAll()
+                if !keepsHistory {
+                    backStack.removeAll()
+                    forwardStack.removeAll()
+                }
                 currentPath = Self.normalized(path: path)
                 pathField = currentPath
                 connectionState = .connected
@@ -221,8 +246,11 @@ extension SFTPBrowserModel {
         if !typed.isEmpty, (try? typed.target.get())?.key != host {
             changeHost()
             fields = typed
+            connect()
+            return
         }
-        connect()
+        // The same connection again: back to the folder that was open.
+        connect(resumingAt: currentPath.isEmpty ? nil : currentPath)
     }
 
     /// Cancel while connecting, or Edit after a failure: back to the host
