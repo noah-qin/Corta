@@ -176,6 +176,22 @@ struct SessionLifecycleTests {
         #expect(!pane.frameLoop.isCurrent(generation))
     }
 
+    /// The reader keeps the session until the child is reaped, which a group
+    /// ignoring SIGHUP stretches to the grace period and past it; the closed
+    /// pane's history was held all that time.
+    @Test("closing a pane frees its history at once")
+    func closingAPaneFreesItsHistory() async throws {
+        var preset = Preset(name: "history")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", "trap '' HUP; i=0; while [ $i -lt 300 ]; do echo line $i; i=$((i+1)); done; exec /bin/cat"]
+        let pane = makePane(preset: preset)
+        let session = try #require(pane.session)
+        #expect(await waitUntilTrue(timeout: .seconds(10)) { session.snapshot().scrollback.count > 100 })
+        pane.teardown()
+        #expect(session.snapshot().scrollback.count == 0)
+        #expect(session.snapshot().scrollback.totalPushed == 0)
+    }
+
     /// Reconnect respawned at the configured grid and font size, so the
     /// remote banner and prompt were laid out at the wrong width before the
     /// resize, and a ⌘+ zoom was lost. A rebuild keeps both.

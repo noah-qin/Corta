@@ -544,6 +544,22 @@ extension TerminalSession {
         registerStateWaiter { state.withLock { $0.terminal.grid.clearableHistoryLineCount } }
     }
 
+    /// Frees what the grid holds — history, images, the side tables — for a
+    /// pane that is closing, after `stop()`. The reader keeps the session,
+    /// and with it the grid, until the child is reaped, up to the hangup
+    /// grace period and more after it; nothing reads the grid of a closed
+    /// pane, so it need not wait that long. Not part of `stop()`: an ended
+    /// session's pane still shows its history, and a rebuild stops one too.
+    /// As a waiter, so a reader holding the lock lets it in.
+    public func releaseContents() {
+        registerStateWaiter {
+            state.withLock {
+                let grid = $0.terminal.grid
+                $0.terminal.grid = Grid(rows: grid.rows, columns: grid.columns, scrollbackLimit: 0)
+            }
+        }
+    }
+
     /// `stop()` has been called; it may still be readable, but takes no input.
     public var isStopped: Bool { stopped.withLock { $0 } }
 

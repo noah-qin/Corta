@@ -312,6 +312,9 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
         frameLoop.detach()
         terminalView?.stopRendering()
         session?.stop()
+        // The pane is gone; its history need not live on with the reader
+        // while the child is given its grace period (`SECURITY.md` §4.4).
+        session?.releaseContents()
         removeBootstrapFolder()
     }
 
