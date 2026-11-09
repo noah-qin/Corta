@@ -405,8 +405,33 @@ final class SplitViewController: NSViewController {
     }
 
     private func updateStatusBarLayout() {
+        let delta = statusBarHeight - (statusBarHeightConstraint?.constant ?? 0)
         statusBarHeightConstraint?.constant = statusBarHeight
         updateWindowMinSize()
+        // The window grows or gives back the bar's height, so the panes keep
+        // theirs: no grid resize, no redraw of what a program has on screen,
+        // no canvas flashing at a new size. Only the tab in front moves the
+        // window; where it cannot move (full screen, or no room on the
+        // screen), the panes make the room as before.
+        if delta != 0, let window = view.window, window.terminalSplit === self,
+           !window.styleMask.contains(.fullScreen), let screen = window.screen {
+            var frame = window.frame
+            frame.size.height += delta
+            frame.origin.y -= delta
+            let visible = screen.visibleFrame
+            if frame.minY < visible.minY { frame.origin.y = visible.minY }
+            if frame.maxY <= visible.maxY, frame.height <= visible.height {
+                window.setFrame(frame, display: true)
+                return
+            }
+        }
+        // A tab behind is laid out with the window, after the tab in front
+        // has moved it: laying it out now would shrink its panes only for
+        // the window to give them their height back.
+        guard view.window == nil || view.window?.terminalSplit === self else {
+            view.needsLayout = true
+            return
+        }
         view.layoutSubtreeIfNeeded()
         for pane in panes { pane.resizeSessionToFitView(); pane.invalidateDisplay() }
     }
