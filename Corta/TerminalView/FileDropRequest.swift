@@ -62,6 +62,9 @@ final class FileDropRequest {
         }
     }
 
+    /// How long a drop waits for its staging folder.
+    static let directoryTimeout: DispatchTimeInterval = .seconds(2)
+
     /// Snapshot types only. Promise takes precedence *per item*, so a lazy
     /// public.file-url on the same item is never called as a second export.
     static func start(
@@ -81,7 +84,19 @@ final class FileDropRequest {
         // A directory is created only for promises; direct file URLs remain
         // the user's originals and are never chmod'd or removed.
         let directory: URL?
-        do { directory = promised > 0 ? try FileDropStorage.makeDirectory() : nil } catch { return nil }
+        if promised > 0 {
+            // Off the main thread, waited for at most `directoryTimeout`: the
+            // state folder can sit on a volume that stopped answering, and
+            // AppKit needs the destination before this returns. One that
+            // comes back late is removed; this drop reports failure.
+            let made = PathProbe.answer(timeout: directoryTimeout, abandoned: { late in
+                if case .success(let directory) = late { FileDropStorage.remove(directory) }
+            }) { Swift.Result { try FileDropStorage.makeDirectory() } }
+            guard case .success(let created) = made else { return nil }
+            directory = created
+        } else {
+            directory = nil
+        }
         let request = FileDropRequest(count: supported.count, directory: directory, completion: completion)
         request.queue.isSuspended = true
         var receiverIndex = 0
