@@ -353,6 +353,18 @@ struct AskpassWordingTests {
         #expect(!SSHAskpass.refusalEndsConnection(kind: .confirm, prompt: "Allow use of key?"))
     }
 
+    @Test("the host-key and notice dialogs say where the question came from")
+    func hostKeyDialogNamesItsSource() {
+        for question in [SSHAskpass.Question.hostKey, .notify] {
+            let direct = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
+                question: question, host: "box", prompt: "fingerprint (yes/no)?"))
+            #expect(direct.informativeText.contains(L10n.text("askpass.source")))
+            let step = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
+                question: question, host: "box", prompt: "fingerprint", isIntermediateStep: true))
+            #expect(step.informativeText.contains(L10n.format("askpass.source.intermediate", "box")))
+        }
+    }
+
     /// What the dialog does is what the broker decided, never read back out
     /// of the text it shows.
     @Test("Cancel's wording follows the broker's decision, not the prompt")
