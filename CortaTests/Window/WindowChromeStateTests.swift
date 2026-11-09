@@ -51,4 +51,22 @@ struct WindowChromeStateTests {
         controller.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification))
         #expect(controller.secureInputIndicator?.isHidden == true)
     }
+
+    /// The chrome measured in full screen was compared with the windowed
+    /// chrome after it, and the difference grew the window on every exit.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aFullScreenTransitionOwesTheWindowNoHeight() throws {
+        let controller = makeWindow()
+        defer { close(controller) }
+        let window = try #require(controller.window)
+        let split = try #require(controller.selectedTab?.split)
+        let frame = window.frame
+        controller.windowWillExitFullScreen(Notification(name: NSWindow.willExitFullScreenNotification))
+        #expect(split.isChangingFullScreen)
+        split.absorbChromeChange()
+        controller.windowDidExitFullScreen(Notification(name: NSWindow.didExitFullScreenNotification))
+        #expect(!split.isChangingFullScreen)
+        split.absorbChromeChange()
+        #expect(window.frame == frame)
+    }
 }

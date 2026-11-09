@@ -67,6 +67,9 @@ final class SplitViewController: NSViewController {
     /// The chrome height at the last layout, for absorbing a change — the
     /// toolbar shown or hidden — into the frame.
     private var lastChromeHeight: CGFloat?
+    /// Between a full-screen transition's will and did: the chrome changes
+    /// through it, and none of that is owed to the window's height.
+    var isChangingFullScreen = false
     /// Whether this split is what its window shows.
     var isSelectedTab: Bool { tab?.isSelected ?? true }
 
@@ -296,6 +299,15 @@ final class SplitViewController: NSViewController {
         absorbChromeChange()
     }
 
+    /// Takes the window's chrome as it is now as the baseline, owing nothing:
+    /// after a full-screen transition, whose chrome is not the windowed
+    /// one's. Measured during full screen and compared after it, the
+    /// difference grew the window on every exit.
+    func resetChromeBaseline() {
+        guard let window = view.window, didSetUpWindow else { return }
+        lastChromeHeight = window.frame.height - window.contentLayoutRect.height
+    }
+
     /// A tab bar appearing or disappearing changes the chrome height; AppKit
     /// would shrink the content area and cost every pane rows. Absorb the
     /// delta into the frame instead (the window grows downward).
@@ -312,7 +324,7 @@ final class SplitViewController: NSViewController {
         // Recorded before `setFrame`, which lays out reentrantly and would
         // otherwise absorb the same delta twice.
         lastChromeHeight = chrome
-        guard let last, chrome != last else { return }
+        guard !isChangingFullScreen, let last, chrome != last else { return }
         growWindow(by: chrome - last, needsRoom: false)
     }
 

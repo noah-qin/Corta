@@ -474,12 +474,44 @@ extension TerminalWindowController {
         updateSecureInputIndicator()
     }
 
+    func windowWillEnterFullScreen(_ notification: Notification) {
+        beginFullScreenTransition()
+    }
+
+    func windowWillExitFullScreen(_ notification: Notification) {
+        beginFullScreenTransition()
+    }
+
     func windowDidEnterFullScreen(_ notification: Notification) {
+        endFullScreenTransition()
         splitController?.updateDirectPresentation()
     }
 
     func windowDidExitFullScreen(_ notification: Notification) {
+        endFullScreenTransition()
         splitController?.updateDirectPresentation()
+    }
+
+    func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+        endFullScreenTransition()
+    }
+
+    func windowDidFailToExitFullScreen(_ window: NSWindow) {
+        endFullScreenTransition()
+    }
+
+    /// The chrome changes through a full-screen transition, not with a tab
+    /// bar: none of it is owed to the window's height. Every tab, since the
+    /// one shown may change before it ends.
+    private func beginFullScreenTransition() {
+        for tab in tabs { tab.split.isChangingFullScreen = true }
+    }
+
+    private func endFullScreenTransition() {
+        for tab in tabs {
+            tab.split.isChangingFullScreen = false
+            tab.split.resetChromeBaseline()
+        }
     }
 
     /// Asks as a sheet, so the answer comes after this returns: refuse now,
