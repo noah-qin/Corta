@@ -1179,7 +1179,12 @@ extension TerminalPaneViewController {
         view.window?.makeFirstResponder(terminalView)
         resizeSessionToFitView(coalesce: false)
         invalidateDisplay()
-        if strictRespawn && showsReconnectNotice {
+        if let notice = pendingSessionNotice {
+            // `viewDidAppear` shows a first spawn's fallback; a rebuild's
+            // view appears without one.
+            pendingSessionNotice = nil
+            terminalView.showToast(notice, kind: .warning)
+        } else if strictRespawn && showsReconnectNotice {
             // Every time: a new connection; the old scrollback is gone.
             terminalView.showToast(remote.reconnectNotice)
         }

@@ -147,6 +147,21 @@ struct SessionLifecycleTests {
         #expect(pane.session !== session)
     }
 
+    /// The fallback notice was shown only from `viewDidAppear`, which a
+    /// rebuilt pane's view never sees again: Try Again fell back silently.
+    @Test("a rebuild that falls back says so, as a first spawn does")
+    func aRebuildThatFallsBackShowsTheNotice() throws {
+        var preset = Preset(name: "missing-directory")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", "exec /bin/cat"]
+        preset.directory = "/corta-test-missing-\(UUID().uuidString)"
+        let pane = makePane(preset: preset)
+        defer { pane.teardown() }
+        pane.rebuildPane(strictRespawn: false)
+        #expect(pane.isOperable)
+        #expect(pane.terminalView?.toastLayer != nil)
+    }
+
     /// A resize waiting out the debounce, or an output callback in flight,
     /// must find a closed pane's generation retired.
     @Test("closing a pane retires its frame-loop generation")
