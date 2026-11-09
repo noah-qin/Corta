@@ -530,12 +530,18 @@ extension TerminalSession {
             state.withLock {
                 switch command {
                 case .clearScreen: $0.terminal.clearScreen()
-                case .clearHistory: $0.terminal.grid.clearScrollback()
+                case .clearHistory: $0.terminal.grid.clearAllHistory()
                 case .reset: $0.terminal.reset()
                 }
                 reportImageBytes($0.terminal)
             }
         }
+    }
+
+    /// The history lines Clear History and Reset discard, the parked main
+    /// screen's included, without copying the grid.
+    public func clearableHistoryLineCount() -> Int {
+        registerStateWaiter { state.withLock { $0.terminal.grid.clearableHistoryLineCount } }
     }
 
     /// `stop()` has been called; it may still be readable, but takes no input.

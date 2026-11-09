@@ -364,7 +364,9 @@ extension PaneCommands {
     ) {
         guard let host, host.isOperable, ConfigurationStore.shared.configuration.confirmClose
         else { return proceed() }
-        let lines = host.session.snapshot().scrollback.count
+        // The parked main screen's history too: Clear History and Reset on
+        // the alternate screen discard it.
+        let lines = host.session.clearableHistoryLineCount()
         guard lines > 0 else { return proceed() }
         let alert = NSAlert()
         alert.alertStyle = .warning
