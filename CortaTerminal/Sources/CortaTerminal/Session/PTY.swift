@@ -296,6 +296,13 @@ extension PTY {
         return group > 0 ? group : nil
     }
 
+    /// The terminal's foreground group is the child's own — the shell is
+    /// waiting at its prompt, not a job it started. Read from the kernel, so
+    /// no output can forge it, unlike the OSC 133 state. False when unknown.
+    public var isChildInForeground: Bool {
+        foregroundProcessGroup == processIdentifier
+    }
+
     public var hasForegroundJob: Bool {
         guard let group = foregroundProcessGroup else { return false }
         return group != processIdentifier

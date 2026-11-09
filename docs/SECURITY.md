@@ -166,7 +166,11 @@ The quoting walks Unicode scalars, not Swift `Character`s. A shell reads
 bytes, and `'` or `\` followed by a combining mark or a joiner is one
 grapheme cluster that compares unequal to `"'"`; matched by `Character`, the
 quote was written raw and closed the quoted run. The app-typed `cd` of Go to
-Parent Directory and Go to Project Root uses the same quoting.
+Parent Directory and Go to Project Root uses the same quoting. It is typed,
+with its Return, only at a ready prompt: OSC 133 must say so, nothing may be
+typed or queued, and — since output can forge any OSC 133 state — the
+terminal's foreground process group, which only the kernel sets, must be the
+shell's own rather than a job it started.
 
 Drop hover negotiation inspects advertised types only, never file URLs or
 contents. A drop starts exactly one representation per item (promise before

@@ -245,6 +245,20 @@ struct PasteDeliveryTests {
         #expect(!host.commands.canChangeDirectorySafely)
         host.commands.cancelPasteScan()
     }
+
+    /// A job's output can print the marks of a ready prompt; it cannot make
+    /// itself not the foreground job.
+    @Test("prompt marks forged by a running job do not open the gate")
+    func forgedPromptMarksFromAJobAreRefused() async throws {
+        let job = #"printf '\033]133;A\007$ \033]133;B\007'; sleep 60"#
+        let (host, session) = try live(script: "set -m; /bin/sh -c \"\(job)\"")
+        defer { session.stop() }
+        host.isOperable = true
+        await settle { session.hasShellIntegration && session.promptEndPosition != nil }
+        #expect(session.hasShellIntegration)
+        #expect(!session.pty.isChildInForeground)
+        #expect(!host.commands.canChangeDirectorySafely)
+    }
 }
 
 /// The byte-level scan against the regular-expression path it replaced, which
