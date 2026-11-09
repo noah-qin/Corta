@@ -56,12 +56,21 @@ public enum Search {
         compileRegex(pattern, caseSensitive: caseSensitive) != nil
     }
 
-    /// Unbounded repetition of a group that repeats or alternates (`(a+)+`,
-    /// `(a|a)+`). A conservative early rejection; progress callbacks also
-    /// enforce cancellation and the time budget for shapes this check misses.
-    /// Conservative: `(\w+\s*)+` is refused
-    /// too — every such pattern has a linear form (`[\w\s]+`) — and a refusal is
-    /// reported as too slow, not as a typo.
+    /// Unbounded repetition of a group whose iterations can split the same
+    /// text more than one way — the shapes that backtrack exponentially. Two
+    /// are refused:
+    ///
+    /// - an unbounded repeat inside the group that nothing required in the
+    ///   iteration separates from the next one: `(a+)+`, `(.*)*`,
+    ///   `(\w+\s?)+`. `(\d+\.)+` passes: each iteration must end on a `.`,
+    ///   which `\d+` cannot take.
+    /// - alternatives that can start on the same character, or match nothing:
+    ///   `(a|a)+`, `(a|ab)+`. `(a|b)+` and `(foo|bar)*` pass.
+    ///
+    /// Conservative where it cannot tell (`.`, a negated class, a
+    /// backreference count as any character), and an early rejection only:
+    /// progress callbacks still enforce cancellation and the time budget for
+    /// shapes it misses. A refusal is reported as too slow, not as a typo.
     public static func isCatastrophic(_ pattern: String) -> Bool {
         let characters = Array(pattern)
         var index = 0
@@ -77,7 +86,7 @@ public enum Search {
                 index += 1
                 continue
             }
-            if bodyCanBacktrack(body) { return true }
+            if RepeatShape.isAmbiguous(body) { return true }
             index = quantified
         }
         return false
@@ -139,34 +148,6 @@ public enum Search {
             index += 1
         }
         return index
-    }
-
-    private static func bodyCanBacktrack(_ body: [Character]) -> Bool {
-        var index = 0
-        while index < body.count {
-            let character = body[index]
-            if character == "\\" {
-                index += 2
-                continue
-            }
-            if character == "[" {
-                index += 1
-                while index < body.count, body[index] != "]" {
-                    index += body[index] == "\\" ? 2 : 1
-                }
-                index += 1
-                continue
-            }
-            if character == "|" { return true }
-            if character == "*" || character == "+" { return true }
-            if character == "{", let brace = body[index...].firstIndex(of: "}") {
-                if String(body[(index + 1)..<brace]).hasSuffix(",") { return true }
-                index = brace + 1
-                continue
-            }
-            index += 1
-        }
-        return false
     }
 
     private static func compileRegex(_ pattern: String, caseSensitive: Bool)

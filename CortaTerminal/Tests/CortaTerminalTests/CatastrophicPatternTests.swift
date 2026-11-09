@@ -30,7 +30,8 @@ import Testing
     func exponentialShapesRefused() {
         for pattern in [
             "(a+)+b", "(a*)*b", "(a|a)+b", "(a+|b)*c", "([a-z]+)+", "(\\d+)+",
-            "(x(y+))+", "(a{2,})+",
+            "(a{2,})+", "(a+)+", "(a|a)+", "(a|ab)+", "(.*)*", "(\\w+\\s?)+", "(\\w+\\s*)+",
+            "(a|)+", "([a-z]+[0-9]*)+", "((a+)b?)+", "(\\d+|\\w+)+", "(A|a)+",
         ] {
             #expect(Search.isCatastrophic(pattern), "\(pattern) should be refused")
         }
@@ -44,9 +45,27 @@ import Testing
             "error", "error \\d+", "^\\s*fatal", "TODO|FIXME", "[a-z]+@[a-z]+",
             "(abc)+", "(?:abc)+", "(a{2})+", "(a|b)", "foo.*bar$", "\\(a+\\)+",
             "warning: .*\\.swift:\\d+", "[(]a+[)]+",
+            "(a|b)+", "(\\d+\\.)+\\d+", "(foo|bar)*", "(x(y+))+", "(\\w+\\s)+", "(a+b|c)+",
+            "([0-9]+,)*[0-9]+", "(?:ab|cd)+", "(\\w+@)+",
         ] {
             #expect(!Search.isCatastrophic(pattern), "\(pattern) should be allowed")
         }
+    }
+
+    /// What the check lets through must really be linear: each allowed
+    /// shape, against the input that would blow up its ambiguous cousin.
+    @Test("allowed repeated groups finish on adversarial lines", arguments: [
+        ("(\\d+\\.)+\\d+x", String(repeating: "1.", count: 90) + "1"),
+        ("(a|b)+c", String(repeating: "ab", count: 90)),
+        ("(x(y+))+z", String(repeating: "xyy", count: 60)),
+        ("(\\w+\\s)+!", String(repeating: "word ", count: 36)),
+    ])
+    func allowedShapesStayLinear(pattern: String, line: String) {
+        #expect(!Search.isCatastrophic(pattern))
+        var terminal = Terminal(rows: 4, columns: 200, scrollbackLimit: 10)
+        terminal.feed(Array(line.utf8))
+        let result = Search.findRegex(pattern, in: terminal.grid, timeBudget: .seconds(2))
+        #expect(!result.timedOut, "\(pattern) ran out of time")
     }
 
     /// A refused pattern never reaches the engine, so the sweep returns at
