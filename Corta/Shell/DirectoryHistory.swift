@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Foundation
+import Synchronization
 
 /// Ranks directories the shell actually visited, for the directory
 /// switcher. Built only from OSC 7 reports, already host-filtered
@@ -152,7 +153,9 @@ struct DirectoryHistory: Equatable {
 /// per command was too much. `flush()` writes what's pending at quit.
 @MainActor
 final class DirectoryHistoryStore {
-    static let shared = DirectoryHistoryStore(fileURL: DirectoryHistoryStore.defaultFileURL)
+    /// Read in the background: the first visit, or the first window, no
+    /// longer waits on the file (`loadsInBackground`).
+    static let shared = DirectoryHistoryStore(fileURL: DirectoryHistoryStore.defaultFileURL, loadsInBackground: true)
 
     private(set) var history = DirectoryHistory()
     /// Injected so tests use a temporary file.
@@ -187,19 +190,65 @@ final class DirectoryHistoryStore {
         AppPaths.applicationSupportDirectory.appendingPathComponent("directory-history.json")
     }
 
+    /// The file's contents, read on `writeQueue` while `loadsInBackground`
+    /// has not delivered them yet.
+    private var pendingLoad: PendingLoad<LoadOutcome>?
+    /// Visits recorded before the file was read, replayed onto it: neither
+    /// lost nor saved over a file not yet seen.
+    private var recordedBeforeLoad: [(path: String, date: Date)] = []
+    var isLoaded: Bool { pendingLoad == nil }
+
+    /// `loadsInBackground`: read and decoded on `writeQueue`, and applied on
+    /// the main actor when done — or at once by whatever needs it first
+    /// (`clear`, `flush`). Unset, read here, as tests rely on.
     init(
         fileURL: URL, saveDelay: TimeInterval = DirectoryHistoryStore.defaultSaveDelay,
-        writeQueue: DispatchQueue = DispatchQueue(label: "Corta.DirectoryHistoryStore", qos: .utility)
+        writeQueue: DispatchQueue = DispatchQueue(label: "Corta.DirectoryHistoryStore", qos: .utility),
+        loadsInBackground: Bool = false
     ) {
         self.fileURL = fileURL
         self.saveDelay = saveDelay
         self.writeQueue = writeQueue
-        load()
+        guard loadsInBackground else {
+            apply(Self.read(fileURL))
+            return
+        }
+        let pending = PendingLoad<LoadOutcome>()
+        pendingLoad = pending
+        writeQueue.async { [weak self] in
+            pending.deliver(Self.read(fileURL))
+            Task { @MainActor [weak self] in self?.applyPendingLoad() }
+        }
+    }
+
+    /// The background read's answer, once; no-op when there is none yet
+    /// or it was already applied.
+    private func applyPendingLoad() {
+        guard let pending = pendingLoad, let outcome = pending.take() else { return }
+        pendingLoad = nil
+        apply(outcome)
+        for visit in recordedBeforeLoad { history.record(visit.path, at: visit.date) }
+        let owed = !recordedBeforeLoad.isEmpty
+        recordedBeforeLoad.removeAll()
+        if owed { scheduleSave() }
+    }
+
+    /// Waits for the background read, at most until `deadline`, and applies it.
+    private func finishLoading(until deadline: DispatchTime) {
+        guard let pending = pendingLoad else { return }
+        pending.wait(until: deadline)
+        applyPendingLoad()
     }
 
     /// Records and schedules a save; a no-op when the setting is off.
     func record(_ path: String) {
         guard ConfigurationStore.shared.configuration.directoryHistory else { return }
+        guard isLoaded else {
+            let now = Date()
+            history.record(path, at: now)
+            recordedBeforeLoad.append((path, now))
+            return
+        }
         history.record(path)
         if isClearing {
             clearing?.history.record(path)
@@ -210,6 +259,10 @@ final class DirectoryHistoryStore {
 
     /// Removes the history and its file, after any in-flight write.
     func clear() async {
+        if !isLoaded {
+            await withCheckedContinuation { continuation in writeQueue.async { continuation.resume() } }
+            applyPendingLoad()
+        }
         guard !preservesNewerFile, !preservesUnreadableFile, !isClearing else { return }
         let deletion = HistoryFileDeletion(fileURL, on: writeQueue)
         clearing = Clearing(deletion: deletion, wasPending: pendingSave != nil)
@@ -246,6 +299,7 @@ final class DirectoryHistoryStore {
     /// when it is written, so a quit can wait for every store at once
     /// under one deadline.
     func flush(into group: DispatchGroup, deadline: DispatchTime) {
+        finishLoading(until: deadline)
         if let deletion = clearing?.deletion {
             deletion.wait(until: deadline)
             finishClear(deletion)
@@ -280,48 +334,63 @@ final class DirectoryHistoryStore {
         var entries: [DirectoryHistory.Entry]
     }
 
-    private struct VersionProbe: Decodable {
+    private nonisolated struct VersionProbe: Decodable {
         var version: Int
     }
 
-    private func load() {
+    /// What reading the file found; read anywhere, applied on the main actor.
+    enum LoadOutcome: Sendable {
+        case nothing
+        case unreadable(any Error)
+        case newer
+        case entries([DirectoryHistory.Entry])
+    }
+
+    nonisolated static func read(_ fileURL: URL) -> LoadOutcome {
         let data: Data
         do {
-            guard let loaded = try PrivateFile.readBounded(fileURL) else { return }
+            guard let loaded = try PrivateFile.readBounded(fileURL) else { return .nothing }
             data = loaded
         } catch {
-            preservesUnreadableFile = true
-            persistenceError = error
-            return
+            return .unreadable(error)
         }
         // The version alone first: a newer version is usually a new shape,
         // which the full decode below would fail and then overwrite.
         if let version = try? JSONDecoder().decode(VersionProbe.self, from: data).version,
             version > Persisted.currentVersion
         {
-            preservesNewerFile = true
-            return
+            return .newer
         }
         if let persisted = try? JSONDecoder().decode(Persisted.self, from: data) {
             // An unknown newer version loads nothing rather than guess, and
             // is not overwritten: this build's save would replace it with
             // what little this run records.
-            guard persisted.version <= Persisted.currentVersion else {
-                preservesNewerFile = true
-                return
-            }
-            history = DirectoryHistory(entries: persisted.entries)
-            return
+            guard persisted.version <= Persisted.currentVersion else { return .newer }
+            return .entries(persisted.entries)
         }
         // Files from before the wrapper are a bare array.
         guard let entries = try? JSONDecoder().decode([DirectoryHistory.Entry].self, from: data)
-        else { return }
-        history = DirectoryHistory(entries: entries)
+        else { return .nothing }
+        return .entries(entries)
+    }
+
+    private func apply(_ outcome: LoadOutcome) {
+        switch outcome {
+        case .nothing:
+            history = DirectoryHistory()
+        case .unreadable(let error):
+            preservesUnreadableFile = true
+            persistenceError = error
+        case .newer:
+            preservesNewerFile = true
+        case .entries(let entries):
+            history = DirectoryHistory(entries: entries)
+        }
     }
 
     /// Snapshots on the main actor; encodes and writes on `writeQueue`.
     private func save(reportSuccess: Bool = true) {
-        guard !preservesNewerFile, !preservesUnreadableFile else { return }
+        guard isLoaded, !preservesNewerFile, !preservesUnreadableFile else { return }
         let persisted = Persisted(
             version: Persisted.currentVersion, entries: Array(history.entries.values))
         let fileURL = fileURL
@@ -341,5 +410,30 @@ final class DirectoryHistoryStore {
                 }
             }
         }
+    }
+}
+
+/// A background read's answer, handed to the main actor once.
+nonisolated final class PendingLoad<Outcome: Sendable>: Sendable {
+    private let state = Mutex<(outcome: Outcome?, taken: Bool)>((nil, false))
+    private let delivered = DispatchSemaphore(value: 0)
+
+    func deliver(_ outcome: Outcome) {
+        state.withLock { $0.outcome = outcome }
+        delivered.signal()
+    }
+
+    /// The answer, the first time it is asked for after it came.
+    func take() -> Outcome? {
+        state.withLock { state in
+            guard !state.taken, let outcome = state.outcome else { return nil }
+            state.taken = true
+            return outcome
+        }
+    }
+
+    func wait(until deadline: DispatchTime) {
+        if state.withLock({ $0.outcome != nil }) { return }
+        if delivered.wait(timeout: deadline) == .success { delivered.signal() }
     }
 }

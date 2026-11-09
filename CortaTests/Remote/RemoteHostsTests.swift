@@ -130,6 +130,25 @@ struct RecentHostsStoreTests {
         #expect(RecentHostsStore(fileURL: url).targets == store.targets, "read back after a relaunch")
     }
 
+    @Test("a connection recorded before a background load is merged with the file")
+    func connectionBeforeBackgroundLoadIsMerged() throws {
+        let url = temporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let first = RecentHostsStore(fileURL: url)
+        first.record(try target("on-disk"))
+        first.flush()
+        let queue = DispatchQueue(label: "test.recent-hosts")
+        queue.suspend()
+        let store = RecentHostsStore(fileURL: url, writeQueue: queue, loadsInBackground: true)
+        #expect(!store.isLoaded)
+        store.record(try target("before-load"))
+        queue.resume()
+        store.flush()
+        #expect(store.isLoaded)
+        #expect(store.targets.map(\.displayName) == ["before-load", "on-disk"])
+        #expect(RecentHostsStore(fileURL: url).targets.map(\.displayName) == ["before-load", "on-disk"])
+    }
+
     /// A quit waits for every store under one deadline: each one's flush
     /// queues its write and joins the group instead of waiting alone.
     @Test("a quit's flush joins a shared group and is written by the time it is left")
