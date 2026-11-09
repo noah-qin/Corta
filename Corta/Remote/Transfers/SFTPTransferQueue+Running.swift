@@ -132,16 +132,20 @@ extension SFTPTransferQueue {
         id: UUID, receipt: SFTPTransferEngine.DirectoryTransferReceipt, isUpload: Bool
     ) {
         jobs[id] = nil
+        // Already whole at the destination (Resume, or a retry's own earlier
+        // files) is done, not a problem to report.
+        let present = receipt.skipped.filter { $0.reason == .alreadyPresent }.count
+        let problems = receipt.skipped.filter { $0.reason != .alreadyPresent }
         if let index = transfers.firstIndex(where: { $0.id == id }) {
-            transfers[index].filesCompleted = receipt.filesTransferred
-            transfers[index].filesTotal = receipt.filesTransferred
+            transfers[index].filesCompleted = receipt.filesTransferred + present
+            transfers[index].filesTotal = receipt.filesTransferred + present
         }
         setState(id, .done(bytes: receipt.bytesTransferred))
-        if !receipt.skipped.isEmpty {
+        if !problems.isEmpty {
             onListingError?(
                 L10n.format(
-                    "sftp.directory.skipped", receipt.skipped.count,
-                    receipt.skipped.prefix(3).map { SFTPBrowserModel.peerText($0.relativePath, limit: 256) }
+                    "sftp.directory.skipped", problems.count,
+                    problems.prefix(3).map { SFTPBrowserModel.peerText($0.relativePath, limit: 256) }
                         .joined(separator: ", ")))
         }
         if isUpload { onUploadFinished?() }

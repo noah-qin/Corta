@@ -80,6 +80,9 @@ extension SFTPTransferEngine {
             case symbolicLink
             case notARegularFile
             case unsafeName
+            /// Resume: already whole at the destination, with no partial
+            /// to continue — left as it is, never replaced.
+            case alreadyPresent
         }
 
         public struct Skipped: Equatable, Sendable {
@@ -151,8 +154,13 @@ extension SFTPTransferEngine {
         }
 
         try await transferFiles(of: plan, into: &receipt, progress: progress) { file, fileProgress throws(SFTPError) in
-            try Self.rejectLocalSymlinkComponents(
-                localDirectory.appendingPathComponent(file.relativePath), within: localDirectory)
+            let destination = localDirectory.appendingPathComponent(file.relativePath)
+            try Self.rejectLocalSymlinkComponents(destination, within: localDirectory)
+            if case .resume = policy, Self.localExists(destination.path),
+                !Self.localExists(Self.partialPath(for: destination.path))
+            {
+                return nil
+            }
             return try await download(
                 remotePath: Self.join(remotePath, file.relativePath),
                 to: localDirectory.appendingPathComponent(file.relativePath),
@@ -189,6 +197,8 @@ extension SFTPTransferEngine {
     }
 
     /// Directory-level consent does not identify existing per-file partials.
+    /// Resume never reaches a file already whole there: the transfer skips
+    /// it before asking (`SkipReason.alreadyPresent`).
     /// Recheck at each file, after preflight, so later collisions also fail.
     private static func directoryFilePolicy(_ policy: ConflictPolicy) -> ConflictPolicy {
         .decide { conflict in
@@ -224,21 +234,33 @@ extension SFTPTransferEngine {
         }
 
         try await transferFiles(of: plan, into: &receipt, progress: progress) { file, fileProgress throws(SFTPError) in
-            try await upload(
+            let destination = Self.join(remotePath, file.relativePath)
+            if case .resume = policy, (try? await lstat(path: destination)) != nil,
+                (try? await lstat(path: Self.partialPath(for: destination))) == nil
+            {
+                return nil
+            }
+            return try await upload(
                 from: localDirectory.appendingPathComponent(file.relativePath),
-                to: Self.join(remotePath, file.relativePath),
+                to: destination,
                 policy: policy, partialDisposition: .automatic, progress: fileProgress)
         }
         return receipt
     }
 
+    private static func localExists(_ path: String) -> Bool {
+        var info = Darwin.stat()
+        return Darwin.lstat(path, &info) == 0
+    }
+
     /// Moves `plan`'s files one at a time with `transfer`, reporting the
     /// directory's progress before each file, through each file's own
-    /// progress, and once at the end.
+    /// progress, and once at the end. A nil receipt is a file left as it was
+    /// (`SkipReason.alreadyPresent`).
     private func transferFiles(
         of plan: TreePlan, into receipt: inout DirectoryTransferReceipt,
         progress: DirectoryProgressHandler?,
-        transfer: (TreePlan.PlannedFile, ProgressHandler?) async throws(SFTPError) -> SFTPTransferReceipt
+        transfer: (TreePlan.PlannedFile, ProgressHandler?) async throws(SFTPError) -> SFTPTransferReceipt?
     ) async throws(SFTPError) {
         var completedBytes: UInt64 = 0
         for (index, file) in plan.files.enumerated() {
@@ -248,7 +270,7 @@ extension SFTPTransferEngine {
                 DirectoryTransferProgress(
                     filesCompleted: index, filesTotal: plan.files.count,
                     completedBytes: completedSoFar, totalBytes: plan.totalBytes))
-            let fileReceipt = try await transfer(
+            let transferred = try await transfer(
                 file,
                 progress.map { handler in
                     { @Sendable fileProgress in
@@ -259,6 +281,10 @@ extension SFTPTransferEngine {
                                 totalBytes: plan.totalBytes))
                     }
                 })
+            guard let fileReceipt = transferred else {
+                receipt.skipped.append(.init(relativePath: file.relativePath, reason: .alreadyPresent))
+                continue
+            }
             completedBytes += fileReceipt.bytesTransferred
             receipt.filesTransferred += 1
             receipt.bytesTransferred += fileReceipt.bytesTransferred

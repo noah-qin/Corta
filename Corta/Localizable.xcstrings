@@ -22777,55 +22777,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A folder with this name already exists here. Overwrite replaces files that exist in both; Resume continues interrupted files; Keep Both uses a new folder name; Skip transfers nothing."
+            "value": "A folder with this name already exists here. Overwrite replaces files that exist in both; Resume continues interrupted files and leaves files already there untouched; Keep Both uses a new folder name; Skip transfers nothing."
           }
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "translated",
-            "value": "此处已有同名文件夹。“覆盖”会替换两边都有的文件；“继续传输”会继续被中断的文件；“保留两者”使用新的文件夹名；“跳过”则不传输任何内容。"
+            "state": "needs_review",
+            "value": "此处已有同名文件夹。“覆盖”会替换两边都有的文件；“继续传输”会续传被中断的文件，并跳过已存在的文件；“保留两者”使用新的文件夹名；“跳过”则不传输任何内容。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "此處已有同名資料夾。覆寫會取代兩邊都有的檔案；續傳會繼續被中斷的檔案；保留兩者使用新資料夾名稱；略過則不傳輸任何內容。"
+            "value": "此處已有同名資料夾。覆寫會取代兩邊都有的檔案；續傳會繼續被中斷的檔案，並略過已存在的檔案；保留兩者使用新資料夾名稱；略過則不傳輸任何內容。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "同名のフォルダが既にここにあります。上書きは両方にあるファイルを置き換え、再開は中断したファイルを続け、両方を保持は新しいフォルダ名を使い、スキップは何も転送しません。"
+            "value": "同名のフォルダが既にここにあります。上書きは両方にあるファイルを置き換え、再開は中断したファイルを続けて既にあるファイルはそのままにし、両方を保持は新しいフォルダ名を使い、スキップは何も転送しません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "같은 이름의 폴더가 이미 있습니다. 덮어쓰기는 양쪽에 있는 파일을 교체하고, 재개는 중단된 파일을 이어가고, 둘 다 유지는 새 폴더 이름을 쓰고, 건너뛰기는 아무것도 전송하지 않습니다."
+            "value": "같은 이름의 폴더가 이미 있습니다. 덮어쓰기는 양쪽에 있는 파일을 교체하고, 재개는 중단된 파일을 이어가며 이미 있는 파일은 그대로 두고, 둘 다 유지는 새 폴더 이름을 쓰고, 건너뛰기는 아무것도 전송하지 않습니다."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Ein Ordner mit diesem Namen existiert hier bereits. Überschreiben ersetzt Dateien, die auf beiden Seiten vorhanden sind; Fortsetzen setzt unterbrochene Dateien fort; Beide behalten verwendet einen neuen Ordnernamen; Überspringen überträgt nichts."
+            "value": "Ein Ordner mit diesem Namen existiert hier bereits. Überschreiben ersetzt Dateien, die auf beiden Seiten vorhanden sind; Fortsetzen setzt unterbrochene Dateien fort und lässt bereits vorhandene unverändert; Beide behalten verwendet einen neuen Ordnernamen; Überspringen überträgt nichts."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Un dossier de ce nom existe déjà ici. Remplacer écrase les fichiers présents des deux côtés ; Reprendre poursuit les fichiers interrompus ; Conserver les deux utilise un nouveau nom de dossier ; Ignorer ne transfère rien."
+            "value": "Un dossier de ce nom existe déjà ici. Remplacer écrase les fichiers présents des deux côtés ; Reprendre poursuit les fichiers interrompus et laisse intacts ceux déjà présents ; Conserver les deux utilise un nouveau nom de dossier ; Ignorer ne transfère rien."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Ya existe aquí una carpeta con este nombre. Sobrescribir reemplaza los archivos presentes en ambos lados; Reanudar continúa los archivos interrumpidos; Conservar ambos usa un nombre de carpeta nuevo; Omitir no transfiere nada."
+            "value": "Ya existe aquí una carpeta con este nombre. Sobrescribir reemplaza los archivos presentes en ambos lados; Reanudar continúa los archivos interrumpidos y deja intactos los que ya están; Conservar ambos usa un nombre de carpeta nuevo; Omitir no transfiere nada."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Já existe aqui uma pasta com este nome. Substituir troca os arquivos presentes em ambos os lados; Retomar continua os arquivos interrompidos; Manter ambos usa um novo nome de pasta; Ignorar não transfere nada."
+            "value": "Já existe aqui uma pasta com este nome. Substituir troca os arquivos presentes em ambos os lados; Retomar continua os arquivos interrompidos e deixa intactos os que já existem; Manter ambos usa um novo nome de pasta; Ignorar não transfere nada."
           }
         }
       }
