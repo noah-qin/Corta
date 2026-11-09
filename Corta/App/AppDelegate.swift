@@ -322,8 +322,11 @@ extension AppDelegate {
     private func finishInitialRestore(_ decision: SessionRestore.RestoreDecision?, store: SessionRestore) {
         switch decision {
         case nil:
+            // Unknown, not empty: saving now could write a fresh window over
+            // an arrangement nobody could read. Held until the file answers.
             layoutPersistenceSuspended = true
             openFreshInitialWindow()
+            rereadRestoreDecision(store: store, attempt: 1)
         case .skipAfterFailure:
             layoutPersistenceSuspended = true
             let controller = openFreshInitialWindow()
@@ -359,6 +362,78 @@ extension AppDelegate {
                         if !self.restoreWindows(states) { self.openWindow(workingDirectory: nil) }
                         self.layoutWrites.async { store.endRestore() }
                         self.finishOpeningInitialWindows()
+                    }
+                }
+            }
+        }
+    }
+
+    /// What a launch whose saved arrangement could not be read does once
+    /// a later read answers.
+    enum LayoutPersistenceResumption: Equatable {
+        /// Still unknown: ask again later.
+        case retry
+        /// No arrangement on disk: this launch's may be written.
+        case resume
+        /// An arrangement this launch did not open: set aside, as a failed
+        /// restore's is, before this launch's is written in its place.
+        case setAsideThenResume
+    }
+
+    static func layoutPersistenceResumption(
+        after decision: SessionRestore.RestoreDecision?
+    ) -> LayoutPersistenceResumption {
+        switch decision {
+        case nil: .retry
+        case .nothingToRestore: .resume
+        case .restore, .skipAfterFailure: .setAsideThenResume
+        }
+    }
+
+    /// Reads attempted after a launch read nothing, before saving stays off
+    /// for the rest of the run.
+    static let restoreDecisionRereads = 6
+    static let restoreDecisionRereadDelay: TimeInterval = 10
+
+    /// The arrangement could not be read at launch (a mount that stopped
+    /// answering, a file the read refused): saving stayed off for the whole
+    /// run. It is read again, a few times, off the main thread; once its
+    /// state is known saving resumes.
+    private func rereadRestoreDecision(store: SessionRestore, attempt: Int) {
+        guard attempt <= Self.restoreDecisionRereads else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.restoreDecisionRereadDelay) { [weak self] in
+            guard self != nil else { return }
+            PathProbe.run { [weak self] in
+                let decision = PathProbe.answer(timeout: SessionRestore.directoryCheckTimeout) {
+                    try? store.readRestoreDecision()
+                } ?? nil
+                Task { @MainActor [weak self] in
+                    self?.resumeLayoutPersistence(after: decision, store: store, attempt: attempt)
+                }
+            }
+        }
+    }
+
+    private func resumeLayoutPersistence(
+        after decision: SessionRestore.RestoreDecision?, store: SessionRestore, attempt: Int
+    ) {
+        guard layoutPersistenceSuspended else { return }
+        switch Self.layoutPersistenceResumption(after: decision) {
+        case .retry:
+            rereadRestoreDecision(store: store, attempt: attempt + 1)
+        case .resume:
+            layoutPersistenceSuspended = false
+            noteLayoutChanged()
+        case .setAsideThenResume:
+            layoutWrites.async { [weak self] in
+                let archived = (try? store.setAsideFailedRestore()) != nil
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if archived {
+                        self.layoutPersistenceSuspended = false
+                        self.noteLayoutChanged()
+                    } else {
+                        self.rereadRestoreDecision(store: store, attempt: attempt + 1)
                     }
                 }
             }

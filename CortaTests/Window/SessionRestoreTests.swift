@@ -40,6 +40,36 @@ struct SessionRestoreTests {
         #expect(!FileManager.default.fileExists(atPath: store.fileURL.path))
     }
 
+    @Test("turning restore off removes a leftover mid-restore marker")
+    func clearRemovesTheMarker() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SessionRestore(directory: root)
+        store.beginRestore()
+        store.clear()
+        #expect(!store.previousRestoreFailed)
+    }
+
+    @Test("a state file that is a link is not followed, and is not written over")
+    func newerStateCheckDoesNotFollowLinks() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SessionRestore(directory: root)
+        try PrivateFile.createDirectory(at: root)
+        let target = root.appendingPathComponent("elsewhere.json")
+        try Data("[]".utf8).write(to: target)
+        try FileManager.default.createSymbolicLink(at: store.fileURL, withDestinationURL: target)
+        #expect(store.holdsNewerState())
+    }
+
+    @Test("a launch that could not read the arrangement resumes saving only once its state is known")
+    @MainActor func layoutPersistenceResumesOnceKnown() {
+        #expect(AppDelegate.layoutPersistenceResumption(after: nil) == .retry)
+        #expect(AppDelegate.layoutPersistenceResumption(after: .nothingToRestore) == .resume)
+        #expect(AppDelegate.layoutPersistenceResumption(after: .restore([])) == .setAsideThenResume)
+        #expect(AppDelegate.layoutPersistenceResumption(after: .skipAfterFailure) == .setAsideThenResume)
+    }
+
     @Test("a pane directory that exists locally is kept")
     func existingDirectoryIsKept() {
         let layout = PaneLayout.pane(directory: "/tmp")

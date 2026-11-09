@@ -151,7 +151,8 @@ nonisolated enum PrivateFile {
     /// older build or a restored backup stays as it came until the next save.
     /// Hardening, not a boundary: `~/Library` already keeps other accounts out.
     /// Nothing is followed: a link here is no file of Corta's.
-    static func read(_ url: URL) throws -> Data {
+    /// Larger than `maximumBytes` is `EFBIG`, unread.
+    static func read(_ url: URL, maximumBytes: Int = .max) throws -> Data {
         let descriptor = open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
         guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
@@ -159,14 +160,18 @@ nonisolated enum PrivateFile {
         guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
             throw POSIXError(.EINVAL)
         }
+        guard info.st_size <= maximumBytes else { throw POSIXError(.EFBIG) }
         _ = makeOwnerOnly(descriptor: descriptor)
-        return try handle.readToEnd() ?? Data()
+        guard maximumBytes < .max else { return try handle.readToEnd() ?? Data() }
+        let data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
+        guard data.count <= maximumBytes else { throw POSIXError(.EFBIG) }
+        return data
     }
 
     /// A missing file is a normal empty store. An unanswered or unreadable
     /// file is different: the caller must not replace its unseen contents.
-    static func readBounded(_ url: URL) throws -> Data? {
-        guard let result = PathProbe.answer(timeout: .seconds(1), { Result { try read(url) } }) else {
+    static func readBounded(_ url: URL, maximumBytes: Int = .max) throws -> Data? {
+        guard let result = PathProbe.answer(timeout: .seconds(1), { Result { try read(url, maximumBytes: maximumBytes) } }) else {
             throw POSIXError(.ETIMEDOUT)
         }
         do {
