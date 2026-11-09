@@ -48,8 +48,9 @@ nonisolated enum FileDropStorage {
     private static let removals = DispatchGroup()
 
     static func makeDirectory(in root: URL = root) throws -> URL {
-        try FileManager.default.createDirectory(at: root.deletingLastPathComponent(),
-            withIntermediateDirectories: true)
+        // Owner-only: on a first drop this creates Corta's whole
+        // Application Support folder, which then listed to anyone.
+        try PrivateFile.createDirectory(at: root.deletingLastPathComponent())
         // A staged launch may use /tmp or another symlinked parent. Give
         // providers the canonical parent, while still refusing a symlink at
         // the private root itself.

@@ -125,10 +125,22 @@ nonisolated enum AppPaths {
     /// its rename (`PrivateFile.replace`). Off the main thread, at launch.
     nonisolated static func removeAbandonedStateFiles() {
         let support = applicationSupportDirectory
+        makeOwnerOnly(directory: support)
         for directory in [support, support.appendingPathComponent("RemoteEdit", isDirectory: true)] {
             PrivateFile.removeAbandonedTemporaries(in: directory, olderThan: abandonedStateFileAge)
         }
         ExportStaging.removeAbandoned()
+    }
+
+    /// An older build created the state folder at the default umask (0755),
+    /// which lists what it holds to other accounts. Tightened to 0700 when it
+    /// is a real directory this user owns; a link is left alone.
+    nonisolated static func makeOwnerOnly(directory: URL) {
+        var info = stat()
+        guard lstat(directory.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+            info.st_uid == getuid(), info.st_mode & 0o077 != 0
+        else { return }
+        chmod(directory.path, 0o700)
     }
 
     /// Past any save in progress, in this Corta or another using the same stage.
