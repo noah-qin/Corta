@@ -146,8 +146,13 @@ extension SplitViewController {
         alert.buttons.first?.hasDestructiveAction = true
         alert.buttons.first?.keyEquivalent = ""
         alert.buttons.last?.keyEquivalent = "\r"
+        alert.window.identifier = Self.closeConfirmationIdentifier
         return alert
     }
+
+    /// The "still running" alert's window, so a quit can tell that a close
+    /// is already being asked about.
+    static let closeConfirmationIdentifier = NSUserInterfaceItemIdentifier("dev.noahqin.Corta.closeConfirmation")
 }
 
 extension SplitViewController {

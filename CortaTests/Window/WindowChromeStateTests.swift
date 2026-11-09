@@ -69,4 +69,32 @@ struct WindowChromeStateTests {
         split.absorbChromeChange()
         #expect(window.frame == frame)
     }
+
+    @Test("a quit while a window asks about closing finds that window")
+    func aQuitFindsTheWindowAlreadyAskingToClose() async throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let other = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        other.isReleasedWhenClosed = false
+        defer {
+            window.close()
+            other.close()
+        }
+        #expect(AppDelegate.windowAskingToClose(among: [other, window]) == nil)
+        let sheet = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        sheet.identifier = SplitViewController.closeConfirmationIdentifier
+        window.beginSheet(sheet, completionHandler: nil)
+        defer { window.endSheet(sheet) }
+        let deadline = SuspendingClock.now + .seconds(5 * Double(testTimeoutScale))
+        while window.attachedSheet == nil, SuspendingClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(AppDelegate.windowAskingToClose(among: [other, window]) === window)
+    }
 }

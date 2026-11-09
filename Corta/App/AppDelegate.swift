@@ -511,6 +511,15 @@ extension AppDelegate {
         else { return .terminateNow }
         // Already asking: that sheet answers this quit too.
         guard !isAskingToTerminate else { return .terminateCancel }
+        // A window is already asking whether to close what runs in it: a
+        // second, app-wide question on top would ask the same thing twice.
+        // Its sheet comes forward and answers first.
+        if let asking = Self.windowAskingToClose(among: windowControllers.compactMap(\.window)) {
+            NSApp.activate()
+            asking.makeKeyAndOrderFront(nil)
+            asking.attachedSheet?.makeKeyAndOrderFront(nil)
+            return .terminateCancel
+        }
         // Only terminal windows with room to present a confirmation sheet.
         let windows = windowControllers.compactMap { controller -> NSWindow? in
             guard let terminal = controller as? TerminalWindowController
@@ -529,6 +538,11 @@ extension AppDelegate {
             NSApp.reply(toApplicationShouldTerminate: $0)
         }
         return .terminateLater
+    }
+
+    /// The first of `windows` showing a close confirmation as a sheet.
+    static func windowAskingToClose(among windows: [NSWindow]) -> NSWindow? {
+        windows.first { $0.attachedSheet?.identifier == SplitViewController.closeConfirmationIdentifier }
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
