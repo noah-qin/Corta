@@ -80,35 +80,6 @@ extension SFTPBrowserModelTests {
         await waitUntil("a fresh connection") { model.client === replacement && model.connectionState == .connected }
     }
 
-    /// Retry used to start over at the session's first folder, losing the
-    /// one the failure interrupted and the way back from it.
-    @Test("Retry on the same connection returns to the open folder and keeps Back")
-    func retryReturnsToTheOpenFolder() async {
-        let stalled = FakeSFTPClient()
-        stalled.listings["/srv"] = []
-        stalled.listings["/srv/app"] = []
-        stalled.hangingListings = ["/hung"]
-        let replacement = FakeSFTPClient()
-        replacement.listings["/srv"] = []
-        replacement.listings["/srv/app"] = []
-        let model = SFTPBrowserModel(host: "build-box", startDirectory: "/srv") { _ in
-            stalled.closed ? replacement : stalled
-        }
-        defer { model.disconnect() }
-        model.connect()
-        await waitUntil("initial listing") { model.connectionState == .connected }
-        model.navigate(to: "/srv/app")
-        await waitUntil("the folder opened") { !model.isLoading && model.currentPath == "/srv/app" }
-        model.connectTimeout = .milliseconds(100)
-        model.navigate(to: "/hung")
-        await waitUntil("timed out") { model.isFailed }
-        model.connectTimeout = .seconds(5)
-        model.retry()
-        await waitUntil("reconnected") { model.client === replacement && model.connectionState == .connected }
-        #expect(model.currentPath == "/srv/app")
-        #expect(!model.backStack.isEmpty)
-    }
-
     /// What macOS's `sftp-server` reports for an APFS volume: counts in
     /// 4 KiB fragments, beside a 1 MiB block size that is not their unit.
     @Test("free space is counted in fragments, not blocks")

@@ -130,8 +130,14 @@ extension SFTPBrowserModel {
     ) async throws -> FirstListing {
         if let resumePath {
             armConnectDeadline(client: client, host: name, generation: generation)
-            if let listing = try? await client.listDirectory(path: resumePath) {
+            do {
+                let listing = try await client.listDirectory(path: resumePath)
                 return FirstListing(path: resumePath, listing: listing, resumed: true)
+            } catch {
+                // Only the server saying no — gone, or no longer allowed —
+                // means start somewhere else; a broken connection fails the
+                // retry as any other connection failure does.
+                guard case .server = Self.sftpError(error) else { throw error }
             }
         }
         let path: String
