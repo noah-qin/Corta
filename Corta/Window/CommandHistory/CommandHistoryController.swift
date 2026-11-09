@@ -53,6 +53,12 @@ final class CommandHistoryController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) { refreshTask?.cancel() }
 
+    /// Uncovered: what the paused polling missed, at once.
+    func windowDidChangeOcclusionState(_ notification: Notification) {
+        guard window?.occlusionState.contains(.visible) == true, refreshTask != nil else { return }
+        model.refresh()
+    }
+
     func show(for pane: TerminalPaneViewController) {
         model.pane = pane
         refreshTask?.cancel()
@@ -60,6 +66,9 @@ final class CommandHistoryController: NSWindowController, NSWindowDelegate {
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(1)) } catch { return }
                 guard let self, self.window?.isVisible == true else { return }
+                // Covered by another window, nobody sees the list: its
+                // occlusion change refreshes it the moment it shows.
+                guard self.window?.occlusionState.contains(.visible) == true else { continue }
                 self.model.refresh()
             }
         }
