@@ -56,6 +56,23 @@ struct WindowTabsTests {
         #expect(strip.tabView(at: 1)?.frame.maxX == 300, "too many to fit: they share the row")
     }
 
+    /// A tab behind the selected one wrote its own cell size into the
+    /// window's resize increments.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aBackgroundTabLeavesTheWindowIncrementsAlone() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        let first = try #require(controller.selectedTab)
+        let second = controller.addTab()
+        controller.container.releaseHeld(animated: false)
+        controller.selectTab(first)
+        let window = try #require(controller.window)
+        let increments = window.contentResizeIncrements
+        let hidden = try #require(second.split.focusedPane)
+        hidden.setFontSize(hidden.fontSize + 6)
+        #expect(window.contentResizeIncrements == increments)
+    }
+
     @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
     func addingSelectingAndClosingTabs() throws {
         let controller = try makeWindow()
