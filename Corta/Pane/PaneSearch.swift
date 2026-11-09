@@ -95,6 +95,18 @@ final class PaneSearch: NSObject {
     var caseSensitive = false
     var regex = false
     var keyMonitor: Any?
+    /// What the current match's rect was last found from, and the rect: the
+    /// bar is placed on every output batch, and the rect needs the grid.
+    var matchRectKey: MatchRectKey?
+    var matchRect: CGRect?
+
+    struct MatchRectKey: Equatable {
+        var index: Int
+        var matchesTotalPushed: Int
+        var matchesGeneration: Int
+        var scrollOffset: Int
+        var cursor: CGRect?
+    }
 
     init(host: PaneSearchHost? = nil) {
         self.host = host
@@ -385,7 +397,7 @@ extension PaneSearch {
     /// `needsRefresh`, which `applyResults` honours; otherwise
     /// the last output could leave results stale once the grid goes quiet.
     func scheduleBackgroundRefresh() {
-        guard bar != nil, let searchField = field, let grid = host?.snapshot() else { return }
+        guard bar != nil, let searchField = field else { return }
         guard task == nil else {
             needsRefresh = true
             return
@@ -406,6 +418,9 @@ extension PaneSearch {
                 return
             }
         }
+        // Taken only for a sweep that will run: an output batch that merely
+        // marks one owed, or waits out the pacing, needs no grid.
+        guard let grid = host?.snapshot() else { return }
         generation &+= 1
         let generation = self.generation
         let query = searchField.stringValue

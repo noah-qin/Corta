@@ -54,10 +54,25 @@ extension PaneSearch {
             distanceFromTop: bounds.height - Self.bottomMargin - size.height)
 
         var obstacles: [CGRect] = []
-        if host.scrollOffset == 0, let cursor = terminalView.cursorRectProvider?() {
+        let cursor = host.scrollOffset == 0 ? terminalView.cursorRectProvider?() : nil
+        if let cursor {
             obstacles.append(terminalView.convert(cursor, to: view))
         }
-        if let match = currentMatchRect(in: terminalView, host: host) {
+        // Found again only when the match, the viewport or the cursor moved:
+        // output that moves none of them leaves the rect where it was.
+        if let index = currentMatchIndex {
+            let key = MatchRectKey(
+                index: index, matchesTotalPushed: matchesTotalPushed, matchesGeneration: generation,
+                scrollOffset: host.scrollOffset, cursor: cursor)
+            if key != matchRectKey {
+                matchRectKey = key
+                matchRect = currentMatchRect(in: terminalView, host: host)
+            }
+        } else {
+            matchRectKey = nil
+            matchRect = nil
+        }
+        if let match = matchRect {
             obstacles.append(terminalView.convert(match, to: view))
         }
         func isClear(_ frame: CGRect) -> Bool {

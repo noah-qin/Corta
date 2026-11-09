@@ -36,7 +36,11 @@ final class SearchTestHost: PaneSearchHost {
     /// Owned here, as a pane owns its search; the search holds its host weakly.
     private(set) lazy var search = PaneSearch(host: self)
 
-    func snapshot() -> Grid? { terminal.grid }
+    private(set) var snapshots = 0
+    func snapshot() -> Grid? {
+        snapshots += 1
+        return terminal.grid
+    }
     func selectedTextForFind() async -> String? { selection?.split(separator: "\n").first.map(String.init) }
     func invalidateDisplay() { redraws += 1 }
 
@@ -134,6 +138,23 @@ struct PaneSearchTests {
         #expect(await waitUpTo(5) { !host.search.matches.isEmpty })
         #expect(host.search.task == nil)
         #expect(host.redraws > 0)
+    }
+
+    /// Output with a sweep already running only marks another owed; taking
+    /// the grid for it copied the grid's references for nothing.
+    @Test("output during a sweep marks a refresh owed without taking the grid")
+    func refreshOwedTakesNoSnapshot() async throws {
+        let host = makeHost()
+        defer { host.search.close() }
+        host.search.show()
+        let field = try #require(host.search.field)
+        field.stringValue = "P04MARKER"
+        host.search.updateResults(scrollsToMatch: true)
+        #expect(host.search.task != nil)
+        let before = host.snapshots
+        host.search.scheduleBackgroundRefresh()
+        #expect(host.snapshots == before)
+        #expect(host.search.needsRefresh)
     }
 
     /// Clear, reset, a reflow or a new session: the matches named rows that
