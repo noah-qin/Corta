@@ -46,4 +46,27 @@ struct SystemStatusBarTests {
             #expect(!refreshes(bar, on: name), "still observing \(name.rawValue) after stop")
         }
     }
+
+    @Test("a normal thermal state says nothing; a serious one is coloured")
+    func thermalShowsOnlyWhenItMatters() {
+        var metrics = SystemMetrics()
+        metrics.thermal = .nominal
+        #expect(SystemStatusFormat.compact(.thermal, metrics: metrics) == nil)
+        metrics.thermal = .serious
+        #expect(SystemStatusFormat.compact(.thermal, metrics: metrics)?.warning == .systemOrange)
+    }
+
+    @Test("a value gaining digits leaves the columns after it where they were")
+    func columnsHoldTheirPlace() {
+        func stops(cpu: Double) -> [CGFloat] {
+            var metrics = SystemMetrics()
+            metrics.cpuPercent = cpu
+            metrics.memoryUsed = 1 << 30
+            let line = SystemStatusFormat.compactLine([.cpu, .load, .memory, .disk], metrics: metrics)
+            let style = line.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+            return style?.tabStops.map(\.location) ?? []
+        }
+        #expect(stops(cpu: 3).count == 4)
+        #expect(stops(cpu: 3) == stops(cpu: 100))
+    }
 }

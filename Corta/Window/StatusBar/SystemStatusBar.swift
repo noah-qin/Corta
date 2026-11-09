@@ -18,7 +18,7 @@ import AppKit
 import SwiftUI
 
 final class SystemStatusBar: NSView {
-    static let height: CGFloat = 24
+    static let height: CGFloat = 20
     private let client = UUID()
     private let button = NSButton(title: "", target: nil, action: nil)
     private var popover: NSPopover?
@@ -32,7 +32,6 @@ final class SystemStatusBar: NSView {
         super.init(frame: frame)
         wantsLayer = true
         button.isBordered = false
-        button.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
         button.alignment = .left
         button.lineBreakMode = .byTruncatingTail
         button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -43,9 +42,11 @@ final class SystemStatusBar: NSView {
         button.toolTip = L10n.text("status.help")
         button.translatesAutoresizingMaskIntoConstraints = false
         addSubview(button)
+        // In line with the terminal's text above it, not the window's edge.
+        let inset = PaneSurfaceView.margin + TerminalLayout.insets.left
         NSLayoutConstraint.activate([
-            button.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            button.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            button.leadingAnchor.constraint(equalTo: leadingAnchor, constant: inset),
+            button.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -inset),
             button.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
         // Resolve the singleton before observing its first-load notification;
@@ -55,15 +56,18 @@ final class SystemStatusBar: NSView {
             NotificationCenter.default.addObserver(self, selector: #selector(changed), name: name, object: nil)
         }
     }
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        NSColor.separatorColor.setFill()
-        NSRect(x: 0, y: bounds.maxY - 1, width: bounds.width, height: 1).fill()
-    }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     isolated deinit { NotificationCenter.default.removeObserver(self) }
 
     override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); refresh() }
+    /// The columns spread over the bar's width, so a resize lays them out again.
+    private var laidOutWidth: CGFloat = 0
+    override func layout() {
+        super.layout()
+        guard button.bounds.width != laidOutWidth else { return }
+        laidOutWidth = button.bounds.width
+        refresh()
+    }
     @objc private func changed() { refresh() }
 
     func stop() {
@@ -81,15 +85,18 @@ final class SystemStatusBar: NSView {
         let config = ConfigurationStore.shared.configuration
         let wasHidden = isHidden
         isHidden = !config.statusBar
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        // The window's own ground, the colour the pane cards sit on, with
+        // no rule of its own: the bar is the window's bottom margin, not a
+        // panel. Light or dark follows the canvas, as the tab strip does.
+        let canvas = PaneSurfaceView.canvasColor
+        let light = canvas.redComponent + canvas.greenComponent + canvas.blueComponent > 1.5
+        let name: NSAppearance.Name = light ? .aqua : .darkAqua
+        if appearance?.name != name { appearance = NSAppearance(named: name) }
+        layer?.backgroundColor = PaneSurfaceView.gutterColor.cgColor
         let metrics = SystemMetricsStore.shared.snapshot
-        var compact = [L10n.text("status.local")]
-        var full = [L10n.text("status.local")]
-        for item in SystemMetrics.Item.allCases where config.statusItems.contains(item) {
-            compact.append(SystemStatusFormat.compactText(item, metrics: metrics))
-            full.append(SystemStatusFormat.text(item, metrics: metrics))
-        }
-        button.title = compact.joined(separator: " · ")
+        let items = SystemMetrics.Item.allCases.filter { config.statusItems.contains($0) }
+        let full = [L10n.text("status.local")] + items.map { SystemStatusFormat.text($0, metrics: metrics) }
+        button.attributedTitle = SystemStatusFormat.compactLine(items, metrics: metrics, width: button.bounds.width)
         let accessible = full.joined(separator: " · ")
         button.setAccessibilityValue(accessible)
         button.toolTip = accessible + "\n" + L10n.text("status.help")
@@ -138,27 +145,157 @@ enum SystemStatusFormat {
         let units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"]
         var index = 0
         while amount >= 1024 && index < units.count - 1 { amount /= 1024; index += 1 }
-        return amount.formatted(.number.precision(.fractionLength(0...1)).grouping(.never)) + units[index]
+        return amount.formatted(.number.precision(.fractionLength(0...1)).grouping(.never)) + " " + units[index]
     }
-    static func compactText(_ item: SystemMetrics.Item, metrics: SystemMetrics) -> String {
-        let value: String
+
+    /// One metric as the bar shows it: a quiet label, its value, and a
+    /// colour when the value is a warning. Nil when there is nothing to
+    /// say: a thermal state that is normal is not news.
+    struct Compact: Equatable {
+        var label: String
+        var value: String
+        /// The widest value this metric is expected to show, so the metrics
+        /// after it keep their place as its digits come and go.
+        var template: String
+        var warning: NSColor?
+        /// How full, from 0 to 1, for a metric drawn with a meter.
+        var fraction: Double?
+    }
+
+    static func compact(_ item: SystemMetrics.Item, metrics: SystemMetrics) -> Compact? {
+        let label = L10n.text("status.short.\(item.rawValue)")
+        func rate(_ value: Double?) -> String {
+            guard let value, value.isFinite else { return "—" }
+            return compactBytes(Int64(min(Double(Int64.max - 1024), max(0, value)))) + "/s"
+        }
         switch item {
         case .cpu:
-            value = metrics.cpuPercent.map { ($0 / 100).formatted(.percent.precision(.fractionLength(0))) } ?? "—"
+            let value = metrics.cpuPercent.map { ($0 / 100).formatted(.percent.precision(.fractionLength(0))) }
+            return Compact(label: label, value: value ?? "—", template: "100%",
+                           fraction: metrics.cpuPercent.map { $0 / 100 })
         case .load:
-            value = metrics.load.map { $0.formatted(.number.precision(.fractionLength(2))) }.joined(separator: "/")
+            // The one-minute figure; all three are in the details.
+            let value = metrics.load.first.map { $0.formatted(.number.precision(.fractionLength(2))) }
+            return Compact(label: label, value: value ?? "—", template: "00.00")
         case .memory:
-            value = compactBytes(metrics.memoryUsed.map(Int64.init)) + "/" + compactBytes(Int64(metrics.memoryTotal))
+            let total = compactBytes(Int64(metrics.memoryTotal))
+            let fraction = metrics.memoryUsed.map { Double($0) / Double(max(1, metrics.memoryTotal)) }
+            return Compact(label: label, value: compactBytes(metrics.memoryUsed.map(Int64.init)) + " / " + total,
+                           template: "00.0 GB / " + total, fraction: fraction)
         case .network:
-            func rate(_ value: Double?) -> String {
-                guard let value, value.isFinite else { return "—" }
-                return compactBytes(Int64(min(Double(Int64.max - 1024), max(0, value)))) + "/s"
+            // The arrows say what it is; the interface is in the details.
+            return Compact(label: "", value: "↓ \(rate(metrics.downloadRate))  ↑ \(rate(metrics.uploadRate))",
+                           template: "↓ 00.0 KB/s  ↑ 00.0 KB/s")
+        case .disk:
+            return Compact(label: label, value: compactBytes(metrics.diskAvailable), template: "000.0 GB")
+        case .thermal:
+            guard let state = metrics.thermal, state != .nominal else { return nil }
+            let warning: NSColor? = switch state {
+            case .serious: .systemOrange
+            case .critical: .systemRed
+            default: nil
             }
-            value = "\(metrics.networkInterface ?? "—") ↓\(rate(metrics.downloadRate)) ↑\(rate(metrics.uploadRate))"
-        case .disk: value = compactBytes(metrics.diskAvailable)
-        case .thermal: value = thermal(metrics.thermal)
+            return Compact(label: label, value: thermal(state), template: "", warning: warning)
         }
-        return L10n.text("status.short.\(item.rawValue)") + " " + (value.isEmpty ? "—" : value)
+    }
+
+    /// The bar's line: Local, then each metric in a column of its own
+    /// width, so a value that gains a digit does not push the rest along.
+    /// With no width yet, the columns sit at the narrowest gap.
+    static func compactLine(_ items: [SystemMetrics.Item], metrics: SystemMetrics,
+                            width: CGFloat = 0) -> NSAttributedString {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        let labelAttributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.tertiaryLabelColor]
+        let valueAttributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.secondaryLabelColor]
+        let space = NSAttributedString(string: " ", attributes: valueAttributes)
+        let line = NSMutableAttributedString()
+        if let host = NSImage(systemSymbolName: "laptopcomputer", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 11, weight: .regular)
+                .applying(.init(paletteColors: [.secondaryLabelColor]))) {
+            let attachment = NSTextAttachment()
+            attachment.image = host
+            attachment.bounds = NSRect(x: 0, y: (font.capHeight - host.size.height) / 2,
+                                       width: host.size.width, height: host.size.height)
+            line.append(NSAttributedString(attachment: attachment))
+            line.append(space)
+        }
+        line.append(NSAttributedString(string: L10n.text("status.local"), attributes: [
+            .font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.secondaryLabelColor,
+        ]))
+        var cells: [(text: NSAttributedString, width: CGFloat)] = []
+        for item in items {
+            guard let part = compact(item, metrics: metrics) else { continue }
+            let cell = NSMutableAttributedString()
+            if !part.label.isEmpty {
+                cell.append(NSAttributedString(string: part.label + " ", attributes: labelAttributes))
+            }
+            var meterWidth: CGFloat = 0
+            if let fraction = part.fraction {
+                let meter = meter(fraction, font: font)
+                cell.append(meter)
+                cell.append(space)
+                meterWidth = meter.size().width + space.size().width
+            }
+            var attributes = valueAttributes
+            if let warning = part.warning { attributes[.foregroundColor] = warning }
+            cell.append(NSAttributedString(string: part.value, attributes: attributes))
+            let prefix = part.label.isEmpty ? "" : part.label + " "
+            let template = NSAttributedString(string: prefix + part.template, attributes: valueAttributes)
+            cells.append((cell, max(template.size().width + meterWidth, cell.size().width)))
+        }
+        // One even gap between every column, Local included, so the line
+        // spans the bar whichever metrics are on: Local at the leading
+        // edge, the last metric flush with the trailing one, where the
+        // panes above end. Narrower than that, the gaps keep a minimum and
+        // the line is cut at its end. A few points in: the button's cell
+        // insets its text.
+        let minimumGap: CGFloat = 16
+        let used = line.size().width + cells.reduce(0) { $0 + $1.width }
+        let even = cells.isEmpty ? 0 : (width - 4 - used) / CGFloat(cells.count)
+        let gap = max(minimumGap, even)
+        var x = line.size().width
+        var stops: [NSTextTab] = []
+        for (index, cell) in cells.enumerated() {
+            x += gap
+            if index == cells.count - 1, even > minimumGap {
+                stops.append(NSTextTab(textAlignment: .right, location: (width - 4).rounded(.down)))
+            } else {
+                stops.append(NSTextTab(textAlignment: .left, location: x.rounded()))
+            }
+            x += cell.width
+            line.append(NSAttributedString(string: "\t", attributes: valueAttributes))
+            line.append(cell.text)
+        }
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.tabStops = stops
+        paragraph.lineBreakMode = .byTruncatingTail
+        line.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: line.length))
+        return line
+    }
+
+    /// A small capsule meter, filled to `fraction`: accent while there is
+    /// room, orange from three quarters, red from nine tenths. Drawn when
+    /// the bar draws, so its colours follow the bar's appearance.
+    static func meter(_ fraction: Double, font: NSFont) -> NSAttributedString {
+        let size = NSSize(width: 26, height: 5)
+        let level = min(1, max(0, fraction.isFinite ? fraction : 0))
+        let image = NSImage(size: size, flipped: false) { rect in
+            let track = NSBezierPath(roundedRect: rect, xRadius: rect.height / 2, yRadius: rect.height / 2)
+            NSColor.labelColor.withAlphaComponent(0.1).setFill()
+            track.fill()
+            guard level > 0 else { return true }
+            let width = max(rect.height, rect.width * level)
+            let fill = NSRect(x: rect.minX, y: rect.minY, width: width, height: rect.height)
+            let color: NSColor = level >= 0.9 ? .systemRed : level >= 0.75 ? .systemOrange : .controlAccentColor
+            color.setFill()
+            NSBezierPath(roundedRect: fill, xRadius: rect.height / 2, yRadius: rect.height / 2).fill()
+            return true
+        }
+        let attachment = NSTextAttachment()
+        attachment.image = image
+        attachment.bounds = NSRect(x: 0, y: ((font.capHeight - size.height) / 2).rounded(),
+                                   width: size.width, height: size.height)
+        return NSAttributedString(attachment: attachment)
     }
 
     static func text(_ item: SystemMetrics.Item, metrics: SystemMetrics) -> String {

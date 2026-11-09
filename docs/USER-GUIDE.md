@@ -305,9 +305,13 @@ so VPN traffic is not added to physical traffic. Enter a specific interface
 name in Settings to measure it instead. Sampling stops while every enabled
 bar is hidden. Thermal state is a four-level macOS report, not degrees.
 
-The bar uses compact labels, a single-space separator and short byte
-units; full names and precision are in its tooltip, its accessibility
-value and the host-details popover.
+The bar uses compact labels, one evenly spaced column per metric and
+short byte units. CPU and memory have a small meter that turns orange from
+75% and red from 90%; load is the one-minute figure, network shows only its two rates, and the
+thermal state appears only when it is not Normal (orange for Serious, red
+for Critical). Full names, all three load averages, the interface and
+precision are in its tooltip, its accessibility value and the
+host-details popover.
 
 ### Creating and editing themes
 
