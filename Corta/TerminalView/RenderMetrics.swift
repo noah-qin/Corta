@@ -166,11 +166,13 @@ nonisolated enum RenderMetrics {
         fileLock.withLock { _ in write(line, to: file) }
     }
 
-    private static func write(_ line: String, to file: URL) {
-        if !FileManager.default.fileExists(atPath: file.path) {
-            FileManager.default.createFile(atPath: file.path, contents: nil)
-        }
-        guard let handle = try? FileHandle(forWritingTo: file) else { return }
+    /// Owner-only and never through a link: the path is a fixed name in a
+    /// shared folder, where a link planted first would have taken the
+    /// measurements anywhere.
+    static func write(_ line: String, to file: URL) {
+        let descriptor = open(file.path, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        guard descriptor >= 0 else { return }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         defer { try? handle.close() }
         let bytes = Data(line.utf8)
         let maximumBytes: UInt64 = 16 * 1024 * 1024

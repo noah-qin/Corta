@@ -145,5 +145,20 @@ struct AppPathsTests {
         #expect(try mode(target) == 0o755)
     }
 
-
+    @Test("render metrics are written owner-only and never through a link")
+    func renderMetricsRefuseALink() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let file = root.appendingPathComponent("metrics.log")
+        RenderMetrics.write("one\n", to: file)
+        let mode = (try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int) ?? -1
+        #expect(mode == 0o600)
+        let planted = root.appendingPathComponent("planted.log")
+        let elsewhere = root.appendingPathComponent("elsewhere")
+        try Data().write(to: elsewhere)
+        try FileManager.default.createSymbolicLink(at: planted, withDestinationURL: elsewhere)
+        RenderMetrics.write("two\n", to: planted)
+        #expect(try Data(contentsOf: elsewhere).isEmpty)
+    }
 }
