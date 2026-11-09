@@ -148,7 +148,7 @@ final class ShellOverlayView: NSView {
         _ state: DirectoryCompletion, anchor: CGRect, font: NSFont, baseline: CGFloat, colors: HintColors
     ) {
         let row = candidateRow ?? DirectoryCandidateRowView()
-        let padding = DirectoryCandidateRowView.inset
+        let padding = DirectoryCandidateRowView.textInset(for: font)
         let margin = TerminalLayout.insets.left
         let availableWidth = max(0, bounds.width - margin - TerminalLayout.insets.right)
         row.frame.size = CGSize(width: availableWidth, height: anchor.height + 10)
@@ -249,19 +249,30 @@ private final class ShellGhostView: NSView {
     }
 }
 
-/// A compact capsule beside the input, over glass; its border distinguishes
-/// it from history.
+/// A compact capsule beside the input, over glass: a folder mark, then the
+/// candidate folders, the chosen one held in a soft chip of its own. Its
+/// hairline distinguishes it from a history suggestion.
 private final class DirectoryCandidateRowView: NSView {
     private var content = NSAttributedString(string: "")
     private var token = NSAttributedString(string: "…")
     private var visibleText = ""
+    /// Where the chosen folder is in `content`, for its chip.
+    private var selectedRange = NSRange(location: NSNotFound, length: 0)
+    private var font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
     var baseline: CGFloat = 12
     private var backdrop = CGColor(gray: 1, alpha: 1)
     private var border = CGColor(gray: 0, alpha: 0.2)
-    /// Text inset from each end, past the capsule's curve.
-    static let inset: CGFloat = 12
+    private var chip = CGColor(gray: 0, alpha: 0.08)
+    private var mark = CGColor(gray: 0, alpha: 0.5)
+    /// The folder mark's inset from the capsule's leading end, past its curve.
+    static let inset: CGFloat = 10
+    /// Room the chip takes either side of the chosen name.
+    static let chipPadding: CGFloat = 6
+    static func markSize(for font: NSFont) -> CGFloat { (font.pointSize * 0.9).rounded() }
+    /// Where the names start: past the folder mark and a gap.
+    static func textInset(for font: NSFont) -> CGFloat { inset + markSize(for: font) + 8 }
     var fittingWidth: CGFloat { ceil(CTLineGetTypographicBounds(
-        CTLineCreateWithAttributedString(content), nil, nil, nil)) + 2 * Self.inset }
+        CTLineCreateWithAttributedString(content), nil, nil, nil)) + Self.textInset(for: font) + 12 }
     override var isFlipped: Bool { true }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func isAccessibilityElement() -> Bool { true }
@@ -271,13 +282,16 @@ private final class DirectoryCandidateRowView: NSView {
     override func accessibilityIdentifier() -> String { "directory-completion-candidates" }
 
     fileprivate func update(state: DirectoryCompletion, font: NSFont, colors: ShellOverlayView.HintColors) {
-        let gap = "  "
+        self.font = font
+        let gap = "   "
         func width(_ text: String) -> CGFloat {
             (text as NSString).size(withAttributes: [.font: font]).width
         }
         backdrop = colors.backdrop
         border = colors.border
-        let available = max(0, bounds.width - 2 * Self.inset - width("…    …"))
+        chip = colors.selected.copy(alpha: 0.1) ?? colors.border
+        mark = colors.candidate
+        let available = max(0, bounds.width - Self.textInset(for: font) - 12 - width("…   +999"))
         var start = state.selectedIndex
         var end = start + 1
         var used = width(state.candidates[start])
@@ -295,17 +309,27 @@ private final class DirectoryCandidateRowView: NSView {
             end += 1
         }
         let muted: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.candidate]
-        let result = NSMutableAttributedString(string: start > 0 ? "…  " : "", attributes: muted)
+        let faint: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.muted]
+        let result = NSMutableAttributedString(string: start > 0 ? "…" + gap : "", attributes: faint)
+        selectedRange = NSRange(location: NSNotFound, length: 0)
         for index in start..<end {
             if index > start { result.append(NSAttributedString(string: gap, attributes: muted)) }
             var attributes = muted
+            if index == state.selectedIndex { attributes[.foregroundColor] = colors.selected }
+            // The trailing slash says "folder" once the mark has; it fades.
+            var name = state.candidates[index]
+            let slash = name.hasSuffix("/")
+            if slash { name.removeLast() }
+            let location = result.length
+            result.append(NSAttributedString(string: name, attributes: attributes))
+            if slash { result.append(NSAttributedString(string: "/", attributes: faint)) }
             if index == state.selectedIndex {
-                attributes[.foregroundColor] = colors.selected
-                attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+                selectedRange = NSRange(location: location, length: result.length - location)
             }
-            result.append(NSAttributedString(string: state.candidates[index], attributes: attributes))
         }
-        if end < state.candidates.count { result.append(NSAttributedString(string: "  …", attributes: muted)) }
+        // How many more there are, rather than a bare ellipsis.
+        let more = state.candidates.count - end
+        if more > 0 { result.append(NSAttributedString(string: gap + "+\(more)", attributes: faint)) }
         content = result
         // Truncation is not part of the selection, even beside it.
         token = NSAttributedString(string: "…", attributes: muted)
@@ -314,27 +338,55 @@ private final class DirectoryCandidateRowView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
-        let radius = (bounds.height - 1) / 2
-        let panel = CGPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
-            cornerWidth: radius, cornerHeight: radius, transform: nil)
+        let radius = bounds.height / 2
+        let panel = CGPath(roundedRect: bounds.insetBy(dx: 0.25, dy: 0.25),
+            cornerWidth: radius - 0.25, cornerHeight: radius - 0.25, transform: nil)
         context.addPath(panel)
         // The canvas colour, thinned so the glass beneath shows through
-        // while the theme's text keeps its contrast.
-        context.setFillColor(backdrop.copy(alpha: backdrop.alpha * 0.55) ?? backdrop)
-        context.setStrokeColor(border)
-        context.setLineWidth(1)
+        // while the theme's text keeps its contrast; a hairline, not a
+        // frame, so the capsule reads as one surface.
+        context.setFillColor(backdrop.copy(alpha: backdrop.alpha * 0.4) ?? backdrop)
+        context.setStrokeColor(border.copy(alpha: border.alpha * 0.5) ?? border)
+        context.setLineWidth(0.5)
         context.drawPath(using: .fillStroke)
+        drawMark(in: context)
+        let textX = Self.textInset(for: font)
         let full = CTLineCreateWithAttributedString(content)
         let ellipsis = CTLineCreateWithAttributedString(token)
-        let line =
-            CTLineCreateTruncatedLine(full, Double(max(0, bounds.width - 2 * Self.inset)), .end, ellipsis) ?? full
+        let room = max(0, bounds.width - textX - 12)
+        let line = CTLineCreateTruncatedLine(full, Double(room), .end, ellipsis) ?? full
+        if selectedRange.location != NSNotFound {
+            let start = CTLineGetOffsetForStringIndex(full, selectedRange.location, nil)
+            let end = CTLineGetOffsetForStringIndex(full, selectedRange.location + selectedRange.length, nil)
+            let rect = CGRect(x: textX + start - Self.chipPadding, y: 3,
+                              width: end - start + 2 * Self.chipPadding, height: bounds.height - 6)
+                .intersection(bounds.insetBy(dx: 3, dy: 0))
+            if !rect.isNull {
+                context.addPath(CGPath(roundedRect: rect, cornerWidth: rect.height / 2,
+                                       cornerHeight: rect.height / 2, transform: nil))
+                context.setFillColor(chip)
+                context.fillPath()
+            }
+        }
         context.saveGState()
-        context.clip(to: bounds.insetBy(dx: Self.inset, dy: 0))
-        context.translateBy(x: Self.inset, y: baseline)
+        context.clip(to: CGRect(x: textX, y: 0, width: room, height: bounds.height))
+        context.translateBy(x: textX, y: baseline)
         context.scaleBy(x: 1, y: -1)
         context.textMatrix = .identity
         context.textPosition = .zero
         CTLineDraw(line, context)
         context.restoreGState()
+    }
+
+    /// A folder outline in the candidates' colour, centred on the row.
+    private func drawMark(in context: CGContext) {
+        let size = Self.markSize(for: font)
+        guard let symbol = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: size * 0.8, weight: .regular)
+                .applying(.init(paletteColors: [NSColor(cgColor: mark) ?? .secondaryLabelColor]))) else { return }
+        let fitted = symbol.size
+        let rect = CGRect(x: Self.inset + (size - fitted.width) / 2, y: (bounds.height - fitted.height) / 2,
+                          width: fitted.width, height: fitted.height).integral
+        symbol.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
 }
