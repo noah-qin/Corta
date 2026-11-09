@@ -123,17 +123,18 @@ enum SSHAskpassPrompter {
         return window
     }
 
-    /// The browser window for `host` when there is one, else the window in
-    /// front.
-    private static func window(for host: String) -> NSWindow? {
-        if let browser = NSApp.windows.first(where: {
+    /// The browser window for `host` when there is one, else a terminal
+    /// window — the key one first — else nil, for a window of its own. Never
+    /// Settings, About or another of Corta's windows: a question about a
+    /// connection hung from one of those reads as coming from it.
+    static func window(for host: String, among windows: [NSWindow] = NSApp.windows) -> NSWindow? {
+        if let browser = windows.first(where: {
             $0.identifier?.rawValue == "Corta.SFTPBrowser" && $0.title == host && $0.isVisible
         }) {
             return browser
         }
-        return [NSApp.keyWindow, NSApp.mainWindow].compactMap { $0 }
-            .first { $0.isVisible && !($0 is NSPanel) }
-            ?? NSApp.windows.first { $0.isVisible && $0.windowController is TerminalWindowController }
+        let terminals = windows.filter { $0.isVisible && $0.windowController is TerminalWindowController }
+        return terminals.first(where: \.isKeyWindow) ?? terminals.first(where: \.isMainWindow) ?? terminals.first
     }
 
     /// The button that answers yes — the second for a host key, whose

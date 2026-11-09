@@ -365,6 +365,17 @@ struct AskpassWordingTests {
         }
     }
 
+    @Test("an askpass sheet hangs only from a terminal or the host's browser window")
+    func askpassNeverHangsFromSettings() {
+        let settings = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        settings.isReleasedWhenClosed = false
+        settings.orderFront(nil)
+        defer { settings.close() }
+        #expect(SSHAskpassPrompter.window(for: "box", among: [settings]) == nil)
+    }
+
     /// What the dialog does is what the broker decided, never read back out
     /// of the text it shows.
     @Test("Cancel's wording follows the broker's decision, not the prompt")

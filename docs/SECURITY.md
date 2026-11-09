@@ -589,8 +589,10 @@ A server reached directly can still word a keyboard-interactive prompt however i
 likes, and one at the far end of a jump is that destination's own question.
 
 A host-key dialog defaults to Cancel, whoever asks. In the background Corta
-bounces in the Dock rather than taking focus; with no window open, the question
-gets a window of its own. The answer is written to that socket and nowhere else
+bounces in the Dock rather than taking focus. The question hangs from the host's
+SFTP browser, else a terminal window (the key one first) — never Settings, About
+or another window that would seem to ask it — and with neither open it gets a
+window of its own. The answer is written to that socket and nowhere else
 — not stored, not logged — and the dialog closes, answering nothing, the moment
 the asking process or the connection's ssh goes away, or the window it hangs on
 closes. Whether a refusal ends the connection is decided once, by the broker,
