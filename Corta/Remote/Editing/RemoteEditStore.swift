@@ -71,11 +71,11 @@ final class RemoteEditStore {
     }()
     private static weak var activeShared: RemoteEditStore?
 
-    static func flushSharedAtQuit() {
+    /// The manifest writes already queued, left in `group` once written.
+    static func flushSharedAtQuit(into group: DispatchGroup) {
         guard let queue = activeShared?.manifestWrites else { return }
-        let drained = DispatchSemaphore(value: 0)
-        queue.async { drained.signal() }
-        _ = drained.wait(timeout: .now() + .seconds(1))
+        group.enter()
+        queue.async { group.leave() }
     }
 
     /// The store's root — injected so tests point at a temporary directory

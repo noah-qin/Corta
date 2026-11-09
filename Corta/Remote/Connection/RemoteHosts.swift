@@ -243,8 +243,8 @@ final class RecentHostsStore {
     }()
     private static weak var activeShared: RecentHostsStore?
 
-    static func flushSharedAtQuit() {
-        activeShared?.flush()
+    static func flushSharedAtQuit(into group: DispatchGroup, deadline: DispatchTime) {
+        activeShared?.flush(into: group, deadline: deadline)
     }
 
     static let limit = 8
@@ -352,14 +352,21 @@ final class RecentHostsStore {
 
     /// Finishes queued work within the quit deadline.
     func flush() {
+        let group = DispatchGroup()
         let deadline = DispatchTime.now() + .seconds(1)
+        flush(into: group, deadline: deadline)
+        _ = group.wait(timeout: deadline)
+    }
+
+    /// `flush` without its wait, for a quit that waits for every store at
+    /// once.
+    func flush(into group: DispatchGroup, deadline: DispatchTime) {
         if let deletion = clearing?.deletion {
             deletion.wait(until: deadline)
             finishClear(deletion)
         }
-        let drained = DispatchSemaphore(value: 0)
-        writeQueue.async { drained.signal() }
-        _ = drained.wait(timeout: deadline)
+        group.enter()
+        writeQueue.async { group.leave() }
     }
 
     /// Waits for writes already scheduled, without blocking the caller.

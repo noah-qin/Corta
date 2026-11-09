@@ -564,14 +564,6 @@ extension AppDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.layoutSaveDelay, execute: item)
     }
 
-    /// Writes a pending arrangement now, at quit.
-    private func flushLayoutSave() {
-        pendingLayoutSave?.cancel()
-        pendingLayoutSave = nil
-        let completion = DispatchGroup()
-        saveWindowStates(completion: completion)
-        _ = completion.wait(timeout: .now() + .seconds(1))
-    }
 
     /// Confirms ⌘Q with something running; quitting bypasses
     /// `windowShouldClose`. A sheet on the key terminal window (or the first
@@ -638,10 +630,16 @@ extension AppDelegate {
         stallTimer?.invalidate()
         stallTimer = nil
         isTerminating = true
-        flushLayoutSave()
-        DirectoryHistoryStore.shared.flush()
-        RecentHostsStore.flushSharedAtQuit()
-        RemoteEditStore.flushSharedAtQuit()
+        // Every store's last write at once, under one deadline: one after
+        // another, a slow disk could spend each its own second in turn.
+        let writes = DispatchGroup()
+        let deadline = DispatchTime.now() + Self.quitFlushDeadline
+        pendingLayoutSave?.cancel()
+        pendingLayoutSave = nil
+        saveWindowStates(completion: writes)
+        DirectoryHistoryStore.shared.flush(into: writes, deadline: deadline)
+        RecentHostsStore.flushSharedAtQuit(into: writes, deadline: deadline)
+        RemoteEditStore.flushSharedAtQuit(into: writes)
         ZshBootstrap.removeGeneratedFiles()
         // The askpass socket and its directory.
         SSHAskpassBroker.shared.stop()
@@ -653,8 +651,12 @@ extension AppDelegate {
             for split in controller.window?.terminalSplits ?? [] { split.teardown() }
         }
         // Not left to the panes' background removals: the process is ending.
-        FileDropStorage.removeThisRun()
+        FileDropStorage.removeThisRun(into: writes, deadline: deadline)
+        _ = writes.wait(timeout: deadline)
     }
+
+    /// How long a quit waits for the last writes, all of them together.
+    static let quitFlushDeadline: DispatchTimeInterval = .milliseconds(1500)
 
     /// AppKit restoration is off: a live process isn't a document.
     /// `SessionRestore` saves the arrangement instead.

@@ -236,7 +236,16 @@ final class DirectoryHistoryStore {
 
     /// Writes a pending save now and waits, for quit.
     func flush() {
+        let group = DispatchGroup()
         let deadline = DispatchTime.now() + .seconds(1)
+        flush(into: group, deadline: deadline)
+        _ = group.wait(timeout: deadline)
+    }
+
+    /// `flush` without its wait: the save is queued and `group` is left
+    /// when it is written, so a quit can wait for every store at once
+    /// under one deadline.
+    func flush(into group: DispatchGroup, deadline: DispatchTime) {
         if let deletion = clearing?.deletion {
             deletion.wait(until: deadline)
             finishClear(deletion)
@@ -246,9 +255,8 @@ final class DirectoryHistoryStore {
             self.pendingSave = nil
             save()
         }
-        let drained = DispatchSemaphore(value: 0)
-        writeQueue.async { drained.signal() }
-        _ = drained.wait(timeout: deadline)
+        group.enter()
+        writeQueue.async { group.leave() }
     }
 
     /// A save is scheduled and has not run.

@@ -130,6 +130,20 @@ struct RecentHostsStoreTests {
         #expect(RecentHostsStore(fileURL: url).targets == store.targets, "read back after a relaunch")
     }
 
+    /// A quit waits for every store under one deadline: each one's flush
+    /// queues its write and joins the group instead of waiting alone.
+    @Test("a quit's flush joins a shared group and is written by the time it is left")
+    func flushJoinsAGroup() throws {
+        let url = temporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let store = RecentHostsStore(fileURL: url)
+        store.record(try target("quit-host"))
+        let group = DispatchGroup()
+        store.flush(into: group, deadline: .now() + .seconds(5))
+        #expect(group.wait(timeout: .now() + .seconds(5)) == .success)
+        #expect(RecentHostsStore(fileURL: url).targets.map(\.displayName) == ["quit-host"])
+    }
+
     @Test("a connection is remembered with the user, port and key it was made with")
     func recordsTheFields() async throws {
         let url = temporaryStoreURL()
