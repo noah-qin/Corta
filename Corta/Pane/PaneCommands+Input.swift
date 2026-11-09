@@ -215,7 +215,13 @@ extension PaneCommands {
                 ? Paste.warningRisks(
                     in: text, bracketedPasteEnabled: bracketed, policy: policy,
                     shouldStop: { Task.isCancelled }) : []
-            await self?.finishPasteScan(id, sanitized: sanitized, risks: risks, delivery: delivery)
+            guard !Task.isCancelled else { return }
+            // Cut here too: chunking megabytes is a copy of all of them, and on
+            // the main thread it stalled the paste it was sending. Encoded for
+            // ?2004 as it is now; `deliver` recuts if that changes meanwhile.
+            let chunks = Paste.PreparedChunks(
+                bracketed: bracketed, chunks: Paste.chunks(for: sanitized, bracketedPasteEnabled: bracketed))
+            await self?.finishPasteScan(id, sanitized: sanitized, risks: risks, delivery: delivery, chunks: chunks)
         }
         pasteScan = PasteScan(id: id, task: task, onDiscard: delivery.onDiscard)
         // Silence for a moment, then an explanation of what is taking so long.
@@ -227,11 +233,12 @@ extension PaneCommands {
     }
 
     private func finishPasteScan(
-        _ id: Int, sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery
+        _ id: Int, sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery,
+        chunks: Paste.PreparedChunks
     ) {
         guard pasteScan?.id == id else { return }
         pasteScan = nil
-        decide(sanitized, risks: risks, delivery: delivery)
+        decide(sanitized, risks: risks, delivery: delivery, chunks: chunks)
     }
 
     /// A scan still running gives way: its text is not sent, and whoever asked
@@ -244,12 +251,17 @@ extension PaneCommands {
     }
 
     /// Sends the text, or asks first when it has risks to name.
-    private func decide(_ sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery) {
+    private func decide(
+        _ sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery, chunks: Paste.PreparedChunks? = nil
+    ) {
         guard !sanitized.isEmpty else { delivery.onDiscard?(); return }
-        guard !risks.isEmpty, let host else { deliver(sanitized, risks: risks, delivery: delivery); return }
+        guard !risks.isEmpty, let host else {
+            deliver(sanitized, risks: risks, delivery: delivery, chunks: chunks)
+            return
+        }
         if let answer = pasteWarningAnswer {
             guard answer(risks) else { delivery.onDiscard?(); return }
-            deliver(sanitized, risks: risks, delivery: delivery)
+            deliver(sanitized, risks: risks, delivery: delivery, chunks: chunks)
             return
         }
         let alert = NSAlert()
@@ -264,7 +276,7 @@ extension PaneCommands {
         alert.present(for: host.view.window) { [weak self] response in
             guard let self, response == .alertFirstButtonReturn else { delivery.onDiscard?(); return }
             if alert.suppressionButton?.state == .on { self.suppressPasteWarnings = true }
-            self.deliver(sanitized, risks: risks, delivery: delivery)
+            self.deliver(sanitized, risks: risks, delivery: delivery, chunks: chunks)
         }
     }
 
@@ -273,7 +285,9 @@ extension PaneCommands {
     /// with a new session this text was never meant for. And `?2004` is the
     /// child's to change: text judged safe because it would arrive marked must
     /// not go unmarked, its newlines then Returns, so it is asked about again.
-    func deliver(_ sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery) {
+    func deliver(
+        _ sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery, chunks: Paste.PreparedChunks? = nil
+    ) {
         guard let host, host.session === delivery.session, !delivery.session.isStopped,
             delivery.validate?() != false
         else { delivery.onDiscard?(); return }
@@ -282,7 +296,9 @@ extension PaneCommands {
             let judgedAgain = PasteDelivery(
                 session: delivery.session, bracketed: false, warns: true, validate: delivery.validate,
                 onDiscard: delivery.onDiscard, onSent: delivery.onSent)
-            decide(sanitized, risks: risks.filter { $0 != .multiline } + [.multiline], delivery: judgedAgain)
+            decide(
+                sanitized, risks: risks.filter { $0 != .multiline } + [.multiline], delivery: judgedAgain,
+                chunks: chunks)
             return
         }
         // Nothing warns here, by choice: nothing was judged, so nothing to keep to.
@@ -290,7 +306,9 @@ extension PaneCommands {
         delivery.onSent?()
         (host as? TerminalPaneViewController)?.updateReaderPriority(input: true)
         host.pointer.returnToBottomOnInput()
-        sendPaste(sanitized, bracketed: bracketed, to: delivery.session)
+        // The scan's cut when it was made for this encoding, else cut now.
+        let prepared = chunks?.bracketed == bracketed ? chunks?.chunks : nil
+        sendPaste(sanitized, bracketed: bracketed, chunks: prepared, to: delivery.session)
     }
 
     /// The text about to be pasted, its concealed scalars made visible, in a
@@ -392,9 +410,11 @@ extension PaneCommands {
     /// a paste the child started reading is then closed with `ESC[201~`.
     /// Saying so when the child is not reading, rather than dropping it
     /// without a word.
-    private func sendPaste(_ sanitized: String, bracketed: Bool, to session: TerminalSession) {
+    private func sendPaste(
+        _ sanitized: String, bracketed: Bool, chunks: [[UInt8]]? = nil, to session: TerminalSession
+    ) {
         let outcome = session.write(
-            paste: Paste.chunks(for: sanitized, bracketedPasteEnabled: bracketed),
+            paste: chunks ?? Paste.chunks(for: sanitized, bracketedPasteEnabled: bracketed),
             closing: Paste.closing(bracketedPasteEnabled: bracketed))
         switch outcome {
         case .accepted:

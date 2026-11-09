@@ -207,6 +207,24 @@ struct PasteDeliveryTests {
         #expect(!session.snapshot().dump().contains("[200~"))
     }
 
+    /// A large paste is cut off the main thread for the encoding it was
+    /// judged under; ?2004 off by the time it goes, that cut is not used.
+    @Test("chunks cut for bracketed paste are recut once ?2004 is off")
+    func preparedChunksFollowTheLiveEncoding() async throws {
+        let (host, session) = try await flipped()
+        defer { session.stop() }
+        session.write(Array("\n".utf8))
+        await settle { !session.isBracketedPasteEnabled }
+        host.commands.pasteWarningAnswer = { _ in true }
+        let log = Log()
+        let prepared = Paste.PreparedChunks(
+            bracketed: true, chunks: Paste.chunks(for: "first\nsecond\n", bracketedPasteEnabled: true))
+        host.commands.deliver("first\nsecond\n", risks: [], delivery: delivery(session, log: log), chunks: prepared)
+        #expect(log.sent == 1)
+        await settle { session.snapshot().dump().contains("second") }
+        #expect(!session.snapshot().dump().contains("[200~"))
+    }
+
     @Test("a single line has no newline to fear and is not asked about")
     func singleLineIsNotAskedAboutAgain() async throws {
         let (host, session) = try await flipped()

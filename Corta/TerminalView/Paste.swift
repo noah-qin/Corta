@@ -162,6 +162,14 @@ nonisolated enum Paste {
         return chunks
     }
 
+    /// `chunks(for:bracketedPasteEnabled:)` of a large paste, cut off the
+    /// main thread, with the encoding it was cut for: one cut for the other
+    /// encoding would send the markers wrongly.
+    struct PreparedChunks: Sendable {
+        let bracketed: Bool
+        let chunks: [[UInt8]]
+    }
+
     /// Wrapped in the ?2004 markers when bracketed, so it reads as data.
     static func bytes(for text: String, bracketedPasteEnabled: Bool) -> [UInt8] {
         let payload = Array(text.utf8)
