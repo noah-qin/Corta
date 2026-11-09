@@ -376,6 +376,12 @@ struct AskpassWordingTests {
         #expect(SSHAskpassPrompter.window(for: "box", among: [settings]) == nil)
     }
 
+    @Test("the drop prompt shows the current folder's name sanitised")
+    func dropPromptSanitisesTheFolderName() {
+        let target = SFTPDropDestination.current(path: "/srv/evil\u{202E}gnp.exe")
+        #expect(!target.prompt(count: 1).contains("\u{202E}"))
+    }
+
     /// What the dialog does is what the broker decided, never read back out
     /// of the text it shows.
     @Test("Cancel's wording follows the broker's decision, not the prompt")
