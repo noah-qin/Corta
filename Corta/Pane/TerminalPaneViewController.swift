@@ -873,17 +873,18 @@ extension TerminalPaneViewController {
     /// frame or, in a tab that draws none, from the output signal.
     private func noteCommandBoundaries() {
         guard let session else { return }
-        let finished = session.takeFinishedCommand()
+        // One lock for what used to take four.
+        let boundary = session.takeCommandBoundaryState()
+        let finished = boundary.finishedExitStatus
         // The prompt's return is the moment the program left: the title
         // names the shell again now, not an interval later.
         if finished != nil, isFocusedPane {
             windowTitle.invalidateProcessFacts()
             windowTitle.apply()
         }
-        if session.hasShellIntegration {
+        if boundary.hasShellIntegration {
             taskNotifier.noteCommandRunning(
-                session.isCommandRunning, exitStatus: finished,
-                commandID: finished != nil ? session.commandRecords.lastCompleted?.id : nil,
+                boundary.isCommandRunning, exitStatus: finished, commandID: boundary.lastCompletedID,
                 in: view.window)
             // Ranked once a command ran there, not on every `cd`.
             if finished != nil, let directory = session.currentDirectory {

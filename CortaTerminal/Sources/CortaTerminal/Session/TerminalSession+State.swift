@@ -64,6 +64,57 @@ extension TerminalSession {
         registerStateWaiter { state.withLock { $0.terminal.applicationKeypadEnabled } }
     }
 
+    /// What a frame reads of the session besides its grid, in one lock:
+    /// separate reads took the session lock — and waited on the reader — up
+    /// to three times a frame before the snapshot.
+    public struct FrameState: Sendable {
+        /// `takeBell()`: true once per ring.
+        public let rangBell: Bool
+        public let isSynchronizedOutputEnabled: Bool
+        public let colors: FrameColors
+    }
+
+    /// Takes the bell, as `takeBell()` does.
+    public func takeFrameState() -> FrameState {
+        registerStateWaiter {
+            state.withLock {
+                FrameState(
+                    rangBell: $0.terminal.takeBell(),
+                    isSynchronizedOutputEnabled: $0.terminal.isSynchronizedOutputEnabled,
+                    colors: FrameColors(
+                        indexedPalette: $0.terminal.indexedPalette, dynamicColors: $0.terminal.dynamicColors,
+                        selectionBackground: $0.terminal.selectionBackground,
+                        selectionForeground: $0.terminal.selectionForeground))
+            }
+        }
+    }
+
+    /// What an output batch reads of the shell's commands, in one lock.
+    public struct CommandBoundaryState: Sendable {
+        /// `takeFinishedCommand()`: a finished command's status, once.
+        public let finishedExitStatus: Int?
+        public let hasShellIntegration: Bool
+        public let isCommandRunning: Bool
+        public let lastCompletedID: Int?
+        /// `CommandRecordStore.statusRevision`, for overlays keyed on it.
+        public let statusRevision: UInt64
+    }
+
+    /// Takes the finished command, as `takeFinishedCommand()` does.
+    public func takeCommandBoundaryState() -> CommandBoundaryState {
+        registerStateWaiter {
+            state.withLock {
+                let finished = $0.terminal.takeFinishedCommand()
+                let records = $0.terminal.commandRecords
+                return CommandBoundaryState(
+                    finishedExitStatus: finished, hasShellIntegration: $0.terminal.hasShellIntegration,
+                    isCommandRunning: $0.terminal.isCommandRunning,
+                    lastCompletedID: finished != nil ? records.lastCompleted?.id : nil,
+                    statusRevision: records.statusRevision)
+            }
+        }
+    }
+
     /// Every colour a frame resolves cells with, under one lock per frame.
     public var frameColors: FrameColors {
         registerStateWaiter {
