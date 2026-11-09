@@ -305,7 +305,11 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
         remote.cancelPendingOpens()
         remote.stopWatchingConnection()
         appearance.stop()
-        frameLoop.suspendRendering()
+        // A resize still waiting out the drag debounce would reach the
+        // stopping session, and its output callback a pane that is gone;
+        // detaching retires the generation every late callback checks.
+        resizeDebouncer?.cancel()
+        frameLoop.detach()
         terminalView?.stopRendering()
         session?.stop()
         removeBootstrapFolder()

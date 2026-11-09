@@ -49,6 +49,17 @@ struct ResizeDebouncerTests {
         #expect(sent.count == 3)
     }
 
+    /// A closing pane drops the size it was waiting to send.
+    @Test func cancelDropsThePendingSize() async throws {
+        var sent: [TerminalSize] = []
+        let debouncer = ResizeDebouncer(delay: 0.05) { sent.append($0) }
+        debouncer.resize(to: TerminalSize(rows: 24, columns: 90), coalesce: true)
+        debouncer.cancel()
+        debouncer.flush()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(sent.isEmpty)
+    }
+
     /// Ending the drag delivers the pending size immediately, and the timer
     /// must not deliver it a second time when it expires.
     @Test func flushDeliversPendingSizeOnce() async throws {

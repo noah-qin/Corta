@@ -147,6 +147,20 @@ struct SessionLifecycleTests {
         #expect(pane.session !== session)
     }
 
+    /// A resize waiting out the debounce, or an output callback in flight,
+    /// must find a closed pane's generation retired.
+    @Test("closing a pane retires its frame-loop generation")
+    func teardownRetiresTheFrameLoopGeneration() throws {
+        var preset = Preset(name: "teardown")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", "exec /bin/cat"]
+        let pane = makePane(preset: preset)
+        let generation = pane.frameLoop.generation
+        #expect(pane.frameLoop.isCurrent(generation))
+        pane.teardown()
+        #expect(!pane.frameLoop.isCurrent(generation))
+    }
+
     /// Reconnect respawned at the configured grid and font size, so the
     /// remote banner and prompt were laid out at the wrong width before the
     /// resize, and a ⌘+ zoom was lost. A rebuild keeps both.
