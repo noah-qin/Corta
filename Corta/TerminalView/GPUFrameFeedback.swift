@@ -32,29 +32,44 @@ nonisolated final class FrameAcceptanceMarker: Sendable {
 /// the lid closed was otherwise "two seconds overdue" on wake, and the pane
 /// showed a renderer failure whose Try Again ends the session.
 nonisolated final class GPUFrameFeedback: Sendable {
+    /// Frames in flight are bounded by the backend's slots, far below this.
+    /// A fixed ring, so a frame's begin and end allocate nothing; were it
+    /// ever full, the oldest entry is kept, which is the one that expires.
+    static let capacity = 8
+
     private struct State {
         var serial: UInt64 = 0
-        var pending: [UInt64: SuspendingClock.Instant] = [:]
+        var pending = ContiguousArray<(serial: UInt64, began: SuspendingClock.Instant)?>(
+            repeating: nil, count: GPUFrameFeedback.capacity)
     }
     private let state = Mutex(State())
 
     func begin(now: SuspendingClock.Instant = .now) -> UInt64 {
         state.withLock {
             $0.serial &+= 1
-            $0.pending[$0.serial] = now
+            let slot = Int($0.serial % UInt64(Self.capacity))
+            if $0.pending[slot] == nil { $0.pending[slot] = ($0.serial, now) }
             return $0.serial
         }
     }
 
     func complete(_ serial: UInt64) {
-        state.withLock { _ = $0.pending.removeValue(forKey: serial) }
+        state.withLock {
+            let slot = Int(serial % UInt64(Self.capacity))
+            if $0.pending[slot]?.serial == serial { $0.pending[slot] = nil }
+        }
     }
 
-    var hasPending: Bool { state.withLock { !$0.pending.isEmpty } }
+    var hasPending: Bool { state.withLock { $0.pending.contains { $0 != nil } } }
 
     func hasExpired(now: SuspendingClock.Instant = .now, timeout: Duration = .seconds(2)) -> Bool {
         state.withLock { current in
-            guard let oldest = current.pending.values.min() else { return false }
+            var oldest: SuspendingClock.Instant?
+            for entry in current.pending {
+                guard let entry else { continue }
+                if oldest.map({ entry.began < $0 }) ?? true { oldest = entry.began }
+            }
+            guard let oldest else { return false }
             return oldest.duration(to: now) >= timeout
         }
     }

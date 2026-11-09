@@ -168,12 +168,15 @@ nonisolated extension Metal4Backend {
             removedAny = true
             return true
         }
-        let expiredTextures = boundTextures.filter {
-            $0.value.lastFrame + $0.value.retentionFrames <= completed
+        // Collected in place into a kept buffer: `filter` built a new
+        // dictionary every frame, nearly always empty.
+        expiredTextureIDs.removeAll(keepingCapacity: true)
+        for (id, entry) in boundTextures where entry.lastFrame + entry.retentionFrames <= completed {
+            expiredTextureIDs.append(id)
         }
-        for (id, entry) in expiredTextures {
+        for id in expiredTextureIDs {
+            guard let entry = boundTextures.removeValue(forKey: id) else { continue }
             residencySet.removeAllocation(entry.texture)
-            boundTextures.removeValue(forKey: id)
             removedAny = true
         }
         if removedAny { residencySet.commit() }

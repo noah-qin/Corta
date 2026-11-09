@@ -48,4 +48,25 @@ struct GPUFrameFeedbackTests {
         replacement.complete(currentID)
         #expect(!replacement.hasPending)
     }
+
+    /// A fixed ring: frames begin and end without growing anything, and a
+    /// completion for a frame the ring no longer holds touches nothing.
+    @Test("the pending ring tracks the oldest frame across wraparound")
+    func ringTracksOldestAcrossWraparound() {
+        let feedback = GPUFrameFeedback()
+        let start = SuspendingClock.now
+        for _ in 0..<(GPUFrameFeedback.capacity * 3) {
+            feedback.complete(feedback.begin(now: start))
+        }
+        #expect(!feedback.hasPending)
+        let first = feedback.begin(now: start)
+        let second = feedback.begin(now: start + .seconds(1))
+        #expect(feedback.hasExpired(now: start + .seconds(2)))
+        feedback.complete(first)
+        #expect(!feedback.hasExpired(now: start + .seconds(2)))
+        #expect(feedback.hasExpired(now: start + .seconds(3)))
+        feedback.complete(second)
+        #expect(!feedback.hasPending)
+    }
+
 }

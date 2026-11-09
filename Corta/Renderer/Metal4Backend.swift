@@ -243,6 +243,8 @@ public nonisolated final class Metal4Backend {
     /// `dropRetired` releases image textures once that frame completes;
     /// persistent atlases retain a `textureRetentionFrames` grace period.
     var boundTextures: [ObjectIdentifier: BoundTexture] = [:]
+    /// `dropRetired`'s scratch, kept so the per-frame sweep allocates nothing.
+    var expiredTextureIDs: ContiguousArray<ObjectIdentifier> = []
     struct BoundTexture {
         var texture: MTLTexture
         var lastFrame: UInt64
@@ -517,6 +519,9 @@ nonisolated extension Metal4Backend {
             // `MTL4CommandQueue`'s contract; a queue-side ordering, not a CPU block.
             queue.waitForDrawable(drawable)
         }
+        // Per frame by the API's shape: commit options carry the feedback
+        // handler, which captures this frame's number and slot, and
+        // `commit` takes its buffers as an array.
         let options = MTL4CommitOptions()
         let frame = frameNumber
         let completion = completion
