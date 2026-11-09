@@ -192,6 +192,27 @@ struct SessionLifecycleTests {
         #expect(session.snapshot().scrollback.totalPushed == 0)
     }
 
+    /// The status tooltips are rebuilt only when what they are built from
+    /// changes — and a clear, which moves nothing and touches no record,
+    /// still changes the rows they sit on.
+    @Test("the status tooltips follow a clear though no record changed")
+    func statusTooltipsFollowAClear() async throws {
+        var preset = Preset(name: "marks")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", #"printf '\033]133;A\007$ false\r\n\033]133;C\007\033]133;D;1\007\033]133;A\007$ '; exec /bin/cat"#]
+        let pane = makePane(preset: preset)
+        defer { pane.teardown() }
+        let session = try #require(pane.session)
+        #expect(await waitUntilTrue(timeout: .seconds(10)) { session.commandRecords.lastCompleted != nil })
+        pane.shell.noteCommandState(statusRevision: session.commandRecords.statusRevision, isCommandRunning: false)
+        pane.shell.updateShellOverlay(grid: session.snapshot(), canvas: .current)
+        let overlay = try #require(pane.terminalView?.shellOverlay)
+        #expect(overlay.statuses.count == 1)
+        session.apply(.clearScreen)
+        pane.shell.updateShellOverlay(grid: session.snapshot(), canvas: .current)
+        #expect(overlay.statuses.isEmpty)
+    }
+
     /// Reconnect respawned at the configured grid and font size, so the
     /// remote banner and prompt were laid out at the wrong width before the
     /// resize, and a ⌘+ zoom was lost. A rebuild keeps both.

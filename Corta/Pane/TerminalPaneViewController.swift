@@ -875,6 +875,7 @@ extension TerminalPaneViewController {
         guard let session else { return }
         // One lock for what used to take four.
         let boundary = session.takeCommandBoundaryState()
+        shell.noteCommandState(statusRevision: boundary.statusRevision, isCommandRunning: boundary.isCommandRunning)
         let finished = boundary.finishedExitStatus
         // The prompt's return is the moment the program left: the title
         // names the shell again now, not an interval later.
