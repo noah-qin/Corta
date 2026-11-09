@@ -240,7 +240,15 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard model.transfers.contains(where: { !$0.isFinished }) else { return true }
-        guard sender.attachedSheet == nil else { return false }
+        // A sheet is already up — this question, or a conflict, or sign-in.
+        // Refusing silently looked like a dead close button: say no, and
+        // show what is in the way.
+        if let sheet = sender.attachedSheet {
+            NSSound.beep()
+            sender.makeKeyAndOrderFront(nil)
+            sheet.makeKeyAndOrderFront(nil)
+            return false
+        }
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = L10n.text("sftp.close.running")

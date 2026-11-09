@@ -49,6 +49,13 @@ final class ResizeDebouncer {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
+    /// Drops the pending size undelivered: the pane is closing, and a
+    /// resize then would reach a session that is being stopped.
+    func cancel() {
+        pending?.cancel()
+        pending = nil
+    }
+
     /// Delivers the pending size now, at the end of a live resize.
     func flush() {
         guard let item = pending, !item.isCancelled else { return }

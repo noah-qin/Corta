@@ -69,7 +69,10 @@ nonisolated enum SFTPDropDestination: Equatable {
         // The folder by name, as the path bar ends: a whole path ran out of
         // room before the part that says where.
         case .current(let path):
-            L10n.format("sftp.drop.current", count, path == "/" ? "/" : (path as NSString).lastPathComponent)
+            // Sanitised as the folder row's name is: the server named it.
+            L10n.format(
+                "sftp.drop.current", count,
+                path == "/" ? "/" : SFTPBrowserModel.displayName((path as NSString).lastPathComponent))
         case .folder(_, let name): L10n.format("sftp.drop.folder", name)
         }
     }

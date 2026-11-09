@@ -83,6 +83,8 @@ final class PaneWindowTitle {
     private var isShowingTransientSize = false
     private var transientSizeReset: DispatchWorkItem?
     private var isStopped = false
+    /// Output arrived while the window was covered (`noteOutput`).
+    private(set) var refreshWhenVisible = false
 
     /// A new session: its facts are unknown, and it starts local.
     func reset(session: TerminalSession) {
@@ -190,6 +192,10 @@ final class PaneWindowTitle {
     /// path here to offer a drag of.
     func apply(fromOutput: Bool = false) {
         guard let window = window() else { return }
+        if fromOutput, !window.occlusionState.contains(.visible) {
+            refreshWhenVisible = true
+            return
+        }
         let tab = tab()
         let controller = window.windowController as? TerminalWindowController
         if let tab, !tab.isSelected {
@@ -205,7 +211,29 @@ final class PaneWindowTitle {
         }
     }
 
-    static let directoryProbeRetryDelay: TimeInterval = 2
+    /// Panes refused a probe while the budget was spent, newest last, each
+    /// with the path and generation it was refused for. A probe's end wakes
+    /// the newest still current; none polls.
+    private static var probeWaiters: [ProbeWaiter] = []
+
+    private struct ProbeWaiter {
+        weak var title: PaneWindowTitle?
+        let path: String
+        let generation: Int
+    }
+
+    /// One probe's slot came free: the newest waiter still asking for the
+    /// path it was refused takes it. Stopped panes and superseded paths drop
+    /// out as they are met.
+    private static func wakeNextProbeWaiter() {
+        while let waiter = probeWaiters.popLast() {
+            guard let title = waiter.title, !title.isStopped,
+                waiter.generation == title.directoryProbeGeneration
+            else { continue }
+            title.probeRepresentedDirectory(waiter.path)
+            return
+        }
+    }
 
     /// OSC 7 paths can point at an unresponsive network mount. Never stat on
     /// the main actor, and never publish a result for a superseded path.
@@ -219,15 +247,13 @@ final class PaneWindowTitle {
             active += 1
             return true
         }
-        // Two probes are already stuck on a slow mount. Try again shortly,
-        // rather than leave this pane without its proxy icon until the next
-        // `cd`; a newer path in the meantime supersedes the retry.
+        // Two probes are already stuck on a slow mount. Wait for one to
+        // end, rather than leave this pane without its proxy icon until the
+        // next `cd` — or ask again every two seconds while the mount stays
+        // dead; a newer path in the meantime supersedes the wait.
         guard admitted else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.directoryProbeRetryDelay) { [weak self] in
-                guard let self, !self.isStopped, generation == self.directoryProbeGeneration
-                else { return }
-                self.probeRepresentedDirectory(path)
-            }
+            Self.probeWaiters.removeAll { $0.title === self || $0.title == nil }
+            Self.probeWaiters.append(ProbeWaiter(title: self, path: path, generation: generation))
             return
         }
         let isDirectory = isDirectory
@@ -237,6 +263,7 @@ final class PaneWindowTitle {
             let exists = isDirectory(path)
             Self.directoryProbes.withLock { $0 -= 1 }
             Task { @MainActor [weak self] in
+                Self.wakeNextProbeWaiter()
                 guard let self, !self.isStopped,
                     generation == self.directoryProbeGeneration else { return }
                 self.representedDirectory = exists ? URL(fileURLWithPath: path) : nil
@@ -326,7 +353,22 @@ final class PaneWindowTitle {
     /// the interval has passed, so a program that quits inside it does not
     /// leave its icon and name on a background tab or an unfocused pane.
     func noteOutput() {
+        // A window nobody can see shows no title or tab: its process facts
+        // (`tcgetpgrp`, `proc_name`, `proc_pidinfo`) wait until it shows.
+        if let window = window(), !window.occlusionState.contains(.visible) {
+            refreshWhenVisible = true
+            return
+        }
         scheduleTrailingTitleRefresh(after: Self.processFactsInterval)
+    }
+
+    /// Output came while the window was covered: read the facts now that it
+    /// shows. From the pane's occlusion observer.
+    func windowVisibilityChanged() {
+        guard refreshWhenVisible, let window = window(), window.occlusionState.contains(.visible) else { return }
+        refreshWhenVisible = false
+        invalidateProcessFacts()
+        scheduleTrailingTitleRefresh(after: 0)
     }
 
     /// On focus and command boundaries, where waiting out the interval would

@@ -107,13 +107,39 @@ import Testing
         #expect(commentedTheme.dark.background == Theme.color("#101018"))
     }
 
+    @Test("a misspelt theme key makes no theme and is written back as written")
+    func misspeltThemeKeyMakesNoTheme() {
+        let (parsed, unknown) = Configuration.parse("theme.foo.nmae = x")
+        #expect(parsed.customThemes.isEmpty)
+        let written = parsed.serialized(preserving: unknown)
+        let themeLines = written.split(separator: "\n").filter { $0.hasPrefix("theme.") }
+        #expect(themeLines == ["theme.foo.nmae = x"])
+    }
+
+    @Test("a theme with one good key and one misspelt one is still that theme")
+    func themeKeepsGoodKeysBesideATypo() {
+        let (parsed, unknown) = Configuration.parse(
+            """
+            theme.mine.dark.backgrund = #000000
+            theme.mine.dark.background = #101010
+            """)
+        #expect(parsed.customThemes.map(\.name) == ["mine"])
+        #expect(unknown.map(\.0) == ["theme.mine.dark.backgrund"])
+    }
+
     /// A half-typed theme must still render — a config file is hand-edited,
-    /// and a bad colour must not black out the terminal.
+    /// and a bad colour must not black out the terminal. With no field that
+    /// applies there is no theme by that name, so the default draws, and the
+    /// line waits in the file to be fixed.
     @Test("a malformed colour is preserved, not applied")
     func malformedColourIsKeptAsUnknown() throws {
         let (parsed, unknown) = Configuration.parse("theme.x.dark.background = mauve")
         #expect(unknown.count == 1)
-        let theme = try #require(Theme.named("x", in: parsed))
+        #expect(Theme.named("x", in: parsed) == nil)
+        let (mixed, mixedUnknown) = Configuration.parse(
+            "theme.x.dark.background = mauve\ntheme.x.dark.foreground = #ffffff")
+        #expect(mixedUnknown.count == 1)
+        let theme = try #require(Theme.named("x", in: mixed))
         #expect(theme.dark.background == Theme.corta.dark.background)
     }
 
@@ -285,6 +311,37 @@ extension ThemeAndKeybindingTests {
             visited.append(try #require(model.selectedRowID))
         }
         #expect(visited == commandRows.map(\.id), "each step lands on the next command row")
+    }
+
+    /// A command its window would refuse ran anyway and failed silently.
+    @Test("a command the window would refuse is listed disabled and cannot run")
+    @MainActor func paletteDisablesUnavailableCommands() throws {
+        let model = CommandPaletteModel()
+        model.isCommandAvailable = { $0 != .newTab }
+        model.reset()
+        model.query = TerminalCommand.newTab.rawValue
+        let row = try #require(model.rows.first { $0.command == .newTab })
+        #expect(!row.selectable)
+        var ran: [TerminalCommand] = []
+        model.onRun = { ran.append($0) }
+        model.select(row)
+        model.runSelected()
+        #expect(!ran.contains(.newTab))
+    }
+
+    /// Availability is read from the window behind the palette: the palette,
+    /// key while it is up, answers `performClose:` itself.
+    @Test("availability follows the window's responder chain and its validation")
+    @MainActor func paletteAvailabilityUsesTheWindowsChain() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled, .closable],
+            backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        #expect(CommandPaletteController.isAvailable(#selector(NSWindow.performClose(_:)), in: window))
+        #expect(!CommandPaletteController.isAvailable(NSSelectorFromString("noSuchCortaAction:"), in: window))
+        #expect(!CommandPaletteController.isAvailable(#selector(NSWindow.performClose(_:)), in: nil)
+            || NSApp.responds(to: #selector(NSWindow.performClose(_:))))
     }
 
     @Test("a cleared query selects the top row, not a copy further down")

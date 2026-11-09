@@ -27,7 +27,9 @@ extension SFTPBrowserModel {
     /// first frame), and `.failed` clears the client, which is what makes
     /// Retry work. A live or in-flight connection is returned to as-is —
     /// re-presenting an open window must not spawn a second session.
-    func connect() {
+    /// `resumingAt`: Retry after a failure on the same connection, which
+    /// goes back to the folder that was open, keeping Back and Forward.
+    func connect(resumingAt resumePath: String? = nil) {
         guard client == nil else { return }
         // A problem with the fields is shown beside them, not as a failure.
         connectFailure = nil
@@ -78,35 +80,33 @@ extension SFTPBrowserModel {
         transferQueue.onListingError = { [weak self] in self?.listingError = $0 }
         connectionGeneration += 1
         let generation = connectionGeneration
-        Task { await self.performConnect(client: client, host: name, generation: generation) }
+        Task {
+            await self.performConnect(client: client, host: name, generation: generation, resumePath: resumePath)
+        }
     }
 
-    private func performConnect(client: any SFTPClient, host name: String, generation: Int) async {
+    private func performConnect(
+        client: any SFTPClient, host name: String, generation: Int, resumePath: String? = nil
+    ) async {
         defer { if generation == connectionGeneration { connectDeadline?.cancel() } }
         do {
             armConnectDeadline(client: client, host: name, generation: generation)
             _ = try await client.connect()
-            // The pane's reported directory when there is one; otherwise
-            // the session's own starting directory, canonicalised by the
-            // server — never a guess at "~".
-            let path: String
-            if let startDirectory {
-                path = startDirectory
-            } else {
-                armConnectDeadline(client: client, host: name, generation: generation)
-                path = try await client.realPath(path: ".")
-            }
-            armConnectDeadline(client: client, host: name, generation: generation)
-            let listing = try await client.listDirectory(path: path)
+            let opened = try await firstListing(
+                client: client, host: name, generation: generation, resumePath: resumePath)
+            let (path, listing) = (opened.path, opened.listing)
             guard generation == connectionGeneration else {
                 client.close()
                 return
             }
             connectDeadline?.cancel()
+            let keepsHistory = opened.resumed
             await applyEntries(listing) {
                 // Publish the directory and its rows together.
-                backStack.removeAll()
-                forwardStack.removeAll()
+                if !keepsHistory {
+                    backStack.removeAll()
+                    forwardStack.removeAll()
+                }
                 currentPath = Self.normalized(path: path)
                 pathField = currentPath
                 connectionState = .connected
@@ -119,6 +119,42 @@ extension SFTPBrowserModel {
             connectionFailed(Self.sftpError(error), client: client, host: name)
         }
         updateTitle()
+    }
+
+    /// The folder a connection opens on, listed: back where the failure left
+    /// the user when that folder is still there (`resumed`); else the pane's
+    /// reported directory when there is one; otherwise the session's own
+    /// starting directory, canonicalised by the server — never a guess at "~".
+    private func firstListing(
+        client: any SFTPClient, host name: String, generation: Int, resumePath: String?
+    ) async throws -> FirstListing {
+        if let resumePath {
+            armConnectDeadline(client: client, host: name, generation: generation)
+            do {
+                let listing = try await client.listDirectory(path: resumePath)
+                return FirstListing(path: resumePath, listing: listing, resumed: true)
+            } catch {
+                // Only the server saying no — gone, or no longer allowed —
+                // means start somewhere else; a broken connection fails the
+                // retry as any other connection failure does.
+                guard case .server = Self.sftpError(error) else { throw error }
+            }
+        }
+        let path: String
+        if let startDirectory {
+            path = startDirectory
+        } else {
+            armConnectDeadline(client: client, host: name, generation: generation)
+            path = try await client.realPath(path: ".")
+        }
+        armConnectDeadline(client: client, host: name, generation: generation)
+        return FirstListing(path: path, listing: try await client.listDirectory(path: path), resumed: false)
+    }
+
+    private struct FirstListing {
+        let path: String
+        let listing: [SFTPEntry]
+        let resumed: Bool
     }
 
     /// Starts the time for one step of connecting, over again: a server that
@@ -221,8 +257,11 @@ extension SFTPBrowserModel {
         if !typed.isEmpty, (try? typed.target.get())?.key != host {
             changeHost()
             fields = typed
+            connect()
+            return
         }
-        connect()
+        // The same connection again: back to the folder that was open.
+        connect(resumingAt: currentPath.isEmpty ? nil : currentPath)
     }
 
     /// Cancel while connecting, or Edit after a failure: back to the host

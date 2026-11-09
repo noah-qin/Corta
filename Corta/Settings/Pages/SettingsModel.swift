@@ -80,6 +80,9 @@ final class SettingsModel {
     var fontStatus = RowStatus()
     var shellIntegrationStatus = RowStatus()
     var isCheckingShellIntegration = false
+    /// What the row's Retry button repeats: the action that failed or did
+    /// not finish in time. Nil while the row offers its ordinary action.
+    var shellIntegrationRetry: (@Sendable (ShellIntegration) -> [String])?
     var directoryHistoryStatus = RowStatus()
     var recentHostsStatus = RowStatus()
     var droppedCopiesStatus = RowStatus()
@@ -137,9 +140,10 @@ final class SettingsModel {
     /// The file may not exist until something writes it, and System Settings
     /// can have flipped notification permission since this window was last
     /// open — both are re-read on every open rather than cached. Called
-    /// once per open, from `SettingsWindowController.show`.
+    /// once per open, from `SettingsWindowController.show`. An existing file
+    /// is not rewritten: opening the window is not a change.
     func windowWillShow() {
-        if !ConfigurationStore.shared.write() { reportWriteFailure() }
+        if !ConfigurationStore.shared.createIfMissing() { reportWriteFailure() }
         TaskNotifier.refreshPermission()
         refresh()
         refreshExternalState()

@@ -132,16 +132,20 @@ extension SFTPTransferQueue {
         id: UUID, receipt: SFTPTransferEngine.DirectoryTransferReceipt, isUpload: Bool
     ) {
         jobs[id] = nil
+        // Already whole at the destination (Resume, or a retry's own earlier
+        // files) is done, not a problem to report.
+        let present = receipt.skipped.filter { $0.reason == .alreadyPresent }.count
+        let problems = receipt.skipped.filter { $0.reason != .alreadyPresent }
         if let index = transfers.firstIndex(where: { $0.id == id }) {
-            transfers[index].filesCompleted = receipt.filesTransferred
-            transfers[index].filesTotal = receipt.filesTransferred
+            transfers[index].filesCompleted = receipt.filesTransferred + present
+            transfers[index].filesTotal = receipt.filesTransferred + present
         }
         setState(id, .done(bytes: receipt.bytesTransferred))
-        if !receipt.skipped.isEmpty {
+        if !problems.isEmpty {
             onListingError?(
                 L10n.format(
-                    "sftp.directory.skipped", receipt.skipped.count,
-                    receipt.skipped.prefix(3).map { SFTPBrowserModel.peerText($0.relativePath, limit: 256) }
+                    "sftp.directory.skipped", problems.count,
+                    problems.prefix(3).map { SFTPBrowserModel.peerText($0.relativePath, limit: 256) }
                         .joined(separator: ", ")))
         }
         if isUpload { onUploadFinished?() }
@@ -255,6 +259,15 @@ extension SFTPTransferQueue {
         }
     }
 
+    /// A folder that first ran under `.fail` — there was nothing at the
+    /// destination to conflict with — is retried as Resume: every file there
+    /// now is one this transfer wrote, and under `.fail` the first of them
+    /// failed the retry at once. Resume leaves those whole files and redoes
+    /// the rest.
+    nonisolated static func retryResolution(_ resolution: Resolution, isDirectory: Bool) -> Resolution {
+        isDirectory && resolution == .fail ? .resume : resolution
+    }
+
     /// Retries a row that offers it (`Transfer.canRetry`): under the same
     /// resolution it ran with, so a resume run's kept partial makes the retry
     /// continue where it stopped rather than start over; or, when it never got
@@ -267,7 +280,7 @@ extension SFTPTransferQueue {
         transfers[index].sampleTime = nil
         transfers[index].bytesPerSecond = nil
         if let resolution = job.resolution {
-            start(id: id, resolution: resolution)
+            start(id: id, resolution: Self.retryResolution(resolution, isDirectory: job.plan.isDirectory))
         } else {
             jobs[id]?.preparation = Task { await preflight(id: id) }
         }

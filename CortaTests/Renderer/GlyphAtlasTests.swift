@@ -91,9 +91,12 @@ import Testing
         #expect(second.deferredShaping)
         second.endFrame()
         GlyphAtlas.noteRefresh(2)
-        second.beginFrame(shapingBudget: .max, timeBudget: spent)
+        // The ledger itself, not a second shape racing the first one's time:
+        // on a loaded machine one shape can outlast sixteen measured earlier.
+        #expect(GlyphAtlas.shapingTimeSpent(at: .now) == .zero, "a new refresh starts the budget afresh")
+        second.beginFrame(shapingBudget: .max, timeBudget: .seconds(60))
         #expect(second.glyph(shaping: 0x4E21, style: .regular) != nil)
-        #expect(second.glyph(shaping: 0x4E22, style: .regular) != nil, "a new refresh starts the budget afresh")
+        #expect(second.glyph(shaping: 0x4E22, style: .regular) != nil)
         second.endFrame()
         GlyphAtlas.noteRefresh(0)
     }

@@ -123,17 +123,18 @@ enum SSHAskpassPrompter {
         return window
     }
 
-    /// The browser window for `host` when there is one, else the window in
-    /// front.
-    private static func window(for host: String) -> NSWindow? {
-        if let browser = NSApp.windows.first(where: {
+    /// The browser window for `host` when there is one, else a terminal
+    /// window — the key one first — else nil, for a window of its own. Never
+    /// Settings, About or another of Corta's windows: a question about a
+    /// connection hung from one of those reads as coming from it.
+    static func window(for host: String, among windows: [NSWindow] = NSApp.windows) -> NSWindow? {
+        if let browser = windows.first(where: {
             $0.identifier?.rawValue == "Corta.SFTPBrowser" && $0.title == host && $0.isVisible
         }) {
             return browser
         }
-        return [NSApp.keyWindow, NSApp.mainWindow].compactMap { $0 }
-            .first { $0.isVisible && !($0 is NSPanel) }
-            ?? NSApp.windows.first { $0.isVisible && $0.windowController is TerminalWindowController }
+        let terminals = windows.filter { $0.isVisible && $0.windowController is TerminalWindowController }
+        return terminals.first(where: \.isKeyWindow) ?? terminals.first(where: \.isMainWindow) ?? terminals.first
     }
 
     /// The button that answers yes — the second for a host key, whose
@@ -177,7 +178,9 @@ enum SSHAskpassPrompter {
                 step ? "askpass.hostKey.title.intermediate" : "askpass.hostKey.title", host)
             let advice = step
                 ? L10n.format("askpass.hostKey.advice.intermediate", host) : L10n.text("askpass.hostKey.advice")
-            alert.informativeText = prompt + "\n\n" + advice
+            // Where the question came from, as every other dialog says
+            // (`SECURITY.md` §4.8), before what to do about it.
+            alert.informativeText = prompt + "\n\n" + source + "\n\n" + advice
             // Cancel is the default: Return must not trust a key unread.
             alert.addButton(withTitle: L10n.text("common.cancel"))
             alert.addButton(withTitle: L10n.text("askpass.hostKey.trust"))
@@ -191,7 +194,7 @@ enum SSHAskpassPrompter {
         case .notify:
             alert.messageText = L10n.format(
                 step ? "askpass.notify.title.intermediate" : "askpass.notify.title", host)
-            alert.informativeText = prompt
+            alert.informativeText = prompt + "\n\n" + source
             alert.addButton(withTitle: L10n.text("askpass.notify.hide"))
         }
         return alert

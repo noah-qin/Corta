@@ -77,9 +77,23 @@ nonisolated enum ExportStaging {
         }
     }
 
-    static func removeAbandoned(in journal: URL = journalDirectory) {
+    /// How long a record that cannot be acted on is kept: the folder it
+    /// names may come back (a disk reattached), but not after this.
+    static let recordLifetime: TimeInterval = 30 * 24 * 60 * 60
+
+    /// How long one record's folder may take to answer; a mount that stopped
+    /// answering keeps its record for the next launch, not the launch.
+    static let recordTimeout: DispatchTimeInterval = .seconds(2)
+
+    /// Removes what dead exports left. Returns the folders where a staging
+    /// directory was left for good — its record past `recordLifetime` and its
+    /// directory still not removable — for the caller to tell the user once;
+    /// the record goes, so the same one is never reported twice.
+    @discardableResult
+    static func removeAbandoned(in journal: URL = journalDirectory, now: Date = Date()) -> [String] {
         PrivateFile.removeAbandonedTemporaries(in: journal, olderThan: AppPaths.abandonedStateFileAge)
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: journal.path) else { return }
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: journal.path) else { return [] }
+        var stranded: [String] = []
         for name in names where name.hasSuffix(".json") {
             guard let id = UUID(uuidString: String(name.dropLast(5))), name == id.uuidString + ".json" else {
                 continue
@@ -90,25 +104,60 @@ nonisolated enum ExportStaging {
                 record.pid > 0, kill(record.pid, 0) != 0, errno == ESRCH,
                 record.parentPath.hasPrefix("/")
             else { continue }
-            if removeAbandoned(id, record: record) { try? PrivateFile.removeIfPresent(entry) }
+            let removed = PathProbe.answer(timeout: recordTimeout) { removeAbandoned(id, record: record) }
+            if removed == true {
+                try? PrivateFile.removeIfPresent(entry)
+            } else if removed == false, isExpired(entry, now: now) {
+                // Unanswered (nil) is not "gone": that record waits.
+                try? PrivateFile.removeIfPresent(entry)
+                stranded.append(record.parentPath)
+            }
         }
+        return stranded
+    }
+
+    private static func isExpired(_ entry: URL, now: Date) -> Bool {
+        var info = stat()
+        guard lstat(entry.path, &info) == 0 else { return false }
+        return now.timeIntervalSince1970 - TimeInterval(info.st_mtimespec.tv_sec) > recordLifetime
     }
 
     private static func removeAbandoned(_ id: UUID, record: Record) -> Bool {
-        let parentFD = openDirectory(record.parentPath)
-        guard parentFD >= 0 else { return false }
+        guard let parentFD = openRecordedDirectory(record) else { return false }
         defer { close(parentFD) }
-        var info = stat()
-        guard fstat(parentFD, &info) == 0, info.st_ino == record.inode else { return false }
-        if let originalVolume = record.volumeUUID {
-            guard volumeUUID(URL(fileURLWithPath: record.parentPath)) == originalVolume else { return false }
-        } else {
-            guard info.st_dev == record.device else { return false }
-        }
         // Keep the record when the original directory is unavailable.
         guard removeStaging(stagingName(id), in: parentFD) else { return false }
         _ = fsync(parentFD)
         return true
+    }
+
+    /// The directory the record names: by path when it is still the same
+    /// directory, else by device and inode through `/.vol` — a folder renamed
+    /// or moved on its volume since keeps both, and APFS resolves them.
+    private static func openRecordedDirectory(_ record: Record) -> Int32? {
+        let parentFD = openDirectory(record.parentPath)
+        if parentFD >= 0 {
+            var info = stat()
+            if fstat(parentFD, &info) == 0, info.st_ino == record.inode, sameVolume(info, record: record) {
+                return parentFD
+            }
+            close(parentFD)
+        }
+        let byIdentity = openDirectory("/.vol/\(record.device)/\(record.inode)")
+        guard byIdentity >= 0 else { return nil }
+        var info = stat()
+        guard fstat(byIdentity, &info) == 0, info.st_ino == record.inode, info.st_dev == record.device else {
+            close(byIdentity)
+            return nil
+        }
+        return byIdentity
+    }
+
+    private static func sameVolume(_ info: stat, record: Record) -> Bool {
+        if let originalVolume = record.volumeUUID {
+            return volumeUUID(URL(fileURLWithPath: record.parentPath)) == originalVolume
+        }
+        return info.st_dev == record.device
     }
 
     private static func volumeUUID(_ url: URL) -> String? {

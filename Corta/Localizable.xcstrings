@@ -22777,55 +22777,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A folder with this name already exists here. Overwrite replaces files that exist in both; Resume continues interrupted files; Keep Both uses a new folder name; Skip transfers nothing."
+            "value": "A folder with this name already exists here. Overwrite replaces files that exist in both; Resume continues interrupted files and leaves files already there untouched; Keep Both uses a new folder name; Skip transfers nothing."
           }
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "translated",
-            "value": "此处已有同名文件夹。“覆盖”会替换两边都有的文件；“继续传输”会继续被中断的文件；“保留两者”使用新的文件夹名；“跳过”则不传输任何内容。"
+            "state": "needs_review",
+            "value": "此处已有同名文件夹。“覆盖”会替换两边都有的文件；“继续传输”会续传被中断的文件，并跳过已存在的文件；“保留两者”使用新的文件夹名；“跳过”则不传输任何内容。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "此處已有同名資料夾。覆寫會取代兩邊都有的檔案；續傳會繼續被中斷的檔案；保留兩者使用新資料夾名稱；略過則不傳輸任何內容。"
+            "value": "此處已有同名資料夾。覆寫會取代兩邊都有的檔案；續傳會繼續被中斷的檔案，並略過已存在的檔案；保留兩者使用新資料夾名稱；略過則不傳輸任何內容。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "同名のフォルダが既にここにあります。上書きは両方にあるファイルを置き換え、再開は中断したファイルを続け、両方を保持は新しいフォルダ名を使い、スキップは何も転送しません。"
+            "value": "同名のフォルダが既にここにあります。上書きは両方にあるファイルを置き換え、再開は中断したファイルを続けて既にあるファイルはそのままにし、両方を保持は新しいフォルダ名を使い、スキップは何も転送しません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "같은 이름의 폴더가 이미 있습니다. 덮어쓰기는 양쪽에 있는 파일을 교체하고, 재개는 중단된 파일을 이어가고, 둘 다 유지는 새 폴더 이름을 쓰고, 건너뛰기는 아무것도 전송하지 않습니다."
+            "value": "같은 이름의 폴더가 이미 있습니다. 덮어쓰기는 양쪽에 있는 파일을 교체하고, 재개는 중단된 파일을 이어가며 이미 있는 파일은 그대로 두고, 둘 다 유지는 새 폴더 이름을 쓰고, 건너뛰기는 아무것도 전송하지 않습니다."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Ein Ordner mit diesem Namen existiert hier bereits. Überschreiben ersetzt Dateien, die auf beiden Seiten vorhanden sind; Fortsetzen setzt unterbrochene Dateien fort; Beide behalten verwendet einen neuen Ordnernamen; Überspringen überträgt nichts."
+            "value": "Ein Ordner mit diesem Namen existiert hier bereits. Überschreiben ersetzt Dateien, die auf beiden Seiten vorhanden sind; Fortsetzen setzt unterbrochene Dateien fort und lässt bereits vorhandene unverändert; Beide behalten verwendet einen neuen Ordnernamen; Überspringen überträgt nichts."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Un dossier de ce nom existe déjà ici. Remplacer écrase les fichiers présents des deux côtés ; Reprendre poursuit les fichiers interrompus ; Conserver les deux utilise un nouveau nom de dossier ; Ignorer ne transfère rien."
+            "value": "Un dossier de ce nom existe déjà ici. Remplacer écrase les fichiers présents des deux côtés ; Reprendre poursuit les fichiers interrompus et laisse intacts ceux déjà présents ; Conserver les deux utilise un nouveau nom de dossier ; Ignorer ne transfère rien."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Ya existe aquí una carpeta con este nombre. Sobrescribir reemplaza los archivos presentes en ambos lados; Reanudar continúa los archivos interrumpidos; Conservar ambos usa un nombre de carpeta nuevo; Omitir no transfiere nada."
+            "value": "Ya existe aquí una carpeta con este nombre. Sobrescribir reemplaza los archivos presentes en ambos lados; Reanudar continúa los archivos interrumpidos y deja intactos los que ya están; Conservar ambos usa un nombre de carpeta nuevo; Omitir no transfiere nada."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Já existe aqui uma pasta com este nome. Substituir troca os arquivos presentes em ambos os lados; Retomar continua os arquivos interrompidos; Manter ambos usa um novo nome de pasta; Ignorar não transfere nada."
+            "value": "Já existe aqui uma pasta com este nome. Substituir troca os arquivos presentes em ambos os lados; Retomar continua os arquivos interrompidos e deixa intactos os que já existem; Manter ambos usa um novo nome de pasta; Ignorar não transfere nada."
           }
         }
       }
@@ -49490,6 +49490,301 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Remover"
+          }
+        }
+      }
+    },
+    "settings.status.shellIntegrationTimedOut": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The shell’s startup files did not answer in time. They may be on a disk that stopped responding."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Shell 启动文件未及时响应。它们可能位于已无响应的磁盘上。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Shell 啟動檔案未及時回應。它們可能位於已無回應的磁碟上。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "シェルの起動ファイルが時間内に応答しませんでした。応答しないディスク上にある可能性があります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "셸 시작 파일이 제때 응답하지 않았습니다. 응답하지 않는 디스크에 있을 수 있습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Startdateien der Shell haben nicht rechtzeitig geantwortet. Sie liegen möglicherweise auf einem Datenträger, der nicht mehr reagiert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Les fichiers de démarrage du shell n’ont pas répondu à temps. Ils se trouvent peut-être sur un disque qui ne répond plus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Los archivos de inicio del shell no respondieron a tiempo. Pueden estar en un disco que dejó de responder."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Os arquivos de inicialização do shell não responderam a tempo. Eles podem estar em um disco que parou de responder."
+          }
+        }
+      }
+    },
+    "file.tooLarge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is larger than %2$@ and was not read. Changes aren’t saved until it is smaller."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ 大于 %2$@，未读取。文件变小之前不会保存更改。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ 大於 %2$@，未讀取。檔案變小之前不會儲存變更。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ は %2$@ を超えているため読み込まれませんでした。小さくなるまで変更は保存されません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ 파일이 %2$@보다 커서 읽지 않았습니다. 더 작아질 때까지 변경 사항은 저장되지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ ist größer als %2$@ und wurde nicht gelesen. Bis sie kleiner ist, werden Änderungen nicht gesichert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ dépasse %2$@ et n’a pas été lu. Les modifications ne sont pas enregistrées tant qu’il n’est pas plus petit."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ supera %2$@ y no se leyó. Los cambios no se guardan hasta que sea más pequeño."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@ é maior que %2$@ e não foi lido. As alterações não são salvas até que fique menor."
+          }
+        }
+      }
+    },
+    "sftp.transfer.notAFile": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is not a file or folder (a pipe, socket or device), so it can’t be uploaded."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ 不是文件或文件夹（而是管道、套接字或设备），无法上传。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ 不是檔案或檔案夾（而是管道、通訊端或裝置），無法上傳。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ はファイルでもフォルダでもない（パイプ、ソケット、デバイス）ため、アップロードできません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@은(는) 파일이나 폴더가 아니어서(파이프, 소켓 또는 장치) 업로드할 수 없습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ ist weder Datei noch Ordner (eine Pipe, ein Socket oder ein Gerät) und kann nicht hochgeladen werden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ n’est ni un fichier ni un dossier (un tube, une socket ou un périphérique) et ne peut pas être envoyé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ no es un archivo ni una carpeta (una tubería, un socket o un dispositivo), así que no se puede subir."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@ não é um arquivo nem uma pasta (um pipe, socket ou dispositivo), então não pode ser enviado."
+          }
+        }
+      }
+    },
+    "export.stranded.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An unfinished export left a temporary folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未完成的导出留下了临时文件夹"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未完成的匯出留下了暫存檔案夾"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "完了しなかった書き出しが一時フォルダを残しました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "완료되지 않은 내보내기가 임시 폴더를 남겼습니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ein abgebrochener Export hat einen temporären Ordner hinterlassen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Une exportation inachevée a laissé un dossier temporaire"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Una exportación sin terminar dejó una carpeta temporal"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Uma exportação não concluída deixou uma pasta temporária"
+          }
+        }
+      }
+    },
+    "export.stranded.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta could not remove a hidden folder named “.corta-export-…” in:\n%@\n\nIt holds only the unfinished export and can be deleted. Corta will not mention it again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 无法删除以下位置中名为“.corta-export-…”的隐藏文件夹：\n%@\n\n它只包含未完成的导出内容，可以删除。Corta 不会再提示。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 無法刪除以下位置中名為「.corta-export-…」的隱藏檔案夾：\n%@\n\n它只包含未完成的匯出內容，可以刪除。Corta 不會再提示。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta は次の場所にある「.corta-export-…」という隠しフォルダを削除できませんでした：\n%@\n\n未完成の書き出しだけが入っており、削除してかまいません。今後この通知は表示されません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta가 다음 위치의 “.corta-export-…” 숨김 폴더를 제거하지 못했습니다:\n%@\n\n완료되지 않은 내보내기만 들어 있으므로 삭제해도 됩니다. 다시 알리지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta konnte einen verborgenen Ordner „.corta-export-…“ hier nicht entfernen:\n%@\n\nEr enthält nur den abgebrochenen Export und kann gelöscht werden. Corta weist nicht erneut darauf hin."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta n’a pas pu supprimer un dossier masqué nommé « .corta-export-… » dans :\n%@\n\nIl ne contient que l’exportation inachevée et peut être supprimé. Corta ne le signalera plus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta no pudo eliminar una carpeta oculta llamada «.corta-export-…» en:\n%@\n\nSolo contiene la exportación sin terminar y se puede borrar. Corta no volverá a avisar."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O Corta não conseguiu remover uma pasta oculta chamada “.corta-export-…” em:\n%@\n\nEla contém apenas a exportação não concluída e pode ser apagada. O Corta não avisará de novo."
           }
         }
       }

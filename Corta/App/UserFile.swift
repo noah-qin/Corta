@@ -53,22 +53,52 @@ nonisolated enum UserFile {
         case text(String)
     }
 
+    /// The most `readText` takes by default: far past any startup file a
+    /// person writes, short of one that would stall whoever parses it.
+    static let defaultMaximumBytes = 16 << 20
+
+    /// A file larger than its reader accepts, never read.
+    struct TooLargeError: LocalizedError {
+        let path: String
+        let maximumBytes: Int
+        var errorDescription: String? {
+            L10n.format(
+                "file.tooLarge", path,
+                ByteCountFormatter.string(fromByteCount: Int64(maximumBytes), countStyle: .binary))
+        }
+    }
+
     /// Reads `url` as UTF-8, telling a missing file from one that exists but
-    /// cannot be read or decoded.
-    static func readText(at url: URL) -> ReadResult {
+    /// cannot be read or decoded. Links are followed — a dotfiles config is
+    /// one. A file over `maximumBytes`, or one that is not a regular file (a
+    /// FIFO would block the read), is unreadable and never read.
+    static func readText(at url: URL, maximumBytes: Int = defaultMaximumBytes) -> ReadResult {
+        // Non-blocking only for the open, so a FIFO cannot hold it.
+        let descriptor = open(url.path, O_RDONLY | O_CLOEXEC | O_NONBLOCK)
+        guard descriptor >= 0 else {
+            let code = errno
+            // A dangling symlink is missing too: writing creates its target.
+            if code == ENOENT { return .missing }
+            return .unreadable(POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO))
+        }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var info = stat()
+        guard fstat(descriptor, &info) == 0 else {
+            return .unreadable(POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO))
+        }
+        guard info.st_mode & S_IFMT == S_IFREG else { return .unreadable(POSIXError(.EINVAL)) }
+        guard info.st_size <= maximumBytes else {
+            return .unreadable(TooLargeError(path: url.path, maximumBytes: maximumBytes))
+        }
         let data: Data
         do {
-            data = try Data(contentsOf: url)
+            // One past the cap, in case the file grew since the `fstat`.
+            data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
         } catch {
-            let nsError = error as NSError
-            let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
-            if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileReadNoSuchFileError
-                || underlying?.domain == NSPOSIXErrorDomain && underlying?.code == Int(ENOENT)
-            {
-                // A dangling symlink is missing too: writing creates its target.
-                return .missing
-            }
             return .unreadable(error)
+        }
+        guard data.count <= maximumBytes else {
+            return .unreadable(TooLargeError(path: url.path, maximumBytes: maximumBytes))
         }
         guard let text = String(data: data, encoding: .utf8) else {
             return .unreadable(CocoaError(.fileReadInapplicableStringEncoding, userInfo: [
@@ -80,6 +110,33 @@ nonisolated enum UserFile {
 
     static func readTextBounded(at url: URL) -> ReadResult {
         PathProbe.answer(timeout: .seconds(1)) { readText(at: url) } ?? .unreadable(POSIXError(.ETIMEDOUT))
+    }
+
+    /// The `.<name>.<uuid>` temporaries `write` leaves beside `targets` when
+    /// it dies between write and rename — a config or rc file's copy in the
+    /// user's home or config folder. Only that exact name for each target,
+    /// a regular file this user owns, older than `age`: never another dot
+    /// file of the home folder.
+    static func removeAbandonedTemporaries(
+        besides targets: [URL], olderThan age: TimeInterval, now: Date = Date()
+    ) {
+        let resolved = Set(targets.map { resolvingLinks($0) })
+        let byDirectory = Dictionary(grouping: resolved) { $0.deletingLastPathComponent() }
+        for (directory, files) in byDirectory {
+            let prefixes = files.map { "." + $0.lastPathComponent + "." }
+            guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { continue }
+            for name in names {
+                guard let prefix = prefixes.first(where: { name.hasPrefix($0) }),
+                    UUID(uuidString: String(name.dropFirst(prefix.count))) != nil
+                else { continue }
+                let path = directory.appendingPathComponent(name).path
+                var info = stat()
+                guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_uid == getuid(),
+                    now.timeIntervalSince1970 - TimeInterval(info.st_mtimespec.tv_sec) > age
+                else { continue }
+                unlink(path)
+            }
+        }
     }
 
     /// Follows links, resolving relative targets against the link's
@@ -121,7 +178,8 @@ nonisolated enum PrivateFile {
     /// older build or a restored backup stays as it came until the next save.
     /// Hardening, not a boundary: `~/Library` already keeps other accounts out.
     /// Nothing is followed: a link here is no file of Corta's.
-    static func read(_ url: URL) throws -> Data {
+    /// Larger than `maximumBytes` is `EFBIG`, unread.
+    static func read(_ url: URL, maximumBytes: Int = .max) throws -> Data {
         let descriptor = open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
         guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
@@ -129,14 +187,19 @@ nonisolated enum PrivateFile {
         guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
             throw POSIXError(.EINVAL)
         }
+        guard info.st_size <= maximumBytes else { throw POSIXError(.EFBIG) }
         _ = makeOwnerOnly(descriptor: descriptor)
-        return try handle.readToEnd() ?? Data()
+        guard maximumBytes < .max else { return try handle.readToEnd() ?? Data() }
+        let data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
+        guard data.count <= maximumBytes else { throw POSIXError(.EFBIG) }
+        return data
     }
 
     /// A missing file is a normal empty store. An unanswered or unreadable
     /// file is different: the caller must not replace its unseen contents.
-    static func readBounded(_ url: URL) throws -> Data? {
-        guard let result = PathProbe.answer(timeout: .seconds(1), { Result { try read(url) } }) else {
+    static func readBounded(_ url: URL, maximumBytes: Int = .max) throws -> Data? {
+        let result = PathProbe.answer(timeout: .seconds(1)) { Result { try read(url, maximumBytes: maximumBytes) } }
+        guard let result else {
             throw POSIXError(.ETIMEDOUT)
         }
         do {

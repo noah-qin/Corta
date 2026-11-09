@@ -48,8 +48,9 @@ nonisolated enum FileDropStorage {
     private static let removals = DispatchGroup()
 
     static func makeDirectory(in root: URL = root) throws -> URL {
-        try FileManager.default.createDirectory(at: root.deletingLastPathComponent(),
-            withIntermediateDirectories: true)
+        // Owner-only: on a first drop this creates Corta's whole
+        // Application Support folder, which then listed to anyone.
+        try PrivateFile.createDirectory(at: root.deletingLastPathComponent())
         // A staged launch may use /tmp or another symlinked parent. Give
         // providers the canonical parent, while still refusing a symlink at
         // the private root itself.
@@ -182,9 +183,17 @@ nonisolated enum FileDropStorage {
     /// A quit: this run's copies, for at most `timeout`, so a slow disk cannot
     /// hold up the exit. Whatever is left goes at the next launch.
     static func removeThisRun(in roots: [URL]? = nil, timeout: TimeInterval = 1.5) {
-        let directories = roots ?? [root, dragRoot]
-        let done = DispatchSemaphore(value: 0)
+        let group = DispatchGroup()
         let deadline = DispatchTime.now() + timeout
+        removeThisRun(in: roots, into: group, deadline: deadline)
+        _ = group.wait(timeout: deadline)
+    }
+
+    /// `removeThisRun` without its wait: `group` is left once the removals
+    /// are done or `deadline` passes, for a quit waiting on several at once.
+    static func removeThisRun(in roots: [URL]? = nil, into group: DispatchGroup, deadline: DispatchTime) {
+        let directories = roots ?? [root, dragRoot]
+        group.enter()
         DispatchQueue.global(qos: .userInitiated).async {
             for root in directories {
                 for child in children(of: root)
@@ -193,9 +202,8 @@ nonisolated enum FileDropStorage {
                 }
             }
             _ = removals.wait(timeout: deadline)
-            done.signal()
+            group.leave()
         }
-        _ = done.wait(timeout: deadline)
     }
 
     /// Clean Now: this run's finished copies and anything nobody owns. What is

@@ -179,6 +179,31 @@ struct DirectoryHistoryStoreTests {
         #expect(reloaded.history.entries["/Users/noah/Developer/personal/Corta"]?.visitCount == 1)
     }
 
+    /// The shared store reads its file off the main thread; a visit before
+    /// the read lands is kept, merged onto what was on disk, and never
+    /// written over it.
+    @Test("a visit recorded before a background load is merged with the file")
+    func visitBeforeBackgroundLoadIsMerged() throws {
+        defer { removeDirectory() }
+        let first = DirectoryHistoryStore(fileURL: file)
+        first.record("/on/disk")
+        first.flush()
+        // Held, so the read cannot land before the visit.
+        let queue = DispatchQueue(label: "test.directory-history")
+        queue.suspend()
+        let store = DirectoryHistoryStore(fileURL: file, writeQueue: queue, loadsInBackground: true)
+        #expect(!store.isLoaded)
+        store.record("/before/load")
+        queue.resume()
+        store.flush()
+        #expect(store.isLoaded)
+        #expect(store.history.entries["/on/disk"] != nil)
+        #expect(store.history.entries["/before/load"] != nil)
+        let reloaded = DirectoryHistoryStore(fileURL: file)
+        #expect(reloaded.history.entries["/on/disk"] != nil)
+        #expect(reloaded.history.entries["/before/load"] != nil)
+    }
+
     @Test("a history file from a newer Corta is left alone")
     func newerFileIsPreserved() throws {
         defer { removeDirectory() }

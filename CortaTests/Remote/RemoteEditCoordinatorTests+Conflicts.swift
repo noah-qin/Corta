@@ -229,6 +229,43 @@ extension RemoteEditCoordinatorTests {
         #expect(FileManager.default.fileExists(atPath: store.approvalsURL.path))
     }
 
+    /// The store loads only when Remote Edit is first used; launch sweeps
+    /// without it.
+    @Test("a dead process's approval snapshots go at launch, without the store")
+    func staleApprovalSnapshotsGoWithoutTheStore() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-remote-edit-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let dead = root.appendingPathComponent(".approvals-2147483647-\(UUID().uuidString)")
+        let live = root.appendingPathComponent(".approvals-\(getpid())-\(UUID().uuidString)")
+        for folder in [dead, live] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        RemoteEditStore.removeAbandonedApprovalsNow(in: root)
+        #expect(!FileManager.default.fileExists(atPath: dead.path))
+        #expect(FileManager.default.fileExists(atPath: live.path))
+    }
+
+    /// The shared store's manifest is read ahead at launch; a store made
+    /// afterwards uses that read only while the file is unchanged.
+    @Test("a manifest read ahead is used only while the file is unchanged")
+    func prefetchedManifestIsUsedOnlyWhenUnchanged() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-remote-edit-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = RemoteEditStore(rootURL: root)
+        _ = first.recordDownload(host: "box", remotePath: "/srv/a.txt", remoteSize: 1, remoteMTime: 1)
+        await first.finishManifestWrites()
+        RemoteEditStore.prefetchShared(rootURL: root)
+        let reused = RemoteEditStore(rootURL: root)
+        #expect(reused.copy(host: "box", remotePath: "/srv/a.txt") != nil)
+
+        RemoteEditStore.prefetchShared(rootURL: root)
+        try Data("[]".utf8).write(to: root.appendingPathComponent("manifest.json"))
+        let reread = RemoteEditStore(rootURL: root)
+        #expect(reread.copy(host: "box", remotePath: "/srv/a.txt") == nil, "the file changed: read again")
+    }
+
     @Test("an edit after the prompt requires a fresh approval")
     func staleApprovalIsRejected() async throws {
         let fixture = try makeFixture()

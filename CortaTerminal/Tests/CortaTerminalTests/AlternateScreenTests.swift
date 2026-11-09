@@ -41,6 +41,30 @@ struct AlternateScreenTests {
         #expect(terminal.grid[0, 4].scalar == 0x74)
     }
 
+    @Test("Clear History on the alternate screen clears the main screen's history too, and counts it first")
+    func clearHistoryOnTheAlternateScreenReachesTheMainScreen() {
+        var terminal = Terminal(rows: 3, columns: 12, scrollbackLimit: 100)
+        terminal.feed(Array((0..<8).map { "line\($0)" }.joined(separator: "\r\n").utf8))
+        let history = terminal.grid.scrollback.count
+        #expect(history > 0)
+        terminal.feed(Array("\u{1B}[?1049h".utf8))
+        #expect(terminal.grid.scrollback.count == 0)
+        #expect(terminal.grid.clearableHistoryLineCount == history)
+        terminal.grid.clearAllHistory()
+        #expect(terminal.grid.clearableHistoryLineCount == 0)
+        terminal.feed(Array("\u{1B}[?1049l".utf8))
+        #expect(terminal.grid.scrollback.count == 0)
+    }
+
+    @Test("ED 3 from a program on the alternate screen leaves the main screen's history")
+    func eraseSavedLinesOnTheAlternateScreenKeepsMainHistory() {
+        var terminal = Terminal(rows: 3, columns: 12, scrollbackLimit: 100)
+        terminal.feed(Array((0..<8).map { "line\($0)" }.joined(separator: "\r\n").utf8))
+        let history = terminal.grid.scrollback.count
+        terminal.feed(Array("\u{1B}[?1049h\u{1B}[3J\u{1B}[?1049l".utf8))
+        #expect(terminal.grid.scrollback.count == history)
+    }
+
     private func write(_ text: String, to grid: inout Grid) {
         for scalar in text.unicodeScalars { grid.write(scalar.value) }
     }

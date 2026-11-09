@@ -166,7 +166,11 @@ The quoting walks Unicode scalars, not Swift `Character`s. A shell reads
 bytes, and `'` or `\` followed by a combining mark or a joiner is one
 grapheme cluster that compares unequal to `"'"`; matched by `Character`, the
 quote was written raw and closed the quoted run. The app-typed `cd` of Go to
-Parent Directory and Go to Project Root uses the same quoting.
+Parent Directory and Go to Project Root uses the same quoting. It is typed,
+with its Return, only at a ready prompt: OSC 133 must say so, nothing may be
+typed or queued, and — since output can forge any OSC 133 state — the
+terminal's foreground process group, which only the kernel sets, must be the
+shell's own rather than a job it started.
 
 Drop hover negotiation inspects advertised types only, never file URLs or
 contents. A drop starts exactly one representation per item (promise before
@@ -364,7 +368,7 @@ allocating without bound. These caps are asserted in the fuzz harness
 | -------------------------- | ----------------------------------------------------- |
 | OSC / DCS string length    | 4096 bytes ordinarily; discard the sequence on overflow and resynchronise |
 | iTerm2 image OSC | File: base64 of at most 64 MiB decoded data plus 4100 header bytes, and never more than the pane/process image allowance left when the sequence begins (the parser asks before buffering); FilePart: 1 MiB per packet. A placement spans at most 4096 cells each way, as kitty's `c=`/`r=` do. Multipart total: at most 64 MiB decoded and the pane/process allowance. Unrelated OSC/CSI/APC abandons it; malformed base64, declared-size mismatch and oversized dimensions are dropped. The parser releases large string capacity after dispatch. Large base64 decoding uses the existing decode pause outside the session lock |
-| Extended clipboard / pointer stack | OSC 5522: 8192-byte packet cap, 3072 decoded bytes per text transaction, publish only at end; any invalid part discards it. OSC 22: 16 fixed names per screen; oldest evicted, RIS clears both |
+| Extended clipboard / pointer stack | OSC 5522: 8192-byte packet cap, 3072 decoded bytes per text transaction, publish only at end; any invalid part discards it. Completed writes (5522 and OSC 52) wait in a queue of at most 8 for the app; past it the oldest is dropped and, if it was a 5522 write, answered `EIO`. Each 5522 write gets its own status. OSC 22: 16 fixed names per screen; oldest evicted, RIS clears both |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
 | Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size, and held until its last chunk, a delete command, a replacing transmission or RIS (other output between chunks ends nothing: the protocol's rule concerns graphics commands); 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant). A decode outside the session's lock is charged its whole peak while it runs — text and decoded bytes, or decoded bytes and the inflate ceiling — and refused with `ENOSPC` when that does not fit, even if the image alone would. A 61 MiB raw image peaks at about 2.5× its size, down from 5.1× (`PERFORMANCE.md` §5.22) |
 | Kitty PNG / iTerm2 PNG and GIF-first-frame decoding | `corta-image-decoder`, a process of its own under the independent App Sandbox (no access to host user files or network entitlements), 10 s enforced by the app (SIGKILL, the image is not drawn) and 15 s by the helper's own `SIGALRM`, armed before it reads a byte, for a helper whose app has gone; a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor inside its sandbox, so decoded pixels never travel over stdout |
@@ -589,8 +593,10 @@ A server reached directly can still word a keyboard-interactive prompt however i
 likes, and one at the far end of a jump is that destination's own question.
 
 A host-key dialog defaults to Cancel, whoever asks. In the background Corta
-bounces in the Dock rather than taking focus; with no window open, the question
-gets a window of its own. The answer is written to that socket and nowhere else
+bounces in the Dock rather than taking focus. The question hangs from the host's
+SFTP browser, else a terminal window (the key one first) — never Settings, About
+or another window that would seem to ask it — and with neither open it gets a
+window of its own. The answer is written to that socket and nowhere else
 — not stored, not logged — and the dialog closes, answering nothing, the moment
 the asking process or the connection's ssh goes away, or the window it hangs on
 closes. Whether a refusal ends the connection is decided once, by the broker,

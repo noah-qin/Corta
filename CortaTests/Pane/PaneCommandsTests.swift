@@ -62,6 +62,7 @@ final class CommandsTestHost: PaneCommandsHost {
     }
     func settleFontChange() { settles += 1 }
     let pointer = PanePointer()
+    let search = PaneSearch()
     private(set) var redraws = 0
     func invalidateDisplay() { redraws += 1 }
 }

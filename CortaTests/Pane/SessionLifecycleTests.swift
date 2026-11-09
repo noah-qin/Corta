@@ -147,6 +147,75 @@ struct SessionLifecycleTests {
         #expect(pane.session !== session)
     }
 
+    /// The fallback notice was shown only from `viewDidAppear`, which a
+    /// rebuilt pane's view never sees again: Try Again fell back silently.
+    @Test("a rebuild that falls back says so, as a first spawn does")
+    func aRebuildThatFallsBackShowsTheNotice() throws {
+        var preset = Preset(name: "missing-directory")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", "exec /bin/cat"]
+        preset.directory = "/corta-test-missing-\(UUID().uuidString)"
+        let pane = makePane(preset: preset)
+        defer { pane.teardown() }
+        pane.rebuildPane(strictRespawn: false)
+        #expect(pane.isOperable)
+        #expect(pane.terminalView?.toastLayer != nil)
+    }
+
+    /// A resize waiting out the debounce, or an output callback in flight,
+    /// must find a closed pane's generation retired.
+    @Test("closing a pane retires its frame-loop generation")
+    func teardownRetiresTheFrameLoopGeneration() throws {
+        var preset = Preset(name: "teardown")
+        preset.shell = "/bin/sh"
+        preset.arguments = ["-c", "exec /bin/cat"]
+        let pane = makePane(preset: preset)
+        let generation = pane.frameLoop.generation
+        #expect(pane.frameLoop.isCurrent(generation))
+        pane.teardown()
+        #expect(!pane.frameLoop.isCurrent(generation))
+    }
+
+    /// The reader keeps the session until the child is reaped, which a group
+    /// ignoring SIGHUP stretches to the grace period and past it; the closed
+    /// pane's history was held all that time.
+    @Test("closing a pane frees its history at once")
+    func closingAPaneFreesItsHistory() async throws {
+        var preset = Preset(name: "history")
+        preset.shell = "/bin/sh"
+        preset.arguments = [
+            "-c", "trap '' HUP; i=0; while [ $i -lt 300 ]; do echo line $i; i=$((i+1)); done; exec /bin/cat",
+        ]
+        let pane = makePane(preset: preset)
+        let session = try #require(pane.session)
+        #expect(await waitUntilTrue(timeout: .seconds(10)) { session.snapshot().scrollback.count > 100 })
+        pane.teardown()
+        #expect(session.snapshot().scrollback.count == 0)
+        #expect(session.snapshot().scrollback.totalPushed == 0)
+    }
+
+    /// The status tooltips are rebuilt only when what they are built from
+    /// changes — and a clear, which moves nothing and touches no record,
+    /// still changes the rows they sit on.
+    @Test("the status tooltips follow a clear though no record changed")
+    func statusTooltipsFollowAClear() async throws {
+        var preset = Preset(name: "marks")
+        preset.shell = "/bin/sh"
+        let marks = #"printf '\033]133;A\007$ false\r\n\033]133;C\007\033]133;D;1\007\033]133;A\007$ '"#
+        preset.arguments = ["-c", marks + "; exec /bin/cat"]
+        let pane = makePane(preset: preset)
+        defer { pane.teardown() }
+        let session = try #require(pane.session)
+        #expect(await waitUntilTrue(timeout: .seconds(10)) { session.commandRecords.lastCompleted != nil })
+        pane.shell.noteCommandState(statusRevision: session.commandRecords.statusRevision, isCommandRunning: false)
+        pane.shell.updateShellOverlay(grid: session.snapshot(), canvas: .current)
+        let overlay = try #require(pane.terminalView?.shellOverlay)
+        #expect(overlay.statuses.count == 1)
+        session.apply(.clearScreen)
+        pane.shell.updateShellOverlay(grid: session.snapshot(), canvas: .current)
+        #expect(overlay.statuses.isEmpty)
+    }
+
     /// Reconnect respawned at the configured grid and font size, so the
     /// remote banner and prompt were laid out at the wrong width before the
     /// resize, and a ⌘+ zoom was lost. A rebuild keeps both.

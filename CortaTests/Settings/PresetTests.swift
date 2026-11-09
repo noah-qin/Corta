@@ -67,6 +67,30 @@ struct PresetTests {
         #expect(relativeDirectory.presets.isEmpty)
     }
 
+    /// Not offered is not deleted: the file is the user's, and the next save
+    /// — any change in Settings — used to drop every line of such a preset.
+    @Test("an unusable preset's lines survive a save verbatim")
+    func unusablePresetLinesSurviveASave() {
+        let text = """
+            preset.work.shell = zsh
+            preset.work.directory = ~/src
+            preset.notes.directory = docs
+            preset.ok.directory = /tmp
+            """
+        let (parsed, unknown) = Configuration.parse(text)
+        #expect(parsed.presets.map(\.name) == ["ok"])
+        var changed = parsed
+        changed.fontSize = 15
+        let written = changed.serialized(preserving: unknown)
+        #expect(written.contains("preset.work.shell = zsh"))
+        #expect(written.contains("preset.work.directory = ~/src"))
+        #expect(written.contains("preset.notes.directory = docs"))
+        #expect(written.contains("preset.ok.directory = /tmp"))
+        let (reread, rereadUnknown) = Configuration.parse(written)
+        #expect(reread.presets.map(\.name) == ["ok"])
+        #expect(rereadUnknown.count == unknown.count)
+    }
+
     /// A variable name with `=` or NUL in it cannot go into an environment at
     /// all. The *file format* already prevents the first case — a line splits
     /// at its first `=`, so `preset.p.env.A=B = x` parses as the variable `A`

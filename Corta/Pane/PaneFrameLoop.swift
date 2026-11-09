@@ -190,7 +190,9 @@ final class PaneFrameLoop {
         preparedPresentationToken = cursorAtStart.token
         preparedPresentationPending = cursorAtStart.awaits(cursorDrawn: cachedCursorVisible)
         guard !renderingStopped, let session, let renderer else { return false }
-        if session.takeBell() {
+        // One lock for the bell, ?2026 and the colours, not three.
+        let frameState = session.takeFrameState()
+        if frameState.rangBell {
             onBell?()
         }
         let newOutput = outputWake.takePending()
@@ -200,7 +202,7 @@ final class PaneFrameLoop {
         if newOutput {
             onOutputBatch?()
         }
-        if session.isSynchronizedOutputEnabled {
+        if frameState.isSynchronizedOutputEnabled {
             // Owe a present until the DECRST, or a torn state shows.
             wasSynchronizedOutputActive = true
             return false
@@ -215,7 +217,7 @@ final class PaneFrameLoop {
         let cursor = cursorHandoffSignal.snapshot
         preparedPresentationToken = cursor.token
         preparedPresentationPending = cursor.awaits(cursorDrawn: content.cursorVisible)
-        let colors = session.frameColors
+        let colors = frameState.colors
         let indexedPalette = colors.indexedPalette
         let damaged = renderer.updateInstances(
             grid: content.grid, scrollOffset: content.scrollOffset,

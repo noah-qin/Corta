@@ -66,7 +66,21 @@ extension SplitViewController {
     @objc func moveFocusUp(_: Any?) { moveFocus(.up) }
     @objc func moveFocusDown(_: Any?) { moveFocus(.down) }
 
+    /// Leaves zoom before the tree changes: `SplitTree.close(leaf:)` can't
+    /// remove a leaf that isn't in it, and `zoomOrigin` names a slot in the
+    /// tree as it stood.
+    func unzoomIfZoomed() {
+        guard isPaneZoomed else { return }
+        unzoomPane()
+        view.layoutSubtreeIfNeeded()
+    }
+
+    /// From a zoomed pane, zoom ends first, as in other terminals: the
+    /// neighbour is found in the whole tree, and focusing a pane the zoom
+    /// hides would send typing to something off screen.
     private func moveFocus(_ direction: SplitMoveDirection) {
+        splitTransition.finish()
+        unzoomIfZoomed()
         guard let focusedPane,
             let leaf = tree.leaf(from: focusedPane.view, direction: direction, inContainer: view),
             let target = pane(forLeaf: leaf)
@@ -116,13 +130,24 @@ extension SplitViewController {
         }
     }
 
-    // MARK: - Font size (broadcast across the tree)
+    // MARK: - Font size (broadcast across the window)
 
-    /// ⌘= / ⌘- / ⌘0 apply to every pane: they share the window's resize
-    /// increments and minimum size, derived from one cell geometry.
-    /// Each pane refits its own grid (`TerminalPaneViewController.setFontSize`); the
-    /// window frame stays. `settle: false` is a pinch still in progress.
+    /// ⌘= / ⌘- / ⌘0 apply to every pane of every tab in the window: the
+    /// zoom is the window's (`CONFIGURATION.md`, `font-size`), and its panes
+    /// share the window's resize increments and minimum size, derived from
+    /// one cell geometry. Each pane refits its own grid
+    /// (`TerminalPaneViewController.setFontSize`); the window frame stays.
+    /// `settle: false` is a pinch still in progress.
     func setFontSizeForAllPanes(_ size: CGFloat, isZoomed: Bool, settle: Bool = true) {
+        if let controller = tab?.controller {
+            controller.setFontSizeForAllTabs(size, isZoomed: isZoomed, settle: settle)
+        } else {
+            setFontSizeForOwnPanes(size, isZoomed: isZoomed, settle: settle)
+        }
+    }
+
+    /// This tab's panes only; the window's broadcast calls it per tab.
+    func setFontSizeForOwnPanes(_ size: CGFloat, isZoomed: Bool, settle: Bool) {
         for pane in panes {
             pane.setFontSize(size, settle: settle)
             // On every pane, so each pane's `configurationChanged` agrees.
@@ -130,8 +155,16 @@ extension SplitViewController {
         }
     }
 
-    /// The end of a pinch: every pane's grid settles at once.
+    /// The end of a pinch: every pane's grid in the window settles at once.
     func settleFontChangeForAllPanes() {
+        if let controller = tab?.controller {
+            controller.settleFontChangeForAllTabs()
+        } else {
+            settleFontChangeForOwnPanes()
+        }
+    }
+
+    func settleFontChangeForOwnPanes() {
         for pane in panes { pane.settleFontChange() }
     }
 

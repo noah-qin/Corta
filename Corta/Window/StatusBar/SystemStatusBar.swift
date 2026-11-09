@@ -75,7 +75,8 @@ final class SystemStatusBar: NSView {
     /// The visible line alone, from the last sample: what a width change
     /// needs, without the side effects of a full `refresh`.
     private func updateLine() {
-        let items = SystemMetrics.Item.allCases.filter { ConfigurationStore.shared.configuration.statusItems.contains($0) }
+        let enabled = ConfigurationStore.shared.configuration.statusItems
+        let items = SystemMetrics.Item.allCases.filter { enabled.contains($0) }
         button.attributedTitle = SystemStatusFormat.compactLine(
             items, metrics: SystemMetricsStore.shared.snapshot, width: button.bounds.width)
     }
@@ -112,8 +113,11 @@ final class SystemStatusBar: NSView {
         SystemMetricsStore.shared.setActive(
             config.statusBar && window?.occlusionState.contains(.visible) == true, client: client)
         if wasHidden != isHidden { onVisibilityChange?() }
-        if let controller = popover?.contentViewController as? NSHostingController<SystemStatusDetails> {
-            controller.rootView = SystemStatusDetails(metrics: metrics)
+        if popover?.isShown == true,
+            let controller = popover?.contentViewController as? NSHostingController<SystemStatusDetails>,
+            controller.rootView.metrics != metrics
+        {
+            controller.rootView = SystemStatusDetails(metrics: metrics, info: controller.rootView.info)
         }
     }
 
@@ -121,8 +125,10 @@ final class SystemStatusBar: NSView {
         if popover?.isShown == true { popover?.close(); return }
         let popover = NSPopover()
         popover.behavior = .transient
+        // The host's name, system and chip, read once per opening rather
+        // than on every metrics update while it is open.
         popover.contentViewController = NSHostingController(
-            rootView: SystemStatusDetails(metrics: SystemMetricsStore.shared.snapshot))
+            rootView: SystemStatusDetails(metrics: SystemMetricsStore.shared.snapshot, info: LocalHostInfo.read()))
         self.popover = popover
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
     }
@@ -180,8 +186,9 @@ enum SystemStatusFormat {
         switch item {
         case .cpu:
             let value = metrics.cpuPercent.map { ($0 / 100).formatted(.percent.precision(.fractionLength(0))) }
-            return Compact(label: label, value: value ?? "—", template: (1.0).formatted(.percent.precision(.fractionLength(0))),
-                           fraction: metrics.cpuPercent.map { $0 / 100 })
+            return Compact(
+                label: label, value: value ?? "—", template: (1.0).formatted(.percent.precision(.fractionLength(0))),
+                fraction: metrics.cpuPercent.map { $0 / 100 })
         case .load:
             // The one-minute figure; all three are in the details.
             let value = metrics.load.first.map { $0.formatted(.number.precision(.fractionLength(2))) }
@@ -216,12 +223,46 @@ enum SystemStatusFormat {
         .withSymbolConfiguration(.init(pointSize: 11, weight: .regular)
             .applying(.init(paletteColors: [.secondaryLabelColor])))
 
-    static func compactLine(_ items: [SystemMetrics.Item], metrics: SystemMetrics,
-                            width: CGFloat = 0) -> NSAttributedString {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+    /// One metric's column: its text, the template width that sets the gap
+    /// — so the gap does not move as values change — and what it takes now,
+    /// which only a value outgrowing its template exceeds.
+    private struct Cell {
+        let text: NSAttributedString
+        let reserved: CGFloat
+        let width: CGFloat
+    }
+
+    private static func cell(
+        _ item: SystemMetrics.Item, metrics: SystemMetrics, font: NSFont,
+        value valueAttributes: [NSAttributedString.Key: Any]
+    ) -> Cell? {
+        guard let part = compact(item, metrics: metrics) else { return nil }
         let labelAttributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.tertiaryLabelColor]
-        let valueAttributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.secondaryLabelColor]
         let space = NSAttributedString(string: " ", attributes: valueAttributes)
+        let cell = NSMutableAttributedString()
+        if !part.label.isEmpty {
+            cell.append(NSAttributedString(string: part.label + " ", attributes: labelAttributes))
+        }
+        var meterWidth: CGFloat = 0
+        if let fraction = part.fraction {
+            let meter = meter(fraction, font: font)
+            cell.append(meter)
+            cell.append(space)
+            meterWidth = meter.size().width + space.size().width
+        }
+        var attributes = valueAttributes
+        if let warning = part.warning { attributes[.foregroundColor] = warning }
+        cell.append(NSAttributedString(string: part.value, attributes: attributes))
+        let prefix = part.label.isEmpty ? "" : part.label + " "
+        let template = NSAttributedString(string: prefix + part.template, attributes: valueAttributes)
+        let reserved = template.size().width + meterWidth
+        return Cell(text: cell, reserved: reserved, width: max(reserved, cell.size().width))
+    }
+
+    /// The host mark and "Local", where the line starts.
+    private static func leading(font: NSFont, value valueAttributes: [NSAttributedString.Key: Any])
+        -> NSMutableAttributedString
+    {
         let line = NSMutableAttributedString()
         if let host = hostSymbol {
             let attachment = NSTextAttachment()
@@ -229,36 +270,22 @@ enum SystemStatusFormat {
             attachment.bounds = NSRect(x: 0, y: (font.capHeight - host.size.height) / 2,
                                        width: host.size.width, height: host.size.height)
             line.append(NSAttributedString(attachment: attachment))
-            line.append(space)
+            line.append(NSAttributedString(string: " ", attributes: valueAttributes))
         }
         line.append(NSAttributedString(string: L10n.text("status.local"), attributes: [
             .font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.secondaryLabelColor,
         ]))
-        // `reserved` is the column's template width, which sets the gap,
-        // so the gap does not move as values change; `width` is what it
-        // takes now, which only a value outgrowing its template exceeds.
-        var cells: [(text: NSAttributedString, reserved: CGFloat, width: CGFloat)] = []
-        for item in items {
-            guard let part = compact(item, metrics: metrics) else { continue }
-            let cell = NSMutableAttributedString()
-            if !part.label.isEmpty {
-                cell.append(NSAttributedString(string: part.label + " ", attributes: labelAttributes))
-            }
-            var meterWidth: CGFloat = 0
-            if let fraction = part.fraction {
-                let meter = meter(fraction, font: font)
-                cell.append(meter)
-                cell.append(space)
-                meterWidth = meter.size().width + space.size().width
-            }
-            var attributes = valueAttributes
-            if let warning = part.warning { attributes[.foregroundColor] = warning }
-            cell.append(NSAttributedString(string: part.value, attributes: attributes))
-            let prefix = part.label.isEmpty ? "" : part.label + " "
-            let template = NSAttributedString(string: prefix + part.template, attributes: valueAttributes)
-            let reserved = template.size().width + meterWidth
-            cells.append((cell, reserved, max(reserved, cell.size().width)))
-        }
+        return line
+    }
+
+    static func compactLine(_ items: [SystemMetrics.Item], metrics: SystemMetrics,
+                            width: CGFloat = 0) -> NSAttributedString {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        let valueAttributes: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: NSColor.secondaryLabelColor,
+        ]
+        let line = leading(font: font, value: valueAttributes)
+        let cells = items.compactMap { cell($0, metrics: metrics, font: font, value: valueAttributes) }
         // One even gap between every column, Local included, so the line
         // spans the bar whichever metrics are on: Local at the leading
         // edge, the last metric flush with the trailing one, where the
@@ -334,7 +361,9 @@ enum SystemStatusFormat {
 struct SystemStatusDetails: View {
     let metrics: SystemMetrics
     var showMetrics = true
-    private let info = LocalHostInfo.read()
+    /// Read by whoever opens the details: a view rebuilt per update read it
+    /// again each time.
+    let info: LocalHostInfo
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(L10n.text("status.details")).font(.headline)

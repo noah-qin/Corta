@@ -125,7 +125,7 @@ refer to [SECURITY.md](SECURITY.md).
 | `OSC 1337` | StealFocus; SetProfile; SetBadgeFormat; ReportVariable; Custom; inline=0 | refused | No focus theft, config mutation, persistent badges, value echo, scripts or downloads | §2.10; D09/D10 |
 | `OSC 3008` | all | ignored | systemd context hierarchy, no consumer | #411 |
 | `OSC 5113` | all | refused | File transfer writes stream-named files | §2.10; #411 |
-| `OSC 5522` | text/plain write/wdata | implemented | Bounded sanitised text transaction, gated like OSC 52; partial protocol. Replies a fixed `status=DONE`, `EPERM` (writes not allowed) or `EIO` (pasteboard failed, or nothing left once sanitised) | #411 |
+| `OSC 5522` | text/plain write/wdata | implemented | Bounded sanitised text transaction, gated like OSC 52; partial protocol. Replies a fixed `status=DONE`, `EPERM` (writes not allowed) or `EIO` (pasteboard failed, nothing left once sanitised, or dropped from a full queue of 8), one per write | #411 |
 | `OSC 5522` | read, MIME aliases, non-text, primary selection | refused | No clipboard disclosure or extra clipboard surfaces | §2.6; §2.10 |
 | `OSC 7501` | status / probe | implemented | Bounded task state; constant probe reply | #409 |
 | `OSC 21337` | tab metadata | implemented | Bounded self-reported metadata | #409 |

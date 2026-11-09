@@ -158,7 +158,10 @@ struct KittyGraphicsCursorTests {
         #expect(terminal.grid.rowText(9).hasPrefix("footer"))
     }
 
-    @Test("full-screen index scrolling moves and clips images without history", arguments: [false, true])
+    /// With no history the scrolled-off rows still count (`Scrollback.push`),
+    /// so an image moves with the text exactly as it does with history: one
+    /// partly above the top stays whole, and one wholly above it goes.
+    @Test("full-screen index scrolling moves images without history, as with it", arguments: [false, true])
     func fullScreenScrollingWithoutHistoryMovesImages(alternate: Bool) {
         var terminal = Terminal(rows: 6, columns: 20, scrollbackLimit: alternate ? 100 : 0)
         terminal.grid.cellPixelWidth = 10
@@ -166,19 +169,43 @@ struct KittyGraphicsCursorTests {
         if alternate { terminal.feed(Array("\u{1B}[?1049h".utf8)) }
         terminal.feed(Array("\u{1B}[3;1H".utf8))
         terminal.feed(Self.place(width: 10, height: 60, extra: ",C=1"))
+        func screenRow(_ terminal: Terminal) -> Int? {
+            terminal.grid.imagePlacements.orderedPlacements().first.map {
+                ScrollbackCoordinates.reanchoredRow(
+                    $0.row, from: $0.baseScrollbackTotal, to: terminal.grid.scrollback.totalPushed)
+            }
+        }
         terminal.feed(Array("\u{1B}[6;1H\n".utf8))
-        var placements = terminal.grid.imagePlacements.orderedPlacements()
-        #expect(placements.count == 1)
-        #expect(placements.first?.row == 1)
-        #expect(terminal.grid.scrollback.totalPushed == 0)
+        #expect(terminal.grid.imagePlacements.orderedPlacements().count == 1)
+        #expect(screenRow(terminal) == 1)
+        #expect(terminal.grid.scrollback.totalPushed == 1)
+        #expect(terminal.grid.scrollback.count == 0)
 
         terminal.feed(Array("\n\n".utf8))
-        placements = terminal.grid.imagePlacements.orderedPlacements()
-        #expect(placements.first?.row == 0)
-        #expect(placements.first?.rows == 2)
-        #expect(abs((placements.first?.sourceTop ?? -1) - Float(1) / 3) < 0.0001)
+        #expect(screenRow(terminal) == -1)
+        #expect(terminal.grid.imagePlacements.orderedPlacements().first?.sourceTop == 0)
         terminal.feed(Array("\n\n".utf8))
         #expect(terminal.grid.imagePlacements.orderedPlacements().isEmpty)
+    }
+
+    @Test("shrinking the window with no history keeps an image beside its text")
+    func rowShrinkWithoutHistoryKeepsImageAnchors() {
+        var terminal = Terminal(rows: 6, columns: 20, scrollbackLimit: 0)
+        terminal.grid.cellPixelWidth = 10
+        terminal.grid.cellPixelHeight = 20
+        terminal.feed(Array("\u{1B}[3;1H".utf8))
+        terminal.feed(Self.place(width: 10, height: 20, extra: ",C=1"))
+        terminal.feed(Array("\u{1B}[6;1Hlast".utf8))
+        terminal.resize(rows: 4, columns: 20)
+        let placement = terminal.grid.imagePlacements.orderedPlacements().first
+        let row = placement.map {
+            ScrollbackCoordinates.reanchoredRow(
+                $0.row, from: $0.baseScrollbackTotal, to: terminal.grid.scrollback.totalPushed)
+        }
+        // Two rows left the top so the cursor's row stays: the image, on row
+        // 2, is now on row 0, still beside what was drawn there.
+        #expect(row == 0)
+        #expect(terminal.grid.rowText(3).hasPrefix("last"))
     }
 
     @Test("explicit c= and r= win over the pixel size")

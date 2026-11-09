@@ -31,6 +31,8 @@ protocol PaneSearchHost: AnyObject {
     var scrollOffset: Int { get set }
     /// The grid now, or nil without a session.
     func snapshot() -> Grid?
+    /// `Scrollback.totalPushed` now, without taking the grid.
+    func liveTotalPushed() -> Int?
     /// The selected text, for ⌘E.
     func selectedTextForFind() async -> String?
     /// For changes that produce no output: highlights, the viewport.
@@ -85,8 +87,8 @@ final class PaneSearch: NSObject {
     /// back to `refreshPacing` after it. With the bar open over a stream of
     /// output, sweeps used to run back to back — a core busy for as long as
     /// the bar stayed open.
-    private var lastSweepLanded: ContinuousClock.Instant?
-    private var pacingWake: Task<Void, Never>?
+    var lastSweepLanded: ContinuousClock.Instant?
+    var pacingWake: Task<Void, Never>?
     /// The least time from one output-driven sweep landing to the next one
     /// starting. A typed query is never held back.
     static let refreshPacing: Duration = .milliseconds(250)
@@ -95,6 +97,27 @@ final class PaneSearch: NSObject {
     var caseSensitive = false
     var regex = false
     var keyMonitor: Any?
+    /// What the current match's rect was last found from, and the rect: the
+    /// bar is placed on every output batch, and the rect needs the grid.
+    var matchRectKey: MatchRectKey?
+    var matchRect: CGRect?
+
+    struct MatchRectKey: Equatable {
+        // periphery:ignore - read by the synthesised ==
+        var index: Int
+        // periphery:ignore - read by the synthesised ==
+        var matchesTotalPushed: Int
+        // periphery:ignore - read by the synthesised ==
+        var matchesGeneration: Int
+        // periphery:ignore - read by the synthesised ==
+        var scrollOffset: Int
+        // periphery:ignore - read by the synthesised ==
+        var cursor: CGRect?
+        // Output since the sweep moves the match even when the cursor
+        // stays put on the bottom row.
+        // periphery:ignore - read by the synthesised ==
+        var liveTotalPushed: Int?
+    }
 
     init(host: PaneSearchHost? = nil) {
         self.host = host
@@ -385,7 +408,7 @@ extension PaneSearch {
     /// `needsRefresh`, which `applyResults` honours; otherwise
     /// the last output could leave results stale once the grid goes quiet.
     func scheduleBackgroundRefresh() {
-        guard bar != nil, let searchField = field, let grid = host?.snapshot() else { return }
+        guard bar != nil, let searchField = field else { return }
         guard task == nil else {
             needsRefresh = true
             return
@@ -406,6 +429,9 @@ extension PaneSearch {
                 return
             }
         }
+        // Taken only for a sweep that will run: an output batch that merely
+        // marks one owed, or waits out the pacing, needs no grid.
+        guard let grid = host?.snapshot() else { return }
         generation &+= 1
         let generation = self.generation
         let query = searchField.stringValue
@@ -517,7 +543,7 @@ extension PaneSearch {
             : min(grid.scrollback.count, max(0, grid.rows / 2 - row))
     }
 
-    private func setMatches(_ found: [SelectionRange], totalPushed: Int) {
+    func setMatches(_ found: [SelectionRange], totalPushed: Int) {
         matches = found
         matchesTotalPushed = totalPushed
         highlights = found.map { TerminalSelection($0, baseScrollbackTotal: totalPushed) }
@@ -546,29 +572,4 @@ extension PaneSearch {
         }
     }
 
-    /// Flips this pane's case sensitivity and saves it as the default for
-    /// bars opened later; other open bars keep theirs.
-    func toggleSearchCase() {
-        caseSensitive.toggle()
-        if !ConfigurationStore.shared.update({ $0.searchCaseSensitive = self.caseSensitive }) {
-            // A failed write rolls the config back; match it.
-            caseSensitive = ConfigurationStore.shared.configuration.searchCaseSensitive
-        }
-        barModel.caseSensitive = caseSensitive
-        // The list changes; re-find the place rather than keep it.
-        currentMatchAnchor = nil
-        updateResults(scrollsToMatch: true)
-    }
-
-    /// As `toggleSearchCase`, for regex mode.
-    func toggleSearchRegex() {
-        regex.toggle()
-        if !ConfigurationStore.shared.update({ $0.searchRegex = self.regex }) {
-            // See `toggleSearchCase`.
-            regex = ConfigurationStore.shared.configuration.searchRegex
-        }
-        barModel.regex = regex
-        currentMatchAnchor = nil
-        updateResults(scrollsToMatch: true)
-    }
 }

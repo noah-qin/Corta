@@ -232,15 +232,15 @@ struct ThemeTests {
 @MainActor
 @Suite(.serialized)
 struct ConfigurationStoreTests {
-    private let directory = FileManager.default.temporaryDirectory
+    let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("corta-config-tests-\(UUID().uuidString)")
-    private var file: URL { directory.appendingPathComponent("config") }
+    var file: URL { directory.appendingPathComponent("config") }
 
-    private func removeDirectory() {
+    func removeDirectory() {
         try? FileManager.default.removeItem(at: directory)
     }
 
-    private func writeFile(_ text: String) throws {
+    func writeFile(_ text: String) throws {
         try FileManager.default.createDirectory(
             at: directory, withIntermediateDirectories: true)
         try text.write(to: file, atomically: true, encoding: .utf8)

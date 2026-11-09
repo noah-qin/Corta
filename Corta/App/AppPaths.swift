@@ -123,12 +123,40 @@ nonisolated enum AppPaths {
 
     /// `.<name>.<uuid>` left in the state directories by a save that died before
     /// its rename (`PrivateFile.replace`). Off the main thread, at launch.
-    nonisolated static func removeAbandonedStateFiles() {
+    /// Returns the folders where an unfinished export's staging directory
+    /// could not be removed and has stopped being tried
+    /// (`ExportStaging.removeAbandoned`), for a one-time notice.
+    @discardableResult
+    nonisolated static func removeAbandonedStateFiles() -> [String] {
         let support = applicationSupportDirectory
+        makeOwnerOnly(directory: support)
         for directory in [support, support.appendingPathComponent("RemoteEdit", isDirectory: true)] {
             PrivateFile.removeAbandonedTemporaries(in: directory, olderThan: abandonedStateFileAge)
         }
-        ExportStaging.removeAbandoned()
+        // The user's files Corta writes atomically leave theirs beside them.
+        UserFile.removeAbandonedTemporaries(besides: userFileTargets, olderThan: abandonedStateFileAge)
+        let remoteEdit = support.appendingPathComponent("RemoteEdit", isDirectory: true)
+        RemoteEditStore.removeAbandonedApprovalsNow(in: remoteEdit)
+        // The manifest too, read ahead off the main thread for the store.
+        RemoteEditStore.prefetchShared(rootURL: remoteEdit)
+        return ExportStaging.removeAbandoned()
+    }
+
+    /// Every user file `UserFile.write` may write: the config file and each
+    /// shell's startup files.
+    nonisolated static var userFileTargets: [URL] {
+        [configFileURL] + ShellKind.allCases.flatMap { $0.rcFileURLs + $0.otherRCFileURLs }
+    }
+
+    /// An older build created the state folder at the default umask (0755),
+    /// which lists what it holds to other accounts. Tightened to 0700 when it
+    /// is a real directory this user owns; a link is left alone.
+    nonisolated static func makeOwnerOnly(directory: URL) {
+        var info = stat()
+        guard lstat(directory.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+            info.st_uid == getuid(), info.st_mode & 0o077 != 0
+        else { return }
+        chmod(directory.path, 0o700)
     }
 
     /// Past any save in progress, in this Corta or another using the same stage.

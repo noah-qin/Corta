@@ -130,6 +130,39 @@ struct RecentHostsStoreTests {
         #expect(RecentHostsStore(fileURL: url).targets == store.targets, "read back after a relaunch")
     }
 
+    @Test("a connection recorded before a background load is merged with the file")
+    func connectionBeforeBackgroundLoadIsMerged() throws {
+        let url = temporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let first = RecentHostsStore(fileURL: url)
+        first.record(try target("on-disk"))
+        first.flush()
+        let queue = DispatchQueue(label: "test.recent-hosts")
+        queue.suspend()
+        let store = RecentHostsStore(fileURL: url, writeQueue: queue, loadsInBackground: true)
+        #expect(!store.isLoaded)
+        store.record(try target("before-load"))
+        queue.resume()
+        store.flush()
+        #expect(store.isLoaded)
+        #expect(store.targets.map(\.displayName) == ["before-load", "on-disk"])
+        #expect(RecentHostsStore(fileURL: url).targets.map(\.displayName) == ["before-load", "on-disk"])
+    }
+
+    /// A quit waits for every store under one deadline: each one's flush
+    /// queues its write and joins the group instead of waiting alone.
+    @Test("a quit's flush joins a shared group and is written by the time it is left")
+    func flushJoinsAGroup() throws {
+        let url = temporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let store = RecentHostsStore(fileURL: url)
+        store.record(try target("quit-host"))
+        let group = DispatchGroup()
+        store.flush(into: group, deadline: .now() + .seconds(5))
+        #expect(group.wait(timeout: .now() + .seconds(5)) == .success)
+        #expect(RecentHostsStore(fileURL: url).targets.map(\.displayName) == ["quit-host"])
+    }
+
     @Test("a connection is remembered with the user, port and key it was made with")
     func recordsTheFields() async throws {
         let url = temporaryStoreURL()

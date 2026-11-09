@@ -44,7 +44,7 @@ nonisolated extension TerminalRenderer {
         // After the selection, before the cursor, which stays on top.
         for index in visibleSearchMatches(overlay.searchMatches, grid: grid, offset: offset) {
             Self.appendSelectionQuads(
-                overlay.searchMatches[index], grid: grid, offset: offset, cell: cell,
+                overlay.searchMatches[index], grid: grid, at: QuadPlacement(offset: offset, cell: cell),
                 color: index == overlay.currentSearchMatchIndex
                     ? frameOverlay.currentSearchMatch : frameOverlay.searchMatch, into: &overlayScratch)
         }
@@ -170,14 +170,24 @@ nonisolated extension TerminalRenderer {
         _ selection: TerminalSelection, grid: Grid, offset: Int, cell: SIMD2<Float>, color: SIMD4<Float>
     ) -> ContiguousArray<QuadInstance> {
         var quads: ContiguousArray<QuadInstance> = []
-        Self.appendSelectionQuads(selection, grid: grid, offset: offset, cell: cell, color: color, into: &quads)
+        Self.appendSelectionQuads(
+            selection, grid: grid, at: QuadPlacement(offset: offset, cell: cell), color: color, into: &quads)
         return quads
     }
 
+    /// Where a selection's rows land: the viewport's offset into the
+    /// document and the cell size, in pixels. Plain values, so building one
+    /// per match costs nothing.
+    struct QuadPlacement {
+        let offset: Int
+        let cell: SIMD2<Float>
+    }
+
     private static func appendSelectionQuads(
-        _ selection: TerminalSelection, grid: Grid, offset: Int, cell: SIMD2<Float>,
+        _ selection: TerminalSelection, grid: Grid, at placement: QuadPlacement,
         color: SIMD4<Float>, into quads: inout ContiguousArray<QuadInstance>
     ) {
+        let (offset, cell) = (placement.offset, placement.cell)
         let (cellWidth, cellHeight) = (cell.x, cell.y)
         guard selection.start.row <= selection.end.row else { return }
         // `totalPushed`, as the copy path uses — `.count` let the highlight and
@@ -203,5 +213,30 @@ nonisolated extension TerminalRenderer {
                     size: .init(Float(endColumn - startColumn) * cellWidth, cellHeight),
                     color: color))
         }
+    }
+
+    // Search produces ordered document ranges. Validate only on a new set
+    // so a renderer caller supplying an arbitrary range list still works.
+    func visibleSearchMatches(_ matches: [TerminalSelection], grid: Grid, offset: Int) -> Range<Int> {
+        if cachedOverlay?.searchMatches != matches {
+            searchMatchesOrdered = zip(matches, matches.dropFirst()).allSatisfy { earlier, later in
+                earlier.start.row + earlier.baseScrollbackTotal <= later.start.row + later.baseScrollbackTotal
+                    && earlier.end.row + earlier.baseScrollbackTotal <= later.end.row + later.baseScrollbackTotal
+            }
+        }
+        guard searchMatchesOrdered else { return matches.indices }
+        let top = grid.scrollback.totalPushed - offset
+        func firstIndex(where predicate: (TerminalSelection) -> Bool) -> Int {
+            var low = 0
+            var high = matches.count
+            while low < high {
+                let middle = low + (high - low) / 2
+                if predicate(matches[middle]) { high = middle } else { low = middle + 1 }
+            }
+            return low
+        }
+        let first = firstIndex { $0.end.row + $0.baseScrollbackTotal >= top }
+        let end = firstIndex { $0.start.row + $0.baseScrollbackTotal >= top + grid.rows }
+        return first..<max(first, end)
     }
 }

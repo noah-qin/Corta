@@ -1417,3 +1417,19 @@ do not quote them as absolutes.
 The snapshot row is 60 resizes 100 ms apart with a snapshot every 8 ms, as a frame
 would ask; `SIGWINCH` still waits for the reflow. A loop snapshotting with no gap
 holds so many old grids alive that it showed 1106 MiB, which no frame does.
+
+**Reading the pasteboard before the size check (2026-11-09).** ⌘V reads the
+whole string, then refuses one over `Paste.maximumBytes` (64 MiB). Read from
+another process — as ⌘V reads what another app copied — on Apple M5, Xcode
+27.2, macOS 27.2, a private named pasteboard, one run each:
+
+| Text on the pasteboard | `string(forType:)` + UTF-16 count | `data(forType:)` | `types` |
+| --- | --- | --- | --- |
+| 64 MiB | 15–35 ms | 12.5 ms | < 0.1 ms |
+| 128 MiB | 31–47 ms | 10.3 ms | < 0.1 ms |
+
+Under the ~50 ms a frame-visible stall needs, and AppKit offers no size for an
+item without copying its data (`types` names it; `data(forType:)` is the copy),
+so the read stays on the main thread — `NSPasteboard` is not safe to read from
+another. A paste over the threshold is now also cut into its chunks off the
+main thread, with its scan, for the `?2004` encoding it was judged under.

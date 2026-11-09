@@ -125,4 +125,28 @@ struct UserFileTests {
         #expect(permissions(of: file) == 0o600)
         #expect(try String(contentsOf: file, encoding: .utf8) == "still secret\n")
     }
+
+    /// A write that died before its rename leaves `..zshrc.<uuid>` beside the
+    /// file; only that, for files Corta writes, is swept — never other dot
+    /// files in the folder.
+    @Test("abandoned write temporaries beside a user file are swept, nothing else")
+    func abandonedTemporariesBesideUserFiles() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        let target = home.appendingPathComponent(".zshrc")
+        let old = home.appendingPathComponent("..zshrc.\(UUID().uuidString)")
+        let fresh = home.appendingPathComponent("..zshrc.\(UUID().uuidString)")
+        let other = home.appendingPathComponent("..bashrc.\(UUID().uuidString)")
+        let unrelated = home.appendingPathComponent(".zshrc.backup")
+        for file in [old, fresh, other, unrelated] { try Data("x".utf8).write(to: file) }
+        let past = Date().addingTimeInterval(-3600)
+        for file in [old, other, unrelated] {
+            try FileManager.default.setAttributes([.modificationDate: past], ofItemAtPath: file.path)
+        }
+        UserFile.removeAbandonedTemporaries(besides: [target], olderThan: 300)
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+        for file in [fresh, other, unrelated] { #expect(FileManager.default.fileExists(atPath: file.path)) }
+    }
+
 }

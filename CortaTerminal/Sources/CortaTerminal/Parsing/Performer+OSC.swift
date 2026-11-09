@@ -202,8 +202,7 @@ extension Performer {
         guard let decoded = Self.decodeBase64(data) else { return }
         let text = Self.sanitiseClipboardText(decoded)
         guard !text.isEmpty else { return }
-        state.pendingClipboardCopy = text
-        state.clipboardNeedsAcknowledgement = false
+        queueClipboardCopy(text, acknowledged: false)
     }
 
     /// Strips `ConcealingScalars` — what lets pasted text differ from how it

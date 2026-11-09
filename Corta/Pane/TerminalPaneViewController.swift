@@ -144,6 +144,8 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
     /// (`resizeSessionToFitView`).
     var didSizeWindow = false
     private var resizeDebouncer: ResizeDebouncer!
+    /// The size the debouncer last handed the session, to tell a reflow.
+    private var lastCommittedSize: TerminalSize?
 
     /// ⌘+/⌘− re-fit the window to keep this grid size.
     var lastRequestedSize: TerminalSize?
@@ -303,9 +305,16 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
         remote.cancelPendingOpens()
         remote.stopWatchingConnection()
         appearance.stop()
-        frameLoop.suspendRendering()
+        // A resize still waiting out the drag debounce would reach the
+        // stopping session, and its output callback a pane that is gone;
+        // detaching retires the generation every late callback checks.
+        resizeDebouncer?.cancel()
+        frameLoop.detach()
         terminalView?.stopRendering()
         session?.stop()
+        // The pane is gone; its history need not live on with the reader
+        // while the child is given its grace period (`SECURITY.md` §4.4).
+        session?.releaseContents()
         removeBootstrapFolder()
     }
 
@@ -585,8 +594,15 @@ extension TerminalPaneViewController {
     }
 
     private func installSessionCallbacks() {
+        lastCommittedSize = nil
         resizeDebouncer = ResizeDebouncer { [weak self] size in
-            self?.session?.resize(to: size)
+            guard let self, let session = self.session else { return }
+            let columnsChanged = self.lastCommittedSize.map { $0.columns != size.columns } ?? false
+            self.lastCommittedSize = size
+            session.resize(to: size)
+            // A reflow renumbers rows; matches found before it would be
+            // drawn over the wrong text until the next paced sweep.
+            if columnsChanged { self.search.invalidateResults() }
         }
         // Each is idempotent: a retry's second setup observes nothing twice.
         focus.observeWindows()
@@ -857,17 +873,19 @@ extension TerminalPaneViewController {
     /// frame or, in a tab that draws none, from the output signal.
     private func noteCommandBoundaries() {
         guard let session else { return }
-        let finished = session.takeFinishedCommand()
+        // One lock for what used to take four.
+        let boundary = session.takeCommandBoundaryState()
+        shell.noteCommandState(statusRevision: boundary.statusRevision, isCommandRunning: boundary.isCommandRunning)
+        let finished = boundary.finishedExitStatus
         // The prompt's return is the moment the program left: the title
         // names the shell again now, not an interval later.
         if finished != nil, isFocusedPane {
             windowTitle.invalidateProcessFacts()
             windowTitle.apply()
         }
-        if session.hasShellIntegration {
+        if boundary.hasShellIntegration {
             taskNotifier.noteCommandRunning(
-                session.isCommandRunning, exitStatus: finished,
-                commandID: finished != nil ? session.commandRecords.lastCompleted?.id : nil,
+                boundary.isCommandRunning, exitStatus: finished, commandID: boundary.lastCompletedID,
                 in: view.window)
             // Ranked once a command ran there, not on every `cd`.
             if finished != nil, let directory = session.currentDirectory {
@@ -1017,6 +1035,8 @@ extension TerminalPaneViewController {
         session?.snapshot()
     }
 
+    func liveTotalPushed() -> Int? { session?.scrollbackTotalPushed }
+
     func selectedTextForFind() async -> String? {
         guard let session, let (grid, range) = commands.selectionSnapshot() else { return nil }
         let task = Task.detached(priority: .userInitiated) {
@@ -1138,6 +1158,8 @@ extension TerminalPaneViewController {
         terminalView?.stopRendering()
         readerDemotion?.cancel()
         readerDemotion = nil
+        // Its matches and any sweep in flight read the old session's grid.
+        search.close()
         frameLoop.detach()
         session?.stop()
         session = nil
@@ -1164,7 +1186,12 @@ extension TerminalPaneViewController {
         view.window?.makeFirstResponder(terminalView)
         resizeSessionToFitView(coalesce: false)
         invalidateDisplay()
-        if strictRespawn && showsReconnectNotice {
+        if let notice = pendingSessionNotice {
+            // `viewDidAppear` shows a first spawn's fallback; a rebuild's
+            // view appears without one.
+            pendingSessionNotice = nil
+            terminalView.showToast(notice, kind: .warning)
+        } else if strictRespawn && showsReconnectNotice {
             // Every time: a new connection; the old scrollback is gone.
             terminalView.showToast(remote.reconnectNotice)
         }

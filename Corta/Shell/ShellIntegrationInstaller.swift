@@ -250,7 +250,7 @@ nonisolated struct ShellIntegrationInstaller: Sendable {
     func install() -> Bool {
         let created: Bool
         var existing: String
-        switch UserFile.readText(at: rcFileURL) {
+        switch UserFile.readTextBounded(at: rcFileURL) {
         case .missing:
             created = true
             existing = ""
@@ -274,7 +274,7 @@ nonisolated struct ShellIntegrationInstaller: Sendable {
     /// when there is no whole block to replace.
     @discardableResult
     func update() -> Bool {
-        guard let existing = try? String(contentsOf: rcFileURL, encoding: .utf8),
+        guard case .text(let existing) = UserFile.readTextBounded(at: rcFileURL),
             let range = scriptRange(in: existing)
         else { return false }
         var updated = existing
@@ -303,7 +303,7 @@ nonisolated struct ShellIntegrationInstaller: Sendable {
     @discardableResult
     func uninstall() -> Bool {
         let existing: String
-        switch UserFile.readText(at: rcFileURL) {
+        switch UserFile.readTextBounded(at: rcFileURL) {
         case .missing: return true
         // Whether it holds a block is unknown; say so rather than "removed".
         case .unreadable: return false

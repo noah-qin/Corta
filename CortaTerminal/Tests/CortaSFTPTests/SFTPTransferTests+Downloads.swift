@@ -177,6 +177,37 @@ extension SFTPTransferTests {
         #expect(!FileManager.default.fileExists(atPath: rig.directory.appendingPathComponent("out").path))
     }
 
+    /// Resume on a folder that exists continued interrupted files and
+    /// silently overwrote whole ones; a whole file is now left as it is.
+    @Test("a folder Resume leaves a file already there untouched")
+    func directoryResumeSkipsWholeFiles() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        rig.fileSystem.createFile("/tree/a", data: [1, 2, 3])
+        rig.fileSystem.createFile("/tree/b", data: [4, 5])
+        let existing = try localFile(rig, "a", contents: [7])
+        let receipt = try await rig.engine.downloadDirectory(remotePath: "/tree", to: rig.directory, policy: .resume)
+        #expect(localContents(existing) == [7])
+        #expect(localContents(rig.directory.appendingPathComponent("b")) == [4, 5])
+        #expect(receipt.skipped.contains(.init(relativePath: "a", reason: .alreadyPresent)))
+        #expect(receipt.filesTransferred == 1)
+    }
+
+    @Test("a folder Resume upload leaves a remote file already there untouched")
+    func directoryResumeUploadSkipsWholeFiles() async throws {
+        let rig = try await makeRig()
+        defer { teardown(rig) }
+        let tree = rig.directory.appendingPathComponent("tree")
+        try FileManager.default.createDirectory(at: tree, withIntermediateDirectories: true)
+        try Data([1, 2, 3]).write(to: tree.appendingPathComponent("a"))
+        try Data([4, 5]).write(to: tree.appendingPathComponent("b"))
+        rig.fileSystem.createFile("/dest/a", data: [7])
+        let receipt = try await rig.engine.uploadDirectory(from: tree, to: "/dest", policy: .resume)
+        #expect(rig.fileSystem.file("/dest/a")?.data == [7])
+        #expect(rig.fileSystem.file("/dest/b")?.data == [4, 5])
+        #expect(receipt.skipped.contains(.init(relativePath: "a", reason: .alreadyPresent)))
+    }
+
     @Test("managed downloads replace a stale partial without replacing a complete destination")
     func managedPartialRecovery() async throws {
         let rig = try await makeRig(configureEngine: { $0.restartsManagedDownloadPartials = true })

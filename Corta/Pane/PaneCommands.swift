@@ -42,6 +42,8 @@ protocol PaneCommandsHost: AnyObject {
     func settleFontChange()
     /// Selection geometry and the viewport's return to the live screen.
     var pointer: PanePointer { get }
+    /// Whose matches a clear or reset invalidates.
+    var search: PaneSearch { get }
 }
 
 /// The commands a pane answers from the menu, the palette and its own
@@ -364,7 +366,9 @@ extension PaneCommands {
     ) {
         guard let host, host.isOperable, ConfigurationStore.shared.configuration.confirmClose
         else { return proceed() }
-        let lines = host.session.snapshot().scrollback.count
+        // The parked main screen's history too: Clear History and Reset on
+        // the alternate screen discard it.
+        let lines = host.session.clearableHistoryLineCount()
         guard lines > 0 else { return proceed() }
         let alert = NSAlert()
         alert.alertStyle = .warning
@@ -388,6 +392,8 @@ extension PaneCommands {
         guard let host, host.isOperable else { return }
         host.session.apply(command)
         host.pointer.clearSelection()
+        // The matches named rows that are now blank or gone.
+        host.search.invalidateResults()
         host.scrollOffset = 0
         host.invalidateDisplay()
         host.terminalView?.noteAccessibilityValueChanged()
@@ -402,8 +408,8 @@ extension PaneCommands {
         switch menuItem.action {
         case #selector(exportCommandOutput(_:)):
             guard let host, host.isOperable else { return false }
-            return PaneShellIntegration.commandOutputText(
-                grid: host.session.snapshot(), record: host.effectiveCommand) != nil
+            return PaneShellIntegration.hasCommandOutput(
+                grid: host.session.snapshot(), record: host.effectiveCommand)
         case #selector(exportText(_:)):
             return host?.isOperable == true
         case #selector(revealWorkingDirectoryInFinder(_:)), #selector(copyWorkingDirectoryPath(_:)),

@@ -203,6 +203,25 @@ extension Grid {
         scrollback.removeAll()
     }
 
+    /// Clear History: every line of history the pane holds. On the
+    /// alternate screen that is the parked main screen's, which is what a
+    /// person means — the alternate screen keeps none of its own — and
+    /// clearing only the live one left it all there, behind a toast saying
+    /// it was gone. `ED 3` from a program stays `clearScrollback`.
+    public mutating func clearAllHistory() {
+        clearScrollback()
+        if let suspended = suspendedMain {
+            var main = suspended.grid
+            main.clearScrollback()
+            suspendedMain = SuspendedScreen(main)
+        }
+    }
+
+    /// The lines `clearAllHistory` discards.
+    public var clearableHistoryLineCount: Int {
+        scrollback.count + (suspendedMain?.grid.scrollback.count ?? 0)
+    }
+
     /// DECSTR (soft reset) resets modes without erasing the display or
     /// moving the active cursor.
     public mutating func softReset() {

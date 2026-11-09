@@ -321,7 +321,7 @@ nonisolated struct SessionRestore: Sendable {
     private func readLayout() throws -> [WindowState] {
         let data: Data
         do {
-            data = try PrivateFile.read(fileURL)
+            data = try PrivateFile.read(fileURL, maximumBytes: Self.maximumStateBytes)
         } catch let error as POSIXError where error.code == .ENOENT {
             return []
         }
@@ -397,17 +397,33 @@ nonisolated struct SessionRestore: Sendable {
         }
     }
 
-    /// The file on disk has a window from a newer format.
+    /// The largest arrangement read: windows, tabs and splits as JSON are
+    /// kilobytes.
+    static let maximumStateBytes = 8 << 20
+
+    /// The file on disk has a window from a newer format. Read as the layout
+    /// is — no link followed, bounded in time and size — and a file that
+    /// cannot be read counts as one: it is not written over unseen.
     func holdsNewerState() -> Bool {
         struct VersionProbe: Decodable { var version: Int? }
-        guard let data = try? Data(contentsOf: fileURL),
-            let probes = try? JSONDecoder().decode([VersionProbe].self, from: data)
+        let data: Data?
+        do {
+            data = try PrivateFile.readBounded(fileURL, maximumBytes: Self.maximumStateBytes)
+        } catch {
+            return true
+        }
+        guard let data, let probes = try? JSONDecoder().decode([VersionProbe].self, from: data)
         else { return false }
         return probes.contains { ($0.version ?? 0) > WindowState.currentVersion }
     }
 
+    /// Restore turned off: the arrangement and the mid-restore marker both
+    /// go — a marker left behind made the next launch with restore on skip
+    /// an arrangement that never failed. A failed restore's set-aside copy
+    /// stays, for recovery by hand.
     func clear() {
         try? FileManager.default.removeItem(at: fileURL)
+        endRestore()
     }
 
     /// Keep the most recent failed arrangement for manual recovery. The

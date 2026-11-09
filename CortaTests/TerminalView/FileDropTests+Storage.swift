@@ -255,4 +255,15 @@ extension FileDropTests {
         #expect(FileManager.default.fileExists(atPath: first.path))
     }
 
+    @Test("the first drop creates the state folder owner-only")
+    func firstDropCreatesAPrivateParent() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: base) }
+        let parent = base.appendingPathComponent("Corta")
+        let directory = try FileDropStorage.makeDirectory(in: parent.appendingPathComponent("DroppedFiles"))
+        defer { FileDropStorage.remove(directory) }
+        let mode = (try FileManager.default.attributesOfItem(atPath: parent.path)[.posixPermissions] as? Int) ?? -1
+        #expect(mode == 0o700)
+    }
+
 }

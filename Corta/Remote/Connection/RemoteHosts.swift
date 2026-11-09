@@ -237,17 +237,19 @@ nonisolated enum SSHConfigHosts {
 @MainActor
 final class RecentHostsStore {
     static let shared: RecentHostsStore = {
-        let store = RecentHostsStore(fileURL: defaultFileURL)
+        // Read in the background: the first connect dialog or window no
+        // longer waits on the file.
+        let store = RecentHostsStore(fileURL: defaultFileURL, loadsInBackground: true)
         activeShared = store
         return store
     }()
     private static weak var activeShared: RecentHostsStore?
 
-    static func flushSharedAtQuit() {
-        activeShared?.flush()
+    static func flushSharedAtQuit(into group: DispatchGroup, deadline: DispatchTime) {
+        activeShared?.flush(into: group, deadline: deadline)
     }
 
-    static let limit = 8
+    nonisolated static let limit = 8
 
     static var defaultFileURL: URL {
         AppPaths.applicationSupportDirectory.appendingPathComponent("recent-hosts.json")
@@ -292,10 +294,51 @@ final class RecentHostsStore {
         }
     }
 
-    init(fileURL: URL, writeQueue: DispatchQueue = DispatchQueue(label: "Corta.RecentHostsStore", qos: .utility)) {
+    private enum Change {
+        case record(SSHTarget, Date)
+        case remove(SSHTarget)
+    }
+
+    /// The background read, until applied (`loadsInBackground`).
+    private var pendingLoad: PendingLoad<LoadOutcome>?
+    /// Changes made before the file was read, replayed onto it.
+    private var changesBeforeLoad: [Change] = []
+    var isLoaded: Bool { pendingLoad == nil }
+
+    /// `loadsInBackground`: read on `writeQueue` and applied on the main
+    /// actor; changes made before then are kept and replayed, and nothing is
+    /// written over a file not yet read. Unset, read here, as tests rely on.
+    init(
+        fileURL: URL, writeQueue: DispatchQueue = DispatchQueue(label: "Corta.RecentHostsStore", qos: .utility),
+        loadsInBackground: Bool = false
+    ) {
         self.fileURL = fileURL
         self.writeQueue = writeQueue
-        load()
+        guard loadsInBackground else {
+            apply(Self.read(fileURL))
+            return
+        }
+        let pending = PendingLoad<LoadOutcome>()
+        pendingLoad = pending
+        writeQueue.async { [weak self] in
+            pending.deliver(Self.read(fileURL))
+            Task { @MainActor [weak self] in self?.applyPendingLoad() }
+        }
+    }
+
+    private func applyPendingLoad() {
+        guard let pending = pendingLoad, let outcome = pending.take() else { return }
+        pendingLoad = nil
+        apply(outcome)
+        let changes = changesBeforeLoad
+        changesBeforeLoad.removeAll()
+        for change in changes {
+            switch change {
+            case .record(let target, let date): history.record(target, at: date)
+            case .remove(let target): history.remove(target)
+            }
+        }
+        if !changes.isEmpty { save() }
     }
 
     /// Moves `target` to the front, trimmed to `limit`. One entry per
@@ -304,12 +347,20 @@ final class RecentHostsStore {
     func record(_ target: SSHTarget, at date: Date = Date()) {
         guard let target = Self.checked(target) else { return }
         history.record(target, at: date)
+        guard isLoaded else {
+            changesBeforeLoad.append(.record(target, date))
+            return
+        }
         clearing?.history.record(target, at: date)
         noteChange()
     }
 
     func remove(_ target: SSHTarget) {
         history.remove(target)
+        guard isLoaded else {
+            changesBeforeLoad.append(.remove(target))
+            return
+        }
         clearing?.history.remove(target)
         noteChange()
     }
@@ -320,6 +371,10 @@ final class RecentHostsStore {
 
     /// Deletes the file after earlier writes, keeping connections made while it was being deleted.
     func clear() async {
+        if !isLoaded {
+            await withCheckedContinuation { continuation in writeQueue.async { continuation.resume() } }
+            applyPendingLoad()
+        }
         guard !preservesNewerFile, !preservesUnreadableFile, !isClearing else { return }
         let deletion = HistoryFileDeletion(fileURL, on: writeQueue)
         clearing = Clearing(deletion: deletion)
@@ -352,14 +407,25 @@ final class RecentHostsStore {
 
     /// Finishes queued work within the quit deadline.
     func flush() {
+        let group = DispatchGroup()
         let deadline = DispatchTime.now() + .seconds(1)
+        flush(into: group, deadline: deadline)
+        _ = group.wait(timeout: deadline)
+    }
+
+    /// `flush` without its wait, for a quit that waits for every store at
+    /// once.
+    func flush(into group: DispatchGroup, deadline: DispatchTime) {
+        if let pending = pendingLoad {
+            pending.wait(until: deadline)
+            applyPendingLoad()
+        }
         if let deletion = clearing?.deletion {
             deletion.wait(until: deadline)
             finishClear(deletion)
         }
-        let drained = DispatchSemaphore(value: 0)
-        writeQueue.async { drained.signal() }
-        _ = drained.wait(timeout: deadline)
+        group.enter()
+        writeQueue.async { group.leave() }
     }
 
     /// Waits for writes already scheduled, without blocking the caller.
@@ -372,7 +438,7 @@ final class RecentHostsStore {
     /// The rules a typed connection passes, re-applied to a stored one: an
     /// edited or damaged file offers nothing a person could not have typed.
     /// A key that has since moved is kept — connecting says it is missing.
-    private static func checked(_ target: SSHTarget) -> SSHTarget? {
+    nonisolated private static func checked(_ target: SSHTarget) -> SSHTarget? {
         try? SSHTarget.parse(
             host: target.host, user: target.user ?? "",
             port: target.port.map(String.init) ?? "",
@@ -392,40 +458,61 @@ final class RecentHostsStore {
         var used: [String: Double]?
     }
 
-    private func load() {
+    /// What reading the file found; read anywhere, applied on the main actor.
+    enum LoadOutcome: Sendable {
+        case nothing
+        case unreadable(any Error)
+        case newer
+        case targets([SSHTarget], lastUsed: [String: Date])
+    }
+
+    nonisolated static func read(_ fileURL: URL) -> LoadOutcome {
         struct VersionProbe: Decodable { let version: Int }
         let data: Data
         do {
-            guard let loaded = try PrivateFile.readBounded(fileURL) else { return }
+            guard let loaded = try PrivateFile.readBounded(fileURL) else { return .nothing }
             data = loaded
         } catch {
-            preservesUnreadableFile = true
-            persistenceError = error
-            return
+            return .unreadable(error)
         }
         if let probe = try? JSONDecoder().decode(VersionProbe.self, from: data),
             probe.version > Persisted.currentVersion
         {
-            preservesNewerFile = true
-            return
+            return .newer
         }
         guard
             let persisted = try? JSONDecoder().decode(Persisted.self, from: data),
             persisted.version <= Persisted.currentVersion
-        else { return }
+        else { return .nothing }
         let stored = persisted.targets ?? persisted.hosts.compactMap(SSHTarget.named)
         var seen = Set<String>()
-        history.targets = Array(
+        let targets = Array(
             stored.compactMap(Self.checked).filter { seen.insert($0.displayName).inserted }
                 .prefix(Self.limit))
-        history.lastUsed = (persisted.used ?? [:])
+        let lastUsed = (persisted.used ?? [:])
             .filter { name, _ in seen.contains(name) }
             .mapValues { Date(timeIntervalSince1970: $0) }
+        return .targets(targets, lastUsed: lastUsed)
+    }
+
+    private func apply(_ outcome: LoadOutcome) {
+        switch outcome {
+        case .nothing:
+            history = History()
+        case .unreadable(let error):
+            preservesUnreadableFile = true
+            persistenceError = error
+        case .newer:
+            preservesNewerFile = true
+        case .targets(let targets, let lastUsed):
+            history.targets = targets
+            history.lastUsed = lastUsed
+        }
     }
 
     /// Snapshots on the main actor, encodes and writes on the serial queue.
     private func save(reportSuccess: Bool = true) {
-        guard !preservesNewerFile, !preservesUnreadableFile else { return }
+        guard isLoaded, !preservesNewerFile, !preservesUnreadableFile else { return }
         // A host with a port is left out of `hosts`: an older build would
         // read `host:port` as a host name.
         let hosts = targets.filter { $0.port == nil }

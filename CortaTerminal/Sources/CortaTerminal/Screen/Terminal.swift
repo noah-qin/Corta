@@ -361,16 +361,16 @@ extension Terminal {
         takeClipboardCopyRequest()?.text
     }
 
+    /// The oldest write not yet taken, with its own status replies; call
+    /// until nil to drain them in order.
     public mutating func takeClipboardCopyRequest() -> ClipboardCopyRequest? {
-        guard let text = performer.state.pendingClipboardCopy else { return nil }
-        let answers = performer.state.clipboardNeedsAcknowledgement
+        guard !performer.state.pendingClipboardCopies.isEmpty else { return nil }
+        let pending = performer.state.pendingClipboardCopies.removeFirst()
         func status(_ word: String) -> [UInt8] {
-            answers ? Array("\u{1B}]5522;type=write:status=\(word)\u{1B}\\".utf8) : []
+            pending.acknowledged ? Array("\u{1B}]5522;type=write:status=\(word)\u{1B}\\".utf8) : []
         }
-        performer.state.pendingClipboardCopy = nil
-        performer.state.clipboardNeedsAcknowledgement = false
         return ClipboardCopyRequest(
-            text: text, acknowledgement: status("DONE"), refusal: status("EPERM"), failure: status("EIO"))
+            text: pending.text, acknowledgement: status("DONE"), refusal: status("EPERM"), failure: status("EIO"))
     }
 
     /// Image bytes this terminal may hold in all, set from an

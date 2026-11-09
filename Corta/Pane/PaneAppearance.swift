@@ -210,8 +210,12 @@ final class PaneAppearance: NSObject {
             invalidateDisplay()
             return
         }
-        window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
-        host.splitController?.updateWindowMinSize()
+        // The window's increments and minimum are the selected tab's: a tab
+        // behind it refits its own grid and leaves them alone.
+        if host.splitController?.isSelectedTab ?? true {
+            window.contentResizeIncrements = NSSize(width: metrics.cellWidth, height: metrics.cellHeight)
+            host.splitController?.updateWindowMinSize()
+        }
         host.resizeSessionToFitView(coalesce: !settle)
         invalidateDisplay()
     }

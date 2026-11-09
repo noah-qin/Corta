@@ -123,4 +123,42 @@ struct AppPathsTests {
     @Test func onlyTheInstalledBuildCarriesAnUpdater() {
         #expect(UpdateController.isAvailable == !AppPaths.isDevelopmentBuild)
     }
+
+    @Test("an older build's world-listable state folder is made owner-only; a link is left alone")
+    func stateFolderIsTightened() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let folder = root.appendingPathComponent("Corta")
+        try FileManager.default.createDirectory(
+            at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o755])
+        let link = root.appendingPathComponent("link")
+        let target = root.appendingPathComponent("target")
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o755])
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        AppPaths.makeOwnerOnly(directory: folder)
+        AppPaths.makeOwnerOnly(directory: link)
+        func mode(_ url: URL) throws -> Int {
+            try (FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int) ?? -1
+        }
+        #expect(try mode(folder) == 0o700)
+        #expect(try mode(target) == 0o755)
+    }
+
+    @Test("render metrics are written owner-only and never through a link")
+    func renderMetricsRefuseALink() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let file = root.appendingPathComponent("metrics.log")
+        RenderMetrics.write("one\n", to: file)
+        let mode = (try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int) ?? -1
+        #expect(mode == 0o600)
+        let planted = root.appendingPathComponent("planted.log")
+        let elsewhere = root.appendingPathComponent("elsewhere")
+        try Data().write(to: elsewhere)
+        try FileManager.default.createSymbolicLink(at: planted, withDestinationURL: elsewhere)
+        RenderMetrics.write("two\n", to: planted)
+        #expect(try Data(contentsOf: elsewhere).isEmpty)
+    }
 }

@@ -122,7 +122,11 @@ extension PaneCommands {
     var canChangeDirectorySafely: Bool {
         guard let host, host.isOperable, let session = host.session,
             session.hasShellIntegration, !session.isCommandRunning,
-            !session.hasPendingInput, pasteScan == nil
+            !session.hasPendingInput, pasteScan == nil,
+            // Output can forge every check above (OSC 133 saying "at a
+            // prompt"); the kernel's foreground group it cannot: a running
+            // job holds the terminal, not the shell.
+            session.pty.isChildInForeground
         else {
             return false
         }

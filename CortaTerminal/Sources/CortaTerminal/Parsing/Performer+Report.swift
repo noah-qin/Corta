@@ -104,8 +104,10 @@ struct PerformerState: Sendable {
     var commandRecords = CommandRecordStore()
     /// OSC 52 writes only. The read form would hand the clipboard to the
     /// child and stays unimplemented (`SECURITY.md` §6).
-    var pendingClipboardCopy: String?
-    var clipboardNeedsAcknowledgement = false
+    /// Oldest first, at most `Performer.maximumPendingClipboardCopies`; each
+    /// OSC 5522 write gets its own status, so one completed before the app
+    /// drained the last is queued, not written over.
+    var pendingClipboardCopies: [PendingClipboardCopy] = []
     var pendingImageTransmission: PendingImageTransmission?
     var itermImage: ITermImageTransfer?
     var clipboardTransfer: [UInt8]?
@@ -137,7 +139,7 @@ struct PendingImageTransmission: Sendable {
 
 /// OSC 10/11/12's colours, 8 bits per channel; reported by doubling each
 /// byte into xterm's 16-bit form.
-/// `TerminalSession.frameColors`: what a frame reads, taken together.
+/// `TerminalSession.takeFrameState()`'s colours: what a frame reads, taken together.
 public struct FrameColors: Sendable {
     public var indexedPalette: IndexedPalette
     public var dynamicColors: DynamicColors
@@ -243,4 +245,11 @@ extension Performer {
             title = stack.removeLast()
         }
     }
+}
+
+/// A clipboard write the app has not taken yet. `acknowledged`: an OSC 5522
+/// write, whose client waits for a status; OSC 52 has none.
+struct PendingClipboardCopy: Sendable {
+    let text: String
+    let acknowledged: Bool
 }

@@ -47,9 +47,23 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
     /// so `effectiveCommand` never targets a command scrolled out of view.
     /// `jumpToCommand` sets it after its own scroll.
     var selectedCommandID: Int?
-    private weak var statusSession: TerminalSession?
-    private var statusRevision: UInt64 = 0
-    private var statusByRow: [Int: Int] = [:]
+    weak var statusSession: TerminalSession?
+    var statusRevision: UInt64 = 0
+    var statusByRow: [Int: Int] = [:]
+    /// The command store's `statusRevision` and running flag as the last
+    /// output batch found them (`noteCommandState`): they change only with
+    /// output, so a frame need not lock the session to read them again.
+    private(set) var knownStatusRevision: UInt64 = 0
+    private(set) var knownCommandRunning = false
+    /// What the status tooltips were last built from; the same key builds
+    /// the same rows, so a frame that changes none of it builds none.
+    var statusOverlayKey: Int?
+
+    /// From the output batch's one read of the session's command state.
+    func noteCommandState(statusRevision: UInt64, isCommandRunning: Bool) {
+        knownStatusRevision = statusRevision
+        knownCommandRunning = isCommandRunning
+    }
 
     init(host: PaneShellIntegrationHost? = nil) {
         self.host = host
@@ -57,13 +71,13 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
 
     // The pane's state, read and written where the code that uses it reads
     // it best.
-    private var session: TerminalSession! { host?.session ?? nil }
+    var session: TerminalSession! { host?.session ?? nil }
     private var isOperable: Bool { host?.isOperable ?? false }
-    private var terminalView: TerminalView? { host?.terminalView ?? nil }
-    private var terminalRenderer: TerminalRenderer? { host?.terminalRenderer ?? nil }
-    private var isFocusedPane: Bool { host?.isFocusedPane ?? false }
-    private var topInset: CGFloat { host?.topInset ?? 0 }
-    private var scrollOffset: Int {
+    var terminalView: TerminalView? { host?.terminalView ?? nil }
+    var terminalRenderer: TerminalRenderer? { host?.terminalRenderer ?? nil }
+    var isFocusedPane: Bool { host?.isFocusedPane ?? false }
+    var topInset: CGFloat { host?.topInset ?? 0 }
+    var scrollOffset: Int {
         get { host?.scrollOffset ?? 0 }
         set { host?.scrollOffset = newValue }
     }
@@ -196,6 +210,17 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
         guard let range = commandOutputRange(grid: grid, record: record) else { return nil }
         let text = Selection.text(of: range, in: grid)
         return text.isEmpty ? nil : text
+    }
+
+    /// Whether `commandOutputText` would have text, without building it.
+    /// Menu validation runs on every menu open and key equivalent, and
+    /// building a long command's whole output there to test it for
+    /// emptiness was a stall. `Selection.text` joins rows with newlines, so
+    /// only a one-row range can come out empty: then the row is read.
+    nonisolated static func hasCommandOutput(grid: Grid, record: CommandRecord?) -> Bool {
+        guard let range = commandOutputRange(grid: grid, record: record) else { return false }
+        guard range.start.row == range.end.row else { return true }
+        return grid.documentLine(range.start.row).cells.contains { $0.scalar > 0x20 }
     }
 
     /// The document range of a completed command's output; nil while running
@@ -383,7 +408,8 @@ extension PaneShellIntegration {
             #selector(jumpToNextFailedCommand(_:)):
             return hasShellIntegration && hasFailedCommands
         case #selector(copyLastCommandOutput(_:)):
-            return commandOutputText(for: effectiveCommand) != nil
+            guard isOperable else { return false }
+            return Self.hasCommandOutput(grid: session.snapshot(), record: effectiveCommand)
         case #selector(snapshotRunningCommandOutput(_:)):
             guard isOperable else { return false }
             return session.commandRecords.last?.isRunning == true
@@ -410,74 +436,21 @@ extension PaneShellIntegration {
     /// Puts OSC 52 text on the pasteboard if the user allows it. Called per
     /// output batch from the damage pass; the policy lives here because the
     /// core has no pasteboard and no user.
+    /// Every queued write, oldest first, each answered on its own.
     func drainClipboardRequests() {
-        guard let request = session.takeClipboardCopyRequest() else { return }
-        guard ConfigurationStore.shared.configuration.allowClipboardWrite else {
-            if !request.refusal.isEmpty { session.write(request.refusal) }
-            return
+        while let request = session.takeClipboardCopyRequest() {
+            guard ConfigurationStore.shared.configuration.allowClipboardWrite else {
+                if !request.refusal.isEmpty { session.write(request.refusal) }
+                continue
+            }
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            let reply = pasteboard.setString(request.text, forType: .string) ? request.acknowledgement : request.failure
+            if !reply.isEmpty { session.write(reply) }
         }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        let reply = pasteboard.setString(request.text, forType: .string) ? request.acknowledgement : request.failure
-        if !reply.isEmpty { session.write(reply) }
     }
 
     // MARK: - Status marks and directory completion
-
-    func updateShellOverlay(grid: Grid, canvas: CanvasTextColors) {
-        guard let terminalView, let terminalRenderer else { return }
-        let overlay = terminalView.shellOverlay
-        if overlay.frame != terminalView.bounds { overlay.frame = terminalView.bounds }
-        let metrics = terminalRenderer.pointMetrics
-        let content = PaneFrameLoop.contentRect(in: terminalView.bounds.size, scale: 1,
-            gridHeight: CGFloat(grid.rows) * metrics.cellHeight, topInset: topInset)
-        let config = ConfigurationStore.shared.configuration
-        var rows: [ShellOverlayView.Status] = []
-        // The tooltips for the rules the renderer draws (`TerminalRenderer.rebuildMarks`).
-        if config.commandStatusMarks && !grid.isAlternateScreenActive {
-            let records = session.commandRecords
-            if statusSession !== session || statusRevision != records.statusRevision {
-                statusSession = session
-                statusRevision = records.statusRevision
-                statusByRow.removeAll(keepingCapacity: true)
-                for record in records.recordsInOrder {
-                    if let status = record.exitStatus { statusByRow[record.promptRow] = status }
-                }
-            }
-            let firstAbsolute = grid.scrollback.totalPushed - scrollOffset
-            for row in 0..<grid.rows {
-                let absolute = firstAbsolute + row
-                guard let line = grid.line(atAbsoluteRow: absolute), line.mark.hasOutcome else { continue }
-                let code =
-                    statusByRow[absolute] ?? (line.mark == .promptSucceeded ? 0 : line.mark == .promptInterrupted ? 130 : 1)
-                let text =
-                    code == 0
-                    ? L10n.text("commandStatus.succeeded")
-                    : code == 130
-                        ? L10n.text("commandHistory.statusInterrupted")
-                        : L10n.format("commandHistory.statusFailed", code)
-                rows.append(.init(
-                    rect: CGRect(
-                        x: content.minX - TerminalLayout.statusRuleOffset,
-                        y: content.minY + CGFloat(row) * metrics.cellHeight,
-                        width: TerminalLayout.statusRuleWidth, height: metrics.cellHeight),
-                    description: text))
-            }
-        }
-        overlay.updateStatuses(rows)
-        let canSuggest =
-            isFocusedPane && scrollOffset == 0 && host?.search.bar == nil && !session.isCommandRunning
-            && !grid.isAlternateScreenActive
-        let completion = canSuggest && config.directoryCompletion ? session.directoryCompletion : nil
-        let history = canSuggest && config.historySuggestions ? session.historySuggestion : nil
-        let anchor = CGRect(x: content.minX + CGFloat(grid.cursor.column) * metrics.cellWidth,
-            y: content.minY + CGFloat(grid.cursor.row) * metrics.cellHeight,
-            width: metrics.cellWidth, height: metrics.cellHeight)
-        overlay.showCompletion(completion, history: history, anchor: anchor,
-            font: (host?.fontStyle ?? FontStyle()).font(
-                ofSize: host?.fontSize ?? TerminalPaneViewController.defaultFontSize) as NSFont,
-            baseline: metrics.baselineOffset, colors: canvas)
-    }
 
     func handleDirectoryCompletionKey(_ event: NSEvent) -> Bool {
         if let terminalView, terminalView.shellOverlay.historySuggestion != nil {

@@ -67,6 +67,32 @@ extension SFTPBrowserModel {
     /// At most this many steps back; a long session's walk is not kept whole.
     private static let historyLimit = 50
 
+    /// The listed folder becomes the current one, and Back and Forward
+    /// follow how it was reached.
+    private func moveTo(_ destination: String, history: HistoryMove) {
+        if destination != currentPath {
+            receptionNotice = nil
+            switch history {
+            case .visit:
+                backStack.append(currentPath)
+                forwardStack.removeAll()
+            case .back:
+                backStack.removeLast()
+                forwardStack.append(currentPath)
+            case .forward:
+                forwardStack.removeLast()
+                backStack.append(currentPath)
+            case .none:
+                break
+            }
+            if backStack.count > Self.historyLimit {
+                backStack.removeFirst(backStack.count - Self.historyLimit)
+            }
+        }
+        currentPath = destination
+        pathField = currentPath
+    }
+
     private func load(_ path: String, history: HistoryMove = .visit) {
         guard let client else { return }
         isLoading = true
@@ -83,30 +109,7 @@ extension SFTPBrowserModel {
                 let listing = try await client.listDirectory(path: path)
                 deadline.cancel()
                 guard generation == directoryGeneration else { return }
-                await applyEntries(listing) {
-                    let destination = Self.normalized(path: path)
-                    if destination != currentPath {
-                        receptionNotice = nil
-                        switch history {
-                        case .visit:
-                            backStack.append(currentPath)
-                            forwardStack.removeAll()
-                        case .back:
-                            backStack.removeLast()
-                            forwardStack.append(currentPath)
-                        case .forward:
-                            forwardStack.removeLast()
-                            backStack.append(currentPath)
-                        case .none:
-                            break
-                        }
-                        if backStack.count > Self.historyLimit {
-                            backStack.removeFirst(backStack.count - Self.historyLimit)
-                        }
-                    }
-                    currentPath = destination
-                    pathField = currentPath
-                }
+                await applyEntries(listing) { moveTo(Self.normalized(path: path), history: history) }
                 guard generation == directoryGeneration else { return }
                 selection = []
                 updateTitle()

@@ -112,6 +112,10 @@ final class CommandPaletteModel {
     private let agentEntries: () -> [AgentDirectory.Entry]
     private let canJumpToNextWaitingPane: () -> Bool
     private let paneMoveTargets: () -> [PaneMoveTarget]
+    /// Whether a command would do anything where it would be sent — the
+    /// window the palette opened over — as its menu item's validation says.
+    /// Set by the controller; a disabled row cannot be chosen.
+    var isCommandAvailable: (TerminalCommand) -> Bool = { _ in true }
 
     init(
         agents: @escaping () -> [AgentDirectory.Entry] = { AgentDirectory.entries },
@@ -149,7 +153,8 @@ final class CommandPaletteModel {
         let shortcuts = ConfigurationStore.shared.configuration.keybindings
         func row(_ command: TerminalCommand, recent: Bool = false) -> Row {
             .command(command, recent: recent, shortcut: shortcuts[command]?.displayText ?? "",
-                     enabled: command != .nextWaitingPane || canJumpToNextWaitingPane())
+                     enabled: isCommandAvailable(command)
+                        && (command != .nextWaitingPane || canJumpToNextWaitingPane()))
         }
         rows =
             query.isEmpty

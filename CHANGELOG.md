@@ -29,8 +29,69 @@ Versioning for compatibility changes.
   instead of a frame, behind a folder mark; the chosen folder is held in a
   soft chip rather than underlined, trailing slashes fade, and a count such
   as +3 says how many more there are.
+- ⌘+, ⌘−, ⌘0 and pinch zoom every tab of the window, and a new tab opens
+  at the window's zoom, as the documentation already said.
+- Resume on a folder transfer continues interrupted files and leaves files
+  already there untouched; it no longer overwrites them. Retry on a folder
+  that failed part-way skips the files it already sent.
+- Regex search refuses only patterns that can backtrack exponentially;
+  `(\d+\.)+\d+`, `(foo|bar)*` and similar now run.
+- A configuration file larger than 1 MiB is treated as unreadable: Corta
+  keeps its settings and Settings says why changes are not saved.
+- Opening Settings no longer rewrites the configuration file; it creates
+  one only when there is none.
 
 ### Fixed
+
+- Settings keeps the lines of a preset it cannot use (a relative shell or
+  directory, or an empty one) and of a misspelt theme key in the file
+  instead of dropping them or writing out an extra theme.
+- The status bar's network interface field saves when it loses focus.
+  Shell integration install, update and removal time out after ten
+  seconds, and a failure or timeout offers Retry.
+- With `scrollback-lines = 0` and on the alternate screen, command marks,
+  records, a selection and images stay with their text as it scrolls, and
+  an image no longer moves when the window loses rows.
+- Clear History on the alternate screen clears the main screen's history
+  too, and its confirmation counts those lines.
+- Each OSC 5522 clipboard write gets its own status reply, even when
+  several finish before Corta reads them.
+- Search results are dropped and found again after Clear, Reset, a width
+  change, Try Again or Reconnect, instead of highlighting text that moved
+  or is gone. Try Again shows when the pane fell back to another shell or
+  folder.
+- Moving focus from a zoomed pane, or closing any pane while one is
+  zoomed, ends the zoom first.
+- The secure-input lock shows only on the key window. Choosing the tab
+  already shown keeps focus in its search field. A tab behind the selected
+  one no longer changes the window's resize steps, and leaving full screen
+  no longer makes the window taller.
+- Quit while a window is asking whether to close brings that question
+  forward instead of asking a second time. The command palette disables
+  commands the window would refuse, and beeps if one is refused when run.
+- A closed pane's history is freed at once rather than after its process
+  has been given time to exit. A launch that could not read the saved
+  window arrangement resumes saving it once the file can be read.
+- The host-key dialog says whether the question came from OpenSSH or a
+  machine on the way, sign-in questions appear only over a terminal or SFTP
+  window, and the SFTP drop prompt shows a server's folder name sanitised.
+- Go to Parent Directory and Go to Project Root type their `cd` only when
+  the shell itself, not a running job, holds the terminal.
+- A pipe or device chosen for SFTP upload is refused instead of hanging the
+  transfer. SFTP Retry reconnects to the folder that was open, and closing
+  an SFTP window with a sheet up beeps and shows the sheet.
+- Corta's Application Support folder and render-metrics file are
+  owner-only. Launch cleanup also removes leftovers of interrupted saves
+  beside the config and shell startup files, approval copies Remote Edit
+  left, and an unfinished export's temporary folder after it was moved;
+  one it still cannot remove after 30 days is reported once.
+- Large pastes are cut into chunks off the main thread. Frames take the
+  session lock once instead of several times, command-status tooltips,
+  search placement and the idle cursor no longer redo or hold work every
+  frame, and a covered window stops polling for its title and the command
+  history. Directory history and recent hosts load in the background, zsh
+  startup files and drop folders are written off the main thread, and Quit
+  waits for all of its last writes together.
 
 - Turning the status bar on or off grows or shrinks the window by the bar's
   height rather than resizing the panes, so the canvas no longer flashes

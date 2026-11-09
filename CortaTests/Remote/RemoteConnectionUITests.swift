@@ -353,6 +353,35 @@ struct AskpassWordingTests {
         #expect(!SSHAskpass.refusalEndsConnection(kind: .confirm, prompt: "Allow use of key?"))
     }
 
+    @Test("the host-key and notice dialogs say where the question came from")
+    func hostKeyDialogNamesItsSource() {
+        for question in [SSHAskpass.Question.hostKey, .notify] {
+            let direct = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
+                question: question, host: "box", prompt: "fingerprint (yes/no)?"))
+            #expect(direct.informativeText.contains(L10n.text("askpass.source")))
+            let step = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
+                question: question, host: "box", prompt: "fingerprint", isIntermediateStep: true))
+            #expect(step.informativeText.contains(L10n.format("askpass.source.intermediate", "box")))
+        }
+    }
+
+    @Test("an askpass sheet hangs only from a terminal or the host's browser window")
+    func askpassNeverHangsFromSettings() {
+        let settings = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        settings.isReleasedWhenClosed = false
+        settings.orderFront(nil)
+        defer { settings.close() }
+        #expect(SSHAskpassPrompter.window(for: "box", among: [settings]) == nil)
+    }
+
+    @Test("the drop prompt shows the current folder's name sanitised")
+    func dropPromptSanitisesTheFolderName() {
+        let target = SFTPDropDestination.current(path: "/srv/evil\u{202E}gnp.exe")
+        #expect(!target.prompt(count: 1).contains("\u{202E}"))
+    }
+
     /// What the dialog does is what the broker decided, never read back out
     /// of the text it shows.
     @Test("Cancel's wording follows the broker's decision, not the prompt")

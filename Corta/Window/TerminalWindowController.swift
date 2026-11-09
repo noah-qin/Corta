@@ -103,8 +103,12 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
 
     /// A titlebar lock while Secure Keyboard Entry is engaged — the effect is
     /// invisible otherwise. Follows `SecureInput.engaged`, not the setting.
-    private var secureInputIndicator: NSTitlebarAccessoryViewController?
+    private(set) var secureInputIndicator: NSTitlebarAccessoryViewController?
     private var secureInputObserver: NSObjectProtocol?
+    /// What the lock reads, injectable so a test never engages the machine's
+    /// secure input or needs a real key window.
+    var secureInputIsEngaged: () -> Bool = { SecureInput.shared.engaged }
+    lazy var windowIsKey: () -> Bool = { [weak self] in self?.window?.isKeyWindow ?? false }
     private var isStripRefreshPending = false
 
     isolated deinit {
@@ -126,7 +130,22 @@ extension TerminalWindowController {
             tab.customTitle = restore.customTabTitle
         }
         container.add(split, hidden: hidden)
+        // The window's temporary zoom (⌘+, pinch) is the window's, so a new
+        // tab opens at it, as a new split does.
+        if let zoomed = tabs.first(where: { $0 !== tab })?.split.focusedPane, zoomed.isFontSizeZoomed {
+            split.setFontSizeForOwnPanes(zoomed.fontSize, isZoomed: true, settle: true)
+        }
         return tab
+    }
+
+    /// ⌘= / ⌘− / ⌘0 and pinch, for every tab: a temporary zoom is per
+    /// window, not per tab.
+    func setFontSizeForAllTabs(_ size: CGFloat, isZoomed: Bool, settle: Bool) {
+        for tab in tabs { tab.split.setFontSizeForOwnPanes(size, isZoomed: isZoomed, settle: settle) }
+    }
+
+    func settleFontChangeForAllTabs() {
+        for tab in tabs { tab.split.settleFontChangeForOwnPanes() }
     }
 
     /// Takes `tab` into the window's list, selected if it is the first; its
@@ -176,7 +195,11 @@ extension TerminalWindowController {
         selectedTab = tab
         container.show(tab.split, holding: previous, direction: backward ? -1 : 1)
         tab.split.didBecomeSelectedTab()
-        if window.isKeyWindow || !window.isVisible || changed {
+        // Choosing the tab already shown leaves the keyboard where it is in
+        // it — a search field, a rename — rather than taking it back to the
+        // terminal.
+        let responderInTab = (window.firstResponder as? NSView)?.isDescendant(of: tab.split.view) == true
+        if changed || ((window.isKeyWindow || !window.isVisible) && !responderInTab) {
             window.makeFirstResponder(tab.split.focusedPane?.terminalView)
         }
         tab.split.applyWindowTitle()
@@ -417,9 +440,9 @@ extension TerminalWindowController {
         SettingsWindowController.shared.showPrivacySettings(sender)
     }
 
-    private func updateSecureInputIndicator() {
-        guard let window else { return }
-        let hidden = !(SecureInput.shared.engaged && window.isKeyWindow)
+    func updateSecureInputIndicator() {
+        guard window != nil else { return }
+        let hidden = !(secureInputIsEngaged() && windowIsKey())
         secureInputIndicator?.isHidden = hidden
         // Native tab/titlebar transitions can retain an accessory's layout;
         // hide its view too so an inactive lock cannot remain visible.
@@ -439,12 +462,16 @@ extension TerminalWindowController {
         return proposedOptions.union([.fullScreen, .autoHideToolbar, .autoHideMenuBar])
     }
 
-    func windowDidEnterFullScreen(_ notification: Notification) {
-        splitController?.updateDirectPresentation()
+    /// The lock shows on the key window only. Moving between two terminal
+    /// windows leaves secure input engaged, so `SecureInput.didChange` never
+    /// posts and the window losing key kept its lock; each window follows
+    /// its own key state too.
+    func windowDidBecomeKey(_ notification: Notification) {
+        updateSecureInputIndicator()
     }
 
-    func windowDidExitFullScreen(_ notification: Notification) {
-        splitController?.updateDirectPresentation()
+    func windowDidResignKey(_ notification: Notification) {
+        updateSecureInputIndicator()
     }
 
     /// Asks as a sheet, so the answer comes after this returns: refuse now,

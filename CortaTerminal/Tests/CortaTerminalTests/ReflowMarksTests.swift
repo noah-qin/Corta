@@ -102,6 +102,25 @@ struct ReflowMarksTests {
         }
     }
 
+    /// With no history the scrolled-off rows still count, so a record's
+    /// absolute rows keep naming the text it was made for.
+    @Test("with no scrollback, command records stay on their rows as output scrolls")
+    func recordsFollowTheirRowsWithoutHistory() throws {
+        var terminal = Terminal(rows: 5, columns: 20, scrollbackLimit: 0)
+        terminal.feed(Self.commands(4))
+        var checked = 0
+        for record in terminal.commandRecords.records where !record.isRunning {
+            guard Self.text(terminal, atAbsoluteRow: record.promptRow) != nil else { continue }
+            #expect(Self.text(terminal, atAbsoluteRow: record.promptRow)?.hasPrefix("$ cmd\(record.id)") == true)
+            #expect(terminal.grid.line(atAbsoluteRow: record.promptRow)?.mark.isPrompt == true)
+            checked += 1
+        }
+        #expect(checked > 0)
+        #expect(terminal.grid.promptRows.allSatisfy {
+            Self.text(terminal, atAbsoluteRow: $0)?.hasPrefix("$") == true
+        })
+    }
+
     @Test("leaving the alternate screen after a width change keeps the records on their rows")
     func alternateScreenExitReflowKeepsRecords() throws {
         var terminal = Terminal(rows: 5, columns: 20, scrollbackLimit: 100)

@@ -44,8 +44,11 @@ extension Grid {
             // Only enough rows to keep the cursor on screen; the rest are blank.
             let excess = rows - newRows
             let fromTop = min(excess, max(0, cursor.row - (newRows - 1)))
+            // Counted even with no history (`Scrollback.push`), so images and
+            // marks anchored below keep their rows.
             for row in 0..<fromTop { scrollback.push(lines[row]) }
             if fromTop > 0 {
+                dropImagesLeftWithoutHistory()
                 lines.removeFirst(fromTop)
                 cursor.row -= fromTop
             }

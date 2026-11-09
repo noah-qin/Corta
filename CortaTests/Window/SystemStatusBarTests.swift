@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import AppKit
+import Synchronization
 import Testing
 
 @testable import Corta
@@ -78,4 +79,39 @@ struct SystemStatusBarTests {
             #expect(quiet == busy, "\(quiet) vs \(busy)")
         }
     }
+
+    /// Every bar redraws on the notification; an unchanged sample used to
+    /// send it every two seconds regardless.
+    @Test("an unchanged sample posts no change")
+    func unchangedSamplePostsNothing() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent("config")
+        try "status-bar = true\n".write(to: file, atomically: true, encoding: .utf8)
+        let config = ConfigurationStore(fileURL: file)
+        var fixed = SystemMetrics()
+        fixed.cpuPercent = 12
+        let constant = fixed
+        let metrics = SystemMetricsStore(store: config) { _, _, _ in constant }
+        final class Posts: Sendable { let count = Mutex(0) }
+        let posts = Posts()
+        let observer = NotificationCenter.default.addObserver(
+            forName: SystemMetricsStore.didChange, object: metrics, queue: nil
+        ) { _ in posts.count.withLock { $0 += 1 } }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        let client = UUID()
+        metrics.setActive(true, client: client)
+        let deadline = SuspendingClock.now + .seconds(5)
+        while posts.count.withLock({ $0 }) == 0, SuspendingClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(posts.count.withLock { $0 } == 1)
+        metrics.setActive(false, client: client)
+        metrics.setActive(true, client: client)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(posts.count.withLock { $0 } == 1)
+        metrics.setActive(false, client: client)
+    }
+
 }

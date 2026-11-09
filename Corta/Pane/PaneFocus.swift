@@ -62,7 +62,12 @@ final class PaneFocus: NSObject {
     private var lastCursorOutputRevision: UInt64 = 0
     private var idleCursorLayer: CursorLayerPresentation?
     private var pendingCursorLayer: CursorLayerPresentation?
-    private var lastCursorGrid: Grid?
+    /// Of the last frame's grid, only what the idle cursor layer needs: a
+    /// whole `Grid` kept between frames held its history and images alive
+    /// past the diff (`PERFORMANCE.md` §5.9). A capture takes a fresh
+    /// snapshot and drops it at once.
+    private var lastCursorRows = 0
+    private var lastCursorHasImages = false
     private var blinkIsInvalidating = false
     private var cursorOffAt: CFTimeInterval?
 
@@ -94,50 +99,6 @@ final class PaneFocus: NSObject {
             idleCursorLayer = nil
         }
     }
-    private func makeIdleCursorLayer(capture: TerminalRenderer.CursorImage? = nil) -> CursorLayerPresentation? {
-        guard let pane = host as? TerminalPaneViewController, let grid = lastCursorGrid,
-            let renderer = pane.terminalRenderer, let view = pane.terminalView,
-            !view.hasMarkedText(), pane.selection == nil,
-            pane.search.highlights.isEmpty, pane.pointer.hoveredLink == nil,
-            grid.imagePlacements.placementCount == 0
-        else { return nil }
-        let metrics = renderer.pointMetrics
-        let scale = renderer.scale
-        let style = lastBlinkStyle ?? .block
-        var column = grid.cursor.column
-        var columns = 1
-        let layer = CALayer()
-        layer.actions = ["opacity": NSNull(), "position": NSNull(), "bounds": NSNull()]
-        layer.contentsScale = scale
-        layer.opacity = 0
-        layer.backgroundColor =
-            NSColor(
-                srgbRed: CGFloat(TerminalColorPalette.activeVariant.cursor.x),
-                green: CGFloat(TerminalColorPalette.activeVariant.cursor.y),
-                blue: CGFloat(TerminalColorPalette.activeVariant.cursor.z), alpha: 1
-            ).cgColor
-        if style == .blinkingBlock {
-            guard let capture else { return nil }
-            column = capture.column
-            columns = capture.columns
-            layer.contents = capture.image
-        }
-        let content = PaneFrameLoop.contentRect(
-            in: view.bounds.size, scale: 1,
-            gridHeight: CGFloat(grid.rows) * metrics.cellHeight, topInset: pane.topInset)
-        var frame = CGRect(
-            x: content.minX + CGFloat(column) * metrics.cellWidth,
-            y: content.minY + CGFloat(grid.cursor.row) * metrics.cellHeight,
-            width: metrics.cellWidth * CGFloat(columns), height: metrics.cellHeight)
-        let stroke = max(2, floor(metrics.cellHeight * scale / 8)) / scale
-        if style == .blinkingBar { frame.size.width = stroke }
-        if style == .blinkingUnderline {
-            frame.origin.y += frame.height - stroke
-            frame.size.height = stroke
-        }
-        layer.frame = frame
-        return CursorLayerPresentation(layer: layer)
-    }
 
     private var cursorCaptureTask: Task<Void, Never>?
     private var cursorCaptureGeneration: UInt64 = 0
@@ -157,8 +118,13 @@ final class PaneFocus: NSObject {
             if let layer = makeIdleCursorLayer() { installIdleCursorLayer(layer) }
             return
         }
+        // Taken now and dropped with the task: the frame's own was released
+        // after its diff. Output since that frame moved the cursor or its
+        // cell, and the capture waits for the next idle moment.
         guard let pane = host as? TerminalPaneViewController, let renderer = pane.terminalRenderer,
-            let grid = lastCursorGrid else { return }
+            let grid = pane.session?.snapshot(), grid.cursor == lastBlinkCursor, grid.rows == lastCursorRows,
+            handoff.snapshot.outputRevision == lastCursorOutputRevision
+        else { return }
         let generation = cursorCaptureGeneration
         let revision = lastCursorOutputRevision
         cursorCaptureTask = Task { [weak self] in
@@ -385,6 +351,7 @@ extension PaneFocus {
     @objc private func windowFocusChanged(_ note: Notification) {
         guard let window = note.object as? NSWindow, window === host?.view.window else { return }
         (host as? TerminalPaneViewController)?.updateReaderPriority()
+        (host as? TerminalPaneViewController)?.windowTitle.windowVisibilityChanged()
         reportIfNeeded()
         // Cmd-Tab drops the ring even though the focused pane doesn't change.
         applyAppearance()
@@ -441,7 +408,8 @@ extension PaneFocus {
         {
             noteCursorActivity()
         }
-        lastCursorGrid = grid
+        lastCursorRows = grid.rows
+        lastCursorHasImages = grid.imagePlacements.placementCount > 0
         lastCursorOutputRevision = outputRevision ?? handoff.snapshot.outputRevision
         lastBlinkCursor = grid.cursor
         lastBlinkStyle = style
@@ -472,4 +440,53 @@ extension PaneFocus {
 /// Input falls through to the terminal view.
 private final class PassthroughView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+// MARK: - The idle cursor layer
+
+extension PaneFocus {
+    fileprivate func makeIdleCursorLayer(capture: TerminalRenderer.CursorImage? = nil) -> CursorLayerPresentation? {
+        guard let pane = host as? TerminalPaneViewController, let cursor = lastBlinkCursor,
+            let renderer = pane.terminalRenderer, let view = pane.terminalView,
+            !view.hasMarkedText(), pane.selection == nil,
+            pane.search.highlights.isEmpty, pane.pointer.hoveredLink == nil,
+            !lastCursorHasImages
+        else { return nil }
+        let metrics = renderer.pointMetrics
+        let scale = renderer.scale
+        let style = lastBlinkStyle ?? .block
+        var column = cursor.column
+        var columns = 1
+        let layer = CALayer()
+        layer.actions = ["opacity": NSNull(), "position": NSNull(), "bounds": NSNull()]
+        layer.contentsScale = scale
+        layer.opacity = 0
+        layer.backgroundColor =
+            NSColor(
+                srgbRed: CGFloat(TerminalColorPalette.activeVariant.cursor.x),
+                green: CGFloat(TerminalColorPalette.activeVariant.cursor.y),
+                blue: CGFloat(TerminalColorPalette.activeVariant.cursor.z), alpha: 1
+            ).cgColor
+        if style == .blinkingBlock {
+            guard let capture else { return nil }
+            column = capture.column
+            columns = capture.columns
+            layer.contents = capture.image
+        }
+        let content = PaneFrameLoop.contentRect(
+            in: view.bounds.size, scale: 1,
+            gridHeight: CGFloat(lastCursorRows) * metrics.cellHeight, topInset: pane.topInset)
+        var frame = CGRect(
+            x: content.minX + CGFloat(column) * metrics.cellWidth,
+            y: content.minY + CGFloat(cursor.row) * metrics.cellHeight,
+            width: metrics.cellWidth * CGFloat(columns), height: metrics.cellHeight)
+        let stroke = max(2, floor(metrics.cellHeight * scale / 8)) / scale
+        if style == .blinkingBar { frame.size.width = stroke }
+        if style == .blinkingUnderline {
+            frame.origin.y += frame.height - stroke
+            frame.size.height = stroke
+        }
+        layer.frame = frame
+        return CursorLayerPresentation(layer: layer)
+    }
 }

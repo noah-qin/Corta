@@ -391,3 +391,61 @@ extension WindowTabsTests {
         }
     }
 }
+
+extension WindowTabsTests {
+    /// ⌘+ in one tab zoomed only that tab, while the window's increments
+    /// and the documentation call the zoom the window's.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func fontZoomAppliesToEveryTabAndNewTabsInheritIt() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        let first = try #require(controller.selectedTab)
+        let second = controller.addTab()
+        controller.container.releaseHeld(animated: false)
+        controller.selectTab(first)
+        let pane = try #require(first.split.focusedPane)
+        let before = pane.fontSize
+        pane.commands.increaseFontSize(nil)
+        #expect(pane.fontSize == before + 1)
+        #expect(second.split.panes.allSatisfy { $0.fontSize == before + 1 && $0.isFontSizeZoomed })
+        let third = controller.addTab()
+        #expect(third.split.panes.allSatisfy { $0.fontSize == before + 1 && $0.isFontSizeZoomed })
+        third.split.focusedPane?.commands.resetFontSize(nil)
+        #expect(controller.tabs.allSatisfy { $0.split.panes.allSatisfy { !$0.isFontSizeZoomed } })
+    }
+
+    /// A tab behind the selected one wrote its own cell size into the
+    /// window's resize increments.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func aBackgroundTabLeavesTheWindowIncrementsAlone() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        let first = try #require(controller.selectedTab)
+        let second = controller.addTab()
+        controller.container.releaseHeld(animated: false)
+        controller.selectTab(first)
+        let window = try #require(controller.window)
+        let increments = window.contentResizeIncrements
+        let hidden = try #require(second.split.focusedPane)
+        hidden.setFontSize(hidden.fontSize + 6)
+        #expect(window.contentResizeIncrements == increments)
+    }
+
+    /// Choosing the tab already shown took the keyboard from its search
+    /// field back to the terminal.
+    @Test(.enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+    func selectingTheShownTabKeepsItsSearchFieldFocused() throws {
+        let controller = try makeWindow()
+        defer { close(controller) }
+        let tab = try #require(controller.selectedTab)
+        let window = try #require(controller.window)
+        // Hidden, the old rule took the keyboard whatever held it.
+        window.orderOut(nil)
+        let pane = try #require(tab.split.focusedPane)
+        pane.search.show()
+        #expect(pane.search.hasKeyboardFocus)
+        controller.selectTab(tab)
+        #expect(pane.search.hasKeyboardFocus)
+        pane.search.close()
+    }
+}

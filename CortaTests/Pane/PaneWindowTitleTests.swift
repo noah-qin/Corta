@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import AppKit
 import Foundation
 import Synchronization
 import Testing
@@ -92,7 +93,7 @@ struct PaneWindowTitleTests {
     /// Two probes stuck on a slow mount fill the admission; a third pane's
     /// probe is retried once there is room rather than dropped, so the pane
     /// gets its proxy icon without waiting for its next `cd`.
-    @Test("a probe refused while two are stuck is retried, not dropped")
+    @Test("a probe refused while two are stuck runs when one ends, not dropped")
     func refusedProbeIsRetried() async {
         let release = DispatchSemaphore(value: 0)
         let entered = Mutex(0)
@@ -121,8 +122,8 @@ struct PaneWindowTitleTests {
 
         release.signal()
         release.signal()
-        deadline = SuspendingClock.now
-            + .seconds(PaneWindowTitle.directoryProbeRetryDelay + 3) * testTimeoutScale
+        // Woken by a probe's end, not a timer: well inside a second.
+        deadline = SuspendingClock.now + .seconds(1) * testTimeoutScale
         while !asked.withLock({ $0 }), SuspendingClock.now < deadline {
             try? await Task.sleep(for: .milliseconds(20))
         }
@@ -170,4 +171,24 @@ extension PaneWindowTitleTests {
         _ = title.composed
         #expect(title.hasTrailingRefresh)
     }
+
+    /// A covered window shows no title: output there leaves the process
+    /// facts unread until the window shows again.
+    @Test("output in a covered window defers the title refresh until it shows")
+    func coveredWindowDefersTheRefresh() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let title = PaneWindowTitle(isDirectory: { _ in true })
+        title.window = { window }
+        defer { title.stop() }
+        // Never ordered in: not visible.
+        #expect(!window.occlusionState.contains(.visible))
+        title.noteOutput()
+        #expect(title.refreshWhenVisible)
+        #expect(!title.hasTrailingRefresh)
+    }
+
 }

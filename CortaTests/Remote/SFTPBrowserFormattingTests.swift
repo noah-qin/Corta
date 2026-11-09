@@ -189,4 +189,19 @@ struct SFTPBrowserFormattingTests {
         #expect(SFTPConnection.destinationScope(for: SSHTarget(host: "box", port: 2222)) != plain)
         #expect(SFTPConnection.destinationScope(for: SSHTarget(host: "other")) != plain)
     }
+
+    @Test("a FIFO chosen for upload is refused before it is queued")
+    func aFIFOIsNotAnUploadSource() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let fifo = root.appendingPathComponent("pipe")
+        #expect(mkfifo(fifo.path, 0o600) == 0)
+        let file = root.appendingPathComponent("file")
+        try Data([1]).write(to: file)
+        #expect(SFTPLocalFacts.source(fifo).isSpecial)
+        #expect(!SFTPLocalFacts.source(file).isSpecial)
+        #expect(!SFTPLocalFacts.source(root).isSpecial)
+    }
+
 }

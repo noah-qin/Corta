@@ -217,7 +217,7 @@ the mouse wheel over it — and follows the tab you select.
   curly (`SGR 4:3`, Neovim's diagnostics) underlines; dotted and dashed draw
   single. Blinking text (`SGR 5`) is kept but not animated.
 - **Zoom.** ⌘= / ⌘− / ⌘0 or a pinch make the text bigger, smaller or
-  the configured size again, in the current window only. Zoom never
+  the configured size again, in every tab of the current window only. Zoom never
   changes the config file. Font changes never move or resize the window: the visible rows and
   columns refit to it, and what is left of a cell shows as background under the last row.
 - **Theme.** Three built-in themes, `corta`, `solarized` and `mono`, each with light and dark variants;

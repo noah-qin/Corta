@@ -142,21 +142,43 @@ struct InputSourceColorField: View {
     }
 }
 
+/// `status-network-interface`, committed on Return, blur or the page going
+/// away, as the other text fields are: committed on Return alone, a name
+/// typed and then clicked away from was silently dropped.
 struct StatusNetworkInterfaceField: View {
     @Bindable var model: SettingsModel
-    @State private var value = "auto"
+    @State private var draft = "auto"
+    @State private var synced = "auto"
+    @FocusState private var isEditing: Bool
+
     var body: some View {
         LabeledContent(L10n.text("status.interface")) {
-            TextField("", text: $value).labelsHidden().frame(width: 180)
+            TextField("", text: $draft).labelsHidden().frame(width: 180)
+                .focused($isEditing)
                 .accessibilityIdentifier("status-network-interface")
-                .onSubmit {
-                    model.setStatusNetworkInterface(value)
-                    value = model.statusNetworkInterface
+                .onSubmit(commit)
+                .onChange(of: isEditing) { _, editing in
+                    if !editing { commit() }
                 }
-                .onAppear { value = model.statusNetworkInterface }
-                .onChange(of: model.statusNetworkInterface) { _, name in value = name }
+                .onAppear {
+                    draft = model.statusNetworkInterface
+                    synced = draft
+                }
+                .onChange(of: model.statusNetworkInterface) { _, name in
+                    if draft == synced { draft = name }
+                    synced = name
+                }
+                .onDisappear(perform: commit)
                 .help(L10n.text("status.network.help"))
         }
+    }
+
+    private func commit() {
+        guard draft != synced else { return }
+        model.setStatusNetworkInterface(draft)
+        // A refused or normalised value reads back as what the file holds.
+        synced = model.statusNetworkInterface
+        draft = synced
     }
 }
 

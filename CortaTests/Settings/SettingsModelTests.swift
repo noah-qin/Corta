@@ -15,6 +15,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CoreText
+import Foundation
+import Synchronization
 import Testing
 
 @testable import Corta
@@ -44,6 +46,48 @@ struct SettingsModelTests {
             result?.resume(returning: entries)
             result = nil
         }
+    }
+
+    private func waitUntil(_ condition: () -> Bool) async -> Bool {
+        let deadline = SuspendingClock.now + .seconds(5 * Double(testTimeoutScale))
+        while SuspendingClock.now < deadline {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return condition()
+    }
+
+    @Test("a shell-integration write that failed offers Retry, which repeats it")
+    func shellIntegrationFailureOffersRetry() async {
+        let model = SettingsModel()
+        // The page checks the real files as it opens; let that finish first.
+        #expect(await waitUntil { !model.isCheckingShellIntegration })
+        final class Attempts: Sendable { let count = Mutex(0) }
+        let attempts = Attempts()
+        model.checkShellIntegration { _ in
+            attempts.count.withLock { $0 += 1 }
+            return ["~/.zshrc"]
+        }
+        #expect(await waitUntil { !model.isCheckingShellIntegration })
+        #expect(model.shellIntegrationStatus.kind == .failed)
+        #expect(model.shellIntegrationStatus.actionTitle == L10n.text("settings.status.retry"))
+        model.toggleShellIntegration()
+        #expect(await waitUntil { !model.isCheckingShellIntegration })
+        #expect(attempts.count.withLock { $0 } == 2)
+    }
+
+    @Test("a shell-integration action that does not finish in time frees the row and offers Retry")
+    func shellIntegrationTimeoutFreesTheRow() async {
+        let model = SettingsModel()
+        #expect(await waitUntil { !model.isCheckingShellIntegration })
+        model.checkShellIntegration(timeout: .milliseconds(50)) { _ in
+            Thread.sleep(forTimeInterval: 1)
+            return []
+        }
+        #expect(await waitUntil { !model.isCheckingShellIntegration })
+        #expect(model.shellIntegrationStatus.message == L10n.text("settings.status.shellIntegrationTimedOut"))
+        #expect(model.shellIntegrationStatus.actionTitle == L10n.text("settings.status.retry"))
+        #expect(model.shellIntegrationRetry != nil)
     }
 
     @Test("an older font scan cannot replace a newer list")

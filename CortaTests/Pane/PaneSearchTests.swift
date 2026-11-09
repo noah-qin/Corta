@@ -36,7 +36,12 @@ final class SearchTestHost: PaneSearchHost {
     /// Owned here, as a pane owns its search; the search holds its host weakly.
     private(set) lazy var search = PaneSearch(host: self)
 
-    func snapshot() -> Grid? { terminal.grid }
+    private(set) var snapshots = 0
+    func snapshot() -> Grid? {
+        snapshots += 1
+        return terminal.grid
+    }
+    func liveTotalPushed() -> Int? { terminal.grid.scrollback.totalPushed }
     func selectedTextForFind() async -> String? { selection?.split(separator: "\n").first.map(String.init) }
     func invalidateDisplay() { redraws += 1 }
 
@@ -134,6 +139,66 @@ struct PaneSearchTests {
         #expect(await waitUpTo(5) { !host.search.matches.isEmpty })
         #expect(host.search.task == nil)
         #expect(host.redraws > 0)
+    }
+
+    /// Output with a sweep already running only marks another owed; taking
+    /// the grid for it copied the grid's references for nothing.
+    @Test("output during a sweep marks a refresh owed without taking the grid")
+    func refreshOwedTakesNoSnapshot() async throws {
+        let host = makeHost()
+        defer { host.search.close() }
+        host.search.show()
+        let field = try #require(host.search.field)
+        field.stringValue = "P04MARKER"
+        host.search.updateResults(scrollsToMatch: true)
+        #expect(host.search.task != nil)
+        let before = host.snapshots
+        host.search.scheduleBackgroundRefresh()
+        #expect(host.snapshots == before)
+        #expect(host.search.needsRefresh)
+    }
+
+    /// Clear, reset, a reflow or a new session: the matches named rows that
+    /// are gone, so they go at once and the grid is swept again unpaced.
+    @Test("invalidating drops the matches at once and sweeps the grid as it is now")
+    func invalidatingDropsMatchesAndSweepsAgain() async throws {
+        let host = makeHost()
+        defer { host.search.close() }
+        host.search.show()
+        let field = try #require(host.search.field)
+        field.stringValue = "P04MARKER"
+        host.search.updateResults(scrollsToMatch: true)
+        #expect(await waitUpTo(5) { !host.search.matches.isEmpty && host.search.task == nil })
+        let generation = host.search.generation
+
+        host.terminal.feed(Array("\u{1B}[2J\u{1B}[3J".utf8))
+        host.search.invalidateResults()
+        #expect(host.search.matches.isEmpty)
+        #expect(host.search.highlights.isEmpty)
+        #expect(host.search.currentMatchIndex == nil)
+        #expect(host.search.generation != generation)
+        #expect(host.search.task != nil, "swept again without waiting out the pacing")
+        #expect(await waitUpTo(5) { host.search.task == nil })
+        #expect(host.search.matches.isEmpty)
+        #expect(host.search.barModel.countText == L10n.text("search.noResults"))
+    }
+
+    @Test("a sweep in flight when the results are invalidated lands nowhere")
+    func invalidatingSupersedesASweepInFlight() async throws {
+        let host = makeHost()
+        defer { host.search.close() }
+        host.search.show()
+        let field = try #require(host.search.field)
+        field.stringValue = "P04MARKER"
+        host.search.updateResults(scrollsToMatch: true)
+        let stale = host.search.generation
+        host.search.invalidateResults()
+        // The old sweep's result, arriving late, is refused.
+        host.search.applyResults(
+            .init(matches: [SelectionRange(start: .init(row: 0, column: 0), end: .init(row: 0, column: 8))],
+                status: .complete),
+            generation: stale, scrollsToMatch: false, totalPushed: 0)
+        #expect(host.search.matches.isEmpty)
     }
 
     /// The highlights are built once per sweep, anchored to the scrollback
