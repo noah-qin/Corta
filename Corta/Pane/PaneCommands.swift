@@ -408,8 +408,8 @@ extension PaneCommands {
         switch menuItem.action {
         case #selector(exportCommandOutput(_:)):
             guard let host, host.isOperable else { return false }
-            return PaneShellIntegration.commandOutputText(
-                grid: host.session.snapshot(), record: host.effectiveCommand) != nil
+            return PaneShellIntegration.hasCommandOutput(
+                grid: host.session.snapshot(), record: host.effectiveCommand)
         case #selector(exportText(_:)):
             return host?.isOperable == true
         case #selector(revealWorkingDirectoryInFinder(_:)), #selector(copyWorkingDirectoryPath(_:)),

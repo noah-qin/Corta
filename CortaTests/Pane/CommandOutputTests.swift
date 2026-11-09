@@ -66,6 +66,23 @@ struct CommandOutputTests {
         #expect(PaneCommands.command(at: 0, records: []) == nil)
     }
 
+    /// Menu validation asks only whether there is output; it must agree
+    /// with the text it no longer builds.
+    @Test("the cheap output check agrees with the output text")
+    func hasCommandOutputAgreesWithTheText() throws {
+        let terminal = Self.session(commands: [
+            Run("echo one", ["one"], 0), Run("true", [], 0), Run("blank", ["   ", ""], 0),
+            Run("long", (0..<80).map { "line\($0)" }, 0),
+        ])
+        for record in terminal.commandRecords.records {
+            let text = PaneShellIntegration.commandOutputText(grid: terminal.grid, record: record)
+            #expect(
+                PaneShellIntegration.hasCommandOutput(grid: terminal.grid, record: record) == (text != nil),
+                "record \(record.id)")
+        }
+        #expect(!PaneShellIntegration.hasCommandOutput(grid: terminal.grid, record: nil))
+    }
+
     // MARK: - Marks
 
     @Test("prompt rows and failed prompt rows are both found")

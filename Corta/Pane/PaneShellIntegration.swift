@@ -198,6 +198,17 @@ final class PaneShellIntegration: NSObject, NSMenuItemValidation {
         return text.isEmpty ? nil : text
     }
 
+    /// Whether `commandOutputText` would have text, without building it.
+    /// Menu validation runs on every menu open and key equivalent, and
+    /// building a long command's whole output there to test it for
+    /// emptiness was a stall. `Selection.text` joins rows with newlines, so
+    /// only a one-row range can come out empty: then the row is read.
+    nonisolated static func hasCommandOutput(grid: Grid, record: CommandRecord?) -> Bool {
+        guard let range = commandOutputRange(grid: grid, record: record) else { return false }
+        guard range.start.row == range.end.row else { return true }
+        return grid.documentLine(range.start.row).cells.contains { $0.scalar > 0x20 }
+    }
+
     /// The document range of a completed command's output; nil while running
     /// or empty. `exportCommandOutput(_:)` needs the range itself.
     nonisolated static func commandOutputRange(grid: Grid, record: CommandRecord?) -> SelectionRange? {
@@ -383,7 +394,8 @@ extension PaneShellIntegration {
             #selector(jumpToNextFailedCommand(_:)):
             return hasShellIntegration && hasFailedCommands
         case #selector(copyLastCommandOutput(_:)):
-            return commandOutputText(for: effectiveCommand) != nil
+            guard isOperable else { return false }
+            return Self.hasCommandOutput(grid: session.snapshot(), record: effectiveCommand)
         case #selector(snapshotRunningCommandOutput(_:)):
             guard isOperable else { return false }
             return session.commandRecords.last?.isRunning == true
