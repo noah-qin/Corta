@@ -121,13 +121,24 @@ extension SplitViewController {
         }
     }
 
-    // MARK: - Font size (broadcast across the tree)
+    // MARK: - Font size (broadcast across the window)
 
-    /// ⌘= / ⌘- / ⌘0 apply to every pane: they share the window's resize
-    /// increments and minimum size, derived from one cell geometry.
-    /// Each pane refits its own grid (`TerminalPaneViewController.setFontSize`); the
-    /// window frame stays. `settle: false` is a pinch still in progress.
+    /// ⌘= / ⌘- / ⌘0 apply to every pane of every tab in the window: the
+    /// zoom is the window's (`CONFIGURATION.md`, `font-size`), and its panes
+    /// share the window's resize increments and minimum size, derived from
+    /// one cell geometry. Each pane refits its own grid
+    /// (`TerminalPaneViewController.setFontSize`); the window frame stays.
+    /// `settle: false` is a pinch still in progress.
     func setFontSizeForAllPanes(_ size: CGFloat, isZoomed: Bool, settle: Bool = true) {
+        if let controller = tab?.controller {
+            controller.setFontSizeForAllTabs(size, isZoomed: isZoomed, settle: settle)
+        } else {
+            setFontSizeForOwnPanes(size, isZoomed: isZoomed, settle: settle)
+        }
+    }
+
+    /// This tab's panes only; the window's broadcast calls it per tab.
+    func setFontSizeForOwnPanes(_ size: CGFloat, isZoomed: Bool, settle: Bool) {
         for pane in panes {
             pane.setFontSize(size, settle: settle)
             // On every pane, so each pane's `configurationChanged` agrees.
@@ -135,8 +146,16 @@ extension SplitViewController {
         }
     }
 
-    /// The end of a pinch: every pane's grid settles at once.
+    /// The end of a pinch: every pane's grid in the window settles at once.
     func settleFontChangeForAllPanes() {
+        if let controller = tab?.controller {
+            controller.settleFontChangeForAllTabs()
+        } else {
+            settleFontChangeForOwnPanes()
+        }
+    }
+
+    func settleFontChangeForOwnPanes() {
         for pane in panes { pane.settleFontChange() }
     }
 

@@ -126,7 +126,22 @@ extension TerminalWindowController {
             tab.customTitle = restore.customTabTitle
         }
         container.add(split, hidden: hidden)
+        // The window's temporary zoom (⌘+, pinch) is the window's, so a new
+        // tab opens at it, as a new split does.
+        if let zoomed = tabs.first(where: { $0 !== tab })?.split.focusedPane, zoomed.isFontSizeZoomed {
+            split.setFontSizeForOwnPanes(zoomed.fontSize, isZoomed: true, settle: true)
+        }
         return tab
+    }
+
+    /// ⌘= / ⌘− / ⌘0 and pinch, for every tab: a temporary zoom is per
+    /// window, not per tab.
+    func setFontSizeForAllTabs(_ size: CGFloat, isZoomed: Bool, settle: Bool) {
+        for tab in tabs { tab.split.setFontSizeForOwnPanes(size, isZoomed: isZoomed, settle: settle) }
+    }
+
+    func settleFontChangeForAllTabs() {
+        for tab in tabs { tab.split.settleFontChangeForOwnPanes() }
     }
 
     /// Takes `tab` into the window's list, selected if it is the first; its
