@@ -103,8 +103,12 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
 
     /// A titlebar lock while Secure Keyboard Entry is engaged — the effect is
     /// invisible otherwise. Follows `SecureInput.engaged`, not the setting.
-    private var secureInputIndicator: NSTitlebarAccessoryViewController?
+    private(set) var secureInputIndicator: NSTitlebarAccessoryViewController?
     private var secureInputObserver: NSObjectProtocol?
+    /// What the lock reads, injectable so a test never engages the machine's
+    /// secure input or needs a real key window.
+    var secureInputIsEngaged: () -> Bool = { SecureInput.shared.engaged }
+    lazy var windowIsKey: () -> Bool = { [weak self] in self?.window?.isKeyWindow ?? false }
     private var isStripRefreshPending = false
 
     isolated deinit {
@@ -436,9 +440,9 @@ extension TerminalWindowController {
         SettingsWindowController.shared.showPrivacySettings(sender)
     }
 
-    private func updateSecureInputIndicator() {
-        guard let window else { return }
-        let hidden = !(SecureInput.shared.engaged && window.isKeyWindow)
+    func updateSecureInputIndicator() {
+        guard window != nil else { return }
+        let hidden = !(secureInputIsEngaged() && windowIsKey())
         secureInputIndicator?.isHidden = hidden
         // Native tab/titlebar transitions can retain an accessory's layout;
         // hide its view too so an inactive lock cannot remain visible.
@@ -456,6 +460,18 @@ extension TerminalWindowController {
             isFullScreen: true, paneCount: splitController?.panes.count ?? 0)
         guard active.contains(.toolbar) else { return proposedOptions }
         return proposedOptions.union([.fullScreen, .autoHideToolbar, .autoHideMenuBar])
+    }
+
+    /// The lock shows on the key window only. Moving between two terminal
+    /// windows leaves secure input engaged, so `SecureInput.didChange` never
+    /// posts and the window losing key kept its lock; each window follows
+    /// its own key state too.
+    func windowDidBecomeKey(_ notification: Notification) {
+        updateSecureInputIndicator()
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        updateSecureInputIndicator()
     }
 
     func windowDidEnterFullScreen(_ notification: Notification) {
