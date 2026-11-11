@@ -268,7 +268,15 @@ final class SplitViewController: NSViewController {
         // Nothing else claims first responder; without it keyDown never fires
         // and First Responder menu actions (⌘V, ⌘=, ⌘D) dead-end. A tab
         // restored behind another leaves the keyboard to the selected one.
-        if isSelectedTab { window.makeFirstResponder(pane.terminalView) }
+        if isSelectedTab {
+            if let terminalView = pane.terminalView {
+                window.makeFirstResponder(terminalView)
+            } else if let primary = pane.sessionEndedPanel?.panel.buttons.last {
+                // A restored connection (#519) never built a terminal view: its
+                // panel's primary action takes the keyboard, as a failure's does.
+                window.makeFirstResponder(primary)
+            }
+        }
         // The first title, before any output: the root pane was focused at
         // creation, so no focus change applies one, and a child that says
         // nothing at first — an ssh still connecting — left "Corta" there.
