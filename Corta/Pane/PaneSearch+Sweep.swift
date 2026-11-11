@@ -25,7 +25,8 @@ extension PaneSearch {
     nonisolated static func sweep(
         _ query: String, in grid: Grid, caseSensitive: Bool, regex: Bool,
         maxMatches: Int = Search.defaultMatchLimit,
-        timeBudget: Duration = Search.regexTimeBudget, from resumeRow: Int? = nil
+        timeBudget: Duration = Search.regexTimeBudget, from resumeRow: Int? = nil,
+        downToRow: Int? = nil
     ) -> SweepOutcome {
         guard regex else {
             let matches = Search.find(
@@ -45,7 +46,7 @@ extension PaneSearch {
         }
         let result = Search.findRegex(
             query, in: grid, caseSensitive: caseSensitive,
-            maxMatches: maxMatches, timeBudget: timeBudget, from: resumeRow,
+            maxMatches: maxMatches, timeBudget: timeBudget, from: resumeRow, downToRow: downToRow,
             shouldStop: { Task.isCancelled })
         return SweepOutcome(
             matches: result.matches,

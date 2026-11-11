@@ -542,7 +542,9 @@ event monitor makes that easy to get wrong:
   resumes it in one more bounded detached sweep, re-anchored to the grid as
   it is then (rows shifted by the output's growth, evicted matches dropped). A
   typed query, a toggle, a new grid or closing the bar drops the place, as it
-  drops any other sweep.
+  drops any other sweep. Lines that arrived since are swept in the same
+  pass, and while the continued results are shown output starts no refresh,
+  which would re-sweep from the newest line and drop the older hits.
 - **The bar keeps off what it searches.** It sits top-right and moves to
   the bottom-right while the cursor or the current match would be under it
   (`PaneSearch.placeClearOfContent`, on output, scroll, layout and match

@@ -179,7 +179,7 @@ public enum Search {
     public static func findRegex(
         _ pattern: String, in grid: Grid, caseSensitive: Bool = false,
         maxMatches: Int = .max, timeBudget: Duration = regexTimeBudget,
-        from resumeRow: Int? = nil, shouldStop: () -> Bool = { false }
+        from resumeRow: Int? = nil, downToRow: Int? = nil, shouldStop: () -> Bool = { false }
     ) -> RegexResult {
         guard maxMatches > 0, !isCatastrophic(pattern),
             let regex = compileRegex(pattern, caseSensitive: caseSensitive)
@@ -194,6 +194,8 @@ public enum Search {
         // from its start would spend the next budget the same way, forever.
         var linesRead = 0
         for logicalLine in lines {
+            // Lines at or below `downToRow` were searched by an earlier slice.
+            if let downToRow, logicalLine.lastRow <= downToRow { break }
             if shouldStop() { break }
             let text = logicalLine.text
             guard !text.isEmpty else { continue }

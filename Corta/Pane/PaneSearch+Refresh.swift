@@ -34,6 +34,7 @@ extension PaneSearch {
         needsRefresh = false
         lastSweepLanded = nil
         clearOlderSearch()
+        continuedSweep = false
         generation &+= 1
         setMatches([], totalPushed: 0)
         matchesTruncated = false
@@ -77,9 +78,14 @@ extension PaneSearch {
     /// and cancelled by a new query or the bar closing like any other sweep.
     func searchOlderLines() {
         guard let older = olderSearch, let searchField = field, bar != nil,
-            task == nil, let grid = host?.snapshot()
+            let grid = host?.snapshot()
         else { return }
+        // An output-driven refresh in flight is superseded: the click is a
+        // decision, not something to drop until the refresh lands.
+        task?.cancel()
+        task = nil
         clearOlderSearch()
+        continuedSweep = true
         generation &+= 1
         let generation = self.generation
         let query = searchField.stringValue
@@ -90,10 +96,7 @@ extension PaneSearch {
         // Output since the earlier slice shifted every row by the same growth;
         // what has scrolled out of the retained scrollback is gone.
         let growth = ScrollbackCoordinates.growth(from: older.totalPushed, to: totalPushed)
-        // Lines that arrived since the first sweep are newer than the resume
-        // point and this slice never reads them: when there are any, a
-        // refresh covers them once the slice lands (`applyResults`).
-        needsRefresh = growth > 0
+        needsRefresh = false
         let lowest = grid.documentRowRange.lowerBound
         let priorMatches = older.matches.compactMap { range -> SelectionRange? in
             let start = range.start.row - growth
@@ -109,9 +112,19 @@ extension PaneSearch {
             let slice = Self.sweep(
                 query, in: grid, caseSensitive: caseSensitive, regex: regex,
                 maxMatches: maxMatches, timeBudget: timeBudget, from: resumeRow)
+            // Lines that arrived since the first sweep sit newer than every
+            // row it read; the slice above never reaches them, so they get
+            // their own bounded pass.
+            let fresh = growth > 0
+                ? Self.sweep(
+                    query, in: grid, caseSensitive: caseSensitive, regex: regex,
+                    maxMatches: maxMatches, timeBudget: timeBudget, from: nil,
+                    downToRow: grid.rows - 1 - growth)
+                : nil
             await MainActor.run {
                 self?.applyOlderSlice(
-                    slice, priorMatches: priorMatches, unsearchedLines: unsearchedLines,
+                    slice, priorMatches: priorMatches, freshMatches: fresh,
+                    unsearchedLines: unsearchedLines,
                     totalPushed: totalPushed, generation: generation)
             }
         }
@@ -120,11 +133,17 @@ extension PaneSearch {
     /// The older slice comes first, then what the first sweep found; the
     /// count is still a floor while either part left lines unsearched.
     private func applyOlderSlice(
-        _ slice: SweepOutcome, priorMatches: [SelectionRange], unsearchedLines: Int,
+        _ slice: SweepOutcome, priorMatches: [SelectionRange], freshMatches: SweepOutcome?,
+        unsearchedLines: Int,
         totalPushed: Int, generation: Int
     ) {
         var outcome = slice
         outcome.matches.append(contentsOf: priorMatches)
+        if let freshMatches {
+            outcome.matches.append(contentsOf: freshMatches.matches)
+            outcome.unsearchedLines += freshMatches.unsearchedLines
+            if freshMatches.status == .incomplete { outcome.status = .incomplete }
+        }
         outcome.unsearchedLines += unsearchedLines
         if outcome.unsearchedLines > 0, case .complete = outcome.status {
             outcome.status = .incomplete

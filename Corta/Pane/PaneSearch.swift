@@ -81,6 +81,9 @@ final class PaneSearch: NSObject {
     var regexTimeBudget = Search.regexTimeBudget
     /// A regex sweep that ran out of time, kept for "Search older lines".
     var olderSearch: PendingOlderSearch?
+    /// The shown results include a continued (older) slice. Output then starts
+    /// no refresh: it would re-sweep from the newest line and drop those hits.
+    var continuedSweep = false
     private var selectionTask: Task<Void, Never>?
     /// Paired scroll position and scrollback anchor, restored when search closes.
     var previousScrollOffset: Int?
@@ -366,6 +369,7 @@ final class PaneSearch: NSObject {
         pacingWake = nil
         needsRefresh = false
         clearOlderSearch()
+        continuedSweep = false
         generation &+= 1
         if let beforeSearch = previousScrollOffset, let host {
             if beforeSearch == 0 {
@@ -404,6 +408,7 @@ extension PaneSearch {
         // Any typed query supersedes an older slice, including emptying the
         // field: the offer goes with the sweep it belonged to.
         clearOlderSearch()
+        continuedSweep = false
         generation &+= 1
         let generation = self.generation
         task?.cancel()
@@ -449,7 +454,7 @@ extension PaneSearch {
     /// `needsRefresh`, which `applyResults` honours; otherwise
     /// the last output could leave results stale once the grid goes quiet.
     func scheduleBackgroundRefresh() {
-        guard bar != nil, let searchField = field else { return }
+        guard bar != nil, let searchField = field, !continuedSweep else { return }
         // Composing: the preedit is not the query, so output arriving now
         // starts no sweep. The change that commits the text sweeps for it.
         guard !isComposingText else { return }
