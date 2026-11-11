@@ -10,6 +10,12 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- A program that sets a selection foreground colour no longer makes every
+  scrolling frame rebuild the whole screen: with no selection, only the
+  damaged rows are rebuilt.
+
 ## [1.6.2] - 2026-11-10
 
 ### Changed
