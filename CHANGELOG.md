@@ -17,6 +17,14 @@ Versioning for compatibility changes.
   no longer gets slower on a taller window. Each scrolled line cost time in
   proportion to the region's height (1,583 ns at 200 rows); it now costs
   about what a whole-screen scroll does (135 ns), at every height.
+### Fixed
+
+- A program that sets a selection foreground colour no longer makes every
+  scrolling frame rebuild the whole screen: with no selection, only the
+  damaged rows are rebuilt.
+- Corta starts shells when its application is kept inside another `.app`
+  bundle, or under a folder whose name ends in `.app`: the `corta-exec`
+  helper is looked for in the innermost bundle instead of the outermost.
 
 ## [1.6.2] - 2026-11-10
 

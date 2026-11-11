@@ -24,14 +24,41 @@ import Testing
 /// decoded. The pipe tests drive `readHelperStatus` directly; the last
 /// three spawn real children (hence `.serialized`).
 @Suite(.serialized) struct SpawnHandshakeTests {
+    /// #545: the bundle is the **last** `.app/Contents/` in the image path,
+    /// not the first. A build kept inside another application's bundle, or
+    /// under a folder whose name ends in `.app`, still finds its own
+    /// `corta-exec`; the hosted test bundle under `Contents/PlugIns` resolves
+    /// to the app that hosts it.
     @Test("inside an app bundle the helper is looked for in one place only")
     func insideABundleTheHelperHasOneCandidate() {
-        for image in [
-            "/Applications/Corta.app/Contents/Frameworks/CortaTerminal.framework/Versions/A/CortaTerminal",
-            "/Applications/Corta.app/Contents/MacOS/Corta",
-            "/Applications/Corta.app/Contents/PlugIns/CortaTests.xctest/Contents/MacOS/CortaTests",
-        ] {
-            #expect(Spawn.helperCandidates(forImage: image) == ["/Applications/Corta.app/Contents/MacOS/corta-exec"])
+        let cases: [(image: String, helper: String)] = [
+            (
+                "/Applications/Corta.app/Contents/MacOS/Corta",
+                "/Applications/Corta.app/Contents/MacOS/corta-exec"
+            ),
+            (
+                "/Applications/Corta.app/Contents/Frameworks/"
+                    + "CortaTerminal.framework/Versions/A/CortaTerminal",
+                "/Applications/Corta.app/Contents/MacOS/corta-exec"
+            ),
+            (
+                "/Applications/Corta Dev.app/Contents/PlugIns/"
+                    + "CortaTests.xctest/Contents/MacOS/CortaTests",
+                "/Applications/Corta Dev.app/Contents/MacOS/corta-exec"
+            ),
+            (
+                "/Applications/Outer.app/Contents/Resources/Corta.app/Contents/MacOS/Corta",
+                "/Applications/Outer.app/Contents/Resources/Corta.app/Contents/MacOS/corta-exec"
+            ),
+            (
+                "/Users/someone/Something.app/Corta.app/Contents/MacOS/Corta",
+                "/Users/someone/Something.app/Corta.app/Contents/MacOS/corta-exec"
+            ),
+        ]
+        for (image, helper) in cases {
+            #expect(
+                Spawn.helperCandidates(forImage: image) == [helper],
+                "\(image) should resolve to its own bundle's helper")
         }
     }
 
