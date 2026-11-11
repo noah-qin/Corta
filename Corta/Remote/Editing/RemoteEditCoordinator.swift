@@ -267,7 +267,12 @@ extension RemoteEditCoordinator {
         guard let executable = command.split(whereSeparator: \.isWhitespace).first.map(String.init)
         else { return .notSet }
         guard executable.hasPrefix("/") else { return .notAbsolute(executable) }
-        guard FileManager.default.isExecutableFile(atPath: executable) else { return .missing(executable) }
+        // `isExecutableFile` is also true for a searchable directory such as an
+        // `.app` bundle, which `Process` cannot run: only a regular file counts.
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: executable, isDirectory: &isDirectory),
+            !isDirectory.boolValue, FileManager.default.isExecutableFile(atPath: executable)
+        else { return .missing(executable) }
         return nil
     }
 

@@ -104,6 +104,14 @@ extension RemoteEditCoordinatorTests {
         #expect(made == 0, "neither case connected")
     }
 
+    @Test("a directory such as an app bundle is not a launchable editor")
+    func directoryIsNotAnEditor() {
+        #expect(
+            RemoteEditCoordinator.editorCommandProblem(for: "/Applications {file}")
+                == .missing("/Applications"))
+        #expect(RemoteEditCoordinator.editorCommandProblem(for: "/bin/sh {file}") == nil)
+    }
+
     @Test("a usable editor command leaves the edit unchanged")
     func usableEditorProceeds() async throws {
         let fixture = try makeFixture()
