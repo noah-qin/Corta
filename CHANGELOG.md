@@ -10,6 +10,15 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- With VoiceOver on, a finished command's output is announced in the
+  focused pane: short output is read, a long output such as `yes` is
+  summarised instead of queuing speech, a failure is spoken with its exit
+  status, and a full-screen program or a pane scrolled into history stays
+  silent. It needs shell integration, and typing at the prompt is not
+  announced twice.
+
 ### Fixed
 
 - A pane that was connected over SSH from the connect sheet when Corta quit

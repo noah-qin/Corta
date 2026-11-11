@@ -32,7 +32,7 @@ import Metal
 /// (`docs/DESIGN.md` §4.1), and new behaviour is added as one.
 class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneCommandsHost,
     PaneFocusHost, PanePointerHost, PaneShellIntegrationHost, PaneAppearanceHost,
-    PaneSessionEndHost, NSMenuItemValidation
+    PaneSessionEndHost, PaneOutputAnnouncementHost, NSMenuItemValidation
 {
     // Not `private`: extensions reach these and cannot add storage.
     var terminalView: TerminalView!
@@ -172,6 +172,8 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
     /// OSC 133's jumps, command output, history fill, the status marks and
     /// directory completion, and the OSC 52 drain.
     private(set) lazy var shell = PaneShellIntegration(host: self)
+    /// A finished command's output, read aloud while VoiceOver runs.
+    private(set) lazy var outputAnnouncements = PaneOutputAnnouncements(host: self)
     /// The configuration file and the live appearance followed, and the
     /// font's size, family and backing scale applied.
     private(set) lazy var appearance = PaneAppearance(host: self)
@@ -913,6 +915,11 @@ extension TerminalPaneViewController {
             if finished != nil, let directory = session.currentDirectory {
                 DirectoryHistoryStore.shared.record(directory)
             }
+        }
+        if let finished, let commandID = boundary.lastCompletedID {
+            // Heard rather than seen: one announcement per finished command,
+            // and nothing built for it unless VoiceOver is on.
+            outputAnnouncements.noteFinishedCommand(exitStatus: finished, commandID: commandID)
         }
     }
 

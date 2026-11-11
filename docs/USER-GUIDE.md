@@ -815,6 +815,11 @@ It is the quickest way to reach the commands that have no default shortcut.
   applications from reading your keystrokes while Corta is in front — for
   typing passwords. A lock in the title bar shows when it is actually on.
 - **VoiceOver** reads the terminal's text and follows the focused pane.
+  With shell integration, a finished command's output is announced once:
+  short output in full, long output as a one-line summary, and a failure
+  with its exit status. Typing at the prompt is not announced again, and
+  a pane scrolled into history or running a full-screen program stays
+  silent.
 - **Clipboard from programs.** Off by default. With
   `allow-clipboard-write = true`, a program — including one inside `tmux`
   or over `ssh` — may put text on your clipboard (OSC 52). Nothing may read

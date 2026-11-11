@@ -285,6 +285,10 @@ Corta as terminal programs.
 - **Bundled shell integration covers zsh, bash and fish.** Other shells need
   their own OSC 133 hooks for command boundaries; without them notifications
   use a heuristic.
+- **VoiceOver output announcements need shell integration.** A command's
+  output is announced when its OSC 133 mark says it finished. Without those
+  marks Corta cannot tell prompt echo from program output, so nothing is
+  announced in a shell with no integration.
 - **Emoji presentation sequences take two columns.** Standardized text-default
   characters with VS16 (⚠️, ✍️, 🖼️) occupy a wide pair, including at a
   line boundary. Programs must count the full sequence, not each scalar.
