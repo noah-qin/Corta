@@ -559,11 +559,12 @@ extension PTY {
     }
 
     /// Idempotent, and never waits. The child sees EOF; `terminate()` first to
-    /// also hang up. A call still in flight on another thread keeps the
+    /// also hang up. A system call in the kernel on another thread keeps the
     /// descriptor until it returns — so it can never reach a recycled number —
     /// and the last one out closes it. A read or write parked in a readiness
-    /// wait is woken here and fails with `.closed`, so closing a pane ends a
-    /// write the child stopped reading instead of holding the primary open.
+    /// wait is woken here and fails with `.closed` at once, so closing a pane
+    /// releases the reader, the writer and the descriptor rather than waiting
+    /// for the child that stopped reading.
     public func close() {
         guard descriptor.close() else { return }
         closeWakeup.withLock { $0?.signalAndClose() }
