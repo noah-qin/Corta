@@ -68,42 +68,61 @@ struct DescriptorHygieneTests {
         #expect(output.contains("CORTA-OPEN::END"), "the shell held more than its terminal:\n\(output)")
     }
 
-    @Test("a close during a read returns at once and keeps the number until the read does")
-    func closeDuringReadKeepsTheNumber() throws {
+    /// #546 ended the old contract this test used to pin. The primary is
+    /// non-blocking now, and a read that would block parks in a readiness
+    /// wait that `close()` wakes, so a close during a read ends the read at
+    /// once instead of leaving it parked in the kernel. The number stays held
+    /// while the call is in flight — `GuardedDescriptorTests` pins that
+    /// enter/leave order — and is released when the call leaves; the close
+    /// wakeup makes that prompt rather than the child's lifetime.
+    @Test("a close during a read ends the read at once and releases the number when it leaves")
+    func closeDuringReadEndsTheReadAndReleasesTheNumber() throws {
         let pty = try PTYFixture.shell("sleep 30")
         defer {
+            // The close hangs the child up; reap it.
             pty.terminate()
             _ = pty.waitForExit()
         }
-        let number = pty.fileDescriptor
         let returned = DispatchSemaphore(value: 0)
+        let outcome = Mutex<Result<Int, PTYError>?>(nil)
         let reader = Thread {
-            var buffer = [UInt8](repeating: 0, count: 64)
-            _ = try? buffer.withUnsafeMutableBytes { try pty.read(into: $0) }
-            returned.signal()
+            defer { returned.signal() }
+            let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 64, alignment: 1)
+            defer { buffer.deallocate() }
+            do throws(PTYError) {
+                let count = try pty.read(into: buffer)
+                outcome.withLock { $0 = .success(count) }
+            } catch {
+                outcome.withLock { $0 = .failure(error) }
+            }
         }
         reader.start()
-        // The read has entered the guard; what remains before `read(2)`
-        // parks is a few instructions, and the child writes nothing.
+        // The read has entered the guard and parked in its readiness wait;
+        // the child writes nothing.
         let deadline = SuspendingClock.now + .seconds(10)
         while pty.callsInFlight == 0, SuspendingClock.now < deadline { Thread.sleep(forTimeInterval: 0.001) }
         #expect(pty.callsInFlight == 1, "the reader never started its read")
         Thread.sleep(forTimeInterval: 0.01)
 
-        // Darwin's `close(2)` would sleep until the read returned — here,
-        // until `sleep 30` ended. The caller may be the main thread.
+        // Darwin's `close(2)` would sleep until a kernel read returned — for
+        // this child, until `sleep 30` ended. The close wakeup ends the read,
+        // so the caller never waits and the call does not outlive it.
         let closeStarted = SuspendingClock.now
         pty.close()
-        #expect(SuspendingClock.now - closeStarted < .seconds(1))
+        #expect(closeStarted.duration(to: .now) < .seconds(1))
 
-        // The lowest free number is what `open` returns, so a released
-        // number would come straight back here.
-        let opened = open("/dev/null", O_RDONLY | O_CLOEXEC)
-        defer { if opened >= 0 { close(opened) } }
-        #expect(opened != number, "a new file took the number a read was still using")
-
-        #expect(pty.terminate())
+        // The wakeup ends the parked call: it leaves, reports the close rather
+        // than a byte, and the number is released with the last one out.
+        let releasedDeadline = SuspendingClock.now + testTimeout(5)
+        while pty.callsInFlight != 0, SuspendingClock.now < releasedDeadline {
+            Thread.sleep(forTimeInterval: 0.001)
+        }
+        #expect(pty.callsInFlight == 0, "the close should end the parked read")
+        #expect(pty.isClosed)
+        // The reader records its outcome after the call leaves, which is after
+        // `callsInFlight` reaches zero: join it before reading the outcome.
         #expect(returned.wait(timeout: .now() + testTimeoutInterval(10)) == .success)
+        #expect(outcome.withLock { $0 } == .failure(.closed), "the read must report the close")
     }
 
     /// The kernel revokes a session's terminal when its leader exits, so a job

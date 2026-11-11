@@ -97,6 +97,12 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
 
     /// Applied once at spawn; set before the view loads.
     var preset: Preset?
+    /// What a restored arrangement said about this pane's remote side
+    /// (`#519`). Read once, at the first spawn: a connect-sheet target shows
+    /// the ended-session panel instead of spawning, and a hand-typed launcher
+    /// gives a local shell that says it was remote. Set before the view loads.
+    var restoredRemote: PaneRemoteRestore?
+
     /// What actually spawned — after a fallback, not what was asked for. The
     /// remote-state composition and Reconnect read it.
     private(set) var launchedCommand: (executable: String, arguments: [String])?
@@ -138,7 +144,7 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
     private(set) lazy var sessionEnd = PaneSessionEnd(host: self)
     var sessionEndedPanel: PaneStatusOverlay? { sessionEnd.overlay }
     /// A fallback shell or directory, reported once the toast can be seen.
-    private var pendingSessionNotice: String?
+    private(set) var pendingSessionNotice: String?
     /// The window is sized (`SplitViewController.prepareWindow`); until then a
     /// layout runs at a placeholder size and must not reach the child
     /// (`resizeSessionToFitView`).
@@ -155,6 +161,7 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
     /// Whether this pane talks to another machine, Reconnect, remote
     /// references and the SFTP browser's entry.
     private(set) lazy var remote = PaneRemote(host: self)
+
     /// Font size, copy and export, drops and Services, Finder actions and
     /// app-initiated `cd`.
     private(set) lazy var commands = PaneCommands(host: self)
@@ -470,16 +477,31 @@ extension TerminalPaneViewController {
     /// A rebuild keeps the pane's grid and font size: the new child is born
     /// at the size it is shown at, and the window does not move.
     private func setUpPane(strictRespawn: Bool = false, keeping grid: TerminalSize? = nil) {
-        let configuration = ConfigurationStore.shared.configuration
+        let restore = RestoredRemoteAction.forRestore(restoredRemote, strictRespawn: strictRespawn)
+        restoredRemote = nil
         if grid == nil || !isFontSizeZoomed {
-            fontSize = Configuration.fontSizeRange.clamped(configuration.fontSize)
+            fontSize = Configuration.fontSizeRange.clamped(ConfigurationStore.shared.configuration.fontSize)
         }
+        if case .connectionPanel(let target) = restore {
+            // Nothing is spawned for a restored connection: a launch may not
+            // connect on its own, nor put a local shell where a remote
+            // session was (`#519`). Reconnect leaves this state; New Session
+            // starts a local shell through `startLocalSession`.
+            sessionEnd.presentRestoredConnection(hostName: target.displayName)
+            return
+        }
+        let configuration = ConfigurationStore.shared.configuration
         fontStyle = FontStyle(configuration)
         guard prepareRenderer() else { return }
         let initialSize = initialTerminalSize(keeping: grid)
         guard let started = startSession(strictRespawn: strictRespawn, size: initialSize, configuration: configuration)
         else { return }
         adopt(started, size: initialSize)
+        if restore == .spawnWithRemoteNote {
+            // Said once, when this first output can be seen: this shell is
+            // local, though the pane's last session was not (`#519`).
+            pendingSessionNotice = L10n.text("restore.remoteNotResumed")
+        }
         // Before the reader starts, so the shell's first output is measured
         // the way the configuration says.
         session.ambiguousWidthIsWide = configuration.ambiguousWidth == .wide
@@ -1155,7 +1177,9 @@ extension TerminalPaneViewController {
     private func rebuildPane(strictRespawn: Bool, showsReconnectNotice: Bool) {
         // The grid it is shown at, while a session still says so; a pane
         // that never built starts from the configured one.
-        let grid = didSizeWindow && session != nil ? lastRequestedSize : nil
+        // A restored connection (#519) has no session but sits in a sized
+        // window: it keeps the grid its split gave it, not the configured one.
+        let grid = didSizeWindow ? (session != nil ? lastRequestedSize : initialGridSize) : nil
         // Input on its way to the old session has nowhere to land now, and
         // must not land in the new one.
         commands.fileDropRequest?.cancel()
@@ -1202,5 +1226,43 @@ extension TerminalPaneViewController {
             // Every time: a new connection; the old scrollback is gone.
             terminalView.showToast(remote.reconnectNotice)
         }
+    }
+}
+
+// MARK: - Restoring a remote side
+
+extension TerminalPaneViewController {
+    /// What a save records of this pane's remote side (`#519`): the connect
+    /// sheet's own target, or the fact of a hand-typed launcher. A configured
+    /// preset is run again on restore, so it needs no note; a reported host is
+    /// child output and is never recorded (`SECURITY.md` §2).
+    var restorableRemote: PaneRemoteRestore? {
+        if let target = preset?.connectTarget { return .target(target.key) }
+        guard preset == nil else { return nil }
+        switch remote.state {
+        case .remote, .remoteUnknown: return .launcher
+        case .local, .connected, .unknown: return nil
+        }
+    }
+
+    /// What takes the keyboard when this pane is focused: its terminal, or —
+    /// for a restored connection that never built one (`#519`) — the primary
+    /// action of its panel, as a failure's card does.
+    var keyboardTarget: NSResponder? {
+        terminalView ?? sessionEndedPanel?.panel.buttons.last
+    }
+
+    /// A restored connection's panel: a local shell in the saved directory,
+    /// with the saved ssh preset dropped so New Session cannot run it.
+    /// Reconnect is the panel's other action, and reuses that preset.
+    func startLocalSession() {
+        guard !didTeardown else { return }
+        remote.cancelPendingOpens()
+        remote.stopWatchingConnection()
+        search.close()
+        preset = nil
+        launchedCommand = nil
+        restoredRemote = nil
+        rebuildPane(strictRespawn: false, showsReconnectNotice: false)
     }
 }

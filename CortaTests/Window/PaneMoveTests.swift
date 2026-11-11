@@ -247,7 +247,9 @@ struct PaneMoveTests {
             return
         }
         #expect(!vertical)
-        guard case .pane(_, _, let firstFocused) = first, case .pane(_, _, let secondFocused) = second else {
+        guard case .pane(_, _, let firstFocused, _) = first,
+            case .pane(_, _, let secondFocused, _) = second
+        else {
             Issue.record("expected two panes")
             return
         }

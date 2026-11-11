@@ -63,13 +63,20 @@ extension Grid {
 
     /// Newest first, so a capped search keeps the recent matches.
     public func reversedLogicalLines() -> ReversedLogicalLineSequence {
-        ReversedLogicalLineSequence(grid: self)
+        ReversedLogicalLineSequence(grid: self, startRow: nil)
+    }
+
+    /// Newest first from the logical line whose last row is `lastRow` down —
+    /// where a regex sweep that ran out of time resumes. `lastRow` must be a
+    /// logical line's last row (a span's), not one inside a wrap chain.
+    func reversedLogicalLines(startingAtLastRow lastRow: Int) -> ReversedLogicalLineSequence {
+        ReversedLogicalLineSequence(grid: self, startRow: lastRow)
     }
 
     /// Spans only: a caller that can answer from the cells (`Search.find`'s
     /// ASCII path) pays for a `LogicalLine` only where it must.
     func reversedLogicalLineSpans() -> ReversedLogicalLineSpanSequence {
-        ReversedLogicalLineSpanSequence(grid: self)
+        ReversedLogicalLineSpanSequence(grid: self, startRow: nil)
     }
 
     /// One logical line as ASCII bytes, with the grid row and column each
@@ -290,13 +297,15 @@ public struct LogicalLineSequence: Sequence {
 
 public struct ReversedLogicalLineSequence: Sequence {
     private let grid: Grid
+    private let startRow: Int?
 
-    fileprivate init(grid: Grid) {
+    fileprivate init(grid: Grid, startRow: Int?) {
         self.grid = grid
+        self.startRow = startRow
     }
 
     public func makeIterator() -> Iterator {
-        Iterator(grid: grid)
+        Iterator(grid: grid, startRow: startRow)
     }
 
     public struct Iterator: IteratorProtocol {
@@ -304,9 +313,10 @@ public struct ReversedLogicalLineSequence: Sequence {
         /// Built on the span walk, so a fix to chain-finding cannot miss one.
         private var spans: ReversedLogicalLineSpanSequence.Iterator
 
-        fileprivate init(grid: Grid) {
+        fileprivate init(grid: Grid, startRow: Int?) {
             self.grid = grid
-            self.spans = grid.reversedLogicalLineSpans().makeIterator()
+            self.spans = ReversedLogicalLineSpanSequence(grid: grid, startRow: startRow)
+                .makeIterator()
         }
 
         public mutating func next() -> LogicalLine? {
@@ -323,13 +333,15 @@ struct LogicalLineSpan: Sendable, Equatable {
 
 struct ReversedLogicalLineSpanSequence: Sequence {
     private let grid: Grid
+    private let startRow: Int?
 
-    fileprivate init(grid: Grid) {
+    fileprivate init(grid: Grid, startRow: Int?) {
         self.grid = grid
+        self.startRow = startRow
     }
 
     func makeIterator() -> Iterator {
-        Iterator(grid: grid)
+        Iterator(grid: grid, startRow: startRow)
     }
 
     struct Iterator: IteratorProtocol {
@@ -337,9 +349,9 @@ struct ReversedLogicalLineSpanSequence: Sequence {
         private var nextRow: Int
         private let lowerBound: Int
 
-        fileprivate init(grid: Grid) {
+        fileprivate init(grid: Grid, startRow: Int?) {
             self.grid = grid
-            self.nextRow = grid.rows - 1
+            self.nextRow = Swift.min(startRow ?? grid.rows - 1, grid.rows - 1)
             self.lowerBound = grid.documentRowRange.lowerBound
         }
 

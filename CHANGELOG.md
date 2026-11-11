@@ -19,6 +19,50 @@ Versioning for compatibility changes.
   silent. It needs shell integration, and typing at the prompt is not
   announced twice.
 
+### Fixed
+
+- A pane that was connected over SSH from the connect sheet when Corta quit
+  now comes back as an ended connection naming the host, with **Reconnect**
+  and **New Session**, instead of a silent local shell in the directory `ssh`
+  was started from. Launch connects nothing until Reconnect is pressed, and
+  New Session opens a local shell there. A pane where `ssh` was typed by hand
+  comes back as a local shell with a note that it was remote, because the
+  destination in its output is not Corta's to trust. State written by 1.6.2
+  still restores; the saved state now carries format version 2, so an older
+  build skips it cleanly rather than restoring a silent shell, and
+  `restore-windows = false` still writes no destination.
+- A regular-expression search that runs out of its time budget no longer
+  says **No Results** for a scrollback it did not finish. The bar says the
+  search covered only part of the document, and the new **Search Older
+  Lines** action continues it from where the budget ended; a pattern that
+  matches nothing reaches No Results only once the whole scrollback was
+  searched. Lines skipped for exceeding the line limit are reported the
+  same way.
+- **Edit** on a remote file, and ⌘-clicking a `path:line` in a remote pane,
+  now check **Settings ▸ Terminal ▸ Open File Command** before connecting or
+  downloading. With no editor configured the message says so, offers **Open
+  Settings**, and nothing is fetched; a command whose executable is missing
+  names the path. Previously the file was downloaded first (up to 64 MiB)
+  and the listing then said only "open-file-command could not be run". The
+  setting's help no longer claims an empty command opens the default
+  application — an empty command disables opening files from output.
+- The find bar treats an input method's marked text as composition, not as
+  a query: Esc cancels the composition and leaves the bar open on its
+  previous query and results, and the scrollback is searched once for the
+  committed text instead of for every letter being composed.
+- Closing a pane ends an input write the kernel had parked on a program
+  that stopped reading, instead of holding its writer thread, its pty and
+  its session until that program exits. A job that ignored the hangup now
+  sees its terminal close.
+- The SFTP browser's column header no longer draws a stray vertical divider
+  before **Name**; the dividers between Name, Size and Modified are unchanged.
+- A program that sets a selection foreground colour no longer makes every
+  scrolling frame rebuild the whole screen: with no selection, only the
+  damaged rows are rebuilt.
+- Corta starts shells when its application is kept inside another `.app`
+  bundle, or under a folder whose name ends in `.app`: the `corta-exec`
+  helper is looked for in the innermost bundle instead of the outermost.
+
 ## [1.6.2] - 2026-11-10
 
 ### Changed

@@ -45,6 +45,14 @@ struct GuardedDescriptorTests {
         #expect(guarded.enter())
         #expect(guarded.close())
         #expect(Self.isOpen(read), "the number must outlive the call still using it")
+        // While the call is in flight the number is not free, so the next
+        // `open` anywhere in the process cannot be handed it. This is the
+        // order a PTY close relies on; it is pinned here, not through a pty,
+        // whose close wakeup ends its waits promptly (#546).
+        let stranger = open("/dev/null", O_RDONLY | O_CLOEXEC)
+        try #require(stranger >= 0)
+        defer { if stranger >= 0 { close(stranger) } }
+        #expect(stranger != read, "a new file took the number a call was still using")
         #expect(!guarded.enter(), "a closed descriptor admits no new call")
         guarded.leave()
         #expect(!Self.isOpen(read), "the last call out must close the number")

@@ -100,7 +100,7 @@ struct SessionRestoreTests {
             directory: "/tmp", presetName: "work", isFocused: true)
         let repaired = layout.validated().droppingMissingDirectories()
         #expect(repaired.firstPresetName == "work")
-        guard case .pane(_, let presetName, let isFocused) = repaired else {
+        guard case .pane(_, let presetName, let isFocused, _) = repaired else {
             Issue.record("expected a pane")
             return
         }
@@ -112,7 +112,7 @@ struct SessionRestoreTests {
     func droppingDirectoryPreservesPresetAndFocus() {
         let layout = PaneLayout.pane(
             directory: "/no/such/directory", presetName: "work", isFocused: true)
-        guard case .pane(let directory, let presetName, let isFocused) =
+        guard case .pane(let directory, let presetName, let isFocused, _) =
             layout.droppingMissingDirectories()
         else {
             Issue.record("expected a pane")
