@@ -12,6 +12,10 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- Closing a pane ends an input write the kernel had parked on a program
+  that stopped reading, instead of holding its writer thread, its pty and
+  its session until that program exits. A job that ignored the hangup now
+  sees its terminal close.
 - The SFTP browser's column header no longer draws a stray vertical divider
   before **Name**; the dividers between Name, Size and Modified are unchanged.
 - A program that sets a selection foreground colour no longer makes every

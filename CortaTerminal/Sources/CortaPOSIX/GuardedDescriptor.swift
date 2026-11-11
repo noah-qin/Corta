@@ -27,10 +27,11 @@ import Synchronization
 /// flight leaves the number open for the last one out to close.
 ///
 /// Deferred, not done in place: Darwin's `close(2)` (and `dup2` over the
-/// number) sleeps until an in-flight call on the file returns — measured: a
-/// `close` of a pty primary with a reader parked in `read` waited out the
-/// child's 30-second `sleep`. Callers arrange a bounded wait or an explicit
-/// close wakeup so the deferred close follows promptly.
+/// number) sleeps until an in-flight call on the file returns — measured
+/// behind a read on a file whose other end stayed idle, it waited out the
+/// reader's 30-second `sleep`. Callers arrange a bounded wait or an explicit
+/// close wakeup so the deferred close follows promptly: the PTY wakes its
+/// own waits, so its close never waits for a parked read or write.
 ///
 /// Shared by the core's PTY and the SFTP channel through `package` access:
 /// neither library exposes it.

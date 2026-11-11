@@ -93,6 +93,68 @@ struct PTYLifecycleTests {
         wakeup.signalAndClose()  // a repeated close must touch neither number
     }
 
+    /// #546: the writer's wait is one indefinite `poll` on the primary and
+    /// the close pipe. A timer or a spin there would show as extra readiness
+    /// polls while nothing happens — the same shape whose removal from the
+    /// reader `PERFORMANCE.md` §5.6 records.
+    @Test("a parked writer makes no wake-ups while it waits")
+    func parkedWriterMakesNoWakeUps() throws {
+        // Raw and never reading: the primary's input buffer fills at ~1 KiB.
+        let pty = try PTYFixture.shell("stty raw -echo; printf ready; sleep 30")
+        let returned = Mutex(false)
+        let failure = Mutex<PTYError?>(nil)
+        defer {
+            // Ends the parked write even on a failing run: the child's hangup
+            // closes the replica, and then the writer's own wait sees EIO.
+            pty.terminate()
+            pty.close()
+            _ = pty.waitForExit(timeout: .seconds(2))
+            let deadline = SuspendingClock.now + testTimeout(5)
+            while !returned.withLock({ $0 }), SuspendingClock.now < deadline {
+                Thread.sleep(forTimeInterval: 0.002)
+            }
+        }
+        // Readiness first: the child's `stty raw` has to have run, or the
+        // cooked mode's larger buffer may take the whole write and never park.
+        #expect(pty.readOutput(containing: "ready").contains("ready"))
+
+        let writer = Thread {
+            let bytes = UnsafeMutableRawBufferPointer.allocate(byteCount: 64 * 1024, alignment: 1)
+            defer { bytes.deallocate() }
+            _ = memset(bytes.baseAddress, 0x78, bytes.count)
+            do throws(PTYError) {
+                _ = try pty.writeAll(UnsafeRawBufferPointer(bytes))
+            } catch {
+                failure.withLock { $0 = error }
+            }
+            returned.withLock { $0 = true }
+        }
+        writer.qualityOfService = .userInitiated
+        writer.start()
+
+        let parkedDeadline = SuspendingClock.now + testTimeout(10)
+        while pty.readinessPollCount == 0, SuspendingClock.now < parkedDeadline {
+            Thread.sleep(forTimeInterval: 0.002)
+        }
+        let pollsWhenParked = pty.readinessPollCount
+        #expect(pollsWhenParked >= 1, "the writer should be waiting on a readiness poll")
+
+        Thread.sleep(forTimeInterval: 0.2)
+        #expect(
+            pty.readinessPollCount == pollsWhenParked,
+            "an idle writer took \(pty.readinessPollCount - pollsWhenParked) more wake-ups")
+
+        // The wait is indefinite; the close byte is what ends it.
+        pty.close()
+        let doneDeadline = SuspendingClock.now + testTimeout(5)
+        while !returned.withLock({ $0 }), SuspendingClock.now < doneDeadline {
+            Thread.sleep(forTimeInterval: 0.002)
+        }
+        #expect(returned.withLock { $0 }, "the close should end the parked write")
+        #expect(pty.callsInFlight == 0)
+        #expect(failure.withLock { $0 } == .closed)
+    }
+
     // MARK: Descriptor reuse after close
 
     @Test("a write after close cannot leak into a recycled descriptor")
