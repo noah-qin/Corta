@@ -379,7 +379,10 @@ own error text is under **Details**.
   (`search-case-sensitive`, `search-regex`). The bar sits at the top right
   of the pane and moves to the bottom while the cursor or the current match
   would be under it; in a narrow split it narrows rather than covering the
-  pane. Each pane has its own bar.
+  pane. Each pane has its own bar. Typing with an input method composes in
+  the bar as it does in any text field: Esc cancels the composition and
+  leaves the bar open, and the scrollback is searched once for the committed
+  text.
 - **Selecting.** Drag to select, double-click for a word, triple-click for
   a line. A finished selection is copied at once (`copy-on-select`); ⌘C
   copies too. A copy is confirmed by a band of light sweeping once along the
