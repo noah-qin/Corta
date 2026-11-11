@@ -533,6 +533,18 @@ event monitor makes that easy to get wrong:
 - **No refresh is lost.** An output-triggered refresh that arrives while
   a sweep is in flight sets `search.needsRefresh` instead of being
   dropped; the tail of a burst is searched once the sweep lands.
+- **Running out of time is a pause, not a verdict.** A regex sweep's time
+  budget ends it between lines, or — when nothing was read before it — counts
+  as unsearched a line one whole budget cannot finish. The pane keeps the
+  sweep's place: the matches so far, the line to resume at, and the
+  `Scrollback.totalPushed` those rows belong to. The bar says the search
+  covered part of the document instead of No Results, and Search Older Lines
+  resumes it in one more bounded detached sweep, re-anchored to the grid as
+  it is then (rows shifted by the output's growth, evicted matches dropped). A
+  typed query, a toggle, a new grid or closing the bar drops the place, as it
+  drops any other sweep. Lines that arrived since are swept in the same
+  pass, and while the continued results are shown output starts no refresh,
+  which would re-sweep from the newest line and drop the older hits.
 - **The bar keeps off what it searches.** It sits top-right and moves to
   the bottom-right while the cursor or the current match would be under it
   (`PaneSearch.placeClearOfContent`, on output, scroll, layout and match

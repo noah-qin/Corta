@@ -57,9 +57,12 @@ extension View {
 @Observable
 final class SearchBarModel {
     var countText = ""
+    /// Whether a timed-out regex sweep has an older part to read.
+    var canSearchOlder = false
     var caseSensitive = false
     var regex = false
     var onToggleCase: () -> Void = {}
+    var onSearchOlder: () -> Void = {}
     var onToggleRegex: () -> Void = {}
     var onPrevious: () -> Void = {}
     var onNext: () -> Void = {}
@@ -112,6 +115,11 @@ struct SearchBarView: View {
                     .foregroundStyle(secondary)
                     .frame(minWidth: 44, alignment: .trailing)
                     .padding(.trailing, 4)
+                if model.canSearchOlder {
+                    button("arrow.up.to.line", L10n.text("search.searchOlder"),
+                        action: model.onSearchOlder)
+                        .padding(.trailing, -4)
+                }
                 Divider().frame(height: 16).padding(.trailing, 4)
                 toggle("textformat", L10n.text("search.caseSensitive"), isOn: model.caseSensitive,
                     action: model.onToggleCase)

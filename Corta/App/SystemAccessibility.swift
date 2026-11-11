@@ -37,4 +37,16 @@ enum SystemAccessibility {
     static func duration(_ preferred: CFTimeInterval) -> CFTimeInterval {
         reduceMotion ? 0 : preferred
     }
+
+    /// A system assistive technology that walks the UI is running: VoiceOver
+    /// or Switch Control, the only two `NSWorkspace` reports. A braille
+    /// display reaches the tree through VoiceOver, so VoiceOver covers it;
+    /// Voice Control, Accessibility Inspector and third-party AX clients have
+    /// no public "is attached" signal at all. This is therefore *not* "any
+    /// client is attached" — it decides a visual affordance, while the
+    /// string-free change notifications post unconditionally for the clients
+    /// this cannot see (`TerminalView+Accessibility.swift`, D32).
+    static var isVoiceOverOrSwitchControlRunning: Bool {
+        NSWorkspace.shared.isVoiceOverEnabled || NSWorkspace.shared.isSwitchControlEnabled
+    }
 }

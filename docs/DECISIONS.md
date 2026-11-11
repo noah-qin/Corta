@@ -47,6 +47,7 @@ Status of every entry below is **accepted** unless it says otherwise.
 | [D29](#d29--no-homebrew-cask-until-homebrewcask-accepts-one) | No Homebrew cask until `homebrew/cask` accepts one | Accepted |
 | [D30](#d30--tabs-are-cortas-own-drawn-in-the-titlebar-row) | Tabs are Corta's own, drawn in the titlebar row | Accepted |
 | [D31](#d31--the-website-is-a-static-site-in-website-built-with-bun) | The website is a static site in `website/`, built with Bun | Accepted |
+| [D32](#d32--accessibility-change-notifications-post-unconditionally-the-snapshot-stays-lazy) | Accessibility change notifications post unconditionally; the snapshot stays lazy | Accepted |
 
 ---
 
@@ -906,3 +907,37 @@ saying so.
 
 **Consequence.** Reopen if the site needs a server, takes user input, or
 starts to share code with the app.
+
+## D32 — Accessibility change notifications post unconditionally; the snapshot stays lazy
+
+**Decision.** `TerminalView.noteAccessibilityValueChanged` and
+`noteAccessibilitySelectionChanged` post `AXValueChanged` and
+`AXSelectedTextChanged` whether or not an assistive technology is known to
+be running. The notifications carry no string; a client that hears one reads
+the text through `accessibilitySnapshot()`, which is built only when a
+client asks — cached for 0.2 s, and rebuilt after a posted change. Value
+posts are rate-limited to one per 0.4 s with a trailing post; a selection
+change posts as it happens.
+
+**Why.** AppKit has no public API for "is an arbitrary accessibility client
+attached": `NSWorkspace` reports only VoiceOver and Switch Control. A guard
+on VoiceOver alone left Voice Control, Switch Control, Accessibility
+Inspector, a third-party screen reader and a braille display that does not
+run through VoiceOver with no change notification at all. The notification
+is the only way such a client learns the text moved, and it costs no string
+building, so gating it buys nothing.
+
+**What it costs.** Every output batch that reaches the view clears the
+snapshot cache and (rate-limited) posts, and a selection drag posts per
+position, even with no client attached. The tests pin that a flood builds no
+snapshot, and D17's Release frame-CPU baseline is re-measured before and
+after in the pull request that introduces this. Reopen if macOS gains a
+public "an AX client is attached to this process" API: the unnecessary posts
+could then be dropped without reintroducing the VoiceOver-only hole.
+
+**Consequence for the pane header.** The zoom button is revealed for
+VoiceOver and Switch Control, the two clients `NSWorkspace` can report. A
+client it cannot report still finds the button in the accessibility tree —
+alpha is not `setAccessibilityHidden` — so the button is not hidden from it;
+it is only revealed visually for the signals that exist. Reopen if a public
+query for attached clients makes "any client" the better visibility rule.
