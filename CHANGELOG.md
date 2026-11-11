@@ -12,6 +12,8 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- The SFTP browser's column header no longer draws a stray vertical divider
+  before **Name**; the dividers between Name, Size and Modified are unchanged.
 - A program that sets a selection foreground colour no longer makes every
   scrolling frame rebuild the whole screen: with no selection, only the
   damaged rows are rebuilt.
