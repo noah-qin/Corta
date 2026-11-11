@@ -232,8 +232,12 @@ struct TerminalAccessibilitySnapshot {
         guard range.location >= 0, range.length > 0,
             range.location <= length, range.length <= length - range.location,
             let start = documentPoint(forOffset: range.location),
-            let end = documentPoint(forOffset: range.location + range.length - 1)
+            var end = documentPoint(forOffset: range.location + range.length - 1)
         else { return nil }
+        // The range is inclusive of cells: a wide character's end is its
+        // second column, or the highlight clips half of it.
+        let span = cellSpan(forOffset: range.location + range.length - 1)
+        end.column = min(end.column + max(1, span.columns) - 1, columns - 1)
         return SelectionRange(start: start, end: end)
     }
 }

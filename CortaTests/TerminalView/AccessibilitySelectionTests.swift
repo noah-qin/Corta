@@ -106,7 +106,8 @@ struct AccessibilitySelectionSetterTests {
         var terminal = Self.terminal()
         terminal.feed(Array("中文测试".utf8))
         let (view, applied) = Self.settable(terminal)
-        // "文测": UTF-16 units 1...2, columns 2...4.
+        // "文测": UTF-16 units 1...2, columns 2...5 (the last character's second
+        // column is part of the selection, or its highlight is half a glyph).
         view.setAccessibilitySelectedTextRange(NSRange(location: 1, length: 2))
 
         let recorded = applied()
@@ -114,7 +115,7 @@ struct AccessibilitySelectionSetterTests {
             Self.range(of: recorded.first ?? nil)
                 == SelectionRange(
                     start: SelectionPoint(row: 0, column: 2),
-                    end: SelectionPoint(row: 0, column: 4)))
+                    end: SelectionPoint(row: 0, column: 5)))
         #expect(Self.copied(recorded.first ?? nil, in: terminal) == "文测")
     }
 
