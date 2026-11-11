@@ -22,6 +22,12 @@ Versioning for compatibility changes.
   still restores; the saved state now carries format version 2, so an older
   build skips it cleanly rather than restoring a silent shell, and
   `restore-windows = false` still writes no destination.
+- A program that sets a selection foreground colour no longer makes every
+  scrolling frame rebuild the whole screen: with no selection, only the
+  damaged rows are rebuilt.
+- Corta starts shells when its application is kept inside another `.app`
+  bundle, or under a folder whose name ends in `.app`: the `corta-exec`
+  helper is looked for in the innermost bundle instead of the outermost.
 
 ## [1.6.2] - 2026-11-10
 
