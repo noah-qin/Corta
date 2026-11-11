@@ -45,7 +45,8 @@ extension SplitViewController {
     }
 
     func splitFocusedPane(
-        orientation: SplitOrientation, workingDirectory: String? = nil, preset: Preset? = nil
+        orientation: SplitOrientation, workingDirectory: String? = nil, preset: Preset? = nil,
+        remote: PaneRemoteRestore? = nil
     ) {
         guard let focusedPane else { return }
         defer {
@@ -64,7 +65,7 @@ extension SplitViewController {
         let pane = makePane(
             workingDirectory: workingDirectory ?? focusedPane.session?.workingDirectory,
             initialGridSize: halvedGridSize(of: focusedPane, orientation: orientation),
-            preset: preset)
+            preset: preset, remote: remote)
         // A window's temporary zoom also applies to newly created panes.
         pane.setFontSize(focusedPane.fontSize)
         pane.isFontSizeZoomed = focusedPane.isFontSizeZoomed

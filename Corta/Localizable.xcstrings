@@ -49788,6 +49788,242 @@
           }
         }
       }
+    },
+    "session.ended.restored.title.host": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection to %@ ended when Corta quit"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 退出时与 %@ 的连接已结束"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 結束時與 %@ 的連線已結束"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta の終了時に %@ への接続が終了しました"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta를 종료할 때 %@ 연결이 종료되었습니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Verbindung zu %@ endete, als Corta beendet wurde"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La connexion à %@ a pris fin à la fermeture de Corta"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La conexión con %@ terminó al salir de Corta"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A conexão com %@ terminou quando o Corta foi encerrado"
+          }
+        }
+      }
+    },
+    "session.ended.restored.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corta does not reconnect on launch, and nothing has been sent to this host."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 在启动时不会自动重连，也没有向该主机发送任何内容。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 啟動時不會自動重新連線，也沒有向該主機送出任何內容。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta は起動時に再接続せず、このホストには何も送信していません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta는 실행할 때 다시 연결하지 않으며, 이 호스트로 아무것도 보내지 않았습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta verbindet sich beim Start nicht neu, und an diesen Host wurde nichts gesendet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta ne se reconnecte pas au lancement, et rien n’a été envoyé à cet hôte."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta no se reconecta al iniciarse y no se ha enviado nada a este host."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O Corta não se reconecta ao iniciar, e nada foi enviado para este host."
+          }
+        }
+      }
+    },
+    "session.ended.restored.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnect starts a new connection to this host. New Session opens a local shell here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“重新连接”会向该主机发起新连接；“新建会话”会在此打开本地 shell。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「重新連線」會向該主機發起新連線；「新增工作階段」會在此開啟本機 shell。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「再接続」でこのホストへの新しい接続を開始します。「新規セッション」でここにローカルシェルを開きます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "‘다시 연결’은 이 호스트로 새 연결을 시작합니다. ‘새 세션’은 여기에 로컬 셸을 엽니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„Neu verbinden“ startet eine neue Verbindung zu diesem Host. „Neue Sitzung“ öffnet hier eine lokale Shell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Reconnecter lance une nouvelle connexion à cet hôte. Nouvelle session ouvre ici un shell local."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Reconectar inicia una conexión nueva con este host. Nueva sesión abre aquí un shell local."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Reconectar inicia uma nova conexão com este host. Nova sessão abre aqui um shell local."
+          }
+        }
+      }
+    },
+    "restore.remoteNotResumed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This pane was connected to another computer when Corta quit; it is a local shell now."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 退出时此窗格连接着另一台电脑；现在它是一个本地 shell。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta 結束時此窗格連線到另一台電腦；現在它是本機 shell。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta の終了時、このペインは別のコンピュータに接続していました。現在はローカルシェルです。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Corta를 종료할 때 이 창은 다른 컴퓨터에 연결되어 있었습니다. 지금은 로컬 셸입니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dieser Bereich war beim Beenden von Corta mit einem anderen Computer verbunden; jetzt ist er eine lokale Shell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ce volet était connecté à un autre ordinateur à la fermeture de Corta ; c’est maintenant un shell local."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Este panel estaba conectado a otro ordenador al salir de Corta; ahora es un shell local."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Este painel estava conectado a outro computador quando o Corta foi encerrado; agora é um shell local."
+          }
+        }
+      }
     }
   }
 }

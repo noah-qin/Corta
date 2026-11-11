@@ -137,7 +137,8 @@ final class SplitViewController: NSViewController {
         } else {
             pane = makePane(
                 workingDirectory: pendingRestore?.layout.firstDirectory ?? setup.workingDirectory,
-                initialGridSize: nil, preset: pendingPreset ?? restoredPreset)
+                initialGridSize: nil, preset: pendingPreset ?? restoredPreset,
+                remote: pendingRestore?.layout.firstRemote)
         }
         focusedPane = pane
         tree = SplitTree(root: pane.view)
@@ -328,27 +329,6 @@ final class SplitViewController: NSViewController {
         }
         systemStatusBar.isHidden = hidesOverlays || !ConfigurationStore.shared.configuration.statusBar
         if active != previous { updateStatusBarLayout() }
-    }
-
-    // MARK: - Panes
-
-    /// Creates a pane and its session, force-loading the view so the shell
-    /// spawns at the target grid size and directory rather than reflowing.
-    func makePane(
-        workingDirectory: String?, initialGridSize: TerminalSize?, preset: Preset? = nil
-    ) -> TerminalPaneViewController {
-        let pane = TerminalPaneViewController()
-        // Before `pane.view` loads: the preset supplies spawn settings.
-        pane.preset = preset
-        // Opens where the focused pane is (OSC 7), else home. The directory is
-        // already host-filtered, so a remote path never reaches a local spawn.
-        pane.inheritedWorkingDirectory = workingDirectory
-        pane.inheritedDirectoryChecked = setup.directoriesChecked
-        pane.initialGridSize = initialGridSize
-        pane.didSizeWindow = didSetUpWindow
-        addChild(pane)
-        _ = pane.view
-        return pane
     }
 
     /// The terminal root changes identity on the first split and last collapse;

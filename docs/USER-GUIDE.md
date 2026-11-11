@@ -69,7 +69,7 @@ values and when it applies).
 | Copy on select | `copy-on-select`, **on** by default. Set `false` for ⌘C only. |
 | Programs copying to the clipboard over `ssh` or from `tmux` (OSC 52) | `allow-clipboard-write = true`. Off by default; reading the clipboard is not possible under any setting. |
 | Being asked before closing a busy window | `confirm-close`, on by default. |
-| Windows reopening where you left them | `restore-windows`, on by default. Layouts, tabs and working directories come back; processes and terminal text do not. |
+| Windows reopening where you left them | `restore-windows`, on by default. Layouts, tabs and working directories come back; processes and terminal text do not. A pane that was on a connect-sheet SSH session comes back as an ended connection with Reconnect and New Session, not a new connection. |
 | Your own colour scheme | A theme defined in the file (`theme.<name>.*`), or **View ▸ Theme editor…**. [Creating and editing themes](#creating-and-editing-themes). |
 | Your own key bindings | `bind.<command> = <shortcut>`. The command names are in [Keyboard shortcuts](#keyboard-shortcuts). |
 | A font of your choice | **Settings ▸ Appearance ▸ Font**, or `font-family`. Only monospaced families Corta can lay out on its grid are offered. |
@@ -170,7 +170,12 @@ the mouse wheel over it — and follows the tab you select.
 - **Restoring windows.** Quit and relaunch, and every window comes back
   with its tabs, splits, divider positions and each pane's working directory
   (`restore-windows`, on by default). Each pane starts a fresh process;
-  terminal text and running jobs are not restored.
+  terminal text and running jobs are not restored. A pane the connect sheet
+  opened over SSH comes back as an ended connection naming the host, with
+  **Reconnect** and **New Session** — nothing connects until you ask. A pane
+  where you typed `ssh` yourself comes back as a local shell in that
+  directory, with a note that it was remote: the destination in its output
+  is not something Corta reconnects from.
 - **Presets.** A preset is a named shell, directory and environment,
   defined in the config file. **Shell ▸ New Pane with Preset** opens one;
   hold ⌥ to open it in a window of its own
