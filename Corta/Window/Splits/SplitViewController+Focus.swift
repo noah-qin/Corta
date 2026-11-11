@@ -27,8 +27,8 @@ extension SplitViewController {
         // become first responder, and a header button then acted on the
         // pane focused before it.
         noteFocus(pane)
-        if isSelectedTab, let terminalView = pane.terminalView {
-            view.window?.makeFirstResponder(terminalView)
+        if isSelectedTab, let target = pane.keyboardTarget {
+            view.window?.makeFirstResponder(target)
         }
     }
 

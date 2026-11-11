@@ -63,7 +63,8 @@ extension SplitViewController {
         // first layout is already 50/50 instead of flashing a zero-size pane.
         let oldFrame = focusedPane.view.frame
         let pane = makePane(
-            workingDirectory: workingDirectory ?? focusedPane.session?.workingDirectory,
+            workingDirectory: workingDirectory ?? focusedPane.session?.workingDirectory
+                ?? focusedPane.inheritedWorkingDirectory,
             initialGridSize: halvedGridSize(of: focusedPane, orientation: orientation),
             preset: preset, remote: remote)
         // A window's temporary zoom also applies to newly created panes.

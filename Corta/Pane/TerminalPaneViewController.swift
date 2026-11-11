@@ -477,6 +477,9 @@ extension TerminalPaneViewController {
     private func setUpPane(strictRespawn: Bool = false, keeping grid: TerminalSize? = nil) {
         let restore = RestoredRemoteAction.forRestore(restoredRemote, strictRespawn: strictRespawn)
         restoredRemote = nil
+        if grid == nil || !isFontSizeZoomed {
+            fontSize = Configuration.fontSizeRange.clamped(ConfigurationStore.shared.configuration.fontSize)
+        }
         if case .connectionPanel(let target) = restore {
             // Nothing is spawned for a restored connection: a launch may not
             // connect on its own, nor put a local shell where a remote
@@ -486,9 +489,6 @@ extension TerminalPaneViewController {
             return
         }
         let configuration = ConfigurationStore.shared.configuration
-        if grid == nil || !isFontSizeZoomed {
-            fontSize = Configuration.fontSizeRange.clamped(configuration.fontSize)
-        }
         fontStyle = FontStyle(configuration)
         guard prepareRenderer() else { return }
         let initialSize = initialTerminalSize(keeping: grid)
@@ -1170,7 +1170,9 @@ extension TerminalPaneViewController {
     private func rebuildPane(strictRespawn: Bool, showsReconnectNotice: Bool) {
         // The grid it is shown at, while a session still says so; a pane
         // that never built starts from the configured one.
-        let grid = didSizeWindow && session != nil ? lastRequestedSize : nil
+        // A restored connection (#519) has no session but sits in a sized
+        // window: it keeps the grid its split gave it, not the configured one.
+        let grid = didSizeWindow ? (session != nil ? lastRequestedSize : initialGridSize) : nil
         // Input on its way to the old session has nowhere to land now, and
         // must not land in the new one.
         commands.fileDropRequest?.cancel()
@@ -1234,6 +1236,13 @@ extension TerminalPaneViewController {
         case .remote, .remoteUnknown: return .launcher
         case .local, .connected, .unknown: return nil
         }
+    }
+
+    /// What takes the keyboard when this pane is focused: its terminal, or —
+    /// for a restored connection that never built one (`#519`) — the primary
+    /// action of its panel, as a failure's card does.
+    var keyboardTarget: NSResponder? {
+        terminalView ?? sessionEndedPanel?.panel.buttons.last
     }
 
     /// A restored connection's panel: a local shell in the saved directory,
