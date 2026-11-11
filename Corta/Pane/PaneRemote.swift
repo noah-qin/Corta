@@ -322,10 +322,13 @@ final class PaneRemote: NSObject, NSMenuItemValidation {
             defer { self?.openTasks[id] = nil }
             guard let self else { return }
             do {
-                let opened = try await RemoteEditCoordinator.shared.open(
+                let result = try await RemoteEditCoordinator.shared.open(
                     host: reference.host, remotePath: reference.remotePath,
                     line: reference.line, column: reference.column)
-                if !opened {
+                // `.editorUnavailable` has already said what to set, with the
+                // settings button; only a launch that failed after a usable
+                // command needs the toast.
+                if result == .launchFailed {
                     host?.terminalView?.showToast(
                         L10n.text("toast.badOpenFileCommand"), kind: .warning)
                 }

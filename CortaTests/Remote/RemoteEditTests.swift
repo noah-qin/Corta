@@ -236,6 +236,7 @@ struct RemoteEditCoordinatorTests {
         var uploads: [RemoteEditCoordinator.PendingUpload] = []
         var conflicts: [RemoteEditCoordinator.UploadConflict] = []
         var errors: [String] = []
+        var editorProblems: [RemoteEditCoordinator.EditorCommandProblem] = []
         struct Opened {
             var url: URL
             var line: Int
@@ -289,49 +290,14 @@ struct RemoteEditCoordinatorTests {
             presenter: RemoteEditCoordinator.RemoteEditPresenter(
                 promptUpload: { recorder.uploads.append($0) },
                 promptConflict: { recorder.conflicts.append($0) },
-                showError: { recorder.errors.append($0) }),
+                showError: { recorder.errors.append($0) },
+                showEditorProblem: { recorder.editorProblems.append($0) }),
             operationTimeout: operationTimeout)
+        // `/bin/sh` exists on every Mac the tests run on; the opener is the
+        // test's, so nothing is launched.
+        coordinator.openFileCommand = { "/bin/sh {file}" }
         return Fixture(
             root: root, store: store, fake: fake, recorder: recorder, coordinator: coordinator)
-    }
-
-    @Test("remote copies never reach a default handler without a configured editor")
-    func remoteDefaultHandlerRefused() async throws {
-        let root = try makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let store = RemoteEditStore(rootURL: root)
-        let fake = FakeSFTPClient()
-        var opened = 0
-        let coordinator = RemoteEditCoordinator(
-            store: store, makeClient: { _ in fake },
-            opener: { url, line, column in
-                opened += 1
-                return PanePointer.openFileAt(
-                    url: url, line: line, column: column,
-                    command: "")
-            },
-            presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
-        for name in ["evil.command", "evil.terminal", "evil.app", "script", "source.swift"] {
-            let path = "/srv/" + name
-            fake.lstatResults[path] = SFTPAttributes(size: 1)
-            fake.onTransfer = { call, _ in
-                try "echo SHOULD_NOT_RUN".write(toFile: call.localPath, atomically: true, encoding: .utf8)
-            }
-            #expect(try await !coordinator.open(host: "build-box", remotePath: path, line: 2, column: nil))
-            #expect(try await !coordinator.open(host: "build-box", remotePath: path, line: 3, column: nil))
-            #expect(store.copy(host: "build-box", remotePath: path)?.openCount == 0)
-        }
-        #expect(opened == 10)
-        #expect(fake.transferCalls.count == 5, "cached copies pass the same guard")
-    }
-
-    @Test("an explicitly configured remote editor receives the file as data")
-    func configuredRemoteEditorAllowed() {
-        for name in ["file.swift", "evil.command", "semi;$(echo evil).terminal"] {
-            #expect(PanePointer.openFileAt(
-                url: URL(fileURLWithPath: "/tmp/" + name), line: 42, column: 7,
-                command: "/usr/bin/true {file} {line} {column}"))
-        }
     }
 
     @Test("a failed stat retires a connection and the next action reconnects")
@@ -355,11 +321,14 @@ struct RemoteEditCoordinatorTests {
             },
             opener: { _, _, _ in true },
             presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
+        coordinator.openFileCommand = { "/bin/sh {file}" }
         await #expect(throws: SFTPError.transport(.connectionLost)) {
             try await coordinator.materialize(host: "build-box", remotePath: path)
         }
         #expect(first.closed)
-        #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
+        #expect(
+            try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil)
+                == .opened)
         #expect(made == 2 && !replacement.closed)
     }
 

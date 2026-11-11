@@ -27,6 +27,9 @@ protocol PaneSessionEndHost: AnyObject {
     func closeEndedPane()
     func invalidateDisplay()
     func rebuildPane(strictRespawn: Bool)
+    /// New Session on a restored connection: a local shell here, with the
+    /// saved connection dropped (`#519`).
+    func startLocalSession()
 }
 
 /// The pane's session having ended: the panel that says so until something
@@ -47,30 +50,55 @@ final class PaneSessionEnd {
     ///   - remoteHost: where a connection went, for the title.
     ///   - program: the launcher or shell's name.
     func present(_ exit: ProcessExit, isConnection: Bool, remoteHost: String?, program: String) {
-        guard let host else { return }
-        overlay?.removeFromSuperview()
         let content = SessionEnded.content(
             for: exit, isConnection: isConnection, host: remoteHost, program: program)
-        // Asked nothing more: the panel says what starting again clears. A
-        // button press is the decision, never a key — the panel takes no
-        // keyboard, so a key pressed in a dead pane starts nothing.
-        let panel = PaneStatusPanel(content, actions: [
-            .init(title: L10n.text("menu.closePane")) { [weak host] in host?.closeEndedPane() },
-            .init(
-                title: L10n.text(isConnection ? "failure.button.reconnect" : "session.ended.newSession"),
-                isPrimary: true
-            ) { [weak self] in self?.startAgain(isConnection: isConnection) },
-        ])
-        if let first = panel.buttons.first, let last = panel.buttons.last {
-            first.nextKeyView = last
-            last.nextKeyView = first
+        show(
+            content,
+            actions: [
+                .init(title: L10n.text("menu.closePane")) { [weak host] in host?.closeEndedPane() },
+                .init(
+                    title: L10n.text(isConnection ? "failure.button.reconnect" : "session.ended.newSession"),
+                    isPrimary: true
+                ) { [weak self] in self?.startAgain(strictRespawn: isConnection) },
+            ])
+    }
+
+    /// A pane restored from a connect-sheet SSH session (`#519`): nothing ran
+    /// this launch, so there is no exit; the panel names the host and offers
+    /// the saved connection again, or a local shell in this directory.
+    func presentRestoredConnection(hostName: String) {
+        show(
+            SessionEnded.restoredConnection(host: hostName),
+            actions: [
+                .init(title: L10n.text("menu.closePane")) { [weak host] in host?.closeEndedPane() },
+                .init(title: L10n.text("session.ended.newSession")) { [weak host] in
+                    host?.startLocalSession()
+                },
+                .init(
+                    title: L10n.text("failure.button.reconnect"), isPrimary: true,
+                    handler: { [weak self] in self?.startAgain(strictRespawn: true) }
+                ),
+            ])
+    }
+
+    /// Asked nothing more: the panel says what starting again clears. A
+    /// button press is the decision, never a key — the panel takes no
+    /// keyboard, so a key pressed in a dead pane starts nothing.
+    private func show(_ content: PaneStatusPanel.Content, actions: [PaneStatusPanel.Action]) {
+        guard let host else { return }
+        overlay?.removeFromSuperview()
+        let panel = PaneStatusPanel(content, actions: actions)
+        // Tab walks the actions in their order; Shift-Tab enters from the last.
+        for (index, button) in panel.buttons.enumerated() {
+            button.nextKeyView = panel.buttons[(index + 1) % panel.buttons.count]
         }
         // Found by UI tests and Accessibility as before.
         panel.identifier = NSUserInterfaceItemIdentifier("Corta.SessionEnded")
         let overlay = PaneStatusOverlay(panel: panel, backdrop: .dim)
         // Centred in the pane, as a failure's card is: pinned to the edge
         // away from the last output, it read as misplaced. The dim behind it
-        // keeps that output readable.
+        // keeps that output readable; a restored pane has none, and its dark
+        // canvas reads the same.
         overlay.present(in: host.view)
         self.overlay = overlay
         NSAccessibility.post(element: panel, notification: .layoutChanged)
@@ -100,8 +128,8 @@ final class PaneSessionEnd {
         overlay = nil
     }
 
-    private func startAgain(isConnection: Bool) {
+    private func startAgain(strictRespawn: Bool) {
         guard let host, !host.didTeardown, overlay != nil else { return }
-        host.rebuildPane(strictRespawn: isConnection)
+        host.rebuildPane(strictRespawn: strictRespawn)
     }
 }
