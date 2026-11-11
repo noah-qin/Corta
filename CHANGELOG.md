@@ -10,6 +10,12 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Corta starts shells when its application is kept inside another `.app`
+  bundle, or under a folder whose name ends in `.app`: the `corta-exec`
+  helper is looked for in the innermost bundle instead of the outermost.
+
 ## [1.6.2] - 2026-11-10
 
 ### Changed
