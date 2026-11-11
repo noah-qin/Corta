@@ -76,6 +76,14 @@ final class PaneSearch: NSObject {
     var status: SweepOutcome.Status = .complete
     var matchesTruncated = false
     var task: Task<Void, Never>?
+    /// The budget for one regex sweep: `Search.regexTimeBudget`, except for a
+    /// test that needs a deterministic timeout.
+    var regexTimeBudget = Search.regexTimeBudget
+    /// A regex sweep that ran out of time, kept for "Search older lines".
+    var olderSearch: PendingOlderSearch?
+    /// The shown results include a continued (older) slice. Output then starts
+    /// no refresh: it would re-sweep from the newest line and drop those hits.
+    var continuedSweep = false
     private var selectionTask: Task<Void, Never>?
     /// Paired scroll position and scrollback anchor, restored when search closes.
     var previousScrollOffset: Int?
@@ -127,6 +135,23 @@ final class PaneSearch: NSObject {
     struct SweepOutcome: Sendable {
         var matches: [SelectionRange]
         var status: Status
+        /// Where an older regex slice resumes: the last row of the next
+        /// logical line to read, in the swept grid's coordinates. Nil when
+        /// nothing older remains, or the sweep was not a timed-out regex.
+        var resumeRow: Int?
+        /// Lines this sweep did not search: past `regexLineLimit`, or too
+        /// slow to finish within one budget.
+        var unsearchedLines: Int
+
+        nonisolated init(
+            matches: [SelectionRange], status: Status, resumeRow: Int? = nil,
+            unsearchedLines: Int = 0
+        ) {
+            self.matches = matches
+            self.status = status
+            self.resumeRow = resumeRow
+            self.unsearchedLines = unsearchedLines
+        }
 
         enum Status: Sendable {
             /// The whole document was searched.
@@ -260,6 +285,8 @@ final class PaneSearch: NSObject {
         barModel.onPrevious = { [weak self] in self?.showPreviousMatch() }
         barModel.onNext = { [weak self] in self?.showNextMatch() }
         barModel.onClose = { [weak self] in self?.close() }
+        barModel.canSearchOlder = false
+        barModel.onSearchOlder = { [weak self] in self?.searchOlderLines() }
     }
 
     /// Shows the bar or refocuses its field, remembering the scroll position
@@ -341,6 +368,8 @@ final class PaneSearch: NSObject {
         pacingWake?.cancel()
         pacingWake = nil
         needsRefresh = false
+        clearOlderSearch()
+        continuedSweep = false
         generation &+= 1
         if let beforeSearch = previousScrollOffset, let host {
             if beforeSearch == 0 {
@@ -376,6 +405,10 @@ extension PaneSearch {
     /// discards a result that slipped past cancellation.
     func updateResults(scrollsToMatch: Bool) {
         guard bar != nil, let searchField = field, let grid = host?.snapshot() else { return }
+        // Any typed query supersedes an older slice, including emptying the
+        // field: the offer goes with the sweep it belonged to.
+        clearOlderSearch()
+        continuedSweep = false
         generation &+= 1
         let generation = self.generation
         task?.cancel()
@@ -394,9 +427,9 @@ extension PaneSearch {
         }
         let caseSensitive = self.caseSensitive
         let regex = self.regex
+        let timeBudget = regexTimeBudget
         // Copy-on-write: a few retains, not a copy.
         let totalPushed = grid.scrollback.totalPushed
-        // This sweep already reads the current grid.
         needsRefresh = false
         task = Task.detached(priority: .userInitiated) { [weak self] in
             // A cancelled sleep throws, so a superseded query never scans.
@@ -404,7 +437,8 @@ extension PaneSearch {
                 try await Task.sleep(for: .milliseconds(Self.debounceMilliseconds))
             } catch { return }
             let outcome = Self.sweep(
-                query, in: grid, caseSensitive: caseSensitive, regex: regex)
+                query, in: grid, caseSensitive: caseSensitive, regex: regex,
+                timeBudget: timeBudget)
             await MainActor.run {
                 self?.applyResults(
                     outcome, generation: generation, scrollsToMatch: scrollsToMatch,
@@ -420,7 +454,7 @@ extension PaneSearch {
     /// `needsRefresh`, which `applyResults` honours; otherwise
     /// the last output could leave results stale once the grid goes quiet.
     func scheduleBackgroundRefresh() {
-        guard bar != nil, let searchField = field else { return }
+        guard bar != nil, let searchField = field, !continuedSweep else { return }
         // Composing: the preedit is not the query, so output arriving now
         // starts no sweep. The change that commits the text sweeps for it.
         guard !isComposingText else { return }
@@ -453,11 +487,13 @@ extension PaneSearch {
         let totalPushed = grid.scrollback.totalPushed
         let caseSensitive = self.caseSensitive
         let regex = self.regex
+        let timeBudget = regexTimeBudget
         let gate = sweepGate
         task = Task.detached(priority: .utility) { [weak self] in
             gate?()
             let outcome = Self.sweep(
-                query, in: grid, caseSensitive: caseSensitive, regex: regex)
+                query, in: grid, caseSensitive: caseSensitive, regex: regex,
+                timeBudget: timeBudget)
             await MainActor.run {
                 self?.applyResults(
                     outcome, generation: generation, scrollsToMatch: false,
@@ -477,6 +513,7 @@ extension PaneSearch {
         task = nil
         lastSweepLanded = .now
         setMatches(outcome.matches, totalPushed: totalPushed)
+        noteOlderSearch(outcome, totalPushed: totalPushed)
         matchesTruncated = matches.count >= Search.defaultMatchLimit
         if matches.isEmpty {
             currentMatchIndex = nil
@@ -568,23 +605,6 @@ extension PaneSearch {
     func liveRow(_ row: Int, in grid: Grid) -> Int {
         ScrollbackCoordinates.reanchoredRow(
             row, from: matchesTotalPushed, to: grid.scrollback.totalPushed)
-    }
-
-    private func updateCountLabel() {
-        guard bar != nil else { return }
-        if status == .invalidPattern {
-            barModel.countText = L10n.text("search.invalidPattern")
-        } else if status == .patternTooSlow {
-            barModel.countText = L10n.text("search.patternTooSlow")
-        } else if matches.isEmpty {
-            barModel.countText = field?.stringValue.isEmpty == false ? L10n.text("search.noResults") : ""
-        } else if let current = currentMatchIndex {
-            // "+" when the sweep stopped early (the match cap, an over-long line, or
-            // the time budget): there may be uncounted matches.
-            barModel.countText =
-                "\(current + 1)/\(matches.count)"
-                + (status == .incomplete ? "+" : "")
-        }
     }
 
 }

@@ -270,7 +270,7 @@ struct SearchTests {
         let terminal = Self.terminal(["error 404", "error 500", "ok 200"])
         let result = Search.findRegex("error \\d+", in: terminal.grid)
         #expect(result.matches.count == 2)
-        #expect(result.skippedLongLines == 0)
+        #expect(result.unsearchedLines == 0)
     }
 
     @Test("case sensitivity applies to patterns too")
@@ -344,6 +344,86 @@ struct SearchTests {
         terminal.feed(Array("\r\nshort needle\r\n".utf8))
         let result = Search.findRegex("needle", in: terminal.grid)
         #expect(result.matches.count == 1)
-        #expect(result.skippedLongLines == 1)
+        #expect(result.unsearchedLines == 1)
+    }
+
+    /// The budget ending says where to continue, not that the document was
+    /// searched: a zero budget reads nothing and reports the newest line as
+    /// the resume point, and a resumed sweep finds what the first missed.
+    @Test func aTimedOutSweepResumesBelowTheLineItReached() {
+        var terminal = Terminal(rows: 4, columns: 40, scrollbackLimit: 1000)
+        terminal.feed(Array("needle in the oldest line\r\n".utf8))
+        for index in 0..<200 { terminal.feed(Array("filler \(index)\r\n".utf8)) }
+
+        let first = Search.findRegex("needle", in: terminal.grid, timeBudget: .zero)
+        #expect(first.matches.isEmpty)
+        #expect(first.isIncomplete)
+        #expect(first.timedOut)
+        let resumeRow = first.resumeRow
+        #expect(resumeRow != nil, "a sweep that read nothing says where to resume")
+
+        let continued = Search.findRegex(
+            "needle", in: terminal.grid, timeBudget: .seconds(5), from: resumeRow)
+        #expect(continued.matches.count == 1)
+        #expect(continued.resumeRow == nil)
+        #expect(!continued.isIncomplete)
+    }
+
+    /// "No Results" is a verdict about the whole document. A sweep that stopped
+    /// early is incomplete, and a resumed sweep that reaches the oldest line
+    /// over a pattern that matches nothing is complete and empty.
+    @Test func anUnfinishedSweepIsNotAVerdictAboutTheWholeDocument() {
+        var terminal = Terminal(rows: 4, columns: 40, scrollbackLimit: 1000)
+        for index in 0..<200 { terminal.feed(Array("filler \(index)\r\n".utf8)) }
+
+        let first = Search.findRegex("absent", in: terminal.grid, timeBudget: .zero)
+        #expect(first.matches.isEmpty)
+        #expect(first.isIncomplete)
+
+        let continued = Search.findRegex(
+            "absent", in: terminal.grid, timeBudget: .seconds(5), from: first.resumeRow)
+        #expect(continued.matches.isEmpty)
+        #expect(!continued.isIncomplete, "the whole scrollback was searched")
+        #expect(continued.resumeRow == nil)
+    }
+
+    /// The issue's scale: 99,000 lines of 80-character log text behind the
+    /// only match, in the oldest line. A budget that ends before it says
+    /// where to continue, and the resumed sweep finds it.
+    @Test func aHundredThousandLineScrollbackFindsItsOldestMatch() {
+        var terminal = Terminal(rows: 40, columns: 120, scrollbackLimit: 100_000)
+        terminal.feed(Array("ERROR oldest match\r\n".utf8))
+        let line = Array((String(repeating: "log ", count: 18) + "line\r\n").utf8)
+        var batch: [UInt8] = []
+        batch.reserveCapacity(line.count * 500)
+        for _ in 0..<500 { batch += line }
+        for _ in 0..<198 { terminal.feed(batch) }
+        #expect(terminal.grid.scrollback.count > 90_000)
+
+        let first = Search.findRegex("ERROR \\w+", in: terminal.grid, timeBudget: .zero)
+        #expect(first.matches.isEmpty)
+        #expect(first.isIncomplete)
+        let continued = Search.findRegex(
+            "ERROR \\w+", in: terminal.grid, timeBudget: .seconds(30),
+            from: first.resumeRow)
+        #expect(continued.matches.count == 1)
+        #expect(continued.matches[0].start.row == terminal.grid.documentRowRange.lowerBound)
+        #expect(!continued.isIncomplete)
+    }
+
+    /// `from` starts at the logical line whose last row it names, so a
+    /// resumed sweep reads the older lines and not the newer ones again.
+    @Test func resumingBelowARowReadsOnlyTheOlderLines() {
+        var terminal = Terminal(rows: 4, columns: 40, scrollbackLimit: 100)
+        terminal.feed(Array("needle old\r\n".utf8))
+        for index in 0..<50 { terminal.feed(Array("filler \(index)\r\n".utf8)) }
+        terminal.feed(Array("needle new\r\n".utf8))
+
+        let all = Search.findRegex("needle", in: terminal.grid)
+        #expect(all.matches.count == 2)
+        let olderOnly = Search.findRegex(
+            "needle", in: terminal.grid, from: all.matches[1].start.row - 1)
+        #expect(olderOnly.matches.count == 1)
+        #expect(olderOnly.matches.first == all.matches.first)
     }
 }

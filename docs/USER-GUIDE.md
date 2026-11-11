@@ -379,7 +379,13 @@ own error text is under **Details**.
   (`search-case-sensitive`, `search-regex`). The bar sits at the top right
   of the pane and moves to the bottom while the cursor or the current match
   would be under it; in a narrow split it narrows rather than covering the
-  pane. Each pane has its own bar. Typing with an input method composes in
+  pane. Each pane has its own bar. Over a very long scrollback a regular
+  expression finishes only the most recent lines within its time budget: the
+  bar then says the search was partial instead of **No Results**, and the
+  arrow button beside the count, **Search Older Lines**, continues from where
+  it stopped. **No Results** appears only once the whole scrollback has been
+  searched.
+  Typing with an input method composes in
   the bar as it does in any text field: Esc cancels the composition and
   leaves the bar open, and the scrollback is searched once for the committed
   text.
