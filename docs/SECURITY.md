@@ -472,6 +472,13 @@ closing a window stopped what was in it. A group still there ten seconds
 later — it ignored `SIGHUP` — gets `SIGKILL`, and is reaped. Only that
 group: a job the shell moved into its own group is the shell's to end.
 
+Closing a pane also ends an input write the kernel has parked because the
+program stopped reading. The primary is non-blocking, and a writer waits
+for room on the same close wakeup the reader uses, so `close()` releases
+the writer thread, the descriptor and the session at once instead of
+leaving the primary open until that program exits. The hangup is what a
+job still holding the replica needs in order to see its terminal close.
+
 ### 4.5 Secure keyboard entry
 
 Shipped in B16 as `secure-keyboard-entry` (`docs/CONFIGURATION.md` §2),

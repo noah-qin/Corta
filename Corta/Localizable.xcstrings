@@ -13696,55 +13696,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Runs when a path:line reference in output is ⌘-clicked. {file}, {line} and {column} are substituted. The command must be an absolute path; leave empty to use the default app, which cannot be told a line number."
+            "value": "Runs when a path:line reference in output is ⌘-clicked. {file}, {line} and {column} are substituted. The command must start with the editor executable's absolute path; an empty command disables opening files from output. Corta never opens one with the system default application."
           }
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "translated",
-            "value": "当输出中的 path:line 引用被 ⌘ 点按时运行。{file}、{line} 和 {column} 会被替换。命令必须是绝对路径；留空则使用默认应用程序，但默认应用程序无法接收行号。"
+            "state": "needs_review",
+            "value": "当输出中的 path:line 引用被 ⌘ 点按时运行。{file}、{line} 和 {column} 会被替换。命令必须以编辑器可执行文件的绝对路径开头；留空则禁用从输出打开文件。Corta 绝不会用系统默认应用程序打开这类文件。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "當輸出中的 path:line 參照被 ⌘ 點按時執行。{file}、{line} 和 {column} 會被替換。指令必須是絕對路徑；留空則使用預設應用程式，但預設應用程式無法接收行號。"
+            "value": "當輸出中的 path:line 參照被 ⌘ 點按時執行。{file}、{line} 和 {column} 會被替換。指令必須以編輯器可執行檔的絕對路徑開頭；留空則停用從輸出開啟檔案。Corta 絕不會用系統預設應用程式開啟這類檔案。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "出力中の path:line 参照を ⌘ クリックしたときに実行されます。{file}、{line}、{column} が置き換えられます。コマンドは絶対パスである必要があります。空欄にすると既定のアプリケーションを使用しますが、行番号は渡せません。"
+            "value": "出力中の path:line 参照を ⌘ クリックしたときに実行されます。{file}、{line}、{column} が置き換えられます。コマンドはエディタ実行ファイルの絶対パスで始まる必要があります。空欄にすると出力からのファイルを開く機能が無効になります。Corta がシステムの既定のアプリで開くことはありません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "출력의 path:line 참조를 ⌘-클릭할 때 실행됩니다. {file}, {line}, {column}이 치환됩니다. 명령은 절대 경로여야 합니다. 비워 두면 기본 응용 프로그램을 사용하지만 행 번호는 전달할 수 없습니다."
+            "value": "출력의 path:line 참조를 ⌘-클릭할 때 실행됩니다. {file}, {line}, {column}이 치환됩니다. 명령은 편집기 실행 파일의 절대 경로로 시작해야 합니다. 비워 두면 출력에서 파일 열기가 비활성화됩니다. Corta는 시스템 기본 응용 프로그램으로 열지 않습니다."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Wird ausgeführt, wenn eine „path:line“-Referenz in der Ausgabe bei gedrückter Befehlstaste angeklickt wird. {file}, {line} und {column} werden ersetzt. Der Befehl muss ein absoluter Pfad sein; leer lassen, um die Standardapp zu verwenden, der keine Zeilennummer übergeben werden kann."
+            "value": "Wird ausgeführt, wenn eine „path:line“-Referenz in der Ausgabe bei gedrückter Befehlstaste angeklickt wird. {file}, {line} und {column} werden ersetzt. Der Befehl muss mit dem absoluten Pfad der ausführbaren Editor-Datei beginnen; ein leerer Befehl deaktiviert das Öffnen von Dateien aus der Ausgabe. Corta öffnet sie nie mit der Standardapp des Systems."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "S’exécute lorsqu’une référence path:line dans la sortie est cliquée avec ⌘. {file}, {line} et {column} sont remplacés. La commande doit être un chemin absolu ; laisser vide pour utiliser l’app par défaut, à laquelle le numéro de ligne ne peut pas être transmis."
+            "value": "S’exécute lorsqu’une référence path:line dans la sortie est cliquée avec ⌘. {file}, {line} et {column} sont remplacés. La commande doit commencer par le chemin absolu de l’exécutable de l’éditeur ; une commande vide désactive l’ouverture des fichiers depuis la sortie. Corta ne les ouvre jamais avec l’application par défaut du système."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Se ejecuta al hacer ⌘-clic en una referencia path:line de la salida. Se sustituyen {file}, {line} y {column}. El comando debe ser una ruta absoluta; déjalo vacío para usar la app por omisión, a la que no se le puede indicar el número de línea."
+            "value": "Se ejecuta al hacer ⌘-clic en una referencia path:line de la salida. Se sustituyen {file}, {line} y {column}. El comando debe empezar por la ruta absoluta del ejecutable del editor; un comando vacío desactiva la apertura de archivos desde la salida. Corta nunca los abre con la aplicación predeterminada del sistema."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Executado ao clicar com ⌘ em uma referência path:line na saída. {file}, {line} e {column} são substituídos. O comando precisa ser um caminho absoluto; deixe vazio para usar o app padrão, que não recebe o número da linha."
+            "value": "Executado ao clicar com ⌘ em uma referência path:line na saída. {file}, {line} e {column} são substituídos. O comando deve começar pelo caminho absoluto do executável do editor; um comando vazio desativa a abertura de arquivos a partir da saída. O Corta nunca os abre com o aplicativo padrão do sistema."
           }
         }
       }
@@ -36110,6 +36110,124 @@
         }
       }
     },
+    "search.notAllLines": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not all lines searched"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅搜索了部分行"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "僅搜尋了部分行"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "一部の行のみ検索"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "일부 줄만 검색됨"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nicht alle Zeilen durchsucht"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Pas toutes les lignes recherchées"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No se buscaron todas las líneas"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Nem todas as linhas pesquisadas"
+          }
+        }
+      }
+    },
+    "search.searchOlder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Older Lines"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索更早的行"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "搜尋更早的行"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "以前の行を検索"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "이전 줄 검색"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ältere Zeilen durchsuchen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Rechercher les lignes plus anciennes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Buscar líneas anteriores"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Pesquisar linhas anteriores"
+          }
+        }
+      }
+    },
     "search.previousMatch": {
       "extractionState": "manual",
       "localizations": {
@@ -49785,6 +49903,242 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "O Corta não conseguiu remover uma pasta oculta chamada “.corta-export-…” em:\n%@\n\nEla contém apenas a exportação não concluída e pode ser apagada. O Corta não avisará de novo."
+          }
+        }
+      }
+    },
+    "remoteEdit.editorNeeded.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remote editing needs an editor"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "远程编辑需要编辑器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "遠端編輯需要編輯器"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "リモート編集にはエディタが必要です"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "원격 편집에는 편집기가 필요합니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Remote-Bearbeitung braucht einen Editor"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "L’édition à distance nécessite un éditeur"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "La edición remota necesita un editor"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A edição remota precisa de um editor"
+          }
+        }
+      }
+    },
+    "remoteEdit.editorNeeded.notSet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set Settings ▸ Terminal ▸ Open File Command to your editor's executable, then try again. Corta never opens a remote copy with the system default application."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请在“设置 ▸ 终端 ▸ 打开文件方式”中填写编辑器的可执行文件，然后重试。Corta 绝不会用系统默认应用程序打开远程副本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "請在「設定 ▸ 終端機 ▸ 打開檔案方式」中填入編輯器的可執行檔，然後再試一次。Corta 絕不會用系統預設應用程式開啟遠端副本。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「設定 ▸ ターミナル ▸ ファイルを開くコマンド」にエディタの実行ファイルを設定してから、もう一度お試しください。Corta がリモートのコピーをシステムの既定のアプリで開くことはありません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "‘설정 ▸ 터미널 ▸ 파일 열기 명령’에 편집기 실행 파일을 설정한 다음 다시 시도하십시오. Corta는 원격 사본을 시스템 기본 응용 프로그램으로 열지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Setze unter „Einstellungen ▸ Terminal ▸ Datei öffnen mit“ die ausführbare Datei deines Editors und versuche es dann erneut. Corta öffnet eine Remote-Kopie nie mit der Standardapp des Systems."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Définissez Réglages ▸ Terminal ▸ Ouvrir le fichier avec sur l’exécutable de votre éditeur, puis réessayez. Corta n’ouvre jamais une copie distante avec l’application par défaut du système."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Configura Ajustes ▸ Terminal ▸ Abrir archivo con con el ejecutable de tu editor y vuelve a intentarlo. Corta nunca abre una copia remota con la aplicación predeterminada del sistema."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Defina Ajustes ▸ Terminal ▸ Abrir arquivo com com o executável do seu editor e tente novamente. O Corta nunca abre uma cópia remota com o aplicativo padrão do sistema."
+          }
+        }
+      }
+    },
+    "remoteEdit.editorNeeded.missing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings ▸ Terminal ▸ Open File Command names an executable that is not there: %@. Correct the path, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“设置 ▸ 终端 ▸ 打开文件方式”指定了一个不存在的可执行文件：%@。请修正路径后重试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「設定 ▸ 終端機 ▸ 打開檔案方式」指定了不存在的可執行檔：%@。請修正路徑後再試一次。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「設定 ▸ ターミナル ▸ ファイルを開くコマンド」が指す実行ファイルが見つかりません: %@。パスを修正してから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "‘설정 ▸ 터미널 ▸ 파일 열기 명령’이 가리키는 실행 파일이 없습니다: %@. 경로를 수정한 다음 다시 시도하십시오."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„Einstellungen ▸ Terminal ▸ Datei öffnen mit“ nennt eine ausführbare Datei, die es nicht gibt: %@. Korrigiere den Pfad und versuche es dann erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Réglages ▸ Terminal ▸ Ouvrir le fichier avec désigne un exécutable absent : %@. Corrigez le chemin, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ajustes ▸ Terminal ▸ Abrir archivo con indica un ejecutable que no existe: %@. Corrige la ruta y vuelve a intentarlo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ajustes ▸ Terminal ▸ Abrir arquivo com indica um executável que não existe: %@. Corrija o caminho e tente novamente."
+          }
+        }
+      }
+    },
+    "remoteEdit.editorNeeded.notAbsolute": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings ▸ Terminal ▸ Open File Command must start with the editor executable's absolute path; “%@” is not one. Correct it, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "“设置 ▸ 终端 ▸ 打开文件方式”必须以编辑器可执行文件的绝对路径开头；“%@”不是。请修正后重试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「設定 ▸ 終端機 ▸ 打開檔案方式」必須以編輯器可執行檔的絕對路徑開頭；「%@」不是。請修正後再試一次。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "「設定 ▸ ターミナル ▸ ファイルを開くコマンド」はエディタ実行ファイルの絶対パスで始まる必要があります。“%@”は絶対パスではありません。修正してから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "‘설정 ▸ 터미널 ▸ 파일 열기 명령’은 편집기 실행 파일의 절대 경로로 시작해야 합니다. ‘%@’은(는) 절대 경로가 아닙니다. 수정한 다음 다시 시도하십시오."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "„Einstellungen ▸ Terminal ▸ Datei öffnen mit“ muss mit dem absoluten Pfad der ausführbaren Editor-Datei beginnen; „%@“ ist keiner. Korrigiere ihn und versuche es dann erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Réglages ▸ Terminal ▸ Ouvrir le fichier avec doit commencer par le chemin absolu de l’exécutable de l’éditeur ; « %@ » n’en est pas un. Corrigez-le, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ajustes ▸ Terminal ▸ Abrir archivo con debe empezar por la ruta absoluta del ejecutable del editor; «%@» no lo es. Corrígela y vuelve a intentarlo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ajustes ▸ Terminal ▸ Abrir arquivo com deve começar pelo caminho absoluto do executável do editor; “%@” não é um. Corrija e tente novamente."
           }
         }
       }
