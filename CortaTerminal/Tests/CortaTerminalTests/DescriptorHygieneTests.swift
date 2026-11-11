@@ -119,8 +119,10 @@ struct DescriptorHygieneTests {
         }
         #expect(pty.callsInFlight == 0, "the close should end the parked read")
         #expect(pty.isClosed)
-        #expect(outcome.withLock { $0 } == .failure(.closed), "the read must report the close")
+        // The reader records its outcome after the call leaves, which is after
+        // `callsInFlight` reaches zero: join it before reading the outcome.
         #expect(returned.wait(timeout: .now() + testTimeoutInterval(10)) == .success)
+        #expect(outcome.withLock { $0 } == .failure(.closed), "the read must report the close")
     }
 
     /// The kernel revokes a session's terminal when its leader exits, so a job
