@@ -23,7 +23,12 @@ import AppKit
 nonisolated struct WindowState: Equatable, Sendable {
     /// Bumped when the saved shape changes beyond what `decodeIfPresent`
     /// absorbs. Absent in older data, hence the `0` default.
-    static let currentVersion = 1
+    ///
+    /// 2 added `PaneLayout.pane`'s remote side (`#519`). A build that does not
+    /// know it would restore a connection as a silent local shell, so these
+    /// windows are skipped rather than restored wrongly; older state still
+    /// decodes, because every new field is optional.
+    static let currentVersion = 2
 
     var version: Int
     /// `TerminalWindowController.windowID`, so an App Intent's identity
@@ -151,11 +156,81 @@ extension NSRect {
     }
 }
 
+/// What a saved pane recorded of a session that was not a plain local shell
+/// (`#519`). Nothing here comes from the screen: a target is the connect
+/// sheet's own destination — the value Recent Hosts keeps — and `launcher`
+/// records only that a remote launcher was in front, so a restored local
+/// shell can say it was remote. A hand-typed `ssh` keeps no destination,
+/// because its only host text is child output (`SECURITY.md` §2).
+nonisolated enum PaneRemoteRestore: Equatable, Sendable {
+    /// `SSHTarget.key` the connect sheet opened the pane with.
+    case target(String)
+    /// A remote launcher was in front; there is no destination to keep.
+    case launcher
+}
+
+nonisolated extension PaneRemoteRestore: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case target, launcher
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // A target this build cannot read (an older or hand-edited file) is
+        // still the fact of a remote launcher: the note is right, and no
+        // destination is trusted that ssh could not be given.
+        if let key = try container.decodeIfPresent(String.self, forKey: .target),
+            SSHTarget(key: key) != nil
+        {
+            self = .target(key)
+        } else {
+            self = .launcher
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .target(let key): try container.encode(key, forKey: .target)
+        case .launcher: try container.encode(true, forKey: .launcher)
+        }
+    }
+}
+
+/// What a restored pane does before spawning, from the saved remote side
+/// (`#519`). Pure, so the decision is tested without a window.
+nonisolated enum RestoredRemoteAction: Equatable {
+    /// Nothing saved, or a Reconnect: spawn what the pane was saved with.
+    case spawn
+    /// A connect-sheet destination: show the ended panel, run nothing.
+    case connectionPanel(SSHTarget)
+    /// A hand-typed launcher: a local shell, and a note that it was remote.
+    case spawnWithRemoteNote
+
+    /// - Parameter strictRespawn: Reconnect reuses the saved command; it is
+    ///   never the restored panel again.
+    static func forRestore(_ remote: PaneRemoteRestore?, strictRespawn: Bool) -> Self {
+        guard !strictRespawn, let remote else { return .spawn }
+        switch remote {
+        case .target(let key):
+            // The target was validated when it was saved and again when it was
+            // read; one this build still cannot read keeps the fact of the
+            // launcher rather than becoming a silent shell.
+            return SSHTarget(key: key).map(Self.connectionPanel) ?? .spawnWithRemoteNote
+        case .launcher:
+            return .spawnWithRemoteNote
+        }
+    }
+}
+
 /// The split tree as a value, mirroring `SplitTree`.
 nonisolated indirect enum PaneLayout: Equatable, Sendable {
     /// A pane: its last OSC 7 directory (always local; remote reports become
-    /// `RemoteContext`), its preset, and whether it had focus.
-    case pane(directory: String?, presetName: String? = nil, isFocused: Bool = false)
+    /// `RemoteContext`), its preset, whether it had focus, and what it knew of
+    /// a remote session (`PaneRemoteRestore`, `#519`).
+    case pane(
+        directory: String?, presetName: String? = nil, isFocused: Bool = false,
+        remote: PaneRemoteRestore? = nil)
     /// - Parameter position: the divider as a fraction, so proportions hold
     ///   on another display or window size.
     case split(vertical: Bool, position: Double, first: PaneLayout, second: PaneLayout)
@@ -164,7 +239,7 @@ nonisolated indirect enum PaneLayout: Equatable, Sendable {
     /// is applied.
     var firstDirectory: String? {
         switch self {
-        case .pane(let directory, _, _): return directory
+        case .pane(let directory, _, _, _): return directory
         case .split(_, _, let first, _): return first.firstDirectory
         }
     }
@@ -172,8 +247,16 @@ nonisolated indirect enum PaneLayout: Equatable, Sendable {
     /// As `firstDirectory`, for the preset.
     var firstPresetName: String? {
         switch self {
-        case .pane(_, let presetName, _): return presetName
+        case .pane(_, let presetName, _, _): return presetName
         case .split(_, _, let first, _): return first.firstPresetName
+        }
+    }
+
+    /// As `firstDirectory`, for the saved remote side.
+    var firstRemote: PaneRemoteRestore? {
+        switch self {
+        case .pane(_, _, _, let remote): return remote
+        case .split(_, _, let first, _): return first.firstRemote
         }
     }
 
@@ -193,7 +276,9 @@ nonisolated indirect enum PaneLayout: Equatable, Sendable {
         case .pane:
             return self
         case .split(let vertical, let position, let first, let second):
-            guard depth < Self.maximumDepth else { return .pane(directory: firstDirectory) }
+            guard depth < Self.maximumDepth else {
+                return .pane(directory: firstDirectory, remote: first.firstRemote)
+            }
             let clamped =
                 position.isFinite
                 ? min(max(position, Self.dividerRange.lowerBound), Self.dividerRange.upperBound)
@@ -211,9 +296,11 @@ nonisolated indirect enum PaneLayout: Equatable, Sendable {
         isDirectory: (String) -> Bool = PathProbe.isDirectory
     ) -> PaneLayout {
         switch self {
-        case .pane(let directory, let presetName, let isFocused):
+        case .pane(let directory, let presetName, let isFocused, let remote):
             if let directory, !isDirectory(directory) {
-                return .pane(directory: nil, presetName: presetName, isFocused: isFocused)
+                return .pane(
+                    directory: nil, presetName: presetName, isFocused: isFocused,
+                    remote: remote)
             }
             return self
         case .split(let vertical, let position, let first, let second):
@@ -227,7 +314,7 @@ nonisolated indirect enum PaneLayout: Equatable, Sendable {
     /// Every directory the layout names.
     var directories: [String] {
         switch self {
-        case .pane(let directory, _, _): return directory.map { [$0] } ?? []
+        case .pane(let directory, _, _, _): return directory.map { [$0] } ?? []
         case .split(_, _, let first, let second): return first.directories + second.directories
         }
     }
@@ -244,6 +331,9 @@ nonisolated extension PaneLayout: Codable {
         var directory: String?
         var presetName: String?
         var isFocused: Bool?
+        /// Absent before `#519`, and in state a newer build wrote; both
+        /// restore as they always did.
+        var remote: PaneRemoteRestore?
     }
 
     private struct SplitPayload: Codable {
@@ -258,7 +348,7 @@ nonisolated extension PaneLayout: Codable {
         if let pane = try container.decodeIfPresent(PanePayload.self, forKey: .pane) {
             self = .pane(
                 directory: pane.directory, presetName: pane.presetName,
-                isFocused: pane.isFocused ?? false)
+                isFocused: pane.isFocused ?? false, remote: pane.remote)
         } else {
             let split = try container.decode(SplitPayload.self, forKey: .split)
             self = .split(
@@ -270,9 +360,11 @@ nonisolated extension PaneLayout: Codable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .pane(let directory, let presetName, let isFocused):
+        case .pane(let directory, let presetName, let isFocused, let remote):
             try container.encode(
-                PanePayload(directory: directory, presetName: presetName, isFocused: isFocused),
+                PanePayload(
+                    directory: directory, presetName: presetName, isFocused: isFocused,
+                    remote: remote),
                 forKey: .pane)
         case .split(let vertical, let position, let first, let second):
             try container.encode(

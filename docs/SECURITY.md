@@ -666,8 +666,11 @@ state file an older build left wider is tightened, its ACL cleared, as it loads.
 
 **Custom session restoration saves plaintext metadata, not terminal text.**
 `restore-windows` defaults to `true`. `state.json` can contain window geometry,
-split layout, focused pane, working directories, preset identifiers and
-launch metadata. Setting `restore-windows = false` disables restoration. The file is
+split layout, focused pane, working directories, preset identifiers, launch
+metadata, and — for a pane the connect sheet opened over SSH — the destination
+(host, user, port, and the identity file's path; never the key's contents).
+Setting `restore-windows = false` disables restoration, and writes no
+destination: the state file is cleared instead. The file is
 owner-only (`0600`), as are `directory-history.json` and `recent-hosts.json`.
 Saved directories and host/preset metadata may themselves be sensitive.
 

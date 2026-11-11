@@ -80,6 +80,17 @@ enum SessionEnded {
         }
     }
 
+    /// A pane restored from a saved SSH session (`#519`): nothing ran this
+    /// launch, so there is no exit — the connection ended when Corta quit, and
+    /// the panel says the app will not reconnect on its own.
+    static func restoredConnection(host: String) -> PaneStatusPanel.Content {
+        .init(
+            symbol: "network.slash", tint: .systemOrange,
+            title: L10n.format("session.ended.restored.title.host", host),
+            body: L10n.text("session.ended.restored.body"),
+            note: L10n.text("session.ended.restored.note"))
+    }
+
     /// `SIGTERM`, `SIGKILL`, …; the number alone for one without a name.
     nonisolated static func signalName(_ signal: Int32) -> String {
         let names: [Int32: String] = [

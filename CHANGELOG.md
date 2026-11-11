@@ -12,6 +12,16 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- A pane that was connected over SSH from the connect sheet when Corta quit
+  now comes back as an ended connection naming the host, with **Reconnect**
+  and **New Session**, instead of a silent local shell in the directory `ssh`
+  was started from. Launch connects nothing until Reconnect is pressed, and
+  New Session opens a local shell there. A pane where `ssh` was typed by hand
+  comes back as a local shell with a note that it was remote, because the
+  destination in its output is not Corta's to trust. State written by 1.6.2
+  still restores; the saved state now carries format version 2, so an older
+  build skips it cleanly rather than restoring a silent shell, and
+  `restore-windows = false` still writes no destination.
 - A regular-expression search that runs out of its time budget no longer
   says **No Results** for a scrollback it did not finish. The bar says the
   search covered only part of the document, and the new **Search Older

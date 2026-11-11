@@ -311,4 +311,9 @@ an upload remain pending edits. Once connected, a remote-edit operation that
 runs past 120 seconds is stopped and its upload offered again. Managed copies remain on disk with private
 file modes. Restored sessions retain arrangement and directory metadata,
 with `restore-windows = true` by default, and start fresh processes without
-restoring terminal text. See [data-at-rest policy](SECURITY.md#5-data-at-rest).
+restoring terminal text. A pane the connect sheet opened over SSH restores as
+an ended connection naming the host, with Reconnect and New Session, and never
+connects on launch; a hand-typed `ssh` restores as a local shell with a note
+that the pane was remote, because a reported host cannot be trusted for a
+reconnection. A pane opened from a configured preset still runs that preset.
+See [data-at-rest policy](SECURITY.md#5-data-at-rest).
