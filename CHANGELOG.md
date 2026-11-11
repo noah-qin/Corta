@@ -12,6 +12,10 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- The find bar treats an input method's marked text as composition, not as
+  a query: Esc cancels the composition and leaves the bar open on its
+  previous query and results, and the scrollback is searched once for the
+  committed text instead of for every letter being composed.
 - Closing a pane ends an input write the kernel had parked on a program
   that stopped reading, instead of holding its writer thread, its pty and
   its session until that program exits. A job that ignored the hangup now

@@ -20,6 +20,11 @@ import AppKit
 extension PaneSearch: NSSearchFieldDelegate {
     func controlTextDidChange(_ notification: Notification) {
         guard (notification.object as? NSTextField) === field else { return }
+        // Marked text is the input method's preedit, not the query: composing
+        // 状态 with Pinyin must not search for z, zh, zhuang or scroll the
+        // viewport to each. The change that replaces it with the committed
+        // text sweeps the scrollback once.
+        guard !isComposingText else { return }
         updateResults(scrollsToMatch: true)
     }
 
