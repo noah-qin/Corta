@@ -10,6 +10,13 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Closing a pane ends an input write the kernel had parked on a program
+  that stopped reading, instead of holding its writer thread, its pty and
+  its session until that program exits. A job that ignored the hangup now
+  sees its terminal close.
+
 ## [1.6.2] - 2026-11-10
 
 ### Changed

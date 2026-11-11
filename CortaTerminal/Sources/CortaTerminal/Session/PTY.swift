@@ -30,6 +30,14 @@ public final class PTY: @unchecked Sendable {
     /// System calls on the primary still running (`GuardedDescriptor`).
     var callsInFlight: Int { descriptor.callsInFlight }
 
+    /// `close()` has been called. The number itself is released once
+    /// `callsInFlight` reaches zero. For tests.
+    var isClosed: Bool { descriptor.isClosed }
+
+    /// Readiness `poll`s the primary has waited on. Tests count them to prove
+    /// that a wait that should be indefinite does not wake repeatedly.
+    var readinessPollCount: Int { closeWakeup.withLock { $0?.pollCount ?? 0 } }
+
     /// Every system call on the primary goes through this, so a `close()` on
     /// another thread can never hand an in-flight call a recycled number.
     private let descriptor: GuardedDescriptor
@@ -140,7 +148,14 @@ public final class PTY: @unchecked Sendable {
     }
 
     private static func openPair() throws(PTYError) -> Pair {
-        let primary = posix_openpt(O_RDWR | O_NOCTTY)
+        // Non-blocking in both directions. A blocking `write(2)` to a replica
+        // whose program stopped reading parks in the kernel once about 1 KiB
+        // is queued, and `close()` cannot end it: Darwin's `close` would sleep
+        // on that call, so `GuardedDescriptor` defers. The reader waits for
+        // readability and the writer for room, both on the close wakeup, so a
+        // closed pane never leaves either parked. The child opens the replica
+        // blocking, as a terminal is meant to be.
+        let primary = posix_openpt(O_RDWR | O_NOCTTY | O_NONBLOCK)
         guard primary >= 0 else { throw .openFailed(code: errno) }
         // So no other child this process starts (a `Process`, another session)
         // inherits the primary side.
@@ -174,45 +189,42 @@ public final class PTY: @unchecked Sendable {
 
     // MARK: - I/O
 
-    /// 0 at end of file — including Darwin's `EIO` once the replica closes.
-    /// `.closed` after `close()`: the number may already be another file's.
-    public func read(into buffer: UnsafeMutableRawBufferPointer) throws(PTYError) -> Int {
-        guard let base = buffer.baseAddress, !buffer.isEmpty else {
-            guard !descriptor.isClosed else { throw .closed }
-            return 0
-        }
-        let result = try descriptor.withNumber { fd throws(PTYError) -> Int in
-            while true {
-                let count = Darwin.read(fd, base, buffer.count)
-                if count >= 0 { return count }
-                switch errno {
-                case EINTR: continue
-                case EIO: return 0
-                case let code: throw .ioFailed(code: code)
-                }
-            }
-        }
-        guard let result else { throw .closed }
-        return result
-    }
-
     /// Whether a read would return without blocking, waiting up to
     /// `timeoutMilliseconds` (`-1`: no limit). End of file and errors count as
     /// readable — the read reports them. `.closed` after `close()`.
     public func waitUntilReadable(timeoutMilliseconds: Int32) throws(PTYError) -> Bool {
-        let wakeup = try closeWakeup.withLock { wakeup throws(PTYError) -> PTYCloseWakeup in
+        try waitUntilReady(for: Int16(POLLIN), timeoutMilliseconds: timeoutMilliseconds, whileHolding: nil)
+    }
+
+    /// The pipe a readiness wait parks on; created on first use, and woken by
+    /// `close()` so no wait on either side can outlive the pty.
+    private func readinessWakeup() throws(PTYError) -> PTYCloseWakeup {
+        try closeWakeup.withLock { wakeup throws(PTYError) -> PTYCloseWakeup in
             guard !descriptor.isClosed else { throw .closed }
             if let wakeup { return wakeup }
             let created = try PTYCloseWakeup()
             wakeup = created
             return created
         }
-        let result = try descriptor.withNumber { fd throws(PTYError) -> Bool in
+    }
+
+    /// Waits for `events` on the primary. `whileHolding` is the caller's
+    /// already-entered descriptor number, so a read or write can wait for its
+    /// next byte without giving the number back; nil takes it here. Returns
+    /// whether the primary has anything to report — any `revents`, so end of
+    /// file and errors reach the system call that reports them — and throws
+    /// `.closed` when the close wakeup wins.
+    private func waitUntilReady(
+        for events: Int16, timeoutMilliseconds: Int32, whileHolding held: Int32?
+    ) throws(PTYError) -> Bool {
+        let wakeup = try readinessWakeup()
+        let wait = { (descriptorNumber: Int32) throws(PTYError) -> Bool in
             let ready = try wakeup.readEnd.withNumber { wakeFD throws(PTYError) -> Bool in
                 while true {
                     var requests = (
-                        pollfd(fd: fd, events: Int16(POLLIN), revents: 0),
+                        pollfd(fd: descriptorNumber, events: events, revents: 0),
                         pollfd(fd: wakeFD, events: Int16(POLLIN), revents: 0))
+                    wakeup.recordPoll()
                     let count = withUnsafeMutablePointer(to: &requests) {
                         $0.withMemoryRebound(to: pollfd.self, capacity: 2) {
                             poll($0, 2, timeoutMilliseconds)
@@ -228,6 +240,37 @@ public final class PTY: @unchecked Sendable {
             guard let ready else { throw .closed }
             return ready
         }
+        if let held { return try wait(held) }
+        let result = try descriptor.withNumber { fd throws(PTYError) -> Bool in
+            try wait(fd)
+        }
+        guard let result else { throw .closed }
+        return result
+    }
+
+    /// 0 at end of file — including Darwin's `EIO` once the replica closes.
+    /// `.closed` after `close()`: the number may already be another file's.
+    public func read(into buffer: UnsafeMutableRawBufferPointer) throws(PTYError) -> Int {
+        guard let base = buffer.baseAddress, !buffer.isEmpty else {
+            guard !descriptor.isClosed else { throw .closed }
+            return 0
+        }
+        let result = try descriptor.withNumber { fd throws(PTYError) -> Int in
+            while true {
+                let count = Darwin.read(fd, base, buffer.count)
+                if count >= 0 { return count }
+                switch errno {
+                case EINTR: continue
+                case EIO: return 0
+                case EAGAIN:
+                    // The primary is non-blocking: wait where a blocking read
+                    // would, holding the number so a close cannot recycle it.
+                    _ = try waitUntilReady(
+                        for: Int16(POLLIN), timeoutMilliseconds: -1, whileHolding: fd)
+                case let code: throw .ioFailed(code: code)
+                }
+            }
+        }
         guard let result else { throw .closed }
         return result
     }
@@ -241,8 +284,15 @@ public final class PTY: @unchecked Sendable {
             while true {
                 let count = Darwin.write(fd, base, bytes.count)
                 if count >= 0 { return count }
-                if errno == EINTR { continue }
-                throw .ioFailed(code: errno)
+                switch errno {
+                case EINTR: continue
+                case EAGAIN:
+                    // The terminal's input buffer is full: wait for the child
+                    // to read, or for `close()` to end the write at once.
+                    _ = try waitUntilReady(
+                        for: Int16(POLLOUT), timeoutMilliseconds: -1, whileHolding: fd)
+                case let code: throw .ioFailed(code: code)
+                }
             }
         }
         guard let result else { throw .closed }
@@ -511,51 +561,11 @@ extension PTY {
     /// Idempotent, and never waits. The child sees EOF; `terminate()` first to
     /// also hang up. A call still in flight on another thread keeps the
     /// descriptor until it returns — so it can never reach a recycled number —
-    /// and the last one out closes it.
+    /// and the last one out closes it. A read or write parked in a readiness
+    /// wait is woken here and fails with `.closed`, so closing a pane ends a
+    /// write the child stopped reading instead of holding the primary open.
     public func close() {
         guard descriptor.close() else { return }
         closeWakeup.withLock { $0?.signalAndClose() }
-    }
-}
-
-/// Both pipe ends use the same lease rules as the PTY: an in-flight poll
-/// keeps its read number owned until the close byte wakes it. One byte,
-/// never periodic polling; CLOEXEC keeps these parent-only handles private.
-final class PTYCloseWakeup: Sendable {
-    let readEnd: GuardedDescriptor
-    private let writeEnd: GuardedDescriptor
-    private let isSignalled = Mutex(false)
-
-    init() throws(PTYError) {
-        var numbers = (Int32(-1), Int32(-1))
-        let result = withUnsafeMutablePointer(to: &numbers) {
-            $0.withMemoryRebound(to: Int32.self, capacity: 2) { pipe($0) }
-        }
-        guard result == 0 else { throw .ioFailed(code: errno) }
-        guard fcntl(numbers.0, F_SETFD, FD_CLOEXEC) >= 0,
-            fcntl(numbers.1, F_SETFD, FD_CLOEXEC) >= 0,
-            fcntl(numbers.1, F_SETFL, O_NONBLOCK) >= 0 else {
-            let code = errno
-            Darwin.close(numbers.0)
-            Darwin.close(numbers.1)
-            throw .ioFailed(code: code)
-        }
-        readEnd = GuardedDescriptor(numbers.0)
-        writeEnd = GuardedDescriptor(numbers.1)
-    }
-
-    func signalAndClose() {
-        let first = isSignalled.withLock { signalled in
-            guard !signalled else { return false }
-            signalled = true
-            return true
-        }
-        guard first else { return }
-        _ = writeEnd.withNumber { fd in
-            var byte: UInt8 = 1
-            while Darwin.write(fd, &byte, 1) < 0, errno == EINTR {}
-        }
-        readEnd.close()
-        writeEnd.close()
     }
 }
