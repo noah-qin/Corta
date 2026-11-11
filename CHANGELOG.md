@@ -10,6 +10,16 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Assistive technologies other than VoiceOver learn that a pane's text or
+  selection changed: Voice Control, Switch Control, a braille display or
+  third-party screen reader, and Accessibility Inspector now receive the
+  same change notifications. They carry no text, and the accessibility
+  snapshot is still built only when a client asks, so a flood with no
+  client attached builds nothing. The pane's zoom button also stays visible
+  for Switch Control, not only VoiceOver.
+
 ## [1.6.2] - 2026-11-10
 
 ### Changed

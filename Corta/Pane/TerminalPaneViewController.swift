@@ -863,7 +863,8 @@ extension TerminalPaneViewController {
             // The cursor may have moved under the bar.
             search.placeClearOfContent()
         }
-        // Rate-limited and gated on VoiceOver inside the call.
+        // String-free, rate-limited and snapshot-lazy inside the call; posted
+        // whether or not a client is known to be attached (D32).
         terminalView?.noteAccessibilityValueChanged()
         shell.drainClipboardRequests()
         noteCommandBoundaries()

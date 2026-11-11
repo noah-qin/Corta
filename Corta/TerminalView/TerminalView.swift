@@ -54,6 +54,10 @@ final class TerminalView: NSView, CALayerDelegate {
     var lastAccessibilityPost: CFTimeInterval = 0
     /// The trailing `valueChanged` post owed inside the rate-limit interval.
     var pendingAccessibilityPost: DispatchWorkItem?
+    /// How a change notification reaches AppKit. `nil` posts through
+    /// `NSAccessibility`; a test records the post instead, since the test
+    /// host cannot attach a real AX client to itself.
+    var accessibilityNotificationPoster: ((TerminalView, NSAccessibility.Notification) -> Void)?
 
     /// Called once per accepted frame on the main thread; forwarded to
     /// `frameScheduler`.

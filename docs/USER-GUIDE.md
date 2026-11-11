@@ -795,7 +795,11 @@ It is the quickest way to reach the commands that have no default shortcut.
 - **Secure Keyboard Entry.** **Shell ▸ Secure Keyboard Entry** stops other
   applications from reading your keystrokes while Corta is in front — for
   typing passwords. A lock in the title bar shows when it is actually on.
-- **VoiceOver** reads the terminal's text and follows the focused pane.
+- **VoiceOver and other accessibility clients** read the terminal's text and
+  follow the focused pane. Text and selection changes are announced to
+  whichever client is listening — VoiceOver, Voice Control, Switch Control, a
+  braille display, a third-party screen reader or the Accessibility
+  Inspector — and the text is then read on request, not pushed.
 - **Clipboard from programs.** Off by default. With
   `allow-clipboard-write = true`, a program — including one inside `tmux`
   or over `ssh` — may put text on your clipboard (OSC 52). Nothing may read
