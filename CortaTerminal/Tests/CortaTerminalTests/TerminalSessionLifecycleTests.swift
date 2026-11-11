@@ -15,6 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CortaPOSIX
+import Darwin
 import Foundation
 import Synchronization
 import Testing
@@ -216,6 +217,118 @@ import Testing
         _ = waitForGrid(session) { $0.contains("CORTA-READY") }
         session.stop()
         #expect(session.pty.waitForExit(timeout: .seconds(5)) == .signalled(signal: SIGHUP))
+    }
+
+    /// #546: a write the kernel parked on a child that stopped reading held
+    /// the writer thread, the primary and the session for as long as that
+    /// child lived — and because the primary stayed open, the child never saw
+    /// the hangup closing a terminal delivers. The writer now waits on the
+    /// close wakeup as the reader does, so `stop()` ends the parked write at
+    /// once and the descriptor is released.
+    ///
+    /// The job gets its own process group and the terminal (`set -m`) and
+    /// ignores `SIGHUP`, so it outlives the hangup and the shell's own
+    /// `SIGKILL` just as a real job does; it only reads the terminal once the
+    /// test asks it to, which is what keeps the kernel's input buffer full.
+    @Test func aParkedWriteEndsWhenThePaneCloses() throws {
+        let result = FileManager.default.temporaryDirectory
+            .appendingPathComponent("corta-parked-write-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: result) }
+        let session = try TerminalSession(
+            executable: "/bin/bash",
+            arguments: ["--norc", "-c", Self.neverReadingJob(reportingTo: result)],
+            seams: .init(hangupGracePeriod: .seconds(5)))
+        let jobGroup = Mutex<pid_t?>(nil)
+        defer {
+            if let group = jobGroup.withLock({ $0 }) { kill(-group, SIGKILL) }
+            session.stop()
+            _ = session.pty.waitForExit(timeout: .seconds(5))
+        }
+        session.start()
+
+        let ready = waitForGrid(session) { $0.contains("CORTA-PARKED") }
+        #expect(
+            ready.contains("CORTA-PARKED"),
+            "the job should reach its never-reading loop; grid held:\n\(ready)")
+        let group = try #require(waitForTerminalJob(session), "the job should own the terminal")
+        jobGroup.withLock { $0 = group }
+
+        #expect(awaitParkedWriter(session), "the writer should be parked on the full primary")
+        session.stop()
+        #expect(
+            waitUntil({ session.pty.callsInFlight == 0 }, timeout: testTimeout(2)),
+            "a parked write kept a system call in flight after stop()")
+        #expect(session.pty.isClosed, "the primary should be closed by stop()")
+
+        // The job ignored the hangup and kept the terminal; once the primary
+        // is closed, a read on it has to end rather than park.
+        #expect(kill(-group, SIGUSR1) == 0, "the terminal's job should still run after the close")
+        let exitCode = awaitReport(at: result)
+        #expect(
+            exitCode == "0" || exitCode == "1",
+            "reading the closed terminal should end; cat exited \(String(describing: exitCode))")
+    }
+
+    /// A shell that starts one job in its own process group and on the
+    /// terminal (`set -m`), both ignoring `SIGHUP`. The job never reads the
+    /// terminal until it gets `SIGUSR1`, then reads to end of file or `EIO`
+    /// and writes `cat`'s status to `result`. The trailing `:` keeps bash from
+    /// `exec`ing its last command, which would leave the job in the shell's
+    /// own process group; a shell that hung up instead of ignoring `SIGHUP`
+    /// would revoke the terminal and end the parked write for the wrong
+    /// reason.
+    private static func neverReadingJob(reportingTo result: URL) -> String {
+        """
+        trap '' HUP
+        set -m
+        stty raw -echo
+        /bin/bash --norc -c 'trap "" HUP; readNow=; trap "readNow=1" USR1; \
+        printf "CORTA-PARKED\\n"; while [ -z "$readNow" ]; do sleep 0.02; done; \
+        cat >/dev/null; printf "%s" $? > "\(result.path)"'
+        :
+        """
+    }
+
+    /// Queues 64 KiB — more than the kernel's terminal input buffer — and
+    /// waits for the writer to park on it, with the reader's own readiness
+    /// wait as the other system call in flight.
+    private func awaitParkedWriter(_ session: TerminalSession) -> Bool {
+        session.write([UInt8](repeating: UInt8(ascii: "x"), count: 64 * 1024))
+        return waitUntil({ session.pty.callsInFlight >= 2 }, timeout: testTimeout(10))
+    }
+
+    /// The job that owns the terminal, once job control has handed it over.
+    private func waitForTerminalJob(_ session: TerminalSession) -> pid_t? {
+        let deadline = SuspendingClock.now + testTimeout(10)
+        while SuspendingClock.now < deadline {
+            if let group = session.pty.foregroundProcessGroup,
+                group != session.pty.processIdentifier
+            {
+                return group
+            }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        return nil
+    }
+
+    /// The status the job wrote after reading the closed terminal.
+    private func awaitReport(at url: URL) -> String? {
+        let deadline = SuspendingClock.now + testTimeout(5)
+        while SuspendingClock.now < deadline {
+            if let report = try? String(contentsOf: url, encoding: .utf8) { return report }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        return nil
+    }
+
+    /// Waits until `condition` holds, up to `timeout`: a bounded wait on
+    /// `SuspendingClock`, which a closed lid cannot spend.
+    private func waitUntil(_ condition: () -> Bool, timeout: Duration) -> Bool {
+        let deadline = SuspendingClock.now + timeout
+        while !condition(), SuspendingClock.now < deadline {
+            Thread.sleep(forTimeInterval: 0.005)
+        }
+        return condition()
     }
 
     /// Polls the grid until `condition` accepts its dump, or the hang

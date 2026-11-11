@@ -223,4 +223,34 @@ extension SplitViewController {
         isRearrangingPanes = false
     }
 
+    // MARK: - Panes
+
+    /// Creates a pane and its session, force-loading the view so the shell
+    /// spawns at the target grid size and directory rather than reflowing.
+    /// - Parameter remote: a saved remote side to restore (`#519`). A
+    ///   connect-sheet target rebuilds the preset that sheet made, so
+    ///   Reconnect runs the same destination; the pane itself shows the
+    ///   ended-session panel instead of spawning.
+    func makePane(
+        workingDirectory: String?, initialGridSize: TerminalSize?, preset: Preset? = nil,
+        remote: PaneRemoteRestore? = nil
+    ) -> TerminalPaneViewController {
+        let pane = TerminalPaneViewController()
+        // Before `pane.view` loads: the preset supplies spawn settings.
+        if case .target(let key)? = remote, let target = SSHTarget(key: key) {
+            pane.preset = SSHDestination.preset(for: target)
+        } else {
+            pane.preset = preset
+        }
+        pane.restoredRemote = remote
+        // Opens where the focused pane is (OSC 7), else home. The directory is
+        // already host-filtered, so a remote path never reaches a local spawn.
+        pane.inheritedWorkingDirectory = workingDirectory
+        pane.inheritedDirectoryChecked = setup.directoriesChecked
+        pane.initialGridSize = initialGridSize
+        pane.didSizeWindow = didSetUpWindow
+        addChild(pane)
+        _ = pane.view
+        return pane
+    }
 }

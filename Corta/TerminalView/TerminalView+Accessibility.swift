@@ -134,6 +134,41 @@ extension TerminalView {
         return [NSValue(range: snapshot.selectedRange)]
     }
 
+    /// `AXSetSelectedTextRange`: a screen reader's own text-selection commands
+    /// arrive here. The range counts UTF-16 units in the value this view
+    /// reports, so offsets and columns agree only for ASCII; the snapshot maps
+    /// it to document cells (D06) and the pane records that in the core.
+    ///
+    /// A zero-length range clears the selection. It never moves the insertion
+    /// point: that is the child's cursor, and typing at a prompt belongs to the
+    /// shell. A range outside the current text is a client naming a line the
+    /// viewport no longer shows — stale after a rewrite — so it is ignored
+    /// rather than clamped onto whatever now sits at those offsets.
+    override func setAccessibilitySelectedTextRange(_ range: NSRange) {
+        Self.trace?.debug(
+            "setSelectedTextRange \(range.location, privacy: .public)+\(range.length, privacy: .public)")
+        // Fresh, not the cached copy: a range computed from text that has since
+        // been replaced must fail the bounds check, not select other text.
+        cachedAccessibilitySnapshot = nil
+        guard let snapshot = accessibilitySnapshot(), let onAccessibilitySetSelection else { return }
+        let length = snapshot.text.utf16.count
+        guard range.location >= 0, range.length >= 0,
+            range.location <= length, range.length <= length - range.location
+        else { return }
+        if range.length == 0 {
+            onAccessibilitySetSelection(nil)
+        } else if let selected = snapshot.documentRange(for: range) {
+            onAccessibilitySetSelection(
+                TerminalSelection(selected, baseScrollbackTotal: snapshot.scrollbackTotal))
+        } else {
+            return
+        }
+        // What the client reads next is built from the new selection; the
+        // notification is the pane's `setSelection`/`clearSelection`, as for a
+        // mouse selection.
+        cachedAccessibilitySnapshot = nil
+    }
+
     /// The visible line: `cursorRow` is a document row, off by the scroll
     /// offset.
     override func accessibilityInsertionPointLineNumber() -> Int {

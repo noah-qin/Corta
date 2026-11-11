@@ -49,6 +49,11 @@ final class TerminalView: NSView, CALayerDelegate {
     var accessibilitySnapshotProvider: (() -> TerminalAccessibilitySnapshot?)?
     /// One cell's rect in view coordinates, for VoiceOver's cursor.
     var accessibilityCellFrameProvider: ((_ row: Int, _ column: Int) -> CGRect)?
+    /// Applies a selection an assistive client set through
+    /// `setAccessibilitySelectedTextRange(_:)`; `nil` clears it. The view maps
+    /// the client's UTF-16 range through the snapshot, but the selection lives
+    /// in the core (D06), so the pane records it.
+    var onAccessibilitySetSelection: ((TerminalSelection?) -> Void)?
     var cachedAccessibilitySnapshot: TerminalAccessibilitySnapshot?
     var cachedAccessibilitySnapshotTime: CFTimeInterval = 0
     var lastAccessibilityPost: CFTimeInterval = 0

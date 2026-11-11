@@ -199,6 +199,10 @@ final class PanePointer: NSObject {
             guard let self, let session else { return .zero }
             return cellRect(row: row, column: column, rows: session.snapshot().rows) ?? .zero
         }
+        view.onAccessibilitySetSelection = { [weak self] selection in
+            guard let self, let session else { return }
+            applyAccessibilitySelection(selection, in: session.snapshot())
+        }
         view.cellAtPoint = { [weak self] point in
             guard let self, let terminalRenderer, session != nil, let terminalView
             else { return (column: 0, row: 0) }

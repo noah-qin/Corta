@@ -43,6 +43,7 @@ extension RemoteEditCoordinatorTests {
             },
             opener: { _, _, _ in true },
             presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
+        coordinator.openFileCommand = { "/bin/sh {file}" }
         do {
             _ = try await coordinator.materialize(host: "build-box", remotePath: "/missing")
         } catch {
@@ -53,7 +54,9 @@ extension RemoteEditCoordinatorTests {
             try await coordinator.materialize(host: "build-box", remotePath: path)
         }
         #expect(first.closed)
-        #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
+        #expect(
+            try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil)
+                == .opened)
         #expect(made == 2)
     }
 
@@ -61,8 +64,10 @@ extension RemoteEditCoordinatorTests {
     func failedUploadRetainsDecision() async throws {
         let fixture = try makeFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
-        #expect(try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil))
+        #expect(
+            try await fixture.coordinator.open(
+                host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+                == .opened)
         try "edited".write(to: fixture.localCopyURL, atomically: true, encoding: .utf8)
         await fixture.coordinator.noteLocalWrite(copyID: fixture.copyID)
         let pending = try #require(fixture.coordinator.pendingUploads.first)
@@ -105,7 +110,10 @@ extension RemoteEditCoordinatorTests {
             },
             opener: { _, _, _ in true },
             presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { errors.append($0) }))
-        #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
+        coordinator.openFileCommand = { "/bin/sh {file}" }
+        #expect(
+            try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil)
+                == .opened)
         let copy = try #require(store.copy(host: "build-box", remotePath: path))
         try "edited".write(to: store.localURL(for: copy), atomically: true, encoding: .utf8)
         await coordinator.noteLocalWrite(copyID: copy.id)
@@ -144,13 +152,16 @@ extension RemoteEditCoordinatorTests {
                 }
             },
             presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }))
+        coordinator.openFileCommand = { "/bin/sh {file}" }
         // A reused copy after a coordinator restart has no in-memory digest.
         let relative = RemoteEditStore.localRelativePath(host: "build-box", remotePath: path)
         let url = root.appendingPathComponent(relative)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try "original".write(to: url, atomically: true, encoding: .utf8)
         _ = store.recordDownload(host: "build-box", remotePath: path, remoteSize: 2, remoteMTime: nil)
-        #expect(try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil))
+        #expect(
+            try await coordinator.open(host: "build-box", remotePath: path, line: 1, column: nil)
+                == .opened)
         #expect(coordinator.pendingUploads.count == 1)
         #expect(fake.transferCalls.isEmpty)
     }
@@ -162,7 +173,7 @@ extension RemoteEditCoordinatorTests {
 
         let opened = try await fixture.coordinator.open(
             host: "build-box", remotePath: "/srv/app/main.rs", line: 12, column: 3)
-        #expect(opened)
+        #expect(opened == .opened)
         #expect(fixture.recorder.opened.count == 1)
         let first = try #require(fixture.recorder.opened.first)
         #expect(first.line == 12 && first.column == 3)
@@ -180,7 +191,7 @@ extension RemoteEditCoordinatorTests {
         // Second open: the copy is reused, not downloaded again.
         let again = try await fixture.coordinator.open(
             host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
-        #expect(again)
+        #expect(again == .opened)
         #expect(fixture.fake.transferCalls.count == 1, "no second download")
         #expect(fixture.store.copies[fixture.copyID]?.openCount == 2)
     }
@@ -231,6 +242,7 @@ extension RemoteEditCoordinatorTests {
                     asked.questions.append((host, path))
                     return asked.answer
                 }))
+        coordinator.openFileCommand = { "/bin/sh {file}" }
 
         // Declined: nothing is connected, nothing downloaded, and the
         // caller hears "cancelled" — the user's answer, not a failure.
@@ -256,7 +268,7 @@ extension RemoteEditCoordinatorTests {
         asked.answer = true
         #expect(
             try await coordinator.open(
-                host: host, remotePath: "/srv/app/main.rs", line: 1, column: nil))
+                host: host, remotePath: "/srv/app/main.rs", line: 1, column: nil) == .opened)
         #expect(asked.questions.count == 2)
         #expect(clientsMade == 1)
         #expect(RemoteHostConsent.isConfirmed(host))

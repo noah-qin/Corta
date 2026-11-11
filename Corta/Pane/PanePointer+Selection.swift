@@ -159,6 +159,21 @@ extension PanePointer {
         invalidateDisplay()
     }
 
+    /// An assistive client's selection, mapped from a snapshot of this pane by
+    /// `TerminalView.setAccessibilitySelectedTextRange(_:)` and recorded here
+    /// against the live grid. `nil` clears it.
+    ///
+    /// The client's range is document-anchored (D06): if output scrolled
+    /// between the snapshot it was mapped from and this call, re-anchoring
+    /// keeps it on the same text, exactly as copy reads a stored selection.
+    func applyAccessibilitySelection(_ selection: TerminalSelection?, in grid: Grid) {
+        guard let selection else {
+            clearSelection()
+            return
+        }
+        setSelection(selectionRange(for: selection, in: grid), in: grid)
+    }
+
     /// Drops the selection once the program rewrites the text it covers,
     /// which otherwise leaves the highlight on text it no longer names
     /// (#341). Once per frame, and before a copy or an export reads it. A
