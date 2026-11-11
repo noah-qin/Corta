@@ -424,4 +424,96 @@ extension DamageTrackingTests {
         #expect(
             renderer.cachedInstances.map { $0.map { [$0.origin.x, $0.origin.y, Float($0.atlasIndex)] } } == instances)
     }
+
+    /// A program that sets a selection foreground must not turn every
+    /// scrolling frame into a full rebuild. With no selection there is no
+    /// selected column for any row, so the damage-tracked path still applies
+    /// (#544) — and it keeps applying after the first scroll.
+    @Test func scrollWithSelectionForegroundAndNoSelectionRebuildsOnlyDamagedRows() throws {
+        let renderer = try #require(Self.makeRenderer())
+        var terminal = Terminal(rows: 10, columns: 20, scrollbackLimit: 100)
+        for i in 0..<10 { terminal.feed(Array("row\(i)\r\n".utf8)) }
+        let selectionForeground = Color.rgb(255, 0, 0)
+        renderer.updateInstances(
+            grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil,
+            selectionForeground: selectionForeground)
+
+        // One line scrolls into history: only the newly exposed row changes.
+        terminal.feed(Array("\r\nnext".utf8))
+        #expect(
+            renderer.updateInstances(
+                grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil,
+                selectionForeground: selectionForeground))
+        #expect(renderer.lastRebuiltRowCount == 1)
+        #expect(renderer.lastRebuiltRowCount < terminal.grid.rows)
+
+        // Later scrolling frames stay cheap too, not just the first.
+        terminal.feed(Array("\r\nagain".utf8))
+        #expect(
+            renderer.updateInstances(
+                grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil,
+                selectionForeground: selectionForeground))
+        #expect(renderer.lastRebuiltRowCount == 1)
+    }
+
+    /// With a selection present, selected cells keep the program's selection
+    /// foreground as output scrolls, as the selection moves, and after it is
+    /// cleared — and clearing it puts scrolling back on the damage-tracked
+    /// path (#544).
+    @Test func selectionForegroundFollowsTheSelectionThroughScrollChangeAndClear() throws {
+        let renderer = try #require(Self.makeRenderer())
+        renderer.themeVariant = Theme.corta.dark
+        var terminal = Terminal(rows: 4, columns: 8, scrollbackLimit: 100)
+        terminal.feed(Array("aaaa\r\nbbbb\r\ncccc\r\ndddd".utf8))
+        let selectionForeground = Color.rgb(255, 0, 0)
+        let red = QuadInstance.packColor(SIMD4(1, 0, 0, 1))
+        func redGlyphCount() -> Int { renderer.cachedGlyphs.filter { $0.rgba == red }.count }
+
+        // Rows 1 and 2 ("bbbb", "cccc") selected.
+        var selection = TerminalSelection(
+            start: GridPosition(row: 1, column: 0), end: GridPosition(row: 2, column: 7),
+            baseScrollbackTotal: terminal.grid.scrollback.totalPushed)
+        renderer.updateInstances(
+            grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: selection,
+            selectionForeground: selectionForeground)
+        #expect(redGlyphCount() == 8, "the two selected rows' eight glyphs take the colour")
+
+        // One line scrolls into history: the selected text moves up with it
+        // and keeps the colour.
+        terminal.feed(Array("\r\neeee".utf8))
+        renderer.updateInstances(
+            grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: selection,
+            selectionForeground: selectionForeground)
+        #expect(redGlyphCount() == 8)
+
+        // The selection changes: only its two cells keep the colour.
+        selection = TerminalSelection(
+            start: GridPosition(row: 2, column: 0), end: GridPosition(row: 2, column: 1),
+            baseScrollbackTotal: terminal.grid.scrollback.totalPushed)
+        renderer.updateInstances(
+            grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: selection,
+            selectionForeground: selectionForeground)
+        #expect(redGlyphCount() == 2)
+
+        // And output scrolls again under the new selection.
+        terminal.feed(Array("\r\nffff".utf8))
+        renderer.updateInstances(
+            grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: selection,
+            selectionForeground: selectionForeground)
+        #expect(redGlyphCount() == 2)
+
+        // Cleared: no cell keeps the colour.
+        renderer.updateInstances(
+            grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil,
+            selectionForeground: selectionForeground)
+        #expect(redGlyphCount() == 0)
+
+        // Once no selection is left, scrolling is damage-tracked again.
+        terminal.feed(Array("\r\nhhhh".utf8))
+        #expect(
+            renderer.updateInstances(
+                grid: terminal.grid, scrollOffset: 0, cursorVisible: false, selection: nil,
+                selectionForeground: selectionForeground))
+        #expect(renderer.lastRebuiltRowCount == 1)
+    }
 }
