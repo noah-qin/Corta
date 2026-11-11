@@ -41,6 +41,11 @@ struct TerminalAccessibilitySnapshot {
     let selectedRange: NSRange
     /// Document row `r` is visible row `r + scrollOffset`.
     let scrollOffset: Int
+    /// `Grid.Scrollback.totalPushed` when the snapshot was taken. Document
+    /// rows are anchored to this screen boundary, so a selection mapped from
+    /// the snapshot can be re-anchored if output scrolled before it was
+    /// applied (D06).
+    let scrollbackTotal: Int
 
     /// Per visible row, character boundaries as (UTF-16 offset, column).
     ///
@@ -87,6 +92,7 @@ struct TerminalAccessibilitySnapshot {
         self.cursorRow = grid.cursor.row
         self.cursorColumn = grid.cursor.column
         self.scrollOffset = scrollOffset
+        self.scrollbackTotal = grid.scrollback.totalPushed
         self.rowBoundaries = rowBoundaries
         self.rowLengths = rowLengths
 
@@ -198,5 +204,36 @@ struct TerminalAccessibilitySnapshot {
             return (row, boundary.column + (within - boundary.offset))
         }
         return (row, boundary.column)
+    }
+
+    // MARK: - A selection an assistive client sets
+
+    /// The document cell a UTF-16 offset names: the character containing it, so
+    /// a range edge never splits a wide character or a combining sequence. The
+    /// column stays inside the viewport's last column when the offset falls on
+    /// the line separator after a full row. `nil` when the offset is outside
+    /// the snapshot's text.
+    func documentPoint(forOffset offset: Int) -> SelectionPoint? {
+        guard offset >= 0, offset <= text.utf16.count, columns > 0 else { return nil }
+        let cell = cell(forOffset: offset)
+        return SelectionPoint(row: cell.row - scrollOffset, column: min(cell.column, columns - 1))
+    }
+
+    /// The document range an assistive client's UTF-16 range names — the
+    /// inverse of `selectedRange`. `nil` when the range is empty, negative or
+    /// not wholly inside the text this snapshot covers: a range computed before
+    /// the grid changed is then ignored instead of selecting other text.
+    ///
+    /// A range edge on a row's line separator snaps to that row's last cell: a
+    /// selection covers cells, not the separators between rows, so copy joins
+    /// rows by its own rule (D03).
+    func documentRange(for range: NSRange) -> SelectionRange? {
+        let length = text.utf16.count
+        guard range.location >= 0, range.length > 0,
+            range.location <= length, range.length <= length - range.location,
+            let start = documentPoint(forOffset: range.location),
+            let end = documentPoint(forOffset: range.location + range.length - 1)
+        else { return nil }
+        return SelectionRange(start: start, end: end)
     }
 }

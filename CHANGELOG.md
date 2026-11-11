@@ -10,6 +10,12 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- Assistive technologies can set the selection in a pane, so VoiceOver's
+  text-selection commands select the text they name and ⌘C copies it. A
+  zero-length range clears the selection; the child's cursor never moves.
+
 ## [1.6.2] - 2026-11-10
 
 ### Changed
