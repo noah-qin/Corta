@@ -82,7 +82,6 @@ extension PaneSearch {
         clearOlderSearch()
         generation &+= 1
         let generation = self.generation
-        needsRefresh = false
         let query = searchField.stringValue
         let caseSensitive = self.caseSensitive
         let regex = self.regex
@@ -91,6 +90,10 @@ extension PaneSearch {
         // Output since the earlier slice shifted every row by the same growth;
         // what has scrolled out of the retained scrollback is gone.
         let growth = ScrollbackCoordinates.growth(from: older.totalPushed, to: totalPushed)
+        // Lines that arrived since the first sweep are newer than the resume
+        // point and this slice never reads them: when there are any, a
+        // refresh covers them once the slice lands (`applyResults`).
+        needsRefresh = growth > 0
         let lowest = grid.documentRowRange.lowerBound
         let priorMatches = older.matches.compactMap { range -> SelectionRange? in
             let start = range.start.row - growth
