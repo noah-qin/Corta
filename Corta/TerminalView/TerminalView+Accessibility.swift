@@ -239,8 +239,8 @@ extension TerminalView {
 
     // MARK: - Snapshot caching
 
-    /// Rebuilds at most once per `snapshotLifetime`, so a VoiceOver step is
-    /// answered consistently; `noteAccessibilityValueChanged` drops it.
+    /// Rebuilds at most once per `snapshotLifetime`, so a client's burst of
+    /// questions is answered consistently; a change notification drops it.
     private func accessibilitySnapshot() -> TerminalAccessibilitySnapshot? {
         if let cached = cachedAccessibilitySnapshot,
             CACurrentMediaTime() - cachedAccessibilitySnapshotTime < Self.snapshotLifetime
@@ -255,11 +255,21 @@ extension TerminalView {
 
     static let snapshotLifetime: CFTimeInterval = 0.2
 
-    /// The grid changed: drop the cache and notify, so VoiceOver hears new
-    /// output. Rate-limited and only while VoiceOver runs, keeping string
+    /// The grid changed: drop the cache and tell any assistive client the
+    /// text changed. The notification carries no string — a client reads the
+    /// new text through `accessibilitySnapshot()`, built only when it asks —
+    /// so this can post with no client attached and still keeps string
     /// building off the render path (`PERFORMANCE.md` §2).
+    ///
+    /// Posting unconditionally is deliberate: AppKit has no public API for
+    /// "is an arbitrary accessibility client attached". `NSWorkspace`
+    /// reports VoiceOver and Switch Control only, so the old
+    /// `isVoiceOverEnabled` guard silenced Voice Control, Accessibility
+    /// Inspector, a third-party screen reader and a braille display that
+    /// does not go through VoiceOver (D32). Rate-limited so a flood cannot
+    /// outpace a client, with one trailing post so a burst's final state is
+    /// never dropped.
     func noteAccessibilityValueChanged() {
-        guard NSWorkspace.shared.isVoiceOverEnabled else { return }
         // Whatever happens to the notification, the old snapshot is stale.
         cachedAccessibilitySnapshot = nil
         let now = CACurrentMediaTime()
@@ -272,7 +282,7 @@ extension TerminalView {
                 self.pendingAccessibilityPost = nil
                 self.lastAccessibilityPost = CACurrentMediaTime()
                 self.cachedAccessibilitySnapshot = nil
-                NSAccessibility.post(element: self, notification: .valueChanged)
+                self.postAccessibilityNotification(.valueChanged)
             }
             pendingAccessibilityPost = item
             DispatchQueue.main.asyncAfter(
@@ -280,18 +290,31 @@ extension TerminalView {
             return
         }
         lastAccessibilityPost = now
-        NSAccessibility.post(element: self, notification: .valueChanged)
+        postAccessibilityNotification(.valueChanged)
     }
 
     /// A local selection change: its own notification, separate from value.
+    /// Not rate-limited, deliberately: a selection moves at human speed, and
+    /// during a drag a client needs every position, the last one included.
+    /// Posted unconditionally for the same reason as the value notification.
     func noteAccessibilitySelectionChanged() {
-        guard NSWorkspace.shared.isVoiceOverEnabled else { return }
         cachedAccessibilitySnapshot = nil
         Self.trace?.debug("post selectedTextChanged")
-        NSAccessibility.post(element: self, notification: .selectedTextChanged)
+        postAccessibilityNotification(.selectedTextChanged)
     }
 
     static let accessibilityPostInterval: CFTimeInterval = 0.4
+
+    /// Posts to the accessibility server, or to the test seam when one is
+    /// installed. Neither path builds the snapshot: the element is the view,
+    /// and a client reads its attributes only after hearing the notification.
+    private func postAccessibilityNotification(_ notification: NSAccessibility.Notification) {
+        if let accessibilityNotificationPoster {
+            accessibilityNotificationPoster(self, notification)
+        } else {
+            NSAccessibility.post(element: self, notification: notification)
+        }
+    }
 
     private static func clamp(_ range: NSRange, to length: Int) -> NSRange? {
         guard range.location >= 0, range.location <= length else { return nil }

@@ -10,19 +10,15 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
-### Added
-
-- Assistive technologies can set the selection in a pane, so VoiceOver's
-  text-selection commands select the text they name and ⌘C copies it. A
-  zero-length range clears the selection; the child's cursor never moves.
-- With VoiceOver on, a finished command's output is announced in the
-  focused pane: short output is read, a long output such as `yes` is
-  summarised instead of queuing speech, a failure is spoken with its exit
-  status, and a full-screen program or a pane scrolled into history stays
-  silent. It needs shell integration, and typing at the prompt is not
-  announced twice.
-
 ### Fixed
+
+- Assistive technologies other than VoiceOver learn that a pane's text or
+  selection changed: Voice Control, Switch Control, a braille display or
+  third-party screen reader, and Accessibility Inspector now receive the
+  same change notifications. They carry no text, and the accessibility
+  snapshot is still built only when a client asks, so a flood with no
+  client attached builds nothing. The pane's zoom button also stays visible
+  for Switch Control, not only VoiceOver.
 
 - A pane that was connected over SSH from the connect sheet when Corta quit
   now comes back as an ended connection naming the host, with **Reconnect**
@@ -65,6 +61,18 @@ Versioning for compatibility changes.
 - Corta starts shells when its application is kept inside another `.app`
   bundle, or under a folder whose name ends in `.app`: the `corta-exec`
   helper is looked for in the innermost bundle instead of the outermost.
+
+### Added
+
+- Assistive technologies can set the selection in a pane, so VoiceOver's
+  text-selection commands select the text they name and ⌘C copies it. A
+  zero-length range clears the selection; the child's cursor never moves.
+- With VoiceOver on, a finished command's output is announced in the
+  focused pane: short output is read, a long output such as `yes` is
+  summarised instead of queuing speech, a failure is spoken with its exit
+  status, and a full-screen program or a pane scrolled into history stays
+  silent. It needs shell integration, and typing at the prompt is not
+  announced twice.
 
 ## [1.6.2] - 2026-11-10
 
