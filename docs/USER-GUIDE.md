@@ -703,7 +703,12 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   `path:line` in a remote pane — downloads a copy and opens it in your
   editor. Set **Settings ▸ Terminal ▸ Open File Command** first, using an
   absolute editor executable and `{file}`, `{line}`, `{column}` placeholders
-  ([examples](CONFIGURATION.md#following-a-file-reference)). Uploading your
+  ([examples](CONFIGURATION.md#following-a-file-reference)). Corta checks
+  that setting, and that its executable exists, **before** it connects or
+  downloads anything: with no editor configured the message says so and its
+  **Open Settings** button opens that page, and a command whose executable
+  is missing names the path. Corta never hands a remote copy to the system
+  default application. Uploading your
   changes is a separate, explicit step, and Corta
   checks first whether the remote file changed meanwhile. Files over 64 MiB
   are not copied this way; download them from the browser, which shows

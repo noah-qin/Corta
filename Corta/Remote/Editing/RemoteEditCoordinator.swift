@@ -80,6 +80,31 @@ final class RemoteEditCoordinator {
         case dismiss
     }
 
+    /// Why the configured `open-file-command` cannot launch a copy. Checked
+    /// before any connection is made, so a first Edit with no editor
+    /// configured downloads nothing and asks no connection question.
+    nonisolated enum EditorCommandProblem: Equatable {
+        /// The setting is empty.
+        case notSet
+        /// The template's first word is not an absolute path, so it would
+        /// resolve through a `PATH` Corta does not control.
+        case notAbsolute(String)
+        /// The absolute executable the template names does not exist or is
+        /// not an executable file.
+        case missing(String)
+    }
+
+    /// How an `open` ended.
+    nonisolated enum OpenResult: Equatable {
+        /// The editor was launched on the managed copy.
+        case opened
+        /// Nothing was connected or downloaded: the configured editor cannot
+        /// run, and the presenter has said what to set.
+        case editorUnavailable
+        /// The copy is in place, but launching the editor failed.
+        case launchFailed
+    }
+
     /// Everything the coordinator needs from a UI, as closures.
     nonisolated struct RemoteEditPresenter {
         var promptUpload: @MainActor (PendingUpload) -> Void
@@ -90,6 +115,10 @@ final class RemoteEditCoordinator {
         /// so fetching a file from it is asked — host and path named —
         /// before any process is spawned. `true` means connect.
         var confirmConnection: @MainActor (_ host: String, _ remotePath: String) async -> Bool
+        /// The configured editor cannot run a copy. The presenter says what
+        /// to set, names the executable when the command has one, and offers
+        /// the settings page; nothing has been connected or downloaded.
+        var showEditorProblem: @MainActor (EditorCommandProblem) -> Void
 
         init(
             promptUpload: @escaping @MainActor (PendingUpload) -> Void,
@@ -97,12 +126,14 @@ final class RemoteEditCoordinator {
             showError: @escaping @MainActor (String) -> Void,
             confirmConnection: @escaping @MainActor (String, String) async -> Bool = { _, _ in
                 true
-            }
+            },
+            showEditorProblem: @escaping @MainActor (EditorCommandProblem) -> Void = { _ in }
         ) {
             self.promptUpload = promptUpload
             self.promptConflict = promptConflict
             self.showError = showError
             self.confirmConnection = confirmConnection
+            self.showEditorProblem = showEditorProblem
         }
     }
 
@@ -118,6 +149,10 @@ final class RemoteEditCoordinator {
     /// rather than launching an editor.
     private let opener: @MainActor (URL, Int, Int?) -> Bool
     var presenter: RemoteEditPresenter
+
+    /// The configured `open-file-command` template. A test's own, so the
+    /// editor check is driven without a configuration file.
+    var openFileCommand: () -> String = { ConfigurationStore.shared.configuration.openFileCommand }
 
     private var clients: [String: any SFTPClient] = [:]
     private var activeClientUses: [ObjectIdentifier: Int] = [:]
@@ -223,14 +258,42 @@ final class RemoteEditCoordinator {
 
 extension RemoteEditCoordinator {
 
+    /// Why `command` cannot launch a copy of a remote file, or nil when it
+    /// can. Empty is "not set"; a first word that is not absolute would
+    /// resolve through the shell's `PATH`; an absolute first word must name
+    /// an executable file. Only the template and the file system are read,
+    /// so tests drive all three cases.
+    static func editorCommandProblem(for command: String) -> EditorCommandProblem? {
+        guard let executable = command.split(whereSeparator: \.isWhitespace).first.map(String.init)
+        else { return .notSet }
+        guard executable.hasPrefix("/") else { return .notAbsolute(executable) }
+        guard FileManager.default.isExecutableFile(atPath: executable) else { return .missing(executable) }
+        return nil
+    }
+
+    /// The configured editor's problem, or nil when it can launch a copy.
+    func configuredEditorProblem() -> EditorCommandProblem? {
+        Self.editorCommandProblem(for: openFileCommand())
+    }
+
     /// Downloads (or reuses) the managed copy of a remote file, records the
     /// open, starts watching, and opens the editor at `line`/`column`.
-    /// Returns whether the editor was actually launched. A missing or invalid
-    /// editor command refuses remote copies instead of using a file handler.
+    ///
+    /// The configured editor is checked *first*: a missing or unusable
+    /// command says so through the presenter and returns `.editorUnavailable`
+    /// before the consent question, a connection, or a download (up to
+    /// `maximumCopyBytes`). Only `open-file-command` can launch a copy —
+    /// never a file handler (`SECURITY.md` §6).
     @discardableResult
     func open(
         host: String, remotePath: String, line: Int, column: Int?
-    ) async throws(SFTPError) -> Bool {
+    ) async throws(SFTPError) -> OpenResult {
+        // Before the host question any connection would ask: with no editor
+        // to hand the copy to, both the question and the download are waste.
+        if let problem = configuredEditorProblem() {
+            presenter.showEditorProblem(problem)
+            return .editorUnavailable
+        }
         // A host named by the pane's OSC 7 report is child output; the
         // first connection to it is the user's decision, not the far
         // end's (`RemoteHostConsent`). A reused copy still goes through
@@ -257,12 +320,12 @@ extension RemoteEditCoordinator {
         watch(copy)
         guard opener(store.localURL(for: copy), line, column) else {
             if !alreadyWatched { unwatch(copy.id) }
-            return false
+            return .launchFailed
         }
         store.recordOpen(copy)
         // A synchronous editor save may precede delivery of the file event.
         await noteLocalWrite(copyID: copy.id)
-        return true
+        return .opened
     }
 
     /// The manifest's copy of the file, re-secured, while its local file is

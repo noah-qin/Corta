@@ -56,6 +56,17 @@ extension RemoteEditCoordinator.RemoteEditPresenter {
                 alert.addButton(withTitle: L10n.text("sftp.host.connect"))
                 alert.addButton(withTitle: L10n.text("common.cancel"))
                 return alert.runModal() == .alertFirstButtonReturn
+            },
+            showEditorProblem: { problem in
+                let alert = NSAlert()
+                alert.alertStyle = .warning
+                alert.messageText = L10n.text("remoteEdit.editorNeeded.title")
+                alert.informativeText = problem.message
+                alert.addButton(withTitle: L10n.text("failure.button.settings"))
+                alert.addButton(withTitle: L10n.text("common.cancel"))
+                if alert.runModal() == .alertFirstButtonReturn {
+                    SettingsWindowController.shared.open(.terminal)
+                }
             })
     }
 
@@ -101,4 +112,17 @@ extension RemoteEditCoordinator.RemoteEditPresenter {
         }
     }
 
+}
+
+extension RemoteEditCoordinator.EditorCommandProblem {
+    /// What the message says: the setting's name as the user sees it, and
+    /// the executable when the command has one, so a wrong path is visible
+    /// without opening Settings first.
+    var message: String {
+        switch self {
+        case .notSet: L10n.text("remoteEdit.editorNeeded.notSet")
+        case .missing(let executable): L10n.format("remoteEdit.editorNeeded.missing", executable)
+        case .notAbsolute(let executable): L10n.format("remoteEdit.editorNeeded.notAbsolute", executable)
+        }
+    }
 }

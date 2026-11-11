@@ -444,6 +444,19 @@ Approve the new edit explicitly. An older managed entry without a remote
 content digest also needs a conflict decision once. A content comparison
 can identify remote changes even when file size and timestamp are unchanged.
 
+### Edit says no editor is configured
+
+**Edit** in Browse Remote Files…, and ⌘-clicking a `path:line` in a remote
+pane, need `open-file-command`. Corta checks it before connecting or
+downloading, so with none set nothing is fetched and no connection is made;
+the message's **Open Settings** button opens **Settings ▸ Terminal ▸ Open
+File Command**. Enter the editor executable's absolute path with `{file}`,
+`{line}` and `{column}` placeholders — for example
+`/usr/local/bin/code --goto {file}:{line}:{column}` — then try again. A
+command whose executable does not exist is stopped the same way, and the
+message names the path. Corta never falls back to the system default
+application for a remote copy.
+
 ### A remote-edit upload asks again after a long wait
 
 The connection stalled. Once connected, each remote-edit operation has 120

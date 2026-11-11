@@ -10,6 +10,17 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Edit** on a remote file, and ⌘-clicking a `path:line` in a remote pane,
+  now check **Settings ▸ Terminal ▸ Open File Command** before connecting or
+  downloading. With no editor configured the message says so, offers **Open
+  Settings**, and nothing is fetched; a command whose executable is missing
+  names the path. Previously the file was downloaded first (up to 64 MiB)
+  and the listing then said only "open-file-command could not be run". The
+  setting's help no longer claims an empty command opens the default
+  application — an empty command disables opening files from output.
+
 ## [1.6.2] - 2026-11-10
 
 ### Changed

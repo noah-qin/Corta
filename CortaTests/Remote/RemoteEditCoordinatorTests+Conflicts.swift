@@ -392,6 +392,7 @@ extension RemoteEditCoordinatorTests {
                 promptUpload: { recorder.uploads.append($0) },
                 promptConflict: { recorder.conflicts.append($0) },
                 showError: { recorder.errors.append($0) }))
+        coordinator.openFileCommand = { "/bin/sh {file}" }
         _ = try await coordinator.open(
             host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         #expect(recorder.uploads.count == 1)
@@ -419,6 +420,7 @@ extension RemoteEditCoordinatorTests {
                 promptUpload: { recorder.uploads.append($0) },
                 promptConflict: { recorder.conflicts.append($0) },
                 showError: { recorder.errors.append($0) }))
+        coordinator.openFileCommand = { "/bin/sh {file}" }
         _ = try await coordinator.open(
             host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
         #expect(recorder.uploads.isEmpty)
@@ -436,8 +438,10 @@ extension RemoteEditCoordinatorTests {
             at: orphan.deletingLastPathComponent(), withIntermediateDirectories: true)
         try "local edits".write(to: orphan, atomically: true, encoding: .utf8)
 
-        #expect(try await fixture.coordinator.open(
-            host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil))
+        #expect(
+            try await fixture.coordinator.open(
+                host: "build-box", remotePath: "/srv/app/main.rs", line: 1, column: nil)
+                == .opened)
         #expect(try String(contentsOf: orphan, encoding: .utf8) == "remote v1")
         let siblings = try FileManager.default.contentsOfDirectory(
             atPath: orphan.deletingLastPathComponent().path)
