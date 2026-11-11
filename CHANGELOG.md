@@ -10,6 +10,14 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Changed
+
+- Output under a scroll region that leaves the first or last row out, as a
+  shell under a status line or a full-screen program with a header does,
+  no longer gets slower on a taller window. Each scrolled line cost time in
+  proportion to the region's height (1,583 ns at 200 rows); it now costs
+  about what a whole-screen scroll does (135 ns), at every height.
+
 ## [1.6.2] - 2026-11-10
 
 ### Changed

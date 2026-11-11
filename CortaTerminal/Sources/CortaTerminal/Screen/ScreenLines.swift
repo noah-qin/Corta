@@ -121,10 +121,51 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
     }
 
     /// Rotate storage and revisions together; only exposed rows are stamped.
-    /// Three reversals cost O(region height), independent of scroll count.
+    ///
+    /// A region that is small next to the screen is rotated in place, by three
+    /// reversals: O(region height). A tall region with few rows outside it is
+    /// cheaper the other way round: turn the whole ring, as a full-screen
+    /// scroll does, then put back only the rows outside the region (the header
+    /// above it and the footer below it), O(top + rows below + count). A
+    /// status line under a full-height region, the usual shape of a shell
+    /// prompt or a TUI, then costs the same at 25 rows and at 200.
     mutating func rotate(top: Int, bottom: Int, by delta: Int) {
-        let count = Swift.min(abs(delta), bottom - top + 1)
+        let height = bottom - top + 1
+        let count = Swift.min(abs(delta), height)
         guard count > 0 else { return }
+        let rows = storage.count
+        let below = rows - 1 - bottom
+        if count < height, top + below + 2 * count < height {
+            // `count < height <= rows`, so one wrap in either direction is enough.
+            if delta > 0 {
+                // The rows to drop lead the header; the turn then puts the
+                // header at the top, and the tail holds the footer followed by
+                // the dropped rows, which swap places.
+                rotateLeft(0, top + count - 1, by: top)
+                head += count
+                if head >= rows { head -= rows }
+                rotateLeft(bottom - count + 1, rows - 1, by: below)
+            } else {
+                // The mirror: the footer moves in front of the rows to drop,
+                // the turn goes backwards, and the header swaps with them.
+                rotateLeft(bottom - count + 1, rows - 1, by: count)
+                head -= count
+                if head < 0 { head += rows }
+                rotateLeft(0, top + count - 1, by: count)
+            }
+        } else {
+            rotateLeft(top, bottom, by: delta > 0 ? count : height - count)
+        }
+        let exposed = delta > 0 ? (bottom - count + 1)...bottom : top...(top + count - 1)
+        for row in exposed { self[row].recycle() }
+        recordScroll(top: top, bottom: bottom, delta: delta > 0 ? count : -count)
+    }
+
+    /// Rows `first...last` rotated left by `amount`, storage and revisions
+    /// together, by three reversals. An `amount` of zero or the whole range
+    /// changes nothing.
+    private mutating func rotateLeft(_ first: Int, _ last: Int, by amount: Int) {
+        guard amount > 0, amount < last - first + 1 else { return }
         func reverse(_ first: Int, _ last: Int) {
             var a = first, b = last
             while a < b {
@@ -134,13 +175,9 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
                 a += 1; b -= 1
             }
         }
-        let left = delta > 0 ? count : bottom - top + 1 - count
-        reverse(top, top + left - 1)
-        reverse(top + left, bottom)
-        reverse(top, bottom)
-        let exposed = delta > 0 ? (bottom - count + 1)...bottom : top...(top + count - 1)
-        for row in exposed { self[row].recycle() }
-        recordScroll(top: top, bottom: bottom, delta: delta > 0 ? count : -count)
+        reverse(first, first + amount - 1)
+        reverse(first + amount, last)
+        reverse(first, last)
     }
 
     mutating func append<S: Sequence>(contentsOf newElements: S) where S.Element == Line {
