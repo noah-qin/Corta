@@ -10,6 +10,11 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- The SFTP browser's column header no longer draws a stray vertical divider
+  before **Name**; the dividers between Name, Size and Modified are unchanged.
+
 ## [1.6.2] - 2026-11-10
 
 ### Changed
