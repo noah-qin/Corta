@@ -212,9 +212,12 @@ final class SFTPBrowserController: NSWindowController, NSWindowDelegate {
             let remotePath = SFTPBrowserModel.joinPath(model.currentPath, entry.name)
             Task {
                 do {
-                    let opened = try await RemoteEditCoordinator.shared.open(
+                    let result = try await RemoteEditCoordinator.shared.open(
                         host: host, remotePath: remotePath, line: 1, column: nil)
-                    if !opened {
+                    // `.editorUnavailable` has already said what to set, with
+                    // the settings button; only a launch that failed after a
+                    // usable command needs the listing's own notice.
+                    if result == .launchFailed {
                         model.listingError = L10n.text("toast.badOpenFileCommand")
                     }
                 } catch {

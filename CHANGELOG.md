@@ -19,6 +19,24 @@ Versioning for compatibility changes.
   matches nothing reaches No Results only once the whole scrollback was
   searched. Lines skipped for exceeding the line limit are reported the
   same way.
+- **Edit** on a remote file, and ⌘-clicking a `path:line` in a remote pane,
+  now check **Settings ▸ Terminal ▸ Open File Command** before connecting or
+  downloading. With no editor configured the message says so, offers **Open
+  Settings**, and nothing is fetched; a command whose executable is missing
+  names the path. Previously the file was downloaded first (up to 64 MiB)
+  and the listing then said only "open-file-command could not be run". The
+  setting's help no longer claims an empty command opens the default
+  application — an empty command disables opening files from output.
+- The find bar treats an input method's marked text as composition, not as
+  a query: Esc cancels the composition and leaves the bar open on its
+  previous query and results, and the scrollback is searched once for the
+  committed text instead of for every letter being composed.
+- Closing a pane ends an input write the kernel had parked on a program
+  that stopped reading, instead of holding its writer thread, its pty and
+  its session until that program exits. A job that ignored the hangup now
+  sees its terminal close.
+- The SFTP browser's column header no longer draws a stray vertical divider
+  before **Name**; the dividers between Name, Size and Modified are unchanged.
 - A program that sets a selection foreground colour no longer makes every
   scrolling frame rebuild the whole screen: with no selection, only the
   damaged rows are rebuilt.

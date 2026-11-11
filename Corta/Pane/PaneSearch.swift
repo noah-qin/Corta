@@ -203,6 +203,11 @@ final class PaneSearch: NSObject {
         else {
             return event
         }
+        // An input method's composition owns Esc: passed through, the field
+        // editor lets the input context cancel the preedit, and the bar stays
+        // open on its previous query and results. With nothing marked, the
+        // next Esc closes it.
+        guard !isComposingText else { return event }
         close()
         return nil
     }
@@ -218,6 +223,13 @@ final class PaneSearch: NSObject {
     /// the field editor, whose delegate is our `field`, or a bar
     /// control focused by Full Keyboard Access, found by ancestry.
     var hasKeyboardFocus: Bool { isResponderActive }
+
+    /// Whether the field editor holds input-method marked text: a composition
+    /// in progress. That text is the input method's preedit, not the query —
+    /// it is neither searched for nor an Esc for this bar.
+    var isComposingText: Bool {
+        (field?.currentEditor() as? NSTextView)?.hasMarkedText() == true
+    }
 
     private var isResponderActive: Bool {
         guard let responder = host?.view.window?.firstResponder else { return false }
@@ -438,6 +450,9 @@ extension PaneSearch {
     /// the last output could leave results stale once the grid goes quiet.
     func scheduleBackgroundRefresh() {
         guard bar != nil, let searchField = field else { return }
+        // Composing: the preedit is not the query, so output arriving now
+        // starts no sweep. The change that commits the text sweeps for it.
+        guard !isComposingText else { return }
         guard task == nil else {
             needsRefresh = true
             return

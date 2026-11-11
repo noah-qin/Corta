@@ -387,6 +387,13 @@ extension SFTPBrowserView {
                     .itemProvider(entry.kind == .file ? { model.dragItem(for: entry).itemProvider() } : nil)
             }
         }
+        .background { SFTPHeaderLeadingSeparatorMask() }
+        // The inset table style draws a separator at the leading edge of every
+        // column, so the header has one before **Name**, with no column to its
+        // left (#530). `Table` exposes no header view, and hiding the header
+        // would take sorting and column resizing with it, so the stock header
+        // is clipped from its first column's leading edge instead. The header
+        // is transparent, so the table's own content background shows through.
         .alternatingRowBackgrounds(.enabled)
         // Files from Finder: into the folder row they land on, or the
         // folder shown (`SFTPDropTarget`).
