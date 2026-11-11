@@ -12,6 +12,9 @@ Versioning for compatibility changes.
 
 ### Added
 
+- Assistive technologies can set the selection in a pane, so VoiceOver's
+  text-selection commands select the text they name and ⌘C copies it. A
+  zero-length range clears the selection; the child's cursor never moves.
 - With VoiceOver on, a finished command's output is announced in the
   focused pane: short output is read, a long output such as `yes` is
   summarised instead of queuing speech, a failure is spoken with its exit

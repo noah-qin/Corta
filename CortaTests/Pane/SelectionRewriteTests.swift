@@ -139,6 +139,43 @@ struct SelectionRewriteTests {
         #expect(pane.selection != nil)
     }
 
+    /// An assistive technology's selection is document-anchored (D06): output
+    /// that scrolls after the snapshot it was mapped from keeps it on its text,
+    /// as a copy of a stored selection does.
+    @Test func anAssistiveSelectionFollowsItsTextAcrossScrolling() {
+        let pane = TerminalPaneViewController()
+        var terminal = Terminal(rows: 3, columns: 20)
+        terminal.feed(Array("one\r\ntwo\r\nthree\r\n".utf8))
+        // Document row 1 is "three" at this scrollback depth.
+        let selection = TerminalSelection(
+            SelectionRange(
+                start: SelectionPoint(row: 1, column: 0), end: SelectionPoint(row: 1, column: 4)),
+            grid: terminal.grid)
+        terminal.feed(Array("four\r\nfive\r\n".utf8))
+        let grid = terminal.grid
+        pane.pointer.applyAccessibilitySelection(selection, in: grid)
+        guard let recorded = pane.selection else {
+            Issue.record("the selection was not recorded")
+            return
+        }
+        let range = pane.pointer.selectionRange(for: recorded, in: grid)
+        #expect(Selection.text(of: range, in: grid) == "three")
+    }
+
+    /// A zero-length range clears the selection, and the child's insertion
+    /// point does not move.
+    @Test func anEmptyAssistiveSelectionClearsWithoutMovingTheCursor() {
+        let pane = TerminalPaneViewController()
+        let terminal = numbered()
+        let grid = terminal.grid
+        let cursor = grid.cursor
+        pane.pointer.setSelection(row2, in: grid)
+        #expect(pane.selection != nil)
+        pane.pointer.applyAccessibilitySelection(nil, in: grid)
+        #expect(pane.selection == nil)
+        #expect(grid.cursor == cursor)
+    }
+
     /// ⌘A covers the blank rows below the cursor; output landing there does
     /// not rewrite anything it selected.
     @Test func aSelectAllSurvivesOutputBelowThePrompt() {
