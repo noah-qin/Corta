@@ -10,6 +10,13 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- The find bar treats an input method's marked text as composition, not as
+  a query: Esc cancels the composition and leaves the bar open on its
+  previous query and results, and the scrollback is searched once for the
+  committed text instead of for every letter being composed.
+
 ## [1.6.2] - 2026-11-10
 
 ### Changed
