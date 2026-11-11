@@ -36,19 +36,28 @@ public enum Search {
 
     public struct RegexResult: Sendable {
         public var matches: [SelectionRange]
-        public var skippedLongLines: Int
+        /// Lines the sweep did not search: past `regexLineLimit`, or a line
+        /// whose matches could not be found within one whole time budget.
+        public var unsearchedLines: Int
         /// The count is then a floor.
         public var timedOut: Bool
+        /// Where an older sweep resumes: the last row of the next logical
+        /// line to read, in the swept grid's coordinates. Nil when nothing
+        /// older remains, or the sweep was superseded. Pass it back as
+        /// `findRegex(_:in:from:)`'s `resumeRow`.
+        public var resumeRow: Int?
 
         public init(
-            matches: [SelectionRange] = [], skippedLongLines: Int = 0, timedOut: Bool = false
+            matches: [SelectionRange] = [], unsearchedLines: Int = 0, timedOut: Bool = false,
+            resumeRow: Int? = nil
         ) {
             self.matches = matches
-            self.skippedLongLines = skippedLongLines
+            self.unsearchedLines = unsearchedLines
             self.timedOut = timedOut
+            self.resumeRow = resumeRow
         }
 
-        public var isIncomplete: Bool { skippedLongLines > 0 || timedOut }
+        public var isIncomplete: Bool { unsearchedLines > 0 || timedOut }
     }
 
     /// Not "no matches": a half-typed regex is the normal state of typing one.
@@ -162,39 +171,81 @@ public enum Search {
     /// Oldest first, with the substring path's cap and cancellation; the line
     /// bound is what makes cancellation reachable on one enormous line.
     /// Zero-length matches advance one character instead of spinning.
+    ///
+    /// `resumeRow` continues a sweep that ran out of time: the last row of the
+    /// next logical line to read, from an earlier result's `resumeRow`. It
+    /// must be a logical line's last row (the earlier result guarantees it),
+    /// and nil starts from the newest line.
     public static func findRegex(
         _ pattern: String, in grid: Grid, caseSensitive: Bool = false,
         maxMatches: Int = .max, timeBudget: Duration = regexTimeBudget,
-        shouldStop: () -> Bool = { false }
+        from resumeRow: Int? = nil, shouldStop: () -> Bool = { false }
     ) -> RegexResult {
         guard maxMatches > 0, !isCatastrophic(pattern),
             let regex = compileRegex(pattern, caseSensitive: caseSensitive)
         else { return RegexResult() }
         var result = RegexResult()
         let sweep = RegexSweep(regex: regex, maxMatches: maxMatches, deadline: SuspendingClock.now + timeBudget)
-        for logicalLine in grid.reversedLogicalLines() {
-            guard !shouldStop() else { break }
+        let lines =
+            resumeRow.map { grid.reversedLogicalLines(startingAtLastRow: $0) }
+            ?? grid.reversedLogicalLines()
+        // Lines fully read in this call. A line that cannot be finished in one
+        // whole budget is left unsearched and the sweep moves on; retrying it
+        // from its start would spend the next budget the same way, forever.
+        var linesRead = 0
+        for logicalLine in lines {
+            if shouldStop() { break }
             let text = logicalLine.text
             guard !text.isEmpty else { continue }
             // Here too: a line with no match never calls the block.
             if sweep.isExpired {
                 result.timedOut = true
+                result.resumeRow = logicalLine.lastRow
                 break
             }
             guard text.utf16.count <= regexLineLimit else {
-                result.skippedLongLines += 1
+                result.unsearchedLines += 1
+                linesRead += 1
                 continue
             }
             let found = sweep.matches(in: logicalLine, result: &result, shouldStop: shouldStop)
+            if result.timedOut {
+                resumeAfterLineTimeout(in: logicalLine, grid: grid, linesRead: linesRead, result: &result)
+                break
+            }
             result.matches.append(contentsOf: found.reversed())
+            linesRead += 1
             if result.matches.count >= maxMatches || shouldStop() { break }
             if sweep.isExpired {
-                result.timedOut = true
+                // Older than this line is unread.
+                if logicalLine.firstRow > grid.documentRowRange.lowerBound {
+                    result.timedOut = true
+                    result.resumeRow = logicalLine.firstRow - 1
+                }
                 break
             }
         }
         result.matches.reverse()
         return result
+    }
+
+    /// Where the sweep resumes when the budget ended inside a logical line.
+    /// A line reached after others were read gets a fresh budget; one that a
+    /// whole budget could not finish (nothing read before it) never would, so
+    /// it is left unsearched and counted rather than retried forever.
+    private static func resumeAfterLineTimeout(
+        in logicalLine: LogicalLine, grid: Grid, linesRead: Int, result: inout RegexResult
+    ) {
+        guard linesRead == 0 else {
+            result.resumeRow = logicalLine.lastRow
+            return
+        }
+        result.unsearchedLines += 1
+        guard logicalLine.firstRow > grid.documentRowRange.lowerBound else {
+            result.resumeRow = nil
+            return
+        }
+        result.resumeRow = logicalLine.firstRow - 1
     }
 
     /// One regex sweep's fixed inputs: the expression, the cap and the deadline.

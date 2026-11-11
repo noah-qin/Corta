@@ -10,6 +10,16 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- A regular-expression search that runs out of its time budget no longer
+  says **No Results** for a scrollback it did not finish. The bar says the
+  search covered only part of the document, and the new **Search Older
+  Lines** action continues it from where the budget ended; a pattern that
+  matches nothing reaches No Results only once the whole scrollback was
+  searched. Lines skipped for exceeding the line limit are reported the
+  same way.
+
 ## [1.6.2] - 2026-11-10
 
 ### Changed

@@ -20,17 +20,20 @@ import Foundation
 /// The scan itself: pure and `nonisolated`, run by the debounced sweep tasks.
 extension PaneSearch {
     /// One sweep in either mode, pure and `nonisolated` so both detached
-    /// tasks share it.
+    /// tasks share it. `timeBudget` is `Search.regexTimeBudget` except for a
+    /// test that needs a deterministic timeout.
     nonisolated static func sweep(
-        _ query: String, in grid: Grid, caseSensitive: Bool, regex: Bool
+        _ query: String, in grid: Grid, caseSensitive: Bool, regex: Bool,
+        maxMatches: Int = Search.defaultMatchLimit,
+        timeBudget: Duration = Search.regexTimeBudget, from resumeRow: Int? = nil
     ) -> SweepOutcome {
         guard regex else {
             let matches = Search.find(
                 query, in: grid, caseSensitive: caseSensitive,
-                maxMatches: Search.defaultMatchLimit, shouldStop: { Task.isCancelled })
+                maxMatches: maxMatches, shouldStop: { Task.isCancelled })
             return SweepOutcome(
                 matches: matches,
-                status: matches.count >= Search.defaultMatchLimit ? .incomplete : .complete)
+                status: matches.count >= maxMatches ? .incomplete : .complete)
         }
         // An invalid or catastrophic-backtracking pattern is its own state, not
         // "no results": the search never ran.
@@ -42,10 +45,13 @@ extension PaneSearch {
         }
         let result = Search.findRegex(
             query, in: grid, caseSensitive: caseSensitive,
-            maxMatches: Search.defaultMatchLimit, shouldStop: { Task.isCancelled })
+            maxMatches: maxMatches, timeBudget: timeBudget, from: resumeRow,
+            shouldStop: { Task.isCancelled })
         return SweepOutcome(
             matches: result.matches,
-            status: result.isIncomplete ? .incomplete : .complete)
+            status: result.isIncomplete ? .incomplete : .complete,
+            resumeRow: result.resumeRow,
+            unsearchedLines: result.unsearchedLines)
     }
 
     /// The match nearest a remembered absolute row: the exact line may be
