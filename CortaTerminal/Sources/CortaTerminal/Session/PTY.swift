@@ -234,7 +234,9 @@ public final class PTY: @unchecked Sendable {
                         if requests.1.revents != 0 { throw .closed }
                         return requests.0.revents != 0
                     }
-                    if errno != EINTR { return true }
+                    // A failing poll (ENOMEM, ...) is an I/O error, not readiness: the
+                    // primary is non-blocking, so "ready" would spin on EAGAIN.
+                    if errno != EINTR { throw .ioFailed(code: errno) }
                 }
             }
             guard let ready else { throw .closed }
