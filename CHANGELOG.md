@@ -16,6 +16,18 @@ Versioning for compatibility changes.
   a query: Esc cancels the composition and leaves the bar open on its
   previous query and results, and the scrollback is searched once for the
   committed text instead of for every letter being composed.
+- Closing a pane ends an input write the kernel had parked on a program
+  that stopped reading, instead of holding its writer thread, its pty and
+  its session until that program exits. A job that ignored the hangup now
+  sees its terminal close.
+- The SFTP browser's column header no longer draws a stray vertical divider
+  before **Name**; the dividers between Name, Size and Modified are unchanged.
+- A program that sets a selection foreground colour no longer makes every
+  scrolling frame rebuild the whole screen: with no selection, only the
+  damaged rows are rebuilt.
+- Corta starts shells when its application is kept inside another `.app`
+  bundle, or under a folder whose name ends in `.app`: the `corta-exec`
+  helper is looked for in the innermost bundle instead of the outermost.
 
 ## [1.6.2] - 2026-11-10
 

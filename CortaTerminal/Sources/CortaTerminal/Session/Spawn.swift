@@ -16,6 +16,7 @@
 
 import CortaPOSIX
 import Darwin
+import Foundation
 
 /// Launches a child on a pty replica by `posix_spawn`ing `corta-exec`, which
 /// adds `TIOCSCTTY` (`posix_spawn` cannot express it) and `execve`s the shell.
@@ -221,16 +222,18 @@ enum Spawn {
     ///
     /// Inside an app bundle, exactly one place: the signature covers
     /// `Contents/MacOS`, and looking anywhere else could only ever find
-    /// something that should not be there. The first `.app/Contents/` in the
-    /// path is the outermost bundle, which is also what a hosted test bundle
-    /// under `Contents/PlugIns` runs in.
+    /// something that should not be there. The last `.app/Contents/` in the
+    /// path is the running bundle: a build kept inside another application's
+    /// bundle (`Outer.app/Contents/Resources/Corta.app/...`) or under a folder
+    /// whose name ends in `.app` still finds its own helper, and a hosted test
+    /// bundle under `Contents/PlugIns` resolves to the app that hosts it.
     ///
     /// Outside one (a SwiftPM build's `.xctest`, `corta-bench`), a walk of at
     /// most six parents, because the helper is the build directory's sibling.
     /// A bundle under a build directory (the `.xctest`) has a `Contents` of
     /// its own, so the walk also looks in that `MacOS`.
     static func helperCandidates(forImage path: String) -> [String] {
-        if let bundle = path.firstRange(of: ".app/Contents/") {
+        if let bundle = path.range(of: ".app/Contents/", options: .backwards) {
             return [String(path[..<bundle.upperBound]) + "MacOS/corta-exec"]
         }
         var candidates: [String] = []

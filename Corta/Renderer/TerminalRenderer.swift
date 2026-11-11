@@ -498,6 +498,14 @@ nonisolated extension TerminalRenderer {
             frameSelectedColumns.removeAll(keepingCapacity: true)
             return
         }
+        // With a selection neither now nor in the overlay the cache was built
+        // from, no row's colour depends on the selected columns: a scroll
+        // stays on the damage-tracked path instead of rebuilding every row
+        // for the life of the pane (#544). A selection cleared since the
+        // cached overlay still falls through and repaints the cells it
+        // coloured, and non-empty `frameSelectedColumns` implies such an
+        // overlay, so the early return never strands a colour.
+        guard selection != nil || cachedOverlay?.selection != nil else { return }
         if needsFullRebuild || frameSelectedColumns.count != grid.rows
             || !Self.selectionsEqual(selection, cachedOverlay?.selection)
             || cachedScrollbackTotalPushed != grid.scrollback.totalPushed
