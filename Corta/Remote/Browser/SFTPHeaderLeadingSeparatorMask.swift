@@ -69,7 +69,11 @@ struct SFTPHeaderLeadingSeparatorMask: NSViewRepresentable {
                 return
             }
             retries = 0
-            guard header !== self.header else { return }
+            if header === self.header {
+                // Already bound: put the clip back if something took it off.
+                if header.layer?.mask == nil || header.layer?.mask !== installedMask { applyMask() }
+                return
+            }
             removeMask()
             self.header = header
             header.postsFrameChangedNotifications = true
@@ -98,7 +102,9 @@ struct SFTPHeaderLeadingSeparatorMask: NSViewRepresentable {
         private func removeMask() {
             if let frameObserver { NotificationCenter.default.removeObserver(frameObserver) }
             frameObserver = nil
-            header?.layer?.mask = nil
+            // Only a clip this view installed: a successor installer may
+            // already have clipped the same header.
+            if let installedMask, header?.layer?.mask === installedMask { header?.layer?.mask = nil }
             installedMask = nil
             headerLayer = nil
             header = nil
