@@ -35,11 +35,18 @@ struct SFTPHeaderLeadingSeparatorMask: NSViewRepresentable {
     private final class Mask: NSView {
         private weak var header: NSTableHeaderView?
         private var retries = 0
-        // Removed from a `deinit`, which cannot touch main-actor state.
+        // Touched from a `deinit`, which cannot use main-actor state: the
+        // header's layer, so its mask is cleared even if the view is never
+        // detached from the window, and the frame observer.
+        nonisolated(unsafe) private weak var headerLayer: CALayer?
+        nonisolated(unsafe) private weak var installedMask: CALayer?
         nonisolated(unsafe) private var frameObserver: NSObjectProtocol?
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+            // A later window attachment gets its own retry budget: the header
+            // can be missing during the first one and appear by the next.
+            retries = 0
             if window == nil {
                 removeMask()
             } else {
@@ -50,7 +57,10 @@ struct SFTPHeaderLeadingSeparatorMask: NSViewRepresentable {
         /// The table's header is created in a layout pass after this view joins
         /// the window, so the first attempts retry on the next main-queue turns.
         func install() {
-            guard window != nil else { return }
+            guard window != nil else {
+                retries = 0
+                return
+            }
             guard let content = window?.contentView, let header = Self.header(in: content) else {
                 retries += 1
                 if retries <= 10 {
@@ -75,23 +85,31 @@ struct SFTPHeaderLeadingSeparatorMask: NSViewRepresentable {
             guard let header, let table = header.tableView, table.numberOfColumns > 0 else { return }
             let leading = table.rect(ofColumn: 0).minX
             header.wantsLayer = true
+            headerLayer = header.layer
             let mask = CALayer()
             mask.backgroundColor = NSColor.black.cgColor
             mask.frame = CGRect(
                 x: leading, y: 0,
                 width: max(0, header.bounds.width - leading), height: header.bounds.height)
             header.layer?.mask = mask
+            installedMask = mask
         }
 
         private func removeMask() {
             if let frameObserver { NotificationCenter.default.removeObserver(frameObserver) }
             frameObserver = nil
             header?.layer?.mask = nil
+            installedMask = nil
+            headerLayer = nil
             header = nil
+            retries = 0
         }
 
         deinit {
             if let frameObserver { NotificationCenter.default.removeObserver(frameObserver) }
+            // Only what this view installed: a successor may already have
+            // masked the same header.
+            if let installedMask, headerLayer?.mask === installedMask { headerLayer?.mask = nil }
         }
 
         private static func header(in view: NSView) -> NSTableHeaderView? {
