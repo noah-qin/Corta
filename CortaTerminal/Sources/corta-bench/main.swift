@@ -36,6 +36,7 @@ let modes: [(flag: String, run: () -> Void)] = [
     ("--compression", benchmarkCompressionCodecs),
     ("--scroll-allocations", profileSteadyScrolling),
     ("--memory-only", benchmarkScrollbackMemory),
+    ("--footprint", diagnoseScrollbackFootprint),
     ("--reflow-only", benchmarkReflowCost),
     ("--region-scroll", benchmarkRegionScroll),
     ("--image-stall", benchmarkSnapshotLatencyUnderImage),

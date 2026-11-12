@@ -1524,3 +1524,35 @@ busy, so it gets no bounded-slice treatment. A history of CJK or mixed lines sti
 takes the `String` path on every line, as before; this change is for the ASCII
 logs most scrollback is.
 
+### 5.25 What a line's storage reserves (#537, 2026-11-12)
+
+The issue's diagnostic grew a bare `ContiguousArray<Cell>` one append at a time and
+found 158 cells of capacity for 120, 57 MB of slack over 100,000 rows. That is how
+the standard array grows, not how a row reaches history: `Scrollback.push` copies a
+line's trimmed cells into a batch's shared arena, so no row keeps its own capacity.
+`corta-bench --footprint` now measures the real structures, for 100,000 lines of
+120 columns:
+
+| What | Held | Reserved |
+| --- | ---: | ---: |
+| The 50 live screen rows | 91 KiB | +7 KiB (8 %) |
+| Uncompressed history, plain text | 185,846 KiB | +1,853 KiB (1.0 %) |
+| Uncompressed history, a 256-colour SGR on every line | 93,704 KiB | +6,379 KiB (6.8 %) |
+| Compressed history before this change | 3,264 KiB | 95,027 KiB (28×) |
+| Compressed history after this change | 3,264 KiB | 3,738 KiB (1.15×) |
+
+The slack was in the compressed buffers: LZ4 was given half the raw size to write
+into and a log line packs to about 1.5 % of it, so each batch kept a buffer 28 times
+what it held, with the pages it had written staying resident. The buffer is now
+copied to its own size (a memcpy of about 3 KiB per 256 rows, off the session lock).
+No allocation is added per character or per frame, and a live row is not touched:
+reserving a row to the column count would trade a rare growth step for a larger
+allocation on every row, to save the 8 % of 50 rows.
+
+`corta-bench --memory-only` at 100,000 lines of the plain ASCII corpus, Apple M5,
+macOS 27.2, Xcode 27.2, release, old and new binaries alternated, four runs each:
+memory added by the history 9.0 / 11.8 / 16.1 / 16.7 MB before, 3.1 / 7.5 / 7.5 /
+7.5 MB after (a standalone run varies with what the allocator had cached; the
+reserved bytes above are exact). Core feed throughput did not move (278 MiB/s
+after, 284 before, on a run in which neither was alone on the machine).
+

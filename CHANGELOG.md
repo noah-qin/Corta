@@ -12,6 +12,11 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Scrollback that has been compressed no longer keeps the room its encoder was
+  offered. Each compressed batch reserved half the size of its raw cells while
+  holding about 1.5 % of it; it now holds only what it uses, which takes the
+  memory a 100,000-line history adds after compression from about 12–17 MB to
+  7.6 MB in the core benchmark.
 - Searching the scrollback for Chinese, Japanese or Korean text no longer
   builds text for every line that holds only ASCII and cannot match. Over
   100,000 lines of ASCII log a query like `状态` took 709 ms and now takes
