@@ -1493,3 +1493,34 @@ grid and feed figures did not move.
 Not done: `vtebench`'s `unicode` case against the built app, the `esctest` rate,
 the D17 frame-CPU baseline and a launched-app check (D14); the cluster-join skip
 in `Grid.write` the issue also suggests is not part of this change.
+
+### 5.24 Searching for non-ASCII text over ASCII history (#521, 2026-11-12)
+
+A query with a scalar that stays non-ASCII under case folding and canonical
+decomposition (a CJK ideograph, a full-width letter, `é`) cannot equal any text
+made only of ASCII, so `Search.find` reads such a line with the ASCII reader it
+already had, finds no non-ASCII cell and moves on, and builds a `String` only for
+a line that holds non-ASCII text. The Kelvin sign, U+037E and ligatures fold or
+decompose to ASCII and keep the old path, as do queries made only of combining,
+format or control scalars. `SearchNonASCIIQueryTests` compares the result with a
+`String` comparison on every logical line for mixed lines, full-width forms,
+queries that fold to ASCII, combining and joiner scalars, and wrapped wide
+characters.
+
+`corta-bench --search-only --compressed` (release core, 120 columns, an 80-cell ASCII
+log line repeated, cold scrollback compressed, match cap 5,000), Apple M5,
+macOS 27.2, Xcode 27.2, on battery; the old and new binaries run back to back,
+steady runs of five:
+
+| History | ASCII hit | ASCII miss | CJK miss, before | CJK miss, after |
+| --- | ---: | ---: | ---: | ---: |
+| 10,000 lines | 2.4–2.8 ms | 2.5–4.8 ms | 70–75 ms | 1.8–2.1 ms |
+| 100,000 lines | 1.2–1.5 ms | 23–30 ms | 692–735 ms | 18–19 ms |
+
+A CJK query over ASCII history is now within the 2× of an ASCII query that finds
+nothing that #521 asks for. Plain search keeps no time budget: at 19 ms over
+100,000 lines the 250 ms re-sweep under a streaming bar is no longer a core held
+busy, so it gets no bounded-slice treatment. A history of CJK or mixed lines still
+takes the `String` path on every line, as before; this change is for the ASCII
+logs most scrollback is.
+
