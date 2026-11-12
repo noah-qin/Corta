@@ -49,7 +49,7 @@ public struct Scrollback: Sendable {
     struct Batch: Sendable {
         var id: Int
         var arena: ContiguousArray<Cell> = []
-        var compressed: (bytes: ContiguousArray<UInt8>, cellCount: Int)?
+        var compressed: (block: CompressedBlock, cellCount: Int)?
         var rows: ContiguousArray<RowSpan> = []
         var attempted = false
         var rowHyperlinks: [Int: Set<HyperlinkID>] = [:]
@@ -178,6 +178,10 @@ public struct Scrollback: Sendable {
 
     /// Oldest first; small enough (`limit / batchSize`) to be a plain FIFO.
     var batches: ContiguousArray<Batch> = []
+
+    /// Where the next compressed batch is packed (`CompressedChunk`). A
+    /// reference: copies of this scrollback share it and its fill mark.
+    var openChunk: CompressedChunk?
 
     /// Rows already evicted from the oldest (`batches.first`) batch.
     private var headSkip = 0
@@ -310,6 +314,7 @@ public struct Scrollback: Sendable {
         cache.invalidate()
         cache = Cache()
         batches.removeAll(keepingCapacity: true)
+        openChunk = nil
         compressionCursor = 0
         headSkip = 0
         count = 0
@@ -325,9 +330,9 @@ extension Scrollback {
         guard let compressed = batch.compressed else { return batch.arena }
         let decode = {
             var cells = ContiguousArray<Cell>(repeating: .blank, count: compressed.cellCount)
-            let decoded = cells.withUnsafeMutableBytes { dst in compressed.bytes.withUnsafeBufferPointer { src in
+            let decoded = cells.withUnsafeMutableBytes { dst in compressed.block.withUnsafeBytes { src in
                 compression_decode_buffer(dst.baseAddress!.assumingMemoryBound(to: UInt8.self),
-                    dst.count, src.baseAddress!, src.count, nil, COMPRESSION_LZ4)
+                    dst.count, src.baseAddress!.assumingMemoryBound(to: UInt8.self), src.count, nil, COMPRESSION_LZ4)
             } }
             precondition(
                 decoded == compressed.cellCount * MemoryLayout<Cell>.stride, "invalid internal scrollback block")

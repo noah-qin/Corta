@@ -162,6 +162,7 @@ func benchmarkFloodMemory() {
     for flood in floods {
         for pass in 1...2 {
             for chunk in 0..<(flood.megabytes) {
+                if CommandLine.arguments.contains("--trace"), pass == 1, chunk < 20 { report("  \(flood.name) MiB \(chunk)") }
                 let bytes = flood.make(flood.name.hasPrefix("29") ? chunk % 29 : chunk)
                 var offset = 0
                 var slice = 0
@@ -176,5 +177,18 @@ func benchmarkFloodMemory() {
             terminal.compressColdScrollback()
             report("\(flood.name), pass \(pass)")
         }
+    }
+    if CommandLine.arguments.contains("--relief") {
+        for (label, zone, goal) in [("default zone, goal 0", malloc_default_zone(), 0), ("all zones, goal 1 GiB", nil, 1 << 30)] {
+            let released = malloc_zone_pressure_relief(zone, goal)
+            report("pressure relief \(label): returned \(released / 1024) KiB")
+        }
+        sleep(5)
+        report("5 s later")
+    }
+    if CommandLine.arguments.contains("--hold") {
+        print("holding pid \(getpid())")
+        fflush(stdout)
+        sleep(40)
     }
 }

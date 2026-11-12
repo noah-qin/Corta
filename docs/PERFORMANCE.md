@@ -1647,6 +1647,44 @@ buffers, as far as an unwatched window can say; a run with the window visible
 and the CJK flood drawn was not made, and the issue's fresh window (54–56 MB)
 is larger than this one (31 MB), so its absolute figures are not comparable.
 
-Followed up, not done here: the 25–30 MB the allocator keeps could be returned
-after a flood ends; `malloc_zone_pressure_relief` did not do it in the probe.
+The 25–30 MB the allocator keeps is addressed in §5.28.
+
+### 5.28 Compressed history in chunks, not small blocks (#526, 2026-11-12)
+
+§5.27 left 25–30 MB that malloc had freed and not returned, and
+`malloc_zone_pressure_relief` gave back none of it, also not with a goal of 1 GiB or
+after five idle seconds. `vmmap` and `heap` on the probe showed why: every live
+object was in the allocator's *small* zone, 387 compressed batches of 28 KiB beside
+392 row indexes of 3.5 KiB, and that zone also served the half-megabyte arena and
+245 KiB encoder buffer each batch used for a moment. A freed hole in it cannot hold
+a block of a different size, and history changes its block size as the text does (a
+log packs to 3 KiB a batch, CJK to 9, colour codes to 28), so the holes stayed
+resident, dirty, beside 13 MB of live data.
+
+Compressed batches now sit in one-megabyte chunks of their own mapping
+(`CompressedChunk`), appended in arrival order. History drops its oldest batches
+first, so a chunk is unmapped whole when its last batch leaves. The encoder writes
+into a mapping of its own too, instead of a 245 KiB `malloc` block, and the exact
+bytes are copied out. Chunks share their fill mark between copies of a scrollback (a
+suspended screen and the live one), so no two copies are handed the same bytes.
+Recycling the emptied arena for the next batch was tried and changed nothing, so it
+is not in.
+
+Footprint added since the start, the three floods of §5.27, Apple M5, macOS 27.2,
+Xcode 27.2, release:
+
+| Measurement | main (after #565) | chunks |
+| --- | ---: | ---: |
+| Core probe, after the dense SGR floods (2 runs each) | 38–41 MB | 26–28 MB |
+| Application, ad hoc Release, window on screen, after the ASCII floods | 54.3 to 125.5 MB (+71.2) | 54.9 to 65.8 MB (+10.9) |
+| the same, after the CJK floods | 136.5 MB (+82.2) | 74.2 MB (+19.3) |
+| the same, after the SGR floods and 20 s idle | 136.5 MB (+82.2) | 74.2 MB (+19.3) |
+
+The window was on screen this time, which the run in §5.27 was not: its fresh
+footprint, 54–55 MB, is the issue's 54–56 MB, and the growth is much larger than
+the 24 MB measured with the window unwatched, because the renderer and the history
+caches read the batches too. The application's growth is the figure that matters,
++82 MB before and +19 MB after, and no longer the 141 MB the issue measured (that
+was also before #565). What is left in the core probe, about 9 MB of the 27, appears
+in the first megabyte of input and does not grow with it; it was not attributed.
 
