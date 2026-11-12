@@ -33,13 +33,19 @@ extension Scrollback {
             // room than that: past it LZ4 returns 0, the same refusal, and
             // nothing is zero-filled or copied twice.
             let capacity = max(0, rawCount / 2 - 1)
-            let bytes = ContiguousArray<UInt8>(unsafeUninitializedCapacity: capacity) { dst, initialized in
+            let encoded = ContiguousArray<UInt8>(unsafeUninitializedCapacity: capacity) { dst, initialized in
                 initialized = cells.withUnsafeBytes { src in
                     guard let base = src.baseAddress, !src.isEmpty, let out = dst.baseAddress else { return 0 }
                     return compression_encode_buffer(out, dst.count,
                         base.assumingMemoryBound(to: UInt8.self), src.count, nil, COMPRESSION_LZ4)
                 }
             }
+            // The encoder was given half the raw size to write into and a log
+            // line packs far smaller (about 3 KiB of the 245 KiB a 100,000-line
+            // history batch is offered), so the buffer is copied to its own size:
+            // kept as it was, the slack stays reserved and its partly written
+            // pages stay resident for the life of the batch.
+            let bytes = encoded.withUnsafeBufferPointer { ContiguousArray($0) }
             var rowHyperlinks: [Int: Set<HyperlinkID>] = [:], rowGraphemes: [Int: Set<GraphemeID>] = [:]
             var rowUnderlineColors: [Int: Set<UInt16>] = [:]
             if !bytes.isEmpty {

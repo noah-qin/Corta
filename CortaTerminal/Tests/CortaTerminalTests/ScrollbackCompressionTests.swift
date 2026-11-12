@@ -167,4 +167,24 @@ import Testing
         #expect(current.nextCompressionWork() == nil)
     }
 
+    /// The encoder is offered half the raw size to write into; a log line packs
+    /// far smaller, and the buffer used to keep that whole offer reserved
+    /// (28 times what it held, #537). It is now copied to its own size.
+    @Test func aCompressedBatchReservesNoMoreThanItHolds() {
+        var history = Scrollback(limit: 20_000)
+        for _ in 0..<20_000 {
+            var line = Line()
+            for column in 0..<119 { line[column] = Cell(scalar: 0x78, foreground: .default, background: .default, attributes: []) }
+            history.push(line)
+        }
+        history.compressColdBatches()
+        #expect(history.compressedBatchCount > 0)
+        let held = history.storedCellBytes
+        let reserved = history.retainedCellCapacityBytes
+        #expect(reserved >= held)
+        // The newest batches stay uncompressed with their arena headroom; the
+        // compressed ones add at most a malloc size class each.
+        #expect(reserved - held < held / 2 + history.compressedBatchCount * 32 + 64 * 1024, "held \(held), reserved \(reserved)")
+    }
+
 }

@@ -64,19 +64,32 @@ func profileSteadyScrolling() {
     print("scroll allocations: STEADY ends (\(batches) MiB batches)")
 }
 
+/// What a 100,000-line history holds against what it has reserved, for plain
+/// text and for a dense 256-colour SGR line, before and after the cold batches
+/// are compressed. The numbers come from the real `Scrollback` (its batched
+/// arenas and the compressed buffers), not from a bare array grown one append
+/// at a time, which never was how a row reaches history (#537).
 func diagnoseScrollbackFootprint() {
-    var probe = ContiguousArray<Cell>()
-    for _ in 0..<120 { probe.append(.blank) }
-    let stride = MemoryLayout<Cell>.stride
-    let usedBytes = 120 * stride
-    let allocatedBytes = probe.capacity * stride
-    print(
-        "diagnostic: a 120-cell row grown one append at a time has capacity "
-            + "\(probe.capacity) (stride \(stride)B) => \(allocatedBytes)B allocated vs "
-            + "\(usedBytes)B used (\(allocatedBytes - usedBytes)B slack/row); "
-            + "x100k rows => \((allocatedBytes - usedBytes) * 100_000 / 1_048_576)MB slack, "
-            + "\(usedBytes * 100_000 / 1_048_576)MB actual cell data, "
-            + "\(allocatedBytes * 100_000 / 1_048_576)MB allocated cell storage")
+    let corpora: [(String, String)] = [
+        ("ASCII, 120 columns", String(repeating: "x", count: 119)),
+        ("ASCII, 72 columns", String(repeating: "abcdefg ", count: 9)),
+        ("256-colour SGR on every line", String(repeating: "\u{1B}[38;5;196mab\u{1B}[0m", count: 30)),
+    ]
+    for (name, text) in corpora {
+        var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: 100_000)
+        let bytes = Array((text + "\r\n").utf8)
+        for _ in 0..<100_000 { terminal.feed(bytes) }
+        func line(_ stage: String, _ scrollback: Scrollback) {
+            let stored = scrollback.storedCellBytes, reserved = scrollback.retainedCellCapacityBytes
+            print(
+                "diagnostic: \(name), \(stage): \(stored / 1024) KiB held, \(reserved / 1024) KiB reserved "
+                    + "(\(String(format: "%.1f", 100 * Double(reserved - stored) / Double(max(1, stored)))) % slack), "
+                    + "\(scrollback.compressedBatchCount) compressed batches")
+        }
+        line("before compressing", terminal.grid.scrollback)
+        terminal.grid.scrollback.compressColdBatches()
+        line("after compressing", terminal.grid.scrollback)
+    }
     print(
         "diagnostic: sizeof(Line) = \(MemoryLayout<Line>.stride)B, x100k => "
             + "\(MemoryLayout<Line>.stride * 100_000 / 1_048_576)MB for the outer array alone"

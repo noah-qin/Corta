@@ -12,6 +12,11 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Scrollback that has been compressed no longer keeps the room its encoder was
+  offered. Each compressed batch reserved half the size of its raw cells while
+  holding about 1.5 % of it; it now holds only what it uses, which takes the
+  memory a 100,000-line history adds after compression from about 12–17 MB to
+  7.6 MB in the core benchmark.
 - Text that is not ASCII is read into the screen faster: accented Latin, box
   drawing, Cyrillic, Chinese, Japanese and emoji take about 1.25 to 1.9 times
   less time to parse and write, and plain ASCII is no slower. A whole
