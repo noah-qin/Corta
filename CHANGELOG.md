@@ -12,6 +12,10 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Searching the scrollback for Chinese, Japanese or Korean text no longer
+  builds text for every line that holds only ASCII and cannot match. Over
+  100,000 lines of ASCII log a query like `状态` took 709 ms and now takes
+  19 ms, about what an ASCII query that finds nothing costs.
 - Text that is not ASCII is read into the screen faster: accented Latin, box
   drawing, Cyrillic, Chinese, Japanese and emoji take about 1.25 to 1.9 times
   less time to parse and write, and plain ASCII is no slower. A whole
