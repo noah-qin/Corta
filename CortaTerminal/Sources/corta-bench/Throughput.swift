@@ -79,6 +79,28 @@ func benchmarkParseThroughput() {
     )
 }
 
+/// Lines fed through a scroll region that leaves the first and last row out,
+/// as a shell under a status line does. A region scroll that costs the
+/// region's height would grow with the row count; these figures should not.
+func benchmarkRegionScroll() {
+    let line = Array((String(repeating: "x", count: 80) + "\r\n").utf8)
+    let batchLines = 1_000
+    let batch = (0..<batchLines).flatMap { _ in line }
+    let batches = 400
+    for rows in [25, 50, 100, 200] {
+        var best = Double.infinity
+        for _ in 0..<5 {
+            var terminal = Terminal(rows: rows, columns: 120, scrollbackLimit: 0)
+            terminal.feed(Array("\u{1B}[1;\(rows - 1)r\u{1B}[\(rows - 1);1H".utf8))
+            let start = DispatchTime.now().uptimeNanoseconds
+            for _ in 0..<batches { terminal.feed(batch) }
+            let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start)
+            best = min(best, elapsed / Double(batches * batchLines))
+        }
+        print("region scroll, \(rows) rows, margins 1;\(rows - 1): \(String(format: "%.0f", best)) ns/line (best of 5)")
+    }
+}
+
 // Synthetic workloads; never captured terminal output.
 func benchmarkUnicodeCorpora() {
     struct Counter: ParserPerformer {

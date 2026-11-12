@@ -69,7 +69,7 @@ values and when it applies).
 | Copy on select | `copy-on-select`, **on** by default. Set `false` for ⌘C only. |
 | Programs copying to the clipboard over `ssh` or from `tmux` (OSC 52) | `allow-clipboard-write = true`. Off by default; reading the clipboard is not possible under any setting. |
 | Being asked before closing a busy window | `confirm-close`, on by default. |
-| Windows reopening where you left them | `restore-windows`, on by default. Layouts, tabs and working directories come back; processes and terminal text do not. |
+| Windows reopening where you left them | `restore-windows`, on by default. Layouts, tabs and working directories come back; processes and terminal text do not. A pane that was on a connect-sheet SSH session comes back as an ended connection with Reconnect and New Session, not a new connection. |
 | Your own colour scheme | A theme defined in the file (`theme.<name>.*`), or **View ▸ Theme editor…**. [Creating and editing themes](#creating-and-editing-themes). |
 | Your own key bindings | `bind.<command> = <shortcut>`. The command names are in [Keyboard shortcuts](#keyboard-shortcuts). |
 | A font of your choice | **Settings ▸ Appearance ▸ Font**, or `font-family`. Only monospaced families Corta can lay out on its grid are offered. |
@@ -170,7 +170,12 @@ the mouse wheel over it — and follows the tab you select.
 - **Restoring windows.** Quit and relaunch, and every window comes back
   with its tabs, splits, divider positions and each pane's working directory
   (`restore-windows`, on by default). Each pane starts a fresh process;
-  terminal text and running jobs are not restored.
+  terminal text and running jobs are not restored. A pane the connect sheet
+  opened over SSH comes back as an ended connection naming the host, with
+  **Reconnect** and **New Session** — nothing connects until you ask. A pane
+  where you typed `ssh` yourself comes back as a local shell in that
+  directory, with a note that it was remote: the destination in its output
+  is not something Corta reconnects from.
 - **Presets.** A preset is a named shell, directory and environment,
   defined in the config file. **Shell ▸ New Pane with Preset** opens one;
   hold ⌥ to open it in a window of its own
@@ -379,7 +384,16 @@ own error text is under **Details**.
   (`search-case-sensitive`, `search-regex`). The bar sits at the top right
   of the pane and moves to the bottom while the cursor or the current match
   would be under it; in a narrow split it narrows rather than covering the
-  pane. Each pane has its own bar.
+  pane. Each pane has its own bar. Over a very long scrollback a regular
+  expression finishes only the most recent lines within its time budget: the
+  bar then says the search was partial instead of **No Results**, and the
+  arrow button beside the count, **Search Older Lines**, continues from where
+  it stopped. **No Results** appears only once the whole scrollback has been
+  searched.
+  Typing with an input method composes in
+  the bar as it does in any text field: Esc cancels the composition and
+  leaves the bar open, and the scrollback is searched once for the committed
+  text.
 - **Selecting.** Drag to select, double-click for a word, triple-click for
   a line. A finished selection is copied at once (`copy-on-select`); ⌘C
   copies too. A copy is confirmed by a band of light sweeping once along the
@@ -703,7 +717,12 @@ Corta uses the system's OpenSSH — your `~/.ssh/config`, keys, agent and
   `path:line` in a remote pane — downloads a copy and opens it in your
   editor. Set **Settings ▸ Terminal ▸ Open File Command** first, using an
   absolute editor executable and `{file}`, `{line}`, `{column}` placeholders
-  ([examples](CONFIGURATION.md#following-a-file-reference)). Uploading your
+  ([examples](CONFIGURATION.md#following-a-file-reference)). Corta checks
+  that setting, and that its executable exists, **before** it connects or
+  downloads anything: with no editor configured the message says so and its
+  **Open Settings** button opens that page, and a command whose executable
+  is missing names the path. Corta never hands a remote copy to the system
+  default application. Uploading your
   changes is a separate, explicit step, and Corta
   checks first whether the remote file changed meanwhile. Files over 64 MiB
   are not copied this way; download them from the browser, which shows
@@ -795,7 +814,16 @@ It is the quickest way to reach the commands that have no default shortcut.
 - **Secure Keyboard Entry.** **Shell ▸ Secure Keyboard Entry** stops other
   applications from reading your keystrokes while Corta is in front — for
   typing passwords. A lock in the title bar shows when it is actually on.
-- **VoiceOver** reads the terminal's text and follows the focused pane.
+- **VoiceOver and other accessibility clients** read the terminal's text and
+  follow the focused pane. Text and selection changes are announced to
+  whichever client is listening — VoiceOver, Voice Control, Switch Control, a
+  braille display, a third-party screen reader or the Accessibility
+  Inspector — and the text is then read on request, not pushed.
+  With shell integration, a finished command's output is announced once:
+  short output in full, long output as a one-line summary, and a failure
+  with its exit status. Typing at the prompt is not announced again, and
+  a pane scrolled into history or running a full-screen program stays
+  silent.
 - **Clipboard from programs.** Off by default. With
   `allow-clipboard-write = true`, a program — including one inside `tmux`
   or over `ssh` — may put text on your clipboard (OSC 52). Nothing may read

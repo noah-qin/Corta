@@ -166,9 +166,15 @@ final class PaneHeader: NSView {
         let button = buttons[2]
         button.isHidden = !split.hasMultiplePanes
         // Preserve the slot while hovering so the adjacent controls stay put.
-        // Keyboard focus and VoiceOver keep the same control discoverable.
+        // Keyboard focus and a UI-walking assistive technology keep the same
+        // control visible. VoiceOver and Switch Control are the only clients
+        // `NSWorkspace` reports; one it cannot report (Voice Control,
+        // Accessibility Inspector, a third-party reader) still finds the
+        // button in the accessibility tree, since alpha is not
+        // `setAccessibilityHidden`; the least surprising choice is to reveal
+        // it for the signals that exist rather than for every user (D32).
         let visible = hovering || (button as? PaneZoomButton)?.hasKeyboardFocus == true
-            || NSWorkspace.shared.isVoiceOverEnabled
+            || SystemAccessibility.isVoiceOverOrSwitchControlRunning
         button.alphaValue = visible ? 0.6 : 0
     }
 

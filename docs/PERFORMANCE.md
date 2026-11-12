@@ -1180,6 +1180,31 @@ It also records final full Unit and D17, live flood tails and outstanding gates.
 
 October 11 merge follow-up: the [final validation](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-11-merge-validation.md) corrects flood sampling before teardown, records three passing sustained default-driver pairs and a final-source check, matches scripted input cadence across power modes, withdraws no-sync, and attributes the three-second idle timer to Apple AGX deferred GPU setup. Historical negative results above are retained with their method limits; absolute zero process wakeups and an unperformed human panel observation are not claimed.
 
+#### Region scroll that does not grow with its height (#547, 2026-11-11)
+
+A scroll region taller than what lies outside it used to be rotated in place,
+so each scrolled line cost O(region height). `ScreenLines.rotate` now turns the
+whole ring and puts back only the rows above and below the region.
+
+November 11, 2026: Apple M5, macOS 27.2, Xcode 27.2 (27B52), Release
+optimization, on battery (15% charge, Low Power Mode not checked). Baseline
+`2f3f9ec`; `corta-bench --region-scroll` feeds 82-byte LF-terminated lines
+with `CSI 1;(rows-1) r` set, best of five runs of 400,000 lines, two
+alternating before/after launches (both shown as a range). Battery power and
+the run-to-run spread make the figures indicative; the shape is what the
+change is for.
+
+| Rows | Before, ns/line | After, ns/line |
+| ---: | ---: | ---: |
+| 25 | 295–319 | 125–139 |
+| 50 | 457–663 | 126–136 |
+| 100 | 819–870 | 131–144 |
+| 200 | 1,583–1,807 | 135–146 |
+
+The change touches no rendering code. The Release performance tests still
+pass; their figures were not compared against a baseline here, and
+`vtebench` and a launched app were not run.
+
 ### 5.15 Memory and core optimization (#286–#289, 2026-10-11)
 
 The same-machine before/after record, codec experiment, Unicode corpus,

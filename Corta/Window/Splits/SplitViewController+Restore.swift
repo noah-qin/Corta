@@ -38,9 +38,14 @@ extension SplitViewController {
     private func layout(of subtree: NSView) -> PaneLayout {
         guard let split = subtree as? NSSplitView, split.subviews.count == 2 else {
             let pane = pane(forView: subtree)
+            // A pane that never spawned — a restored connection's panel — has
+            // no session to read a directory from; the one it was created
+            // with keeps the saved directory across another quit (`#519`).
             return .pane(
-                directory: pane?.session?.workingDirectory, presetName: pane?.preset?.name,
-                isFocused: pane === focusedPane)
+                directory: pane?.session?.workingDirectory ?? pane?.inheritedWorkingDirectory,
+                presetName: pane?.preset?.name,
+                isFocused: pane === focusedPane,
+                remote: pane?.restorableRemote)
         }
         let axis = split.isVertical ? split.bounds.width : split.bounds.height
         let first = split.subviews[0].frame
@@ -91,14 +96,15 @@ extension SplitViewController {
         _ node: PaneLayout, at pane: TerminalPaneViewController, focusTarget: inout TerminalPaneViewController?
     ) {
         switch node {
-        case .pane(_, _, let isFocused):
+        case .pane(_, _, let isFocused, _):
             if isFocused { focusTarget = pane }
         case .split(let vertical, _, let first, let second):
             focusedPane = pane
             splitFocusedPane(
                 orientation: vertical ? .columns : .rows,
                 workingDirectory: second.firstDirectory,
-                preset: resolvedPreset(named: second.firstPresetName))
+                preset: resolvedPreset(named: second.firstPresetName),
+                remote: second.firstRemote)
             guard let created = focusedPane, created !== pane else { return }
             rebuild(first, at: pane, focusTarget: &focusTarget)
             rebuild(second, at: created, focusTarget: &focusTarget)

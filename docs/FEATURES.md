@@ -285,6 +285,10 @@ Corta as terminal programs.
 - **Bundled shell integration covers zsh, bash and fish.** Other shells need
   their own OSC 133 hooks for command boundaries; without them notifications
   use a heuristic.
+- **VoiceOver output announcements need shell integration.** A command's
+  output is announced when its OSC 133 mark says it finished. Without those
+  marks Corta cannot tell prompt echo from program output, so nothing is
+  announced in a shell with no integration.
 - **Emoji presentation sequences take two columns.** Standardized text-default
   characters with VS16 (⚠️, ✍️, 🖼️) occupy a wide pair, including at a
   line boundary. Programs must count the full sequence, not each scalar.
@@ -311,4 +315,9 @@ an upload remain pending edits. Once connected, a remote-edit operation that
 runs past 120 seconds is stopped and its upload offered again. Managed copies remain on disk with private
 file modes. Restored sessions retain arrangement and directory metadata,
 with `restore-windows = true` by default, and start fresh processes without
-restoring terminal text. See [data-at-rest policy](SECURITY.md#5-data-at-rest).
+restoring terminal text. A pane the connect sheet opened over SSH restores as
+an ended connection naming the host, with Reconnect and New Session, and never
+connects on launch; a hand-typed `ssh` restores as a local shell with a note
+that the pane was remote, because a reported host cannot be trusted for a
+reconnection. A pane opened from a configured preset still runs that preset.
+See [data-at-rest policy](SECURITY.md#5-data-at-rest).

@@ -199,6 +199,7 @@ extension RemoteEditCoordinatorTests {
             opener: { _, _, _ in true },
             presenter: .init(promptUpload: { _ in }, promptConflict: { _ in }, showError: { _ in }),
             connectTimeout: .milliseconds(100))
+        coordinator.openFileCommand = { "/bin/sh {file}" }
         let asking = Guarded(wrappedValue: true)
         let asked = Guarded(wrappedValue: [String]())
         coordinator.isAskingHost = { host in
