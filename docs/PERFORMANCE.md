@@ -1577,7 +1577,7 @@ alternated:
 | plus two CJK floods | 121–124 | 26 |
 | plus two SGR floods | 123–126 | 40 |
 
-The 123–126 is the figure the issue saw. Most of it was the compressed batches
+The 123–126 is the size of the 141 MB the issue saw (an earlier variant of the probe that held its corpora in memory read 139–142). Most of it was the compressed batches
 reserving 28 times what they held (§5.25); with that fixed the history holds 7.2
 MB after the ASCII floods, 3.5 MB after CJK and 9.6 MB after the SGR file, and
 reserves 7.7 / 4.0 / 11.3 MB. The dense SGR lines do compress worse than the plain
@@ -1589,8 +1589,8 @@ What the 40 MB is made of, from the same runs: the history (up to 9.6 MB held,
 25–30 MB, is memory malloc has freed and not returned (`malloc_zone_statistics`:
 the zone's allocated bytes minus its in-use bytes; `malloc_zone_pressure_relief`
 returned none of it). It depends on how much uncompressed history exists at once:
-compressing every 16 KiB read gave +20 MB after the ASCII floods and every 64 reads
-(a megabyte) +172 MB, with the same history afterwards. The session compresses as
+compressing every 2 reads gave +17–21 MB after the ASCII floods, every 16 reads +25 MB
+and every 64 reads (a megabyte) +172 MB, with the same history afterwards. The session compresses as
 batches seal, which is the first case.
 
 The application, ad hoc signed Release build, `CORTA_STAGE_DIR` with
@@ -1606,7 +1606,7 @@ sustained drawing:
 | of which `MALLOC`, before / after | 18.5 / 18.8 | 48.5 / 35.3 | 71.5 / 42.8 | 71.5 / 42.8 |
 
 Every megabyte of the growth, 53.1 before and 23.8 after, is in `MALLOC`; the other
-regions (the 4.5 MB `IOSurface`, `IOKit`, `__DATA`) did not move. So the 141 MB was
+regions I read (the 4.5 MB `IOSurface` and `IOKit`) did not move. So the 141 MB was
 the core's compressed batches plus allocator retention, not the atlas or the GPU
 buffers, as far as an unwatched window can say; a run with the window visible
 and the CJK flood drawn was not made, and the issue's fresh window (54–56 MB)
