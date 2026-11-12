@@ -32,7 +32,7 @@ the [user guide](USER-GUIDE.md) says where each feature lives and how to use it.
   the history: three 64 MiB floods (ASCII, CJK, dense colour codes) left a
   full 100,000-line pane about 40 MB above a fresh one in the core, of which
   the history itself was 3 to 10 MB, the rest memory the allocator keeps
-  after it is freed ([Performance](PERFORMANCE.md#527-what-a-panes-memory-is-made-of-after-heavy-output-526)).
+  after it is freed ([Performance](PERFORMANCE.md#527-what-a-panes-memory-is-made-of-after-heavy-output-526-2026-11-12)).
 - Typing, paste and input-method text request the panel's maximum frame rate
   (120 Hz on ProMotion); Low Power Mode, an inactive window and thermal
   pressure lower it otherwise.
