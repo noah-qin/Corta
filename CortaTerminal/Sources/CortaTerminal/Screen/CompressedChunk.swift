@@ -94,3 +94,35 @@ enum VirtualMemory {
         munmap(pointer, byteCount)
     }
 }
+
+/// The encoder's output space, reused. Mapping fresh pages for every batch cost
+/// a zero-fill fault and an unmap each time: about ten times the system time of
+/// a scrolling flood (#526 follow-up). A few mappings are kept, each only as
+/// resident as the most the encoder ever wrote into it, and handed to one
+/// encoder at a time.
+enum EncodeScratch {
+    /// A mapping owned by whoever took it from the pool; only one holder at a time.
+    private struct Mapping: @unchecked Sendable {
+        let pointer: UnsafeMutableRawPointer
+        let capacity: Int
+    }
+
+    private static let pool = Mutex<[Mapping]>([])
+    private static let pooled = 4
+
+    static func with<R>(capacity: Int, _ body: (UnsafeMutableRawPointer) -> R) -> R {
+        let taken: Mapping? = pool.withLock { pool in
+            guard let index = pool.firstIndex(where: { $0.capacity >= capacity }) else { return nil }
+            return pool.remove(at: index)
+        }
+        let scratch = taken ?? Mapping(pointer: VirtualMemory.map(capacity), capacity: capacity)
+        let result = body(scratch.pointer)
+        let kept = pool.withLock { pool -> Bool in
+            guard pool.count < pooled else { return false }
+            pool.append(scratch)
+            return true
+        }
+        if !kept { VirtualMemory.unmap(scratch.pointer, scratch.capacity) }
+        return result
+    }
+}

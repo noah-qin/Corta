@@ -14,6 +14,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import Compression
+import Foundation
+import Synchronization
 import Testing
 @testable import CortaTerminal
 
@@ -238,6 +241,39 @@ import Testing
         second.compressColdBatches()
         for row in stride(from: 0, to: first.count, by: 131) { #expect(first[row][5].scalar & 0xF00 == (row < 2048 ? 0x100 : 0x400), "first \(row)") }
         for row in stride(from: 0, to: second.count, by: 131) { #expect(second[row][5].scalar & 0xF00 == (row < 2048 ? 0x100 : 0x800), "second \(row)") }
+    }
+
+
+    /// Encoders running at once each get a scratch mapping of their own from the
+    /// pool, so every result decodes back to the cells it was given.
+    @Test func concurrentEncodersShareThePoolSafely() {
+        let works: [Scrollback.CompressionWork] = (0..<64).map { index in
+            var cells = ContiguousArray<Cell>()
+            for offset in 0..<(256 * (40 + index % 50)) {
+                cells.append(Cell(scalar: UInt32(0x41 + (offset &* (index + 3)) % 26), foreground: .default, background: .default, attributes: []))
+            }
+            let rows = ContiguousArray([Scrollback.RowSpan(start: 0, length: Int32(cells.count), wrapped: false)])
+            return Scrollback.CompressionWork(id: index, namespace: UUID(), cells: cells, rows: rows)
+        }
+        let results = Mutex<[Int: (ContiguousArray<UInt8>, Int)]>([:])
+        DispatchQueue.concurrentPerform(iterations: works.count) { index in
+            let result = works[index].compress()
+            results.withLock { $0[index] = (result.bytes, result.cellCount) }
+        }
+        let all = results.withLock { $0 }
+        #expect(all.count == works.count)
+        for (index, work) in works.enumerated() {
+            guard let (bytes, count) = all[index] else { continue }
+            #expect(count == work.cells.count)
+            #expect(!bytes.isEmpty)
+            var decoded = ContiguousArray<Cell>(repeating: .blank, count: count)
+            let written = decoded.withUnsafeMutableBytes { dst in bytes.withUnsafeBufferPointer { src in
+                compression_decode_buffer(dst.baseAddress!.assumingMemoryBound(to: UInt8.self), dst.count,
+                    src.baseAddress!, src.count, nil, COMPRESSION_LZ4)
+            } }
+            #expect(written == count * MemoryLayout<Cell>.stride)
+            #expect(decoded == work.cells, "work \(index)")
+        }
     }
 
 }

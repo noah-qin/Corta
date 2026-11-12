@@ -33,21 +33,22 @@ extension Scrollback {
             // room than that: past it LZ4 returns 0, the same refusal, and
             // nothing is zero-filled or copied twice.
             let capacity = max(0, rawCount / 2 - 1)
-            // Encoded into pages of its own and copied out at its real size:
+            // Encoded into pages outside malloc and copied out at its real size:
             // a 245 KiB `malloc` block per batch, freed a moment later, left
             // holes among the live small blocks that stayed resident (#526). The
             // mapping is only touched where the encoder writes, about 3 to 30 KiB.
             var bytes = ContiguousArray<UInt8>()
             if capacity > 0 {
-                let scratch = VirtualMemory.map(capacity)
-                defer { VirtualMemory.unmap(scratch, capacity) }
-                let written = cells.withUnsafeBytes { src -> Int in
-                    guard let base = src.baseAddress, !src.isEmpty else { return 0 }
-                    return compression_encode_buffer(
-                        scratch.assumingMemoryBound(to: UInt8.self), capacity,
-                        base.assumingMemoryBound(to: UInt8.self), src.count, nil, COMPRESSION_LZ4)
+                bytes = EncodeScratch.with(capacity: capacity) { scratch in
+                    let written = cells.withUnsafeBytes { src -> Int in
+                        guard let base = src.baseAddress, !src.isEmpty else { return 0 }
+                        return compression_encode_buffer(
+                            scratch.assumingMemoryBound(to: UInt8.self), capacity,
+                            base.assumingMemoryBound(to: UInt8.self), src.count, nil, COMPRESSION_LZ4)
+                    }
+                    return ContiguousArray(
+                        UnsafeBufferPointer(start: scratch.assumingMemoryBound(to: UInt8.self), count: written))
                 }
-                bytes = ContiguousArray(UnsafeBufferPointer(start: scratch.assumingMemoryBound(to: UInt8.self), count: written))
             }
             var rowHyperlinks: [Int: Set<HyperlinkID>] = [:], rowGraphemes: [Int: Set<GraphemeID>] = [:]
             var rowUnderlineColors: [Int: Set<UInt16>] = [:]
