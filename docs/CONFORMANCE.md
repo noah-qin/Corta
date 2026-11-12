@@ -497,6 +497,12 @@ under `Corta/` is therefore verified by launching the app and checking:
 7. in a non-English locale (`-AppleLanguages '(zh-Hans)'` on the launch),
    the *menu bar* is translated, not only the menus beneath it.
 
+Items 5 to 7 have UI tests in the `UI` plan: keys and menu actions reaching the
+pane are `ShortcutTests` and `ContextMenuAndPasteUITests`, and the restored tabbed
+window and the Simplified Chinese menu bar are `LaunchedAppChecksUITests`. Running
+the plan (`TESTING.md`) covers them; items 1 to 4 still need the launched app looked
+at.
+
 The app that gets launched is the development build — the `Corta (Dev)`
 scheme, `CortaDev.app`, bundle identifier `dev.noahqin.Corta.dev` (D22).
 It can run beside an installed Corta, so identify the one under test by
