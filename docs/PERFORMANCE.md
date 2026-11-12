@@ -1687,15 +1687,26 @@ Xcode 27.2, release:
 | Core probe, after the dense SGR floods (2 runs each) | 38–41 MB | 26–28 MB |
 | Application, ad hoc Release, window on screen, after the ASCII floods | 54.3 to 125.5 MB (+71.2) | 54.9 to 65.8 MB (+10.9) |
 | the same, after the CJK floods | 136.5 MB (+82.2) | 74.2 MB (+19.3) |
-| the same, after the SGR floods and 20 s idle | 136.5 MB (+82.2) | 74.2 MB (+19.3) |
+| the same, after the SGR floods and 20 s idle (one run each; see below) | 136.5 MB (+82.2) | 74.2 MB (+19.3) |
 
 The window was on screen this time, which the run in §5.27 was not: its fresh
-footprint, 54–55 MB, is the issue's 54–56 MB, and the growth is much larger than
-the 24 MB measured with the window unwatched, because the renderer and the history
-caches read the batches too. The application's growth is the figure that matters,
-+82 MB before and +19 MB after, and no longer the 141 MB the issue measured (that
-was also before #565). What is left in the core probe, about 9 MB of the 27, appears
-in the first megabyte of input and does not grow with it; it was not attributed.
+footprint, 54–55 MB, is the issue's 54–56 MB. That single run of the chunked build
+is the low end, though: its GPU regions did not grow. Three more runs of each
+build on AC power (a41f1ae against 639b2c8, the build before #565), `vmmap -summary`
+before and after the three floods and 20 s idle:
+
+| Build | fresh | after | added |
+| --- | ---: | ---: | ---: |
+| 639b2c8 | 54.4 / 53.2 MB | 272.5 / 252.3 MB | +218 / +199 |
+| a41f1ae (#565, #569, #571) | 53.3 / 54.4 / 53.2 MB | 116.3 / 131.0 / 108.3 MB | +63 / +77 / +55 |
+
+By region, in a41f1ae: `IOSurface` +15.9 MB and `IOAccelerator` +3.1 MB, the
+drawables and the glyph atlas after the CJK flood, the same in both builds; the
+compressed history chunks (`Untagged`) +10.2 MB; `MALLOC_SMALL` in use +11–15 MB; and
+`MALLOC_SMALL (empty)` +11–37 MB still kept by the allocator from elsewhere in the
+application, against +129 MB before. That last part is what is left to attribute.
+What is left in the core probe, about 9 MB of the 27, appears in the first megabyte
+of input and does not grow with it; it was not attributed either.
 
 ### 5.29 CJK history lines ruled out by their row index (#521, 2026-11-12)
 

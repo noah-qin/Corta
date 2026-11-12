@@ -21,8 +21,9 @@ Versioning for compatibility changes.
   scrollback is packed into a few large blocks that are handed back to the
   system as their lines leave history, instead of one small allocation per 256
   lines whose holes the allocator kept. After three 64 MiB floods (ASCII, CJK
-  and dense colour codes) into a 100,000-line pane, the application held about
-  19 MB more than a fresh window, where it held about 82 MB more.
+  and dense colour codes) into a 100,000-line pane, the application held
+  55–77 MB more than a fresh window, where it held about 200 MB more, about
+  20 MB of it the glyph atlas and drawing buffers.
 - Output that is mostly Chinese or Japanese ideographs is written to the screen
   about 1.7 times faster: a run of them is decoded and placed as pairs in one
   step instead of one character at a time. Anything that is not a plain run —
