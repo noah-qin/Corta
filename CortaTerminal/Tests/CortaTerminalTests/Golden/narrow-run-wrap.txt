@@ -1,0 +1,5 @@
+rows: 3 columns: 6
+cursor: row 1 column 4
+   0 |──────| wrapped
+   1 |──éé  |
+   2 |      |

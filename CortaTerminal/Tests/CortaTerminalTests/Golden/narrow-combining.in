@@ -1,0 +1,5 @@
+# A combining mark (Mn, width 0; UnicodeData 0301;Mn) after a narrow
+# non-ASCII scalar joins that cell and does not advance the cursor: ü
+# (U+00FC) then U+0301, x and é take three columns, not four. The dump shows
+# the base scalar of a cluster, so what is pinned is the column accounting.
+\xC3\xBC\xCC\x81x\xC3\xA9\r\nok

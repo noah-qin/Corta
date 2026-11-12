@@ -551,11 +551,24 @@ let characterWidthRanges: [CharacterWidthRange] = [
 /// emoji with default emoji presentation. Everything else is 1, including
 /// East Asian Ambiguous and unassigned scalars.
 ///
-/// Pure and allocation-free: a binary search over `characterWidthRanges`,
-/// behind a printable-ASCII fast path — the hot corpus is ASCII, and the
-/// first two ranges already exclude C0 and DEL/C1.
+/// Pure and allocation-free: printable ASCII returns first, a Basic
+/// Multilingual Plane scalar is one load from `bmpWidthTable`, and the
+/// supplementary planes take a binary search over `characterWidthRanges`.
 func displayWidth(of scalar: Unicode.Scalar) -> Int {
     let value = scalar.value
+    if value >= 0x20, value < 0x7F { return 1 }
+    if value < 0x10000 { return Int(bmpWidthTable[Int(value)]) }
+    return searchedDisplayWidth(of: value)
+}
+
+/// The width of every Basic Multilingual Plane scalar, one byte each (64 KiB),
+/// built once on first use from `searchedDisplayWidth` so the table and the
+/// ranges cannot disagree; `CharacterWidthTests` checks all 65,536 entries.
+private let bmpWidthTable: [UInt8] = (0..<0x10000).map { UInt8(searchedDisplayWidth(of: UInt32($0))) }
+
+/// The width by range search, with no table: what fills `bmpWidthTable` and
+/// answers the supplementary planes.
+private func searchedDisplayWidth(of value: UInt32) -> Int {
     if value >= 0x20, value < 0x7F { return 1 }
     // The generated Unicode ranges assign width 2 throughout these two
     // ideograph blocks. Avoid a binary search for ordinary Chinese prose.

@@ -122,6 +122,22 @@ struct CharacterWidthTests {
         #expect(displayWidth(of: Unicode.Scalar(scalar)!) == expected)
     }
 
+    /// The Basic Multilingual Plane answers from a 64 KiB table built from the
+    /// range search; every one of its 65,536 entries must equal a plain linear
+    /// scan of the generated ranges, which shares no code with either.
+    @Test func bmpTableMatchesLinearScanOfRanges() {
+        for value in UInt32(0)..<0x10000 {
+            guard let scalar = Unicode.Scalar(value) else { continue }
+            let expected: Int
+            if (0x20..<0x7F).contains(value) {
+                expected = 1
+            } else {
+                expected = characterWidthRanges.first { value >= $0.lower && value <= $0.upper }.map { Int($0.width) } ?? 1
+            }
+            #expect(displayWidth(of: scalar) == expected, "U+\(String(value, radix: 16, uppercase: true))")
+        }
+    }
+
     @Test("the width is never outside 0...2")
     func widthsAreBounded() {
         // Sweep a spread of the codespace, including every range boundary.
