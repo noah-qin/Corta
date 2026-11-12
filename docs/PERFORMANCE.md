@@ -1670,6 +1670,15 @@ suspended screen and the live one), so no two copies are handed the same bytes.
 Recycling the emptied arena for the next batch was tried and changed nothing, so it
 is not in.
 
+The encoder's mapping was first made and unmapped for every batch, which a 64 MiB
+`y` flood with compression showed as a zero-fill fault and an unmap per 256 rows:
+system time 0.40–0.98 s against 0.02–0.08 s before chunks, and 2.5 G more
+instructions (2 %). A pool of up to four mappings, each taken by one encoder at a
+time (`EncodeScratch`), brings the instructions back to the figure before chunks
+(116.9 G) and the system time to 0.10–0.11 s. Filling a new chunk still faults its
+pages in once, which `malloc` reusing freed blocks did not: cycles for that flood
+are about 5 % above the figure before chunks, the price of returning the memory.
+
 Footprint added since the start, the three floods of §5.27, Apple M5, macOS 27.2,
 Xcode 27.2, release:
 
