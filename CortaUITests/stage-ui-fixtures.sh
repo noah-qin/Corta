@@ -72,6 +72,8 @@ mkdir -p "$root/connection-placement/ApplicationSupport"
 cat > "$root/connection-placement/ApplicationSupport/recent-hosts.json" <<'JSON'
 {"version":1,"hosts":["127.0.0.1"],"targets":[{"host":"127.0.0.1","port":1}]}
 JSON
+stage tab-restore 'columns = 90\nrows = 24\nrestore-windows = true\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+stage menu-language 'columns = 90\nrows = 24\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 stage cursor-oversized 'columns = 500\nrows = 300\nrestore-windows = true\ncursor-shape = bar\ncursor-blink = true\n'
 stage cursor-blink 'appearance = light\ncolumns = 90\nrows = 24\nrestore-windows = false\ncursor-shape = bar\ncursor-blink = true\n'
 stage cursor-idle-block 'appearance = light\ncolumns = 90\nrows = 24\nrestore-windows = false\ncursor-shape = block\ncursor-blink = true\n'
