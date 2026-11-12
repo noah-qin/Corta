@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-11-12
+
 ### Changed
 
 - Searching scrollback made of Chinese or Japanese text for a word that is
@@ -2826,7 +2828,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.6.2...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.6.3...main
+[1.6.3]: https://github.com/noah-qin/Corta/releases/tag/v1.6.3
 [1.6.2]: https://github.com/noah-qin/Corta/releases/tag/v1.6.2
 [1.6.1]: https://github.com/noah-qin/Corta/releases/tag/v1.6.1
 [1.6.0]: https://github.com/noah-qin/Corta/releases/tag/v1.6.0
