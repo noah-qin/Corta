@@ -406,9 +406,22 @@ extension Search {
             opaqueScalars[value] = opaque
             return opaque
         }
+        // A query with a scalar that stays non-ASCII under case folding and
+        // canonical decomposition cannot equal any text made only of ASCII, so a
+        // line of ASCII cells is skipped without building a `String` for it.
+        let cannotMatchASCIIOnlyLine = matcher == nil && queryNeedsNonASCII(query, caseSensitive: caseSensitive)
         for span in grid.reversedLogicalLineSpans() {
             let stopped: Bool
-            if let matcher,
+            if cannotMatchASCIIOnlyLine,
+                grid.fillWithASCIILogicalLine(
+                    firstRow: span.firstRow, lastRow: span.lastRow, into: &haystack,
+                    historyReader: &historyReader)
+            {
+                // The default `nonASCIIIsOpaque` refuses at the first non-ASCII cell
+                // or cluster, so `true` here means every cell was ASCII.
+                if !haystack.text.isEmpty, shouldStop() { break }
+                continue
+            } else if let matcher,
                 grid.fillWithASCIILogicalLine(
                     firstRow: span.firstRow, lastRow: span.lastRow, into: &haystack,
                     historyReader: &historyReader, nonASCIIIsOpaque: nonASCIIIsOpaque)
@@ -427,6 +440,32 @@ extension Search {
         var results = matches.ranges
         results.reverse()
         return results
+    }
+
+    /// True when `query` holds a scalar that no ASCII text can produce under the
+    /// comparison `find` uses: a letter, number, symbol or punctuation scalar
+    /// whose case-folded (unless `caseSensitive`) canonical decomposition still
+    /// has a non-ASCII scalar. The Kelvin sign and U+037E fold or decompose to
+    /// ASCII and so do not count. Marks, format and control scalars never count:
+    /// the comparison may ignore or reorder them, so a query made of them takes
+    /// the `String` path on every line, as before.
+    static func queryNeedsNonASCII(_ query: String, caseSensitive: Bool) -> Bool {
+        for scalar in query.unicodeScalars where scalar.value >= 0x80 {
+            switch scalar.properties.generalCategory {
+            case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter,
+                .decimalNumber, .letterNumber, .otherNumber,
+                .connectorPunctuation, .dashPunctuation, .openPunctuation, .closePunctuation,
+                .initialPunctuation, .finalPunctuation, .otherPunctuation,
+                .mathSymbol, .currencySymbol, .modifierSymbol, .otherSymbol:
+                var text = String(scalar)
+                if !caseSensitive { text = text.folding(options: .caseInsensitive, locale: nil) }
+                text = text.decomposedStringWithCanonicalMapping
+                if text.unicodeScalars.contains(where: { $0.value >= 0x80 }) { return true }
+            default:
+                continue
+            }
+        }
+        return false
     }
 
     /// An ASCII query, reversed for a right-to-left KMP scan of a line's

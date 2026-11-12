@@ -170,17 +170,28 @@ func probeColdHistory() {
     )
 }
 
-/// `--search-only`: search over 100k plain lines, optionally compressed.
+/// `--search-only`: search over plain ASCII lines at 10,000 and 100,000, each
+/// query five times: an ASCII hit, an ASCII miss and a CJK miss (#521). The
+/// CJK query holds no ASCII, so what it costs over the ASCII miss is the price
+/// of a `String` per line that cannot match.
 func probeSearchOnly() {
-    var grid = { () -> Grid in
-        var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: 100_000)
-        for _ in 0..<100_000 { terminal.feed(Array("the quick brown fox jumps over the lazy dog\r\n".utf8)) }
-        return terminal.grid
-    }()
-    if CommandLine.arguments.contains("--compressed") { grid.scrollback.compressColdBatches() }
-    for _ in 0..<5 {
-        let start = DispatchTime.now().uptimeNanoseconds
-        let matches = Search.find("fox", in: grid)
-        print("search-only \(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6) ms \(matches.count)")
+    for lines in [10_000, 100_000] {
+        var grid = { () -> Grid in
+            var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: lines)
+            for _ in 0..<lines { terminal.feed(Array("the quick brown fox jumps over the lazy dog\r\n".utf8)) }
+            return terminal.grid
+        }()
+        if CommandLine.arguments.contains("--compressed") { grid.scrollback.compressColdBatches() }
+        for (name, query) in [("ASCII hit", "fox"), ("ASCII miss", "zebra"), ("CJK miss", "状态")] {
+            var milliseconds: [Double] = []
+            var count = 0
+            for _ in 0..<5 {
+                let start = DispatchTime.now().uptimeNanoseconds
+                count = Search.find(query, in: grid, maxMatches: 5_000).count
+                milliseconds.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)
+            }
+            let list = milliseconds.map { String(format: "%.1f", $0) }.joined(separator: " ")
+            print("search-only \(lines) lines, \(name): \(list) ms, \(count) matches")
+        }
     }
 }
