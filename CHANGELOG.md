@@ -17,6 +17,10 @@ Versioning for compatibility changes.
   holding about 1.5 % of it; it now holds only what it uses, which takes the
   memory a 100,000-line history adds after compression from about 12–17 MB to
   7.6 MB in the core benchmark.
+- Searching the scrollback for Chinese, Japanese or Korean text no longer
+  builds text for every line that holds only ASCII and cannot match. Over
+  100,000 lines of ASCII log a query like `状态` took 709 ms and now takes
+  19 ms, about what an ASCII query that finds nothing costs.
 - Text that is not ASCII is read into the screen faster: accented Latin, box
   drawing, Cyrillic, Chinese, Japanese and emoji take about 1.25 to 1.9 times
   less time to parse and write, and plain ASCII is no slower. A whole
