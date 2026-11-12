@@ -1591,3 +1591,62 @@ Not done: the D17 frame-CPU baseline (nothing in the render loop changed), a
 `vtebench` run and a launched-app check. The core's CJK feed is still about 70 % of
 ASCII's; what is left is the per-cell write and the pen lookup.
 
+### 5.27 What a pane's memory is made of after heavy output (#526, 2026-11-12)
+
+One run on the maintainer's Mac measured 141 MB above a fresh window after three
+kinds of output, against about 11 MiB in the table above. The 11 MiB is what the
+*history* adds for 100,000 lines of 120 columns; it was never the pane's footprint
+after a flood. `corta-bench --flood-memory` feeds the three floods the issue names,
+64 MiB of ASCII log, 64 MiB of CJK log and 400,000 lines of 256-colour,
+true-colour and bold/underline SGR (29 MiB), each twice, into a 100,000-line
+terminal in 16 KiB reads, compressing as the session does (`--compress-every N`
+reads, default 4), and prints the process footprint after each pass.
+
+Core only (no window, atlas or GPU), Apple M5, macOS 27.2, Xcode 27.2, release;
+footprint added since the empty terminal, MB, two runs each, old and new binary
+alternated:
+
+| After | Before #537 (main at 38f8326) | After #537 |
+| --- | ---: | ---: |
+| two ASCII floods | 78–79 | 20 |
+| plus two CJK floods | 121–124 | 26 |
+| plus two SGR floods | 123–126 | 40 |
+
+The 123–126 is the size of the 141 MB the issue saw (an earlier variant of the probe that held its corpora in memory read 139–142). Most of it was the compressed batches
+reserving 28 times what they held (§5.25); with that fixed the history holds 7.2
+MB after the ASCII floods, 3.5 MB after CJK and 9.6 MB after the SGR file, and
+reserves 7.7 / 4.0 / 11.3 MB. The dense SGR lines do compress worse than the plain
+log (9.6 MB against 7.2 for the same 100,000 lines, 1.3×) but not by an order of
+magnitude: they are the largest single contributor to the 40.
+
+What the 40 MB is made of, from the same runs: the history (up to 9.6 MB held,
+1.7 MB reserved beyond that), the 50-row screen (0.1 MB), and the rest, about
+25–30 MB, is memory malloc has freed and not returned (`malloc_zone_statistics`:
+the zone's allocated bytes minus its in-use bytes; `malloc_zone_pressure_relief`
+returned none of it). It depends on how much uncompressed history exists at once:
+compressing every 2 reads gave +17–21 MB after the ASCII floods, every 16 reads +25 MB
+and every 64 reads (a megabyte) +172 MB, with the same history afterwards. The session compresses as
+batches seal, which is the first case.
+
+The application, ad hoc signed Release build, `CORTA_STAGE_DIR` with
+`scrollback-lines = 100000`, a shell script as `$SHELL` that waits and then `cat`s
+each file twice, `footprint` and `vmmap -summary` on the process after each; the
+window was not watched while it ran, so the glyph atlas and drawables saw no
+sustained drawing:
+
+| Physical footprint, MB | Fresh | after ASCII | after CJK | after SGR and idle |
+| --- | ---: | ---: | ---: | ---: |
+| before #537 | 31.3 | 61.4 | 84.4 | 84.4 |
+| after #537 | 31.7 | 48.2 | 55.5 | 55.5 |
+| of which `MALLOC`, before / after | 18.5 / 18.8 | 48.5 / 35.3 | 71.5 / 42.8 | 71.5 / 42.8 |
+
+Every megabyte of the growth, 53.1 before and 23.8 after, is in `MALLOC`; the other
+regions I read (the 4.5 MB `IOSurface` and `IOKit`) did not move. So the 141 MB was
+the core's compressed batches plus allocator retention, not the atlas or the GPU
+buffers, as far as an unwatched window can say; a run with the window visible
+and the CJK flood drawn was not made, and the issue's fresh window (54–56 MB)
+is larger than this one (31 MB), so its absolute figures are not comparable.
+
+Followed up, not done here: the 25–30 MB the allocator keeps could be returned
+after a flood ends; `malloc_zone_pressure_relief` did not do it in the probe.
+
