@@ -13,8 +13,8 @@ Versioning for compatibility changes.
 ### Changed
 
 - Text that is not ASCII is read into the screen faster: accented Latin, box
-  drawing, Cyrillic, Chinese, Japanese and emoji are read into the screen about
-  1.25 to 1.9 times faster, and plain ASCII is no slower. A whole
+  drawing, Cyrillic, Chinese, Japanese and emoji take about 1.25 to 1.9 times
+  less time to parse and write, and plain ASCII is no slower. A whole
   multi-byte character is decoded in one step when all its bytes have arrived,
   and a character's width comes from a table instead of a search. Malformed or
   cut-off input is still shown as U+FFFD exactly as before.

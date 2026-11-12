@@ -1458,3 +1458,38 @@ item without copying its data (`types` names it; `data(forType:)` is the copy),
 so the read stays on the main thread — `NSPasteboard` is not safe to read from
 another. A paste over the threshold is now also cut into its chunks off the
 main thread, with its scan, for the `?2004` encoding it was judged under.
+
+### 5.23 Non-ASCII text without a per-byte decoder (#548, 2026-11-12)
+
+A complete, well-formed two-, three- or four-byte sequence that is already in the
+slice being parsed is decoded in place (`Parser+UTF8Run.swift`) and the parser
+stays in ground; any malformed, cut-off or control-interrupted sequence still goes
+byte by byte through `UTF8Decoder`, so U+FFFD reporting and reads split anywhere
+are unchanged (`UTF8ParseLoopTests` compares whole, cut and one-byte feeds,
+every malformed class and a seeded random sweep). `displayWidth(of:)` answers the
+Basic Multilingual Plane from a 64 KiB table built once from the range search.
+
+`corta-bench --unicode` (release, 72-cell lines, 5 samples after one warmup),
+Apple M5, macOS 27.2, Xcode 27.2, **on battery**; the old and new binaries run
+alternately, three rounds, and the table gives feed throughput (MiB/s), the
+middle of the three:
+
+| Corpus | Before | After | Factor |
+| --- | ---: | ---: | ---: |
+| ASCII | 305 | 305 | 1.0 |
+| CJK | 97 | 144 | 1.5 |
+| Box drawing | 88 | 163 | 1.9 |
+| Accented Latin | 125 | 156 | 1.25 |
+| Emoji | 82 | 133 | 1.6 |
+| AI CLI | 147 | 198 | 1.35 |
+
+Parser-only throughput, which has no grid behind it, moved much more (box drawing
+220 to 1,441, accented Latin 452 to 1,056, CJK 222 to 796): the decoder was the
+parser's cost, and the grid write the rest. The grid write is now what is left,
+which is why the feed factors are smaller. Parser-only ASCII read 722 before and
+631–692 after, inside a spread that wide in both (391–745 across runs); the ASCII
+grid and feed figures did not move.
+
+Not done: `vtebench`'s `unicode` case against the built app, the `esctest` rate,
+the D17 frame-CPU baseline and a launched-app check (D14); the cluster-join skip
+in `Grid.write` the issue also suggests is not part of this change.
