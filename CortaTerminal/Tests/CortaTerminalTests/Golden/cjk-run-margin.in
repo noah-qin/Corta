@@ -1,0 +1,5 @@
+# A run that ends one column before the margin (six columns: a, then two pairs,
+# leaving column 5 free), the next write landing in that column; then a run that
+# ends exactly at the margin (three pairs) arms the deferred wrap, so an ASCII
+# byte after it starts the next row.
+a\xE4\xB8\xAD\xE6\x96\x87b\r\n\xE4\xB8\xAD\xE6\x96\x87\xE6\xB5\x8Bc

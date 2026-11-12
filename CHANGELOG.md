@@ -12,6 +12,11 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Output that is mostly Chinese or Japanese ideographs is written to the screen
+  about 1.7 times faster: a run of them is decoded and placed as pairs in one
+  step instead of one character at a time. Anything that is not a plain run —
+  a line that wraps, insert mode, autowrap off, a cut-off character — is written
+  exactly as before.
 - Scrollback that has been compressed no longer keeps the room its encoder was
   offered. Each compressed batch reserved half the size of its raw cells while
   holding about 1.5 % of it; it now holds only what it uses, which takes the

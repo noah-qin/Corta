@@ -1556,3 +1556,38 @@ memory added by the history 9.0 / 11.8 / 16.1 / 16.7 MB before, 3.1 / 7.5 / 7.5 
 reserved bytes above are exact). Core feed throughput did not move (278 MiB/s
 after, 284 before, on a run in which neither was alone on the machine).
 
+### 5.26 CJK ideographs written as runs (#536, 2026-11-12)
+
+The parser finds a run of two or more whole three-byte sequences in CJK Unified
+Ideographs (U+4E00–U+9FFF) in the ground state and hands it to the grid in one call
+(`printCJK`, as `printASCII` does for ASCII). Every scalar of the block is width 2,
+a letter, never combining, concealing, a control or East Asian Ambiguous
+(`CJKRunTests` checks all 20,992). `Grid.writeCJK` sends the first scalar the
+ordinary way, since it may continue a ZWJ cluster, then writes whole pairs that fit
+the row with one growth and one buffer borrow (`Line.overwriteIdeographs`),
+blanking only the pair halves at the two ends that the old per-pair path would have.
+A pending wrap, the last column, insert mode, autowrap off and a one-column screen
+take `write` for the scalar, as they always did. A run at the borrowed span's end
+that is cut off, or not well formed, ends the run, so reads split anywhere match.
+
+`corta-bench --unicode` feed (MiB/s), release, Apple M5, macOS 27.2, Xcode 27.2, on
+battery; old and new binaries alternated, three rounds, the three results:
+
+| Corpus | Before | After |
+| --- | ---: | ---: |
+| CJK | 144–147 | 245–246 |
+| AI CLI | 199–201 | 218–224 |
+| ASCII | 297–312 | 302–308 |
+| Box drawing | 163–171 | 163–171 |
+| Accented Latin | 159–162 | 156–163 |
+| Emoji | 127–139 | 129–137 |
+
+The first version of the run detector was inlined into the parse loop and made every
+other corpus 15–25 % slower (box drawing 170 to 135, emoji 137 to 105, accented
+Latin 161 to 122); out of line, behind a lead-byte test, they are level. A corpus
+that is not CJK pays two compares per multi-byte sequence for it.
+
+Not done: the D17 frame-CPU baseline (nothing in the render loop changed), a
+`vtebench` run and a launched-app check. The core's CJK feed is still about 70 % of
+ASCII's; what is left is the per-cell write and the pen lookup.
+

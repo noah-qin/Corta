@@ -1,0 +1,8 @@
+rows: 2 columns: 8
+cursor: row 1 column 4
+   0 |中 文 �测  | wrapped
+   1 |试 汉     |
+styles:
+   0 |.....AA.|
+   1 |AAAA....|
+   A = fg:1 bg:default attrs:none

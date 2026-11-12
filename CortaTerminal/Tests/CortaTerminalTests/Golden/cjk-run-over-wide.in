@@ -1,0 +1,6 @@
+# A run written over wide pairs that are only partly covered. Row 0 holds four
+# pairs; carriage return, one ASCII byte and a run of two pairs overwrite its
+# first three pairs and must blank the spacer of the third. Row 1 does the same
+# from column 1, a spacer column, so the lead it parts is blanked too. Eight
+# columns.
+\xE4\xB8\x80\xE4\xBA\x8C\xE4\xB8\x89\xE5\x9B\x9B\rx\xE4\xB8\xAD\xE6\x96\x87\r\n\xE7\x94\xB2\xE4\xB9\x99\xE4\xB8\x99\xE4\xB8\x81\r\e[C\xE6\x88\x8A\xE5\xB7\xB1
