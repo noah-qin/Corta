@@ -161,6 +161,28 @@ extension Grid {
         return true
     }
 
+    /// True when the history rows `firstRow...lastRow` (all of them in history)
+    /// provably lack one of the ideographs a search needs: no row holds a grapheme
+    /// cluster or a compatibility ideograph (which is canonically equivalent to a
+    /// unified one the query may name), and none of their scalars is `required`.
+    /// False means "cannot tell", never "has it".
+    func historyLacksRequiredScalar(
+        _ required: [UInt32], firstRow: Int, lastRow: Int, reader: inout Scrollback.ASCIIReader
+    ) -> Bool {
+        guard lastRow < 0, !required.isEmpty else { return false }
+        var missing = required
+        for row in firstRow...lastRow {
+            guard let scalars = scrollback.nonASCIIScalars(at: scrollback.count + row, reader: &reader) else {
+                return false
+            }
+            for scalar in scalars {
+                if (0xF900...0xFAFF).contains(scalar) || (0x2F800...0x2FA1F).contains(scalar) { return false }
+                if let hit = missing.firstIndex(of: scalar) { missing.remove(at: hit) }
+            }
+        }
+        return !missing.isEmpty
+    }
+
     public func logicalLine(containing row: Int) -> LogicalLine {
         let span = logicalLineRowSpan(containing: row)
         return joinedLogicalLine(firstRow: span.first, lastRow: span.last)

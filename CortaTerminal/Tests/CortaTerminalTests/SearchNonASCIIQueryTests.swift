@@ -137,4 +137,37 @@ struct SearchNonASCIIQueryTests {
         let partial = Search.find("状态", in: terminal.grid, shouldStop: { polls += 1; return polls > 1 })
         #expect(partial.count < 2)
     }
+    @Test("history lines of CJK text are ruled out by their row index, and only by it when sure")
+    func cjkHistoryLines() {
+        var lines: [String] = []
+        for index in 0..<60 {
+            switch index % 6 {
+            case 0: lines.append("终端性能测试 \(index) 日志状态正常")
+            case 1: lines.append("请求已处理，耗时三毫秒 \(index)")
+            case 2: lines.append("日本語の文章 \(index) 状 態")
+            case 3: lines.append("plain ascii line \(index)")
+            case 4: lines.append("状\u{301}态 \(index) 组合")
+            default: lines.append(String(repeating: "状态说明", count: 12) + " \(index)")
+            }
+        }
+        for query in ["状态", "状", "态", "日志", "测试", "说明状", "状态 x", "zzz状", "終端"] {
+            expectSame(query, lines, columns: 20)
+            expectSame(query, lines, columns: 7)
+            expectSame(query, lines, columns: 20, caseSensitive: true)
+        }
+    }
+
+    @Test("a compatibility ideograph in history is equivalent to its unified one, both ways")
+    func compatibilityIdeographs() {
+        var lines: [String] = []
+        for index in 0..<40 { lines.append(index % 3 == 0 ? "豈 \(index) 更" : (index % 3 == 1 ? "豈 \(index)" : "其他 \(index)")) }
+        for query in ["\u{F900}", "\u{8C48}", "\u{F900}\u{66F4}", "\u{8C48}\u{66F4}", "\u{66F4}", "\u{F901}"] {
+            expectSame(query, lines, columns: 20)
+        }
+        // The line carries the unified form, the query the compatibility one.
+        let unified = (0..<40).map { $0 % 2 == 0 ? "\u{8C48} \($0)" : "x \($0)" }
+        expectSame("\u{F900}", unified, columns: 20)
+        #expect(Search.isUnifiedIdeograph(0x8C48) && !Search.isUnifiedIdeograph(0xF900))
+    }
+
 }
