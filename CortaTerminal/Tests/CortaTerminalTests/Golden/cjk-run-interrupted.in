@@ -1,0 +1,4 @@
+# A run cut by a truncated sequence and an escape: U+6587 is missing its last
+# byte when ESC [ 31 m arrives, so it shows as U+FFFD and the colour change
+# applies to the run that follows. Eight columns.
+\xE4\xB8\xAD\xE6\x96\x87\xE6\x96\e[31m\xE6\xB5\x8B\xE8\xAF\x95\xE6\xB1\x89

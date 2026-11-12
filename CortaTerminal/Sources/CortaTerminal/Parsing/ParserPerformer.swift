@@ -28,6 +28,11 @@ public protocol ParserPerformer {
     /// dispatch per byte on the common path.
     mutating func printASCII(_ bytes: ArraySlice<UInt8>)
 
+    /// A run of two or more whole three-byte sequences for CJK Unified
+    /// Ideographs (U+4E00...U+9FFF) in the ground state, already validated by
+    /// the parser: `bytes.count` is a multiple of three.
+    mutating func printCJK(_ bytes: ArraySlice<UInt8>)
+
     /// A C0 control that acts immediately.
     mutating func execute(_ control: UInt8)
 
@@ -63,6 +68,16 @@ extension ParserPerformer {
 
     public mutating func printASCII(_ bytes: ArraySlice<UInt8>) {
         for byte in bytes { print(UInt32(byte)) }
+    }
+
+    public mutating func printCJK(_ bytes: ArraySlice<UInt8>) {
+        var index = bytes.startIndex
+        while index + 2 < bytes.endIndex {
+            print(
+                UInt32(bytes[index] & 0x0F) << 12 | UInt32(bytes[index + 1] & 0x3F) << 6
+                    | UInt32(bytes[index + 2] & 0x3F))
+            index += 3
+        }
     }
 
     public mutating func escapeDispatch(intermediates: Intermediates, final: UInt8) {}

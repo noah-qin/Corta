@@ -1,0 +1,5 @@
+# A run of CJK ideographs (width 2) on a seven-column screen: three pairs fill
+# columns 0-5 and the fourth does not fit in the one column left, so that column
+# is blanked and the run wraps, as the per-scalar path always did. Eight
+# ideographs make rows of three, three and two; both full rows are wrapped.
+\xE4\xB8\xAD\xE6\x96\x87\xE6\xB5\x8B\xE8\xAF\x95\xE6\xB1\x89\xE5\xAD\x97\xE6\xBC\xA2\xE5\xAD\x97

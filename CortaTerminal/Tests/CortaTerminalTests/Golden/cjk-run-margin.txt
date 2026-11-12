@@ -1,0 +1,5 @@
+rows: 3 columns: 6
+cursor: row 2 column 1
+   0 |a中 文 b|
+   1 |中 文 测 | wrapped
+   2 |c     |

@@ -118,6 +118,44 @@ extension Grid {
         }
     }
 
+    /// A run of CJK Unified Ideographs from the parser (three bytes each, a
+    /// multiple of three, two or more of them): width 2, never combining. The
+    /// first goes the ordinary way, since it may continue a ZWJ cluster; after
+    /// it the previous cell is an ideograph. Whole pairs that fit the row are
+    /// written in one go; a pending wrap, the last column, insert mode,
+    /// autowrap off and a one-column screen take `write` for the scalar, which
+    /// is what they always did.
+    public mutating func writeCJK(_ bytes: ArraySlice<UInt8>) {
+        var index = bytes.startIndex
+        write(Self.ideograph(bytes, at: index))
+        index += 3
+        while index < bytes.endIndex {
+            if pendingWrap || insertMode || !autowrapEnabled || columns < 2 || cursor.column >= columns - 1 {
+                write(Self.ideograph(bytes, at: index))
+                index += 3
+                continue
+            }
+            let pairs = min((columns - cursor.column) / 2, (bytes.endIndex - index) / 3)
+            let end = index + pairs * 3
+            lines[cursor.row].overwriteIdeographs(
+                bytes[index..<end], at: cursor.column, width: columns, pen: pen)
+            index = end
+            let next = cursor.column + pairs * 2
+            if next >= columns {
+                cursor.column = columns - 1
+                pendingWrap = true
+            } else {
+                cursor.column = next
+                pendingWrap = false
+            }
+        }
+    }
+
+    @inline(__always)
+    private static func ideograph(_ bytes: ArraySlice<UInt8>, at index: Int) -> UInt32 {
+        UInt32(bytes[index] & 0x0F) << 12 | UInt32(bytes[index + 1] & 0x3F) << 6 | UInt32(bytes[index + 2] & 0x3F)
+    }
+
     /// A tag continuing a cluster that starts with U+1F3F4: a subdivision flag.
     private func continuesFlagTagSequence(_ scalar: UInt32) -> Bool {
         guard ConcealingScalars.isTag(scalar), let target = clusterJoinTarget() else { return false }

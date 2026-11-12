@@ -49,4 +49,25 @@ extension Parser {
         let high = UInt32(lead & 0x07) << 18 | UInt32(second & 0x3F) << 12
         return (high | UInt32(third & 0x3F) << 6 | UInt32(fourth & 0x3F), 4)
     }
+
+    /// Where a run of CJK Unified Ideographs (U+4E00...U+9FFF, three bytes
+    /// each) starting at `offset` ends, or nil when fewer than two complete
+    /// sequences are there. Every scalar of the block is width 2, none
+    /// combines, is a control, conceals, or is East Asian Ambiguous, so the
+    /// grid can write the run as pairs without asking about each one
+    /// (`CJKRunTests` checks the block). A sequence that is cut off, not
+    /// well formed or outside the block ends the run; the byte after it goes
+    /// the ordinary way.
+    @inline(never)
+    static func cjkRunEnd(_ span: Span<UInt8>, from offset: Int) -> Int? {
+        var end = offset
+        while end + 2 < span.count {
+            let lead = span[end], second = span[end + 1], third = span[end + 2]
+            guard lead >= 0xE4, lead <= 0xE9, second & 0xC0 == 0x80, third & 0xC0 == 0x80,
+                lead != 0xE4 || second >= 0xB8
+            else { break }
+            end += 3
+        }
+        return end - offset >= 6 ? end : nil
+    }
 }
