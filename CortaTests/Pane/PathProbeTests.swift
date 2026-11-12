@@ -84,11 +84,14 @@ struct PathProbeTests {
     @Test("a reference check answers off the main thread and is then cached")
     func referenceProbeAnswersAndCaches() async {
         let calls = Mutex(0)
+        // A fixed clock: an answer stands for `lifetime` (2 s) of real uptime, and
+        // a CI runner busy elsewhere let more than that pass between the answer
+        // and the check of the cache below. Expiry is not what this test is about.
         let probe = FileReferenceProbe(
             check: { _ in
                 calls.withLock { $0 += 1 }
                 return true
-            }, timeout: .seconds(30))
+            }, now: { 0 }, timeout: .seconds(30))
         #expect(probe.cached("/a.swift") == nil)
         var answers: [Bool] = []
         probe.probe("/a.swift") { answers.append($0) }
