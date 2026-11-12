@@ -12,6 +12,11 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Searching scrollback made of Chinese or Japanese text for a word that is
+  not in most of its lines is about a hundred times faster: over 100,000 lines
+  a query for `状态` took about 1 s and now takes about 10 ms when it finds
+  nothing and about 19 ms when it finds a few. A line is ruled out from a
+  summary of the characters it holds, without building its text.
 - A pane's memory after heavy output no longer stays high. Compressed
   scrollback is packed into a few large blocks that are handed back to the
   system as their lines leave history, instead of one small allocation per 256

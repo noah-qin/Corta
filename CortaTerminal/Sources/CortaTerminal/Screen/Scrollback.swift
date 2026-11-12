@@ -350,14 +350,7 @@ extension Scrollback {
         guard index >= 0, index < count else { return false }
         let global = index + headSkip, batch = batches[global / batchSize]
         let rowIndex = global % batchSize
-        let build = { asciiPlane(of: batch) }
-        let plane: ASCIIPlane
-        if reader.id == batch.id, let cached = reader.plane {
-            plane = cached
-        } else {
-            plane = global / batchSize == batches.count - 1 ? build() : cache.plane(id: batch.id, build: build)
-            reader.id = batch.id; reader.plane = plane
-        }
+        let plane = plane(for: global, batch: batch, reader: &reader)
         guard !plane.unsupported[rowIndex], plane.nonASCII[rowIndex].allSatisfy(nonASCIIIsOpaque) else { return false }
         let span = batch.rows[rowIndex]
         for column in 0..<Int(span.length) {
@@ -366,6 +359,26 @@ extension Scrollback {
             line.append(byte, row: Int32(documentRow), column: Int32(column))
         }
         return true
+    }
+
+    /// The row's distinct non-ASCII scalars, or nil when it holds a grapheme
+    /// cluster (which the plane cannot describe) or is not in history. Lets a
+    /// search rule a row out without reading its cells.
+    func nonASCIIScalars(at index: Int, reader: inout ASCIIReader) -> [UInt32]? {
+        guard index >= 0, index < count else { return nil }
+        let global = index + headSkip, batch = batches[global / batchSize]
+        let rowIndex = global % batchSize
+        let plane = plane(for: global, batch: batch, reader: &reader)
+        return plane.unsupported[rowIndex] ? nil : plane.nonASCII[rowIndex]
+    }
+
+    private func plane(for global: Int, batch: Batch, reader: inout ASCIIReader) -> ASCIIPlane {
+        let build = { asciiPlane(of: batch) }
+        if reader.id == batch.id, let cached = reader.plane { return cached }
+        let plane = global / batchSize == batches.count - 1 ? build() : cache.plane(id: batch.id, build: build)
+        reader.id = batch.id
+        reader.plane = plane
+        return plane
     }
 
     /// A batch as one byte per stored cell: ASCII as itself, a wide pair's

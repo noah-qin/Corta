@@ -1688,3 +1688,29 @@ caches read the batches too. The application's growth is the figure that matters
 was also before #565). What is left in the core probe, about 9 MB of the 27, appears
 in the first megabyte of input and does not grow with it; it was not attributed.
 
+### 5.29 CJK history lines ruled out by their row index (#521, 2026-11-12)
+
+§5.24 made a CJK query over ASCII history cheap and left history that is itself CJK on
+the `String` path: every line was built as text to learn that it lacks the word.
+The scrollback's row index already lists each row's distinct non-ASCII scalars
+(the plane `Search` reads for ASCII queries), so for a query that names CJK Unified
+Ideographs a history line is skipped when its rows do not hold all of them. A line is
+never skipped when it cannot be sure: a row with a grapheme cluster, or with a
+compatibility ideograph (U+F900–FAFF, U+2F800–2FA1F), which is canonically equivalent
+to a unified one the query may name. `SearchNonASCIIQueryTests` compares the result
+with the `String` comparison on every line, including both directions of that
+equivalence, a combining mark after an ideograph, and wrapped lines.
+
+`corta-bench --search-only --compressed`, history of 80-cell CJK lines, one in 1,000
+holding `状态` (release core, Apple M5, macOS 27.2, Xcode 27.2, on battery, five runs):
+
+| History | Query | Before | After |
+| --- | --- | ---: | ---: |
+| 10,000 lines | absent | 93–100 ms | 1.4 ms |
+| 10,000 lines | in 10 lines | 93–97 ms | 2–3 ms |
+| 100,000 lines | absent | 998–1,129 ms | 9–11 ms |
+| 100,000 lines | in 100 lines | 982–1,053 ms | 17–23 ms |
+
+A line that does hold the ideographs still takes the `String` path, and so does a
+query with none (a kana or Hangul query, for instance): those are not helped.
+

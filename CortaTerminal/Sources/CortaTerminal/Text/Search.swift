@@ -410,6 +410,17 @@ extension Search {
         // canonical decomposition cannot equal any text made only of ASCII, so a
         // line of ASCII cells is skipped without building a `String` for it.
         let cannotMatchASCIIOnlyLine = matcher == nil && queryNeedsNonASCII(query, caseSensitive: caseSensitive)
+        // The ideographs the query names, which only a line holding those very
+        // scalars can match (an ideograph has no case, and the one canonical
+        // equivalence that reaches one, from a compatibility ideograph, is
+        // checked per row): a history line without them is skipped from its
+        // row index, without building its text.
+        var requiredIdeographs: [UInt32] = []
+        if cannotMatchASCIIOnlyLine {
+            for scalar in query.unicodeScalars where isUnifiedIdeograph(scalar.value) {
+                if !requiredIdeographs.contains(scalar.value) { requiredIdeographs.append(scalar.value) }
+            }
+        }
         for span in grid.reversedLogicalLineSpans() {
             let stopped: Bool
             if cannotMatchASCIIOnlyLine,
@@ -420,6 +431,12 @@ extension Search {
                 // The default `nonASCIIIsOpaque` refuses at the first non-ASCII cell
                 // or cluster, so `true` here means every cell was ASCII.
                 if !haystack.text.isEmpty, shouldStop() { break }
+                continue
+            } else if !requiredIdeographs.isEmpty,
+                grid.historyLacksRequiredScalar(
+                    requiredIdeographs, firstRow: span.firstRow, lastRow: span.lastRow, reader: &historyReader)
+            {
+                if shouldStop() { break }
                 continue
             } else if let matcher,
                 grid.fillWithASCIILogicalLine(
@@ -440,6 +457,12 @@ extension Search {
         var results = matches.ranges
         results.reverse()
         return results
+    }
+
+    /// CJK Unified Ideographs and extensions A to H, not the compatibility blocks.
+    static func isUnifiedIdeograph(_ value: UInt32) -> Bool {
+        (0x3400...0x4DBF).contains(value) || (0x4E00...0x9FFF).contains(value)
+            || (0x20000...0x323AF).contains(value) && !(0x2F800...0x2FA1F).contains(value)
     }
 
     /// True when `query` holds a scalar that no ASCII text can produce under the

@@ -193,5 +193,26 @@ func probeSearchOnly() {
             let list = milliseconds.map { String(format: "%.1f", $0) }.joined(separator: " ")
             print("search-only \(lines) lines, \(name): \(list) ms, \(count) matches")
         }
+        // History made of CJK text: a query that is absent, and one in 1 line of 1,000.
+        var cjk = { () -> Grid in
+            var terminal = Terminal(rows: 50, columns: 120, scrollbackLimit: lines)
+            for index in 0..<lines {
+                let tail = index % 1_000 == 0 ? "状态" : "正常"
+                terminal.feed(Array("终端性能测试日志:请求已处理，耗时三毫秒，路径 /接口/列表/项目 结果成功\(tail)\r\n".utf8))
+            }
+            return terminal.grid
+        }()
+        if CommandLine.arguments.contains("--compressed") { cjk.scrollback.compressColdBatches() }
+        for (name, query) in [("CJK history, CJK miss", "找不到"), ("CJK history, CJK rare hit", "状态")] {
+            var milliseconds: [Double] = []
+            var count = 0
+            for _ in 0..<5 {
+                let start = DispatchTime.now().uptimeNanoseconds
+                count = Search.find(query, in: cjk, maxMatches: 5_000).count
+                milliseconds.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)
+            }
+            let list = milliseconds.map { String(format: "%.1f", $0) }.joined(separator: " ")
+            print("search-only \(lines) lines, \(name): \(list) ms, \(count) matches")
+        }
     }
 }
