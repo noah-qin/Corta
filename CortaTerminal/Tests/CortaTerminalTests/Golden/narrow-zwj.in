@@ -1,0 +1,6 @@
+# ZWJ (U+200D, Cf) is Grapheme_Extend (UAX #29 GB9): it joins the cell of
+# the narrow non-ASCII scalar before it and takes no column of its own, and
+# it is not one of the scalars drawn as U+FFFD (the emoji sequences in
+# zwj-cluster need it). The line ends after the ZWJ so the case does not
+# depend on what follows one. é (U+00E9), ZWJ, CR LF, ok.
+\xC3\xA9\xE2\x80\x8D\r\nok

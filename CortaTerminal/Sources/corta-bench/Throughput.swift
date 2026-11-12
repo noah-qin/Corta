@@ -112,6 +112,8 @@ func benchmarkUnicodeCorpora() {
     for (name, line) in [
         ("ASCII", "\u{1B}[32mdrwxr-xr-x\u{1B}[0m user file.log\r\n"),
         ("CJK", "\u{1B}[32m终端性能测试 日本語の文章 输出历史与搜索\u{1B}[0m\r\n"),
+        ("box drawing", "┌" + String(repeating: "─", count: 34) + "┬" + String(repeating: "─", count: 35) + "┐\r\n"),
+        ("accented Latin", "Résumé façade café naïve señor über crème brûlée Ångström déjà vu, año nuevo\r\n"),
         ("emoji", "┌────┐ │ ✅ 🚀 👩🏽‍💻 🌈 │ └────┘\r\n"),
         ("AI CLI", "\u{1B}[36m│ 分析代码 ✅\u{1B}[0m changes: +42 −12 ├── src/main.swift 🚀\r\n"),
     ] {

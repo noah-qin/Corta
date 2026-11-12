@@ -1,0 +1,8 @@
+# A run of narrow non-ASCII scalars (width 1: U+2500 and U+00E9 are
+# EastAsianWidth A, one column unless the ambiguous-wide option is on) fills
+# columns the way ASCII does. Eight box-drawing scalars on a six-column
+# screen fill the row, the deferred wrap fires on the seventh and the row is
+# marked wrapped; two accented letters follow on the second row. Each scalar
+# is a complete multi-byte sequence in one read.
+\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80\xE2\x94\x80
+\xE2\x94\x80\xE2\x94\x80\xC3\xA9\xC3\xA9

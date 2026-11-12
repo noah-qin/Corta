@@ -1,0 +1,6 @@
+# SECURITY.md §2.5: a scalar that would render invisibly is drawn as U+FFFD
+# in one column, so a bidi override or a hidden space cannot pass as
+# nothing. Three-byte forms: U+202E (right-to-left override), U+FEFF (BOM)
+# and U+2060 (word joiner); the four-byte form is U+E0001 (language tag).
+# a U+202E b U+FEFF c U+2060 d U+E0001
+a\xE2\x80\xAEb\xEF\xBB\xBFc\xE2\x81\xA0d\xF3\xA0\x80\x81

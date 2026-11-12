@@ -47,6 +47,10 @@ struct GoldenTests {
         Golden.Case("char-width", rows: 3, columns: 10),
         Golden.Case("zwj-cluster", rows: 2, columns: 6),
         Golden.Case("flag-cluster", rows: 2, columns: 10),
+        Golden.Case("narrow-run-wrap", rows: 3, columns: 6),
+        Golden.Case("narrow-combining", rows: 2, columns: 8),
+        Golden.Case("narrow-zwj", rows: 2, columns: 8),
+        Golden.Case("narrow-concealing", rows: 2, columns: 10),
     ]
 
     @Test("golden files match", arguments: cases)
