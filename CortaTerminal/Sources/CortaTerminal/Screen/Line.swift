@@ -132,6 +132,42 @@ public struct Line: Equatable, Sendable {
         }
     }
 
+    /// Whole-pair ideograph run: `bytes` holds three-byte sequences, each
+    /// becoming a `.wide` lead and a `.wideSpacer`, from `column` on. As one
+    /// `overwriteWide` per pair does, the two ends can part a wide pair —
+    /// everything between is overwritten — and nothing shifts.
+    mutating func overwriteIdeographs(_ bytes: ArraySlice<UInt8>, at column: Int, width: Int, pen: Pen) {
+        let pairs = bytes.count / 3
+        guard pairs > 0, column >= 0 else { return }
+        let end = column + pairs * 2
+        if column < cells.count, cells[column].attributes.contains(.wideSpacer), column > 0 {
+            cells[column - 1] = pen.eraseCell
+        }
+        if end - 1 < cells.count, cells[end - 1].attributes.contains(.wide), end < width {
+            self[end] = pen.eraseCell
+        }
+        grow(to: end)
+        var lead = pen.cell(0x20)
+        lead.attributes.insert(.wide)
+        var spacer = pen.cell(0x20)
+        spacer.attributes.insert(.wideSpacer)
+        cells.withUnsafeMutableBufferPointer { buffer in
+            bytes.withUnsafeBufferPointer { source in
+                var destination = column
+                var read = 0
+                while read < source.count {
+                    lead.scalar =
+                        UInt32(source[read] & 0x0F) << 12 | UInt32(source[read + 1] & 0x3F) << 6
+                        | UInt32(source[read + 2] & 0x3F)
+                    buffer[destination] = lead
+                    buffer[destination + 1] = spacer
+                    destination += 2
+                    read += 3
+                }
+            }
+        }
+    }
+
     public mutating func fill(_ cell: Cell, in range: Range<Int>) {
         let lower = max(0, range.lowerBound)
         guard range.upperBound > lower else { return }

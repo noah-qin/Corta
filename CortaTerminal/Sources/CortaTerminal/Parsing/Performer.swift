@@ -62,6 +62,10 @@ struct Performer: ParserPerformer, Sendable {
         grid.writeASCII(bytes)
     }
 
+    mutating func printCJK(_ bytes: ArraySlice<UInt8>) {
+        grid.writeCJK(bytes)
+    }
+
     mutating func execute(_ control: UInt8) {
         switch control {
         case 0x08: grid.backspace()

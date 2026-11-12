@@ -1,0 +1,5 @@
+rows: 3 columns: 7
+cursor: row 2 column 4
+   0 |中 文 测  | wrapped
+   1 |试 汉 字  | wrapped
+   2 |漢 字    |

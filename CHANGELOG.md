@@ -12,6 +12,11 @@ Versioning for compatibility changes.
 
 ### Changed
 
+- Output that is mostly Chinese or Japanese ideographs is written to the screen
+  about 1.7 times faster: a run of them is decoded and placed as pairs in one
+  step instead of one character at a time. Anything that is not a plain run —
+  a line that wraps, insert mode, autowrap off, a cut-off character — is written
+  exactly as before.
 - Text that is not ASCII is read into the screen faster: accented Latin, box
   drawing, Cyrillic, Chinese, Japanese and emoji take about 1.25 to 1.9 times
   less time to parse and write, and plain ASCII is no slower. A whole
