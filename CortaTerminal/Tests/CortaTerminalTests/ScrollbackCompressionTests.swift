@@ -182,9 +182,62 @@ import Testing
         let held = history.storedCellBytes
         let reserved = history.retainedCellCapacityBytes
         #expect(reserved >= held)
-        // The newest batches stay uncompressed with their arena headroom; the
-        // compressed ones add at most a malloc size class each.
-        #expect(reserved - held < held / 2 + history.compressedBatchCount * 32 + 64 * 1024, "held \(held), reserved \(reserved)")
+        // Compressed batches are packed into one-megabyte chunks, and the chunk
+        // still being filled and the oldest one (kept whole by its newest
+        // batch) can each be mostly empty; the newest batches stay
+        // uncompressed with their arena headroom.
+        let chunkSlack = 2 * CompressedChunk.capacity
+        #expect(reserved - held < held / 2 + chunkSlack + 64 * 1024, "held \(held), reserved \(reserved)")
+    }
+
+    /// Rows come back intact from batches packed across chunk boundaries, after
+    /// older chunks have been dropped, and a dropped chunk's memory is freed.
+    @Test func rowsSurviveChunkBoundariesAndEvictionFreesChunks() {
+        var history = Scrollback(limit: 30_000)
+        weak var firstChunk: CompressedChunk?
+        for row in 0..<90_000 {
+            var line = Line()
+            // Varied content so batches compress to different sizes.
+            for column in 0..<(40 + row % 70) {
+                line[column] = Cell(
+                    scalar: UInt32(0x21 + (row &* 31 &+ column &* 7) % 90), foreground: .default,
+                    background: .default, attributes: [])
+            }
+            history.push(line)
+            if row == 5_000 { history.compressColdBatches(); firstChunk = history.openChunk }
+            if row % 2_000 == 0 { history.compressColdBatches() }
+        }
+        history.compressColdBatches()
+        #expect(firstChunk == nil, "the first chunk should be gone once its batches were evicted")
+        #expect(history.compressedBatchCount > 0)
+        for row in stride(from: 0, to: history.count, by: 997) {
+            let absolute = history.totalPushed - history.count + row
+            let line = history[row]
+            #expect(line.count == 40 + absolute % 70, "row \(row)")
+            #expect(line[3].scalar == UInt32(0x21 + (absolute &* 31 &+ 3 &* 7) % 90), "row \(row)")
+        }
+    }
+
+    /// Two copies of a scrollback (a suspended screen and the live one) share the
+    /// open chunk's fill mark, so neither is handed the other's bytes.
+    @Test func copiesSharingAChunkNeverOverlap() {
+        var first = Scrollback(limit: 4096)
+        func fill(_ history: inout Scrollback, _ base: UInt32) {
+            for row in 0..<2048 {
+                var line = Line()
+                for column in 0..<100 { line[column] = Cell(scalar: base + UInt32((row + column) % 50), foreground: .default, background: .default, attributes: []) }
+                history.push(line)
+            }
+        }
+        fill(&first, 0x100)
+        first.compressColdBatches()
+        var second = first
+        fill(&first, 0x400)
+        fill(&second, 0x800)
+        first.compressColdBatches()
+        second.compressColdBatches()
+        for row in stride(from: 0, to: first.count, by: 131) { #expect(first[row][5].scalar & 0xF00 == (row < 2048 ? 0x100 : 0x400), "first \(row)") }
+        for row in stride(from: 0, to: second.count, by: 131) { #expect(second[row][5].scalar & 0xF00 == (row < 2048 ? 0x100 : 0x800), "second \(row)") }
     }
 
 }

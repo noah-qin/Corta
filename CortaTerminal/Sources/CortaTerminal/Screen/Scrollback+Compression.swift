@@ -33,19 +33,22 @@ extension Scrollback {
             // room than that: past it LZ4 returns 0, the same refusal, and
             // nothing is zero-filled or copied twice.
             let capacity = max(0, rawCount / 2 - 1)
-            let encoded = ContiguousArray<UInt8>(unsafeUninitializedCapacity: capacity) { dst, initialized in
-                initialized = cells.withUnsafeBytes { src in
-                    guard let base = src.baseAddress, !src.isEmpty, let out = dst.baseAddress else { return 0 }
-                    return compression_encode_buffer(out, dst.count,
+            // Encoded into pages of its own and copied out at its real size:
+            // a 245 KiB `malloc` block per batch, freed a moment later, left
+            // holes among the live small blocks that stayed resident (#526). The
+            // mapping is only touched where the encoder writes, about 3 to 30 KiB.
+            var bytes = ContiguousArray<UInt8>()
+            if capacity > 0 {
+                let scratch = VirtualMemory.map(capacity)
+                defer { VirtualMemory.unmap(scratch, capacity) }
+                let written = cells.withUnsafeBytes { src -> Int in
+                    guard let base = src.baseAddress, !src.isEmpty else { return 0 }
+                    return compression_encode_buffer(
+                        scratch.assumingMemoryBound(to: UInt8.self), capacity,
                         base.assumingMemoryBound(to: UInt8.self), src.count, nil, COMPRESSION_LZ4)
                 }
+                bytes = ContiguousArray(UnsafeBufferPointer(start: scratch.assumingMemoryBound(to: UInt8.self), count: written))
             }
-            // The encoder was given half the raw size to write into and a log
-            // line packs far smaller (about 3 KiB of the 245 KiB a 100,000-line
-            // history batch is offered), so the buffer is copied to its own size:
-            // kept as it was, the slack stays reserved and its partly written
-            // pages stay resident for the life of the batch.
-            let bytes = encoded.withUnsafeBufferPointer { ContiguousArray($0) }
             var rowHyperlinks: [Int: Set<HyperlinkID>] = [:], rowGraphemes: [Int: Set<GraphemeID>] = [:]
             var rowUnderlineColors: [Int: Set<UInt16>] = [:]
             if !bytes.isEmpty {
@@ -99,8 +102,8 @@ extension Scrollback {
         while compressionCursor < batches.count, batches[compressionCursor].attempted {
             compressionCursor += 1
         }
-        if !result.bytes.isEmpty {
-            batches[index].compressed = (result.bytes, result.cellCount)
+        if !result.bytes.isEmpty, let block = pack(result.bytes) {
+            batches[index].compressed = (block, result.cellCount)
             batches[index].arena = []
             batches[index].rowHyperlinks = result.rowHyperlinks
             batches[index].rowGraphemes = result.rowGraphemes
@@ -108,15 +111,35 @@ extension Scrollback {
         }
         return true
     }
+    /// Copies compressed bytes into the open chunk, opening the next when
+    /// they do not fit.
+    private mutating func pack(_ bytes: ContiguousArray<UInt8>) -> CompressedBlock? {
+        bytes.withUnsafeBufferPointer { buffer in
+            if let block = openChunk?.append(buffer) { return block }
+            let chunk = CompressedChunk()
+            openChunk = chunk
+            return chunk.append(buffer)
+        }
+    }
+
     public mutating func compressColdBatches() {
         while let work = nextCompressionWork() { _ = installCompression(work.compress()) }
     }
     /// Representation bytes only; excludes allocator slack, indexes and cache.
     public var storedCellBytes: Int {
-        batches.reduce(0) { $0 + ($1.compressed?.bytes.count ?? ($1.arena.count * MemoryLayout<Cell>.stride)) }
+        batches.reduce(0) { $0 + ($1.compressed?.block.count ?? ($1.arena.count * MemoryLayout<Cell>.stride)) }
     }
     public var retainedCellCapacityBytes: Int {
-        batches.reduce(0) { $0 + ($1.compressed?.bytes.capacity ?? ($1.arena.capacity * MemoryLayout<Cell>.stride)) }
+        var chunks = Set<ObjectIdentifier>()
+        var total = 0
+        for batch in batches {
+            if let block = batch.compressed?.block {
+                if chunks.insert(ObjectIdentifier(block.chunk)).inserted { total += CompressedChunk.capacity }
+            } else {
+                total += batch.arena.capacity * MemoryLayout<Cell>.stride
+            }
+        }
+        return total
     }
     public func withCellBatches(_ body: (UnsafeBufferPointer<Cell>) -> Void) {
         for batch in batches { arena(batch).withUnsafeBufferPointer(body) }

@@ -17,6 +17,12 @@ Versioning for compatibility changes.
   a query for `状态` took about 1 s and now takes about 10 ms when it finds
   nothing and about 19 ms when it finds a few. A line is ruled out from a
   summary of the characters it holds, without building its text.
+- A pane's memory after heavy output no longer stays high. Compressed
+  scrollback is packed into a few large blocks that are handed back to the
+  system as their lines leave history, instead of one small allocation per 256
+  lines whose holes the allocator kept. After three 64 MiB floods (ASCII, CJK
+  and dense colour codes) into a 100,000-line pane, the application held about
+  19 MB more than a fresh window, where it held about 82 MB more.
 - Output that is mostly Chinese or Japanese ideographs is written to the screen
   about 1.7 times faster: a run of them is decoded and placed as pairs in one
   step instead of one character at a time. Anything that is not a plain run —
