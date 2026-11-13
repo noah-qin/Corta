@@ -80,8 +80,18 @@ struct PaneFrameLoopTests {
         var signals = 0
         rig.loop.onOutputSignal = { signals += 1 }
         rig.session.write(Array("hidden-output\n".utf8))
-        // Counted in ticks: this callback comes on the main queue, which another
-        // test may be holding for seconds (#497).
+        // Two waits, so a failure says which half went missing: the child's
+        // echo, or the signal that follows it.
+        await waitUntil("the echo") {
+            rig.session.snapshot().logicalLines().contains { $0.text.contains("hidden-output") }
+        }
+        // Counted in ticks, not on a clock (#497). The signal is a main-queue
+        // callback 50 ms after the output, and in a full Unit run the main
+        // queue is shared with every other `@MainActor` test the run has in
+        // flight: instrumented runs measured it unanswered for up to 5.9 s
+        // while the main thread built other tests' windows and panes, with
+        // the echo already in the grid. A 5 s wall-clock ceiling expired
+        // behind that backlog with no signal; nothing was lost.
         await waitUntil("the metadata signal") { signals > 0 }
         #expect(signals > 0)
         #expect(rig.batches == 0, "metadata must run even without any display frames")
