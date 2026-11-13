@@ -10,6 +10,18 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Changed
+
+- A split pane's header buttons sit evenly. The zoom button, which shows only
+  while the pointer is over the header, now keeps its place at the start of the
+  group instead of leaving a gap between the split buttons and Close; showing
+  it moves nothing.
+- The pane header's buttons are drawn in the same tone as its icon instead of
+  faded beneath it, so they are easier to see: about 5.3–6.9:1 against the
+  header in the dark built-in themes and 3.1:1 in the light ones, up from
+  3.1–3.7:1 and 1.8:1. Increase Contrast draws the icon and buttons in the
+  primary label colour.
+
 ## [1.6.3] - 2026-11-12
 
 ### Changed
