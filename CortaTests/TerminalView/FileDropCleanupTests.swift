@@ -24,6 +24,7 @@ import Testing
 /// Whose a copy is decides when it goes. Scratch roots stand in for
 /// `DroppedFiles`, with `.owner` records written as a process would write them.
 @MainActor
+@Suite(.configurationSerialized)
 struct FileDropCleanupTests {
     fileprivate func scratchRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory

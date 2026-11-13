@@ -42,6 +42,7 @@ import Testing
 /// concern — that a translated label fits in the space the row gives it —
 /// generalized as a plain string-measurement test with no view involved.
 @MainActor
+@Suite(.configurationSerialized)
 struct SettingsPageTests {
     // MARK: - UI04
 
