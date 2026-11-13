@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.6.4] - 2026-11-13
+
 ### Changed
 
 - A split pane's header buttons sit evenly. The zoom button, which shows only
@@ -2850,7 +2852,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.6.3...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.6.4...main
+[1.6.4]: https://github.com/noah-qin/Corta/releases/tag/v1.6.4
 [1.6.3]: https://github.com/noah-qin/Corta/releases/tag/v1.6.3
 [1.6.2]: https://github.com/noah-qin/Corta/releases/tag/v1.6.2
 [1.6.1]: https://github.com/noah-qin/Corta/releases/tag/v1.6.1
