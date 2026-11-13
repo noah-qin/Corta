@@ -91,7 +91,11 @@ private struct PreviewGrid: View {
         Grid(horizontalSpacing: 24, verticalSpacing: 20) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 GridRow {
+                    // On the canvas itself, opaque: the sample output runs
+                    // under this column too, and the label sat on it (#532).
                     Text(label(row.flags)).font(.system(size: 11, weight: .semibold)).foregroundStyle(text)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(canvas, in: RoundedRectangle(cornerRadius: 5))
                         .frame(width: 130, alignment: .leading)
                     SearchBarView(model: row.bar, field: row.field, accessibilityOverride: row.flags)
                         .frame(width: 430)
