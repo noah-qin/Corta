@@ -22,6 +22,7 @@ import Testing
 @testable import Corta
 
 /// `SGR 4:n` and `21`, drawn: one rule, two, or a wave.
+@MainActor
 @Suite(
     .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct UnderlineStyleRenderTests {

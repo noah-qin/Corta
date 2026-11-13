@@ -27,6 +27,7 @@ import Testing
 /// shaped as one run, and no glyph ever inks a cell that is not its own.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
+@MainActor
 @Suite(
     .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct WideGlyphRenderTests {

@@ -31,6 +31,11 @@ nonisolated extension GlyphAtlas {
     func shape(_ string: String, style: Style)
         -> (runs: [ShapedRun], sawNotdef: Bool)
     {
+        #if DEBUG
+            // The app shapes on the main thread only (see `GlyphAtlas`);
+            // a test that did not once crashed Core Text (#582).
+            dispatchPrecondition(condition: .onQueue(.main))
+        #endif
         let requested = requestedFont(for: string, style: style)
         var sawNotdef = false
         // Use the typed Foundation key instead of bridging a CFString-keyed

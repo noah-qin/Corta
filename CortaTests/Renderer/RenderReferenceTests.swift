@@ -32,6 +32,7 @@ import UniformTypeIdentifiers
 /// replaced the two-backend pixel equivalence: Metal 4 must draw what 1.0.1
 /// drew. `TEST_RUNNER_CORTA_RECORD_RENDER_REFERENCES=1` rewrites them; only
 /// for an intended visual change, with every new PNG inspected.
+@MainActor
 @Suite(
     .serialized, .metalSerialized,
     .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))

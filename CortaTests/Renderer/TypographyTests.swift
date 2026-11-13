@@ -151,6 +151,7 @@ struct TypographyConfigurationTests {
 /// What the atlas draws a character with, and where, under those
 /// preferences. `.serialized`: each builds a `GlyphAtlas`, single-threaded
 /// by design.
+@MainActor
 @Suite(
     .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct TypographyAtlasTests {

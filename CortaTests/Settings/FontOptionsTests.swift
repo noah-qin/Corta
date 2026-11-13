@@ -37,7 +37,8 @@ import Testing
 ///
 /// `.serialized`: the atlas cases build a `GlyphAtlas`, which is
 /// single-threaded by design — see that type's comment.
-@Suite(.serialized) struct FontOptionsTests {
+@MainActor
+@Suite(.serialized, .metalSerialized) struct FontOptionsTests {
     private static func makeDevice() -> MTLDevice? { MTLCreateSystemDefaultDevice() }
 
     /// Whether the font subsystem can currently hand back a usable face for

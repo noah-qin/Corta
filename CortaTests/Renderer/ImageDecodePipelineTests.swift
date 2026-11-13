@@ -27,6 +27,7 @@ import Testing
 /// only *schedules* decodes onto an injected scheduler; reused image ids
 /// invalidate the texture decoded from the old bytes; and pruning runs even
 /// when the last placement disappears.
+@MainActor
 @Suite("Image decode pipeline", .serialized, .metalSerialized)
 struct ImageDecodePipelineTests {
     @Test("a slow GPU upload cannot block the frame's cache lookups")

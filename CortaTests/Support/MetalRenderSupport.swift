@@ -277,6 +277,7 @@ struct RenderFixture {
 
 /// The guard itself, since everything else in `CortaTests` now depends on it
 /// to fail rather than to abort.
+@MainActor
 @Suite(.serialized, .metalSerialized) struct MetalRenderTargetTests {
 
     @Test("a degenerate size fails its own test instead of the whole run")
