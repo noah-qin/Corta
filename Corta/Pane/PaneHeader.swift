@@ -27,6 +27,10 @@ final class PaneHeader: NSView {
     private var displayedProgram: ProgramIcon?
     private var displayedZoom: Bool?
     private var buttons: [NSButton] = []
+    /// First in the group: hidden at rest, its slot is the group's leading
+    /// edge, so the visible buttons sit together and none moves when it
+    /// shows (#529).
+    private var zoomButton: NSButton { buttons[0] }
     private var hovering = false
 
     private struct Command {
@@ -78,12 +82,12 @@ final class PaneHeader: NSView {
         controls.spacing = 2
         controls.setContentHuggingPriority(.required, for: .horizontal)
         let actions: [Command] = [
+            .init(symbol: "arrow.up.left.and.arrow.down.right", label: TerminalCommand.zoomPane.title,
+                  action: #selector(zoom), identifier: "pane.zoom"),
             .init(symbol: "rectangle.split.2x1", label: TerminalCommand.splitRight.title,
                   action: #selector(splitRight), identifier: "pane.splitRight"),
             .init(symbol: "rectangle.split.1x2", label: TerminalCommand.splitDown.title,
                   action: #selector(splitDown), identifier: "pane.splitDown"),
-            .init(symbol: "arrow.up.left.and.arrow.down.right", label: TerminalCommand.zoomPane.title,
-                  action: #selector(zoom), identifier: "pane.zoom"),
             .init(symbol: "xmark", label: TerminalCommand.close.title,
                   action: #selector(closePane), identifier: "pane.close"),
         ]
@@ -99,9 +103,7 @@ final class PaneHeader: NSView {
             button.setAccessibilityIdentifier(command.identifier)
             button.isBordered = false
             button.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
-            button.alphaValue = 0.6
             button.imageScaling = .scaleProportionallyDown
-            button.contentTintColor = .secondaryLabelColor
             button.toolTip = label
             button.setAccessibilityLabel(label)
             button.widthAnchor.constraint(equalToConstant: 22).isActive = true
@@ -138,17 +140,32 @@ final class PaneHeader: NSView {
         if title.toolTip != fullTitle { title.toolTip = fullTitle }
         let textColor: NSColor = pane.isFocusedPane ? .labelColor : .secondaryLabelColor
         if title.textColor != textColor { title.textColor = textColor }
-        if buttons[2].isEnabled != split.hasMultiplePanes { buttons[2].isEnabled = split.hasMultiplePanes }
+        refreshSymbolTint()
+        if zoomButton.isEnabled != split.hasMultiplePanes { zoomButton.isEnabled = split.hasMultiplePanes }
         refreshZoomVisibility()
         let zoomed = split.zoomedPane === pane
         guard displayedZoom != zoomed else { return }
         displayedZoom = zoomed
         let label = L10n.text(zoomed ? "command.unzoomPane" : "command.zoomPane")
-        buttons[2].image = NSImage(systemSymbolName: zoomed
+        zoomButton.image = NSImage(systemSymbolName: zoomed
             ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
             accessibilityDescription: label)
-        buttons[2].toolTip = label
-        buttons[2].setAccessibilityLabel(label)
+        zoomButton.toolTip = label
+        zoomButton.setAccessibilityLabel(label)
+    }
+
+    /// The icon and the buttons in one tone. Measured at the thin strokes'
+    /// darkest or brightest pixel against the header, the buttons drew at
+    /// 0.6 alpha on top of the secondary label colour: 3.1–3.7:1 in the
+    /// dark themes and 1.8:1 in the light ones. At full secondary they
+    /// match the icon (5.3–6.9:1 dark, 3.1:1 light); Increase Contrast takes
+    /// the primary label colour, as it promotes secondary labels elsewhere.
+    /// An inactive window draws them the same: AppKit does not dim a
+    /// borderless button's tint (#531).
+    private func refreshSymbolTint() {
+        let tint: NSColor = SystemAccessibility.increaseContrast ? .labelColor : .secondaryLabelColor
+        if icon.contentTintColor != tint { icon.contentTintColor = tint }
+        for button in buttons where button.contentTintColor != tint { button.contentTintColor = tint }
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -162,10 +179,11 @@ final class PaneHeader: NSView {
     }
 
     private func refreshZoomVisibility() {
-        guard buttons.count > 2, let split = pane?.splitController else { return }
-        let button = buttons[2]
+        guard !buttons.isEmpty, let split = pane?.splitController else { return }
+        let button = zoomButton
         button.isHidden = !split.hasMultiplePanes
-        // Preserve the slot while hovering so the adjacent controls stay put.
+        // Preserve the slot while hovering so the adjacent controls stay put;
+        // it leads the group, so at rest there is no gap between the others.
         // Keyboard focus and a UI-walking assistive technology keep the same
         // control visible. VoiceOver and Switch Control are the only clients
         // `NSWorkspace` reports; one it cannot report (Voice Control,
@@ -175,7 +193,7 @@ final class PaneHeader: NSView {
         // it for the signals that exist rather than for every user (D32).
         let visible = hovering || (button as? PaneZoomButton)?.hasKeyboardFocus == true
             || SystemAccessibility.isVoiceOverOrSwitchControlRunning
-        button.alphaValue = visible ? 0.6 : 0
+        button.alphaValue = visible ? 1 : 0
     }
 
     private func perform(_ action: (SplitViewController) -> Void) {
