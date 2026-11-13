@@ -16,7 +16,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Prepare the stages CursorAndWindowUITests, SystemStatusAndThemeEditorUITests,
-# InputSourceIndicatorUITests and DirectoryCompletionUITests launch the app
+# InputSourceIndicatorUITests, DirectoryCompletionUITests, SplitPaneUITests'
+# pane drag and the other fixture tests launch the app
 # against. The UI-test runner is sandboxed: it can read
 # anywhere but write only its own container, which the app cannot read, so
 # a test cannot write its own config. Each test finds a directory named
@@ -74,6 +75,9 @@ cat > "$root/connection-placement/ApplicationSupport/recent-hosts.json" <<'JSON'
 JSON
 stage tab-restore 'columns = 90\nrows = 24\nrestore-windows = true\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 stage menu-language 'columns = 90\nrows = 24\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+# The pane drag: the status bar on, so a drop aimed at a pane's bottom edge
+# is proven to land above the window's own chrome.
+stage pane-drag 'columns = 120\nrows = 30\nrestore-windows = false\ncursor-blink = false\nstatus-bar = true\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 stage cursor-oversized 'columns = 500\nrows = 300\nrestore-windows = true\ncursor-shape = bar\ncursor-blink = true\n'
 stage cursor-blink 'appearance = light\ncolumns = 90\nrows = 24\nrestore-windows = false\ncursor-shape = bar\ncursor-blink = true\n'
 stage cursor-idle-block 'appearance = light\ncolumns = 90\nrows = 24\nrestore-windows = false\ncursor-shape = block\ncursor-blink = true\n'
