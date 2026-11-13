@@ -24,6 +24,7 @@ import Testing
 @testable import Corta
 
 /// `.serialized`: builds a `GlyphAtlas`, which is single-threaded by design.
+@MainActor
 @Suite(
     "Block elements", .serialized, .metalSerialized,
     .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))

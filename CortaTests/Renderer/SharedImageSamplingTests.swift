@@ -21,6 +21,7 @@ import Testing
 
 @testable import Corta
 
+@MainActor
 @Suite(
     .serialized, .metalSerialized,
     .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))

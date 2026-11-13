@@ -25,6 +25,7 @@ import Testing
 /// The selection's document rows (scrollback rows
 /// negative) are translated to viewport rows through the scroll offset and
 /// the scrollback's growth since the selection was recorded.
+@MainActor
 @Suite(
     .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct SelectionRendererTests {

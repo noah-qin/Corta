@@ -29,8 +29,15 @@ import Testing
 ///   texture descriptor Metal refused. Nothing reproduced it in
 ///   isolation; the suites that build an atlas now take turns.
 ///
-/// Applied alongside `.serialized`, not instead of it: `@Suite(.serialized,
-/// .metalSerialized)`.
+/// Taking turns among themselves did not keep them off the other suites'
+/// atlases: every pane and window test builds one too, on the main actor,
+/// while a gated suite shaped on a cooperative thread. Twice that aborted
+/// the host inside `CTLineCreateWithAttributedString` (#582). A gated suite
+/// is therefore also `@MainActor`, as the app is, and `GlyphAtlas.shape`
+/// checks the thread in a Debug build.
+///
+/// Applied alongside `.serialized`, not instead of it: `@MainActor
+/// @Suite(.serialized, .metalSerialized)`.
 struct SuiteSerializationTrait: SuiteTrait, TestTrait, TestScoping {
 
     let gate: SuiteGate

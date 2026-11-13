@@ -27,6 +27,7 @@ import Testing
 /// offscreen-texture pattern `CursorStyleRenderTests` already uses.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded by
 /// design — see the type's comment.
+@MainActor
 @Suite(
     .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct IndexedPaletteRenderTests {

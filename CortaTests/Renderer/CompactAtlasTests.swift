@@ -22,6 +22,7 @@ import Metal
 import Testing
 @testable import Corta
 
+@MainActor
 @Suite(.serialized, .metalSerialized) struct CompactAtlasTests {
     @Test func instanceABIAndGeometry() {
         #expect(MemoryLayout<QuadInstance>.stride == 24)

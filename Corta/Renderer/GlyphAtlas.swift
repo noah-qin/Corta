@@ -69,7 +69,8 @@ nonisolated enum GlyphAtlasError: Error, CustomStringConvertible {
 ///
 /// **Single-threaded.** No synchronisation, and Core Text objects are not
 /// shareable — two threads segfault in `CTRunGetImageBounds`. The app
-/// drives it from the main thread; tests that build one are serialised.
+/// drives it from the main thread; tests that build one are serialised
+/// and on the main actor too, and a Debug build traps shaping elsewhere.
 
 nonisolated final class GlyphAtlas {
     /// The four faces, as two bits: part of the glyph-cache key looked up

@@ -24,6 +24,7 @@ import Testing
 
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
+@MainActor
 @Suite(.serialized, .metalSerialized) struct GlyphAtlasTests {
     @Test("oversized clusters are rejected before shaping and oversized ink never evicts")
     func rejectedGlyphsDoNotThrash() throws {

@@ -29,6 +29,7 @@ import Testing
 /// flight, and what a stalled GPU costs — dropped frames, never a blocked
 /// render loop. Whole frames against 1.0.1's output are
 /// `RenderReferenceTests`.
+@MainActor
 @Suite(
     "Metal4Backend", .serialized, .metalSerialized,
     .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
@@ -319,6 +320,7 @@ struct Metal4BackendTests {
 }
 
 /// The per-device pipeline cache and its binary archive.
+@MainActor
 @Suite(
     .serialized, .metalSerialized,
     .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))

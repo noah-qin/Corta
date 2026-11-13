@@ -29,6 +29,7 @@ import Testing
 /// into the atlas's RGBA texture and draw through the color pipeline.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
+@MainActor
 @Suite(
     .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct ColorEmojiRenderTests {

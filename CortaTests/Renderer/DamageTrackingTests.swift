@@ -28,6 +28,7 @@ import Testing
 /// the frame and idle at ~0% CPU.
 /// `.serialized`: these build a `GlyphAtlas`, which is single-threaded
 /// by design — see the type's comment.
+@MainActor
 @Suite(
     .serialized, .metalSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct DamageTrackingTests {
