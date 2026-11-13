@@ -26,6 +26,15 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <description>Corta release updates.</description>
         <language>en</language>
         <item>
+            <title>1.6.4</title>
+            <pubDate>Fri, 13 Nov 2026 15:21:38 +0000</pubDate>
+            <sparkle:version>25</sparkle:version>
+            <sparkle:shortVersionString>1.6.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.6.4/Corta-1.6.4.dmg" length="7105220" type="application/octet-stream" sparkle:edSignature="x7iUL/y/Vk6ogtwJ5nMVz/PcDM1Ft3UDkNy37KRIv8KtzptXIh+IiOpWZOv+FsfP2hYpixbo+PWVpr4szECSAg=="/>
+        </item>
+        <item>
             <title>1.6.3</title>
             <pubDate>Thu, 12 Nov 2026 16:30:21 +0000</pubDate>
             <sparkle:version>24</sparkle:version>
@@ -42,15 +51,6 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.6.2/Corta-1.6.2.dmg" length="7081285" type="application/octet-stream" sparkle:edSignature="+twBGncvrE+zGIP4pNxG6E4cooZhtiYBo3ZVKBWh3sfZztacMrhKQ+2zmlNuQixZZKWvc43PSNSnBWvfdWK9Bg=="/>
-        </item>
-        <item>
-            <title>1.6.1</title>
-            <pubDate>Sat, 07 Nov 2026 15:43:41 +0000</pubDate>
-            <sparkle:version>22</sparkle:version>
-            <sparkle:shortVersionString>1.6.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/noah-qin/Corta/releases/download/v1.6.1/Corta-1.6.1.dmg" length="7052860" type="application/octet-stream" sparkle:edSignature="eWonCGbTJuawj64VeLiGl36KuZCW+DHFgjwkBtKxcsgeFa0A/PhpvEltzA9PDZPSj7IeE1fDVjcZoIHZ/gSoBQ=="/>
         </item>
         <item>
             <title>1.0.1</title>
@@ -79,6 +79,6 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: gj3ES66dQrWpA1BkCMVJloKoqEFt5xSPuk1hIAaUtmdcPUF+Abj5Kinw2W+p00eQ0YKxiFpDOfefqn/kMP6JCg==
+edSignature: akoHtVK+f9xrX+IWkFBbkfsQpwRohg1GAv7ninjN4RODJ/Exow1pCrH6AAFJ48WXquLcrfrLsUQMleu0V/EcBQ==
 length: 5375
 -->
