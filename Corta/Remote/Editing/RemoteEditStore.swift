@@ -264,12 +264,6 @@ final class RemoteEditStore {
         }
     }
 
-    nonisolated private static func contains(_ url: URL, in root: URL) -> Bool {
-        let rootPath = root.resolvingSymlinksInPath().standardizedFileURL.path
-        return url.standardizedFileURL.path.hasPrefix(root.standardizedFileURL.path + "/")
-            && url.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(rootPath + "/")
-    }
-
     nonisolated private static func removeACL(at url: URL) -> Bool {
         clearExtendedACL(path: url.path) == 0
     }
@@ -293,9 +287,11 @@ final class RemoteEditStore {
         case .newer:
             preservesNewerManifest = true
         case .copies(let stored):
-            let prefix = rootURL.standardizedFileURL.path + "/"
+            // `standardized`, not `standardizedFileURL`: the root exists and a
+            // copy may not, and only an existing path loses its `/private`.
+            let prefix = rootURL.standardized.path + "/"
             copies = Dictionary(
-                stored.filter { localURL(for: $0).standardizedFileURL.path.hasPrefix(prefix) }
+                stored.filter { localURL(for: $0).standardized.path.hasPrefix(prefix) }
                     .map { ($0.id, $0) },
                 uniquingKeysWith: { first, _ in first })
         }
@@ -524,5 +520,39 @@ extension RemoteEditStore {
             return value
         }), taken.stamp == FileStamp(url) else { return nil }
         return taken.outcome
+    }
+}
+
+// MARK: - Containment
+
+extension RemoteEditStore {
+    nonisolated static func contains(_ url: URL, in root: URL) -> Bool {
+        guard let rootPath = canonicalPath(root), let path = canonicalPath(url) else { return false }
+        return path.hasPrefix(rootPath + "/")
+    }
+
+    /// The path with every symbolic link resolved, for a file that may not
+    /// exist yet: `realpath(3)` of its deepest existing ancestor, the rest
+    /// appended. Foundation will not do for the comparison: both
+    /// `standardizedFileURL` and `resolvingSymlinksInPath` drop a leading
+    /// `/private` only from a path that exists, so under a root in `/tmp` or
+    /// `/var/folders` a file about to be created and the root it goes in were
+    /// spelled differently, and every new snapshot was refused as outside the
+    /// store. `standardized` resolves `.` and `..` without that. Nil for an
+    /// entry that exists but does not resolve, such as a dangling link:
+    /// where it would write is unknown.
+    nonisolated static func canonicalPath(_ url: URL) -> String? {
+        var existing = url.standardized.path
+        var missing: [String] = []
+        while true {
+            if let resolved = realpath(existing, nil) {
+                defer { free(resolved) }
+                return missing.reversed().reduce(String(cString: resolved)) { $0 == "/" ? "/" + $1 : $0 + "/" + $1 }
+            }
+            var info = stat()
+            guard errno == ENOENT, lstat(existing, &info) != 0, existing != "/" else { return nil }
+            missing.append((existing as NSString).lastPathComponent)
+            existing = (existing as NSString).deletingLastPathComponent
+        }
     }
 }

@@ -10,6 +10,16 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Remote Edit's Upload works again when Corta's support folder is reached
+  through a symbolic link, such as a `CORTA_STAGE_DIR` in `/tmp`. Since 1.6.1
+  it showed "A local file operation failed (snapshot approved content, error
+  5)" and sent nothing: the check that keeps a copy inside its folder spelled
+  the folder without `/private` and the new file with it. The check now
+  compares fully resolved paths, which also refuses a link inside the folder
+  that leads out of it.
+
 ## [1.6.3] - 2026-11-12
 
 ### Changed
