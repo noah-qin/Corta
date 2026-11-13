@@ -46,7 +46,8 @@ struct PaneTransferTests {
         #expect(abs(frame.maxX - (first.paneHeader.bounds.width - 8)) < 1)
         #expect(frame.width == 22)
         let parent = second.view.superview
-        try #require(controls.first).performClick(nil)
+        // By name: the zoom button leads the group now (#529).
+        try #require(controls.first { $0.accessibilityIdentifier() == "pane.splitRight" }).performClick(nil)
         #expect(source.panes.count == 3)
         #expect(first.view.superview !== parent)
         #expect(second.view.superview === parent)
