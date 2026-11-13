@@ -51,6 +51,42 @@ struct RemoteEditStoreTests {
         #expect(RemoteEditStore.hostDirectoryName("build-box.internal") == "build-box.internal")
     }
 
+    /// A store under `/tmp` or `/var/folders` — a `CORTA_STAGE_DIR` stage, or
+    /// a home behind a link — is reached through `/private`. A snapshot about
+    /// to be created there was refused as outside the store, and every
+    /// Upload failed with "snapshot approved content, error 5".
+    @Test("a new file in a store reached through a symbolic link is inside it")
+    func containmentThroughALinkedRoot() throws {
+        let real = try #require(RemoteEditStore.canonicalPath(try makeTempDirectory()))
+        #expect(real.hasPrefix("/private/"), "the temporary directory is reached through /private")
+        let root = URL(fileURLWithPath: real).appendingPathComponent("RemoteEdit", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let snapshot = root.appendingPathComponent(".approvals-1-x/\(UUID().uuidString)")
+        try RemoteEditStore.secureCopy(at: snapshot, rootURL: root)
+        #expect(FileManager.default.fileExists(atPath: snapshot.deletingLastPathComponent().path))
+        #expect(RemoteEditStore.contains(root.appendingPathComponent("a/b/c"), in: root))
+    }
+
+    @Test("a link inside the store that leads out of it, or nowhere, is outside it")
+    func containmentRefusesLinksOut() throws {
+        let base = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: base) }
+        let root = base.appendingPathComponent("RemoteEdit", isDirectory: true)
+        let outside = base.appendingPathComponent("elsewhere", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: root.appendingPathComponent("out"), withDestinationURL: outside)
+        try FileManager.default.createSymbolicLink(
+            at: root.appendingPathComponent("dangling"), withDestinationURL: base.appendingPathComponent("gone"))
+        #expect(!RemoteEditStore.contains(root.appendingPathComponent("out/new"), in: root))
+        #expect(!RemoteEditStore.contains(root.appendingPathComponent("dangling"), in: root))
+        #expect(throws: (any Error).self) {
+            try RemoteEditStore.secureCopy(at: root.appendingPathComponent("out/new"), rootURL: root)
+        }
+    }
+
     @Test("the manifest round-trips with its version field")
     func manifestRoundTrip() async throws {
         let root = try makeTempDirectory()
