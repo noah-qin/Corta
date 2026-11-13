@@ -760,6 +760,34 @@ development build silently stopped recording command history.
 separate process, which XCTest does not mark, so they keep the
 development stage unless they set `CORTA_STAGE_DIR` themselves.
 
+### A Release build without the Developer ID certificate
+
+A contributor with no signing identity can build the Release configuration, but
+the result does not launch as built: with `CODE_SIGN_IDENTITY=-` the app is
+ad hoc signed with the hardened runtime, and dyld refuses `Sparkle.framework`
+(which carries its own Team ID) with *mapping process and mapped file
+(non-platform) have different Team IDs*. Re-sign the whole bundle ad hoc, once,
+after the build, then launch it staged:
+
+```sh
+xcodebuild -project Corta.xcodeproj -scheme Corta -configuration Release \
+  -derivedDataPath .build/release-check \
+  CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build
+app=.build/release-check/Build/Products/Release/Corta.app
+codesign --force --deep -s - "$app"
+stage=$(mktemp -d)
+CORTA_STAGE_DIR="$stage" "$app/Contents/MacOS/Corta"
+```
+
+`--deep` matters: it gives the app and Sparkle the same ad hoc identity, which
+is what library validation compares. The scratch `CORTA_STAGE_DIR` keeps the
+run off `~/.config/corta/config` and `~/Library/Application Support/Corta/`;
+remove it afterwards. The re-signed bundle is for a launched-app check only,
+never for distribution. The shipped entitlements do not carry
+`com.apple.security.cs.disable-library-validation` and must not gain it to make
+this work, and the official release is signed as `release.yml` says (D20,
+D26).
+
 ### Downloads to a volume without ACLs
 
 exFAT, FAT and some SMB shares answer `ENOTSUP` when a download clears its

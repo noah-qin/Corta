@@ -509,7 +509,10 @@ It can run beside an installed Corta, so identify the one under test by
 bundle identifier or by PID; "the frontmost Corta" is ambiguous by
 design, and a check that reads the wrong window is a check that proves
 nothing. To run these against a *Release* build instead, stage it with
-`CORTA_STAGE_DIR`.
+`CORTA_STAGE_DIR`. Without the Developer ID
+certificate, build it ad hoc and re-sign the bundle as a whole before launching
+it, or dyld refuses Sparkle (`TESTING.md`, "A Release build without the
+Developer ID certificate").
 
 **Secure Keyboard Entry is checked by hand.** Shell ▸ Secure Keyboard Entry
 shows the titlebar lock only while a terminal window is key, and the lock clears
