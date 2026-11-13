@@ -26,6 +26,7 @@ import Testing
 /// through `ConfigurationStore.shared`, so these tests restore whatever
 /// they change.
 @MainActor
+@Suite(.configurationSerialized)
 struct SettingsModelTests {
     private actor FontScan {
         private var result: CheckedContinuation<[MonospacedFontCatalog.Entry], Never>?

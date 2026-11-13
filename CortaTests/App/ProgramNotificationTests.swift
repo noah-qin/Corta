@@ -21,7 +21,7 @@ import UserNotifications
 @testable import Corta
 
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .configurationSerialized)
 struct ProgramNotificationTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["CORTA_REQUIRE_NOTIFICATIONS"] == "1"))
     func nativeAuthorizationPrecondition() async {

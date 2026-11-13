@@ -36,8 +36,14 @@ import Testing
 /// is therefore also `@MainActor`, as the app is, and `GlyphAtlas.shape`
 /// checks the thread in a Debug build.
 ///
+/// - **`.configurationSerialized`** — `ConfigurationStore.shared` is one
+///   store for the whole host. A suite that sets a key and restores the whole
+///   configuration afterwards puts back its own snapshot over whatever another
+///   suite set meanwhile: `PaneAgentsTests` lost its `agent-processes = cat`
+///   mid-test (#590). Every suite that writes the shared store takes turns.
+///
 /// Applied alongside `.serialized`, not instead of it: `@MainActor
-/// @Suite(.serialized, .metalSerialized)`.
+/// @Suite(.serialized, .metalSerialized)`. No suite takes both gates.
 struct SuiteSerializationTrait: SuiteTrait, TestTrait, TestScoping {
 
     let gate: SuiteGate
@@ -69,6 +75,9 @@ struct SuiteSerializationTrait: SuiteTrait, TestTrait, TestScoping {
 extension Trait where Self == SuiteSerializationTrait {
     /// See `SuiteSerializationTrait`.
     static var metalSerialized: Self { Self(gate: .metal) }
+
+    /// See `SuiteSerializationTrait`.
+    static var configurationSerialized: Self { Self(gate: .configuration) }
 }
 
 /// A one-holder gate per kind of shared state. Not a lock: the scope it
@@ -76,6 +85,7 @@ extension Trait where Self == SuiteSerializationTrait {
 /// stall the pool rather than order it.
 actor SuiteGate {
     static let metal = SuiteGate()
+    static let configuration = SuiteGate()
 
     private var isHeld = false
     private var waiters: [CheckedContinuation<Void, Never>] = []

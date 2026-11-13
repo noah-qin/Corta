@@ -22,7 +22,7 @@ import Testing
 @testable import Corta
 
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .configurationSerialized)
 struct PaneAgentsTests {
     // Supply only a view and PTY. Loading the production pane would start a
     // renderer, shell and window services unrelated to state resolution.

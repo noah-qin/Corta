@@ -31,7 +31,7 @@ import Testing
 /// (`docs/DECISIONS.md` D13 — never change the machine to test); every assertion here
 /// either reads it or checks it is unchanged.
 @MainActor
-@Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
+@Suite(.serialized, .configurationSerialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct FontSizeZoomTests {
     private func makeSplit() -> (SplitViewController, NSWindow) {
         let split = SplitViewController()
