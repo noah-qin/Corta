@@ -33,15 +33,16 @@ struct ChildDescriptorTests {
         0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1,
     ]
 
-    /// Writes the descriptors from 3 to 200 this process holds to `report`.
+    /// Writes the descriptors from 3 to `last` this process holds to `report`.
     /// A duplicate onto an unused number rather than `-e /dev/fd/n`, which
     /// cannot stat a shared-memory object: the pixel mapping would pass unseen,
     /// and so would a leaked one. Redirecting a number that is open (0, or 2 per
     /// command) makes bash park the old one on 10, which then reads as held.
-    private static func probe(report: String) -> String {
+    /// The duplicate goes one past `last`, a number the scan never asks about.
+    private static func probe(report: String, through last: Int32) -> String {
         """
         exec 2>/dev/null; open=; n=3
-        while [ $n -le 200 ]; do ( exec 222<&$n ) && open="$open $n"; n=$((n + 1)); done
+        while [ $n -le \(last) ]; do ( exec \(last + 1)<&$n ) && open="$open $n"; n=$((n + 1)); done
         echo "open:$open" > '\(report)'
         """
     }
@@ -61,16 +62,18 @@ struct ChildDescriptorTests {
     }
 
     /// A descriptor open without close-on-exec, the shape of a leak, for the
-    /// length of `body`.
-    private func withOpenPipe(_ body: () throws -> Void) throws {
+    /// length of `body`, which is handed the last number a probe must scan to
+    /// see it. At least 200, so the scan also covers what sits below; past
+    /// that only when a full parallel run has left the pipe numbered higher,
+    /// since the probe forks once per number (#584).
+    private func withOpenPipe(_ body: (_ scanThrough: Int32) throws -> Void) throws {
         var ends: [Int32] = [0, 0]
         try #require(pipe(&ends) == 0)
         defer {
             close(ends[0])
             close(ends[1])
         }
-        #expect(ends[1] <= 200, "the probe does not reach descriptor \(ends[1])")
-        try body()
+        try body(max(200, ends[0], ends[1]))
     }
 
     private func awaitReport(_ url: URL) -> String? {
@@ -87,10 +90,10 @@ struct ChildDescriptorTests {
     @Test("the image decoder gets its pipes and the pixel mapping, and nothing else")
     func decoderHoldsOnlyWhatItIsGiven() throws {
         try withScratch { folder in
-            try withOpenPipe {
+            try withOpenPipe { last in
                 let report = folder.appendingPathComponent("report")
                 let helper = folder.appendingPathComponent("helper")
-                try executable(helper, Self.probe(report: report.path))
+                try executable(helper, Self.probe(report: report.path, through: last))
                 #expect(ImageDecoderProcess.decodePNG(Self.png, helper: helper.path) == nil)
                 let held = awaitReport(report)
                 #expect(held == "open: 3", "the decoder held \(held ?? "no report")")
@@ -113,18 +116,18 @@ struct ChildDescriptorTests {
     @Test("neither ssh nor the askpass it runs holds the broker's socket or anything else of ours")
     func sshAndAskpassHoldOnlyTheirStandardPipes() throws {
         try withScratch { folder in
-            try withOpenPipe {
+            try withOpenPipe { last in
                 let broker = SSHAskpassBroker(executable: Bundle.main.executablePath) { _ in nil }
                 defer { broker.stop() }
                 let grant = try #require(broker.grant(host: "probe"))
                 let sshReport = folder.appendingPathComponent("ssh")
                 let askpassReport = folder.appendingPathComponent("askpass")
                 let askpass = folder.appendingPathComponent("askpass-probe")
-                try executable(askpass, Self.probe(report: askpassReport.path))
+                try executable(askpass, Self.probe(report: askpassReport.path, through: last))
 
                 var environment = grant.environment
                 environment["SSH_ASKPASS"] = askpass.path
-                let script = Self.probe(report: sshReport.path) + "\n\"$SSH_ASKPASS\""
+                let script = Self.probe(report: sshReport.path, through: last) + "\n\"$SSH_ASKPASS\""
                 let channel = try SFTPSubprocessChannel.spawn(
                     host: "probe", executable: "/bin/sh", arguments: ["-c", script], environment: environment)
                 defer { channel.close() }

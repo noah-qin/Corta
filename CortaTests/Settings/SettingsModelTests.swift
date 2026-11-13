@@ -48,13 +48,24 @@ struct SettingsModelTests {
         }
     }
 
+    /// Counts the time this loop saw, a tick at a time, as the target's
+    /// shared `waitUntil` does: in a full run another test can hold the main
+    /// actor for seconds, and the completion this waits for is queued behind
+    /// the loop's own wake-up. A deadline on the clock spent that stall and
+    /// gave up one turn before the answer ran.
     private func waitUntil(_ condition: () -> Bool) async -> Bool {
-        let deadline = SuspendingClock.now + .seconds(5 * Double(testTimeoutScale))
-        while SuspendingClock.now < deadline {
-            if condition() { return true }
+        let ceiling = .seconds(5) * testTimeoutScale
+        let clock = SuspendingClock()
+        var waited = Duration.zero
+        var last = clock.now
+        while !condition() {
+            if waited > ceiling { return false }
             try? await Task.sleep(for: .milliseconds(20))
+            let now = clock.now
+            waited += min(last.duration(to: now), .milliseconds(50))
+            last = now
         }
-        return condition()
+        return true
     }
 
     @Test("a shell-integration write that failed offers Retry, which repeats it")
