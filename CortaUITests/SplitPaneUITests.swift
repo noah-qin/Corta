@@ -54,10 +54,15 @@ final class SplitPaneUITests: XCTestCase {
     /// A real press and drag on a pane's header. The drop on the other pane's
     /// bottom edge stacks them; Esc would leave them. `PaneDragTests` holds the
     /// rest; only this reaches the gesture through the event system.
+    ///
+    /// On a stage of its own, with the status bar on: launched bare it read the
+    /// developer's config, and the drop point, aimed at the window's bottom
+    /// edge, landed on that bar instead of the pane whenever it was shown. The
+    /// drop is aimed at the pane's own bottom edge, above whatever chrome the
+    /// window has below it.
     @MainActor
     func testDraggingAPaneHeaderStacksThePanes() throws {
-        let app = XCUIApplication()
-        app.launchEnvironment["CORTA_RESTORE_WINDOWS"] = "0"
+        let app = UIFixtures.app(stage: try UIFixtures.stage("pane-drag"), runner: Self.self)
         app.launch()
         defer { app.terminate() }
         let window = app.windows.firstMatch
@@ -67,11 +72,15 @@ final class SplitPaneUITests: XCTestCase {
         XCTAssertTrue(closes.element(boundBy: 1).waitForExistence(timeout: 5))
         let (first, second) = (closes.element(boundBy: 0).frame, closes.element(boundBy: 1).frame)
         XCTAssertEqual(first.minY, second.minY, accuracy: 1, "side by side to begin with")
+        let target = try XCTUnwrap(
+            window.textViews.allElementsBoundByIndex.map(\.frame)
+                .first { $0.minX < second.minX && $0.maxX > second.maxX },
+            "the second pane's terminal")
         let origin = window.coordinate(withNormalizedOffset: .zero)
         let header = origin.withOffset(CGVector(
             dx: first.minX - 150 - window.frame.minX, dy: first.midY - window.frame.minY))
         let edge = origin.withOffset(CGVector(
-            dx: second.minX - 120 - window.frame.minX, dy: window.frame.height - 12))
+            dx: second.minX - 120 - window.frame.minX, dy: target.maxY - 12 - window.frame.minY))
         // `click`, not `press`: on macOS `press(forDuration:thenDragTo:)` reaches the
         // app as no mouse event at all.
         header.click(forDuration: 0.5, thenDragTo: edge, withVelocity: .slow, thenHoldForDuration: 0.5)
