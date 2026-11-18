@@ -102,6 +102,30 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
         revisions[physicalIndex(position)]
     }
 
+    /// What DECALN left: every row holds `cell` in its first `width` columns.
+    /// True only while `nextRevision` has not moved, so any change to any row
+    /// (or to the row count) since ends it. It rides on the value, so a copy
+    /// changed on its own cannot vouch for another.
+    private struct UniformFill: Sendable {
+        var revision: UInt64
+        var cell: Cell
+        var width: Int
+        var wrappedCleared: Bool
+    }
+
+    private var uniformFill: UniformFill?
+
+    mutating func markUniform(_ cell: Cell, width: Int, wrappedCleared: Bool) {
+        uniformFill = UniformFill(revision: nextRevision, cell: cell, width: width, wrappedCleared: wrappedCleared)
+    }
+
+    /// Whether every row still holds what `markUniform` recorded; with
+    /// `wrappedCleared`, also that no row is marked wrapped.
+    func isUniform(_ cell: Cell, width: Int, wrappedCleared: Bool) -> Bool {
+        guard let fill = uniformFill, fill.revision == nextRevision else { return false }
+        return fill.cell == cell && fill.width == width && (fill.wrappedCleared || !wrappedCleared)
+    }
+
     @inline(__always)
     private mutating func stamp(_ physicalIndex: Int) {
         nextRevision &+= 1
@@ -186,18 +210,21 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
         storage.append(contentsOf: newElements)
         // Only keeps `revisions` the same length: a resize rebuilds anyway.
         revisions.append(contentsOf: repeatElement(0, count: storage.count - before))
+        nextRevision &+= 1
     }
 
     mutating func removeFirst(_ count: Int) {
         materialize()
         storage.removeFirst(count)
         revisions.removeFirst(count)
+        nextRevision &+= 1
     }
 
     mutating func removeLast(_ count: Int) {
         materialize()
         storage.removeLast(count)
         revisions.removeLast(count)
+        nextRevision &+= 1
     }
 
     private func physicalIndex(_ logical: Int) -> Int {

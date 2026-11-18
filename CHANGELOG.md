@@ -10,6 +10,14 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- `ESC # 8` (the alignment test that fills the screen with `E`) fills each row
+  at once instead of writing every cell, and a repeat on an unchanged screen
+  costs nothing. A stream made of it held a 120 × 400 window's lock for 1.8 s
+  per 16 KiB of output; it now takes under a millisecond, and 90 ms when other
+  output keeps the screen changing between fills.
+
 ## [1.6.5] - 2026-11-18
 
 ### Fixed

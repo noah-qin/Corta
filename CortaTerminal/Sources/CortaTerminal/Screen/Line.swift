@@ -172,8 +172,8 @@ public struct Line: Equatable, Sendable {
         let lower = max(0, range.lowerBound)
         guard range.upperBound > lower else { return }
         grow(to: range.upperBound)
-        for column in lower..<range.upperBound {
-            cells[column] = cell
+        cells.withUnsafeMutableBufferPointer { buffer in
+            buffer[lower..<range.upperBound].update(repeating: cell)
         }
     }
 

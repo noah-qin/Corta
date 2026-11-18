@@ -250,17 +250,20 @@ extension Grid {
         pen.reset()
         pendingWrap = false
         cursor = Cursor(row: 0, column: 0)
-        for _ in 0..<rows {
-            for _ in 0..<columns {
-                write(UInt32(UInt8(ascii: "E")))
-            }
-            pendingWrap = false
-            if cursor.row < rows - 1 {
-                cursor = Cursor(row: cursor.row + 1, column: 0)
-            }
+        // One fill a row, not a `write(_:)` a cell: three bytes of input must
+        // not cost a full write per cell under the session lock (`SECURITY.md`
+        // §3). Every cell becomes a plain narrow "E", so no pair or cluster
+        // survives to repair. Each row's `wrapped` stays as it was, except in
+        // insert mode, where the per-cell writes' shift cleared it.
+        let cell = pen.cell(UInt32(UInt8(ascii: "E")))
+        // A screen nothing has touched since the last fill already holds it:
+        // a stream of DECALN costs one fill, not one per sequence.
+        guard !lines.isUniform(cell, width: columns, wrappedCleared: insertMode) else { return }
+        for row in 0..<rows {
+            lines[row].fill(cell, in: 0..<columns)
+            if insertMode { lines[row].wrapped = false }
         }
-        cursor = Cursor(row: 0, column: 0)
-        pendingWrap = false
+        lines.markUniform(cell, width: columns, wrappedCleared: insertMode)
     }
 
     public mutating func setTabStop() {
