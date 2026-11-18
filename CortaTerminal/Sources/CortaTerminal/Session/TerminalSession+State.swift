@@ -160,14 +160,36 @@ extension TerminalSession {
         registerStateWaiter { state.withLock { $0.terminal.grid.backingScale = scale } }
     }
     public var programStatuses: [String: ProgramStatus] {
-        registerStateWaiter { state.withLock { $0.terminal.programStatuses } }
+        readStampedSignals { $0.programStatuses }
     }
     public var programProgress: ProgramProgress? {
         registerStateWaiter { state.withLock { $0.terminal.programProgress } }
     }
     /// One lock for a pane's whole agent-state read; drains its edges.
     public func takeProgramSignals() -> ProgramSignalSnapshot {
-        registerStateWaiter { state.withLock { $0.terminal.takeProgramSignals() } }
+        readStampedSignals { $0.takeProgramSignals() }
+    }
+
+    /// Program signals once the reader has stamped the waits its last slice
+    /// began. It stamps them as soon as the foreground group's reading
+    /// returns, so this waits about that long, and only right after a wait
+    /// began. A reader preempted in that gap on a loaded machine can take
+    /// tens of milliseconds, so the bound is a second, a backstop rather than
+    /// a timeout: past it the signals are read anyway, and an unstamped wait
+    /// reads as unverified, which raises nothing.
+    private func readStampedSignals<T>(_ read: (inout Terminal) -> T) -> T {
+        let deadline = clock_gettime_nsec_np(CLOCK_UPTIME_RAW) + 1_000_000_000
+        while true {
+            let value: T? = registerStateWaiter {
+                state.withLock { current in
+                    guard !current.waitsAwaitingStamp || clock_gettime_nsec_np(CLOCK_UPTIME_RAW) >= deadline
+                    else { return nil }
+                    return read(&current.terminal)
+                }
+            }
+            if let value { return value }
+            usleep(50)
+        }
     }
 
     public var windowTitle: String? {
