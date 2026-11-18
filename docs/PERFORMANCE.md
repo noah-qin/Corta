@@ -90,6 +90,10 @@ screen outside the render snapshot lock and resumes parsing after it commits.
 **Cap the work in one parse batch.** Give a batch a byte budget (roughly
 1 MB) and yield afterwards. Without a cap, a single enormous burst
 starves the UI and the window appears frozen.
+Within a batch, each slice fed under the session lock is bounded in time as well
+as in bytes: past 4 ms the next slice halves, down to 256 bytes, and under 1 ms it
+doubles back to 16 KiB, because a few bytes of output can do a whole screen's work
+(§5.30).
 
 ### 2.2 An ASCII fast path that bypasses shaping
 
@@ -1739,9 +1743,12 @@ query with none (a kana or Hangul query, for instance): those are not helped.
 
 A survey of what is left, not a change: no code moved. It records three limits
 measured in the app and the shapes of output that were checked and found sound, so
-the next measurement starts from them.
+the next measurement starts from them. The figures below are the ones measured on
+2026-11-18 and stay as the record. What was fixed afterwards, and the figures after
+the fix, are in "Fixed since" at the end of this section.
 
-**A lock slice is bounded in bytes, not in time.** The reader feeds the terminal in
+**A lock slice is bounded in bytes, not in time.** *Fixed: DECALN (#601) and the
+slice's time (#603); see "Fixed since".* The reader feeds the terminal in
 16 KiB slices under the session lock (§2.1), and the main thread takes that lock
 several times a frame: `takeFrameState`, the grid snapshot, `takeProgramSignals`,
 the title's read. A sequence a few bytes long that does work proportional to the
@@ -1765,7 +1772,7 @@ erase and RIS floods did not hold the main thread at 50 × 200 (worst frame 6.6 
 and 3.1 ms); 120 × 400 was measured in the core only.
 
 **A window title change costs the main thread about 5.5 ms in front, 2.5 ms
-behind.** A title set 20 times a second (`OSC 0`) kept the main thread 11 % busy in
+behind.** *Reduced by #605, not to the target; see "Fixed since".* A title set 20 times a second (`OSC 0`) kept the main thread 11 % busy in
 a key window, against a frame CPU median of 0.54 ms for a two-byte spinner at the
 same rate; a frame that carried a title change had a median of 3.0 ms.
 `PaneWindowTitle.apply(fromOutput:)` sets `NSWindow.title` on every output batch
@@ -1773,7 +1780,8 @@ that changes it, and the titlebar's layout and layer commit are most of the cost
 The tab strip's own refresh is already held to once in 100 ms
 (`TerminalWindowController.refreshTabStripSoon`); the window's title is not.
 
-**The image caps add up to about 2 GB.** Twelve panes each sent twenty
+**The image caps add up to about 2 GB.** *Unchanged, by decision: the two 1 GB
+ceilings are the design until `DECISIONS.md` says otherwise.* Twelve panes each sent twenty
 1024 × 1024 RGBA images (960 MiB of pixels in all): physical footprint 1,952 MB.
 The pixel budget (`ImageMemoryBudget`, 1 GB) and the texture budget
 (`GlobalTextureBudget`, 1 GB) are separate ceilings and both were reached. That is
@@ -1798,10 +1806,37 @@ behind another application: 64 MiB of ASCII to each pane (768 MiB in all) took
 and 40,000 placements of one image, and a repeat count of 2,147,483,647 cost no more
 than a clamped one for every sequence that takes one. Malformed UTF-8 (a run of
 `0xFF` or `0x80`) feeds at 41 MiB/s against 552 MiB/s for ASCII: each byte draws a
-U+FFFD through the full `write(_:)` path.
+U+FFFD through the full `write(_:)` path (fixed by #607; see "Fixed since").
 
 Apple M5, macOS 27.2 (26B123), Xcode 27.2, on AC power. Core figures from a scratch
 SwiftPM package depending on `CortaTerminal` by path, `-c release`; app figures from
 the `Benchmark` configuration with `CORTA_RENDER_METRICS`, a staged
 `CORTA_STAGE_DIR`, and a script as `SHELL` that writes a prepared file to the
 terminal.
+
+#### Fixed since (2026-11-19)
+
+Each fix is measured against `main` just before it, on the same machine (Apple M5,
+macOS 27.2, Xcode 27.2). Core figures come from a scratch SwiftPM package with
+`CortaTerminal` by path, `-c release`. The pull requests have every run. Another
+project's builds and simulators loaded the machine during some of these runs, which
+is why several figures are medians of alternating runs.
+
+| Limit (2026-11-18) | Fix | Before | After |
+| --- | --- | --- | --- |
+| DECALN, one 16 KiB slice at 120 × 400 | #601: one fill a row; a repeat on an untouched screen is skipped | 1,761 ms (50 × 200: 355 ms) | 0.16 ms (50 × 200: 0.12 ms) |
+| The same with a byte of output between fills (`ESC # 8 x`) | #601 | 1,479 ms | 90 ms, which #603 then cuts into slices |
+| Coloured erase (`SGR 41` + `ED 2`), time a slice holds the lock at 120 × 400 | #603: the next slice halves past 4 ms (to 256 bytes) and doubles under 1 ms | 57 ms | at most 6.9 ms once settled, median 1.9 ms; the first four or five slices still take 64, 32, 17 and 8 ms |
+| RIS, the same | #603 | 18 ms | at most 4.4 ms, median 1.6 ms |
+| Session throughput, `cat` of 64 MiB of coloured lines | #603 | 127.0 MiB/s | 125.2 MiB/s (−1.4 %) |
+| Window title at 20 changes a second, a key window's main thread busy | #605: from output, at most one change in 100 ms, and the last always lands | 9.3–9.5 % | 6.3–7.4 %, against a target of 4 %. About 10 changes a second still land; the floor without titles measured 2.1–4.5 % |
+| Malformed UTF-8, `0xFF` / `0x80` | #607: a run of bytes malformed on their own is written as a run of U+FFFD cells, identical cell for cell | 26.0 / 33.1 MiB/s | 245.0 / 473.2 MiB/s |
+| Foreground group read under the lock for a new wait, 16 members | #608: read outside the lock, stamped before the next slice | reading 202 µs past its cache (38 µs from it); slice under the lock median 154–164 µs | slice under the lock median 18–34 µs |
+
+F13 and the keys above it sent U+F710 and the others as UTF-8 text. That is a
+correctness fix, #609, measured as bytes rather than time: F13 now sends
+`CSI 25 ~`, or `CSI 57376 u` under kitty's flags.
+
+The 1 GB pixel and texture budgets and the 15 fps of a window in the background are
+unchanged.
+
