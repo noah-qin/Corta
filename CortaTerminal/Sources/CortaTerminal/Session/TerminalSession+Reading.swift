@@ -89,6 +89,8 @@ extension TerminalSession {
         var deferredScreenExit: Bool
         /// From taking the lock to the outcome, on `sliceClock`.
         var heldNanoseconds: UInt64 = 0
+        /// The slice began a wait, to be stamped before the next slice.
+        var stampWaits = false
     }
 
     private func apply(_ batch: [UInt8], sizer: inout FeedSliceSizer) {
@@ -138,11 +140,12 @@ extension TerminalSession {
         callbacks.withLock { $0.onOutput }?()
     }
 
-    /// One slice under the lock, or nil with a resize under way.
+    /// One slice under the lock, or nil with a resize under way; then the
+    /// stamp of any wait it began, before anything else is parsed.
     private func applySlice(
         _ slice: ArraySlice<UInt8>, completing finished: DecodedImageTransmission?
     ) -> SliceOutcome? {
-        state.withLock { current -> SliceOutcome? in
+        let outcome = state.withLock { current -> SliceOutcome? in
             // In the lock, so a resize's copy cannot miss a slice that had
             // already passed this check.
             guard !current.isResizing else { return nil }
@@ -151,6 +154,8 @@ extension TerminalSession {
             outcome.heldNanoseconds = sliceClock() &- taken
             return outcome
         }
+        if outcome?.stampWaits == true { stampWaits() }
+        return outcome
     }
 
     /// The slice's work, in `state`'s lock.
@@ -161,12 +166,10 @@ extension TerminalSession {
         let waitsBefore = current.terminal.programBlockedEdges
         if let finished { current.terminal.completeDeferredImage(finished) }
         let consumed = current.terminal.feedDeferringImageDecode(slice)
-        // A new wait: who holds the terminal now, before the lock lets
-        // anyone read it. Only on a slice that began one, and names are
-        // resolved only when the group's members change.
-        if current.terminal.programBlockedEdges != waitsBefore {
-            current.terminal.stampProgramWaits(pty.foregroundProgram)
-        }
+        // A new wait: who holds the terminal now, read once the lock is let
+        // go (`stampWaits`); until then nothing reads the program signals.
+        let beganWait = current.terminal.programBlockedEdges != waitsBefore
+        if beganWait { current.waitsAwaitingStamp = true }
         let deferred = current.terminal.takeDeferredImage()
         reportImageBytes(current.terminal)
         let sliceResponses = current.terminal.takeOutput()
@@ -179,12 +182,28 @@ extension TerminalSession {
         guard episodeAfter != episodeBefore else {
             return SliceOutcome(
                 responses: sliceResponses, episode: nil, compress: compress, consumed: consumed,
-                deferred: deferred, deferredScreenExit: current.terminal.hasDeferredAlternateScreenExit)
+                deferred: deferred, deferredScreenExit: current.terminal.hasDeferredAlternateScreenExit,
+                stampWaits: beganWait)
         }
         current.synchronizedOutputEpisode = episodeAfter
         return SliceOutcome(
             responses: sliceResponses, episode: episodeAfter, compress: compress, consumed: consumed,
-            deferred: deferred, deferredScreenExit: current.terminal.hasDeferredAlternateScreenExit)
+            deferred: deferred, deferredScreenExit: current.terminal.hasDeferredAlternateScreenExit,
+            stampWaits: beganWait)
+    }
+
+    /// Stamps the waits the last slice began with the foreground group
+    /// (`SECURITY.md` §2.9), read outside the lock: with sixteen members a
+    /// reading took 74 µs from the cache and 260 µs past it, every frame's
+    /// snapshot waiting behind it. Runs before the next slice is parsed, so
+    /// no later output can replace a wait first; the group is read after the
+    /// slice that began the wait, as it was under the lock.
+    private func stampWaits() {
+        let program = pty.foregroundProgram
+        state.withLock { current in
+            current.terminal.stampProgramWaits(program)
+            current.waitsAwaitingStamp = false
+        }
     }
 
     /// Rebuild the parked main screen off-lock before applying any byte
