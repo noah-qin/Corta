@@ -43,6 +43,24 @@ struct ProgramSignalsTests {
         #expect(terminal.programStatuses.isEmpty)
     }
 
+    /// The golden `program-status-forged` case's bytes: the core records the
+    /// wait as the program's claim and answers nothing. Whether it raises
+    /// attention is the app's decision, by the pane's foreground program.
+    @Test func aWaitInOrdinaryOutputIsRecordedAsAClaimOnly() throws {
+        let url = Golden.directory.appendingPathComponent("program-status-forged.in")
+        let bytes = try Golden.decode(String(contentsOf: url, encoding: .utf8))
+        let clear = try #require(bytes.lastIndex(of: 0x1B).flatMap { end in
+            bytes[..<end].lastIndex(of: 0x1B) })
+        var terminal = Terminal(rows: 3, columns: 10)
+        terminal.feed(Array(bytes[..<clear]))
+        #expect(terminal.programStatuses[""]?.state == .blocked)
+        #expect(terminal.programStatuses[""]?.app == "claude-code")
+        #expect(terminal.takeBlockedStatus()! == .permission)
+        terminal.feed(Array(bytes[clear...]))
+        #expect(terminal.programStatuses.isEmpty)
+        #expect(terminal.takeOutput().isEmpty, "no reply reaches the child")
+    }
+
     @Test func claude310CompletionReplacesWorkingBeforeProcessExit() {
         var terminal = Terminal()
         // Captured from a real Claude Code 2.1.310 turn. The agent process

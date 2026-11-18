@@ -17,6 +17,18 @@ Versioning for compatibility changes.
   a first-time prompt has no usable fingerprint, the dialog explains why
   and offers Cancel.
 
+### Security
+
+- Waiting for you is raised only by a coding agent. Any program could print
+  Claude Code's wait report — a file shown with `cat`, a remote host, a
+  downloaded page — and put its pane on the tab in orange, in the Dock count,
+  in a notification and at the front of the ⌥⌘J queue. Now the pane's
+  foreground program must be a built-in agent or one named in
+  `agent-processes`; npm's Codex, which runs as `node`, still counts. Any
+  other wait shows as State unknown, marked Unverified in the Agents list. A
+  wait reported over SSH counts as unverified too, since Corta cannot see the
+  program on the far end.
+
 ## [1.6.4] - 2026-11-13
 
 ### Changed

@@ -330,6 +330,16 @@ entry into blocked, once per pane, and never moves focus on a status event. The
 Agents list leads with that queue's order and then sorts by reported state, so a
 program can reach the top by saying it is blocked, as it can raise the Dock
 count, but cannot pass a pane already waiting.
+A wait counts only when the pane's foreground program, as the kernel names it
+(`tcgetpgrp`, `proc_name`, an interpreter's script from `KERN_PROCARGS2`), is a
+built-in or configured agent, read once per waiting episode and again when the
+program changes. Output cannot set that name: a `blocked` report printed by a
+shell, `cat`, `curl` or `ssh` stays State unknown, labelled Unverified, and
+raises no tab state, Dock count, notice or queue entry. Answering the OSC 7501
+probe is not accepted as proof, because the same stream can send the probe;
+so a remote pane's waits never raise attention. What remains is a program
+that is an agent by name, or one the user lists, printing a forged wait; that
+is the agent's own output (#524).
 `notify-from-programs = false` disables both notice paths; `agent-status = false` hides agent chrome.
 
 ### 2.10 OSC ecosystem limits and refusals (#411)

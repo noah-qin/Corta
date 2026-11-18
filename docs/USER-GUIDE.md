@@ -1028,6 +1028,19 @@ commands while searching, and Return still runs the highlighted command:
 move to an agent with the arrow keys to jump to it.
 Several agents in one pane are shown by their most urgent state. Status and
 application names are reported by the program, not verified identities.
+
+**Waiting for you comes only from an agent.** Any bytes a pane prints can carry
+a wait report: a file shown with `cat`, a remote host, the body of a `curl`.
+Corta raises Waiting for you (the orange tab, the Dock count, the attention
+notice and the ⌥⌘J queue) only while the pane's foreground program is an agent:
+one of the built-in names below, or one you add with `agent-processes`. A
+program run by `node`, `bun`, `deno` or Python counts by its script, so Codex
+installed with npm is recognised although its process is `node`. Any other
+program's wait shows as State unknown, labelled Unverified in the Agents list,
+and raises nothing. Answering the status probe is not proof: the same bytes
+can send it. A pane running `ssh` cannot name the program on the far end, so a
+wait reported over SSH shows as Unverified too, Claude Code's included; its
+other states still show.
 Generic OSC 21337 metadata can decorate the current state with an indicator
 colour and a status label when its task title is empty. Without a task state,
 its label remains State unknown. `status-color` is retained metadata; native
@@ -1062,7 +1075,8 @@ recognises as supporting progress; Corta's normal identity is not selected.
 
 Programs without status support are detected by foreground process name
 (claude, claude-code, codex, gemini, aider, opencode); add names with
-`agent-processes = my-agent,another-agent`. These panes show State unknown
+`agent-processes = my-agent,another-agent`. The same list decides whose wait
+counts. These panes show State unknown
 while the process is active: output and prompt redraws do not prove a task
 is working. A return to the shell or a clean process exit means Idle, not
 Done; a known failed exit is Failed. Notifications and BEL request attention
