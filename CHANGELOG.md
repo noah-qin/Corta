@@ -23,6 +23,10 @@ Versioning for compatibility changes.
   the kitty keyboard protocol, F13 to F35 send the protocol's own codes. A key
   that has no sequence, such as Help or F21 and above outside that protocol,
   now sends nothing.
+- Output that is not valid UTF-8, such as a binary file printed with `cat`,
+  appears many times faster. Each invalid byte still shows as one `�`, exactly
+  as before, but a run of them is written in one go instead of one character
+  at a time.
 - `ESC # 8` (the alignment test that fills the screen with `E`) fills each row
   at once instead of writing every cell, and a repeat on an unchanged screen
   costs nothing. A stream made of it held a 120 × 400 window's lock for 1.8 s

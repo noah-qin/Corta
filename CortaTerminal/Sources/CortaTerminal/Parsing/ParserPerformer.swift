@@ -33,6 +33,12 @@ public protocol ParserPerformer {
     /// the parser: `bytes.count` is a multiple of three.
     mutating func printCJK(_ bytes: ArraySlice<UInt8>)
 
+    /// `count` U+FFFD in a row, one for each byte of a run that is malformed
+    /// UTF-8 on its own (a stray continuation, `C0`, `C1`, `F5`–`FF`) in the
+    /// ground state: what `print(UTF8Decoder.replacement)` would get as many
+    /// times.
+    mutating func printReplacements(_ count: Int)
+
     /// A C0 control that acts immediately.
     mutating func execute(_ control: UInt8)
 
@@ -68,6 +74,10 @@ extension ParserPerformer {
 
     public mutating func printASCII(_ bytes: ArraySlice<UInt8>) {
         for byte in bytes { print(UInt32(byte)) }
+    }
+
+    public mutating func printReplacements(_ count: Int) {
+        for _ in 0..<count { print(UTF8Decoder.replacement) }
     }
 
     public mutating func printCJK(_ bytes: ArraySlice<UInt8>) {
