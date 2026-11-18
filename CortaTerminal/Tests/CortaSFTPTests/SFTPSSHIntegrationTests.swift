@@ -72,13 +72,14 @@ struct SFTPSSHIntegrationTests {
     /// OpenSSH's `SSH_ASKPASS`, forced, with no terminal: what the app's
     /// askpass rides on. A stand-in program answers here; the app's own is
     /// tested against its broker in `SSHAskpassBrokerTests`.
-    private func askpass(answering answer: String) throws -> (environment: [String: String], log: URL) {
+    private func askpass(answering answer: String?) throws -> (environment: [String: String], log: URL) {
         let log = root.appendingPathComponent("askpass-\(UUID().uuidString).log")
         let script = root.appendingPathComponent("askpass-\(UUID().uuidString).sh")
+        let response = answer.map { "printf '%s\\n' '\($0)'" } ?? "exit 1"
         try """
             #!/bin/sh
             printf '%s\\n--\\n' "$1" >> '\(log.path)'
-            printf '%s\\n' '\(answer)'
+            \(response)
             """.write(to: script, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
         var environment = ProcessInfo.processInfo.environment
@@ -117,15 +118,21 @@ struct SFTPSSHIntegrationTests {
     func hostKeyThroughAskpass() async throws {
         let known = root.appendingPathComponent("tofu_known_hosts")
         try? FileManager.default.removeItem(at: known)
+        let arguments = ["-F", root.appendingPathComponent("tofu.conf").path, "-s", "--", "fixture", "sftp"]
+        let declined = try askpass(answering: nil)
+        let refused = SFTPConnection(host: "fixture", arguments: arguments, environment: declined.environment)
+        defer { refused.close() }
+        await #expect(throws: SFTPError.self) { try await refused.connect() }
+        #expect(!FileManager.default.fileExists(atPath: known.path))
+
         let (environment, log) = try askpass(answering: "yes")
-        let connection = SFTPConnection(
-            host: "fixture",
-            arguments: ["-F", root.appendingPathComponent("tofu.conf").path, "-s", "--", "fixture", "sftp"],
-            environment: environment)
+        let connection = SFTPConnection(host: "fixture", arguments: arguments, environment: environment)
         defer { connection.close() }
         #expect(try await connection.connect().version == 3)
         let asked = try String(contentsOf: log, encoding: .utf8)
         #expect(asked.contains("(yes/no/[fingerprint])?"))
+        let fingerprint = try String(contentsOf: root.appendingPathComponent("host_fingerprint"), encoding: .utf8)
+        #expect(asked.contains(fingerprint))
         #expect(FileManager.default.fileExists(atPath: known.path))
     }
 

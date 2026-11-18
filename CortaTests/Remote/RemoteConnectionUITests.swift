@@ -355,13 +355,15 @@ struct AskpassWordingTests {
 
     @Test("the host-key and notice dialogs say where the question came from")
     func hostKeyDialogNamesItsSource() {
-        for question in [SSHAskpass.Question.hostKey, .notify] {
-            let direct = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
-                question: question, host: "box", prompt: "fingerprint (yes/no)?"))
-            #expect(direct.informativeText.contains(L10n.text("askpass.source")))
-            let step = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
-                question: question, host: "box", prompt: "fingerprint", isIntermediateStep: true))
-            #expect(step.informativeText.contains(L10n.format("askpass.source.intermediate", "box")))
+        for isIntermediateStep in [false, true] {
+            let source = isIntermediateStep
+                ? L10n.format("askpass.source.intermediate", "box") : L10n.text("askpass.source")
+            let hostKey = SSHHostKeyPrompt(SSHAskpass.Asking(
+                question: .hostKey, host: "box", prompt: "?", isIntermediateStep: isIntermediateStep))
+            #expect(hostKey.source == source)
+            let notice = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
+                question: .notify, host: "box", prompt: "Touch", isIntermediateStep: isIntermediateStep))
+            #expect(notice.informativeText.contains(source))
         }
     }
 
@@ -410,13 +412,10 @@ struct AskpassWordingTests {
         #expect(secret.informativeText.contains(L10n.format("askpass.source.intermediate", "deploy@prod")))
         #expect((secret.accessoryView as? NSSecureTextField)?.accessibilityLabel() == secret.messageText)
 
-        let hostKey = SSHAskpassPrompter.makeAlert(asking(.hostKey, "bastion's fingerprint (yes/no)?"))
-        #expect(hostKey.messageText == L10n.format("askpass.hostKey.title.intermediate", "deploy@prod"))
-        #expect(hostKey.informativeText.contains(L10n.format("askpass.hostKey.advice.intermediate", "deploy@prod")))
-        #expect(!hostKey.informativeText.contains(L10n.text("askpass.hostKey.advice")))
-        // Return must not trust a key unread, here above all.
-        #expect(hostKey.buttons.map(\.title) == [L10n.text("common.cancel"), L10n.text("askpass.hostKey.trust")])
-        #expect(SSHAskpassPrompter.acceptResponse(.hostKey) == .alertSecondButtonReturn)
+        let hostKey = SSHHostKeyPrompt(asking(.hostKey, SSHHostKeySheetTests.hostKeyQuestion))
+        #expect(hostKey.title == L10n.format("askpass.hostKey.title.intermediate", "deploy@prod"))
+        #expect(hostKey.advice == L10n.text("askpass.hostKey.verifyIntermediate"))
+        #expect(hostKey.canContinue)
 
         #expect(SSHAskpassPrompter.makeAlert(asking(.confirm, "Allow?")).messageText
             == L10n.format("askpass.confirm.title.intermediate", "deploy@prod"))
@@ -426,13 +425,13 @@ struct AskpassWordingTests {
 
     @Test("the connection's own ssh asks in the destination's name")
     func aDirectQuestionNamesTheDestination() {
-        let direct = { (question: SSHAskpass.Question) in
-            SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(question: question, host: "prod", prompt: "?"))
-        }
-        #expect(direct(.secret).messageText == L10n.format("askpass.secret.title", "prod"))
-        #expect(direct(.hostKey).messageText == L10n.format("askpass.hostKey.title", "prod"))
-        #expect(direct(.hostKey).informativeText.contains(L10n.text("askpass.hostKey.advice")))
-        #expect(direct(.hostKey).buttons.first?.title == L10n.text("common.cancel"))
+        let secret = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(
+            question: .secret, host: "prod", prompt: "Password:"))
+        #expect(secret.messageText == L10n.format("askpass.secret.title", "prod"))
+        let hostKey = SSHHostKeyPrompt(SSHAskpass.Asking(
+            question: .hostKey, host: "prod", prompt: SSHHostKeySheetTests.hostKeyQuestion))
+        #expect(hostKey.title == L10n.format("askpass.hostKey.title", "prod"))
+        #expect(hostKey.advice == L10n.text("askpass.hostKey.verify"))
     }
 
     /// Whether AppKit ends a sheet when its parent is closed from under it is
@@ -444,10 +443,11 @@ struct AskpassWordingTests {
             backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.orderBack(nil)
-        let alert = SSHAskpassPrompter.makeAlert(SSHAskpass.Asking(question: .hostKey, host: "box", prompt: "?"))
+        let prompt = SSHHostKeyPrompt(.init(
+            question: .hostKey, host: "box", prompt: SSHHostKeySheetTests.hostKeyQuestion))
         let answered = Guarded(wrappedValue: false)
         let answer = Task { @MainActor in
-            let result = await SSHAskpassPrompter.answer(alert, field: nil, question: .hostKey, on: window)
+            let result = await SSHAskpassPrompter.answerHostKey(prompt, on: window)
             answered.wrappedValue = true
             return result
         }

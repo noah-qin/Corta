@@ -44,6 +44,9 @@ def run_fixture(root):
     try:
         for name in ('host','client','wrong'):
          subprocess.run(['/usr/bin/ssh-keygen','-q','-t','ed25519','-N','','-f',str(root/name)],check=True)
+        fingerprint = subprocess.check_output(
+            ['/usr/bin/ssh-keygen', '-E', 'sha256', '-lf', str(root / 'host.pub')], text=True).split()[1]
+        (root / 'host_fingerprint').write_text(fingerprint)
         # A key with a passphrase, which only SSH_ASKPASS can unlock here.
         subprocess.run(['/usr/bin/ssh-keygen','-q','-t','ed25519','-N','corta pass phrase','-f',str(root/'locked')],check=True)
         (root/'authorized_keys').write_text((root/'client.pub').read_text() + (root/'locked.pub').read_text()); (root/'remote').mkdir()

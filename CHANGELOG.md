@@ -10,6 +10,13 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- The SFTP host-key dialog gives the full, copyable fingerprint its own
+  section and makes the trust and cancel buttons easier to tell apart. If
+  a first-time prompt has no usable fingerprint, the dialog explains why
+  and offers Cancel.
+
 ## [1.6.4] - 2026-11-13
 
 ### Changed

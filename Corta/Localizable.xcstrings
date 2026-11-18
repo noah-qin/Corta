@@ -651,65 +651,6 @@
         }
       }
     },
-    "askpass.hostKey.advice.intermediate": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This is not the key of %@. Trust it only if the fingerprint above matches the one the intermediate host’s administrator gave you. OpenSSH then saves it to ~/.ssh/known_hosts."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "这不是 %@ 的密钥。只有在上面的指纹与该中间主机的管理员提供的一致时才信任。之后 OpenSSH 会把它保存到 ~/.ssh/known_hosts。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "這不是 %@ 的金鑰。只有在上面的指紋與該中間主機的管理員提供的一致時才信任。之後 OpenSSH 會把它儲存到 ~/.ssh/known_hosts。"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "これは %@ の鍵ではありません。上の指紋が中継ホストの管理者から伝えられたものと一致する場合にだけ信頼してください。OpenSSH はそれを ~/.ssh/known_hosts に保存します。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "이것은 %@의 키가 아닙니다. 위 지문이 중간 호스트 관리자가 알려 준 것과 일치할 때만 신뢰하세요. 그러면 OpenSSH가 ~/.ssh/known_hosts에 저장합니다."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Dies ist nicht der Schlüssel von %@. Vertrauen Sie ihm nur, wenn der Fingerabdruck oben mit dem übereinstimmt, den Ihnen der Administrator der Zwischenstation genannt hat. OpenSSH speichert ihn dann in ~/.ssh/known_hosts."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Ce n'est pas la clé de %@. Ne lui faites confiance que si l'empreinte ci-dessus correspond à celle que l'administrateur de l'hôte intermédiaire vous a donnée. OpenSSH l'enregistre ensuite dans ~/.ssh/known_hosts."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Esta no es la clave de %@. Confía solo si la huella de arriba coincide con la que te dio el administrador del host intermedio. OpenSSH la guardará entonces en ~/.ssh/known_hosts."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Esta não é a chave de %@. Confie apenas se a impressão digital acima corresponder à que o administrador do host intermediário lhe deu. O OpenSSH então a salva em ~/.ssh/known_hosts."
-          }
-        }
-      }
-    },
     "askpass.hostKey.title.intermediate": {
       "extractionState": "manual",
       "localizations": {
@@ -37762,61 +37703,356 @@
         }
       }
     },
-    "askpass.hostKey.advice": {
+    "askpass.hostKey.fingerprint": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trust it only if the fingerprint above matches the one the server’s administrator gave you. OpenSSH then saves it to ~/.ssh/known_hosts."
+            "value": "Host key fingerprint"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "只有在上面的指纹与服务器管理员提供的一致时才信任。之后 OpenSSH 会把它保存到 ~/.ssh/known_hosts。"
+            "value": "主机密钥指纹"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "只有在上面的指紋與伺服器管理員提供的一致時才信任。之後 OpenSSH 會把它儲存到 ~/.ssh/known_hosts。"
+            "value": "主機金鑰指紋"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "上の指紋がサーバ管理者から伝えられたものと一致する場合にだけ信頼してください。OpenSSH はそれを ~/.ssh/known_hosts に保存します。"
+            "value": "ホスト鍵のフィンガープリント"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "위 지문이 서버 관리자가 알려 준 것과 일치할 때만 신뢰하세요. 그러면 OpenSSH가 ~/.ssh/known_hosts에 저장합니다."
+            "value": "호스트 키 지문"
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Vertrauen Sie ihm nur, wenn der Fingerabdruck oben mit dem übereinstimmt, den Ihnen der Administrator des Servers genannt hat. OpenSSH speichert ihn dann in ~/.ssh/known_hosts."
+            "value": "Fingerabdruck des Host-Schlüssels"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Ne lui faites confiance que si l'empreinte ci-dessus correspond à celle que l'administrateur du serveur vous a donnée. OpenSSH l'enregistre ensuite dans ~/.ssh/known_hosts."
+            "value": "Empreinte de la clé d’hôte"
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Confía solo si la huella de arriba coincide con la que te dio el administrador del servidor. OpenSSH la guardará entonces en ~/.ssh/known_hosts."
+            "value": "Huella de la clave de host"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Confie apenas se a impressão digital acima corresponder à que o administrador do servidor lhe deu. O OpenSSH então a salva em ~/.ssh/known_hosts."
+            "value": "Impressão digital da chave do host"
+          }
+        }
+      }
+    },
+    "askpass.hostKey.details": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original prompt"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原始提示"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "原始提示"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "元のメッセージ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "원본 메시지"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Ursprüngliche Meldung"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Message d’origine"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Mensaje original"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Mensagem original"
+          }
+        }
+      }
+    },
+    "askpass.hostKey.verify": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compare this fingerprint with the one from the server administrator before trusting the key. OpenSSH records the key according to its configuration."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "信任前，请和服务器管理员提供的指纹比对。OpenSSH 会按配置记录此密钥。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "信任前，請和伺服器管理員提供的指紋比對。OpenSSH 會依設定記錄此金鑰。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "鍵を信頼する前に、サーバー管理者から提供されたフィンガープリントと照合してください。OpenSSH は設定に従って鍵を記録します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "키를 신뢰하기 전에 서버 관리자가 제공한 지문과 대조하세요. OpenSSH는 설정에 따라 키를 기록합니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Vergleiche diesen Fingerabdruck vor dem Akzeptieren mit dem vom Serveradministrator. OpenSSH speichert den Schlüssel gemäß seiner Konfiguration."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Avant de faire confiance à la clé, comparez cette empreinte à celle fournie par l’administrateur du serveur. OpenSSH enregistre la clé selon sa configuration."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Antes de confiar en la clave, compara esta huella con la que te dio el administrador del servidor. OpenSSH registra la clave según su configuración."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Antes de confiar na chave, compare esta impressão digital com a fornecida pelo administrador do servidor. O OpenSSH registra a chave conforme sua configuração."
+          }
+        }
+      }
+    },
+    "askpass.hostKey.verifyIntermediate": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compare this fingerprint with the one from the intermediate host’s administrator before trusting the key. OpenSSH records the key according to its configuration."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "信任前，请和中间主机管理员提供的指纹比对。OpenSSH 会按配置记录此密钥。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "信任前，請和中繼主機管理員提供的指紋比對。OpenSSH 會依設定記錄此金鑰。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "鍵を信頼する前に、中継ホストの管理者から提供されたフィンガープリントと照合してください。OpenSSH は設定に従って鍵を記録します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "키를 신뢰하기 전에 중간 호스트 관리자가 제공한 지문과 대조하세요. OpenSSH는 설정에 따라 키를 기록합니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Vergleiche diesen Fingerabdruck vor dem Akzeptieren mit dem vom Administrator des Zwischenhosts. OpenSSH speichert den Schlüssel gemäß seiner Konfiguration."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Avant de faire confiance à la clé, comparez cette empreinte à celle fournie par l’administrateur de l’hôte intermédiaire. OpenSSH enregistre la clé selon sa configuration."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Antes de confiar en la clave, compara esta huella con la que te dio el administrador del host intermedio. OpenSSH registra la clave según su configuración."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Antes de confiar na chave, compare esta impressão digital com a fornecida pelo administrador do host intermediário. O OpenSSH registra a chave conforme sua configuração."
+          }
+        }
+      }
+    },
+    "askpass.hostKey.missing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No host key fingerprint is available to verify. Check with the administrator before reconnecting."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未收到可核对的主机密钥指纹。请向管理员确认后再连接。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未收到可核對的主機金鑰指紋。請向管理員確認後再連線。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "照合できるホスト鍵のフィンガープリントがありません。再接続する前に管理者に確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "확인할 수 있는 호스트 키 지문이 없습니다. 다시 연결하기 전에 관리자에게 확인하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Es liegt kein Fingerabdruck des Host-Schlüssels zur Prüfung vor. Frage beim Administrator nach, bevor du die Verbindung erneut herstellst."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Aucune empreinte de clé d’hôte ne peut être vérifiée. Consultez l’administrateur avant de vous reconnecter."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "No hay una huella de la clave de host que se pueda verificar. Consulta con el administrador antes de volver a conectar."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Não há uma impressão digital da chave do host para verificar. Consulte o administrador antes de reconectar."
+          }
+        }
+      }
+    },
+    "askpass.hostKey.addressConflict": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The prompt reports different keys for this host and its IP address. Confirm the discrepancy with the administrator before continuing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提示显示此主机和对应 IP 地址的密钥不一致。请向管理员确认这一差异后再继续。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "提示顯示此主機和對應 IP 位址的金鑰不一致。請向管理員確認後再繼續。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "メッセージには、ホストとその IP アドレスの鍵が異なると報告しています。続行する前に管理者に確認してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "메시지에 이 호스트와 IP 주소의 키가 서로 다르다고 보고했습니다. 계속하기 전에 관리자에게 확인하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Meldung weist auf unterschiedliche Schlüssel für diesen Host und seine IP-Adresse hin. Kläre die Abweichung mit dem Administrator, bevor du fortfährst."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Le message signale des clés différentes pour cet hôte et son adresse IP. Vérifiez cet écart avec l’administrateur avant de continuer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "El mensaje indica que las claves de este host y de su dirección IP son distintas. Confirma la discrepancia con el administrador antes de continuar."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "A mensagem informa que há chaves diferentes para este host e seu endereço IP. Confirme a divergência com o administrador antes de continuar."
           }
         }
       }
