@@ -200,6 +200,16 @@ extension TerminalView {
             return functional
         }
 
+        // F13–F35 have no legacy form to collide with, so either flag sends
+        // them as kitty's own numbers.
+        if !enhancements.isDisjoint(with: [.disambiguate, .reportEventTypes]),
+            let code = kittyFunctionKeyCode(event)
+        {
+            return kittyKey(
+                code, flags: event.modifierFlags,
+                eventType: enhancements.contains(.reportEventTypes) ? eventType : nil)
+        }
+
         if enhancements.contains(.disambiguate),
             let disambiguated = disambiguatedBytes(
                 for: event,
@@ -256,7 +266,45 @@ extension TerminalView {
         case .f10: return tildeKey(21, modifiers: modifiers)
         case .f11: return tildeKey(23, modifiers: modifiers)
         case .f12: return tildeKey(24, modifiers: modifiers)
-        default: return nil
+        case .insert: return tildeKey(2, modifiers: modifiers)
+        default: return legacyFunctionKeyNumber(special).map { tildeKey($0, modifiers: modifiers) }
+        }
+    }
+
+    /// F13–F20 in xterm's `CSI number ~` numbering; nothing past F20 has one.
+    private static func legacyFunctionKeyNumber(_ special: NSEvent.SpecialKey) -> Int? {
+        let numbers = [25, 26, 28, 29, 31, 32, 33, 34]
+        let index = Int(special.rawValue) - Int(NSEvent.SpecialKey.f13.rawValue)
+        return numbers.indices.contains(index) ? numbers[index] : nil
+    }
+
+    /// kitty's numbers for F13–F35, 57376…57398 (the protocol's functional
+    /// key table).
+    private static func kittyFunctionKeyCode(_ event: NSEvent) -> UInt32? {
+        guard let special = event.specialKey else { return nil }
+        let index = Int(special.rawValue) - Int(NSEvent.SpecialKey.f13.rawValue)
+        return (0...22).contains(index) ? 57376 + UInt32(index) : nil
+    }
+
+    /// `CSI code u`, or `CSI code ; modifiers[:event] u`, as `disambiguatedBytes`
+    /// writes it.
+    private static func kittyKey(_ code: UInt32, flags: NSEvent.ModifierFlags, eventType: Int?) -> [UInt8] {
+        let modifiers = kittyModifiers(flags.subtracting(.capsLock))
+        if modifiers == 1, eventType == nil || eventType == 1 {
+            return Array("\u{1B}[\(code)u".utf8)
+        }
+        let suffix = eventType.map { ":\($0)" } ?? ""
+        return Array("\u{1B}[\(code);\(modifiers)\(suffix)u".utf8)
+    }
+
+    /// A key AppKit reports as a private-use scalar (`NSEvent.SpecialKey`,
+    /// U+F700–U+F8FF) that has no encoding here: Help, Print Screen, F21 and
+    /// past without kitty's numbers, and the rest. Its scalar is no character,
+    /// and the child gets nothing rather than three bytes of it.
+    private static func isUnencodedSpecialKey(_ event: NSEvent) -> Bool {
+        [event.characters, event.charactersIgnoringModifiers].contains { text in
+            guard let scalar = text?.unicodeScalars.first else { return false }
+            return (0xF700...0xF8FF).contains(scalar.value)
         }
     }
 
@@ -266,6 +314,7 @@ extension TerminalView {
         for event: NSEvent, modifiers: Int, newLineMode: Bool, applicationKeypad: Bool, optionAsMeta: Bool
     ) -> [UInt8]? {
         let flags = event.modifierFlags
+        if isUnencodedSpecialKey(event) { return nil }
         // Shift-Tab is backtab (`CSI Z`, terminfo kcbt).
         if event.keyCode == 48, flags.contains(.shift) {
             return modifiers == 2
@@ -424,6 +473,7 @@ extension TerminalView {
         case .some(.home): return Array("\u{1B}[1;\(parameter)H".utf8)
         case .some(.end): return Array("\u{1B}[1;\(parameter)F".utf8)
         case .some(.deleteForward): return Array("\u{1B}[3;\(parameter)~".utf8)
+        case .some(.insert): return Array("\u{1B}[2;\(parameter)~".utf8)
         case .some(.pageUp): return Array("\u{1B}[5;\(parameter)~".utf8)
         case .some(.pageDown): return Array("\u{1B}[6;\(parameter)~".utf8)
         case .some(.f1): return Array("\u{1B}[1;\(parameter)P".utf8)
