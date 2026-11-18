@@ -412,15 +412,22 @@ allocating without bound. These caps are asserted in the fuzz harness
 An unterminated OSC string is the canonical case: a stream that opens one
 and never closes it must not accumulate gigabytes in a buffer.
 
-**Known limit: time under the session lock.** The caps above bound memory and
-bytes; none bounds how long one 16 KiB parse slice holds the session lock, and
-the main thread waits on that lock every frame. `ESC # 8` (DECALN) rewrites the
-whole screen cell by cell for three bytes of input: a slice full of it holds the
-lock for 374 ms on a 50 × 200 screen and 1.8 s on a 120 × 400 one, and a 256 KiB
-file of it kept a window at about a third of its frame rate for nine seconds
-(`PERFORMANCE.md` §5.30). The stream cannot run anything or read anything this
-way; it makes the application slow to answer while it lasts, and it ends with the
-stream. Every other sequence measured stays under a frame at that size.
+**Time under the session lock.** The caps above bound memory and bytes. The time
+one parse slice holds the session lock is bounded separately, and the main thread
+takes that lock every frame. The reader times each slice inside the lock and sizes
+the next from it: halved past 4 ms, down to 256 bytes, and doubled under 1 ms, up
+to 16 KiB (#603). `ESC # 8` (DECALN) fills each row once, and a repeat on a screen
+nothing has touched since costs nothing (#601). Reading the foreground process
+group for a new wait's stamp happens outside the lock (#608). Before these, a slice
+of DECALN held the lock for 374 ms on a 50 × 200 screen and 1.8 s on a 120 × 400
+one, and a 256 KiB file of it kept a window at about a third of its frame rate for
+nine seconds (`PERFORMANCE.md` §5.30). After them, a coloured screen-wide erase, the
+costliest sequence measured, holds the lock for at most 7 ms a slice at 120 × 400
+once the size has settled. The first four or five slices of a slow stream still take
+as long as their 16 KiB took before, and a stream that alternates between fast and
+slow output pays that again each time it turns slow. The stream cannot run anything
+or read anything this way. It makes the application slower to answer while it
+lasts, and it ends with the stream.
 
 **Known limit: the image ceilings are two.** The 1 GB across every pane counts
 decoded pixels; the textures drawn from them have a 1 GB budget of their own
