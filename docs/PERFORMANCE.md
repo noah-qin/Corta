@@ -1734,3 +1734,74 @@ holding `状态` (release core, Apple M5, macOS 27.2, Xcode 27.2, on battery, fi
 A line that does hold the ideographs still takes the `String` path, and so does a
 query with none (a kana or Hangul query, for instance): those are not helped.
 
+
+### 5.30 Where the session lock, a title change and the image caps stand (2026-11-18)
+
+A survey of what is left, not a change: no code moved. It records three limits
+measured in the app and the shapes of output that were checked and found sound, so
+the next measurement starts from them.
+
+**A lock slice is bounded in bytes, not in time.** The reader feeds the terminal in
+16 KiB slices under the session lock (§2.1), and the main thread takes that lock
+several times a frame: `takeFrameState`, the grid snapshot, `takeProgramSignals`,
+the title's read. A sequence a few bytes long that does work proportional to the
+grid makes a slice long. Core time for one slice filled with one sequence (release,
+best of 3):
+
+| Sequence | 50 × 200 | 120 × 400 |
+| --- | ---: | ---: |
+| `ESC # 8` (DECALN) | 374 ms | 1,838 ms |
+| `SGR 41` + `ED 2` (erase with a background colour) | 12 ms | 57 ms |
+| `ESC c` (RIS) | 16 ms | 18 ms |
+| Every other sequence tried (scrolls, insert and delete, alternate screen, tabs, `REP`, Kitty delete, palette) | under 2 ms | under 4 ms |
+
+DECALN is the outlier because `Grid.alignmentDisplay` writes each cell through
+`write(_:)`: 67 µs for a 50 × 200 screen, three bytes of input. In the app a
+256 KiB file of it held a 50 × 200 window for 8.7 s in front (frame CPU median
+29 ms, worst 81 ms; frame interval median 46 ms against 16.7 ms) and 10.3 s behind
+another application (worst frame 490 ms, worst interval 806 ms); a sample of the
+main thread found it waiting on the session lock for nearly all of that time. The
+erase and RIS floods did not hold the main thread at 50 × 200 (worst frame 6.6 ms
+and 3.1 ms); 120 × 400 was measured in the core only.
+
+**A window title change costs the main thread about 5.5 ms in front, 2.5 ms
+behind.** A title set 20 times a second (`OSC 0`) kept the main thread 11 % busy in
+a key window, against a frame CPU median of 0.54 ms for a two-byte spinner at the
+same rate; a frame that carried a title change had a median of 3.0 ms.
+`PaneWindowTitle.apply(fromOutput:)` sets `NSWindow.title` on every output batch
+that changes it, and the titlebar's layout and layer commit are most of the cost.
+The tab strip's own refresh is already held to once in 100 ms
+(`TerminalWindowController.refreshTabStripSoon`); the window's title is not.
+
+**The image caps add up to about 2 GB.** Twelve panes each sent twenty
+1024 × 1024 RGBA images (960 MiB of pixels in all): physical footprint 1,952 MB.
+The pixel budget (`ImageMemoryBudget`, 1 GB) and the texture budget
+(`GlobalTextureBudget`, 1 GB) are separate ceilings and both were reached. That is
+the caps working as written; it is recorded because the sum is what a user sees.
+
+**Checked and sound.** In the app, one 50 × 200 window, 60 Hz in front:
+
+| Output | Result |
+| --- | --- |
+| ASCII, 256 MiB | frame CPU median 0.21 ms, worst 2.5 ms, no interval over 16.7 ms |
+| Every CJK ideograph, Hangul syllable and extension-A ideograph, then three weights | first draws 8.4 ms median, 9.4 ms worst, no interval over 16.7 ms |
+| Emoji blocks, then 200,000 distinct grapheme clusters | 10.0 ms median, 14.0 ms worst, no interval over 16.7 ms |
+| At a prompt, 20 s | no CPU time, under one wakeup a second |
+| One line a second / a spinner at 20 Hz, behind another application | 0.4 % / 2.6 % of a core |
+
+The first-draw frames fit a 60 Hz frame and exceed the 8.3 ms of a 120 Hz one; no
+120 Hz display was measured. Twelve panes in three windows, flooding at once,
+behind another application: 64 MiB of ASCII to each pane (768 MiB in all) took
+2.9–4.1 s a pane with a worst frame of 1.4 ms, and a mixed flood of true colour, CJK and emoji with a worst frame of
+8.6 ms. In the core, growth stayed linear through 400,000 distinct hyperlinks,
+1,600,000 distinct grapheme clusters, 400,000 command cycles, 40,000 Kitty images
+and 40,000 placements of one image, and a repeat count of 2,147,483,647 cost no more
+than a clamped one for every sequence that takes one. Malformed UTF-8 (a run of
+`0xFF` or `0x80`) feeds at 41 MiB/s against 552 MiB/s for ASCII: each byte draws a
+U+FFFD through the full `write(_:)` path.
+
+Apple M5, macOS 27.2 (26B123), Xcode 27.2, on AC power. Core figures from a scratch
+SwiftPM package depending on `CortaTerminal` by path, `-c release`; app figures from
+the `Benchmark` configuration with `CORTA_RENDER_METRICS`, a staged
+`CORTA_STAGE_DIR`, and a script as `SHELL` that writes a prepared file to the
+terminal.
