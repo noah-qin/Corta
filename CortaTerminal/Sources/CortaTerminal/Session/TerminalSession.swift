@@ -76,6 +76,10 @@ public final class TerminalSession: @unchecked Sendable {
         /// A resize has copied the grid and is rebuilding it outside the lock:
         /// the reader and the compressor leave it alone until the commit.
         var isResizing = false
+        /// The slice just parsed began a wait, and the reader is reading the
+        /// foreground group outside the lock to stamp it. Program signals are
+        /// not read until it has: an unstamped wait reads as unverified.
+        var waitsAwaitingStamp = false
     }
 
     struct Callbacks {
