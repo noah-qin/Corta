@@ -412,6 +412,21 @@ allocating without bound. These caps are asserted in the fuzz harness
 An unterminated OSC string is the canonical case: a stream that opens one
 and never closes it must not accumulate gigabytes in a buffer.
 
+**Known limit: time under the session lock.** The caps above bound memory and
+bytes; none bounds how long one 16 KiB parse slice holds the session lock, and
+the main thread waits on that lock every frame. `ESC # 8` (DECALN) rewrites the
+whole screen cell by cell for three bytes of input: a slice full of it holds the
+lock for 374 ms on a 50 × 200 screen and 1.8 s on a 120 × 400 one, and a 256 KiB
+file of it kept a window at about a third of its frame rate for nine seconds
+(`PERFORMANCE.md` §5.30). The stream cannot run anything or read anything this
+way; it makes the application slow to answer while it lasts, and it ends with the
+stream. Every other sequence measured stays under a frame at that size.
+
+**Known limit: the image ceilings are two.** The 1 GB across every pane counts
+decoded pixels; the textures drawn from them have a 1 GB budget of their own
+(`GlobalTextureBudget`). Twelve panes of images reached both, a physical
+footprint of about 2 GB (`PERFORMANCE.md` §5.30).
+
 The decoder's sandbox is checked by the suite, not per decode:
 `ImageDecoderProcessTests` runs the helper's `--check-sandbox` mode, which
 must be refused both reads and writes of an existing private file outside
