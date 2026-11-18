@@ -118,6 +118,7 @@ extension Performer {
         // Likewise waiting episodes: the app suppresses a repeat alert by
         // number, so a wait after RIS must not reuse the last one's.
         let blockedEpisode = state.programSignals.blockedEpisode
+        let blockedEdges = state.programSignals.blockedEdges
         // The session's share of the app's image budget, not terminal state:
         // reset to unlimited, an image later in the same slice ignored it.
         let imageByteAllowance = state.imageByteAllowance
@@ -126,6 +127,7 @@ extension Performer {
         resetCount &+= 1
         state.synchronizedOutputEpisode = synchronizedOutputEpisode
         state.programSignals.blockedEpisode = blockedEpisode
+        state.programSignals.blockedEdges = blockedEdges
         state.imageByteAllowance = imageByteAllowance
         state.hostnamesAtStart = hostnames
         state.commandRecords = history

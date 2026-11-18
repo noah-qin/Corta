@@ -1033,9 +1033,10 @@ application names are reported by the program, not verified identities.
 a wait report: a file shown with `cat`, a remote host, the body of a `curl`.
 Corta raises Waiting for you (the orange tab, the Dock count, the attention
 notice and the ⌥⌘J queue) only while the pane's foreground program is an agent:
-one of the built-in names below, or one you add with `agent-processes`. A
-program run by `node`, `bun`, `deno` or Python counts by its script, so Codex
-installed with npm is recognised although its process is `node`. Any other
+one of the built-in names below, or one you add with `agent-processes`, when
+the wait arrived. An agent started through a wrapper (`caffeinate`, `npx`,
+`op run`) counts, and so does one installed with npm and run by `node`; a
+script that is merely named after an agent does not. Any other
 program's wait shows as State unknown, labelled Unverified in the Agents list,
 and raises nothing. Answering the status probe is not proof: the same bytes
 can send it. A pane running `ssh` cannot name the program on the far end, so a

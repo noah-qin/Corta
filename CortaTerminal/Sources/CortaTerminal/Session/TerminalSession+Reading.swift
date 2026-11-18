@@ -142,8 +142,14 @@ extension TerminalSession {
             // already passed this check.
             guard !current.isResizing else { return nil }
             let episodeBefore = current.terminal.synchronizedOutputEpisode
+            let waitsBefore = current.terminal.programBlockedEdges
             if let finished { current.terminal.completeDeferredImage(finished) }
             let consumed = current.terminal.feedDeferringImageDecode(slice)
+            // A new wait: who holds the terminal now, before the lock lets
+            // anyone read it. A few syscalls, only on the slice that has one.
+            if current.terminal.programBlockedEdges != waitsBefore {
+                current.terminal.recordWaitProgram(pty.foregroundProgram)
+            }
             let deferred = current.terminal.takeDeferredImage()
             reportImageBytes(current.terminal)
             let sliceResponses = current.terminal.takeOutput()

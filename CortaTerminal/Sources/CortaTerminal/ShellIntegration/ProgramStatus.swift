@@ -66,6 +66,23 @@ public struct ProgramSignalSnapshot: Sendable {
     public var hasShellIntegration: Bool
     public var isCommandRunning: Bool
     public var lastExitStatus: Int?
+    /// Who held the terminal when the latest wait arrived: read by the
+    /// session in the same lock as the bytes, so a later program cannot
+    /// claim an earlier one's output. Nil until a session records one.
+    public var waitProgram: ForegroundProgram?
+}
+
+/// The kernel's account of a terminal's foreground process group: each
+/// member's name, and the script it runs if it is an interpreter. Output
+/// cannot set any of it. The group's leader comes first.
+public struct ForegroundProgram: Sendable, Equatable {
+    public struct Member: Sendable, Equatable {
+        public var name: String
+        public var entryPoint: String?
+        public init(name: String, entryPoint: String? = nil) { self.name = name; self.entryPoint = entryPoint }
+    }
+    public var members: [Member]
+    public init(members: [Member]) { self.members = members }
 }
 
 public struct ProgramProgress: Sendable, Equatable {

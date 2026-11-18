@@ -28,15 +28,18 @@ struct AgentWaitGateTests {
     private final class Pane: TerminalPaneViewController {
         override func viewDidLoad() {}
     }
-    /// `program` stands in for the foreground process the gate reads: the
-    /// session really runs `cat`, which echoes each report back as output.
-    private func pane(program: String = "claude", entryPoint: String? = nil) throws -> TerminalPaneViewController {
+    private static func program(_ members: (String, String?)...) -> ForegroundProgram {
+        ForegroundProgram(members: members.map { .init(name: $0.0, entryPoint: $0.1) })
+    }
+    /// `program` stands in for the foreground group the session records with
+    /// a wait: the session really runs `cat`, which echoes each report back.
+    private func pane(_ program: ForegroundProgram) throws -> TerminalPaneViewController {
         let pane = Pane()
         pane.view = NSView()
         pane.session = try TerminalSession(executable: "/bin/cat", arguments: [],
             environment: ChildEnvironment.default(), workingDirectory: "/")
         pane.session.start()
-        pane.agents.foregroundProgram = { _ in (program, entryPoint) }
+        pane.agents.waitProgram = { _ in program }
         return pane
     }
     private func send(_ payload: String, to pane: TerminalPaneViewController) async throws {
@@ -54,13 +57,14 @@ struct AgentWaitGateTests {
     @Test func aWaitFromAProgramThatIsNotAnAgentRaisesNoAttention() async throws {
         let original = ConfigurationStore.shared.configuration
         ConfigurationStore.shared.update { $0.agentStatus = true }
-        // What `printf` at a prompt or `cat` of a file looks like to the gate.
-        let shell = try pane(program: "zsh"), reader = try pane(program: "cat")
+        // What `printf` at a prompt, `cat` of a file and a remote host look like.
+        let panes = try [Self.program(("zsh", nil)), Self.program(("cat", nil)), Self.program(("ssh", nil))]
+            .map { try pane($0) }
         defer {
-            for pane in [shell, reader] { pane.agents.reset(); pane.session.stop() }
+            for pane in panes { pane.agents.reset(); pane.session.stop() }
             ConfigurationStore.shared.update { $0 = original }
         }
-        for pane in [shell, reader] {
+        for pane in panes {
             try await send(osc("7501;state=blocked:kind=permission:app=claude-code"), to: pane)
             #expect(pane.agents.status?.state == .unknown)
             #expect(pane.agents.status?.kind == nil)
@@ -71,8 +75,8 @@ struct AgentWaitGateTests {
             #expect(entry?.title.hasSuffix(L10n.text("agent.state.unknown") + " · " + L10n.text("agent.unverified"))
                 == true)
         }
-        // The same report from an agent is a wait.
-        let agent = try pane(program: "node", entryPoint: "/opt/homebrew/bin/codex")
+        // The same report from an agent behind a wrapper is a wait.
+        let agent = try pane(Self.program(("caffeinate", nil), ("claude", nil)))
         defer { agent.agents.reset(); agent.session.stop() }
         try await send(osc("7501;state=blocked:kind=permission"), to: agent)
         #expect(agent.agents.status?.state == .blocked)
@@ -81,33 +85,10 @@ struct AgentWaitGateTests {
         #expect(AgentDirectory.shared.waiting.paneIDs.contains(agent.taskNotifier.paneID))
     }
 
-    @Test func aWaitIsCheckedAgainForANewProgram() async throws {
-        let original = ConfigurationStore.shared.configuration
-        ConfigurationStore.shared.update { $0.agentStatus = true }
-        var program = "zsh"
-        let pane = try pane()
-        pane.agents.foregroundProgram = { _ in (program, nil) }
-        defer {
-            pane.agents.reset(); pane.session.stop()
-            ConfigurationStore.shared.update { $0 = original }
-        }
-        try await send(osc("7501;state=blocked:kind=question"), to: pane)
-        #expect(pane.agents.statusIsUnverified)
-        // A further report in the same unverified wait is not read again.
-        program = "claude"
-        try await send("output", to: pane)
-        #expect(pane.agents.statusIsUnverified)
-        // A new wait is: the agent now in front raises it.
-        try await send(osc("7501;state=working") + osc("7501;state=blocked:kind=permission"), to: pane)
-        #expect(pane.agents.status?.state == .blocked)
-        #expect(!pane.agents.statusIsUnverified)
-        #expect(AgentDirectory.shared.waiting.paneIDs.contains(pane.taskNotifier.paneID))
-    }
-
     @Test func agentStatusOffShowsNothingAndStillQueuesNoForgedWait() async throws {
         let original = ConfigurationStore.shared.configuration
         ConfigurationStore.shared.update { $0.agentStatus = false }
-        let pane = try pane(program: "zsh")
+        let pane = try pane(Self.program(("zsh", nil)))
         defer {
             pane.agents.reset(); pane.session.stop()
             ConfigurationStore.shared.update { $0 = original }
@@ -119,22 +100,28 @@ struct AgentWaitGateTests {
         #expect(!AgentDirectory.shared.waiting.paneIDs.contains(pane.taskNotifier.paneID))
     }
 
-    @Test func agentsAreNamedByTheirExecutableOrTheScriptAnInterpreterRuns() {
-        func agent(_ process: String?, _ entry: String? = nil, configured: String = "") -> Bool {
-            PaneAgents.isAgent(process: process, entryPoint: entry, configured: configured)
+    @Test func agentsAreNamedByAnExecutableOrAnInstalledCommand() {
+        func agent(_ members: (String, String?)..., configured: String = "") -> Bool {
+            PaneAgents.isAgent(ForegroundProgram(members: members.map { .init(name: $0.0, entryPoint: $0.1) }),
+                configured: configured)
         }
-        #expect(agent("claude"))
-        #expect(agent("codex"))
-        #expect(agent("node", "/opt/homebrew/bin/codex"))
-        #expect(agent("node", "/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js"))
-        #expect(agent("my-agent", configured: "my-agent"))
-        #expect(agent("python3", "/opt/tools/my-agent.py", configured: "my-agent"))
-        #expect(!agent(nil))
-        #expect(!agent(""))
-        #expect(!agent("zsh"))
-        #expect(!agent("cat"))
-        #expect(!agent("ssh"), "a remote pane cannot name the program that reported")
-        #expect(!agent("node", "/Users/me/projects/claude/server.js"))
-        #expect(!agent("node"))
+        #expect(agent(("claude", nil)))
+        #expect(agent(("codex-aarch64-apple-darwin", nil)))
+        #expect(agent(("gemini-cli", nil)))
+        #expect(agent(("node", "/opt/homebrew/bin/codex")))
+        #expect(agent(("node", "/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js")))
+        #expect(agent(("op", nil), ("claude", nil)), "an agent behind a wrapper")
+        #expect(agent(("node", "/Users/me/.npm/_npx/1/node_modules/.bin/claude")))
+        #expect(agent(("my-agent", nil), configured: "my-agent"))
+        #expect(agent(("python3", "/opt/tools/my-agent"), configured: "my-agent"))
+        #expect(!PaneAgents.isAgent(nil, configured: ""))
+        #expect(!agent(("zsh", nil)))
+        #expect(!agent(("cat", nil)))
+        #expect(!agent(("ssh", nil)), "a remote pane cannot name the program that reported")
+        #expect(!agent(("node", "/Users/me/projects/claude/server.js")))
+        #expect(!agent(("node", "scripts/claude.js")))
+        #expect(!agent(("node", "scripts/claude")), "a script named after an agent is not one")
+        #expect(!agent(("python3", "gemini")), "nor is a module")
+        #expect(!agent(("node", nil)))
     }
 }

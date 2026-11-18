@@ -37,15 +37,9 @@ final class PaneAgents {
     /// The reported status is a `blocked` report from a pane whose foreground
     /// program is not a known agent: shown as State unknown, labelled unverified.
     private(set) var statusIsUnverified = false
-    /// Whether the wait in this episode came from an agent, read once per
-    /// wait rather than per output batch; a changed process clears it.
-    private var checkedWait: (episode: Int, fromAgent: Bool)?
-    private var lastProcess: String?
-    /// The pane's foreground program, as the kernel names it, and an
-    /// interpreter's entry point. Tests inject one; output never sets it.
-    var foregroundProgram: @MainActor (TerminalSession) -> (process: String?, entryPoint: String?) = {
-        ($0.activeProcessName, $0.activeProcessEntryPoint)
-    }
+    /// The program that held the terminal when the latest wait arrived, as
+    /// the session recorded it with the bytes. Tests inject one.
+    var waitProgram: @MainActor (ProgramSignalSnapshot) -> ForegroundProgram? = { $0.waitProgram }
 
     init(host: TerminalPaneViewController) { self.host = host }
 
@@ -60,7 +54,7 @@ final class PaneAgents {
         attentionRequest = nil
         processRefresh?.cancel(); processRefresh = nil
         if let host { AgentDirectory.updateWaiting(host.taskNotifier.paneID, blocked: false) }
-        waitingEpisode = nil; checkedWait = nil; lastProcess = nil; statusIsUnverified = false
+        waitingEpisode = nil; statusIsUnverified = false
         status = nil; progress = nil; fallback = nil; fallbackProcess = nil
         lastProcessRead = 0; sawSignals = false; sessionHasExited = false
         AgentDirectory.refresh()
@@ -78,9 +72,9 @@ final class PaneAgents {
         // Any bytes the pane prints can carry a wait: `cat` of a file, a
         // remote host, the body of a `curl`. Only an agent's raises attention.
         let reportsWait = reported.values.contains { $0.state == .blocked }
-        let waitFromAgent = reportsWait && waitComesFromAgent(session: session, signals: signals)
-        let isBlocked = reportsWait && waitFromAgent
-        let blocked = waitFromAgent ? signals.blocked : nil
+        let isBlocked = reportsWait && Self.isAgent(waitProgram(signals),
+            configured: configuration.agentProcesses)
+        let blocked = isBlocked ? signals.blocked : nil
         host.taskNotifier.setProgramBlocked(isBlocked, episode: signals.blockedEpisode)
         // A leave/re-entry can happen between two coalesced UI reads.
         if isBlocked, let waitingEpisode, waitingEpisode != signals.blockedEpisode {
@@ -92,7 +86,7 @@ final class PaneAgents {
         let oldProgress = progress
         let oldUnverified = statusIsUnverified
         if configuration.agentStatus {
-            updateStatus(session: session, signals: signals, unverifiedWait: reportsWait && !waitFromAgent)
+            updateStatus(session: session, signals: signals, unverifiedWait: reportsWait && !isBlocked)
         } else { status = nil; progress = nil; statusIsUnverified = false }
         if let blocked, !visible {
             host.taskNotifier.noteProgramAttention(kind: blocked, in: host.view.window)
@@ -112,35 +106,29 @@ final class PaneAgents {
         }
     }
 
-    /// Whether this pane's wait comes from an agent: its foreground program
-    /// is a built-in or configured agent. Read once per waiting episode and
-    /// again when the program changes, never per output batch. A remote
-    /// pane's program is `ssh`, so a wait reported over SSH never qualifies;
-    /// nor does answering the `?` probe, which the same bytes can send first.
-    private func waitComesFromAgent(session: TerminalSession, signals: ProgramSignalSnapshot) -> Bool {
-        if signals.blocked == nil, let checkedWait, checkedWait.episode == signals.blockedEpisode {
-            return checkedWait.fromAgent
-        }
-        let program = foregroundProgram(session)
-        let fromAgent = Self.isAgent(process: program.process, entryPoint: program.entryPoint,
-            configured: ConfigurationStore.shared.configuration.agentProcesses)
-        checkedWait = (signals.blockedEpisode, fromAgent)
-        return fromAgent
-    }
-
     static let builtInAgents = ["claude", "claude-code", "codex", "gemini", "aider", "opencode"]
+    private static let agentIcons: Set<ProgramIcon> = [.claude, .codex, .gemini, .opencode, .aider]
 
-    /// An agent by its executable's name, or by the script an interpreter
-    /// runs: npm's Codex leads its process group as `node`.
-    static func isAgent(process: String?, entryPoint: String?, configured: String) -> Bool {
-        guard let process, !process.isEmpty else { return false }
-        let names = builtInAgents + configured.split(separator: ",").map(String.init)
-        if names.contains(process) { return true }
-        guard let entryPoint else { return false }
-        let agents: Set<ProgramIcon> = [.claude, .codex, .gemini, .opencode, .aider]
-        if agents.contains(ProgramIcon.identify(process, entryPoint: entryPoint)) { return true }
-        let script = (entryPoint as NSString).lastPathComponent
-        return names.contains(script) || names.contains((script as NSString).deletingPathExtension)
+    /// Whether a wait comes from an agent: a member of the foreground group
+    /// when it arrived is a built-in or configured agent by its executable,
+    /// or an interpreter running one as a package or an installed command
+    /// (npm's Codex is `node …/bin/codex`). A script merely named after an
+    /// agent is not one, and neither is `ssh`: a remote pane cannot name the
+    /// program that reported. Answering the `?` probe proves nothing, since
+    /// the same bytes can send it.
+    static func isAgent(_ program: ForegroundProgram?, configured: String) -> Bool {
+        guard let program else { return false }
+        let names = Set(configured.split(separator: ",").map(String.init))
+        return program.members.contains { member in
+            if builtInAgents.contains(member.name) || names.contains(member.name) { return true }
+            guard let entryPoint = member.entryPoint else {
+                return agentIcons.contains(ProgramIcon.identify(member.name))
+            }
+            if names.contains((entryPoint as NSString).lastPathComponent) { return true }
+            let folders = entryPoint.split(separator: "/")
+            let installed = folders.contains("node_modules") || ["bin", ".bin"].contains(folders.dropLast().last)
+            return installed && agentIcons.contains(ProgramIcon.identify(member.name, entryPoint: entryPoint))
+        }
     }
 
     /// Bounces the Dock icon as the program asked, replacing any earlier
@@ -203,9 +191,6 @@ final class PaneAgents {
             processRefresh?.cancel(); processRefresh = nil
             lastProcessRead = now
             let process = session.activeProcessName ?? ""
-            // A wait checked against the program before this one is unproven.
-            if let lastProcess, lastProcess != process { checkedWait = nil }
-            lastProcess = process
             let configured = ConfigurationStore.shared.configuration.agentProcesses
                 .split(separator: ",").map(String.init)
             let names = Self.builtInAgents + configured

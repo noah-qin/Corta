@@ -48,6 +48,10 @@ struct ProgramSignals: Sendable {
     var blocked: ProgramStatus.Kind??
     var blockedID: String?
     var blockedEpisode = 0
+    /// Counts every new wait (a `blocked` edge), so the session can tell a
+    /// slice that brought one; kept across RIS, like `blockedEpisode`.
+    var blockedEdges = 0
+    var waitProgram: ForegroundProgram?
     var chunks: [String: DesktopNotification] = [:]
     /// Oldest first, so a ninth incomplete message replaces the stalest one
     /// rather than shutting out every later notice.
@@ -75,6 +79,7 @@ struct ProgramSignals: Sendable {
         if state == .blocked, statuses[id]?.state != .blocked || statuses[id]?.kind != kind {
             blocked = .some(kind)
             blockedID = id
+            blockedEdges &+= 1
         } else if state != .blocked, blockedID == id {
             blocked = nil; blockedID = nil
         }

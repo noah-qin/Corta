@@ -373,6 +373,22 @@ extension PTY {
         return Self.processName(ofGroup: group)
     }
 
+    /// Every member of the foreground group, leader first, at most sixteen:
+    /// an agent run through a wrapper (`caffeinate`, `npx`, `op run`) is a
+    /// member, not the leader. Nil when the group cannot be read.
+    public var foregroundProgram: ForegroundProgram? {
+        guard let group = foregroundProcessGroup else { return nil }
+        var pids = [pid_t](repeating: 0, count: 64)
+        let count = proc_listpgrppids(group, &pids, Int32(pids.count * MemoryLayout<pid_t>.size))
+        let others = pids.prefix(Int(max(0, min(count, Int32(pids.count))))).filter { $0 != group && $0 > 0 }
+        var members: [ForegroundProgram.Member] = []
+        for pid in [group] + others where members.count < 16 {
+            guard let name = Self.processName(of: pid) else { continue }
+            members.append(.init(name: name, entryPoint: ProcessEntryPoint.read(pid: pid, process: name)))
+        }
+        return members.isEmpty ? nil : ForegroundProgram(members: members)
+    }
+
     /// An interpreter's script or module, read from the foreground leader.
     /// Absent for unreadable processes and native executables.
     public var activeProcessEntryPoint: String? {

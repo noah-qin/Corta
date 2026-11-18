@@ -330,10 +330,13 @@ entry into blocked, once per pane, and never moves focus on a status event. The
 Agents list leads with that queue's order and then sorts by reported state, so a
 program can reach the top by saying it is blocked, as it can raise the Dock
 count, but cannot pass a pane already waiting.
-A wait counts only when the pane's foreground program, as the kernel names it
-(`tcgetpgrp`, `proc_name`, an interpreter's script from `KERN_PROCARGS2`), is a
-built-in or configured agent, read once per waiting episode and again when the
-program changes. Output cannot set that name: a `blocked` report printed by a
+A wait counts only when a member of the pane's foreground process group, as
+the kernel names it (`tcgetpgrp`, `proc_listpgrppids`, `proc_name`, an
+interpreter's script from `KERN_PROCARGS2`), is a built-in or configured agent.
+The session reads the group in the same lock that parses the report, on the
+slice that brings a new wait, so a program started afterwards cannot claim an
+earlier one's output; an interpreter counts only for an installed command or
+package, not a script named after an agent. Output cannot set any of it: a `blocked` report printed by a
 shell, `cat`, `curl` or `ssh` stays State unknown, labelled Unverified, and
 raises no tab state, Dock count, notice or queue entry. Answering the OSC 7501
 probe is not accepted as proof, because the same stream can send the probe;

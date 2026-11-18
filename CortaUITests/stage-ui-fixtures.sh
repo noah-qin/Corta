@@ -43,14 +43,22 @@ stage() {
 # name it in `agent-processes`.
 cat > "$root/corta-agent.swift" <<'SWIFT'
 import Darwin
-signal(SIGTTOU, SIG_IGN)
+// ^C and ^\ end the script, not this: the terminal goes back to the shell.
+for signal in [SIGTTOU, SIGINT, SIGQUIT] { Darwin.signal(signal, SIG_IGN) }
 let shellGroup = tcgetpgrp(STDIN_FILENO)
 setpgid(0, 0)
 tcsetpgrp(STDIN_FILENO, getpgrp())
 let arguments = ["/bin/sh"] + CommandLine.arguments.dropFirst()
 var argv = arguments.map { strdup($0) } + [nil]
+var attributes: posix_spawnattr_t?
+posix_spawnattr_init(&attributes)
+var defaults = sigset_t()
+sigemptyset(&defaults)
+for signal in [SIGTTOU, SIGINT, SIGQUIT] { sigaddset(&defaults, signal) }
+posix_spawnattr_setsigdefault(&attributes, &defaults)
+posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETSIGDEF))
 var child: pid_t = 0
-guard posix_spawn(&child, "/bin/sh", nil, nil, &argv, environ) == 0 else { exit(127) }
+guard posix_spawn(&child, "/bin/sh", nil, &attributes, &argv, environ) == 0 else { exit(127) }
 var status: Int32 = 0
 while waitpid(child, &status, 0) == -1 && errno == EINTR {}
 if shellGroup > 0 { tcsetpgrp(STDIN_FILENO, shellGroup) }
@@ -310,6 +318,8 @@ cat > "$root/waiting-navigation/waiting-report" <<'SH'
 printf '\033]7501;state=blocked:kind=%s:app=EVILAPP:title=Rm9yZ2VkIENvcnRhIHByb21wdA==\007' "$1"
 printf '\n%s\n' "$2"
 stty size
+# A real agent stays in front while it waits; what is typed meanwhile echoes.
+exec sleep 600
 SH
 chmod 700 "$root/waiting-navigation/waiting-shell" "$root/waiting-navigation/waiting-status" \
   "$root/waiting-navigation/waiting-report"
