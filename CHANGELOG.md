@@ -12,6 +12,12 @@ Versioning for compatibility changes.
 
 ### Fixed
 
+- A program that changes the window title many times a second costs the main
+  thread less. Titles set by output now reach the window and its proxy icon at
+  most once every 100 ms, as the tab strip already did, and the last one always
+  shows. Switching panes, a finished command and a rename still update the
+  title at once. At 20 title changes a second, a key window's main thread went
+  from about 9.4 % busy to about 6.6 %.
 - `ESC # 8` (the alignment test that fills the screen with `E`) fills each row
   at once instead of writing every cell, and a repeat on an unchanged screen
   costs nothing. A stream made of it held a 120 × 400 window's lock for 1.8 s

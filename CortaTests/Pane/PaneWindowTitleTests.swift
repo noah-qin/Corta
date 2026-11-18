@@ -191,4 +191,152 @@ extension PaneWindowTitleTests {
         #expect(!title.hasTrailingRefresh)
     }
 
+    /// Counts what reaches the titlebar, which is where the cost is.
+    private final class CountingWindow: NSWindow {
+        var titleSets: [String] = []
+        override var title: String {
+            didSet { titleSets.append(title) }
+        }
+    }
+
+    /// `cat` echoes each OSC 2 back as output, which retitles the pane.
+    private func retitle(_ session: TerminalSession, _ text: String) async {
+        session.write(Array("\u{1B}]2;\(text)\u{07}\n".utf8))
+        let deadline = SuspendingClock.now + .seconds(3) * testTimeoutScale
+        while session.windowTitle != text, SuspendingClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+    }
+
+    /// Reading the title starts the proxy icon's directory probe, whose
+    /// answer applies the title at once (not from output); let it land so it
+    /// is not counted as one of the output's changes.
+    private func settle(_ title: PaneWindowTitle) async {
+        title.apply()
+        // The probe answers `true` (`isDirectory`), and applies as it does.
+        let deadline = SuspendingClock.now + .seconds(5) * testTimeoutScale
+        while title.representedDirectory == nil, SuspendingClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(title.representedDirectory != nil)
+        title.apply()
+    }
+
+    /// A program retitling faster than the interval reaches the titlebar
+    /// once, then once more when the interval ends, with the last title.
+    @Test("titles from output inside 100 ms make one change, then the last one")
+    func outputTitlesAreCoalesced() async throws {
+        let session = try TerminalSession(
+            executable: "/bin/cat", arguments: [], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 24, columns: 80), workingDirectory: "/")
+        defer { session.stop() }
+        session.start()
+        let window = CountingWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        var clock: CFTimeInterval = 1_000
+        var scheduled: [(delay: TimeInterval, work: () -> Void)] = []
+        let title = PaneWindowTitle(
+            isDirectory: { _ in true }, now: { clock },
+            scheduleAfter: { delay, work in scheduled.append((delay, work)) })
+        defer { title.stop() }
+        title.reset(session: session)
+        title.window = { window }
+        title.isWindowVisible = { _ in true }
+        // Off while the loop runs: on a slow runner it outlasts the 0.4 s
+        // process-facts refresh, whose own deferred apply would count here.
+        var deferredAllowed = false
+        title.canApplyDeferred = { deferredAllowed }
+        await settle(title)
+        window.titleSets.removeAll()
+
+        for index in 0..<10 {
+            await retitle(session, "t \(index)")
+            title.apply(fromOutput: true)
+            clock += 0.009
+        }
+        #expect(window.titleSets.count == 1)
+        #expect(window.titleSets.first?.contains("t 0") == true)
+        #expect(scheduled.count == 1)
+        clock += 0.1
+        deferredAllowed = true
+        scheduled.removeFirst().work()
+        #expect(window.titleSets.count == 2)
+        #expect(window.title.contains("t 9"))
+        #expect(scheduled.isEmpty)
+    }
+
+    /// Focus, a finished command or a rename shows the title at once, and a
+    /// trailing update already scheduled has nothing left to do.
+    @Test("a title applied for focus is immediate and drops the trailing one")
+    func nonOutputTitleIsImmediate() async throws {
+        let session = try TerminalSession(
+            executable: "/bin/cat", arguments: [], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 24, columns: 80), workingDirectory: "/")
+        defer { session.stop() }
+        session.start()
+        let window = CountingWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let clock: CFTimeInterval = 1_000
+        var scheduled: [() -> Void] = []
+        let title = PaneWindowTitle(
+            isDirectory: { _ in true }, now: { clock }, scheduleAfter: { _, work in scheduled.append(work) })
+        defer { title.stop() }
+        title.reset(session: session)
+        title.window = { window }
+        title.isWindowVisible = { _ in true }
+        // The process-facts refresh applies too when it may; it must not here.
+        title.canApplyDeferred = { false }
+        await settle(title)
+        await retitle(session, "first")
+        title.apply(fromOutput: true)
+        await retitle(session, "second")
+        title.apply(fromOutput: true)
+        #expect(!window.title.contains("second"))
+        await retitle(session, "third")
+        title.apply()
+        #expect(window.title.contains("third"))
+        window.titleSets.removeAll()
+        for work in scheduled { work() }
+        #expect(window.titleSets.isEmpty)
+    }
+
+    /// A pane that lost focus inside the interval leaves the window's title
+    /// to the pane that has it.
+    @Test("the trailing title does not apply once the pane may not")
+    func trailingTitleRespectsFocus() async throws {
+        let session = try TerminalSession(
+            executable: "/bin/cat", arguments: [], environment: ChildEnvironment.default(),
+            size: TerminalSize(rows: 24, columns: 80), workingDirectory: "/")
+        defer { session.stop() }
+        session.start()
+        let window = CountingWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        var scheduled: [() -> Void] = []
+        let title = PaneWindowTitle(
+            isDirectory: { _ in true }, now: { 1_000 }, scheduleAfter: { _, work in scheduled.append(work) })
+        defer { title.stop() }
+        title.reset(session: session)
+        title.window = { window }
+        title.isWindowVisible = { _ in true }
+        var focused = true
+        title.canApplyDeferred = { focused }
+        await settle(title)
+        await retitle(session, "mine")
+        title.apply(fromOutput: true)
+        await retitle(session, "later")
+        title.apply(fromOutput: true)
+        focused = false
+        window.titleSets.removeAll()
+        for work in scheduled { work() }
+        #expect(window.titleSets.isEmpty)
+    }
 }

@@ -45,9 +45,24 @@ final class PaneWindowTitle {
     /// Whether a path is a directory — a `stat`, which can block on a mount
     /// that never answers, so it runs off the main actor.
     private let isDirectory: @Sendable (String) -> Bool
+    /// Seconds on a monotonic clock, for the window title's rate limit.
+    private let now: () -> CFTimeInterval
+    /// Runs the window title's trailing update after a delay, on the main actor.
+    private let scheduleAfter: (TimeInterval, @escaping () -> Void) -> Void
+    /// Whether any part of a window can be seen; output in one that cannot
+    /// updates nothing until it shows.
+    var isWindowVisible: (NSWindow) -> Bool = { $0.occlusionState.contains(.visible) }
 
-    init(isDirectory: @escaping @Sendable (String) -> Bool = PaneWindowTitle.isDirectoryOnDisk) {
+    init(
+        isDirectory: @escaping @Sendable (String) -> Bool = PaneWindowTitle.isDirectoryOnDisk,
+        now: @escaping () -> CFTimeInterval = CACurrentMediaTime,
+        scheduleAfter: @escaping (TimeInterval, @escaping () -> Void) -> Void = { delay, work in
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+        }
+    ) {
         self.isDirectory = isDirectory
+        self.now = now
+        self.scheduleAfter = scheduleAfter
     }
 
     nonisolated static func isDirectoryOnDisk(_ path: String) -> Bool {
@@ -83,6 +98,12 @@ final class PaneWindowTitle {
     private var isShowingTransientSize = false
     private var transientSizeReset: DispatchWorkItem?
     private var isStopped = false
+    /// When output last set the window's title, on `now`.
+    private var lastOutputTitleApply: CFTimeInterval = -.infinity
+    /// Output changed the title inside `windowTitleInterval`; one update
+    /// follows when it ends. Bumped to drop a scheduled one.
+    private var pendingOutputTitle: Int?
+    private var outputTitleGeneration = 0
     /// Output arrived while the window was covered (`noteOutput`).
     private(set) var refreshWhenVisible = false
 
@@ -96,6 +117,8 @@ final class PaneWindowTitle {
     /// The pane closed: nothing deferred may apply after this.
     func stop() {
         isStopped = true
+        outputTitleGeneration += 1
+        pendingOutputTitle = nil
         directoryProbeGeneration += 1
         trailingTitleRefresh?.cancel()
         trailingTitleRefresh = nil
@@ -190,9 +213,16 @@ final class PaneWindowTitle {
     /// `session.currentDirectory`, which a remote `OSC 7` report never
     /// reaches (it lands in `remoteContext`), so there is no remote
     /// path here to offer a drag of.
+    ///
+    /// From output, the window's title and proxy icon change at most once in
+    /// `windowTitleInterval`, and the last change inside it lands when it
+    /// ends: a program that retitles 20 times a second cost a key window's
+    /// main thread about 5.5 ms a change, most of it the titlebar's layout
+    /// and commit (`PERFORMANCE.md` §5.30). Focus, a finished command and a
+    /// rename apply at once.
     func apply(fromOutput: Bool = false) {
         guard let window = window() else { return }
-        if fromOutput, !window.occlusionState.contains(.visible) {
+        if fromOutput, !isWindowVisible(window) {
             refreshWhenVisible = true
             return
         }
@@ -202,10 +232,22 @@ final class PaneWindowTitle {
             if fromOutput { controller?.refreshTabStripSoon() } else { tab.controller?.refreshTabStrip() }
             return
         }
+        if fromOutput {
+            controller?.refreshTabStripSoon()
+            let elapsed = now() - lastOutputTitleApply
+            guard elapsed >= Self.windowTitleInterval else {
+                scheduleOutputTitle(after: Self.windowTitleInterval - elapsed)
+                return
+            }
+            lastOutputTitleApply = now()
+        } else {
+            // This one is current; a trailing update would only repeat it.
+            outputTitleGeneration += 1
+            pendingOutputTitle = nil
+            controller?.refreshTabTitle()
+        }
         let title = tab?.customTitle ?? composed
         if window.title != title { window.title = title }
-        if fromOutput { controller?.refreshTabStripSoon() } else { controller?.refreshTabTitle() }
-
         if window.representedURL != representedDirectory {
             window.representedURL = representedDirectory
         }
@@ -272,30 +314,6 @@ final class PaneWindowTitle {
         }
     }
 
-    /// Shows the grid size in the title for a moment after a resize, then
-    /// takes it away again.
-    func noteTransientSizeChange() {
-        isShowingTransientSize = true
-        transientSizeReset?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            isShowingTransientSize = false
-            transientSizeReset = nil
-            apply()
-        }
-        transientSizeReset = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.transientSizeDuration, execute: work)
-    }
-
-    /// A size change that was not a drag (zoom, a font change): no label.
-    func endTransientSize() {
-        transientSizeReset?.cancel()
-        transientSizeReset = nil
-        isShowingTransientSize = false
-    }
-
-    private static let transientSizeDuration: TimeInterval = 1.5
-
     /// The process name, directory and remote state behind the title, and
     /// when they were last read.
     ///
@@ -355,7 +373,7 @@ final class PaneWindowTitle {
     func noteOutput() {
         // A window nobody can see shows no title or tab: its process facts
         // (`tcgetpgrp`, `proc_name`, `proc_pidinfo`) wait until it shows.
-        if let window = window(), !window.occlusionState.contains(.visible) {
+        if let window = window(), !isWindowVisible(window) {
             refreshWhenVisible = true
             return
         }
@@ -365,7 +383,7 @@ final class PaneWindowTitle {
     /// Output came while the window was covered: read the facts now that it
     /// shows. From the pane's occlusion observer.
     func windowVisibilityChanged() {
-        guard refreshWhenVisible, let window = window(), window.occlusionState.contains(.visible) else { return }
+        guard refreshWhenVisible, let window = window(), isWindowVisible(window) else { return }
         refreshWhenVisible = false
         invalidateProcessFacts()
         scheduleTrailingTitleRefresh(after: 0)
@@ -401,4 +419,49 @@ final class PaneWindowTitle {
         let name = (path as NSString).lastPathComponent
         return name.isEmpty ? path : name
     }
+}
+
+extension PaneWindowTitle {
+    /// The window title's last change inside the interval. It reads the title
+    /// when it runs, so it shows the newest, and only while the pane may
+    /// still apply one: a pane that lost focus meanwhile leaves the window to
+    /// the pane that has it.
+    private func scheduleOutputTitle(after delay: TimeInterval) {
+        guard pendingOutputTitle == nil, !isStopped else { return }
+        let generation = outputTitleGeneration
+        pendingOutputTitle = generation
+        scheduleAfter(delay) { [weak self] in
+            guard let self, pendingOutputTitle == generation, generation == outputTitleGeneration else { return }
+            pendingOutputTitle = nil
+            guard !isStopped, canApplyDeferred() else { return }
+            apply(fromOutput: true)
+        }
+    }
+
+    /// The tab strip's own interval (`TerminalWindowController.stripRefreshInterval`).
+    static let windowTitleInterval: TimeInterval = 0.1
+
+    /// Shows the grid size in the title for a moment after a resize, then
+    /// takes it away again.
+    func noteTransientSizeChange() {
+        isShowingTransientSize = true
+        transientSizeReset?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            isShowingTransientSize = false
+            transientSizeReset = nil
+            apply()
+        }
+        transientSizeReset = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.transientSizeDuration, execute: work)
+    }
+
+    /// A size change that was not a drag (zoom, a font change): no label.
+    func endTransientSize() {
+        transientSizeReset?.cancel()
+        transientSizeReset = nil
+        isShowingTransientSize = false
+    }
+
+    private static let transientSizeDuration: TimeInterval = 1.5
 }
