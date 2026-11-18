@@ -118,6 +118,46 @@ extension Grid {
         }
     }
 
+    /// `count` U+FFFD from a run of malformed bytes (`Parser.isMalformedAlone`).
+    /// The first goes the ordinary way: it may continue a ZWJ cluster. After
+    /// it the previous cell is a U+FFFD of its own, which nothing joins, so the
+    /// rest are narrow cells written as an ASCII run is: 23 ns a byte became
+    /// a few. Anything that could make one of them land differently takes
+    /// `write` for every one: a previous cell that would still take the next
+    /// (a ZWJ cluster whose join was dropped), U+FFFD drawn wide (it is East
+    /// Asian Ambiguous), insert mode, and autowrap off, where the cursor stays
+    /// on the last column and the cell before it is the join target.
+    public mutating func writeReplacements(_ count: Int) {
+        let replacement = UTF8Decoder.replacement
+        guard count > 0 else { return }
+        write(replacement)
+        var remaining = count - 1
+        guard remaining > 0 else { return }
+        let joins = clusterJoinTarget().map(clusterEndsWithZWJ) ?? false
+        guard !joins, autowrapEnabled, !insertMode, !(ambiguousIsWide && columns >= 2) else {
+            for _ in 0..<remaining { write(replacement) }
+            return
+        }
+        let cell = pen.cell(replacement)
+        while remaining > 0 {
+            if pendingWrap {
+                lines[cursor.row].wrapped = true
+                cursor.column = 0
+                lineFeedWithoutClearingWrap()
+            }
+            let run = min(columns - cursor.column, remaining)
+            lines[cursor.row].overwrite(repeating: cell, count: run, at: cursor.column, pen: pen)
+            if cursor.column + run >= columns {
+                cursor.column = columns - 1
+                pendingWrap = true
+            } else {
+                cursor.column += run
+                pendingWrap = false
+            }
+            remaining -= run
+        }
+    }
+
     /// A run of CJK Unified Ideographs from the parser (three bytes each, a
     /// multiple of three, two or more of them): width 2, never combining. The
     /// first goes the ordinary way, since it may continue a ZWJ cluster; after

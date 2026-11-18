@@ -155,19 +155,11 @@ public struct Parser: Sendable {
                 }
                 performer.printASCII(bytes[(bytes.startIndex + offset)..<(bytes.startIndex + end)])
                 offset = end
-            } else if case .ground = state, span[offset] >= 0xE4, span[offset] <= 0xE9,
-                let end = Self.cjkRunEnd(span, from: offset)
+            } else if case .ground = state, span[offset] >= 0x80,
+                let end = Self.printUTF8Run(span, bytes, from: offset, performer: &performer)
             {
-                // A run of whole ideograph sequences: one call, as for ASCII.
-                performer.printCJK(bytes[(bytes.startIndex + offset)..<(bytes.startIndex + end)])
+                // Never an APC dispatch to stop after: these only print.
                 offset = end
-            } else if case .ground = state, span[offset] >= 0xC2,
-                let (scalar, length) = Self.wholeScalar(span, at: offset) {
-                // A complete, well-formed sequence already in this slice: no
-                // decoder state to carry, so the parser stays in ground. It
-                // only prints, so it has no APC dispatch to stop after.
-                performer.print(scalar)
-                offset += length
             } else {
                 advance(span[offset], performer: &performer)
                 offset += 1

@@ -132,6 +132,23 @@ public struct Line: Equatable, Sendable {
         }
     }
 
+    /// `count` copies of one narrow cell from `column` on: as `overwriteASCII`,
+    /// only the two ends can part a wide pair.
+    mutating func overwrite(repeating cell: Cell, count: Int, at column: Int, pen: Pen) {
+        guard count > 0, column >= 0 else { return }
+        let end = column + count
+        if column < cells.count, cells[column].attributes.contains(.wideSpacer), column > 0 {
+            cells[column - 1] = pen.eraseCell
+        }
+        if end - 1 < cells.count, cells[end - 1].attributes.contains(.wide), end < cells.count {
+            cells[end] = pen.eraseCell
+        }
+        grow(to: end)
+        cells.withUnsafeMutableBufferPointer { buffer in
+            buffer[column..<end].update(repeating: cell)
+        }
+    }
+
     /// Whole-pair ideograph run: `bytes` holds three-byte sequences, each
     /// becoming a `.wide` lead and a `.wideSpacer`, from `column` on. As one
     /// `overwriteWide` per pair does, the two ends can part a wide pair —

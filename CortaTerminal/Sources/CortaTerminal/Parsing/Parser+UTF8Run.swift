@@ -17,6 +17,45 @@
 // MARK: - Whole UTF-8 sequences
 
 extension Parser {
+    /// A ground-state run that starts with a non-ASCII byte, printed in one
+    /// call: whole ideograph sequences, bytes that are malformed on their own,
+    /// or one whole well-formed scalar. Returns where it ended, or nil to
+    /// leave the byte to `advance` and the decoder.
+    @inline(__always)
+    static func printUTF8Run<P: ParserPerformer>(
+        _ span: Span<UInt8>, _ bytes: ArraySlice<UInt8>, from offset: Int, performer: inout P
+    ) -> Int? {
+        let lead = span[offset]
+        if lead >= 0xE4, lead <= 0xE9, let end = cjkRunEnd(span, from: offset) {
+            // A run of whole ideograph sequences: one call, as for ASCII.
+            performer.printCJK(bytes[(bytes.startIndex + offset)..<(bytes.startIndex + end)])
+            return end
+        }
+        if isMalformedAlone(lead) {
+            // Bytes no sequence can start from: each is one U+FFFD and leaves
+            // the decoder idle, so a run of them is one call.
+            var end = offset + 1
+            while end < span.count, isMalformedAlone(span[end]) { end += 1 }
+            performer.printReplacements(end - offset)
+            return end
+        }
+        if lead >= 0xC2, let (scalar, length) = wholeScalar(span, at: offset) {
+            // A complete, well-formed sequence already in this slice: no
+            // decoder state to carry, so the parser stays in ground.
+            performer.print(scalar)
+            return offset + length
+        }
+        return nil
+    }
+
+    /// A stray continuation (also a lone C1), an overlong lead (`C0`, `C1`)
+    /// or a byte past U+10FFFF's leads: `UTF8Decoder.start` answers
+    /// `.invalid` for each and begins nothing.
+    @inline(__always)
+    static func isMalformedAlone(_ byte: UInt8) -> Bool {
+        (byte >= 0x80 && byte <= 0xC1) || byte >= 0xF5
+    }
+
     /// The scalar and byte length of the two-, three- or four-byte sequence
     /// starting at `offset` when all of its bytes are in `span` and it is
     /// well formed by the rules `UTF8Decoder` applies (no overlong form, no
