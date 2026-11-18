@@ -92,6 +92,10 @@ struct ProgramSignals: Sendable {
         // The same wait, reported again, keeps who began it; a new one waits
         // for the session's stamp (`stampWaits`).
         if state == .blocked, !newWait { statuses[id]?.reporter = previous?.reporter }
+        if state == .blocked {
+            statuses[id]?.wait = newWait ? blockedEdges : previous?.wait
+            statuses[id]?.waitEntry = previous?.state == .blocked ? previous?.waitEntry : blockedEdges
+        }
     }
 
     /// Gives each wait not yet stamped the program in front now. Called by
@@ -159,7 +163,7 @@ struct ProgramSignals: Sendable {
         } else if result.state != .done && result.state != .error {
             result.state = .idle
         }
-        result.kind = nil; result.progress = nil; result.reporter = nil
+        result.kind = nil; result.progress = nil; result.reporter = nil; result.wait = nil; result.waitEntry = nil
         statuses[""] = result
     }
 

@@ -31,6 +31,11 @@ final class PaneAgents {
     private var lastProcessRead: TimeInterval = 0
     private var sawSignals = false
     private var waitingEpisode: Int?
+    /// The trusted waits seen at the last read, by `ProgramStatus.wait` and
+    /// `waitEntry`: an unverified record can neither open nor hold an episode.
+    private var trustedWaits: Set<Int> = []
+    private var trustedEntries: Set<Int> = []
+    private var trustedEpisode = 0
     private var sessionHasExited = false
     private var attentionRequest: Int?
     private var processRefresh: DispatchWorkItem?
@@ -62,6 +67,7 @@ final class PaneAgents {
         processRefresh?.cancel(); processRefresh = nil
         if let host { AgentDirectory.updateWaiting(host.taskNotifier.paneID, blocked: false) }
         waitingEpisode = nil; statusIsUnverified = false
+        trustedWaits = []; trustedEntries = []
         status = nil; progress = nil; fallback = nil; fallbackProcess = nil
         lastProcessRead = 0; sawSignals = false; sessionHasExited = false
         AgentDirectory.refresh()
@@ -82,14 +88,15 @@ final class PaneAgents {
         var unverified: Set<String> = []
         for (id, status) in reported where status.state == .blocked
             && !beganWithAgent(status, configured: configuration.agentProcesses) { unverified.insert(id) }
-        let isBlocked = reported.contains { $0.value.state == .blocked && !unverified.contains($0.key) }
-        let blocked = isBlocked ? signals.blocked : nil
-        host.taskNotifier.setProgramBlocked(isBlocked, episode: signals.blockedEpisode)
+        let trusted = reported.filter { $0.value.state == .blocked && !unverified.contains($0.key) }.values
+        let isBlocked = !trusted.isEmpty
+        let blocked = trustedEdge(trusted)
+        host.taskNotifier.setProgramBlocked(isBlocked, episode: trustedEpisode)
         // A leave/re-entry can happen between two coalesced UI reads.
-        if isBlocked, let waitingEpisode, waitingEpisode != signals.blockedEpisode {
+        if isBlocked, let waitingEpisode, waitingEpisode != trustedEpisode {
             AgentDirectory.updateWaiting(host.taskNotifier.paneID, blocked: false)
         }
-        waitingEpisode = isBlocked ? signals.blockedEpisode : nil
+        waitingEpisode = isBlocked ? trustedEpisode : nil
         let queueChanged = AgentDirectory.updateWaiting(host.taskNotifier.paneID, blocked: isBlocked)
         let oldStatus = status
         let oldProgress = progress
@@ -113,6 +120,20 @@ final class PaneAgents {
         if queueChanged || oldStatus != status || oldProgress != progress || oldUnverified != statusIsUnverified {
             AgentDirectory.refresh()
         }
+    }
+
+    /// A trusted wait not seen at the last read is an edge, and its kind the
+    /// notice's: an unverified record cannot replace or erase it. Entries
+    /// that share nothing with the last read's begin a new episode, as when
+    /// the agent left waiting and came back between two reads.
+    private func trustedEdge(_ trusted: some Collection<ProgramStatus>) -> ProgramStatus.Kind?? {
+        let waits = Set(trusted.compactMap(\.wait))
+        let entries = Set(trusted.compactMap(\.waitEntry))
+        if !entries.isEmpty, entries.isDisjoint(with: trustedEntries) { trustedEpisode += 1 }
+        let fresh = trusted.filter { $0.wait.map { !trustedWaits.contains($0) } ?? false }
+        trustedWaits = waits; trustedEntries = entries
+        guard let newest = fresh.max(by: { ($0.wait ?? 0) < ($1.wait ?? 0) }) else { return nil }
+        return .some(newest.kind)
     }
 
     private func beganWithAgent(_ status: ProgramStatus, configured: String) -> Bool {

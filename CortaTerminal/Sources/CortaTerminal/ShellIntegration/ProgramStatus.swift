@@ -34,6 +34,12 @@ public struct ProgramStatus: Sendable, Equatable {
     /// began, stamped by the session (`ForegroundProgram`). Members empty:
     /// it could not be read. Nil on other states, and outside a session.
     public var reporter: ForegroundProgram?
+    /// For a wait: a serial for this wait (a new one when it begins or its
+    /// kind changes), and the serial it entered waiting with (kept across a
+    /// kind change). The app tells its own edges and episodes from these,
+    /// over the waits it trusts. Nil on other states.
+    public var wait: Int?
+    public var waitEntry: Int?
 
     public init(state: State, kind: Kind? = nil, app: String = "", title: String = "",
                 message: String = "", progress: Int? = nil, color: String? = nil, statusColor: String? = nil) {

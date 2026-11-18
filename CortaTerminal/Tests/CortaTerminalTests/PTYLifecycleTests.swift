@@ -511,3 +511,38 @@ private final class RecycledDescriptorFile {
         unlink(path)
     }
 }
+
+extension PTYLifecycleTests {
+    private func foregroundJob(_ command: String, _ body: (PTY) throws -> Void) throws {
+        let pty = try PTY.spawn(executable: "/bin/bash", arguments: ["--norc", "-i"])
+        defer {
+            pty.terminate()
+            _ = waitForExitDraining(pty)
+            pty.close()
+        }
+        _ = pty.readOutput(containing: "$ ")
+        try pty.write(text: command + "\n")
+        #expect(waitForCondition { pty.hasForegroundJob })
+        try body(pty)
+    }
+
+    @Test("the foreground program lists every member of the group")
+    func foregroundProgramListsAWrappersMembers() throws {
+        // `caffeinate` runs the command as the group's leader and waits as its child.
+        try foregroundJob("/usr/bin/caffeinate -i /bin/sleep 30") { pty in
+            #expect(waitForCondition {
+                Set(pty.foregroundProgram?.members.map(\.name) ?? []) == ["caffeinate", "sleep"]
+            })
+        }
+    }
+
+    @Test("the foreground program follows an exec that keeps the pid")
+    func foregroundProgramFollowsExec() throws {
+        // No child of its own: the group's pids stay the same across the exec.
+        try foregroundJob("/bin/zsh -fc 'read -t 1 x; exec /bin/sleep 30'") { pty in
+            #expect(waitForCondition { pty.foregroundProgram?.members.map(\.name) == ["zsh"] })
+            #expect(waitForCondition { pty.foregroundProgram?.members.map(\.name) == ["sleep"] },
+                "a name read after the exec, not the cached one")
+        }
+    }
+}

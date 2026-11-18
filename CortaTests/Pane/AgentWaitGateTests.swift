@@ -106,6 +106,27 @@ struct AgentWaitGateTests {
         #expect(pane.agents.status?.state == .working)
     }
 
+    @Test func anUnverifiedWaitCannotHoldAnAgentsPlaceInTheQueue() async throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.agentStatus = true }
+        let first = try pane(Self.program(("claude", nil))), second = try pane(Self.program(("claude", nil)))
+        first.agents.reporter = { $0.app == "evil" ? Self.program(("cat", nil)) : Self.program(("claude", nil)) }
+        let firstID = first.taskNotifier.paneID, secondID = second.taskNotifier.paneID
+        defer {
+            for pane in [first, second] { pane.agents.reset(); pane.session.stop() }
+            ConfigurationStore.shared.update { $0 = original }
+        }
+        func ours() -> [UUID] { AgentDirectory.shared.waiting.paneIDs.filter { [firstID, secondID].contains($0) } }
+        try await send(osc("7501;state=blocked:kind=question"), to: first)
+        try await send(osc("7501;state=blocked:id=x:app=evil"), to: first)
+        try await send(osc("7501;state=blocked:kind=question"), to: second)
+        #expect(ours() == [firstID, secondID])
+        // The agent leaves waiting and comes back between two reads. The
+        // forged record still waiting must not make that the same wait.
+        try await send(osc("7501;state=working") + osc("7501;state=blocked:kind=permission"), to: first)
+        #expect(ours() == [secondID, firstID])
+    }
+
     @Test func agentStatusOffShowsNothingAndStillQueuesNoForgedWait() async throws {
         let original = ConfigurationStore.shared.configuration
         ConfigurationStore.shared.update { $0.agentStatus = false }

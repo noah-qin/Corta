@@ -336,8 +336,10 @@ interpreter's script from `KERN_PROCARGS2`), is a built-in or configured agent.
 The session reads the group in the same lock that parses the report, on the
 slice that begins a wait, and stamps it on that wait's record: each wait is
 judged by who began it, so an agent's later wait cannot vouch for a forged one
-left under another id. Names are read again only when the group's members
-change. An interpreter counts only for an absolute path to an installed command
+left under another id, and an unverified wait can neither replace a trusted
+one's notice nor keep its episode open. Names are read again for each new
+wait (`exec` keeps the pid), except within 100 ms of reading the same members,
+when that reading stands; only an interpreter's script is kept longer. An interpreter counts only for an absolute path to an installed command
 or package, not a script named after an agent. Output cannot set any of it: a `blocked` report printed by a
 shell, `cat`, `curl` or `ssh` stays State unknown, labelled Unverified, and
 raises no tab state, Dock count, notice or queue entry. Answering the OSC 7501
