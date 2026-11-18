@@ -66,6 +66,10 @@ struct Performer: ParserPerformer, Sendable {
         grid.writeCJK(bytes)
     }
 
+    mutating func printReplacements(_ count: Int) {
+        grid.writeReplacements(count)
+    }
+
     mutating func execute(_ control: UInt8) {
         switch control {
         case 0x08: grid.backspace()
