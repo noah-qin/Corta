@@ -1040,8 +1040,10 @@ script that is merely named after an agent does not. Any other
 program's wait shows as State unknown, labelled Unverified in the Agents list,
 and raises nothing. Answering the status probe is not proof: the same bytes
 can send it. A pane running `ssh` cannot name the program on the far end, so a
-wait reported over SSH shows as Unverified too, Claude Code's included; its
-other states still show.
+wait reported over SSH shows as Unverified too, Claude Code's included, and so
+does one from inside tmux, screen, `docker exec` or mosh; their other states
+still show. Adding `tmux` or `docker` to `agent-processes` would make every
+program run there count as an agent, so it is not a fix.
 Generic OSC 21337 metadata can decorate the current state with an indicator
 colour and a status label when its task title is empty. Without a task state,
 its label remains State unknown. `status-color` is retained metadata; native

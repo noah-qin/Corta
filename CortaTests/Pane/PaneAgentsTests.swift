@@ -37,7 +37,7 @@ struct PaneAgentsTests {
         pane.session = try TerminalSession(executable: "/bin/cat", arguments: [],
             environment: ChildEnvironment.default(), workingDirectory: "/")
         pane.session.start()
-        pane.agents.waitProgram = { _ in ForegroundProgram(members: [.init(name: "claude")]) }
+        pane.agents.reporter = { _ in ForegroundProgram(members: [.init(name: "claude")]) }
         return pane
     }
     private func waitUntilTrue(timeout: Duration, _ condition: () -> Bool) async -> Bool {

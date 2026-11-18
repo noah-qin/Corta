@@ -31,7 +31,7 @@ struct AgentWaitGateTests {
     private static func program(_ members: (String, String?)...) -> ForegroundProgram {
         ForegroundProgram(members: members.map { .init(name: $0.0, entryPoint: $0.1) })
     }
-    /// `program` stands in for the foreground group the session records with
+    /// `program` stands in for the foreground group the session stamps on
     /// a wait: the session really runs `cat`, which echoes each report back.
     private func pane(_ program: ForegroundProgram) throws -> TerminalPaneViewController {
         let pane = Pane()
@@ -39,7 +39,7 @@ struct AgentWaitGateTests {
         pane.session = try TerminalSession(executable: "/bin/cat", arguments: [],
             environment: ChildEnvironment.default(), workingDirectory: "/")
         pane.session.start()
-        pane.agents.waitProgram = { _ in program }
+        pane.agents.reporter = { _ in program }
         return pane
     }
     private func send(_ payload: String, to pane: TerminalPaneViewController) async throws {
@@ -85,6 +85,27 @@ struct AgentWaitGateTests {
         #expect(AgentDirectory.shared.waiting.paneIDs.contains(agent.taskNotifier.paneID))
     }
 
+    @Test func eachWaitIsJudgedByWhoBeganIt() async throws {
+        let original = ConfigurationStore.shared.configuration
+        ConfigurationStore.shared.update { $0.agentStatus = true }
+        let pane = try pane(Self.program(("claude", nil)))
+        // `cat evil.txt; claude`: the forged record was stamped with `cat`.
+        pane.agents.reporter = { $0.app == "evil" ? Self.program(("cat", nil)) : Self.program(("claude", nil)) }
+        defer {
+            pane.agents.reset(); pane.session.stop()
+            ConfigurationStore.shared.update { $0 = original }
+        }
+        try await send(osc("7501;state=blocked:kind=permission:id=x:app=evil"), to: pane)
+        try await send(osc("7501;state=blocked:kind=question:app=claude-code"), to: pane)
+        #expect(AgentDirectory.shared.waiting.paneIDs.contains(pane.taskNotifier.paneID))
+        #expect(pane.agents.status?.kind == .question, "the agent's own wait, not the forged one")
+        // The agent moves on; the forged record left behind raises nothing.
+        try await send(osc("7501;state=working:app=claude-code"), to: pane)
+        #expect(!AgentDirectory.shared.waiting.paneIDs.contains(pane.taskNotifier.paneID))
+        #expect(!pane.taskNotifier.programBlocked)
+        #expect(pane.agents.status?.state == .working)
+    }
+
     @Test func agentStatusOffShowsNothingAndStillQueuesNoForgedWait() async throws {
         let original = ConfigurationStore.shared.configuration
         ConfigurationStore.shared.update { $0.agentStatus = false }
@@ -113,7 +134,9 @@ struct AgentWaitGateTests {
         #expect(agent(("op", nil), ("claude", nil)), "an agent behind a wrapper")
         #expect(agent(("node", "/Users/me/.npm/_npx/1/node_modules/.bin/claude")))
         #expect(agent(("my-agent", nil), configured: "my-agent"))
-        #expect(agent(("python3", "/opt/tools/my-agent"), configured: "my-agent"))
+        #expect(agent(("python3", "/opt/tools/bin/my-agent"), configured: "my-agent"))
+        #expect(!agent(("python3", "/tmp/my-agent"), configured: "my-agent"), "a script, not an installed command")
+        #expect(!agent(("node", "bin/claude")), "a relative path is a project's own")
         #expect(!PaneAgents.isAgent(nil, configured: ""))
         #expect(!agent(("zsh", nil)))
         #expect(!agent(("cat", nil)))

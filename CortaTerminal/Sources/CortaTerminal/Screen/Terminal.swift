@@ -284,9 +284,9 @@ extension Terminal {
     public var programStatuses: [String: ProgramStatus] { performer.state.programSignals.statuses }
     public var programBlockedEpisode: Int { performer.state.programSignals.blockedEpisode }
     var programBlockedEdges: Int { performer.state.programSignals.blockedEdges }
-    /// Set by the session when a slice brings a new wait (`ProgramSignalSnapshot.waitProgram`).
-    mutating func recordWaitProgram(_ program: ForegroundProgram?) {
-        performer.state.programSignals.waitProgram = program
+    /// The session's stamp on the waits a slice began (`ProgramStatus.reporter`).
+    mutating func stampProgramWaits(_ program: ForegroundProgram?) {
+        performer.state.programSignals.stampWaits(program)
     }
     public var programTabMetadata: ProgramStatus? { performer.state.programSignals.tabMetadata }
     public var programProgress: ProgramProgress? { performer.state.programSignals.progress }
@@ -318,8 +318,7 @@ extension Terminal {
             notification: takeDesktopNotification(),
             attention: takeProgramAttention(), pointerShape: pointerShape,
             hasShellIntegration: hasShellIntegration, isCommandRunning: isCommandRunning,
-            lastExitStatus: commandRecords.lastCompleted?.exitStatus,
-            waitProgram: performer.state.programSignals.waitProgram)
+            lastExitStatus: commandRecords.lastCompleted?.exitStatus)
     }
 
     public var windowTitle: String? { performer.state.windowTitle }

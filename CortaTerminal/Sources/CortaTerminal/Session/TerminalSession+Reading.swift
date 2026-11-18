@@ -146,9 +146,10 @@ extension TerminalSession {
             if let finished { current.terminal.completeDeferredImage(finished) }
             let consumed = current.terminal.feedDeferringImageDecode(slice)
             // A new wait: who holds the terminal now, before the lock lets
-            // anyone read it. A few syscalls, only on the slice that has one.
+            // anyone read it. Only on a slice that began one, and names are
+            // resolved only when the group's members change.
             if current.terminal.programBlockedEdges != waitsBefore {
-                current.terminal.recordWaitProgram(pty.foregroundProgram)
+                current.terminal.stampProgramWaits(pty.foregroundProgram)
             }
             let deferred = current.terminal.takeDeferredImage()
             reportImageBytes(current.terminal)

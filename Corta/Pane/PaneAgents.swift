@@ -37,9 +37,16 @@ final class PaneAgents {
     /// The reported status is a `blocked` report from a pane whose foreground
     /// program is not a known agent: shown as State unknown, labelled unverified.
     private(set) var statusIsUnverified = false
-    /// The program that held the terminal when the latest wait arrived, as
-    /// the session recorded it with the bytes. Tests inject one.
-    var waitProgram: @MainActor (ProgramSignalSnapshot) -> ForegroundProgram? = { $0.waitProgram }
+    /// Who began a wait, as the session stamped it with the bytes. Tests inject one.
+    var reporter: @MainActor (ProgramStatus) -> ForegroundProgram? = { $0.reporter }
+    /// The last verdict: a wait is reported again with every redraw, and its
+    /// reporter changes only with a new wait.
+    private var verdict: Verdict?
+    private struct Verdict {
+        var program: ForegroundProgram?
+        var configured: String
+        var isAgent: Bool
+    }
 
     init(host: TerminalPaneViewController) { self.host = host }
 
@@ -71,9 +78,11 @@ final class PaneAgents {
         host.pointer.refreshProgramPointer(shape: signals.pointerShape)
         // Any bytes the pane prints can carry a wait: `cat` of a file, a
         // remote host, the body of a `curl`. Only an agent's raises attention.
-        let reportsWait = reported.values.contains { $0.state == .blocked }
-        let isBlocked = reportsWait && Self.isAgent(waitProgram(signals),
-            configured: configuration.agentProcesses)
+        // Each wait is judged by who began it, not by a later one's sender.
+        var unverified: Set<String> = []
+        for (id, status) in reported where status.state == .blocked
+            && !beganWithAgent(status, configured: configuration.agentProcesses) { unverified.insert(id) }
+        let isBlocked = reported.contains { $0.value.state == .blocked && !unverified.contains($0.key) }
         let blocked = isBlocked ? signals.blocked : nil
         host.taskNotifier.setProgramBlocked(isBlocked, episode: signals.blockedEpisode)
         // A leave/re-entry can happen between two coalesced UI reads.
@@ -86,7 +95,7 @@ final class PaneAgents {
         let oldProgress = progress
         let oldUnverified = statusIsUnverified
         if configuration.agentStatus {
-            updateStatus(session: session, signals: signals, unverifiedWait: reportsWait && !isBlocked)
+            updateStatus(session: session, signals: signals, unverified: unverified)
         } else { status = nil; progress = nil; statusIsUnverified = false }
         if let blocked, !visible {
             host.taskNotifier.noteProgramAttention(kind: blocked, in: host.view.window)
@@ -104,6 +113,14 @@ final class PaneAgents {
         if queueChanged || oldStatus != status || oldProgress != progress || oldUnverified != statusIsUnverified {
             AgentDirectory.refresh()
         }
+    }
+
+    private func beganWithAgent(_ status: ProgramStatus, configured: String) -> Bool {
+        let program = reporter(status)
+        if let verdict, verdict.program == program, verdict.configured == configured { return verdict.isAgent }
+        let isAgent = Self.isAgent(program, configured: configured)
+        verdict = Verdict(program: program, configured: configured, isAgent: isAgent)
+        return isAgent
     }
 
     static let builtInAgents = ["claude", "claude-code", "codex", "gemini", "aider", "opencode"]
@@ -124,10 +141,12 @@ final class PaneAgents {
             guard let entryPoint = member.entryPoint else {
                 return agentIcons.contains(ProgramIcon.identify(member.name))
             }
-            if names.contains((entryPoint as NSString).lastPathComponent) { return true }
+            // Installed: an absolute path in a package or a `bin` folder.
             let folders = entryPoint.split(separator: "/")
-            let installed = folders.contains("node_modules") || ["bin", ".bin"].contains(folders.dropLast().last)
-            return installed && agentIcons.contains(ProgramIcon.identify(member.name, entryPoint: entryPoint))
+            guard entryPoint.hasPrefix("/"), folders.contains("node_modules")
+                || ["bin", ".bin"].contains(folders.dropLast().last) else { return false }
+            return names.contains((entryPoint as NSString).lastPathComponent)
+                || agentIcons.contains(ProgramIcon.identify(member.name, entryPoint: entryPoint))
         }
     }
 
@@ -147,17 +166,15 @@ final class PaneAgents {
     /// The most urgent reported status, else the process fallback until a
     /// program has reported once; tab metadata colours it, and its progress
     /// stands in when the program sent none.
-    private func updateStatus(session: TerminalSession, signals: ProgramSignalSnapshot, unverifiedWait: Bool) {
+    private func updateStatus(session: TerminalSession, signals: ProgramSignalSnapshot, unverified: Set<String>) {
         refreshFallback(session: session, signals: signals)
         // An unverified wait stays visible, as no more than State unknown.
-        let reported = unverifiedWait ? signals.statuses.mapValues { status in
-            guard status.state == .blocked else { return status }
-            var unverified = status
-            unverified.state = .unknown; unverified.kind = nil
-            return unverified
-        } : signals.statuses
+        var reported = signals.statuses
+        for id in unverified {
+            reported[id]?.state = .unknown; reported[id]?.kind = nil
+        }
         status = Self.preferredStatus(reported) ?? (sawSignals ? nil : fallback)
-        statusIsUnverified = unverifiedWait && status?.state == .unknown
+        statusIsUnverified = !unverified.isEmpty && status?.state == .unknown
         if let metadata = signals.tabMetadata {
             if status == nil {
                 status = metadata
@@ -191,10 +208,9 @@ final class PaneAgents {
             processRefresh?.cancel(); processRefresh = nil
             lastProcessRead = now
             let process = session.activeProcessName ?? ""
-            let configured = ConfigurationStore.shared.configuration.agentProcesses
-                .split(separator: ",").map(String.init)
-            let names = Self.builtInAgents + configured
-            if names.contains(process) {
+            // The same rule as a wait's, applied to the group's leader.
+            if Self.isAgent(ForegroundProgram(members: [.init(name: process)]),
+                            configured: ConfigurationStore.shared.configuration.agentProcesses) {
                 if fallbackProcess != process {
                     fallback = ProgramStatus(state: .unknown, app: process)
                     if !hasReportedStatus { sawSignals = false }

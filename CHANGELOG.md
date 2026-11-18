@@ -26,8 +26,9 @@ Versioning for compatibility changes.
   foreground program must be a built-in agent or one named in
   `agent-processes`; npm's Codex, which runs as `node`, still counts. Any
   other wait shows as State unknown, marked Unverified in the Agents list. A
-  wait reported over SSH counts as unverified too, since Corta cannot see the
-  program on the far end.
+  wait reported over SSH, or from inside tmux, screen, `docker exec` or mosh,
+  counts as unverified too, since Corta cannot see the program on the far
+  side.
 
 ## [1.6.4] - 2026-11-13
 

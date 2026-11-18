@@ -30,6 +30,10 @@ public struct ProgramStatus: Sendable, Equatable {
     public var progress: Int?
     public var color: String?
     public var statusColor: String?
+    /// For a wait: the foreground group that held the terminal when it
+    /// began, stamped by the session (`ForegroundProgram`). Members empty:
+    /// it could not be read. Nil on other states, and outside a session.
+    public var reporter: ForegroundProgram?
 
     public init(state: State, kind: Kind? = nil, app: String = "", title: String = "",
                 message: String = "", progress: Int? = nil, color: String? = nil, statusColor: String? = nil) {
@@ -66,10 +70,6 @@ public struct ProgramSignalSnapshot: Sendable {
     public var hasShellIntegration: Bool
     public var isCommandRunning: Bool
     public var lastExitStatus: Int?
-    /// Who held the terminal when the latest wait arrived: read by the
-    /// session in the same lock as the bytes, so a later program cannot
-    /// claim an earlier one's output. Nil until a session records one.
-    public var waitProgram: ForegroundProgram?
 }
 
 /// The kernel's account of a terminal's foreground process group: each

@@ -56,6 +56,7 @@ public final class PTY: @unchecked Sendable {
     }
 
     private let state = Mutex(State())
+    private let foregroundProgramCache = Mutex<(pids: [pid_t], program: ForegroundProgram?)?>(nil)
     private let exited = DispatchGroup()
     private let exitQueue: DispatchQueue
     private let exitSource: DispatchSourceProcess
@@ -376,17 +377,30 @@ extension PTY {
     /// Every member of the foreground group, leader first, at most sixteen:
     /// an agent run through a wrapper (`caffeinate`, `npx`, `op run`) is a
     /// member, not the leader. Nil when the group cannot be read.
+    ///
+    /// Two syscalls while the members stay the same: a stream that begins
+    /// a wait in every slice cannot make each one read every name again.
     public var foregroundProgram: ForegroundProgram? {
         guard let group = foregroundProcessGroup else { return nil }
-        var pids = [pid_t](repeating: 0, count: 64)
-        let count = proc_listpgrppids(group, &pids, Int32(pids.count * MemoryLayout<pid_t>.size))
-        let others = pids.prefix(Int(max(0, min(count, Int32(pids.count))))).filter { $0 != group && $0 > 0 }
+        let pids = [group] + Self.members(ofGroup: group).filter { $0 != group }
+        if let cached = foregroundProgramCache.withLock({ $0 }), cached.pids == pids { return cached.program }
         var members: [ForegroundProgram.Member] = []
-        for pid in [group] + others where members.count < 16 {
+        for pid in pids where members.count < 16 {
             guard let name = Self.processName(of: pid) else { continue }
             members.append(.init(name: name, entryPoint: ProcessEntryPoint.read(pid: pid, process: name)))
         }
-        return members.isEmpty ? nil : ForegroundProgram(members: members)
+        let program = members.isEmpty ? nil : ForegroundProgram(members: members)
+        foregroundProgramCache.withLock { $0 = (pids, program) }
+        return program
+    }
+
+    /// The group's live members, at most 64. `proc_listpgrppids` takes the
+    /// buffer's size in bytes and returns a count of pids: libproc divides.
+    private static func members(ofGroup group: pid_t) -> [pid_t] {
+        var pids = [pid_t](repeating: 0, count: 64)
+        let count = proc_listpgrppids(group, &pids, Int32(pids.count * MemoryLayout<pid_t>.size))
+        guard count > 0 else { return [] }
+        return pids.prefix(min(Int(count), pids.count)).filter { $0 > 0 }
     }
 
     /// An interpreter's script or module, read from the foreground leader.
@@ -401,12 +415,8 @@ extension PTY {
     /// a nameless foreground job read as "remote?" in the title.
     private static func processName(ofGroup group: pid_t) -> String? {
         if let name = processName(of: group) { return name }
-        var members = [pid_t](repeating: 0, count: 64)
-        let count = proc_listpgrppids(
-            group, &members, Int32(members.count * MemoryLayout<pid_t>.size))
-        guard count > 0 else { return nil }
         // The last listed is the newest — the pipeline's reader, usually.
-        for member in members.prefix(Int(min(count, Int32(members.count)))).reversed() {
+        for member in members(ofGroup: group).reversed() {
             if let name = processName(of: member) { return name }
         }
         return nil
