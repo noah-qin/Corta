@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.6.5] - 2026-11-18
+
 ### Fixed
 
 - The SFTP host-key dialog gives the full, copyable fingerprint its own
@@ -2872,7 +2874,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.6.4...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.6.5...main
+[1.6.5]: https://github.com/noah-qin/Corta/releases/tag/v1.6.5
 [1.6.4]: https://github.com/noah-qin/Corta/releases/tag/v1.6.4
 [1.6.3]: https://github.com/noah-qin/Corta/releases/tag/v1.6.3
 [1.6.2]: https://github.com/noah-qin/Corta/releases/tag/v1.6.2
