@@ -36,6 +36,36 @@ stage() {
   printf "PROMPT='demo ❯ '\n" > "$root/$1/.zshrc"
 }
 
+# Corta counts a reported wait only from a pane whose foreground program is
+# an agent, never from a shell printing one. `corta-agent` stands in for one:
+# it leads the terminal's foreground process group, as a program a shell
+# runs does, and runs a fixture script beneath it. The stages that use it
+# name it in `agent-processes`.
+cat > "$root/corta-agent.swift" <<'SWIFT'
+import Darwin
+// ^C and ^\ end the script, not this: the terminal goes back to the shell.
+for signal in [SIGTTOU, SIGINT, SIGQUIT] { Darwin.signal(signal, SIG_IGN) }
+let shellGroup = tcgetpgrp(STDIN_FILENO)
+setpgid(0, 0)
+tcsetpgrp(STDIN_FILENO, getpgrp())
+let arguments = ["/bin/sh"] + CommandLine.arguments.dropFirst()
+var argv = arguments.map { strdup($0) } + [nil]
+var attributes: posix_spawnattr_t?
+posix_spawnattr_init(&attributes)
+var defaults = sigset_t()
+sigemptyset(&defaults)
+for signal in [SIGTTOU, SIGINT, SIGQUIT] { sigaddset(&defaults, signal) }
+posix_spawnattr_setsigdefault(&attributes, &defaults)
+posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETSIGDEF))
+var child: pid_t = 0
+guard posix_spawn(&child, "/bin/sh", nil, &attributes, &argv, environ) == 0 else { exit(127) }
+var status: Int32 = 0
+while waitpid(child, &status, 0) == -1 && errno == EINTR {}
+if shellGroup > 0 { tcsetpgrp(STDIN_FILENO, shellGroup) }
+exit((status & 0x7F) == 0 ? (status >> 8) & 0xFF : 128 + (status & 0x7F))
+SWIFT
+swiftc -module-cache-path "$root/module-cache" "$root/corta-agent.swift" -o "$root/corta-agent"
+
 stage measurement 'columns = 120\nrows = 40\nfont-size = 14\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 cat > "$root/measurement/kitty-shell" <<'SH'
 #!/bin/sh
@@ -176,7 +206,7 @@ for policy in dangerous always off; do
   printf 'fixture\n' > "$root/context-paste-$policy/sample.swift"
 done
 
-stage agents 'columns = 100\nrows = 30\nfont-size = 14\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\nnotify-from-programs = false\nagent-processes = corta-stub\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+stage agents 'columns = 100\nrows = 30\nfont-size = 14\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\nnotify-from-programs = false\nagent-processes = corta-stub,corta-agent\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 cat > "$root/agents/status-demo" <<'SH2'
 #!/bin/sh
 printf '\nAgent fixture started\n'
@@ -215,37 +245,43 @@ if mkdir "$ZDOTDIR/$TEST_AGENT_MARKER" 2>/dev/null; then
   elif [ "$TEST_AGENT_MODE" = completion ]; then
     "$ZDOTDIR/completion-demo"
   else
-    "$ZDOTDIR/status-demo"
+    "$ZDOTDIR/corta-agent" "$ZDOTDIR/status-demo"
   fi
 fi
 exec /bin/zsh -l
 SH
 chmod 700 "$root/agents/auto-shell"
+cp "$root/corta-agent" "$root/agents/corta-agent"
 
-stage agent-notifications 'columns = 100\nrows = 30\nfont-size = 14\nrestore-windows = false\nnotify-from-programs = true\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+stage agent-notifications 'columns = 100\nrows = 30\nfont-size = 14\nrestore-windows = false\nnotify-from-programs = true\nagent-processes = corta-agent\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 cat > "$root/agent-notifications/notice-shell" <<'SH'
 #!/bin/sh
 export SHELL=/bin/zsh
 if mkdir "$ZDOTDIR/$TEST_AGENT_MARKER" 2>/dev/null; then
-  printf '\nNotification target %s\n' "$TEST_AGENT_CHANNEL"
-  printf '\033]7501;state=working:app=fixture\007'
-  sleep 4
-  printf '\033]7501;state=blocked:app=fixture:kind=permission\007'
-  case "$TEST_AGENT_CHANNEL" in
-    iterm2) printf '\033]9;Corta 409 iterm2: Channel ready\007' ;;
-    ghostty) printf '\033]777;notify;Corta 409 ghostty;Channel ready\007' ;;
-    kitty)
-      printf '\033]99;i=fixture:d=0:p=title;Corta 409 kitty\007'
-      printf '\033]99;i=fixture:p=body;Channel ready\007'
-      printf '\033]99;i=fixture:d=1:a=focus;\007'
-      ;;
-  esac
-  sleep 20
-  printf '\033]7501;state=clear\007'
+  "$ZDOTDIR/corta-agent" "$ZDOTDIR/notice-demo"
 fi
 exec /bin/zsh -l
 SH
-chmod 700 "$root/agent-notifications/notice-shell"
+cat > "$root/agent-notifications/notice-demo" <<'SH'
+#!/bin/sh
+printf '\nNotification target %s\n' "$TEST_AGENT_CHANNEL"
+printf '\033]7501;state=working:app=fixture\007'
+sleep 4
+printf '\033]7501;state=blocked:app=fixture:kind=permission\007'
+case "$TEST_AGENT_CHANNEL" in
+  iterm2) printf '\033]9;Corta 409 iterm2: Channel ready\007' ;;
+  ghostty) printf '\033]777;notify;Corta 409 ghostty;Channel ready\007' ;;
+  kitty)
+    printf '\033]99;i=fixture:d=0:p=title;Corta 409 kitty\007'
+    printf '\033]99;i=fixture:p=body;Channel ready\007'
+    printf '\033]99;i=fixture:d=1:a=focus;\007'
+    ;;
+esac
+sleep 20
+printf '\033]7501;state=clear\007'
+SH
+chmod 700 "$root/agent-notifications/notice-shell" "$root/agent-notifications/notice-demo"
+cp "$root/corta-agent" "$root/agent-notifications/corta-agent"
 
 stage real-claude 'columns = 120\nrows = 40\nfont-size = 14\nrestore-windows = false\nnotify-from-programs = true\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 cat > "$root/real-claude/claude-shell" <<'SH'
@@ -265,8 +301,9 @@ exec /bin/zsh -f
 SH
 chmod 700 "$root/real-claude/claude-shell"
 
-# Waiting navigation uses only synthetic OSC state and a shell without hooks.
-stage waiting-navigation 'columns = 100\nrows = 30\nrestore-windows = true\nnotify-from-programs = false\nagent-status = true\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+# Waiting navigation uses only synthetic OSC state and a shell without hooks,
+# reported from beneath the stand-in agent.
+stage waiting-navigation 'columns = 100\nrows = 30\nrestore-windows = true\nnotify-from-programs = false\nagent-status = true\nagent-processes = corta-agent\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 cat > "$root/waiting-navigation/waiting-shell" <<'SH'
 #!/bin/sh
 printf 'Waiting navigation fixture\n'
@@ -274,10 +311,18 @@ exec /bin/sh -i
 SH
 cat > "$root/waiting-navigation/waiting-status" <<'SH'
 #!/bin/sh
+exec "$ZDOTDIR/corta-agent" "$ZDOTDIR/waiting-report" "$@"
+SH
+cat > "$root/waiting-navigation/waiting-report" <<'SH'
+#!/bin/sh
 printf '\033]7501;state=blocked:kind=%s:app=EVILAPP:title=Rm9yZ2VkIENvcnRhIHByb21wdA==\007' "$1"
 printf '\n%s\n' "$2"
 stty size
+# A real agent stays in front while it waits; what is typed meanwhile echoes.
+exec sleep 600
 SH
-chmod 700 "$root/waiting-navigation/waiting-shell" "$root/waiting-navigation/waiting-status"
+chmod 700 "$root/waiting-navigation/waiting-shell" "$root/waiting-navigation/waiting-status" \
+  "$root/waiting-navigation/waiting-report"
+cp "$root/corta-agent" "$root/waiting-navigation/corta-agent"
 
 printf '%s\n' "$root"

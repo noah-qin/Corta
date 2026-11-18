@@ -1,0 +1,5 @@
+rows: 3 columns: 10
+cursor: row 2 column 4
+   0 |README    |
+   1 |Allow?    |
+   2 |done      |

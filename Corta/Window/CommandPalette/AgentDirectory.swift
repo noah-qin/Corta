@@ -45,8 +45,8 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         guard ConfigurationStore.shared.configuration.agentStatus else { return [] }
         let listed = panes.compactMap { pane -> (entry: Entry, urgency: Int)? in
             guard let status = pane.agents.status else { return nil }
-            return (entry(id: pane.taskNotifier.paneID,
-                paneName: pane.windowTitle.notificationTitle, status: status), status.urgency)
+            return (entry(id: pane.taskNotifier.paneID, paneName: pane.windowTitle.notificationTitle,
+                status: status, unverified: pane.agents.statusIsUnverified), status.urgency)
         }
         return ordered(listed, waiting: shared.waiting.paneIDs)
     }
@@ -67,9 +67,11 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     }
 
     /// Shared by menus and palette: no program-supplied display text.
-    static func entry(id: UUID, paneName: String, status: ProgramStatus) -> Entry {
+    /// `unverified`: a wait reported by a program that is not a known agent.
+    static func entry(id: UUID, paneName: String, status: ProgramStatus, unverified: Bool = false) -> Entry {
         let details = [L10n.text("agent.state." + status.state.rawValue),
-            status.kind.map { L10n.text("agent.kind." + $0.rawValue) } ?? ""]
+            status.kind.map { L10n.text("agent.kind." + $0.rawValue) } ?? "",
+            unverified ? L10n.text("agent.unverified") : ""]
             .filter { !$0.isEmpty }.joined(separator: " · ")
         return Entry(id: id, title: paneName + " — " + details)
     }

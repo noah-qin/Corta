@@ -29,12 +29,15 @@ struct PaneAgentsTests {
     private final class Pane: TerminalPaneViewController {
         override func viewDidLoad() {}
     }
+    /// The session runs `cat`, which echoes each report back as output; the
+    /// gate reads an agent in front, as it would for Claude Code (#524).
     private func pane() throws -> TerminalPaneViewController {
         let pane = Pane()
         pane.view = NSView()
         pane.session = try TerminalSession(executable: "/bin/cat", arguments: [],
             environment: ChildEnvironment.default(), workingDirectory: "/")
         pane.session.start()
+        pane.agents.reporter = { _ in ForegroundProgram(members: [.init(name: "claude")]) }
         return pane
     }
     private func waitUntilTrue(timeout: Duration, _ condition: () -> Bool) async -> Bool {

@@ -283,6 +283,11 @@ extension Terminal {
     }
     public var programStatuses: [String: ProgramStatus] { performer.state.programSignals.statuses }
     public var programBlockedEpisode: Int { performer.state.programSignals.blockedEpisode }
+    var programBlockedEdges: Int { performer.state.programSignals.blockedEdges }
+    /// The session's stamp on the waits a slice began (`ProgramStatus.reporter`).
+    mutating func stampProgramWaits(_ program: ForegroundProgram?) {
+        performer.state.programSignals.stampWaits(program)
+    }
     public var programTabMetadata: ProgramStatus? { performer.state.programSignals.tabMetadata }
     public var programProgress: ProgramProgress? { performer.state.programSignals.progress }
     public mutating func takeDesktopNotification() -> DesktopNotification? {

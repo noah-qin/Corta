@@ -1,0 +1,6 @@
+# OSC 7501 (Program Status Protocol 0.4) inside ordinary output, as `cat` of a
+# file would print it: the reports draw nothing and send no reply; only the
+# `?` probe is answered. Whether a wait counts is the app's decision.
+README\r\n
+\e]7501;state=blocked:kind=permission:app=claude-code\aAllow?\r\n
+\e]7501;state=clear\e\\done

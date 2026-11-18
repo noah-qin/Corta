@@ -44,6 +44,30 @@ struct ProgramStatusConformanceTests {
         try await body(session)
     }
 
+    @Test("a wait carries the foreground group that held the terminal when it began")
+    func aWaitRecordsItsProgram() async throws {
+        try await withSession { session in
+            try await feed(session, report("state=working"))
+            #expect(session.programStatuses[""]?.reporter == nil)
+            try await feed(session, report("state=blocked:kind=permission"))
+            let program = try #require(session.programStatuses[""]?.reporter)
+            #expect(program.members.first?.name == "cat")
+            // The same wait reported again keeps it; leaving the wait drops it.
+            try await feed(session, report("state=blocked:kind=permission:progress=5"))
+            #expect(session.programStatuses[""]?.reporter == program)
+            try await feed(session, report("state=done"))
+            #expect(session.programStatuses[""]?.reporter == nil)
+        }
+    }
+
+    @Test("outside a session a wait has no reporter, so it counts for no one")
+    func aBareTerminalStampsNothing() {
+        var terminal = Terminal()
+        terminal.feed(Array(report("state=blocked:kind=question").utf8))
+        #expect(terminal.programStatuses[""]?.state == .blocked)
+        #expect(terminal.programStatuses[""]?.reporter == nil)
+    }
+
     @Test("a new prompt drops working and blocked, and keeps done and error")
     func promptDropsWhatIsNoLongerTrue() async throws {
         try await withSession { session in

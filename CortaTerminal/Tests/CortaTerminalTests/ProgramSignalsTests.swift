@@ -43,6 +43,44 @@ struct ProgramSignalsTests {
         #expect(terminal.programStatuses.isEmpty)
     }
 
+    /// The golden `program-status-forged` case's bytes: the core records the
+    /// wait as the program's claim and answers nothing. Whether it raises
+    /// attention is the app's decision, by the pane's foreground program.
+    @Test func aWaitInOrdinaryOutputIsRecordedAsAClaimOnly() throws {
+        let url = Golden.directory.appendingPathComponent("program-status-forged.in")
+        let bytes = try Golden.decode(String(contentsOf: url, encoding: .utf8))
+        let clear = try #require(bytes.lastIndex(of: 0x1B).flatMap { end in
+            bytes[..<end].lastIndex(of: 0x1B) })
+        var terminal = Terminal(rows: 3, columns: 10)
+        terminal.feed(Array(bytes[..<clear]))
+        #expect(terminal.programStatuses[""]?.state == .blocked)
+        #expect(terminal.programStatuses[""]?.app == "claude-code")
+        #expect(terminal.takeBlockedStatus()! == .permission)
+        terminal.feed(Array(bytes[clear...]))
+        #expect(terminal.programStatuses.isEmpty)
+        #expect(terminal.takeOutput().isEmpty, "no reply reaches the child")
+    }
+
+    /// Each wait carries its own serial and the serial it entered with,
+    /// so the app can tell edges and episodes over the waits it trusts.
+    @Test func waitSerialsMarkNewWaitsAndEntries() {
+        var terminal = Terminal()
+        terminal.feed(osc("7501;state=blocked:kind=question"))
+        let first = terminal.programStatuses[""]
+        #expect(first?.wait != nil && first?.wait == first?.waitEntry)
+        terminal.feed(osc("7501;state=blocked:kind=question:progress=4"))
+        #expect(terminal.programStatuses[""]?.wait == first?.wait, "a repeat is the same wait")
+        terminal.feed(osc("7501;state=blocked:kind=permission"))
+        let changed = terminal.programStatuses[""]
+        #expect(changed?.wait != first?.wait, "a new kind is a new wait")
+        #expect(changed?.waitEntry == first?.waitEntry, "in the same episode")
+        terminal.feed(osc("7501;state=working") + osc("7501;state=blocked:kind=permission"))
+        #expect(terminal.programStatuses[""]?.waitEntry != first?.waitEntry, "entered again")
+        terminal.feed(osc("7501;state=done"))
+        #expect(terminal.programStatuses[""]?.wait == nil)
+        #expect(terminal.programStatuses[""]?.waitEntry == nil)
+    }
+
     @Test func claude310CompletionReplacesWorkingBeforeProcessExit() {
         var terminal = Terminal()
         // Captured from a real Claude Code 2.1.310 turn. The agent process

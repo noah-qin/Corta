@@ -330,6 +330,32 @@ entry into blocked, once per pane, and never moves focus on a status event. The
 Agents list leads with that queue's order and then sorts by reported state, so a
 program can reach the top by saying it is blocked, as it can raise the Dock
 count, but cannot pass a pane already waiting.
+A wait counts only when a member of the pane's foreground process group, as
+the kernel names it (`tcgetpgrp`, `proc_listpgrppids`, `proc_name`, an
+interpreter's script from `KERN_PROCARGS2`), is a built-in or configured agent.
+The session reads the group in the same lock that parses the report, on the
+slice that begins a wait, and stamps it on that wait's record: each wait is
+judged by who began it, so an agent's later wait cannot vouch for a forged one
+left under another id, and an unverified wait can neither replace a trusted
+one's notice nor keep its episode open. Names are read again for each new
+wait (`exec` keeps the pid), except within 100 ms of reading the same members,
+when that reading stands; only an interpreter's script is kept longer. An interpreter counts only for an absolute path to an installed command
+or package, not a script named after an agent. Output cannot set any of it: a `blocked` report printed by a
+shell, `cat`, `curl` or `ssh` stays State unknown, labelled Unverified, and
+raises no tab state, Dock count, notice or queue entry. Answering the OSC 7501
+probe is not accepted as proof, because the same stream can send the probe;
+so a remote pane's waits never raise attention. What remains is a program
+that is an agent by name, or one the user lists, printing a forged wait; that
+is the agent's own output (#524). Two limits follow from asking the kernel
+rather than the writer. A background job can still write to the terminal
+while an agent is in front (`TOSTOP` is off by default, and Corta does not
+change it), and its forged wait is credited to the agent. Attribution is when
+the bytes are parsed, not written: output still buffered when a command exits
+and an agent starts is credited to the agent, and an agent that reports a wait
+and exits at once can lose it. Behind tmux, screen, `docker exec` or mosh the
+program in front is the multiplexer or client, so those waits show as
+Unverified; adding such a name to `agent-processes` vouches for everything
+it runs.
 `notify-from-programs = false` disables both notice paths; `agent-status = false` hides agent chrome.
 
 ### 2.10 OSC ecosystem limits and refusals (#411)

@@ -55,6 +55,7 @@ struct GoldenTests {
         Golden.Case("cjk-run-margin", rows: 3, columns: 6),
         Golden.Case("cjk-run-interrupted", rows: 2, columns: 8),
         Golden.Case("cjk-run-over-wide", rows: 3, columns: 8),
+        Golden.Case("program-status-forged", rows: 3, columns: 10),
     ]
 
     @Test("golden files match", arguments: cases)

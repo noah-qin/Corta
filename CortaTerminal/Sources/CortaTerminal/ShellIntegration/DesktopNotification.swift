@@ -48,6 +48,9 @@ struct ProgramSignals: Sendable {
     var blocked: ProgramStatus.Kind??
     var blockedID: String?
     var blockedEpisode = 0
+    /// Counts every new wait (a `blocked` edge), so the session can tell a
+    /// slice that brought one; kept across RIS, like `blockedEpisode`.
+    var blockedEdges = 0
     var chunks: [String: DesktopNotification] = [:]
     /// Oldest first, so a ninth incomplete message replaces the stalest one
     /// rather than shutting out every later notice.
@@ -72,9 +75,12 @@ struct ProgramSignals: Sendable {
         let kind = state == .blocked ? fields["kind"].flatMap(ProgramStatus.Kind.init(rawValue:)) : nil
         let title = fields["title"].flatMap { ProgramText.decoded($0, limit: 192) } ?? ""
         let message = fields["msg"].flatMap { ProgramText.decoded($0, limit: 2048) } ?? ""
-        if state == .blocked, statuses[id]?.state != .blocked || statuses[id]?.kind != kind {
+        let previous = statuses[id]
+        let newWait = state == .blocked && (previous?.state != .blocked || previous?.kind != kind)
+        if newWait {
             blocked = .some(kind)
             blockedID = id
+            blockedEdges &+= 1
         } else if state != .blocked, blockedID == id {
             blocked = nil; blockedID = nil
         }
@@ -83,6 +89,21 @@ struct ProgramSignals: Sendable {
         statuses[id] = ProgramStatus(state: state, kind: kind,
             app: ProgramText.clean(fields["app"] ?? "", limit: 80), title: title, message: message,
             progress: reportsProgress ? fields["progress"].flatMap(Int.init).map { min(100, max(0, $0)) } : nil)
+        // The same wait, reported again, keeps who began it; a new one waits
+        // for the session's stamp (`stampWaits`).
+        if state == .blocked, !newWait { statuses[id]?.reporter = previous?.reporter }
+        if state == .blocked {
+            statuses[id]?.wait = newWait ? blockedEdges : previous?.wait
+            statuses[id]?.waitEntry = previous?.state == .blocked ? previous?.waitEntry : blockedEdges
+        }
+    }
+
+    /// Gives each wait not yet stamped the program in front now. Called by
+    /// the session in the lock that parsed it, on the slice that began it.
+    mutating func stampWaits(_ program: ForegroundProgram?) {
+        for (id, status) in statuses where status.state == .blocked && status.reporter == nil {
+            statuses[id]?.reporter = program ?? ForegroundProgram(members: [])
+        }
     }
 
     /// Most recently updated last. Past the cap the stalest subtask makes way:
@@ -142,7 +163,7 @@ struct ProgramSignals: Sendable {
         } else if result.state != .done && result.state != .error {
             result.state = .idle
         }
-        result.kind = nil; result.progress = nil
+        result.kind = nil; result.progress = nil; result.reporter = nil; result.wait = nil; result.waitEntry = nil
         statuses[""] = result
     }
 

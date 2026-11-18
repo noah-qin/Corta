@@ -56,6 +56,8 @@ public final class PTY: @unchecked Sendable {
     }
 
     private let state = Mutex(State())
+    /// `foregroundProgram`'s last reading (`PTY+ForegroundProgram.swift`).
+    let foregroundProgramCache = Mutex<ForegroundProgramCache?>(nil)
     private let exited = DispatchGroup()
     private let exitQueue: DispatchQueue
     private let exitSource: DispatchSourceProcess
@@ -385,12 +387,8 @@ extension PTY {
     /// a nameless foreground job read as "remote?" in the title.
     private static func processName(ofGroup group: pid_t) -> String? {
         if let name = processName(of: group) { return name }
-        var members = [pid_t](repeating: 0, count: 64)
-        let count = proc_listpgrppids(
-            group, &members, Int32(members.count * MemoryLayout<pid_t>.size))
-        guard count > 0 else { return nil }
         // The last listed is the newest — the pipeline's reader, usually.
-        for member in members.prefix(Int(min(count, Int32(members.count)))).reversed() {
+        for member in members(ofGroup: group).reversed() {
             if let name = processName(of: member) { return name }
         }
         return nil
@@ -398,7 +396,7 @@ extension PTY {
 
     /// Trusts the length `proc_name` returns; `String(cString:)` on `[CChar]`
     /// is deprecated.
-    private static func processName(of pid: pid_t) -> String? {
+    static func processName(of pid: pid_t) -> String? {
         var buffer = [CChar](repeating: 0, count: 256)
         let length = proc_name(pid, &buffer, UInt32(buffer.count))
         guard length > 0 else { return nil }
