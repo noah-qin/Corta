@@ -30,6 +30,7 @@ extension TerminalSession {
         defer { buffer.deallocate() }
         var batch = [UInt8]()
         batch.reserveCapacity(Self.batchByteCap)
+        var sizer = FeedSliceSizer(ceiling: Self.feedLockSliceSize)
 
         while !stopped.withLock({ $0 }) {
             applyReaderPriority()
@@ -38,7 +39,7 @@ extension TerminalSession {
             batch.removeAll(keepingCapacity: true)
             let reachedEOF = readBatch(into: &batch, from: source, through: buffer)
             applyReaderPriority()
-            if !batch.isEmpty { apply(batch) }
+            if !batch.isEmpty { apply(batch, sizer: &sizer) }
             if reachedEOF { break }
         }
         finishReading()
@@ -86,15 +87,17 @@ extension TerminalSession {
         var consumed: Int
         var deferred: DeferredImageTransmission?
         var deferredScreenExit: Bool
+        /// From taking the lock to the outcome, on `sliceClock`.
+        var heldNanoseconds: UInt64 = 0
     }
 
-    private func apply(_ batch: [UInt8]) {
+    private func apply(_ batch: [UInt8], sizer: inout FeedSliceSizer) {
         var responses: [UInt8] = []
         var episode: Int?
         var offset = 0
         var decoded: DecodedImageTransmission?
         while offset < batch.count || decoded != nil {
-            var end = min(offset + Self.feedLockSliceSize, batch.count)
+            var end = min(offset + sizer.limit, batch.count)
             // Never end a slice on an ESC: a deferred image's ST must stop
             // the parse in ground, or a RIS in the pause strands its `\`.
             if end < batch.count, batch[end - 1] == 0x1B { end += 1 }
@@ -112,6 +115,8 @@ extension TerminalSession {
             }
             if let newEpisode = applied.episode { episode = newEpisode }
             offset += applied.consumed
+            sizer.record(heldNanoseconds: applied.heldNanoseconds, bytes: applied.consumed)
+            feedSliceLimit.store(sizer.limit, ordering: .relaxed)
             if applied.compress { scheduleCompression() }
             // After the last slice too: the next batch's first slice is
             // one `read(2)` away, sooner than a waiter's wake, so a flood
@@ -141,35 +146,45 @@ extension TerminalSession {
             // In the lock, so a resize's copy cannot miss a slice that had
             // already passed this check.
             guard !current.isResizing else { return nil }
-            let episodeBefore = current.terminal.synchronizedOutputEpisode
-            let waitsBefore = current.terminal.programBlockedEdges
-            if let finished { current.terminal.completeDeferredImage(finished) }
-            let consumed = current.terminal.feedDeferringImageDecode(slice)
-            // A new wait: who holds the terminal now, before the lock lets
-            // anyone read it. Only on a slice that began one, and names are
-            // resolved only when the group's members change.
-            if current.terminal.programBlockedEdges != waitsBefore {
-                current.terminal.stampProgramWaits(pty.foregroundProgram)
-            }
-            let deferred = current.terminal.takeDeferredImage()
-            reportImageBytes(current.terminal)
-            let sliceResponses = current.terminal.takeOutput()
-            // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
-            // A repeated BSU does not extend it, or a child that never sends
-            // ESU could stall presentation forever.
-            let episodeAfter = current.terminal.synchronizedOutputEpisode
-            // An integer compare: a pass is queued only once a batch seals.
-            let compress = current.terminal.hasCompressionWork
-            guard episodeAfter != episodeBefore else {
-                return SliceOutcome(
-                    responses: sliceResponses, episode: nil, compress: compress, consumed: consumed,
-                    deferred: deferred, deferredScreenExit: current.terminal.hasDeferredAlternateScreenExit)
-            }
-            current.synchronizedOutputEpisode = episodeAfter
+            let taken = sliceClock()
+            var outcome = feedSlice(slice, completing: finished, into: &current)
+            outcome.heldNanoseconds = sliceClock() &- taken
+            return outcome
+        }
+    }
+
+    /// The slice's work, in `state`'s lock.
+    private func feedSlice(
+        _ slice: ArraySlice<UInt8>, completing finished: DecodedImageTransmission?, into current: inout State
+    ) -> SliceOutcome {
+        let episodeBefore = current.terminal.synchronizedOutputEpisode
+        let waitsBefore = current.terminal.programBlockedEdges
+        if let finished { current.terminal.completeDeferredImage(finished) }
+        let consumed = current.terminal.feedDeferringImageDecode(slice)
+        // A new wait: who holds the terminal now, before the lock lets
+        // anyone read it. Only on a slice that began one, and names are
+        // resolved only when the group's members change.
+        if current.terminal.programBlockedEdges != waitsBefore {
+            current.terminal.stampProgramWaits(pty.foregroundProgram)
+        }
+        let deferred = current.terminal.takeDeferredImage()
+        reportImageBytes(current.terminal)
+        let sliceResponses = current.terminal.takeOutput()
+        // Rising edges, so DECRST+BSU in one batch arms a fresh timeout.
+        // A repeated BSU does not extend it, or a child that never sends
+        // ESU could stall presentation forever.
+        let episodeAfter = current.terminal.synchronizedOutputEpisode
+        // An integer compare: a pass is queued only once a batch seals.
+        let compress = current.terminal.hasCompressionWork
+        guard episodeAfter != episodeBefore else {
             return SliceOutcome(
-                responses: sliceResponses, episode: episodeAfter, compress: compress, consumed: consumed,
+                responses: sliceResponses, episode: nil, compress: compress, consumed: consumed,
                 deferred: deferred, deferredScreenExit: current.terminal.hasDeferredAlternateScreenExit)
         }
+        current.synchronizedOutputEpisode = episodeAfter
+        return SliceOutcome(
+            responses: sliceResponses, episode: episodeAfter, compress: compress, consumed: consumed,
+            deferred: deferred, deferredScreenExit: current.terminal.hasDeferredAlternateScreenExit)
     }
 
     /// Rebuild the parked main screen off-lock before applying any byte

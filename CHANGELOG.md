@@ -17,6 +17,12 @@ Versioning for compatibility changes.
   costs nothing. A stream made of it held a 120 × 400 window's lock for 1.8 s
   per 16 KiB of output; it now takes under a millisecond, and 90 ms when other
   output keeps the screen changing between fills.
+- Output that does a lot of work per byte no longer holds a pane's lock for
+  tens of milliseconds at a time. Corta reads a stream in slices of at most
+  16 KiB, and it now also measures how long each slice takes and makes the next
+  one smaller when a slice runs past 4 ms. At 120 × 400, a slice of
+  screen-wide erases in a background colour held the lock for 57 ms and now
+  holds it for at most 7 ms. Ordinary output keeps the full slice.
 
 ## [1.6.5] - 2026-11-18
 

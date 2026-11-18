@@ -116,6 +116,10 @@ public final class TerminalSession: @unchecked Sendable {
         /// How long a stopped session's process group has to leave after
         /// `SIGHUP` before it gets `SIGKILL`.
         var hangupGracePeriod: Duration = .seconds(10)
+        /// Nanoseconds on a monotonic clock, read on the reader thread as a
+        /// slice takes and releases the lock; unset, `CLOCK_UPTIME_RAW`.
+        /// Tests make a slice as slow as they need without doing the work.
+        var sliceClock: (@Sendable () -> UInt64)?
     }
 
     let readerSource: ReaderSource?
@@ -125,6 +129,11 @@ public final class TerminalSession: @unchecked Sendable {
     let scheduleTimeout: (@Sendable (Duration, @escaping @Sendable () -> Void) -> Void)?
     /// `Seams.hangupGracePeriod`.
     let hangupGracePeriod: Duration
+    /// `Seams.sliceClock`.
+    let sliceClock: @Sendable () -> UInt64
+    /// The reader's `FeedSliceSizer.limit`, published after every slice, so a
+    /// test's clock can make a slice cost what its size would.
+    let feedSliceLimit = Atomic<Int>(feedLockSliceSize)
     /// Serial: resizes apply in request order.
     let resizeQueue = DispatchQueue(label: "dev.corta.terminal-session.resize")
 
@@ -243,7 +252,8 @@ public final class TerminalSession: @unchecked Sendable {
     /// it, so a paste goes through while the pipe drains at all.
     static let maxPendingWriteBytes = 4 * 1024 * 1024
 
-    /// Per lock acquisition; ≈ 4 ms at the worst measured feed rate.
+    /// The most one lock acquisition feeds; `FeedSliceSizer` takes less
+    /// while slices run slow.
     static let feedLockSliceSize = 16 * 1024
 
     /// Query replies one read batch may queue. A reply can be several times
@@ -292,6 +302,7 @@ public final class TerminalSession: @unchecked Sendable {
         synchronizedOutputTimeout = seams.synchronizedOutputTimeout
         scheduleTimeout = seams.scheduleSynchronizedOutputTimeout
         hangupGracePeriod = seams.hangupGracePeriod
+        sliceClock = seams.sliceClock ?? { clock_gettime_nsec_np(CLOCK_UPTIME_RAW) }
         let pty = try PTY.spawn(
             executable: executable,
             arguments: arguments,
