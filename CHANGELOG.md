@@ -18,6 +18,11 @@ Versioning for compatibility changes.
   shows. Switching panes, a finished command and a rename still update the
   title at once. At 20 title changes a second, a key window's main thread went
   from about 9.4 % busy to about 6.6 %.
+- F13 to F20 and Insert send the escape sequences programs expect. F13 used to
+  send a private-use character instead, which showed as a stray symbol. Under
+  the kitty keyboard protocol, F13 to F35 send the protocol's own codes. A key
+  that has no sequence, such as Help or F21 and above outside that protocol,
+  now sends nothing.
 - `ESC # 8` (the alignment test that fills the screen with `E`) fills each row
   at once instead of writing every cell, and a repeat on an unchanged screen
   costs nothing. A stream made of it held a 120 × 400 window's lock for 1.8 s
