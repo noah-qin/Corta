@@ -63,51 +63,66 @@ enum SSHAskpassPrompter {
         // user comes, and stop once the question is gone.
         let attention = NSApp.isActive ? nil : NSApp.requestUserAttention(.criticalRequest)
         defer { if let attention { NSApp.cancelUserAttentionRequest(attention) } }
-        let alert = makeAlert(asking)
-        let field = alert.accessoryView as? NSSecureTextField
-        let answer = await answer(alert, field: field, question: asking.question, on: window)
-        if asking.refusalEndsConnection, answer == nil, !Task.isCancelled {
+        let reply: String?
+        if asking.question == .hostKey {
+            reply = await answerHostKey(SSHHostKeyPrompt(asking), on: window)
+        } else {
+            let alert = makeAlert(asking)
+            reply = await answer(
+                alert, field: alert.accessoryView as? NSSecureTextField, question: asking.question, on: window)
+        }
+        if asking.refusalEndsConnection, reply == nil, !Task.isCancelled {
             NotificationCenter.default.post(name: refusedNotification, object: host)
         }
-        return answer
+        return reply
     }
 
     static func answer(
         _ alert: NSAlert, field: NSSecureTextField?, question: SSHAskpass.Question, on window: NSWindow
     ) async -> String? {
-        // A window can be closed from under its sheet by something other than
-        // the user — a terminal window its shell ended, say. AppKit then never
-        // calls the sheet's completion, and ssh would wait for ever.
+        let response = await sheetResponse(alert.window, on: window) { completion in
+            alert.beginSheetModal(for: window, completionHandler: completion)
+            if let field { alert.window.makeFirstResponder(field) }
+        }
+        guard response == .alertFirstButtonReturn else { return nil }
+        switch question {
+        case .secret:
+            defer { field?.stringValue = "" }
+            return field?.stringValue ?? ""
+        case .confirm: return "yes"
+        case .notify, .hostKey: return nil
+        }
+    }
+
+    static func answerHostKey(_ prompt: SSHHostKeyPrompt, on window: NSWindow) async -> String? {
+        let sheet = SSHHostKeySheet.makePanel(prompt) { sheet, response in
+            window.endSheet(sheet, returnCode: response)
+        }
+        let response = await sheetResponse(sheet, on: window) { completion in
+            window.beginSheet(sheet, completionHandler: completion)
+        }
+        return prompt.canContinue && response == .OK ? "yes" : nil
+    }
+
+    private static func sheetResponse(
+        _ sheet: NSWindow, on window: NSWindow,
+        present: (@escaping @MainActor (NSApplication.ModalResponse) -> Void) -> Void
+    ) async -> NSApplication.ModalResponse {
+        // Closing a parent does not reliably call its sheet's completion.
         let closing = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification, object: window, queue: .main
         ) { _ in
-            MainActor.assumeIsolated { window.endSheet(alert.window, returnCode: .cancel) }
+            MainActor.assumeIsolated { window.endSheet(sheet, returnCode: .cancel) }
         }
         defer { NotificationCenter.default.removeObserver(closing) }
         return await withTaskCancellationHandler {
-            await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
-                alert.beginSheetModal(for: window) { response in
-                    guard response == acceptResponse(question) else {
-                        continuation.resume(returning: nil)
-                        return
-                    }
-                    switch question {
-                    case .secret: continuation.resume(returning: field?.stringValue ?? "")
-                    case .hostKey, .confirm: continuation.resume(returning: "yes")
-                    case .notify: continuation.resume(returning: nil)
-                    }
-                    // The field's text is not kept past the answer.
-                    field?.stringValue = ""
-                }
-                if let field { alert.window.makeFirstResponder(field) }
-                // Cancelled before the sheet was up: `onCancel` already ran,
-                // with nothing yet to end.
-                if Task.isCancelled { window.endSheet(alert.window, returnCode: .cancel) }
+            await withCheckedContinuation { continuation in
+                present { continuation.resume(returning: $0) }
+                // Cancellation can arrive before the sheet is presented.
+                if Task.isCancelled { window.endSheet(sheet, returnCode: .cancel) }
             }
         } onCancel: {
-            Task { @MainActor in
-                window.endSheet(alert.window, returnCode: .cancel)
-            }
+            Task { @MainActor in window.endSheet(sheet, returnCode: .cancel) }
         }
     }
 
@@ -135,12 +150,6 @@ enum SSHAskpassPrompter {
         }
         let terminals = windows.filter { $0.isVisible && $0.windowController is TerminalWindowController }
         return terminals.first(where: \.isKeyWindow) ?? terminals.first(where: \.isMainWindow) ?? terminals.first
-    }
-
-    /// The button that answers yes — the second for a host key, whose
-    /// default is to refuse.
-    static func acceptResponse(_ question: SSHAskpass.Question) -> NSApplication.ModalResponse {
-        question == .hostKey ? .alertSecondButtonReturn : .alertFirstButtonReturn
     }
 
     /// Below the connection's own ssh, the asker is a machine on the way to
@@ -172,18 +181,7 @@ enum SSHAskpassPrompter {
             field.setAccessibilityLabel(title)
             alert.accessoryView = field
         case .hostKey:
-            alert.alertStyle = .warning
-            alert.icon = symbolIcon("exclamationmark.shield.fill", tint: .systemOrange)
-            alert.messageText = L10n.format(
-                step ? "askpass.hostKey.title.intermediate" : "askpass.hostKey.title", host)
-            let advice = step
-                ? L10n.format("askpass.hostKey.advice.intermediate", host) : L10n.text("askpass.hostKey.advice")
-            // Where the question came from, as every other dialog says
-            // (`SECURITY.md` §4.8), before what to do about it.
-            alert.informativeText = prompt + "\n\n" + source + "\n\n" + advice
-            // Cancel is the default: Return must not trust a key unread.
-            alert.addButton(withTitle: L10n.text("common.cancel"))
-            alert.addButton(withTitle: L10n.text("askpass.hostKey.trust"))
+            preconditionFailure("Host keys use SSHHostKeySheet")
         case .confirm:
             alert.icon = symbolIcon("key.fill", tint: .controlAccentColor)
             alert.messageText = L10n.format(
