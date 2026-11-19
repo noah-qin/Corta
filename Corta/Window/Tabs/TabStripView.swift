@@ -28,6 +28,14 @@ struct TabStripItem: Equatable {
     var toolTip: String
     var status: ProgramStatus?
     var progress: ProgramProgress?
+
+    /// Whether `other` is this item with another tooltip: nothing a tab draws
+    /// or lays out changed.
+    func differsOnlyInToolTip(from other: TabStripItem) -> Bool {
+        var same = other
+        same.toolTip = toolTip
+        return same == self && other.toolTip != toolTip
+    }
 }
 
 /// What the strip asks of its window (`TerminalWindowController`).
@@ -141,6 +149,7 @@ final class TabStripView: NSView {
 
     func update(items: [TabStripItem], selectedIndex: Int) {
         let name: NSAppearance.Name = isLightCanvas ? .aqua : .darkAqua
+        if appearance?.name == name, updatesOnlyToolTips(items: items, selectedIndex: selectedIndex) { return }
         if appearance?.name != name { appearance = NSAppearance(named: name) }
         let changed = items != self.items || selectedIndex != self.selectedIndex
         let selectionMoved = selectedIndex != self.selectedIndex
@@ -162,6 +171,22 @@ final class TabStripView: NSView {
         updateTrackColors()
         if changed { needsLayout = true; needsDisplay = true }
         setAccessibilityChildren(views)
+    }
+
+    /// The program's own title is only a tab's tooltip, and a program that
+    /// retitles 20 times a second changes nothing else. The full pass sets
+    /// the name, the chrome and the track's colours again, which lays out
+    /// the titlebar and commits a transaction on every refresh
+    /// (`PERFORMANCE.md` §5.30). False, having changed nothing, unless some
+    /// item's tooltip changed and nothing else did.
+    private func updatesOnlyToolTips(items: [TabStripItem], selectedIndex: Int) -> Bool {
+        guard selectedIndex == self.selectedIndex, items.count == self.items.count,
+              items.count == views.count, items != self.items,
+              zip(items, self.items).allSatisfy({ $0 == $1 || $0.differsOnlyInToolTip(from: $1) })
+        else { return false }
+        self.items = items
+        for (view, item) in zip(views, items) { view.updateToolTip(item) }
+        return true
     }
 
     /// A view stays with its tab, by identity: closing the third tab takes
