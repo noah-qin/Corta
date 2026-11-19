@@ -533,36 +533,73 @@ absolute numbers should not be cross-cited against that table.)
 
 ### 5.5 Cross-terminal comparison
 
-Corta, Ghostty and iTerm2, current releases, one machine, one day
-(2026-10-09, #279): keypress → glass from Typometer, the external
-screen-capture tool, and throughput from `vtebench` and a 100 MiB `cat`.
-The environment, every run, the calibration and what was not measured are
-in [`history/2026-10-09-CROSS-TERMINAL-RUN.md`](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-10-09-CROSS-TERMINAL-RUN.md),
-which also keeps the pre-1.0 table this replaces. `TESTING.md` →
-*Against other terminals* repeats it.
+Corta 1.7.0 (the signed release, launched by path with a scratch stage),
+Ghostty 1.4.0 and iTerm2 3.7.8, on one MacBook Air M5 at 60 Hz, on AC,
+Low Power Mode off, on 2026-11-20 (#549). Each terminal ran with its own
+defaults apart from a test profile: the font and grid below, a test shell,
+no restored windows. Every run alternated the three, in the order
+Corta–Ghostty–iTerm2, then reversed, then the first order again. The
+evidence, the scripts' recipe and every raw figure are in the pull request
+that closes #549. The 1.1.9 table this replaces, from 2026-10-09 (#279), is
+kept [at its commit](https://github.com/noah-qin/Corta/blob/56371708228db0b1ac9b3d5ef1240a43bf56c554/docs/PERFORMANCE.md#55-cross-terminal-comparison).
+`TESTING.md` → *Against other terminals* has the method.
 
-Keypress → glass, MacBook Air M5, 60 Hz, 3 × 200 samples each, ms:
+Keypress → glass, Typometer, 3 × 200 samples each, pooled, ms (Corta and
+iTerm2 at 18 pt in an 8-row window, Ghostty at 12 pt in 30 rows, Typometer
+below the window):
 
-| Terminal | p50 | p95 | p99 | max |
-| -------- | --- | --- | --- | --- |
-| Corta 1.1.9 | 60.4 | 79.6 | 81.2 | 82.3 |
-| iTerm2 3.6.11 | 38.5 | 56.7 | 60.8 | 69.3 |
-| Ghostty 1.3.1 | 34.5 | 39.7 | 43.7 | 50.1 |
+| Terminal | p50 | p95 | p99 | max | Per-run p50 |
+| -------- | --- | --- | --- | --- | ----------- |
+| Corta 1.7.0 | 21.0 | 40.9 | 48.6 | 55.8 | 20.7–21.6 |
+| Ghostty 1.4.0 | 20.9 | 38.4 | 45.5 | 67.8 | 20.5–21.1 |
+| iTerm2 3.7.8 | 22.2 | 40.5 | 55.6 | 71.8 | 22.1–22.3 |
 
-Corta trails Ghostty by 26 ms at p50, about one and a half frames; before
-1.0 the gap was about one. In-app `keypressToPresent` (§5.7) reads about
-14 ms above this external figure at p50.
+**Ties Ghostty**, inside the run-to-run spread at p50; its p99 is 3 ms
+above Ghostty's, and the per-run p99s overlap (43.8–49.6 against
+42.6–45.5). **Leads iTerm2** by about 1 ms at p50 and 7 ms at p99. On
+2026-10-09 Corta 1.1.9 trailed Ghostty by 26 ms at p50; #337's on-demand
+frame driver closed it (§5.7).
 
-Throughput (vtebench ms per 1 MiB sample, lower is faster; `cat` in MiB/s):
+Throughput, `vtebench` at `ead80032e57d` in a 120 × 30 window, median ms per
+1 MiB sample over three sessions, the sessions' medians in brackets; lower is
+faster. `cat` is the 100 MiB corpus, three times per session, median MiB/s:
 
-| Case | Corta | Ghostty | iTerm2 |
-| ---- | ----- | ------- | ------ |
-| `scrolling` | 30 | 17 | 21 |
-| `scrolling_top_region` | 79 | 22 | 2,040 |
-| `scrolling_fullscreen` | 23 | 25 | 36 |
-| `dense_cells` | 10 | 7 | 80 |
-| `unicode` | 36 | 9 | 50 |
-| `cat` 100 MiB, MiB/s | 88 | 76 | 17 |
+| Case | Corta 1.7.0 | Ghostty 1.4.0 | iTerm2 3.7.8 | Corta |
+| ---- | ----------- | ------------- | ------------ | ----- |
+| `dense_cells` | 9 (9–9) | 5 (4–5) | 128 (126–131) | trails Ghostty 1.8×, [#627](https://github.com/noah-qin/Corta/issues/627) |
+| `medium_cells` | 8 (8–9) | 5 (4–5) | 400 (392–413) | trails Ghostty 1.6×, #627 |
+| `sync_medium_cells` | 11 (10–11) | 5 (4–5) | 351 (345–355) | trails Ghostty 2.2×, #627 |
+| `unicode` | 10 (9–10) | 3 (3–4) | 109 (105–116) | trails Ghostty 3.3×, #627 |
+| `scrolling` | 26 (24–31) | 15 (11–15) | 23 (22–24) | trails Ghostty 1.7× and iTerm2 by 3 ms, #627 |
+| `scrolling_fullscreen` | 31 (30–32) | 19 (15–19) | 42 (41–45) | trails Ghostty 1.6×, #627 |
+| `scrolling_bottom_region` | 26.5 (24–30) | 15 (13–17) | 555 (531–564) | trails Ghostty 1.8×, #627 |
+| `scrolling_bottom_small_region` | 28 (25–32) | 15 (13–17) | 575 (565–589) | trails Ghostty 1.9×, #627 |
+| `scrolling_top_region` | 61 (52–66) | 15 (13–16) | 2,994 (2,929–3,103) | trails Ghostty 4.1×, #627 |
+| `scrolling_top_small_region` | 27 (25–30) | 15 (13–17) | 578 (565–590) | trails Ghostty 1.8×, #627 |
+| `cat` 100 MiB, MiB/s | 114 (109–121) | 175 (129–216) | 11.7 (11–12) | trails Ghostty 1.5×, #627 |
+
+**Trails Ghostty on every throughput case**, by more than the spread;
+[#627](https://github.com/noah-qin/Corta/issues/627) owns the gap.
+#547 (region scroll) and #548 (narrow non-ASCII) fixed the core's side of
+`scrolling_top_region` and `unicode`, which are still the widest gaps in a
+window. **Leads iTerm2** on every case but plain `scrolling`, by 1.4× (`scrolling_fullscreen`) to 49× (`scrolling_top_region`).
+
+Memory, idle and launch, three runs each (five for launch), medians:
+
+| Measure | Corta 1.7.0 | Ghostty 1.4.0 | iTerm2 3.7.8 | Corta |
+| ------- | ----------- | ------------- | ------------ | ----- |
+| `phys_footprint`, 100k lines of history | 98 MB (96–99) | 133 MB (133) | 265 MB (261–282) | leads both |
+| Idle CPU, one window, 60 s | 0.0% | 0.3% | 0.9% | leads both |
+| Idle wakeups, 60 s | 19 (16–20) | 384 (337–395) | 365 (357–374) | leads both |
+| `top` power, idle | 0.0 | 0.6 | 1.0 | leads both |
+| Launch → first window, warm | 269 ms (247–285) | 311 ms (299–314) | 481 ms (457–485) | leads both |
+
+Memory is `footprint`'s `phys_footprint` five seconds after
+`head -n 100000` of the corpus, with each terminal's history set to hold
+it. Idle is `top -l 2 -s 60` on the app's process, so a helper process
+(iTerm2's `iTermServer`) is not counted. Launch is `open -n -a` to the first
+on-screen window, warm, not cold: a cold launch needs the file cache
+purged, which needs root and changes the machine (D13).
 
 ---
 
@@ -578,24 +615,24 @@ reading of them — is its record, preserved at a commit:
 [1.1.1](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-10-03-V1.1.1-BENCHMARK-RUN.md),
 [1.1.5](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/history/2026-10-07-V1.1.5-BENCHMARK-RUN.md).
 
-| Metric | 1.1.5 (2026-10-07) | 1.1.1 (2026-10-03) | 1.1.0 (2026-10-03) | 1.0.1 (2026-09-21) | 1.0.0 (2026-09-18) | How |
-| --- | --- | --- | --- | --- | --- | --- |
-| Core feed throughput | 143.8 MiB/s (one run) | 137.8 MiB/s (one run) | 144.1 MiB/s (one run) | 138.5 MiB/s (one run) | **144.2 MiB/s** (5-run mean; 141.2–146.6) | `corta-bench`, `-c release` |
-| Parser-only / parser + grid | 766.0 / 169.2 MiB/s | 751.7 / 155.4 MiB/s | 779.4 / 167.2 MiB/s | 766.9 / 161.4 MiB/s | 806.3 / 166.9 MiB/s | same run |
-| Memory @ 100k × 120 lines | 185.0 MB | 185.0 MB | 185.0 MB | 184.4 MB | **185.0 MB** | `corta-bench` |
-| Keypress → grid (core side) | p50 0.012 / p95 0.014 / p99 0.016 ms | p50 0.012 / p95 0.014 / p99 0.016 ms | p50 0.018 / p95 0.023 / p99 0.029 ms | p50 0.009 / p95 0.011 / p99 0.012 ms | p50 0.014 / p95 0.018 / p99 0.020 ms | `corta-bench`, 2000 samples; excludes vsync and display |
-| Frame CPU, 120×40 full rebuild, Debug | not re-measured | not re-measured | not comparable — now a Release figure, next row | **1.79 ms** avg (1.76 / 1.75 / 1.87) | **2.26 ms** avg (2.31 / 2.26 / 2.20) | `FrameCPUBaselineTests` (D17), Debug test action; from 1.1.0 a Release figure (§5.8) |
-| Frame CPU, 120×40 full rebuild, Release | **0.57 ms** avg (0.56 / 0.59 / 0.57); full rebuild CPU-only p50 0.126–0.127 ms | not re-measured | **0.87 ms** avg (0.86 / 0.88 / 0.88); full rebuild CPU-only p50 0.13–0.15 ms | — | — | `FrameCPUBaselineTests` (D17), §5.8 command |
-| Live frame CPU, Release, 2 / 4 panes flooded | not re-measured | not re-measured | not re-measured | not re-measured | avg 0.60 / 0.14–0.49 ms; p99 2.59 / 0.38–0.45 | `MeasurementUITests` floods, `CORTA_RENDER_METRICS` |
-| GPU, 2 / 4 panes flooded | not re-measured | not re-measured | not re-measured | not re-measured | avg 0.49 / 0.47 ms | same |
-| Idle CPU, Release, 20 s | not re-measured | not re-measured | not re-measured | not re-measured | **0.05%**; occluded 0.0–0.1% | same |
-| Launch → first window | not re-measured | not re-measured | not re-measured | not re-measured | 208 ms (2-pane restore), 451 ms (4-pane) | same |
-| Spawn: `zsh -l` → first output | p50 42.1 ms | p50 40.3 ms | p50 41.2 ms | p50 46.8 ms | p50 44.5 ms | `corta-bench` |
-| Reflow, 100k lines, 120 → 80 columns | 53.3 ms | 58.9 ms | **51.2 ms** | 97.9 ms | 94.1 ms | `corta-bench` |
-| Search, 100k lines, one query | 25.5 ms warm | 25.8 ms warm | **25.6 ms** warm | ~400 ms warm | ~395 ms warm | `corta-bench` |
-| Keypress → glass, scripted | not re-measured | not re-measured | not re-measured | not re-measured | **61.9 ms** avg; p50 61.4 / p95 69.7 / p99 70.9 | §5.7 |
-| Keypress → glass, a person typing | not re-measured | not re-measured | not re-measured | not re-measured | **66.3 ms** avg; p50 67.0 / p95 78.7 / p99 84.5 | §5.7, `--manual` |
-| Energy, background flood (`yes`, occluded) | not re-measured | not re-measured | not re-measured | not re-measured | 10.2 W machine-wide on mains; 2.6 W in Low Power Mode; idle, occluded and a static image within the machine's noise floor | 1.0.0: a `powermetrics` script, since removed; now an *Activity Monitor* trace (§5.6 note) |
+| Metric | 1.7.0 (2026-11-20) | 1.1.5 (2026-10-07) | 1.1.1 (2026-10-03) | 1.1.0 (2026-10-03) | 1.0.1 (2026-09-21) | 1.0.0 (2026-09-18) | How |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Core feed throughput | 286.6 MiB/s (one run) | 143.8 MiB/s (one run) | 137.8 MiB/s (one run) | 144.1 MiB/s (one run) | 138.5 MiB/s (one run) | **144.2 MiB/s** (5-run mean; 141.2–146.6) | `corta-bench`, `-c release` |
+| Parser-only / parser + grid | 635.3 / 322.2 MiB/s | 766.0 / 169.2 MiB/s | 751.7 / 155.4 MiB/s | 779.4 / 167.2 MiB/s | 766.9 / 161.4 MiB/s | 806.3 / 166.9 MiB/s | same run |
+| Memory @ 100k × 120 lines | 4.4 MB (compressed history, §5.28) | 185.0 MB | 185.0 MB | 185.0 MB | 184.4 MB | **185.0 MB** | `corta-bench` |
+| Keypress → grid (core side) | p50 0.012 / p95 0.014 / p99 0.015 ms | p50 0.012 / p95 0.014 / p99 0.016 ms | p50 0.012 / p95 0.014 / p99 0.016 ms | p50 0.018 / p95 0.023 / p99 0.029 ms | p50 0.009 / p95 0.011 / p99 0.012 ms | p50 0.014 / p95 0.018 / p99 0.020 ms | `corta-bench`, 2000 samples; excludes vsync and display |
+| Frame CPU, 120×40 full rebuild, Debug | not re-measured | not re-measured | not re-measured | not comparable — now a Release figure, next row | **1.79 ms** avg (1.76 / 1.75 / 1.87) | **2.26 ms** avg (2.31 / 2.26 / 2.20) | `FrameCPUBaselineTests` (D17), Debug test action; from 1.1.0 a Release figure (§5.8) |
+| Frame CPU, 120×40 full rebuild, Release | not re-measured in this run; §5.7 (#337, 2026-11-19) | **0.57 ms** avg (0.56 / 0.59 / 0.57); full rebuild CPU-only p50 0.126–0.127 ms | not re-measured | **0.87 ms** avg (0.86 / 0.88 / 0.88); full rebuild CPU-only p50 0.13–0.15 ms | — | — | `FrameCPUBaselineTests` (D17), §5.8 command |
+| Live frame CPU, Release, 2 / 4 panes flooded | not re-measured | not re-measured | not re-measured | not re-measured | not re-measured | avg 0.60 / 0.14–0.49 ms; p99 2.59 / 0.38–0.45 | `MeasurementUITests` floods, `CORTA_RENDER_METRICS` |
+| GPU, 2 / 4 panes flooded | not re-measured | not re-measured | not re-measured | not re-measured | not re-measured | avg 0.49 / 0.47 ms | same |
+| Idle CPU, Release, 20 s | 0.0%, one window, 60 s `top` (§5.5) | not re-measured | not re-measured | not re-measured | not re-measured | **0.05%**; occluded 0.0–0.1% | same |
+| Launch → first window | 269 ms warm, one new window (§5.5) | not re-measured | not re-measured | not re-measured | not re-measured | 208 ms (2-pane restore), 451 ms (4-pane) | same |
+| Spawn: `zsh -l` → first output | p50 51.3 ms | p50 42.1 ms | p50 40.3 ms | p50 41.2 ms | p50 46.8 ms | p50 44.5 ms | `corta-bench` |
+| Reflow, 100k lines, 120 → 80 columns | 30.0 ms | 53.3 ms | 58.9 ms | **51.2 ms** | 97.9 ms | 94.1 ms | `corta-bench` |
+| Search, 100k lines, one query | 25.6 ms warm | 25.5 ms warm | 25.8 ms warm | **25.6 ms** warm | ~400 ms warm | ~395 ms warm | `corta-bench` |
+| Keypress → glass, scripted | Typometer p50 21.0 / p95 40.9 / p99 48.6 ms (§5.5) | not re-measured | not re-measured | not re-measured | not re-measured | **61.9 ms** avg; p50 61.4 / p95 69.7 / p99 70.9 | §5.7 |
+| Keypress → glass, a person typing | not re-measured | not re-measured | not re-measured | not re-measured | not re-measured | **66.3 ms** avg; p50 67.0 / p95 78.7 / p99 84.5 | §5.7, `--manual` |
+| Energy, background flood (`yes`, occluded) | not re-measured | not re-measured | not re-measured | not re-measured | not re-measured | 10.2 W machine-wide on mains; 2.6 W in Low Power Mode; idle, occluded and a static image within the machine's noise floor | 1.0.0: a `powermetrics` script, since removed; now an *Activity Monitor* trace (§5.6 note) |
 
 The 1.0.0 and 1.0.1 runs were on battery for the core benchmarks, not the mains power
 §5.2 asks for; the 1.0.0 keypress and energy runs were on AC. Every
@@ -618,7 +655,18 @@ but it includes the GPU's round trip (§5.8); the CPU-only rebuild, 0.13–0.15
 ms at 1.1.0, is the comparison, and it did not move. Every scripted core
 figure is inside the 1.0.0–1.1.1 range or better than it.
 
-**Since 1.1.5 no release has had a whole-table run.** 1.2.0's changes were
+1.7.0's column is from 2026-11-20, on AC, alongside §5.5's comparison:
+`corta-bench` for the core rows, and §5.5's app-level runs where a row
+names it. Those use a different method from 1.0.0's (a 60-second `top`, a
+warm launch to one new window, Typometer), so they sit beside the older
+cells rather than continuing them. Against 1.1.5, core feed and parser + grid
+are about twice as fast (the scrolling work in §5.14 onward), history is
+compressed (§5.28) and reflow is faster; parser-only reads 17% lower and
+`zsh -l` spawn about 9 ms slower, neither attributed here, both one run.
+The render-loop rows were not re-run for this column; §5.7 has the
+2026-11-19 figures for the same code.
+
+**Between 1.1.5 and 1.7.0 no release had a whole-table run.** 1.2.0's changes were
 measured one batch at a time, each before/after on the same M5 and
 toolchain: scrolling and throughput in §5.14, memory and the core in §5.15,
 full screen in §5.17, the instance build in §5.19. The 2026-10-11 memory
