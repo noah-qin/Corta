@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-19
+
 Two themes. **Performance and security:** output that does heavy work per
 byte, whether a misbehaving program or a hostile stream, can no longer hold a
 pane's lock for long: the worst stream measured held a 120 × 400 window for
@@ -2965,7 +2967,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.6.5...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.7.0...main
+[1.7.0]: https://github.com/noah-qin/Corta/releases/tag/v1.7.0
 [1.6.5]: https://github.com/noah-qin/Corta/releases/tag/v1.6.5
 [1.6.4]: https://github.com/noah-qin/Corta/releases/tag/v1.6.4
 [1.6.3]: https://github.com/noah-qin/Corta/releases/tag/v1.6.3
