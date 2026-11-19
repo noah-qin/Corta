@@ -131,6 +131,12 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         needsLayout = true
     }
 
+    /// The same tab with another tooltip (`TabStripItem.differsOnlyInToolTip`).
+    func updateToolTip(_ item: TabStripItem) {
+        self.item = item
+        if toolTip != item.toolTip { toolTip = item.toolTip }
+    }
+
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         updateChrome()
