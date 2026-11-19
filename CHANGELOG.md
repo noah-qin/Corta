@@ -10,6 +10,18 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+Two themes. **Performance and security:** output that does heavy work per
+byte, whether a misbehaving program or a hostile stream, can no longer hold a
+pane's lock for long: the worst stream measured held a 120 × 400 window for
+1.8 s and now takes under a millisecond, a coloured erase dropped from 57 ms
+to at most 7 ms, and malformed UTF-8 is written about ten times faster.
+Ordinary output and keypress latency are unchanged. **New features:** a native
+field for composing a prompt, opening a folder from Finder, `open -a` or the
+Dock, no pane header on a lone pane, and numbers on tabs that share a title.
+Figures are from one Apple M5 MacBook Air, before and after on the same
+machine and toolchain; [Performance §5.30](docs/PERFORMANCE.md#530-where-the-session-lock-a-title-change-and-the-image-caps-stand-2026-11-18)
+has each method.
+
 ### Added
 
 - **Edit ▸ Compose Text…** (⇧⌘E, also in the command palette) opens a native
