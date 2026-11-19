@@ -50,6 +50,10 @@ struct WindowBirthTests {
         let pane = try #require(split.focusedPane)
         #expect(window.styleMask.contains(.fullSizeContentView), "the mask is final from creation")
         #expect(pane.didSizeWindow, "sized before anything shows it")
+        // A lone pane has no header (#527), and the window was sized knowing
+        // that: shown and hidden again would be a second winsize.
+        #expect(!pane.showsHeader)
+        #expect(pane.paneHeader.isHidden)
 
         controller.showWindow(nil)
         split.view.layoutSubtreeIfNeeded()
@@ -62,6 +66,7 @@ struct WindowBirthTests {
         let fitted = pane.gridSize(fitting: pane.view.bounds.size)
         #expect(Int(fitted.rows) == configuredGrid.rows)
         #expect(Int(fitted.columns) == configuredGrid.columns)
+        #expect(pane.resizesSent == 0, "the child's one winsize is the one it was spawned with")
     }
 
     /// Before the window is sized, a layout at any other size reaches the

@@ -152,6 +152,9 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
     private var resizeDebouncer: ResizeDebouncer!
     /// The size the debouncer last handed the session, to tell a reflow.
     private var lastCommittedSize: TerminalSize?
+    /// The winsizes sent to the child after the one it was spawned with:
+    /// what "a new window's child receives exactly one winsize" is counted by.
+    private(set) var resizesSent = 0
 
     /// ⌘+/⌘− re-fit the window to keep this grid size.
     var lastRequestedSize: TerminalSize?
@@ -179,6 +182,17 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
     private(set) lazy var appearance = PaneAppearance(host: self)
     let inputSourceIndicator = PaneInputSourceIndicator()
     private(set) lazy var paneHeader = PaneHeader(pane: self)
+    /// Whether the header row is shown: only while the tab holds more than
+    /// one pane (#527). A lone pane's tab already names it, so the row goes
+    /// to the grid. Set by `SplitViewController` as panes join and leave it,
+    /// before a new pane's view loads, so a pane spawns at the grid it keeps.
+    var showsHeader = false {
+        didSet {
+            guard showsHeader != oldValue else { return }
+            paneHeader.isHidden = !showsHeader
+            if isViewLoaded { view.needsLayout = true }
+        }
+    }
 
     /// The child sees the final size now, not after the debounce.
     func endLiveResize() { resizeDebouncer?.flush() }
@@ -197,12 +211,7 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
         return max(0, window.frame.height - window.contentLayoutRect.height)
     }
     /// Only a pane touching the window's top sits under the chrome.
-    var topInset: CGFloat {
-        guard view.window != nil else {
-            return TerminalLayout.titlebarHeight + TerminalLayout.insets.top + PaneHeader.height
-        }
-        return TerminalLayout.insets.top + chromeOverlap + PaneHeader.height
-    }
+    var topInset: CGFloat { topInset(showingHeader: showsHeader) }
     /// The chrome share alone — what the focus ring, drawn flush, needs.
     var chromeOverlap: CGFloat {
         guard let window = view.window else { return 0 }
@@ -253,12 +262,7 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
     let minimumColumns = 20
     let minimumRows = 5
 
-    var minimumContentSize: CGSize {
-        let metrics = cellMetrics
-        return CGSize(
-            width: max(230, CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth),
-            height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight + PaneHeader.height)
-    }
+    var minimumContentSize: CGSize { minimumContentSize(showingHeader: showsHeader) }
 
     nonisolated static let fitSlack: CGFloat = 0.5
 
@@ -280,7 +284,7 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
         return NSSize(
             width: CGFloat(grid.columns) * metrics.cellWidth + TerminalLayout.insetWidth + 2 * PaneSurfaceView.margin,
             height: CGFloat(grid.rows) * metrics.cellHeight + TerminalLayout.insetHeight
-                + windowChrome + PaneHeader.height + 2 * PaneSurfaceView.margin)
+                + windowChrome + headerHeight(showingHeader: showsHeader) + 2 * PaneSurfaceView.margin)
     }
 
     override func loadView() { view = PaneSurfaceView(frame: .zero) }
@@ -406,7 +410,9 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
     /// `coalesce: false` delivers the size now: a font change is one step,
     /// and waiting out the drag debounce drew a frame of the new font over
     /// the old grid first.
-    func resizeSessionToFitView(coalesce: Bool = true) {
+    /// `fitting` is the size the view is about to have, when a transition has
+    /// not given it that frame yet.
+    func resizeSessionToFitView(coalesce: Bool, fitting size: CGSize?) {
         // Nothing reaches the child before the window is sized: a layout of the
         // view at its placeholder size would strand blank rows under the
         // prompt. The session is born at the target size, so nothing is lost.
@@ -414,7 +420,7 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
             splitController?.splitTransition.isRunning != true,
             splitController?.isRearrangingPanes != true
         else { return }
-        let grid = gridSize(fitting: view.bounds.size)
+        let grid = gridSize(fitting: size ?? view.bounds.size)
         let pixels = pixelSize(
             columns: Int(grid.columns), rows: Int(grid.rows), metrics: terminalRenderer.metrics)
         let size = TerminalSize(
@@ -449,14 +455,43 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
 // MARK: - Sizes in cells
 
 extension TerminalPaneViewController {
+    /// The grid the view's frame fits, sent to the child; see
+    /// `resizeSessionToFitView(coalesce:fitting:)`.
+    func resizeSessionToFitView(coalesce: Bool = true) {
+        resizeSessionToFitView(coalesce: coalesce, fitting: nil)
+    }
+
+    /// The header's share of the pane's height (#527).
+    private func headerHeight(showingHeader: Bool) -> CGFloat { showingHeader ? PaneHeader.height : 0 }
+
+    /// `topInset`, with or without the header: a split measures the halves
+    /// with the header they are about to have.
+    func topInset(showingHeader: Bool) -> CGFloat {
+        let header = headerHeight(showingHeader: showingHeader)
+        guard view.window != nil else {
+            return TerminalLayout.titlebarHeight + TerminalLayout.insets.top + header
+        }
+        return TerminalLayout.insets.top + chromeOverlap + header
+    }
+
+    /// `minimumContentSize`, with or without the header: either half of a
+    /// split of this pane shows one.
+    func minimumContentSize(showingHeader: Bool) -> CGSize {
+        let metrics = cellMetrics
+        return CGSize(
+            width: max(230, CGFloat(minimumColumns) * metrics.cellWidth + TerminalLayout.insetWidth),
+            height: CGFloat(minimumRows) * metrics.cellHeight + TerminalLayout.insetHeight
+                + headerHeight(showingHeader: showingHeader))
+    }
+
     /// How a split predicts the new pane's winsize before layout settles it.
     /// Also the grid `resizeSessionToFitView` sends, so a prediction and the
     /// session never disagree. Half a point of slack: a window fitted to
     /// whole cells can land a rounding step short of the last one, and the
     /// right and bottom insets absorb the overhang.
-    func gridSize(fitting size: CGSize) -> TerminalSize {
+    func gridSize(fitting size: CGSize, showingHeader: Bool? = nil) -> TerminalSize {
         let metrics = cellMetrics
-        let usable = usableSize(fitting: size)
+        let usable = usableSize(fitting: size, showingHeader: showingHeader ?? showsHeader)
         return TerminalSize(
             rows: Self.cellCount((usable.height + Self.fitSlack) / metrics.cellHeight),
             columns: Self.cellCount((usable.width + Self.fitSlack) / metrics.cellWidth))
@@ -464,8 +499,10 @@ extension TerminalPaneViewController {
 
     /// The area of a pane `size` large that the grid may use: the size less
     /// the insets.
-    func usableSize(fitting size: CGSize) -> CGSize {
-        CGSize(width: size.width - TerminalLayout.insetWidth, height: size.height - verticalInsets)
+    private func usableSize(fitting size: CGSize, showingHeader: Bool) -> CGSize {
+        let top = topInset(showingHeader: showingHeader)
+        return CGSize(
+            width: size.width - TerminalLayout.insetWidth, height: size.height - top - TerminalLayout.insets.bottom)
     }
 }
 
@@ -614,6 +651,7 @@ extension TerminalPaneViewController {
         ])
         terminalView = view
         focus.installViews(in: self.view)
+        paneHeader.isHidden = !showsHeader
         self.view.addSubview(paneHeader)
     }
 
@@ -623,6 +661,7 @@ extension TerminalPaneViewController {
             guard let self, let session = self.session else { return }
             let columnsChanged = self.lastCommittedSize.map { $0.columns != size.columns } ?? false
             self.lastCommittedSize = size
+            self.resizesSent += 1
             session.resize(to: size)
             // A reflow renumbers rows; matches found before it would be
             // drawn over the wrong text until the next paced sweep.

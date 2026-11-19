@@ -27,6 +27,9 @@ final class LaunchedAppChecksUITests: XCTestCase {
     /// selected, and the background tab's split there when it is first shown.
     @MainActor func testRestoredTabbedWindowKeepsOrderSelectionAndBackgroundSplit() throws {
         continueAfterFailure = false
+        // The names are typed: a CJK input method would compose them instead.
+        let previous = LatinInputSource.select()
+        addTeardownBlock { LatinInputSource.restore(previous) }
         let app = UIFixtures.app(stage: try UIFixtures.stage("tab-restore"), runner: Self.self)
         // Restore stays on for both launches: `CORTA_RESTORE_WINDOWS=0` also stops
         // the arrangement being saved. A rerun on the same stage reopens the last
@@ -105,7 +108,8 @@ final class LaunchedAppChecksUITests: XCTestCase {
         }
         XCTAssertEqual(restoredTabs.element(boundBy: 1).value as? Int, 1, "the saved tab is not selected")
         XCTAssertEqual(restoredTabs.element(boundBy: 0).value as? Int, 0)
-        XCTAssertEqual(restored.buttons.matching(identifier: "pane.close").count, 1, "the selected tab is not split")
+        // A lone pane has no header (#527), so no close button of its own.
+        XCTAssertEqual(restored.buttons.matching(identifier: "pane.close").count, 0, "the selected tab is not split")
 
         restoredTabs.element(boundBy: 0).click()
         expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: restored.buttons.matching(identifier: "pane.close"))

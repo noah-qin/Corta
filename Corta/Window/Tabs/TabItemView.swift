@@ -107,10 +107,19 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         }
         self.item = item
         self.selected = selected
-        let text = NSMutableAttributedString(string: item.name, attributes: [
+        let text = NSMutableAttributedString()
+        if let number = item.number {
+            // Before the title, in the name's tone with fixed-width digits, so
+            // tabs that read the same can be told apart at a glance (#528).
+            text.append(NSAttributedString(string: "\(number)  ", attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold),
+                .foregroundColor: NSColor.secondaryLabelColor,
+            ]))
+        }
+        text.append(NSAttributedString(string: item.name, attributes: [
             .font: NSFont.systemFont(ofSize: 13),
             .foregroundColor: selected ? NSColor.labelColor : NSColor.secondaryLabelColor,
-        ])
+        ]))
         if !item.context.isEmpty {
             text.append(NSAttributedString(string: " " + item.context, attributes: [
                 .font: NSFont.systemFont(ofSize: 13), .foregroundColor: NSColor.tertiaryLabelColor,
@@ -126,7 +135,8 @@ final class TabItemView: NSView, NSTextFieldDelegate {
         badge.toolTip = badgeLabel
         badge.setAccessibilityLabel(badgeLabel)
         // The tab is the element VoiceOver reads; the dot alone says nothing.
-        setAccessibilityLabel(badgeLabel.map { "\(item.name), \($0)" } ?? item.name)
+        let label = Self.accessibilityTitle(for: item)
+        setAccessibilityLabel(badgeLabel.map { "\(label), \($0)" } ?? label)
         setAccessibilityValue(selected)
         needsLayout = true
     }
@@ -330,6 +340,13 @@ final class TabItemView: NSView, NSTextFieldDelegate {
 }
 
 extension TabItemView {
+    /// The title as shown, and for a tab whose title another shares, the
+    /// number shown before it: "zsh ~, tab 2" (#528).
+    static func accessibilityTitle(for item: TabStripItem) -> String {
+        guard let number = item.number else { return item.title }
+        return L10n.format("tabs.numbered", item.title, number)
+    }
+
     /// What the badge's dot means, in words.
     static func badgeLabel(status: ProgramStatus?, progress: ProgramProgress?) -> String? {
         guard status != nil || progress != nil else { return nil }

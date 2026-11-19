@@ -28,6 +28,9 @@ struct TabStripItem: Equatable {
     var toolTip: String
     var status: ProgramStatus?
     var progress: ProgramProgress?
+    /// The tab's position, from 1, shown before its title while another tab
+    /// shows the same title (#528); nil for a title no other tab shares.
+    var number: Int?
 
     /// Whether `other` is this item with another tooltip: nothing a tab draws
     /// or lays out changed.
@@ -35,6 +38,23 @@ struct TabStripItem: Equatable {
         var same = other
         same.toolTip = toolTip
         return same == self && other.toolTip != toolTip
+    }
+
+    /// The title as the tab shows it: the name, then the context.
+    var title: String { context.isEmpty ? name : name + " " + context }
+
+    /// `items` in strip order, each whose title another also shows numbered
+    /// by its position, the rest not (#528). Numbers are positions, not
+    /// counts within a group: the number a tab shows is the one ⌘1–⌘8 select
+    /// it by, and they follow the tabs as they move, open and close.
+    static func numberingDuplicates(_ items: [TabStripItem]) -> [TabStripItem] {
+        var counts: [String: Int] = [:]
+        for item in items { counts[item.title, default: 0] += 1 }
+        return items.enumerated().map { index, item in
+            var numbered = item
+            numbered.number = counts[item.title, default: 0] > 1 ? index + 1 : nil
+            return numbered
+        }
     }
 }
 

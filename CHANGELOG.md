@@ -10,6 +10,21 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Changed
+
+- A tab with a single pane no longer repeats its title in a pane header below
+  the tab: the header shows only once a tab is split, and the row it took goes
+  to the terminal. Splitting brings a header back on every pane, and closing
+  back to one pane removes it again. A new window's shell still receives
+  exactly one size at birth. A lone pane splits with ⌘D and ⇧⌘D, the Shell menu
+  or the command palette, closes with ⌘W, and moves by dragging its tab (#527).
+- Tabs that show the same title, such as three `zsh ~` tabs, now show their
+  position number before the title, the number ⌘1–⌘8 select them by. The
+  numbers follow reordering, opening and closing, and appear or go as titles
+  become shared or unique; a tab with a title of its own is unchanged. ⌘9
+  selects the last tab, so a number of 9 or more has no shortcut of its own.
+  VoiceOver reads the number with the title (#528).
+
 ### Fixed
 
 - A program that changes the window title many times a second costs the main

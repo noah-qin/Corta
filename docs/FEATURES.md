@@ -74,6 +74,12 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   existing tab of the same window, from the keyboard, the Shell menu and the
   command palette. Dragging a pane's header does the same, with a
   preview of where it lands, including onto another tab; not to another window.
+- A pane header (name, split, zoom and close) only while a tab holds more
+  than one pane; a lone pane gives that row to the terminal, since its tab
+  already names it.
+- Tabs that show the same title carry their position number before it, the
+  number ⌘1–⌘8 select them by; ⌘9 selects the last tab, so a number of 9 or
+  more has no shortcut of its own.
 - Optional, off by default: equal pane sizes that keep dividers you placed,
   focus that follows the mouse, and a split along the pane's longer side.
 - A full-screen window with one pane is presented directly to the display,

@@ -107,6 +107,7 @@ stage tab-restore 'columns = 90\nrows = 24\nrestore-windows = true\ncursor-blink
 stage menu-language 'columns = 90\nrows = 24\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 # The pane drag: the status bar on, so a drop aimed at a pane's bottom edge
 # is proven to land above the window's own chrome.
+stage tab-numbers 'columns = 100\nrows = 26\nrestore-windows = false\ncursor-blink = false\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 stage pane-drag 'columns = 120\nrows = 30\nrestore-windows = false\ncursor-blink = false\nstatus-bar = true\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 stage cursor-oversized 'columns = 500\nrows = 300\nrestore-windows = true\ncursor-shape = bar\ncursor-blink = true\n'
 stage cursor-blink 'appearance = light\ncolumns = 90\nrows = 24\nrestore-windows = false\ncursor-shape = bar\ncursor-blink = true\n'
