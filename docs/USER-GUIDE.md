@@ -843,8 +843,15 @@ It is the quickest way to reach the commands that have no default shortcut.
 
 ## macOS integration
 
-- **Shortcuts.** Two actions: **Open Corta Window** (optionally in a
-  folder) and **Focus Corta Window**. Neither runs a command in a shell.
+- **Open a folder in Corta.** Control-click a folder in Finder and choose
+  **Services ▸ New Corta Window Here** (the development build's is **New
+  Corta Dev Window Here**). `open -a Corta ~/project` from another terminal,
+  or dropping a folder on Corta's Dock icon, does the same, whether Corta is
+  running or not. Each folder opens a window of its own whose shell starts
+  there, up to ten at once. A file, a missing folder or one you cannot read
+  opens nothing, and Corta says why. Opening a folder never runs a command.
+  If the item is not in Finder's menu, turn it on in **System Settings ▸
+  Keyboard ▸ Keyboard Shortcuts ▸ Services ▸ Files and Folders**.
 - **Services.** Selected terminal text is offered to the **Services** menu.
 - **Secure Keyboard Entry.** **Shell ▸ Secure Keyboard Entry** stops other
   applications from reading your keystrokes while Corta is in front — for

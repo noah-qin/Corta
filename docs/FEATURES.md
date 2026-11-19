@@ -198,8 +198,10 @@ files, remote connections and child-process input.
 
 ## macOS integration
 
-- Open and focus Shortcuts actions. These actions do not send
-  commands to a shell.
+- Open a folder in a new window: Finder's **New Corta Window Here** service,
+  `open -a Corta <folder>`, or a folder dropped on the Dock icon. The folder
+  is the shell's working directory and nothing else; a file, a missing or an
+  unreadable path opens nothing and Corta says why.
 - Secure Keyboard Entry under **Shell**, with an indicator of engaged state.
 - **Edit ▸ Compose Text…** (⇧⌘E): a native text field over the focused pane
   for writing a prompt with the system's input methods, undo, spelling and
@@ -261,7 +263,7 @@ implementation and integration choices compare.
 | Native UI | AppKit, with SwiftUI settings | Native macOS app | SwiftUI on macOS; GTK on Linux |
 | Rendering | Metal 4, with Core Text shaping and font fallback | Metal GPU renderer, configurable | Metal on macOS; OpenGL on Linux |
 | Settings | One text file, also edited by the native Settings window | Settings UI and profiles; dynamic profiles | Text configuration, with support for multiple files |
-| Integration examples | Shortcuts, OpenSSH, SFTP browser and managed remote editing | tmux control-mode integration, Python API and triggers | macOS Shortcuts and AppleScript; embeddable `libghostty` libraries |
+| Integration examples | Finder service and Dock folders, OpenSSH, SFTP browser and managed remote editing | tmux control-mode integration, Python API and triggers | macOS Shortcuts and AppleScript; embeddable `libghostty` libraries |
 
 **Last checked 2026-10-13.** Other terminals change faster than this page;
 treat a row as a snapshot and follow the links for the current state. The

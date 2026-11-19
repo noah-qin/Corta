@@ -349,7 +349,7 @@ Explicitly out of scope. Each has been considered and rejected.
 | Cross-platform                                | Forfeits Metal and Core Text, the entire premise            |
 | tmux control mode (`-CC`)                     | A second protocol *and* a second window model; same cost class as building a multiplexer |
 | AI features, command blocks, cloud sync       | Conflicts with "small, not heavy"                           |
-| Automation that runs commands (a "run this" intent or URL) | An external input reaching a child's stdin; `SECURITY.md` §4.6. Open/focus intents ship; execution does not |
+| Automation that runs commands (a "run this" intent or URL) | An external input reaching a child's stdin; `SECURITY.md` §4.6. Opening a window in a folder ships; execution does not |
 | Implementing SSH or git                       | They are programs running on a PTY; rendering correctly is the whole job |
 | Bidirectional text (RTL)                      | Large complexity, and a security footgun (see `SECURITY.md`) |
 | Terminal title *query* responses              | Command injection vector; see `SECURITY.md` §2.2            |

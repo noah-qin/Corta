@@ -34,7 +34,7 @@ path = [
   "CortaTests/Renderer/RenderReferences/**",
   "Corta.xcodeproj/**",
   "Corta/Assets.xcassets/**",
-  "Corta/Localizable.xcstrings",
+  "Corta/*.xcstrings",
   "TestPlans/*.xctestplan",
   "Sparkle-Info.plist",
   "scripts/image-decoder/*.plist",

@@ -16,7 +16,6 @@
 
 import AppKit
 import CortaTerminal
-import CortaPOSIX
 import Testing
 @testable import Corta
 

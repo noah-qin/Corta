@@ -38,13 +38,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Nothing else retains a window controller, and dropping one takes its
     /// window and session down.
     var windowControllers: [NSWindowController] = []
-    /// The windows an App Intent may name, in opening order.
+    /// The terminal windows, in opening order.
     var terminalWindowControllers: [TerminalWindowController] {
         windowControllers.compactMap { $0 as? TerminalWindowController }
     }
-    /// Every window's tabs, windows in opening order (D30); what an App
-    /// Intent calls a window.
-    var terminalTabs: [TerminalTab] { terminalWindowControllers.flatMap(\.tabs) }
     /// The debounced arrangement write; see `noteLayoutChanged`.
     var pendingLayoutSave: DispatchWorkItem?
     let layoutWrites = DispatchQueue(label: "Corta.WindowLayout", qos: .utility)
@@ -54,18 +51,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     var isTerminating = false
     /// A quit confirmation sheet is up; see `applicationShouldTerminate`.
     var isAskingToTerminate = false
+    /// A folder was named from outside before the first windows opened
+    /// (`AppDelegate+Folders.swift`): that folder's window stands in for the
+    /// fresh one a launch would otherwise open.
+    var launchedForFolder = false
+    /// The first windows — restored or fresh — are up; until then a checked
+    /// folder request waits in `foldersAwaitingLaunch`, so a restore does not
+    /// bury its window.
+    var initialWindowsOpened = false
+    var foldersAwaitingLaunch: [(outcomes: [FolderRequest.Outcome], excess: Int)] = []
 
     /// File > New Window (⌘N).
     @objc func newDocument(_: Any?) {
         openWindow(workingDirectory: nil)
     }
 
-    /// The one route for opening a window (⌘N, Dock click, App Intent).
-    /// `workingDirectory` is a spawn cwd, never written to the child's stdin.
+    /// The one route for opening a window (⌘N, a Dock click, a folder from
+    /// Finder or the Dock). `workingDirectory` is a spawn cwd, never written
+    /// to the child's stdin.
     @discardableResult
     func openWindow(workingDirectory: String?) -> TerminalWindowController? {
-        let controller = makeWindowController(
-            setup: SplitViewController.Setup(workingDirectory: workingDirectory))
+        open(setup: SplitViewController.Setup(workingDirectory: workingDirectory))
+    }
+
+    /// A tracked window born from `setup`, cascaded and shown.
+    @discardableResult
+    func open(setup: SplitViewController.Setup) -> TerminalWindowController? {
+        let controller = makeWindowController(setup: setup)
         cascade(controller)
         controller.showWindow(nil)
         controller.window?.makeKeyAndOrderFront(nil)
@@ -82,22 +94,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         window.setFrame(
             WindowState.Frame(window.frame).onScreen(preferredScreen: window.screen, minimumSize: .zero),
             display: false)
-    }
-
-    /// Brings a window forward by identity for the App Intent, activating the
-    /// app so it really reaches the front. False if the id is gone.
-    @discardableResult
-    func focusWindow(id: String) -> Bool {
-        guard let tab = terminalTabs.first(where: { $0.id == id }), let controller = tab.controller,
-            let window = controller.window
-        else { return false }
-        controller.selectTab(tab)
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
-        // Activation is asynchronous. An inactive app otherwise leaves its
-        // previous window ahead of the requested one on macOS 27.
-        window.orderFrontRegardless()
-        return true
     }
 
     /// File > New Tab (⌘T): a tab of the key window (D30).
@@ -250,6 +246,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // become key.
         SecureInput.shared.start()
         installMenus()
+        // Before launching finishes: a service that launched Corta is
+        // delivered as soon as it has (`AppDelegate+Folders.swift`).
+        NSApp.servicesProvider = self
         // Before any window, so a move-and-relaunch never spawns a shell first.
         ApplicationsFolderMover.promptIfNeeded()
     }
@@ -304,7 +303,7 @@ extension AppDelegate {
     /// next pass of the run loop.
     func openInitialWindows() {
         guard Self.isRestoreEnabled else {
-            openWindow(workingDirectory: nil)
+            if !launchedForFolder { openWindow(workingDirectory: nil) }
             finishOpeningInitialWindows()
             return
         }
@@ -328,7 +327,8 @@ extension AppDelegate {
             rereadRestoreDecision(store: store, attempt: 1)
         case .skipAfterFailure:
             layoutPersistenceSuspended = true
-            let controller = openFreshInitialWindow()
+            // Always a window here: it carries the sheet that says why.
+            let controller = openFreshInitialWindow(evenForFolder: true)
             layoutWrites.async { [weak self, weak controller] in
                 let archived = (try? store.setAsideFailedRestore()) != nil
                 Task { @MainActor [weak self, weak controller] in
@@ -358,7 +358,9 @@ extension AppDelegate {
                     Task { @MainActor [weak self] in
                         guard let self else { return }
                         self.isWaitingForRestore = false
-                        if !self.restoreWindows(states) { self.openWindow(workingDirectory: nil) }
+                        if !self.restoreWindows(states), !self.launchedForFolder {
+                            self.openWindow(workingDirectory: nil)
+                        }
                         self.layoutWrites.async { store.endRestore() }
                         self.finishOpeningInitialWindows()
                     }
@@ -367,16 +369,20 @@ extension AppDelegate {
         }
     }
 
+    /// The launch's own window, unless a folder named from outside opens
+    /// one instead.
     @discardableResult
-    private func openFreshInitialWindow() -> TerminalWindowController? {
+    private func openFreshInitialWindow(evenForFolder: Bool = false) -> TerminalWindowController? {
         isWaitingForRestore = false
-        let controller = openWindow(workingDirectory: nil)
+        let controller = evenForFolder || !launchedForFolder ? openWindow(workingDirectory: nil) : nil
         finishOpeningInitialWindows()
         return controller
     }
 
     /// What a launch does once its first windows are up.
     private func finishOpeningInitialWindows() {
+        initialWindowsOpened = true
+        openFoldersAwaitingLaunch()
         #if DEBUG
         if CommandLine.arguments.contains("--sftp-preview") { SFTPBrowserController.showDevelopmentPreview() }
         if CommandLine.arguments.contains("--glass-preview") { GlassAppearancePreview.show() }

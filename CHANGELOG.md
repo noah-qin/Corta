@@ -21,6 +21,12 @@ Versioning for compatibility changes.
   first. Text not sent stays with the pane, in memory only, until the pane
   closes. The field opens only when chosen and changes nothing about typing
   into the pane otherwise; `bind.compose-text` rebinds it (#540).
+- Open a folder in Corta from outside it: Control-click a folder in Finder and
+  choose **Services ▸ New Corta Window Here**, run `open -a Corta <folder>`, or
+  drop a folder on Corta's Dock icon, whether Corta is running or not. Each
+  folder opens a window of its own whose shell starts there, born at its final
+  size. A file, a missing folder or one you cannot read opens nothing, and
+  Corta says why. Opening a folder never runs a command (#516).
 
 ### Changed
 
@@ -66,6 +72,13 @@ Versioning for compatibility changes.
   one smaller when a slice runs past 4 ms. At 120 × 400, a slice of
   screen-wide erases in a background colour held the lock for 57 ms and now
   holds it for at most 7 ms. Ordinary output keeps the full slice.
+
+### Removed
+
+- The **Open Corta Window** and **Focus Corta Window** Shortcuts actions. A
+  folder now opens from Finder, `open -a` or the Dock instead, without
+  building a Shortcut first; focusing a window by its identity had no use
+  of its own (#516).
 
 ## [1.6.5] - 2026-11-18
 

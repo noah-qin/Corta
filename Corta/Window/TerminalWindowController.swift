@@ -93,12 +93,6 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate {
         window.contentViewController = container
     }
 
-    /// The App Intent identity of the selected tab (`TerminalWindowEntity`).
-    var windowID: String {
-        get { selectedTab?.id ?? "" }
-        set { selectedTab?.id = newValue }
-    }
-
     private var splitController: SplitViewController? { selectedTab?.split }
 
     /// A titlebar lock while Secure Keyboard Entry is engaged — the effect is

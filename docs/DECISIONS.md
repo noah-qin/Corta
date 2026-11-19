@@ -181,8 +181,8 @@ changing this; revisit only once its conformance targets are met.
 **Decision.** Each is a non-goal with a stated reason in `DESIGN.md` §6.
 Compatibility with AI command-line tools is part of terminal correctness,
 not a feature. Automation that *runs commands* — a "run this" intent or
-URL — is likewise out: open/focus intents ship, execution does not
-(`SECURITY.md` §4.6).
+URL — is likewise out: opening a window in a folder from Finder or the
+Dock ships, execution does not (`SECURITY.md` §4.6).
 
 ## D10 — One config file is the only settings store
 

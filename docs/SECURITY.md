@@ -542,16 +542,29 @@ also blocks accessibility clients, macro tools and text expanders.
 
 ### 4.6 External automation is a third trust boundary
 
-Two App Intents let something *outside* a Corta window act on Corta: open a
-window and focus a window. Neither accepts text for a child's stdin, and neither
-ever will: an automation assembled from a shared Shortcut or a web page is no
-more trusted than escape sequences off the PTY. The one parameter an intent
-takes is a directory, checked to exist and handed to `spawn` as its working
-directory. An intent targets a stable tab identity. It selects that tab
-and brings its current window forward, including after the tab has moved.
-Titles come from child processes and are used only for display. An identity
-that no longer resolves fails with an error. Terminal transcripts are never
-indexed for Spotlight.
+Three routes let something *outside* a Corta window open one: Finder's
+**New Corta Window Here** service, `open -a Corta <folder>`, and a folder
+dropped on the Dock icon. All three carry one thing — the location of a
+folder — and none accepts text for a child's stdin, a command, a shell or a
+preset name, and none ever will: any process can send an open request or
+call a service, so what arrives is no more trusted than escape sequences off
+the PTY. The service reads only file URLs from its pasteboard, never text.
+
+Each location is checked before a window exists: a file URL that names an
+existing folder this user can list and change into (`access(R_OK|X_OK)`). A
+file is refused rather than opened in its parent; a missing, unreadable or
+non-local path is refused; each refusal says why in one alert and opens
+nothing. The check runs on `PathProbe` threads under the shared probe budget
+and the restored-directory deadline (one second), never on the main thread,
+so a folder on a mount that stopped answering is refused as not answering
+instead of freezing every window. One request opens at most ten folders. A
+folder that passes becomes the root pane's spawn working directory, given to
+the window by its setup, and nothing else: the pane spawns the configured
+shell as a ⌘N window does, and opening a folder never runs anything in it.
+
+Corta claims folders with the viewer role and the `Alternate` handler rank,
+so the Dock accepts the drop but Corta never becomes the default for opening a
+folder. Terminal transcripts are never indexed for Spotlight.
 
 ### 4.7 The update feed is signed, and its key sits in the release environment
 
