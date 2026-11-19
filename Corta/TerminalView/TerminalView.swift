@@ -282,6 +282,16 @@ final class TerminalView: NSView, CALayerDelegate {
     /// No tick is coming until something asks for one.
     var isFrameLinkPaused: Bool { frameScheduler.isPaused }
 
+    /// Parks the link the moment this view or an ancestor is hidden (a
+    /// background tab, D30), instead of at its next tick: the `ondemand`
+    /// pacing link belongs to the window's content view, and when that view
+    /// is the one hidden its ticks stop, so the tick that would park it never
+    /// comes. Whatever is owed stays owed; showing the view asks for a frame.
+    override func viewDidHide() {
+        super.viewDidHide()
+        frameScheduler.isPaused = true
+    }
+
     func stopRendering() {
         for observer in inputGeometryObservers { NotificationCenter.default.removeObserver(observer) }
         inputGeometryObservers.removeAll()

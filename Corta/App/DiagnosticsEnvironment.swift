@@ -97,13 +97,19 @@ nonisolated enum DiagnosticsEnvironment {
         }
     }
 
+    /// How a pane paces and presents frames. `ondemand`, the default since
+    /// #337, presents an echo on the next refresh; `displaylink`, the
+    /// `CAMetalDisplayLink` driver it replaced, stays for an A/B
+    /// (`PERFORMANCE.md` §5.7).
     enum FrameDriver: String, CaseIterable {
         case displaylink
         case ondemand
     }
 
+    /// `CORTA_FRAME_DRIVER=displaylink|ondemand`. Unset or unknown, the
+    /// default `ondemand`. All builds.
     static func frameDriver(in environment: Environment = ProcessInfo.processInfo.environment) -> FrameDriver {
-        value(.frameDriver, in: environment).flatMap(FrameDriver.init(rawValue:)) ?? .displaylink
+        value(.frameDriver, in: environment).flatMap(FrameDriver.init(rawValue:)) ?? .ondemand
     }
 
     /// `CORTA_FRAME_LATENCY=<n>`, n ≥ 1: the display link's

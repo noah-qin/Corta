@@ -17,9 +17,12 @@
 import AppKit
 import QuartzCore
 
-/// Owns one `TerminalView`'s presentation pipeline. The default
-/// `CAMetalDisplayLink` carries a resolved drawable; the opt-in echo
-/// experiment uses `CADisplayLink` pacing and acquires its own drawable.
+/// Owns one `TerminalView`'s presentation pipeline. The default driver
+/// (`ondemand`, #337) paces with a `CADisplayLink` and acquires its own
+/// drawable, and presents an echo at once when the link is parked; the
+/// `CAMetalDisplayLink` driver, whose drawables reach the glass about three
+/// refreshes after they are drawn in a window, stays behind
+/// `CORTA_FRAME_DRIVER=displaylink` for an A/B (`PERFORMANCE.md` §5.7).
 ///
 /// **The rule.** `isPaused` is the only gate: paused, nothing fires, which
 /// keeps idle CPU near 0% (`PERFORMANCE.md` §3). `resume()` wakes it for a
@@ -153,7 +156,7 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         return ceiling > 0 ? min(panel, max(1, Int(ceiling))) : panel
     }
 
-    /// Consumes an echo wake only in the opt-in experiment. Prepare before
+    /// Consumes an echo wake on the `ondemand` driver. Prepare before
     /// acquire: synchronized output and unchanged pixels acquire no drawable.
     @discardableResult
     func renderEchoOnDemand(now: CFTimeInterval? = nil) -> Bool {
@@ -205,8 +208,8 @@ final class FrameScheduler: NSObject, CAMetalDisplayLinkDelegate {
         }
     }
 
-    /// The experiment uses a separate pacing link. Mixing nextDrawable with
-    /// a paused CAMetalDisplayLink trapped on this OS, so never create both.
+    /// `ondemand` uses its own pacing link. Mixing nextDrawable with a
+    /// paused CAMetalDisplayLink trapped on this OS, so never create both.
     @objc private func pacingTick(_ pacing: CADisplayLink) {
         guard !isHidden() else { isPaused = true; return }
         RenderMetrics.measure(.cpuFrame) {
