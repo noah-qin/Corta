@@ -32,7 +32,7 @@ import Metal
 /// (`docs/DESIGN.md` §4.1), and new behaviour is added as one.
 class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHost, PaneCommandsHost,
     PaneFocusHost, PanePointerHost, PaneShellIntegrationHost, PaneAppearanceHost,
-    PaneSessionEndHost, PaneOutputAnnouncementHost, NSMenuItemValidation
+    PaneSessionEndHost, PaneOutputAnnouncementHost, PaneComposerHost, NSMenuItemValidation
 {
     // Not `private`: extensions reach these and cannot add storage.
     var terminalView: TerminalView!
@@ -161,6 +161,8 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
 
     /// Scrollback search: the bar, its sweeps and the highlighted matches.
     private(set) lazy var search = PaneSearch(host: self)
+    /// The compose field: a prompt written natively, sent as a paste.
+    private(set) lazy var composer = PaneComposer(host: self)
     /// Whether this pane talks to another machine, Reconnect, remote
     /// references and the SFTP browser's entry.
     private(set) lazy var remote = PaneRemote(host: self)
@@ -201,8 +203,7 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
     /// window, the only moment an initial size can apply.
     private var configuredGridSize: TerminalSize {
         let configuration = ConfigurationStore.shared.configuration
-        return TerminalSize(
-            rows: UInt16(configuration.rows), columns: UInt16(configuration.columns))
+        return TerminalSize(rows: UInt16(configuration.rows), columns: UInt16(configuration.columns))
     }
     /// Frame minus content layout rect — the only measure that follows a tab
     /// bar appearing. Before the window exists, the titlebar alone.
@@ -312,6 +313,7 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
         inputSourceIndicator.stop()
         windowTitle.stop()
         search.close()
+        composer.detach()
         commands.stop()
         agents.reset()
         taskNotifier.cancel()
@@ -345,6 +347,7 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
         focus.updateLayout()
         paneHeader.place()
         search.placeClearOfContent()
+        composer.place()
     }
 
     /// ⌘A: `NSResponder` declares it, so the pane overrides rather than
@@ -371,11 +374,11 @@ class TerminalPaneViewController: NSViewController, PaneSearchHost, PaneRemoteHo
     /// only notification selectors and stay out.
     /// Main-actor classes, so `Sendable`: `forwardingTarget(for:)` can carry
     /// one out of its `assumeIsolated`.
-    var actionOwners: [any NSObject & Sendable] { [search, remote, commands, pointer, shell] }
+    var actionOwners: [any NSObject & Sendable] { [search, remote, commands, composer, pointer, shell] }
     /// The same owners as classes, for a question that may come from any
     /// thread and so must not touch the instances.
     nonisolated static let actionOwnerClasses: [NSObject.Type] = [
-        PaneSearch.self, PaneRemote.self, PaneCommands.self, PanePointer.self,
+        PaneSearch.self, PaneRemote.self, PaneCommands.self, PaneComposer.self, PanePointer.self,
         PaneShellIntegration.self,
     ]
 
@@ -1231,6 +1234,8 @@ extension TerminalPaneViewController {
         readerDemotion = nil
         // Its matches and any sweep in flight read the old session's grid.
         search.close()
+        // The field goes with the session it was opened for; its draft stays.
+        composer.detach()
         frameLoop.detach()
         session?.stop()
         session = nil

@@ -437,6 +437,27 @@ own error text is under **Details**.
   Corta says so. A program can turn bracketed paste on without anything behind
   it understanding it; if you paste into remote or old programs and want the
   line-break warning every time, use `paste-warning = always`.
+- **Composing a prompt.** **Edit ▸ Compose Text…** (⇧⌘E, or the command
+  palette) opens a text field over the focused pane — for a long prompt to a
+  coding agent, or anything typed with an input method such as Pinyin. It is
+  a native macOS text field, so the input method's candidates, undo, spelling
+  and dictation work as in any app. Return starts a new line and **⌘Return**
+  sends, so an input method that commits on Return never sends by accident.
+  Esc closes the field; while an input method is composing, Esc cancels the
+  composition first. Closed without sending, the text waits for the next time
+  you open the field in that pane, until the pane closes; it is never written
+  to disk. The field opens only when you choose it, and typing into the pane
+  is unchanged while it is closed.
+
+  Sending is a paste into that pane and nothing more: the same sanitising,
+  bracketed paste and paste warning as ⌘V, and no Return after it — you
+  submit in the program. What a paste means is the program's choice. Claude
+  Code shows a paste of a few lines in full but collapses a longer one to
+  `[Pasted text #1 +4 lines]`; the text is all there and is sent when you press
+  Return. A program's own completions, such as Claude Code's `@` file mentions
+  and `/` commands, do not run while you write in the field; a slash command
+  sent from it still runs once you press Return in the program. Claude Code
+  also offers ⌃G to edit its input in `$EDITOR`.
 - **Dropping files.** Drop files or promised files from another app on a pane
   to fill their quoted paths through the paste channel, without pressing Return.
   Hovering never starts a download. Receiving happens asynchronously and stops
@@ -972,6 +993,7 @@ is the authoritative list:
 | Bigger / Smaller / Actual Size | ⌘= / ⌘− / ⌘0 |
 | Find… / Find Next / Find Previous | ⌘F / ⌘G / ⇧⌘G (Find Next and Previous are fixed) |
 | Copy / Paste / Select All | ⌘C / ⌘V / ⌘A |
+| Compose Text… | ⇧⌘E |
 | Scroll a page / to the top or bottom | ⇧PageUp, ⇧PageDown / ⇧Home, ⇧End |
 | Previous / Next Command | ⌘↑ / ⌘↓ |
 | Previous / Next Failed Command | ⇧⌘↑ / ⇧⌘↓ |

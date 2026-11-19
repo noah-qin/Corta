@@ -47,7 +47,7 @@ nonisolated extension TerminalCommand {
         case .clearScreen, .clearHistory, .resetTerminal, .reconnectRemote, .killAndReconnectRemote,
             .browseRemoteFiles, .secureKeyboardEntry:
             return .terminal
-        case .find, .copy, .paste, .selectAll, .exportText: return .edit
+        case .find, .copy, .paste, .composeText, .selectAll, .exportText: return .edit
         case .settings, .commandPalette: return .app
         }
     }
@@ -126,6 +126,7 @@ nonisolated extension TerminalCommand {
         case .selectAll: return 2
         case .find: return 3
         case .exportText: return 4
+        case .composeText: return 5
         case .clearScreen: return 0
         case .clearHistory: return 1
         case .resetTerminal: return 2

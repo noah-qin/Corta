@@ -199,6 +199,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case find
     case copy
     case paste
+    case composeText = "compose-text"
     case selectAll = "select-all"
     case scrollPageUp = "scroll-page-up"
     case scrollPageDown = "scroll-page-down"
@@ -267,6 +268,7 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .find: return L10n.text("command.find")
         case .copy: return L10n.text("common.copy")
         case .paste: return L10n.text("common.paste")
+        case .composeText: return L10n.text("command.composeText")
         case .selectAll: return L10n.text("common.selectAll")
         case .scrollPageUp: return L10n.text("command.scrollPageUp")
         case .scrollPageDown: return L10n.text("command.scrollPageDown")
@@ -392,6 +394,7 @@ nonisolated extension TerminalCommand {
         case .find: return #selector(PaneSearch.performFindPanelAction(_:))
         case .copy: return #selector(PaneCommands.copy(_:))
         case .paste: return #selector(PaneCommands.paste(_:))
+        case .composeText: return #selector(PaneComposer.composeText(_:))
         case .selectAll: return #selector(NSResponder.selectAll(_:))
         case .scrollPageUp: return #selector(PanePointer.scrollHistoryPageUp(_:))
         case .scrollPageDown: return #selector(PanePointer.scrollHistoryPageDown(_:))

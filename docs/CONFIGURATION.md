@@ -601,6 +601,7 @@ the key against both rows, which is how you spot it.
 | `find` | Find… | `cmd+f` |
 | `copy` | Copy | `cmd+c` |
 | `paste` | Paste | `cmd+v` |
+| `compose-text` | Compose Text… | `shift+cmd+e` |
 | `select-all` | Select All | `cmd+a` |
 | `scroll-page-up` | Scroll Page Up | `shift+pageup` |
 | `scroll-page-down` | Scroll Page Down | `shift+pagedown` |
@@ -694,6 +695,13 @@ only `change-directory-to-parent` works — the `cd` goes to the remote shell,
 where the path lives — while the Finder, clipboard, project-root and
 new-pane commands stay disabled, because none of them may act on a path
 that belongs to another machine (`SECURITY.md` §2.8).
+
+`compose-text` opens a native text field over the focused pane for writing a
+prompt with the system's input methods, undo, spelling and dictation. ⌘Return
+sends the text as a paste — sanitised, bracketed when the program asked for it,
+and subject to `paste-warning` — with no Return after it; Return starts a new
+line, and Esc closes the field, keeping the text for the next time it opens in
+that pane. It only ever opens when you choose it.
 
 `reopen-closed-pane` puts a closed pane back where it was — same split, same
 side, same divider, same working directory. It restores the *arrangement*,

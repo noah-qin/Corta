@@ -195,6 +195,7 @@ extension AppDelegate {
         menu.addItem(withTitle: L10n.text("menu.cut"), action: #selector(NSText.cut(_:)), key: "x")
         menu.addItem(item(for: .copy))
         menu.addItem(item(for: .paste))
+        menu.addItem(item(for: .composeText))
         menu.addItem(withTitle: L10n.text("menu.delete"), action: #selector(NSText.delete(_:)))
         menu.addItem(item(for: .selectAll))
         menu.addItem(.separator())
