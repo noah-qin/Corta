@@ -72,6 +72,10 @@ nonisolated extension TerminalCommand {
         case .find: return Shortcut("f", .command)
         case .copy: return Shortcut("c", .command)
         case .paste: return Shortcut("v", .command)
+        // ⇧⌘E, "editor": a ⌘ key never reaches the program in the pane, so
+        // this shadows nothing it could want, and no menu item or system
+        // shortcut claims it. ⌘E is Use Selection for Find.
+        case .composeText: return Shortcut("e", [.command, .shift])
         case .selectAll: return Shortcut("a", .command)
         case .scrollPageUp: return Shortcut(Shortcut.parse("pageup")!.key, .shift)
         case .scrollPageDown: return Shortcut(Shortcut.parse("pagedown")!.key, .shift)

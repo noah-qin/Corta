@@ -10,6 +10,18 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- **Edit ▸ Compose Text…** (⇧⌘E, also in the command palette) opens a native
+  text field over the focused pane for writing a prompt, with the system's
+  input methods, candidate selection, undo, spelling and dictation. Return
+  starts a new line and ⌘Return sends the text to that pane as a paste: the
+  same sanitising, bracketed paste and paste warning as ⌘V, and no Return
+  after it. Esc closes the field, or cancels an input method's composition
+  first. Text not sent stays with the pane, in memory only, until the pane
+  closes. The field opens only when chosen and changes nothing about typing
+  into the pane otherwise; `bind.compose-text` rebinds it (#540).
+
 ### Changed
 
 - A tab with a single pane no longer repeats its title in a pane header below

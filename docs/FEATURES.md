@@ -201,6 +201,13 @@ files, remote connections and child-process input.
 - Open and focus Shortcuts actions. These actions do not send
   commands to a shell.
 - Secure Keyboard Entry under **Shell**, with an indicator of engaged state.
+- **Edit ▸ Compose Text…** (⇧⌘E): a native text field over the focused pane
+  for writing a prompt with the system's input methods, undo, spelling and
+  dictation. ⌘Return sends it to that pane as a paste — sanitised, bracketed
+  when asked for, subject to the paste warning — without pressing Return; the
+  unsent draft stays in memory with the pane. A program may collapse a long
+  paste (Claude Code shows `[Pasted text #1 +N lines]`), and its own `@` and `/`
+  completions do not run inside the field.
 - Persistent input-source status (`A`, `中`, `あ`, `한` and other language codes)
   in an independent upper-right toolbar group. Automatic display follows enabled
   non-Latin keyboard layouts and IMEs; Latin-only setups hide it. Settings also
