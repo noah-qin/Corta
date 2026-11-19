@@ -600,7 +600,10 @@ since resume: do not add `firstAfterResume` and `callbackLead` as separate
 stages. Only uninterrupted ticks count towards `frameInterval`.
 `gpuExecution` comes from Metal 4's own start and end timestamps and
 `gpuFeedbackDelay` from GPU end to the completion callback; the `gpu`
-submission-to-feedback figure stays the one quoted.
+submission-to-feedback figure stays the one quoted. The flood tests print
+both, with `drawableWait`, beside `gpu` whenever their rings filled, so a
+`gpu` tail can be read as a wait for a drawable, GPU work or a late
+callback (#337, question 3); the header names `CORTA_FRAME_DRIVER`.
 
 Three narrower measurements:
 
