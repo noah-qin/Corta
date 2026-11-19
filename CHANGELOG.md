@@ -14,10 +14,10 @@ Versioning for compatibility changes.
 
 - A program that changes the window title many times a second costs the main
   thread less. Titles set by output now reach the window and its proxy icon at
-  most once every 100 ms, as the tab strip already did, and the last one always
-  shows. Switching panes, a finished command and a rename still update the
-  title at once. At 20 title changes a second, a key window's main thread went
-  from about 9.4 % busy to about 6.6 %.
+  most once every 250 ms, and the last one always shows. Switching panes, a
+  finished command and a rename still update the title at once. At 20 title
+  changes a second, a key window's main thread went from about 9.4 % busy to
+  about 6 %.
 - F13 to F20 and Insert send the escape sequences programs expect. F13 used to
   send a private-use character instead, which showed as a stray symbol. Under
   the kitty keyboard protocol, F13 to F35 send the protocol's own codes. A key
