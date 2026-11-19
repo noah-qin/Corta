@@ -320,6 +320,15 @@ use (`rearrangeFocusedPane`, `detach`, `receive`). `TerminalWindowController`
 keeps tab and window drags, `PaneSplitView` its dividers; the header's press never
 reaches the terminal view, so selection and mouse reporting do not see it.
 
+The header exists only while a tab holds more than one pane (#527).
+`SplitViewController` sets each pane's `showsHeader` from its own child count,
+in `insertChild` and `removeChild`, the one place every split, restore, reopen,
+move and close passes through; the pane's `topInset` follows it. A new pane is
+added before its view loads, so it spawns with its final header, and a split
+predicts the halves' grid with the header they are about to have: the child
+of a new window receives exactly one winsize, and a split or a close back to
+one pane resizes each pane once.
+
 ## 5. Milestones
 
 The original M1–M10 plan and its measurements are preserved in

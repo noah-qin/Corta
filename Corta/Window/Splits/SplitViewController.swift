@@ -76,6 +76,28 @@ final class SplitViewController: NSViewController {
     var panes: [TerminalPaneViewController] { children.compactMap { $0 as? TerminalPaneViewController } }
     var hasMultiplePanes: Bool { panes.count > 1 }
 
+    // Every route a pane joins or leaves this tab by — a split, a restore,
+    // a reopen, a move between tabs, a close — adds or removes a child, so
+    // the headers follow the count here, in one place (#527).
+    override func insertChild(_ childViewController: NSViewController, at index: Int) {
+        super.insertChild(childViewController, at: index)
+        updatePaneHeaders()
+    }
+
+    override func removeChild(at index: Int) {
+        super.removeChild(at: index)
+        updatePaneHeaders()
+    }
+
+    /// A header on every pane while there are two or more, none on a lone
+    /// pane: its tab already names it. The panes' sizes follow at the
+    /// caller's next layout, with the resize the change of count brings.
+    private func updatePaneHeaders() {
+        let panes = panes
+        let multiple = panes.count > 1
+        for pane in panes { pane.showsHeader = multiple }
+    }
+
     /// What the window's root pane spawns as: given at construction, since
     /// the root pane spawns as the view loads.
     struct Setup {
@@ -517,6 +539,12 @@ extension SplitViewController {
         else {
             finishClosingPane(pane)
             return
+        }
+        // The last neighbour going, the survivor loses its header now (#527):
+        // the grid it is resized to under the animation is then the one it
+        // keeps, not one a row short that grows again when the pane is gone.
+        if panes.count == 2 {
+            for survivor in panes where survivor !== pane { survivor.showsHeader = false }
         }
         view.layoutSubtreeIfNeeded()
         let first = node.subviews[0]

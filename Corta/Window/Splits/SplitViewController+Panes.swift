@@ -213,7 +213,16 @@ extension SplitViewController {
         node.setPosition(end, ofDividerAt: 0)
         view.layoutSubtreeIfNeeded()
         isRearrangingPanes = false
-        for child in panes where child !== closing { child.resizeSessionToFitView(coalesce: false) }
+        // A pane left alone in the node takes the node's whole frame once the
+        // node is gone. NSSplitView keeps a point for the collapsed side, so
+        // fitted to its frame here it came out a column short, and resized a
+        // second time when the close finished (#527): it is fitted to the
+        // frame it will have.
+        let sibling = node.subviews.first { $0 !== closing.view }
+        for child in panes where child !== closing {
+            child.resizeSessionToFitView(
+                coalesce: false, fitting: child.view === sibling ? node.bounds.size : nil)
+        }
         isRearrangingPanes = true
         split?.transitionDividerThickness = thickness
         node.setPosition(start, ofDividerAt: 0)

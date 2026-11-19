@@ -337,7 +337,8 @@ extension SplitViewController {
         view.layoutSubtreeIfNeeded()
         guard let anchor = focusedPane else { return nil }
         let bounds = anchor.view.bounds
-        let minimum = anchor.minimumContentSize
+        // The halves will both show a header (#527).
+        let minimum = anchor.minimumContentSize(showingHeader: true)
         if (bounds.width - PaneSurfaceView.gap) / 2 >= minimum.width { return .columns }
         if (bounds.height - PaneSurfaceView.gap) / 2 >= minimum.height { return .rows }
         if wasZoomed { zoomFocusedPane() }

@@ -115,7 +115,8 @@ final class PaneHeader: NSView {
     }
 
     func place() {
-        guard let pane else { return }
+        // Hidden while its tab holds one pane (#527): nothing to place.
+        guard let pane, !isHidden else { return }
         frame = NSRect(x: 0, y: pane.view.bounds.height - pane.chromeOverlap - Self.height,
                        width: pane.view.bounds.width, height: Self.height)
         refresh()

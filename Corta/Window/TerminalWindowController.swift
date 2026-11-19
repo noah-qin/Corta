@@ -358,7 +358,7 @@ extension TerminalWindowController {
     /// program streams: the strip's views are touched only when an item or
     /// the selection changed, or `force` says the colours did.
     func refreshTabStrip(force: Bool = false) {
-        let items = tabs.map(TabIcon.item(for:))
+        let items = TabStripItem.numberingDuplicates(tabs.map(TabIcon.item(for:)))
         let selected = tabs.firstIndex { $0 === selectedTab } ?? 0
         guard force || items != tabStrip.items || selected != tabStrip.selectedIndex else { return }
         tabStrip.update(items: items, selectedIndex: selected)

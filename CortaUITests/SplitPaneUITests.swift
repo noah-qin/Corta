@@ -105,15 +105,31 @@ final class SplitPaneUITests: XCTestCase {
         app.launch()
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 5))
-        let right = window.buttons.matching(identifier: "pane.splitRight").firstMatch
-        XCTAssertTrue(right.waitForExistence(timeout: 3))
-        right.click()
+        // A lone pane has no header (#527); ⌘D splits it, and both halves
+        // show one.
         let rights = window.buttons.matching(identifier: "pane.splitRight")
+        XCTAssertEqual(rights.count, 0, "a lone pane shows no header")
+        app.typeKey("d", modifierFlags: .command)
         expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: rights)
         waitForExpectations(timeout: 5)
-        // The first pane is unfocused. Its action must still operate on itself.
+        // Once the split has sprung open: a click while the buttons still
+        // move can land beside them.
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+        // The first pane is unfocused. Its action must still operate on itself:
+        // stacked, since two more columns may not fit the window.
         window.buttons.matching(identifier: "pane.splitDown").firstMatch.click()
         expectation(for: NSPredicate(format: "count == 3"), evaluatedWith: rights)
+        waitForExpectations(timeout: 5)
+        // Closing back to one pane takes the headers away again.
+        for _ in 0..<2 {
+            window.buttons.matching(identifier: "pane.close").firstMatch.click()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+        }
+        expectation(for: NSPredicate(format: "count == 0"), evaluatedWith: rights)
+        waitForExpectations(timeout: 5)
+        XCTAssertTrue(window.exists, "the last pane's window stays")
+        app.typeKey("d", modifierFlags: .command)
+        expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: rights)
         waitForExpectations(timeout: 5)
         let attachment = XCTAttachment(screenshot: window.screenshot())
         attachment.name = "pane-controls-preview"

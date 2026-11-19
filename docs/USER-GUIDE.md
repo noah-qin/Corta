@@ -104,6 +104,20 @@ right-click it for New Tab, Rename Tab…, Close Tab and Close Other Tabs. When
 there are more tabs than fit, the row scrolls sideways — swipe on it, or turn
 the mouse wheel over it — and follows the tab you select.
 
+Tabs that show the same title — three shells in the same folder all read
+`zsh ~` — carry their position before it: `1  zsh ~`, `2  zsh ~`. The number is
+the tab's place in the row, the one ⌘1–⌘8 select it by, and it follows the
+tabs as you reorder, open and close them; a tab whose title no other tab shows
+has no number. ⌘9 always shows the last tab, so a tab numbered 9 or more has no
+shortcut of its own. VoiceOver reads the number with the title ("zsh ~, tab 2").
+
+A tab with one pane shows no pane header: the tab already names what runs, so
+the row goes to the terminal. Split the pane and every pane in the tab gets a
+header, with its name and its split, zoom and close buttons; close back to one
+and the header goes again. A lone pane still splits with ⌘D and ⇧⌘D, from the
+**Shell** menu or the command palette, and closes with ⌘W; to move it, drag
+its tab.
+
 ![Tabs in the titlebar row with their program icons](brand/native-tab-icon.png)
 
 | To… | Use |
@@ -120,7 +134,7 @@ the mouse wheel over it — and follows the tab you select.
 | Move the focused pane | ⇧⌥⌘ + arrow key |
 | Swap with the neighbouring pane | Swap Pane Left, Right, Up, Down (command palette) |
 | Move the pane to a new or existing tab | **Shell ▸ Move Pane**, **Shell ▸ Move Pane to Tab** |
-| Rearrange panes with the mouse | Drag a pane's header |
+| Rearrange panes with the mouse | Drag a pane's header (a lone pane: drag its tab) |
 | Close the pane, tab or window | ⌘W |
 | Put back the pane you just closed | ⇧⌘T |
 
@@ -146,7 +160,7 @@ the mouse wheel over it — and follows the tab you select.
   unzooms first. A pane whose width in columns changes loses its selection, as
   it does in any resize that rewraps the text.
 - **Dragging a pane.** Drag a pane by its header, the row with its name, anywhere
-  but its buttons. Over another pane, a highlight shows where it would land: an edge
+  but its buttons. A pane alone in its tab has no header; drag the tab instead. Over another pane, a highlight shows where it would land: an edge
   puts it on that side, the middle changes places with that pane. Hold it over
   another tab for a moment to show that tab and do the same there, or drop it on the
   tab to move it in. Esc, or letting go anywhere else, puts everything back: nothing

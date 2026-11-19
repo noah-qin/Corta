@@ -219,10 +219,11 @@ final class TerminalRecoveryUITests: XCTestCase {
 
     @MainActor private func canvasPixels(_ png: Data) -> Data {
         let bitmap = NSBitmapImageRep(data: png)!
-        // Terminal's accessibility frame includes the titlebar. Compare raw
-        // canvas pixels so process-title updates and PNG metadata do not count.
-        let image = bitmap.cgImage!.cropping(to: CGRect(x: 20, y: 160,
-            width: bitmap.pixelsWide - 40, height: bitmap.pixelsHigh - 180))!
+        // Raw canvas pixels, so PNG metadata does not count. A lone pane has
+        // no header (#527): the canvas starts at the frame's top, and the
+        // lines this test writes sit there, so only the rounded edge is cut.
+        let image = bitmap.cgImage!.cropping(to: CGRect(x: 20, y: 20,
+            width: bitmap.pixelsWide - 40, height: bitmap.pixelsHigh - 40))!
         let canvas = NSBitmapImageRep(cgImage: image)
         return Data(bytes: canvas.bitmapData!, count: canvas.bytesPerRow * canvas.pixelsHigh)
     }

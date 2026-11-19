@@ -34,7 +34,8 @@ extension SplitViewController {
         view.layoutSubtreeIfNeeded()
         guard let focusedPane else { return }
         let bounds = focusedPane.view.bounds
-        let minimum = focusedPane.minimumContentSize
+        // Both halves show a header (#527), whether or not this pane does now.
+        let minimum = focusedPane.minimumContentSize(showingHeader: true)
         let half = orientation == .columns
             ? (bounds.width - PaneSurfaceView.gap) / 2 : (bounds.height - PaneSurfaceView.gap) / 2
         guard half >= (orientation == .columns ? minimum.width : minimum.height) else {
@@ -137,6 +138,8 @@ extension SplitViewController {
             orientation == .columns
             ? CGSize(width: (bounds.width - divider) / 2, height: bounds.height)
             : CGSize(width: bounds.width, height: (bounds.height - divider) / 2)
-        return pane.gridSize(fitting: target)
+        // With the header both halves will have (#527): measured without it, a
+        // lone pane's half came out a row too tall and resized at once.
+        return pane.gridSize(fitting: target, showingHeader: true)
     }
 }
