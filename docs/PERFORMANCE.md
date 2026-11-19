@@ -1772,7 +1772,7 @@ erase and RIS floods did not hold the main thread at 50 × 200 (worst frame 6.6 
 and 3.1 ms); 120 × 400 was measured in the core only.
 
 **A window title change costs the main thread about 5.5 ms in front, 2.5 ms
-behind.** *Reduced by #605, not to the target; see "Fixed since".* A title set 20 times a second (`OSC 0`) kept the main thread 11 % busy in
+behind.** *Reduced by #605 and #614, not to the target; #615 profiles the rest; see "Fixed since".* A title set 20 times a second (`OSC 0`) kept the main thread 11 % busy in
 a key window, against a frame CPU median of 0.54 ms for a two-byte spinner at the
 same rate; a frame that carried a title change had a median of 3.0 ms.
 `PaneWindowTitle.apply(fromOutput:)` sets `NSWindow.title` on every output batch
@@ -1830,6 +1830,7 @@ is why several figures are medians of alternating runs.
 | RIS, the same | #603 | 18 ms | at most 4.4 ms, median 1.6 ms |
 | Session throughput, `cat` of 64 MiB of coloured lines | #603 | 127.0 MiB/s | 125.2 MiB/s (−1.4 %) |
 | Window title at 20 changes a second, a key window's main thread busy | #605: from output, at most one change in 100 ms, and the last always lands | 9.3–9.5 % | 6.3–7.4 %, against a target of 4 %. About 10 changes a second still land; the floor without titles measured 2.1–4.5 % |
+| The same, window title held to 250 ms (6 alternating runs each, machine 70–77 % idle, on battery) | #614: one change in 250 ms; the tab strip keeps 100 ms | 100 ms: 2.8–8.7 %, median 4.6 % | 3.3–6.8 %, median 5.9 %; no titles 2.4–4.8 %, median 2.6 %. `setTitle` samples fell from 10–31 to 9–14, but main-thread commits (tab strip layout among them) stayed; the target is still missed, and #615 profiles the rest |
 | Malformed UTF-8, `0xFF` / `0x80` | #607: a run of bytes malformed on their own is written as a run of U+FFFD cells, identical cell for cell | 26.0 / 33.1 MiB/s | 245.0 / 473.2 MiB/s |
 | Foreground group read under the lock for a new wait, 16 members | #608: read outside the lock, stamped before the next slice | reading 202 µs past its cache (38 µs from it); slice under the lock median 154–164 µs | slice under the lock median 18–34 µs |
 

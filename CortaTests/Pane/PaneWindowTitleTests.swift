@@ -224,7 +224,7 @@ extension PaneWindowTitleTests {
 
     /// A program retitling faster than the interval reaches the titlebar
     /// once, then once more when the interval ends, with the last title.
-    @Test("titles from output inside 100 ms make one change, then the last one")
+    @Test("titles from output inside the interval make one change, then the last one")
     func outputTitlesAreCoalesced() async throws {
         let session = try TerminalSession(
             executable: "/bin/cat", arguments: [], environment: ChildEnvironment.default(),
@@ -260,7 +260,7 @@ extension PaneWindowTitleTests {
         #expect(window.titleSets.count == 1)
         #expect(window.titleSets.first?.contains("t 0") == true)
         #expect(scheduled.count == 1)
-        clock += 0.1
+        clock += PaneWindowTitle.windowTitleInterval
         deferredAllowed = true
         scheduled.removeFirst().work()
         #expect(window.titleSets.count == 2)
