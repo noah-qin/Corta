@@ -157,12 +157,16 @@ which release it was measured on.
 | Region scroll, CPU a frame, p50 | **0.026 ms**, down from 0.130 | 1.2 vs 1.1 | [Performance §5.14](docs/PERFORMANCE.md#514-scrolling-without-per-line-screen-allocation-281-283) |
 | Frame CPU, 120 × 40 full rebuild, Release | **0.37–0.39 ms** | 1.2 | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
 | Keypress to glass, full screen, one pane, 60 Hz, a person typing | **49.1–50.8 ms** p50, 82.9–84.2 ms p99 (was 64–68 ms p50) | 1.2 | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
+| Longest a hostile stream holds a pane's lock, 120 × 400, one 16 KiB slice | **0.16 ms**, down from 1,761 (`ESC # 8`); coloured erase **≤ 7 ms**, down from 57 | 1.7 vs 1.6.5 | [Performance §5.30](docs/PERFORMANCE.md#530-where-the-session-lock-a-title-change-and-the-image-caps-stand-2026-11-18) |
+| Malformed UTF-8 throughput (`0xFF` / `0x80`) | **245 / 473 MiB/s**, up from 26 / 33 | 1.7 vs 1.6.5 | same |
 | Idle CPU, Release, 20 seconds | 0.05% | **1.0.0** (2026-09-18); not re-run since the idle-wakeup work in 1.2 | [Performance](docs/PERFORMANCE.md) |
 | esctest2 | 131 passed, 334 known bugs, 102 failed; 567 total | **1.1.5** (2026-10-07) | [Raw results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-10-07-results.txt) |
 
-Measured on an Apple M5 MacBook Air (macOS 27.0.1); the 1.2 rows between
-2026-10-09 and 2026-10-13, each before/after pair on the same machine and
-toolchain. The dated sections of [Performance](docs/PERFORMANCE.md) hold the
+Measured on an Apple M5 MacBook Air: the 1.2 rows between 2026-10-09 and
+2026-10-13 (macOS 27.0.1), the 1.7 rows on 2026-11-19 (macOS 27.2), each
+before/after pair on the same machine and toolchain. The 1.7 rows are a
+misbehaving or hostile program's worst case; ordinary output and keypress
+latency did not change. The dated sections of [Performance](docs/PERFORMANCE.md) hold the
 conditions, every run and what a figure does not establish. The esctest2
 82.0% figure sometimes quoted counts passes **plus known bugs** and is not a
 pass rate; see [conformance](docs/CONFORMANCE.md) for interpretation.
