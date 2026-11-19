@@ -272,7 +272,11 @@ final class MeasurementUITests: XCTestCase {
         // Stopping panes one by one can fill another ring with a changing
         // workload, so its tail is not an N-pane steady-state measurement.
         let lines = try waitForMetrics(["cpuFrame", "gpu", "frameInterval"], timeout: 10)
-        report(lines.map { "\(panes)-pane flood \($0)" })
+        // What the `gpu` stage is made of (#337, question 3): the drawable
+        // wait, Metal's own execution time and the completion callback's
+        // delay. Reported when their rings filled; a run never fails on them.
+        let parts = latestMetrics(["drawableWait", "gpuExecution", "gpuFeedbackDelay"])
+        report((lines + parts).map { "\(panes)-pane flood \($0)" })
         for centre in centres {
             focus(app, at: centre, panes: panes)
             app.typeKey("c", modifierFlags: .control)
@@ -479,6 +483,16 @@ extension MeasurementUITests {
         return metrics.compactMap { latest[$0] }
     }
 
+    /// The newest summary line for each of `metrics` already in the file,
+    /// without waiting; a metric whose ring never filled is left out.
+    private func latestMetrics(_ metrics: [String]) -> [String] {
+        let text = (try? String(contentsOf: metricsFile, encoding: .utf8)) ?? ""
+        let lines = text.split(separator: "\n")
+        return metrics.compactMap { metric in
+            lines.last { $0.hasPrefix("\(metric):") }.map(String.init)
+        }
+    }
+
     /// The app made the file, so the app's shell removes it.
     @MainActor
     private func removeMetricsFile(through app: XCUIApplication) {
@@ -508,7 +522,8 @@ extension MeasurementUITests {
             "machine: \(sysctl("hw.model")) / \(sysctl("machdep.cpu.brand_string")); macOS \(osVersion)",
             "build: \(build)",
             "max drawables: \(runner["CORTA_MAX_DRAWABLES"] ?? "default"); "
-                + "frame latency: \(runner["CORTA_FRAME_LATENCY"] ?? "default")",
+                + "frame latency: \(runner["CORTA_FRAME_LATENCY"] ?? "default"); "
+                + "frame driver: \(runner["CORTA_FRAME_DRIVER"] ?? "default")",
         ]
     }
 
