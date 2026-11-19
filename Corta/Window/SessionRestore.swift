@@ -31,8 +31,8 @@ nonisolated struct WindowState: Equatable, Sendable {
     static let currentVersion = 2
 
     var version: Int
-    /// `TerminalWindowController.windowID`, so an App Intent's identity
-    /// survives a relaunch; nil in older data mints a fresh one.
+    /// `TerminalTab.id`, so a tab's identity survives a relaunch; nil in
+    /// older data mints a fresh one.
     var id: String?
     var frame: Frame
     var layout: PaneLayout

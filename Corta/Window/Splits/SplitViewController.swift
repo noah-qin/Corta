@@ -102,13 +102,14 @@ final class SplitViewController: NSViewController {
     /// the root pane spawns as the view loads.
     struct Setup {
         var restore: WindowState?
-        /// `restore`'s directories were checked just now, off the main thread
-        /// (`AppDelegate.openInitialWindows`): a pane spawning into one has no
-        /// reason to wait on it a second time.
+        /// `restore`'s directories, or `workingDirectory`, were checked just
+        /// now, off the main thread (`AppDelegate.openInitialWindows`,
+        /// `FolderRequest`): a pane spawning into one has no reason to wait
+        /// on it a second time.
         var directoriesChecked = false
         var preset: Preset?
-        /// The directory an App Intent asked for; ignored when `restore` or
-        /// `preset` names one.
+        /// The folder a window was opened for from Finder or the Dock;
+        /// ignored when `restore` or `preset` names one.
         var workingDirectory: String?
         /// A running pane from another tab, to be this tab's root in place of
         /// a new one.
@@ -162,6 +163,10 @@ final class SplitViewController: NSViewController {
                 initialGridSize: nil, preset: pendingPreset ?? restoredPreset,
                 remote: pendingRestore?.layout.firstRemote)
         }
+        // A checked folder was the root pane's alone: a split opens where the
+        // user is, which nobody has checked. A restore keeps it for its
+        // splits until `applyPendingRestore`.
+        if pendingRestore == nil { setup.directoriesChecked = false }
         focusedPane = pane
         tree = SplitTree(root: pane.view)
         systemStatusBar.onVisibilityChange = { [weak self] in self?.updateStatusBarLayout() }

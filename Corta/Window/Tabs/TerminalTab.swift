@@ -18,8 +18,8 @@ import AppKit
 import CortaTerminal
 
 /// One tab of a terminal window (D30): its split view and the panes in it,
-/// the identity an App Intent names and restore keeps, and the title the
-/// user gave it. Its window controller owns it and shows one tab at a time.
+/// the identity restore keeps, and the title the user gave it. Its window
+/// controller owns it and shows one tab at a time.
 @MainActor
 final class TerminalTab {
     let split: SplitViewController

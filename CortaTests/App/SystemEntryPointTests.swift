@@ -158,7 +158,7 @@ struct WindowIdentityStateTests {
 }
 
 /// The root pane spawns as the window's content view loads, so a restore,
-/// a preset or an intent's directory has to be in the controller before
+/// a preset or a folder's directory has to be in the controller before
 /// that: `SplitViewController(setup:)` takes it by initializer, and
 /// `viewDidLoad` is what consumes it — so the consumption is tested here on a
 /// bare `SplitViewController`, the way `PaneTeardownTests` build panes:
@@ -195,7 +195,7 @@ struct WindowSetupStagingTests {
         #expect(split.panes.first?.preset?.name == "staged")
     }
 
-    @Test("an intent's working directory reaches the root pane, and loses to a restore's")
+    @Test("a folder's working directory reaches the root pane, and loses to a restore's")
     func workingDirectoryReachesRootPane() throws {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .standardizedFileURL.path
