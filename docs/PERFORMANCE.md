@@ -742,8 +742,8 @@ first-tick penalty was observed, so no hold-awake was added. The mixed
 CAMetalDisplayLink/nextDrawable prototype trapped twice and was removed; the
 opt-in experiment uses separate CADisplayLink pacing and only bypasses pacing
 for paused-link echoes within 50 ms of input, rate-limited to one refresh.
-**DisplayLink stays the default:** three alternating flood rounds show higher experimental tails, so the promotion
-gate fails. Verified-mains human driver pairs later give median p50 **68.85 → 39.39 ms**
+**DisplayLink stayed the default then:** three alternating flood rounds showed higher experimental tails, so the promotion
+gate failed (passed on November 19, below). Verified-mains human driver pairs later give median p50 **68.85 → 39.39 ms**
 with every paired p95/p99 lower; full visual/tearing acceptance is still pending; scripted power-mode pairs are recorded below.
 
 [Full environment, decomposition, raw rounds and acceptance limits](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/test-results/2026-10-09-input-followup.md)
@@ -784,6 +784,47 @@ confirms a 27.127-second blocked reader; process wakeups remain about
 0.45/s, and disabling diagnostics still gives about 0.60/s. The user did
 not observe the continuous animation, so physical temporal tearing remains
 unconfirmed. No experimental default or acceptance completion is claimed.
+
+**`ondemand` becomes the default (#337, 2026-11-19).** The October
+figures above are why it waited: a four-pane flood GPU tail and no tearing
+check. Both were taken again on the M5 Air's built-in 60 Hz panel, macOS
+27.2 (26B123), AC power, Low Power Mode off, one Benchmark build of
+`f53c869`, the drivers alternated A B / B A / A B. The flood rings now split
+`gpu` into the drawable wait, Metal's own execution time and the callback's
+delay (#623).
+
+| Scripted, `MeasurementUITests` (3 rounds each) | `displaylink` | `ondemand` |
+| --- | --- | --- |
+| keypress → glass p50, window | 66.5–68.4 ms | 27.0–28.9 ms |
+| keypress → glass p99, window | 119.2–133.6 ms | 38.7–50.2 ms |
+| keypress → glass p50, full screen | 66.7–68.3 ms | 31.2–31.4 ms |
+| keypress → glass p99, full screen | 152.0–153.5 ms | 38.7–40.8 ms |
+| four-pane flood `gpu` p99 | 0.71–0.91 ms | 0.59–0.64 ms |
+| four-pane flood `gpuExecution` p99 | 0.55–0.57 ms | 0.16–0.40 ms |
+| four-pane flood `cpuFrame` p99 | 0.26–0.27 ms | 0.27 / 0.31 / 0.40 ms |
+| idle and blinking-cursor CPU, per 4 s sample | ≈ 1 ms | ≈ 1 ms |
+
+| Typometer, same session (3 × 200 each, alternated) | p50 | p95 | p99 |
+| --- | --- | --- | --- |
+| Corta, `ondemand` | 20.7 ms | 40.5 ms | 50.0 ms |
+| Ghostty 1.3.1 | 32.2 ms | 39.8 ms | 44.2 ms |
+| Corta, `displaylink` | 53.9 ms | 69.2 ms | 75.3 ms |
+
+The October GPU tail did not recur: `ondemand`'s `gpu` p99 sat below the
+link driver's in every round. Its `cpuFrame` p99 exceeded the link's range
+in two rounds, by 0.04 and 0.13 ms. That is where the two drivers time
+differently, not extra work: `ondemand` calls `nextDrawable()` inside the
+measured frame, and the 0.40 ms round's `drawableWait` p99 was 0.28 ms,
+while the link hands its drawable over before the frame starts. A person
+watched `cat` of 100 MB, `htop -d 5` and `nvim` scrolling in a loop, windowed
+and full screen, and saw no tearing. D17 in the same session: 0.331 ms mean,
+0.308 ms p50, 0.572 ms p95, 1.070 ms p99. Spotlight indexing ran
+intermittently during the scripted rounds; the load at each run is in #337.
+
+So `FrameScheduler` presents an echo on the next refresh by default, and
+`CORTA_FRAME_DRIVER=displaylink` brings back the link driver for an A/B.
+Not measured: a 120 Hz panel, battery or Low Power Mode, and a person
+typing with the in-app counter.
 
 ### 5.8 The frame-CPU baseline, under Release (D17)
 

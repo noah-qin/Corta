@@ -65,7 +65,7 @@ becomes the reason a training job is slow. `PERFORMANCE.md` §2.1 has how.
 │  NSWindow / tabs / split layout tree / key bindings           │
 │  NSTextInputClient (CJK IME, marked text)                     │
 └──────────┬──────────────────────────────────┬─────────────────┘
-           │ key, mouse, paste                │ CAMetalDisplayLink (vsync)
+           │ key, mouse, paste                │ CADisplayLink (vsync), echo now
            │                                  │
            ▼                                  ▼
 ┌──────────────────────┐         ┌──────────────────────────────┐

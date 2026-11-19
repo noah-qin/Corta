@@ -15,7 +15,8 @@ byte, whether a misbehaving program or a hostile stream, can no longer hold a
 pane's lock for long: the worst stream measured held a 120 × 400 window for
 1.8 s and now takes under a millisecond, a coloured erase dropped from 57 ms
 to at most 7 ms, and malformed UTF-8 is written about ten times faster.
-Ordinary output and keypress latency are unchanged. **New features:** a native
+Ordinary output is unchanged, and a typed character now reaches the screen
+about 40 ms sooner. **New features:** a native
 field for composing a prompt, opening a folder from Finder, `open -a` or the
 Dock, no pane header on a lone pane, and numbers on tabs that share a title.
 Figures are from one Apple M5 MacBook Air, before and after on the same
@@ -54,6 +55,14 @@ has each method.
   become shared or unique; a tab with a title of its own is unchanged. ⌘9
   selects the last tab, so a number of 9 or more has no shortcut of its own.
   VoiceOver reads the number with the title (#528).
+- A typed character reaches the screen about 40 ms sooner. The echo of a
+  keystroke is now drawn and shown on the next refresh of the display, where
+  it used to wait about three: on a 60 Hz MacBook Air a screen-capture tool
+  measured 20.7 ms at the median, against 53.9 ms before and 32.2 ms for
+  Ghostty on the same machine, and the slowest 1 % fell from 75.3 to 50.0 ms.
+  Heavy output in four panes is unaffected, and nothing tears.
+  `CORTA_FRAME_DRIVER=displaylink` brings back the previous driver for a
+  comparison (#337).
 
 ### Fixed
 
