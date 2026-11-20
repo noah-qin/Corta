@@ -158,16 +158,13 @@ which release it was measured on.
 | Scrollback memory, 100k × 120 lines, core | **4.4 MB**, down from 185 in 1.1 | **1.7.0** (`corta-bench`, one run) | [Performance §5.6](docs/PERFORMANCE.md#56-numbers-by-release) |
 | Longest a hostile stream holds a pane's lock, 120 × 400, one 16 KiB slice | **0.16 ms**, down from 1,761 (`ESC # 8`); coloured erase **≤ 7 ms**, down from 57 | 1.7 vs 1.6.5 | [Performance §5.30](docs/PERFORMANCE.md#530-where-the-session-lock-a-title-change-and-the-image-caps-stand-2026-11-18) |
 | Malformed UTF-8 throughput (`0xFF` / `0x80`) | **245 / 473 MiB/s**, up from 26 / 33 | 1.7 vs 1.6.5 | same |
-| esctest2 | 131 passed, 334 known bugs, 102 failed; 567 total | **1.1.5** (2026-10-07) | [Raw results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-10-07-results.txt) |
 
 Measured on an Apple M5 MacBook Air, macOS 27.2: the 1.7 vs 1.6.5 rows on
 2026-11-19 and the 1.7.0 rows on 2026-11-20 (on AC), each comparison on the
 same machine and day. The 1.7 vs 1.6.5 rows are a misbehaving or hostile
 program's worst case; the 1.7.0 rows put the released app beside Ghostty
 and iTerm2, run alternately. The dated sections of [Performance](docs/PERFORMANCE.md) hold the
-conditions, every run and what a figure does not establish. The esctest2
-82.0% figure sometimes quoted counts passes **plus known bugs** and is not a
-pass rate; see [conformance](docs/CONFORMANCE.md) for interpretation.
+conditions, every run and what a figure does not establish.
 
 Known limitations include keypress-to-glass latency still above the
 one-frame target, output throughput behind Ghostty's, incomplete VT
