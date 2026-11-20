@@ -78,7 +78,7 @@ choose Update and open a new shell. See the
 | | |
 | :--- | :--- |
 | **Native Mac input** | CJK input and IME composition, Core Text font fallback, VoiceOver, Secure Keyboard Entry, Services, folders opened from Finder and the Dock — through AppKit, not around it. |
-| **Fast, with evidence** | Keypress latency level with Ghostty's, 2.3× the core throughput of 1.1, and 11 MiB instead of 185 MiB for 100,000 lines of history. Every figure is published with its method and its gaps (below). |
+| **Fast, with evidence** | Keypress latency level with Ghostty's, less memory and idle energy than Ghostty or iTerm2, and 4.4 MB instead of 185 MB for 100,000 lines of history. Every figure is published with its method and its gaps (below). |
 | **Remote work built in** | System OpenSSH with your `~/.ssh/config`, a Finder-like SFTP browser with drag and drop, and remote files opened in your local editor with a conflict check before upload. |
 | **One settings file** | The native Settings window and `~/.config/corta/config` edit the same store; automated checks keep the documented keys and shortcuts aligned with the code. |
 | **Small core, serious safeguards** | A Swift terminal core with no third-party dependencies, resource limits for untrusted output, and a sandboxed image decoder; the app adds only [Sparkle](https://sparkle-project.org) for updates. Clipboard reads and title queries are deliberately absent ([security model](docs/SECURITY.md)). |
@@ -151,24 +151,18 @@ which release it was measured on.
 
 | Check | Recorded result | Measured on | Evidence |
 | :--- | :--- | :--- | :--- |
-| Core feed throughput (parser, grid and scrollback; no PTY or rendering) | **317.3 MiB/s**, up from 137.2 | 1.2 vs 1.1 | [Performance §5.14](docs/PERFORMANCE.md#514-scrolling-without-per-line-screen-allocation-281-283) |
-| Parser + grid throughput | **355.9 MiB/s**, up from 158.0 | 1.2 vs 1.1 | same |
-| Scrollback memory, 100k × 120 lines | **11.4 MiB**, down from 185 | 1.2 vs 1.1 | [Performance §5.6](docs/PERFORMANCE.md#56-numbers-by-release) |
-| Region scroll, CPU a frame, p50 | **0.026 ms**, down from 0.130 | 1.2 vs 1.1 | [Performance §5.14](docs/PERFORMANCE.md#514-scrolling-without-per-line-screen-allocation-281-283) |
-| Frame CPU, 120 × 40 full rebuild, Release | **0.37–0.39 ms** | 1.2 | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
-| Keypress to glass, full screen, one pane, 60 Hz, a person typing | **49.1–50.8 ms** p50, 82.9–84.2 ms p99 (was 64–68 ms p50) | 1.2 | [Performance §5.17](docs/PERFORMANCE.md#517-full-screen-without-the-compositor-285-2026-10-13) |
-| Longest a hostile stream holds a pane's lock, 120 × 400, one 16 KiB slice | **0.16 ms**, down from 1,761 (`ESC # 8`); coloured erase **≤ 7 ms**, down from 57 | 1.7 vs 1.6.5 | [Performance §5.30](docs/PERFORMANCE.md#530-where-the-session-lock-a-title-change-and-the-image-caps-stand-2026-11-18) |
-| Malformed UTF-8 throughput (`0xFF` / `0x80`) | **245 / 473 MiB/s**, up from 26 / 33 | 1.7 vs 1.6.5 | same |
 | Keypress to glass, in a window, Typometer, 60 Hz | **21.0 ms** p50, 48.6 ms p99; Ghostty 1.4.0 20.9 / 45.5, iTerm2 3.7.8 22.2 / 55.6 | **1.7.0** vs Ghostty and iTerm2 | [Performance §5.5](docs/PERFORMANCE.md#55-cross-terminal-comparison) |
 | Memory with 100,000 lines of history, whole app | **98 MB**; Ghostty 133 MB, iTerm2 265 MB | **1.7.0** vs Ghostty and iTerm2 | same |
 | Idle, one window, 60 seconds | **0.0%** CPU, 19 wakeups; Ghostty 0.3% / 384, iTerm2 0.9% / 365 | **1.7.0** vs Ghostty and iTerm2 | same |
 | Output throughput in a window, 100 MiB `cat` | **114 MiB/s**; Ghostty 175, iTerm2 11.7. Behind Ghostty on every `vtebench` case ([#627](https://github.com/noah-qin/Corta/issues/627)) | **1.7.0** vs Ghostty and iTerm2 | same |
+| Scrollback memory, 100k × 120 lines, core | **4.4 MB**, down from 185 in 1.1 | **1.7.0** (`corta-bench`, one run) | [Performance §5.6](docs/PERFORMANCE.md#56-numbers-by-release) |
+| Longest a hostile stream holds a pane's lock, 120 × 400, one 16 KiB slice | **0.16 ms**, down from 1,761 (`ESC # 8`); coloured erase **≤ 7 ms**, down from 57 | 1.7 vs 1.6.5 | [Performance §5.30](docs/PERFORMANCE.md#530-where-the-session-lock-a-title-change-and-the-image-caps-stand-2026-11-18) |
+| Malformed UTF-8 throughput (`0xFF` / `0x80`) | **245 / 473 MiB/s**, up from 26 / 33 | 1.7 vs 1.6.5 | same |
 | esctest2 | 131 passed, 334 known bugs, 102 failed; 567 total | **1.1.5** (2026-10-07) | [Raw results](https://github.com/noah-qin/Corta/blob/f632d5918653cc2feee28fe1baa0c0fd01e93c0e/docs/esctest/2026-10-07-results.txt) |
 
-Measured on an Apple M5 MacBook Air: the 1.2 rows between 2026-10-09 and
-2026-10-13 (macOS 27.0.1), the 1.7 vs 1.6.5 rows on 2026-11-19 and the
-1.7.0 rows on 2026-11-20 (macOS 27.2, on AC), each comparison on the same
-machine and day. The 1.7 vs 1.6.5 rows are a misbehaving or hostile
+Measured on an Apple M5 MacBook Air, macOS 27.2: the 1.7 vs 1.6.5 rows on
+2026-11-19 and the 1.7.0 rows on 2026-11-20 (on AC), each comparison on the
+same machine and day. The 1.7 vs 1.6.5 rows are a misbehaving or hostile
 program's worst case; the 1.7.0 rows put the released app beside Ghostty
 and iTerm2, run alternately. The dated sections of [Performance](docs/PERFORMANCE.md) hold the
 conditions, every run and what a figure does not establish. The esctest2
