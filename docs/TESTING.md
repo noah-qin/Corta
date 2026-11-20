@@ -633,6 +633,14 @@ three for that run, with its Typometer settings and pitfalls, is
 it changes none of the three terminals' own settings (D13). Restore it from
 there to repeat the comparison.
 
+The 2026-11-20 run (#549) added memory, idle and launch, and its pull
+request has the recipe. Two traps it hit with iTerm2 3.7: a killed iTerm2
+leaves its sessions running in `iTermServer` and restores them at the next
+launch, so each test window must be closed and iTerm2 quit through
+AppleScript; and a window running a program asks before closing, so the
+temporary dynamic profile sets `"Prompt Before Closing 2": 0` (it applies
+only to that profile, removed after the run).
+
 ### Which environments can run the render tests
 
 Measured 2026-09-25 (issue #107). `scripts/metal-capability.swift` is the
