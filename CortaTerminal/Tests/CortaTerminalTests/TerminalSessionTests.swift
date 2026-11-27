@@ -46,6 +46,24 @@ import Testing
             "expected the grid to contain the child's output; grid held:\n\(text)")
     }
 
+    @Test func localScreenChangesNotifyAfterCommittingTheGrid() throws {
+        let session = try TerminalSession(executable: "/bin/cat")
+        defer { session.stop() }
+        session.state.withLock { $0.terminal.feed(Array("Question".utf8)) }
+        let sawBlank = Mutex<[Bool]>([])
+        session.onOutput = { [weak session] in
+            guard let session else { return }
+            sawBlank.withLock { $0.append(session.snapshot().line(0).isEmpty) }
+        }
+
+        session.apply(.clearHistory)
+        #expect(sawBlank.withLock { $0.isEmpty })
+        session.apply(.clearScreen)
+        session.state.withLock { $0.terminal.feed(Array("Another question".utf8)) }
+        session.apply(.reset)
+        #expect(sawBlank.withLock { $0 } == [true, true])
+    }
+
     @Test func floodDoesNotHangTheReaderLoop() throws {
         // `yes` floods output; the reader thread must keep draining it
         // without the batch cap ever hanging (`PERFORMANCE.md` §2.1).
