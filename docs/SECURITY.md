@@ -331,8 +331,14 @@ controls and concealing scalars. The program's title appears only inside a
 labelled pane message, beneath Corta's own `notificationTitle`; it never
 becomes the system notification title. Agent permission/question/sign-in
 notices use Corta's fixed localised text. Agents menu and command-palette
-entries use only Corta's own pane name and fixed localised state/kind labels;
-program-provided `app`, `title` and `message` never appear in those entries.
+entry titles use Corta's own pane name, localised state and kind labels, and
+elapsed time from the waiting queue. A selected palette entry for a verified
+wait can also show a read-only box below the title with up to ten non-blank
+rows of its current screen, limited to 100 terminal columns per row. Corta
+removes controls and concealing scalars with `ProgramText.clean`. The box
+shows the same program text the user can see in the pane, and the title
+used to navigate remains Corta's own. The preview stays in the palette and
+is discarded when the user leaves the row or closes the palette.
 Kind is self-reported, not a priority: the waiting-pane queue orders only by
 entry into blocked, once per pane, and never moves focus on a status event. The
 Agents list leads with that queue's order and then sorts by reported state, so a

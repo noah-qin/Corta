@@ -117,6 +117,9 @@ struct AgentWaitGateTests {
         }
         func ours() -> [UUID] { AgentDirectory.shared.waiting.paneIDs.filter { [firstID, secondID].contains($0) } }
         try await send(osc("7501;state=blocked:kind=question"), to: first)
+        let start = try #require(AgentDirectory.shared.waiting.startedAt(for: firstID))
+        try await send(osc("7501;state=blocked:kind=permission"), to: first)
+        #expect(AgentDirectory.shared.waiting.startedAt(for: firstID) == start)
         try await send(osc("7501;state=blocked:id=x:app=evil"), to: first)
         try await send(osc("7501;state=blocked:kind=question"), to: second)
         #expect(ours() == [firstID, secondID])
@@ -124,6 +127,8 @@ struct AgentWaitGateTests {
         // forged record still waiting must not make that the same wait.
         try await send(osc("7501;state=working") + osc("7501;state=blocked:kind=permission"), to: first)
         #expect(ours() == [secondID, firstID])
+        let restarted = try #require(AgentDirectory.shared.waiting.startedAt(for: firstID))
+        #expect(restarted > start)
     }
 
     @Test func agentStatusOffShowsNothingAndStillQueuesNoForgedWait() async throws {
@@ -139,6 +144,12 @@ struct AgentWaitGateTests {
         #expect(!pane.agents.statusIsUnverified)
         #expect(!pane.taskNotifier.programBlocked)
         #expect(!AgentDirectory.shared.waiting.paneIDs.contains(pane.taskNotifier.paneID))
+
+        pane.agents.reporter = { _ in Self.program(("claude", nil)) }
+        try await send(osc("7501;state=working") + osc("7501;state=blocked:kind=permission"), to: pane)
+        #expect(AgentDirectory.shared.waiting.paneIDs.contains(pane.taskNotifier.paneID))
+        #expect(AgentDirectory.entries(of: [pane]).isEmpty)
+        #expect(AgentDirectory.waitingScreen(for: pane.taskNotifier.paneID) == nil)
     }
 
     @Test func agentsAreNamedByAnExecutableOrAnInstalledCommand() {

@@ -30,9 +30,12 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     private var drawnDockPercent: Int?
     static let didChange = Notification.Name("dev.noahqin.Corta.agentsDidChange")
 
+    static let waitingScreenDidChange = Notification.Name("dev.noahqin.Corta.waitingScreenDidChange")
+
     struct Entry: Equatable {
         var id: UUID
         var title: String
+        var waitingSince: Date?
     }
 
     static var panes: [TerminalPaneViewController] {
@@ -41,14 +44,17 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     static var entries: [Entry] { entries(of: panes) }
 
     /// Waiting panes lead, so the list answers "who needs me" first.
-    static func entries(of panes: [TerminalPaneViewController]) -> [Entry] {
+    static func entries(of panes: [TerminalPaneViewController], now: Date = .now) -> [Entry] {
         guard ConfigurationStore.shared.configuration.agentStatus else { return [] }
+        let waiting = shared.waiting
         let listed = panes.compactMap { pane -> (entry: Entry, urgency: Int)? in
             guard let status = pane.agents.status else { return nil }
-            return (entry(id: pane.taskNotifier.paneID, paneName: pane.windowTitle.notificationTitle,
-                status: status, unverified: pane.agents.statusIsUnverified), status.urgency)
+            let id = pane.taskNotifier.paneID
+            return (entry(id: id, paneName: pane.windowTitle.notificationTitle,
+                status: status, unverified: pane.agents.statusIsUnverified,
+                waitingSince: waiting.startedAt(for: id), now: now), status.urgency)
         }
-        return ordered(listed, waiting: shared.waiting.paneIDs)
+        return ordered(listed, waiting: waiting.paneIDs)
     }
 
     /// Queued panes first, in the order they began waiting: the order the jump
@@ -68,12 +74,44 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
 
     /// Shared by menus and palette: no program-supplied display text.
     /// `unverified`: a wait reported by a program that is not a known agent.
-    static func entry(id: UUID, paneName: String, status: ProgramStatus, unverified: Bool = false) -> Entry {
+    static func entry(
+        id: UUID, paneName: String, status: ProgramStatus, unverified: Bool = false,
+        waitingSince: Date? = nil, now: Date = .now
+    ) -> Entry {
+        let waitingSince = status.state == .blocked && !unverified ? waitingSince : nil
         let details = [L10n.text("agent.state." + status.state.rawValue),
             status.kind.map { L10n.text("agent.kind." + $0.rawValue) } ?? "",
-            unverified ? L10n.text("agent.unverified") : ""]
+            unverified ? L10n.text("agent.unverified") : "",
+            waitingSince.map { waitingTime(since: $0, now: now) } ?? ""]
             .filter { !$0.isEmpty }.joined(separator: " · ")
-        return Entry(id: id, title: paneName + " — " + details)
+        return Entry(id: id, title: paneName + " — " + details, waitingSince: waitingSince)
+    }
+
+    private static let waitingDurationFormatter: DateComponentsFormatter = {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.minute]
+        formatter.unitsStyle = .short
+        var calendar = Calendar.current
+        if let language = Bundle.main.preferredLocalizations.first {
+            calendar.locale = Locale(identifier: language)
+        }
+        formatter.calendar = calendar
+        return formatter
+    }()
+
+    private static func waitingTime(since start: Date, now: Date) -> String {
+        let minutes = floor(now.timeIntervalSince(start) / 60)
+        guard minutes >= 1,
+              let duration = waitingDurationFormatter.string(from: DateComponents(minute: Int(minutes))) else {
+            return L10n.text("agent.waitingUnderMinute")
+        }
+        return L10n.format("agent.waitingDuration", duration)
+    }
+
+    static func waitingScreen(for id: UUID) -> Grid? {
+        guard ConfigurationStore.shared.configuration.agentStatus,
+              shared.waiting.startedAt(for: id) != nil else { return nil }
+        return panes.first { $0.taskNotifier.paneID == id }?.session?.snapshot()
     }
 
     static func focus(_ id: UUID) {
@@ -93,7 +131,7 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
 
     @discardableResult
     static func updateWaiting(_ id: UUID, blocked: Bool) -> Bool {
-        shared.waiting.update(id, blocked: blocked)
+        shared.waiting.update(id, blocked: blocked, at: .now)
     }
 
     static var canJumpToNextWaitingPane: Bool {
@@ -111,7 +149,7 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         }
     }
 
-    static func refresh() {
+    static func refresh(changedPane: UUID? = nil) {
         let directory = shared
         if directory.configurationObserver == nil {
             directory.configurationObserver = NotificationCenter.default.addObserver(
@@ -126,7 +164,7 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         let enabled = ConfigurationStore.shared.configuration.agentStatus
         refreshTabs(enabled: enabled)
         refreshDock(enabled: enabled, directory: directory)
-        NotificationCenter.default.post(name: didChange, object: nil)
+        NotificationCenter.default.post(name: didChange, object: changedPane)
     }
 
     /// Each tab shows its most urgent pane status, or its progress, in the

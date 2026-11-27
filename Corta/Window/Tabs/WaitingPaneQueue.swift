@@ -19,27 +19,39 @@ import Foundation
 /// Arrival order of live blocked panes, one UUID per pane, in memory only.
 /// Call on status events and owner teardown; kind and program text are not inputs.
 nonisolated struct WaitingPaneQueue: Equatable, Sendable {
-    private(set) var paneIDs: [UUID] = []
+    private struct Wait: Equatable, Sendable {
+        var paneID: UUID
+        var startedAt: Date
+    }
+
+    private var waits: [Wait] = []
+    var paneIDs: [UUID] { waits.map(\.paneID) }
+
+    func startedAt(for paneID: UUID) -> Date? {
+        waits.first { $0.paneID == paneID }?.startedAt
+    }
 
     @discardableResult
-    mutating func update(_ paneID: UUID, blocked: Bool) -> Bool {
+    mutating func update(_ paneID: UUID, blocked: Bool, at now: Date) -> Bool {
         if blocked {
-            guard !paneIDs.contains(paneID) else { return false }
-            paneIDs.append(paneID)
+            guard startedAt(for: paneID) == nil else { return false }
+            waits.append(Wait(paneID: paneID, startedAt: now))
         } else {
-            guard let index = paneIDs.firstIndex(of: paneID) else { return false }
-            paneIDs.remove(at: index)
+            guard let index = waits.firstIndex(where: { $0.paneID == paneID }) else { return false }
+            waits.remove(at: index)
         }
         return true
     }
 
-    func isEnabled(agentStatus: Bool) -> Bool { agentStatus && !paneIDs.isEmpty }
+    func isEnabled(agentStatus: Bool) -> Bool { agentStatus && !waits.isEmpty }
 
     /// A single current waiter has no successor; an outsider starts at the head.
     func next(after current: UUID?, agentStatus: Bool) -> UUID? {
         guard isEnabled(agentStatus: agentStatus) else { return nil }
-        guard let current, let index = paneIDs.firstIndex(of: current) else { return paneIDs.first }
-        guard paneIDs.count > 1 else { return nil }
-        return paneIDs[(index + 1) % paneIDs.count]
+        guard let current, let index = waits.firstIndex(where: { $0.paneID == current }) else {
+            return waits.first?.paneID
+        }
+        guard waits.count > 1 else { return nil }
+        return waits[(index + 1) % waits.count].paneID
     }
 }

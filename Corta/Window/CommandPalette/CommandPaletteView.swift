@@ -106,15 +106,19 @@ struct CommandPaletteView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(model.rows) { row in
-                                CommandPaletteRowView(
-                                    row: row, isSelected: row.id == model.selectedRowID
-                                )
-                                .id(row.id)
-                                .onTapGesture {
-                                    guard row.selectable else { return }
-                                    model.select(row)
-                                    model.runSelected()
+                                let isSelected = row.id == model.selectedRowID
+                                VStack(alignment: .leading, spacing: 4) {
+                                    CommandPaletteRowView(row: row, isSelected: isSelected)
+                                        .onTapGesture {
+                                            guard row.selectable else { return }
+                                            model.select(row)
+                                            model.runSelected()
+                                        }
+                                    if isSelected, !model.agentPreview.isEmpty {
+                                        AgentScreenPreviewView(lines: model.agentPreview)
+                                    }
                                 }
+                                .id(row.id)
                             }
                         }
                     }
@@ -124,6 +128,10 @@ struct CommandPaletteView: View {
                         guard let newValue else { return }
                         proxy.scrollTo(newValue)
                     }
+                    .onChange(of: model.agentPreview.isEmpty) { _, isEmpty in
+                        guard !isEmpty, let id = model.selectedRowID else { return }
+                        proxy.scrollTo(id)
+                    }
                 }
             }
         }
@@ -132,9 +140,27 @@ struct CommandPaletteView: View {
         // included: the view fills whatever the panel is.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { searchFocused = true }
-        .onReceive(NotificationCenter.default.publisher(for: AgentDirectory.didChange)) { _ in
-            model.rebuildRows()
-        }
+    }
+}
+
+private struct AgentScreenPreviewView: View {
+    let lines: [String]
+
+    var body: some View {
+        let screenText = lines.joined(separator: "\n")
+        let shape = RoundedRectangle(cornerRadius: 6)
+        Text(verbatim: screenText)
+            .font(.system(size: 11, design: .monospaced))
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
+            .background(.background.opacity(0.55), in: shape)
+            .overlay { shape.strokeBorder(.secondary.opacity(0.35)) }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 5)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(L10n.text("agent.screenText") + "\n" + screenText)
+            .accessibilityIdentifier("agent-screen-preview")
     }
 }
 

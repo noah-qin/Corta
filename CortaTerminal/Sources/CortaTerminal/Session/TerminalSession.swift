@@ -362,7 +362,7 @@ extension TerminalSession {
             directoryCompletionToken: directoryCompletionToken, seams: Seams())
     }
 
-    /// On the reader thread; the caller hops if it needs to.
+    /// Fires on the thread that commits output or a screen change.
     public var onOutput: (@Sendable () -> Void)? {
         get { callbacks.withLock { $0.onOutput } }
         set { callbacks.withLock { $0.onOutput = newValue } }
@@ -551,6 +551,7 @@ extension TerminalSession {
                 reportImageBytes($0.terminal)
             }
         }
+        if command != .clearHistory { onOutput?() }
     }
 
     /// The history lines Clear History and Reset discard, the parked main

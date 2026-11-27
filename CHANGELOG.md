@@ -16,6 +16,9 @@ Versioning for compatibility changes.
   coding agent in the same window. Corta includes the source details and
   keeps any draft already there. Review the text and press ⌘Return to paste
   it into the agent’s input (#543).
+- The Agents list shows how long each agent has waited. Select a waiting
+  agent in the command palette to preview the pane’s latest screen text
+  before jumping to it (#541).
 
 ## [1.7.0] - 2026-11-19
 
