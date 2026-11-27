@@ -1071,10 +1071,17 @@ panes and shows aggregate progress. Open the command palette or Window →
 Agents to find every agent pane across windows; choosing an entry focuses it,
 including hidden tabs and panes hidden by another pane's zoom. Panes waiting for
 you lead the list, in the order they began waiting, and the rest follow by
-urgency: failed, working, unknown, done, idle. Entries show
-Corta's own pane name and fixed state/kind labels, never the program's app or
-title text. Window ▸ Jump to Next Waiting Pane (⌥⌘J), also in the command
-palette, cycles through blocked panes in arrival order and wraps at the end.
+urgency: failed, working, unknown, done, idle. Each waiting entry includes the
+time since the pane joined the queue. The label updates when the list is built
+or agent status changes, and starts over when the pane joins again.
+
+In the command palette, move to a waiting entry with the arrow keys to see
+a read-only preview below its title. It shows up to the last ten non-blank
+rows of the pane's current screen, with up to 100 terminal columns per row.
+Press Return to focus that pane and answer there.
+
+Window ▸ Jump to Next Waiting Pane (⌥⌘J), also in the command palette,
+cycles through blocked panes in arrival order and wraps at the end.
 A pane with several blocked subtasks counts once. Leaving blocked or closing
 removes it; entering again puts it last. If your pane is outside the queue,
 the command goes to its first pane; if yours is the only waiter, it stays put.

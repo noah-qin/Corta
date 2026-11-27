@@ -116,6 +116,9 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
   verification. Its OSC 7501 reports distinguish working, waiting, done, idle
   and failure on tabs, the Dock and the Agents list, which leads with the panes
   waiting for you.
+- The Agents list shows how long each verified agent has waited in the Window
+  menu and command palette. Select a waiting agent in the palette to preview
+  the latest visible screen text before focusing its pane.
 - Codex 0.166.0 sends OSC 7501 by itself, with no hook, and Corta's general
   parser shows its idle, working, done and permission-waiting states on the tab
   (checked 2026-11-05). Corta has no Codex-specific state handling; Codex
