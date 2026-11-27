@@ -358,6 +358,17 @@ extension ThemeAndKeybindingTests {
         #expect(model.selectedRowID == "recent-" + command.rawValue)
     }
 
+    @Test("sending to an agent pane is searchable and bindable without default shortcuts")
+    @MainActor func agentPaneBindings() {
+        let model = CommandPaletteModel()
+        for command in [TerminalCommand.sendSelectionToAgent, .sendCommandOutputToAgent] {
+            #expect(command.defaultShortcut == nil)
+            #expect(TerminalCommand(rawValue: command.rawValue) == command)
+            model.query = command.title
+            #expect(model.rows.contains { $0.command == command && $0.selectable })
+        }
+    }
+
     @Test("a title match outranks a config-name match, however long the query")
     @MainActor func paletteTitleMatchesLead() {
         let model = CommandPaletteModel()

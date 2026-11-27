@@ -39,6 +39,7 @@ nonisolated extension TerminalCommand {
         case .increaseFontSize, .decreaseFontSize, .resetFontSize, .scrollPageUp,
             .scrollPageDown, .scrollToTop, .scrollToBottom, .previousCommand, .nextCommand,
             .previousFailedCommand, .nextFailedCommand, .copyLastCommandOutput,
+            .sendSelectionToAgent, .sendCommandOutputToAgent,
             .snapshotRunningCommandOutput, .exportCommandOutput, .openFileReferenceInCommand,
             .revealWorkingDirectory, .copyWorkingDirectoryPath, .changeDirectoryToParent,
             .changeDirectoryToProjectRoot, .openParentDirectoryInNewPane,
@@ -111,16 +112,18 @@ nonisolated extension TerminalCommand {
         case .previousFailedCommand: return 9
         case .nextFailedCommand: return 10
         case .copyLastCommandOutput: return 11
-        case .snapshotRunningCommandOutput: return 12
-        case .exportCommandOutput: return 13
-        case .openFileReferenceInCommand: return 14
-        case .revealWorkingDirectory: return 15
-        case .copyWorkingDirectoryPath: return 16
-        case .changeDirectoryToParent: return 17
-        case .changeDirectoryToProjectRoot: return 18
-        case .openParentDirectoryInNewPane: return 19
-        case .openProjectRootInNewPane: return 20
-        case .searchCommandHistory: return 21
+        case .sendSelectionToAgent: return 12
+        case .sendCommandOutputToAgent: return 13
+        case .snapshotRunningCommandOutput: return 14
+        case .exportCommandOutput: return 15
+        case .openFileReferenceInCommand: return 16
+        case .revealWorkingDirectory: return 17
+        case .copyWorkingDirectoryPath: return 18
+        case .changeDirectoryToParent: return 19
+        case .changeDirectoryToProjectRoot: return 20
+        case .openParentDirectoryInNewPane: return 21
+        case .openProjectRootInNewPane: return 22
+        case .searchCommandHistory: return 23
         case .copy: return 0
         case .paste: return 1
         case .selectAll: return 2

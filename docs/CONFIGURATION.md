@@ -610,6 +610,8 @@ the key against both rows, which is how you spot it.
 | `previous-failed-command` | Previous Failed Command | `shift+cmd+up` |
 | `next-failed-command` | Next Failed Command | `shift+cmd+down` |
 | `copy-last-command-output` | Copy Last Command Output | *(none)* |
+| `send-selection-to-agent` | Send Selection to Agent Pane | *(none)* |
+| `send-command-output-to-agent` | Send Last Command Output to Agent Pane | *(none)* |
 | `snapshot-running-command-output` | Snapshot Running Command's Output | *(none)* |
 | `export-command-output` | Export Command Output… | *(none)* |
 | `open-file-reference-in-command` | Open File Reference in Command Output | *(none)* |
@@ -652,6 +654,12 @@ opens a window with nothing in it. `copy-last-command-output` uses the
 prompt or continued command is excluded from the output. Integration that
 emits no `C` mark falls back to one row after the prompt; only that fallback
 can include part of a multiline prompt or command.
+
+`send-selection-to-agent` and `send-command-output-to-agent` append a
+selection or the same completed output that Copy Last Command Output would
+copy to an agent pane’s Compose Text draft in the same window. Both commands
+are available from Shell and the command palette. Use ⌘Return in the draft
+to paste it into the agent’s input.
 
 `snapshot-running-command-output` is `copy-last-command-output`'s answer for
 a command that has not finished yet: `copy-last-command-output` needs the

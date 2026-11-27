@@ -210,6 +210,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
     case previousFailedCommand = "previous-failed-command"
     case nextFailedCommand = "next-failed-command"
     case copyLastCommandOutput = "copy-last-command-output"
+    case sendSelectionToAgent = "send-selection-to-agent"
+    case sendCommandOutputToAgent = "send-command-output-to-agent"
     case snapshotRunningCommandOutput = "snapshot-running-command-output"
     case exportCommandOutput = "export-command-output"
     case openFileReferenceInCommand = "open-file-reference-in-command"
@@ -279,6 +281,8 @@ nonisolated enum TerminalCommand: String, CaseIterable, Sendable {
         case .previousFailedCommand: return L10n.text("command.previousFailedCommand")
         case .nextFailedCommand: return L10n.text("command.nextFailedCommand")
         case .copyLastCommandOutput: return L10n.text("command.copyLastCommandOutput")
+        case .sendSelectionToAgent: return L10n.text("command.sendSelectionToAgent")
+        case .sendCommandOutputToAgent: return L10n.text("command.sendCommandOutputToAgent")
         case .snapshotRunningCommandOutput:
             return L10n.text("command.snapshotRunningCommandOutput")
         case .exportCommandOutput: return L10n.text("command.exportCommandOutput")
@@ -405,6 +409,10 @@ nonisolated extension TerminalCommand {
         case .previousFailedCommand:
             return #selector(PaneShellIntegration.jumpToPreviousFailedCommand(_:))
         case .nextFailedCommand: return #selector(PaneShellIntegration.jumpToNextFailedCommand(_:))
+        case .sendSelectionToAgent:
+            return #selector(PaneCommands.sendSelectionToAgent(_:))
+        case .sendCommandOutputToAgent:
+            return #selector(PaneCommands.sendCommandOutputToAgent(_:))
         case .copyLastCommandOutput:
             return #selector(PaneShellIntegration.copyLastCommandOutput(_:))
         case .snapshotRunningCommandOutput:

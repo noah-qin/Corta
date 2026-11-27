@@ -77,8 +77,12 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     }
 
     static func focus(_ id: UUID) {
-        guard let pane = panes.first(where: { $0.taskNotifier.paneID == id }),
-              let split = pane.splitController,
+        guard let pane = panes.first(where: { $0.taskNotifier.paneID == id }) else { return }
+        focus(pane)
+    }
+
+    static func focus(_ pane: TerminalPaneViewController) {
+        guard let split = pane.splitController,
               let window = split.tab?.window ?? split.view.window else { return }
         if let tab = split.tab { tab.controller?.selectTab(tab) }
         if split.isPaneZoomed, split.zoomedPane !== pane { split.unzoomPane() }
