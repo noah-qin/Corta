@@ -187,13 +187,14 @@ jobs:
         # readers/transfers, and the nightly sanitizer lane remains parallel.
         run: swift test --package-path CortaTerminal --no-parallel
 
-      # The allocation counts only mean something optimised: in Debug every
-      # unspecialised generic allocates, so the suite disables itself there.
-      # A Release rebuild of the core, ~7 minutes: on main and manual runs,
-      # not on every PR.
-      - name: Hot-path allocations
+      # Allocation counts need optimisation, and snapshot isolation also
+      # guards against an optimizer miscompile. Build the Release tests on
+      # main and manual runs since that rebuild takes about seven minutes.
+      - name: Hot-path allocations and snapshot isolation
         if: needs.changes.outputs.core == 'true' && github.event_name != 'pull_request'
-        run: swift test --package-path CortaTerminal -c release --filter HotPathAllocationTests
+        run: >-
+          swift test --package-path CortaTerminal -c release
+          --filter 'HotPathAllocationTests|snapshotIsolationAcrossCompaction'
 
       # The step above skips the real-OpenSSH suite: it needs an sshd. This
       # one starts a throwaway sshd on 127.0.0.1 with its own keys and config
