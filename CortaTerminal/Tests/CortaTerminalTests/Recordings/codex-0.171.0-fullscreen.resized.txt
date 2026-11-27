@@ -1,0 +1,86 @@
+rows: 40 columns: 104
+cursor: row 36 column 2
+   0 |› Ask me to approve running printf ready > marker.txt in this scratch directory with escalated sandbox… |
+   1 |  2. Most clouds form when moist air cools to its dew point.                                            |
+   2 |  3. Cloud droplets often form around airborne particles such as dust or sea salt.                      |
+   3 |  4. Clouds can look white because their droplets scatter visible wavelengths of sunlight broadly.      |
+   4 |  5. Thick clouds often look dark from below because less sunlight reaches their bases.                 |
+   5 |  6. Fog is a cloud in contact with the ground.                                                         |
+   6 |  7. Cumulus clouds often have flat bases and rounded tops.                                             |
+   7 |  8. Stratus clouds typically form low, fairly uniform layers.                                          |
+   8 |  9. Stratocumulus clouds form low layers or patches with rounded clumps.                               |
+   9 |  10. Cirrus clouds are high, wispy clouds composed of ice crystals.                                    |
+  10 |  11. Cirrostratus clouds can produce halos around the Sun or Moon.                                     |
+  11 |  12. Cirrocumulus clouds often appear as rows of small white ripples.                                  |
+  12 |  13. Altocumulus clouds often form patches of rounded cloud elements at middle levels.                 |
+  13 |  14. Altostratus clouds can make the Sun look like a blurred disk.                                     |
+  14 |  15. Nimbostratus clouds commonly bring widespread, steady rain or snow.                               |
+  15 |  16. Cumulonimbus clouds can produce lightning, hail, and heavy rain.                                  |
+  16 |  17. A mature thunderstorm can develop an anvil-shaped top as its updraft spreads outward.             |
+  17 |  18. Lenticular clouds often form in atmospheric waves downwind of mountains.                          |
+  18 |  19. Mammatus clouds have pouchlike features that hang beneath a cloud base.                           |
+  19 |  20. A shelf cloud can form along the leading edge of a thunderstorm’s outflow.                        |
+  20 |  21. Virga consists of precipitation that evaporates or sublimates before reaching the ground.         |
+  21 |  22. Contrails form when water vapor condenses and freezes in the cold air behind aircraft.            |
+  22 |  23. Noctilucent clouds form high in the mesosphere and can remain sunlit after sunset.                |
+  23 |  24. Polar stratospheric clouds can form during exceptionally cold polar winters.                      |
+  24 |  25. Clouds can contain liquid water droplets at temperatures below freezing.                          |
+  25 |  26. Large wildfires can generate clouds called pyrocumulus.                                           |
+  26 |  27. Clouds can cool Earth’s surface by reflecting incoming sunlight.                                  |
+  27 |  28. Clouds can warm Earth’s surface by absorbing and re-emitting outgoing infrared radiation.         |
+  28 |  29. Weather satellites use infrared measurements to estimate cloud-top temperatures.                  |
+  29 |  30. A ceilometer uses laser pulses to measure the height of a cloud base.                             |
+  30 |  31. Cloud droplets can grow into raindrops by colliding and merging.                                  |
+  31 |  32. Snowflakes grow as water vapor deposits onto ice crystals within clouds.                          |
+  32 |                                                                                                        |
+  33 |  Worked for 56s • 10:11 PM                                                                             |
+  34 |                                                                                                        |
+  35 |                                                                                                        |
+  36 |› Ask Codex to do anything                                                                              |
+  37 |                                                                                                        |
+  38 |  GPT-6.2-Sol medium · /private/tmp/corta-demo.00000/public-demo · Request approval for marker command  |
+  39 |  ← for agents · ? for shortcuts                                                                        |
+styles:
+   0 |AA......................................................................................................|
+   1 |........................................................................................................|
+   2 |........................................................................................................|
+   3 |........................................................................................................|
+   4 |........................................................................................................|
+   5 |........................................................................................................|
+   6 |........................................................................................................|
+   7 |........................................................................................................|
+   8 |........................................................................................................|
+   9 |........................................................................................................|
+  10 |........................................................................................................|
+  11 |........................................................................................................|
+  12 |........................................................................................................|
+  13 |........................................................................................................|
+  14 |........................................................................................................|
+  15 |........................................................................................................|
+  16 |........................................................................................................|
+  17 |........................................................................................................|
+  18 |........................................................................................................|
+  19 |........................................................................................................|
+  20 |........................................................................................................|
+  21 |........................................................................................................|
+  22 |........................................................................................................|
+  23 |........................................................................................................|
+  24 |........................................................................................................|
+  25 |........................................................................................................|
+  26 |........................................................................................................|
+  27 |........................................................................................................|
+  28 |........................................................................................................|
+  29 |........................................................................................................|
+  30 |........................................................................................................|
+  31 |........................................................................................................|
+  32 |........................................................................................................|
+  33 |BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB|
+  34 |........................................................................................................|
+  35 |........................................................................................................|
+  36 |C.BBBBBBBBBBBBBBBBBBBBBBBB..............................................................................|
+  37 |........................................................................................................|
+  38 |........................................................................................................|
+  39 |..C..............C......................................................................................|
+   A = fg:default bg:default attrs:bold,dim
+   B = fg:default bg:default attrs:dim
+   C = fg:default bg:default attrs:bold
