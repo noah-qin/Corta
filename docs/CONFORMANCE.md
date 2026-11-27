@@ -812,6 +812,18 @@ real interactive sessions identifying the terminal as `Corta`
 SHA-256 alongside its version. This is a verified reference version, not a
 promise of compatibility with every Claude Code release.
 
+The offline session suite adds three interactive captures made in Corta
+`ca9e639`. It pins the final grid, OSC 7501 main-slot transitions, mode
+cleanup and the alternate-screen redraws after a resize.
+
+| Recorded CLI | Renderer | Session |
+| :--- | :--- | :--- |
+| Claude Code 2.1.332 | Fullscreen, alternate screen | Local Messages endpoint, streamed public text and one-time Bash approval |
+| Claude Code 2.1.332 | Classic, main screen and scrollback | Local Messages endpoint, streamed public text and one-time Bash approval |
+| Codex 0.171.0 | Fullscreen, alternate screen | Signed-in service, streamed public text and one-time sandbox approval |
+
+See the [recording and review steps](TESTING.md#recorded-cli-sessions).
+
 | Support category | What Corta supports | Boundary |
 | :--- | :--- | :--- |
 | Dedicated Claude task state | OSC 7501 working, blocked, done, idle, error and clear; permission/question/auth reasons; one main slot and 32 subtask slots | Only explicitly reported state; output, silence, BEL and notification prose do not establish an outcome. |

@@ -156,6 +156,94 @@ Use it only for an intentional dump-format migration, inspect every diff,
 and rerun with the variable unset. It must not be used to make a regression
 pass by replacing the expected behaviour.
 
+#### Recorded CLI sessions
+
+Build the recorder and its PTY helper from the repository root. Use a scratch
+directory and a clean Corta pane for each capture. The recorder takes the
+pane's size, relays keyboard input and terminal replies, and records the
+child's output and resizes in their original order. It creates the output with
+owner-only permissions and requires a new filename.
+
+```sh
+swift build --package-path CortaTerminal
+swift build --package-path CortaTerminal --show-bin-path
+```
+
+In the scratch pane, set `bin` to that absolute bin directory and `commit` to
+the source commit of the running Corta app. Check `claude --version` and
+`codex --version` and use those exact versions in the headers. These commands
+show the options used to select the three renderers.
+
+```sh
+CLAUDE_CODE_NO_FLICKER=1 DISABLE_AUTOUPDATER=1 "$bin/corta-record" \
+  claude-fullscreen.in "Claude Code" 2.1.332 fullscreen "$commit" -- \
+  claude --safe-mode --strict-mcp-config --permission-mode default --tools Bash \
+    --settings '{"permissions":{"ask":["Bash"]}}'
+
+CLAUDE_CODE_NO_FLICKER=0 DISABLE_AUTOUPDATER=1 "$bin/corta-record" \
+  claude-classic.in "Claude Code" 2.1.332 classic "$commit" -- \
+  claude --safe-mode --strict-mcp-config --permission-mode default --tools Bash \
+    --settings '{"permissions":{"ask":["Bash"]}}'
+
+"$bin/corta-record" codex-fullscreen.in Codex 0.171.0 fullscreen "$commit" -- \
+  codex --disable hooks --no-daemon -a on-request -s read-only
+```
+
+Use an already authenticated CLI when recording against a live service. Use
+command-line options and child environment variables for the run (D13).
+Keep the shell files, CLI configuration, and launch defaults intact. Submit
+a public prompt, for example a request to run `printf ready` and then stream
+32 one-sentence facts about clouds. In Codex, request a one-time approval for
+`printf ready > marker.txt` in the scratch directory under the read-only
+sandbox. Approve the sample command once. Grow the pane vertically with
+the result still visible, wait for its redraw, then use `/exit`. Keep the
+post-resize screen around for review, especially when the CLI restores its
+main screen on exit.
+
+The stream uses the golden escapes above. `@size <rows> <columns>` precedes
+the first byte and `@resize <rows> <columns>` marks where the child received a
+new size. Use `\x23` and `\x40` for literal lines starting with `#`
+and `@`. Inspect the recording as text before staging it. Review the welcome
+banner, paths in screen text and OSC titles, exit and resume commands, and the
+decoded base64 `title=` and `msg=` fields of OSC 7501. Replace private text
+with the same number of terminal cells and re-encode any changed OSC fields.
+Keep credentials, account names, addresses, home paths and session identifiers
+out of the input and the expectations. Name the reviewer for each input in
+the pull request.
+
+Register the versioned input in
+[`RecordedSessionTests.swift`](../CortaTerminal/Tests/CortaTerminalTests/RecordedSessionTests.swift).
+A `# Grid checkpoint` comment in a fixture pins the visible redraw before
+an alternate-screen exit restores the main screen. Generate the `.txt` grids
+and `.states` list with the following command.
+
+```sh
+CORTA_UPDATE_RECORDINGS=1 swift test --package-path CortaTerminal --filter RecordedSessionTests
+swift test --package-path CortaTerminal
+```
+
+The generated expectations are regression pins. A person accepting them
+reads the dumps against the actual pane and checks the status transitions
+against the wire. After acceptance, record the reason for any expectation
+change in the commit. Add newer CLI versions alongside their predecessors.
+Classic Claude and Codex replay to the same final visible grid when fed only
+the post-resize suffix in a fresh terminal. Fullscreen Claude restores the
+main grid parked before that suffix, so its resized alternate grid has its
+own checkpoint.
+
+| Recording | Checked-in input bytes |
+| :--- | ---: |
+| Claude Code 2.1.332 fullscreen | 65,318 |
+| Claude Code 2.1.332 classic | 39,104 |
+| Codex 0.171.0 fullscreen | 142,677 |
+| **Inputs total** | **247,099** |
+
+The suite occupies 290,197 bytes including expectations. Each input is
+capped at 512 KiB and the suite at 2 MiB. Both Claude recordings used the
+real CLI against a local Messages endpoint streaming public fixture
+content. The Codex recording used its signed-in service. The replay and
+fuzz-corpus pass require only the checked-in files.
+
 ### Fuzzing and sanitizers
 
 ```sh
