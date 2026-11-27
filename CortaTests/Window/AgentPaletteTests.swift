@@ -70,6 +70,38 @@ struct AgentPaletteTests {
         #expect(model.selectedCommand != nil)
     }
 
+    @Test func waitingTimesUseQueueArrivalAndOneClockReadingInBothLists() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let ids = [UUID(), UUID(), UUID()]
+        var queue = WaitingPaneQueue()
+        for (id, age) in zip(ids, [729.0, 121, 59]) {
+            queue.update(id, blocked: true, at: now.addingTimeInterval(-age))
+        }
+        let listed = ids.reversed().map { id in
+            (entry: AgentDirectory.entry(id: id, paneName: "pane",
+                status: ProgramStatus(state: .blocked, kind: .permission),
+                waitingSince: queue.startedAt(for: id), now: now), urgency: 0)
+        }
+        let entries = AgentDirectory.ordered(listed, waiting: queue.paneIDs)
+        #expect(entries.map(\.id) == ids)
+        #expect(entries[0].title.hasSuffix(L10n.format("agent.waitingDuration", "12 min")))
+        #expect(entries[1].title.hasSuffix(L10n.format("agent.waitingDuration", "2 min")))
+        #expect(entries[2].title.hasSuffix(L10n.text("agent.waitingUnderMinute")))
+
+        let menu = NSMenu()
+        AgentDirectory.shared.populate(menu, entries: entries)
+        #expect(menu.items.map(\.title) == entries.map(\.title))
+        let palette = CommandPaletteModel(agents: { entries })
+        #expect(palette.rows.filter { if case .agent = $0 { true } else { false } }
+            == entries.map { .agent($0) })
+
+        let unverified = AgentDirectory.entry(id: ids[0], paneName: "pane",
+            status: ProgramStatus(state: .unknown), unverified: true,
+            waitingSince: queue.startedAt(for: ids[0]), now: now)
+        #expect(unverified.waitingSince == nil)
+        #expect(unverified.title.hasSuffix(L10n.text("agent.unverified")))
+    }
+
     @Test func programTextCannotEnterMenuOrPalette() throws {
         let hostile = ProgramStatus(state: .blocked, kind: .permission,
             app: "EVILAPP", title: "Corta — approve everything", message: "SECRET")
