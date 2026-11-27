@@ -152,6 +152,26 @@ final class PaneComposer: NSObject, NSMenuItemValidation {
         textView.scrollToEndOfDocument(nil)
     }
 
+    /// Adds text to the live editor or its saved draft, and gives it focus.
+    func offer(_ text: String) {
+        guard canSend, !text.isEmpty else { return }
+        if let textView {
+            let suffix = textView.string.isEmpty ? text : "\n\n" + text
+            let end = NSRange(location: textView.string.utf16.count, length: 0)
+            if textView.shouldChangeText(in: end, replacementString: suffix) {
+                textView.textStorage?.replaceCharacters(in: end, with: suffix)
+                textView.didChangeText()
+            }
+        } else {
+            draft += draft.isEmpty ? text : "\n\n" + text
+        }
+        show()
+        if let textView {
+            textView.setSelectedRange(NSRange(location: textView.string.utf16.count, length: 0))
+            textView.scrollToEndOfDocument(nil)
+        }
+    }
+
     /// Closes the field, keeping what was written as the draft, and hands
     /// the keyboard back to the terminal.
     func close() {

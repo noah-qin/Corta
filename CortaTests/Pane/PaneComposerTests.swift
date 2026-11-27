@@ -152,6 +152,25 @@ struct PaneComposerTests {
         #expect(fixture.composer.model.isEmpty == false)
     }
 
+    @Test("an offer opens the composer and appends to both saved and live drafts")
+    func offersAppendToDraft() throws {
+        let fixture = try makeFixture()
+        defer { fixture.tearDown() }
+        fixture.composer.show()
+        try #require(fixture.composer.textView).string = "saved"
+        fixture.composer.close()
+        fixture.composer.offer("first")
+        let field = try #require(fixture.composer.textView)
+        #expect(field.string == "saved\n\nfirst")
+        field.insertText(" edited", replacementRange: NSRange(location: field.string.utf16.count, length: 0))
+        fixture.composer.offer("second")
+        #expect(fixture.composer.textView === field)
+        #expect(field.string == "saved\n\nfirst edited\n\nsecond")
+        #expect(fixture.window.firstResponder === field)
+        #expect(!fixture.composer.model.isEmpty)
+        #expect(!fixture.session.snapshot().logicalLines().contains { $0.text.contains("second") })
+    }
+
     /// The warning takes time to answer; the pane may get a new session
     /// meanwhile. The text was meant for the old one, so it goes nowhere.
     @Test("a pane rebuilt with a new session while the warning is up discards the send")

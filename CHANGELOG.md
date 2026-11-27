@@ -10,6 +10,13 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Added
+
+- Send a terminal selection or a command’s output to the compose draft of a
+  coding agent in the same window. Corta includes the source details and
+  keeps any draft already there. Review the text and press ⌘Return to paste
+  it into the agent’s input (#543).
+
 ## [1.7.0] - 2026-11-19
 
 Two themes. **Performance and security:** output that does heavy work per

@@ -106,6 +106,11 @@ Rendering measurements and their conditions are in [Performance](PERFORMANCE.md)
 
 ## Coding-agent state and generic program notifications
 
+- Add a terminal selection or a completed command’s output to the compose
+  draft of an agent running in the same window, including another tab. The
+  source can be an SSH pane. Corta includes source details in the draft,
+  and ⌘Return pastes the reviewed text into the agent’s input for submission.
+
 - Task state was developed against Claude Code. Development and real
   acceptance used Claude Code 2.1.310; other versions need independent
   verification. Its OSC 7501 reports distinguish working, waiting, done, idle

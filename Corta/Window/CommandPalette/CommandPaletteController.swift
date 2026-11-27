@@ -87,11 +87,29 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
     // MARK: - Presenting
 
     @objc func show(_ sender: Any?) {
-        guard let window else { return }
+        model.clearAgentPanePicker()
         // Asked again while up: the palette is key, and keeps the window it
         // first opened over — taken as its own opener, Esc reopened it.
         if NSApp.keyWindow !== window { invokingWindow = NSApp.keyWindow }
         model.reset()
+        present(sender)
+    }
+
+    func pickAgentPane(
+        _ targets: [CommandPaletteModel.AgentPaneTarget], in source: NSWindow,
+        onPick: @escaping (UUID) -> Void
+    ) {
+        invokingWindow = source
+        model.pickAgentPane(targets)
+        model.onPickAgentPane = { [weak self] id in
+            self?.close()
+            onPick(id)
+        }
+        present(nil)
+    }
+
+    private func present(_ sender: Any?) {
+        guard let window else { return }
         if let host = invokingWindow {
             // Centred, a third of the way down, clear of the prompt.
             let frame = window.frame
@@ -114,6 +132,7 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         window?.orderOut(nil)
         returnTo?.makeKeyAndOrderFront(nil)
         invokingWindow = nil
+        model.clearAgentPanePicker()
     }
 
     /// Something else took the keyboard — a click in another window, another
@@ -122,6 +141,7 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
     func windowDidResignKey(_ notification: Notification) {
         window?.orderOut(nil)
         invokingWindow = nil
+        model.clearAgentPanePicker()
     }
 
     // MARK: - Availability

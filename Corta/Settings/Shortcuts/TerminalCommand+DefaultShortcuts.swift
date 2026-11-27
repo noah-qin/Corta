@@ -92,7 +92,7 @@ nonisolated extension TerminalCommand {
             return Shortcut(Shortcut.parse("up")!.key, [.command, .shift])
         case .nextFailedCommand:
             return Shortcut(Shortcut.parse("down")!.key, [.command, .shift])
-        case .copyLastCommandOutput: return nil
+        case .copyLastCommandOutput, .sendSelectionToAgent, .sendCommandOutputToAgent: return nil
         case .snapshotRunningCommandOutput: return nil
         case .exportCommandOutput: return nil
         case .openFileReferenceInCommand: return nil

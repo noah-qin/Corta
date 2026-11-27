@@ -42,12 +42,14 @@ final class CommandPaletteModel {
         case header(String)
         case agent(AgentDirectory.Entry)
         case paneMoveTarget(PaneMoveTarget)
+        case agentPaneTarget(AgentPaneTarget)
         case command(TerminalCommand, recent: Bool, shortcut: String, enabled: Bool)
 
         var id: String {
             switch self {
             case .agent(let entry): "agent-" + entry.id.uuidString
             case .paneMoveTarget(let target): "move-pane-" + target.id
+            case .agentPaneTarget(let target): "send-to-pane-" + target.id.uuidString
             case .header(let title): "header-\(title)"
             case .command(let command, let recent, _, _):
                 (recent ? "recent-" : "command-") + command.rawValue
@@ -57,7 +59,7 @@ final class CommandPaletteModel {
         var selectable: Bool {
             switch self {
             case .header: false
-            case .agent, .paneMoveTarget: true
+            case .agent, .paneMoveTarget, .agentPaneTarget: true
             case .command(_, _, _, let enabled): enabled
             }
         }
@@ -72,6 +74,26 @@ final class CommandPaletteModel {
     struct PaneMoveTarget: Equatable {
         var id: String
         var title: String
+    }
+
+    struct AgentPaneTarget: Equatable {
+        let id: UUID
+        let title: String
+    }
+
+    private var agentPaneTargets: [AgentPaneTarget]?
+    var onPickAgentPane: ((UUID) -> Void)?
+
+    func pickAgentPane(_ targets: [AgentPaneTarget]) {
+        agentPaneTargets = targets
+        reset()
+    }
+
+    func clearAgentPanePicker() {
+        guard agentPaneTargets != nil else { return }
+        agentPaneTargets = nil
+        onPickAgentPane = nil
+        reset()
     }
 
     /// Rebuilds `rows`, once per change rather than once per read: the view,
@@ -150,6 +172,14 @@ final class CommandPaletteModel {
     /// `spr` finds "Split Pane Right". Ranked so that a match on consecutive
     /// characters, or one starting at a word boundary, beats a scattered one.
     func rebuildRows() {
+        if let agentPaneTargets {
+            let matches = agentPaneTargets.filter {
+                query.isEmpty || Self.score($0.title.lowercased(), query: query.lowercased()) != nil
+            }
+            rows = [.header(L10n.text("commandPalette.chooseAgentPane"))] + matches.map { .agentPaneTarget($0) }
+            selectFirstIfNeeded()
+            return
+        }
         let shortcuts = ConfigurationStore.shared.configuration.keybindings
         func row(_ command: TerminalCommand, recent: Bool = false) -> Row {
             .command(command, recent: recent, shortcut: shortcuts[command]?.displayText ?? "",
@@ -296,19 +326,21 @@ final class CommandPaletteModel {
     }
 
     func runSelected() {
-        guard rows.contains(where: { $0.id == selectedRowID && $0.selectable }) else { return }
-        if let row = rows.first(where: { $0.id == selectedRowID }), case .agent(let entry) = row {
+        guard let row = rows.first(where: { $0.id == selectedRowID && $0.selectable }) else { return }
+        switch row {
+        case .agent(let entry):
             onAgent?(entry.id)
-            return
-        }
-        if let row = rows.first(where: { $0.id == selectedRowID }), case .paneMoveTarget(let target) = row {
+        case .paneMoveTarget(let target):
             onMovePane?(target.id)
-            return
+        case .agentPaneTarget(let target):
+            onPickAgentPane?(target.id)
+        case .command(let command, _, _, _):
+            recentCommands.removeAll { $0 == command }
+            recentCommands.insert(command, at: 0)
+            onRun?(command)
+        case .header:
+            break
         }
-        guard let selectedCommand else { return }
-        recentCommands.removeAll { $0 == selectedCommand }
-        recentCommands.insert(selectedCommand, at: 0)
-        onRun?(selectedCommand)
     }
 
     func dismiss() {

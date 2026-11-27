@@ -56,7 +56,7 @@ protocol PaneCommandsHost: AnyObject {
 final class PaneCommands: NSObject, NSMenuItemValidation {
     weak var host: PaneCommandsHost?
 
-    /// An O(scrollback) copy/export build, off the interaction path. Cancelling
+    /// An O(scrollback) text build, off the interaction path. Cancelling
     /// only stops its result being applied — the build runs to completion — and
     /// `largeTextTaskGeneration` keeps a late one from clearing its successor.
     var largeTextTask: Task<Void, Never>?
@@ -139,12 +139,20 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         menu.addItem(.separator())
         item(.find, host)
         let clickedCommand = event.flatMap(command(under:))
-        let commandID = clickedCommand?.id
+        let commandID = clickedCommand?.record.id
         contextItem(in: menu, key: "context.copyCommandOutput", enabled: clickedCommand != nil) { [weak self] in
             guard let self, let pane = self.host as? TerminalPaneViewController, let commandID,
                 let record = pane.session?.commandRecords.records.first(where: { $0.id == commandID })
             else { return }
             pane.shell.copyCommandOutput(for: record, pasteboard: self.pasteboard)
+        }
+        let contextSession = host?.session?.id
+        let canSendOutput = clickedCommand?.hasOutput == true
+        contextItem(in: menu, key: "context.sendCommandOutputToAgent", enabled: canSendOutput) { [weak self] in
+            guard let self, let session = self.host?.session, session.id == contextSession, let commandID else {
+                return
+            }
+            self.sendCommandOutputToAgent(for: session.commandRecords.recordsInOrder.first { $0.id == commandID })
         }
         if let event { addTargetItems(to: menu, under: event) }
         menu.addItem(.separator())
@@ -163,7 +171,7 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
     /// The recorded command whose prompt or output was right-clicked. Records
     /// index the main screen; an alternate screen's rows start again from
     /// zero and would name an unrelated old command.
-    private func command(under event: NSEvent) -> CommandRecord? {
+    private func command(under event: NSEvent) -> (record: CommandRecord, hasOutput: Bool)? {
         guard let host, host.isOperable, let view = host.terminalView,
             host.terminalRenderer != nil, let session = host.session
         else { return nil }
@@ -171,7 +179,8 @@ final class PaneCommands: NSObject, NSMenuItemValidation {
         guard !grid.isAlternateScreenActive else { return nil }
         let point = host.pointer.documentPosition(for: event, in: view, grid: grid)
         let row = grid.absoluteRow(ofScreenRow: point.row)
-        return Self.command(at: row, records: session.commandRecords.records)
+        guard let record = Self.command(at: row, records: session.commandRecords.records) else { return nil }
+        return (record, PaneShellIntegration.hasCommandOutput(grid: grid, record: record))
     }
 
     /// Open and Copy for the link, or else the local path, under the click.
@@ -406,6 +415,13 @@ extension PaneCommands {
     /// here" where a beep says nothing.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
+        case #selector(sendSelectionToAgent(_:)):
+            return host?.isOperable == true && host?.selection != nil
+        case #selector(sendCommandOutputToAgent(_:)):
+            guard let host, host.isOperable else { return false }
+            let grid = host.session.snapshot()
+            return !grid.isAlternateScreenActive
+                && PaneShellIntegration.hasCommandOutput(grid: grid, record: host.effectiveCommand)
         case #selector(exportCommandOutput(_:)):
             guard let host, host.isOperable else { return false }
             return PaneShellIntegration.hasCommandOutput(

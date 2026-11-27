@@ -112,6 +112,14 @@ Copying a command from a web page where a hidden element appended
   that session has stopped, or the pane has a new one, by the time the warning
   is answered or the scan finishes, nothing is sent.
 
+**Send Selection to Agent Pane** and **Send Last Command Output to Agent
+Pane** enter the same paste path as Compose Text. The user starts the
+transfer between panes of one window, then sends from the agent pane’s
+in-memory draft. A program’s output can carry instructions aimed at the
+agent, just as with a manual paste. The source header and code fence make
+the quoted material easier to identify, and the agent may still follow
+instructions inside it.
+
 ### 2.4 URLs and hyperlinks
 
 ⌘-clicking a URL launches another application. Treat the target as

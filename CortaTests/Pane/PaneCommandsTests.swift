@@ -119,7 +119,10 @@ struct PaneCommandsTests {
         #expect(find.tag == 1, "performFindPanelAction needs the show-find tag")
         let output = try #require(menu.items.first { $0.title == L10n.text("context.copyCommandOutput") })
         #expect(!output.isEnabled)
+        let send = try #require(menu.items.first { $0.title == L10n.text("context.sendCommandOutputToAgent") })
+        #expect(!send.isEnabled)
         menu.update()
+        #expect(!send.isEnabled)
         #expect(!output.isEnabled, "automatic menu validation keeps empty-space copy disabled")
     }
 

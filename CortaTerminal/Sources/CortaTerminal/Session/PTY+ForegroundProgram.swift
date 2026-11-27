@@ -36,23 +36,27 @@ extension PTY {
     /// the same members, that read stands: a stream that begins a wait in
     /// every slice costs two syscalls a slice. An `exec` in that window is
     /// judged as the program before it.
-    public var foregroundProgram: ForegroundProgram? {
+    public var foregroundProgram: ForegroundProgram? { readForegroundProgram() }
+
+    func readForegroundProgram(useCache: Bool = true) -> ForegroundProgram? {
         guard let group = foregroundProcessGroup else { return nil }
         let pids = [group] + Self.members(ofGroup: group).filter { $0 != group }
         let now = clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
         let cached = foregroundProgramCache.withLock { $0 }
-        if let cached, cached.pids == pids, now &- cached.time < 100_000_000 { return cached.program }
+        if useCache, let cached, cached.pids == pids, now &- cached.time < 100_000_000 { return cached.program }
         var members: [ForegroundProgram.Member] = []
         var entries: [pid_t: ForegroundProgram.Member] = [:]
         for pid in pids where members.count < 16 {
             guard let name = Self.processName(of: pid) else { continue }
-            let known = cached?.entries[pid].flatMap { $0.name == name ? $0 : nil }
+            let known = (useCache ? cached : nil)?.entries[pid].flatMap { $0.name == name ? $0 : nil }
             let member = known ?? .init(name: name, entryPoint: ProcessEntryPoint.read(pid: pid, process: name))
             members.append(member)
             entries[pid] = member
         }
         let program = members.isEmpty ? nil : ForegroundProgram(members: members)
-        foregroundProgramCache.withLock { $0 = ForegroundProgramCache(pids: pids, time: now, program: program, entries: entries) }
+        foregroundProgramCache.withLock {
+            $0 = ForegroundProgramCache(pids: pids, time: now, program: program, entries: entries)
+        }
         return program
     }
 

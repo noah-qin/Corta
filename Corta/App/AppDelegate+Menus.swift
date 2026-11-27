@@ -127,7 +127,8 @@ extension AppDelegate {
         installMovePaneToTabMenu(in: shell)
         group("menu.commandsAndOutput", [
             .previousCommand, .nextCommand, .previousFailedCommand, .nextFailedCommand,
-            .copyLastCommandOutput, .snapshotRunningCommandOutput, .exportCommandOutput,
+            .copyLastCommandOutput, .sendSelectionToAgent, .sendCommandOutputToAgent,
+            .snapshotRunningCommandOutput, .exportCommandOutput,
             .openFileReferenceInCommand, .searchCommandHistory,
         ])
         group("menu.workingDirectory", [

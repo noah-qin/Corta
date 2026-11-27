@@ -216,6 +216,9 @@ extension TerminalSession {
 
     public var foregroundProcessName: String? { pty.foregroundProcessName }
 
+    /// A fresh kernel reading for an action that targets the foreground program.
+    public var foregroundProgram: ForegroundProgram? { pty.readForegroundProgram(useCache: false) }
+
     /// Shell included, for a title bar.
     public var activeProcessName: String? { pty.activeProcessName }
     public var activeProcessEntryPoint: String? { pty.activeProcessEntryPoint }

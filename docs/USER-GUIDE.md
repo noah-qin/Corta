@@ -556,7 +556,10 @@ With the hooks loaded, automatically or through startup-file installation:
 - **A command's output.** From the command palette: **Copy Last Command
   Output**, **Snapshot Running Command's Output** (what a build has printed
   so far), **Export Command Output…** to a file, and **Open File Reference
-  in Command Output**, which opens the last `path:line` it printed.
+  in Command Output**, which opens the last `path:line` it printed. Choose
+  **Send Last Command Output to Agent Pane** to add the copied range to an
+  agent’s compose draft. Right-click an earlier command’s output and choose
+  **Send Command Output to Agent Pane** to use that command instead.
 - **Command History.** **Search Command History…** lists every command
   with its time, exit status and directory; **Fill** puts one back at the
   prompt and **Run** runs it again (`command-history-limit`). A command the
@@ -1026,6 +1029,17 @@ For usage questions, go to [Discussions → Q&A](https://github.com/noah-qin/Cor
 or ask in `#help` on the [Discord](https://discord.gg/QNdWfdwr7j).
 
 ## Coding-agent state and program notifications
+
+Use **Shell ▸ Commands and Output ▸ Send Selection to Agent Pane** or
+**Send Last Command Output to Agent Pane** to share terminal text, including
+from an SSH pane. Both commands also appear in the command palette. Corta
+finds agents by their foreground process in the current window, including
+other tabs, and asks which pane to use when several are running. The compose
+field opens with the keyboard and appends the text after any existing draft.
+The header includes the source pane and any available command details.
+Long output keeps up to the first 8 KiB and last 24 KiB at line boundaries
+and marks what was omitted. Review or edit the draft, then press **⌘Return**
+to paste it into the agent’s input. Submit it from the agent’s own prompt.
 
 **Claude Code is the CLI Corta's task-state support was developed against.**
 It was acceptance-tested with the installed **Claude Code 2.1.310** on macOS

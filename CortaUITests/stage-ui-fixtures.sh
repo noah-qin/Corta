@@ -284,6 +284,28 @@ SH
 chmod 700 "$root/agent-notifications/notice-shell" "$root/agent-notifications/notice-demo"
 cp "$root/corta-agent" "$root/agent-notifications/corta-agent"
 
+stage agent-pane-transfer 'columns = 100\nrows = 30\nrestore-windows = false\nagent-status = false\nagent-processes = corta-agent\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
+mkdir "$root/agent-pane-transfer/primary" "$root/agent-pane-transfer/secondary"
+cat > "$root/agent-pane-transfer/agent-input" <<'SH'
+#!/bin/sh
+stty -icanon -echo
+printf '\033[?2004hAgent ready\n'
+exec /usr/bin/python3 -c '
+import os
+pending = b""
+while chunk := os.read(0, 4096):
+    pending += chunk
+    if b"\x1b[201~" in pending:
+        paste, pending = pending.split(b"\x1b[201~", 1)
+        print("Received paste:", paste.removeprefix(b"\x1b[200~").decode(), flush=True)
+    if pending and not b"\x1b[200~".startswith(pending) and not pending.startswith(b"\x1b[200~"):
+        print("Received input outside paste", flush=True)
+        pending = b""
+'
+SH
+chmod 700 "$root/agent-pane-transfer/agent-input"
+cp "$root/corta-agent" "$root/agent-pane-transfer/corta-agent"
+
 stage real-claude 'columns = 120\nrows = 40\nfont-size = 14\nrestore-windows = false\nnotify-from-programs = true\nstatus-bar = false\ninput-source-indicator = off\nsecure-keyboard-entry = false\nconfirm-close = false\nupdate-auto-check = false\nsuggest-applications-folder = false\n'
 cat > "$root/real-claude/claude-shell" <<'SH'
 #!/bin/sh

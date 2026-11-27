@@ -422,6 +422,9 @@ struct LocalizationCoverageTests {
     private static let keysAddedByThisRelease = [
         "command.zoomPane", "command.clearScreen", "command.exportText",
         "command.copyLastCommandOutput", "command.resetTerminal", "menu.presets",
+        "command.sendSelectionToAgent", "command.sendCommandOutputToAgent",
+        "context.sendCommandOutputToAgent", "commandPalette.chooseAgentPane",
+        "toast.noAgentPane", "toast.agentPaneUnavailable", "toast.agentPaneAdded",
         "search.regex", "search.caseSensitive", "toast.exported",
         "settings.label.optionAsMeta", "settings.label.openFileCommand",
         "commandPalette.category.terminal", "scrollback.newOutput",
