@@ -39,6 +39,7 @@ let package = Package(
         .library(name: "CortaSFTP", targets: ["CortaSFTP"]),
         .library(name: "CortaPOSIX", targets: ["CortaPOSIX"]),
         .executable(name: "corta-dump", targets: ["corta-dump"]),
+        .executable(name: "corta-record", targets: ["corta-record"]),
         .executable(name: "corta-bench", targets: ["corta-bench"]),
         .executable(name: "corta-exec", targets: ["corta-exec"]),
         .executable(name: "corta-image-decoder", targets: ["corta-image-decoder"]),
@@ -91,6 +92,11 @@ let package = Package(
         .executableTarget(
             name: "corta-dump",
             dependencies: ["CortaTerminal"],
+            swiftSettings: swiftSettings
+        ),
+        .executableTarget(
+            name: "corta-record",
+            dependencies: ["CortaTerminal", "CortaPOSIX"],
             swiftSettings: swiftSettings
         ),
         // Baseline measurements: parse throughput and scrollback memory,
@@ -150,10 +156,9 @@ let package = Package(
         .testTarget(
             name: "CortaTerminalTests",
             dependencies: ["CortaTerminal", "CortaPOSIX"],
-            // Golden-file inputs and expectations. Read from the source
-            // directory through `#filePath`, so they are neither compiled
-            // nor copied into a bundle.
-            exclude: ["Golden"],
+            // Golden and recorded inputs and expectations. The tests read
+            // these from the source directory through `#filePath`.
+            exclude: ["Golden", "Recordings"],
             swiftSettings: swiftSettings
         ),
         .testTarget(

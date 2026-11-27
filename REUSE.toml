@@ -30,6 +30,7 @@ path = [
   "docs/program-icons-sources.json",
   "NOTICE",
   "CortaTerminal/Tests/CortaTerminalTests/Golden/**",
+  "CortaTerminal/Tests/CortaTerminalTests/Recordings/**",
   "CortaTerminal/Tests/Fuzz/**",
   "CortaTests/Renderer/RenderReferences/**",
   "Corta.xcodeproj/**",

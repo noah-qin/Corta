@@ -94,6 +94,12 @@ struct FuzzCorpusTests {
         for entry in corpus { feedAndCheckCaps(entry.bytes, name: entry.name) }
     }
 
+    @Test(arguments: RecordedSessionTests.captures)
+    func recordedSessionHoldsTheCaps(_ capture: RecordedSessionTests.Capture) throws {
+        let recording = try RecordedSession.load(capture.name)
+        feedAndCheckCaps(recording.bytes, name: capture.name)
+    }
+
     /// The canonical resource-exhaustion case from `SECURITY.md` §3: a
     /// stream that opens an OSC and never closes it must not accumulate.
     @Test("an unterminated OSC string does not accumulate")

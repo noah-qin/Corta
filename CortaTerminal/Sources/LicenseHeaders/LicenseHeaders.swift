@@ -64,6 +64,7 @@ public enum LicenseHeaders {
 
         // Files that must not change by a byte, or cannot hold a comment.
         ("CortaTerminal/Tests/CortaTerminalTests/Golden/**", .reuse),
+        ("CortaTerminal/Tests/CortaTerminalTests/Recordings/**", .reuse),
         ("CortaTerminal/Tests/Fuzz/**", .reuse),
         ("CortaTests/Renderer/RenderReferences/**", .reuse),
         ("docs/brand/*.png", .reuse),

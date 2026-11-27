@@ -1,0 +1,944 @@
+# CLI: Codex
+# Version: 0.171.0
+# Renderer: fullscreen
+# Corta commit: ca9e639
+@size 24 82
+\e[?2004h
+\e[>4;0m\e[>7u\e[?1004h
+\e[?u\e[?1007$p\e[c\e[6n\e]10;?\e\\\e]11;?\e\\
+\e[?2026h\e[?25l\e[?1049h\e[>4;0m\e[>7u\e[?1007l\e[?1000h\e[?1002h\e[?1003h\e[?1006h\e[?25l
+\e[1;1H\e[J\e[?2026h\e[?25l\e[1;2H\e[0m\e[K\e[2;29H\e[0m\e[K\e[3;13H\e[0m\e[K\e[4;2H\e[0m\e[K\e[5;2H\e[0m\e[K\e[6;2H\e[0m\e[K\e[7;2H\e[0m\e[K\e[8;2H\e[0m\e[K\e[9;2H\e[0m\e[K\e[10;2H\e[0m\e[K\e[11;2H\e[0m\e[K\e[12;2H\e[0m\e[K\e[13;2H\e[0m\e[K\e[14;2H\e[0m\e[K\e[15;2H\e[0m\e[K\e[16;2H\e[0m\e[K\e[17;2H\e[0m\e[K\e[18;2H\e[0m\e[K\e[19;2H\e[0m\e[K\e[20;2H\e[0m\e[K\e[21;2H\e[0m\e[K\e[22;27H\e[0m\e[K\e[23;2H\e[0m\e[K\e[24;18H\e[0m\e[K\e[1;1H \e[2;1H  >_ \e[1mOpenAI Codex\e[22m\e[2m (v0.171.0)\e[3;1H\e[22m     \e[2mloading\e[4;1H\e[22m \e[5;1H \e[6;1H \e[7;1H \e[8;1H \e[9;1H \e[10;1H \e[11;1H \e[12;1H \e[13;1H \e[14;1H \e[15;1H \e[16;1H \e[17;1H \e[18;1H \e[19;1H \e[20;1H \e[21;1H \e[22;1H\e[1m›\e[22m \e[2mAsk Codex to do anything\e[23;1H\e[22m \e[24;1H  \e[1m?\e[22m for shortcuts\e[0m\e[1;1H\e[0 q\e[1;1H \e[0m\e[22;3H\e[?25h\e[?2026l\e[?2026l\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[3;6H\e[2m/private/tmp/corta-demo.00000/public-demo\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[22;3H\e[?25h\e[?2026l
+\e]0;public-demo\a
+\e]7501;state=idle:app=codex\e\\
+\e[?2026h\e[?25l
+\e[22;2H\e[0m\e[K\e[21;1H\e[1m›\e[21;3H\e[22m\e[2mAsk Codex to do anything\e[22;1H\e[22m \e[23;3HGPT-6.2-Sol\e[23;15Hdefault\e[23;23H·\e[23;25H/private/tmp/corta-demo.00000/public-demo\e[24;3H\e[1m←\e[24;9H\e[22magen\e[24;14Hs · \e[1m?\e[24;20H\e[22mfor\e[24;24Hshortcuts\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠋ public-demo\a
+\e]0;⠙ public-demo\a\e]7501;state=working:app=codex\e\\
+\e[?2026h\e[?25l\e[23;65H\e[0m\e[K\e[5;1H\e[2m  To get started, describe a task or try one of these commands:\e[7;3H\e[22m/init\e[2m - create an AGENTS.md file with instructions for Codex\e[8;3H\e[22m/status\e[2m - show current session configuration\e[9;3H\e[22m/permissions\e[2m - choose what Codex is allowed to do\e[10;3H\e[22m/model\e[2m - choose what model and reasoning effort to use\e[11;3H\e[22m/review\e[2m - review any changes and find issues\e[23;15H\e[22mm\e[23;17Hdi\e[23;20Hm · /private/tmp/corta-demo.00000/public-demo\e[0m\e[21;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠹ public-demo\a
+\e]0;⠸ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠼ public-demo\a
+\e]0;⠴ public-demo\a
+\e]0;⠦ public-demo\a
+\e]0;⠧ public-demo\a
+\e]0;⠇ public-demo\a
+\e]0;⠏ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠋ public-demo\a
+\e]0;⠙ public-demo\a
+\e]0;⠹ public-demo\a
+\e]0;⠸ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠼ public-demo\a
+\e]0;⠴ public-demo\a
+\e]0;⠦ public-demo\a
+\e]0;⠧ public-demo\a
+\e]0;⠇ public-demo\a
+\e]0;⠏ public-demo\a
+\e]0;public-demo\a
+\e]7501;state=idle:app=codex\e\\
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[21;2H\e[0m\e[K\e[24;2H\e[0m\e[K\e[18;1H\e[1m›\e[18;3H\e[22mAsk\e[18;7Hme\e[18;10Hto\e[18;13Happrove\e[18;21Hrunning\e[18;29Hprintf\e[18;36Hready\e[18;42H>\e[18;44Hmarker.txt\e[18;55Hin\e[18;58Hthis\e[18;63Hscratch\e[18;71Hdirectory\e[19;3Hwith\e[19;8Hescalated\e[19;18Hsandbox\e[19;26Hpermissions.\e[19;39HAfter\e[19;45Hthe\e[19;49Hcommand,\e[19;58Hwrite\e[19;64H32\e[19;67Hnumbered\e[19;76Hone-\e[20;3Hsentence\e[20;12Hfacts\e[20;18Habout\e[20;24Hclouds.\e[20;32HUse\e[20;36Hno\e[20;39Hother\e[20;45Htools.\e[21;1H \e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]7501;state=working:app=codex\e\\
+\e[?2026h\e[?25l
+\e[18;2H\e[0m\e[K\e[19;2H\e[0m\e[K\e[20;2H\e[0m\e[K\e[14;1H\e[1m\e[2m› \e[22mAsk\e[14;7Hme\e[14;10Hto\e[14;13Happrove\e[14;21Hrunning\e[14;29Hprintf\e[14;36Hready\e[14;42H>\e[14;44Hmarker.txt\e[14;55Hin\e[14;58Hthis\e[14;63Hscratch\e[14;71Hdirectory\e[15;3Hwith\e[15;8Hescalated\e[15;18Hsandbox\e[15;26Hpermissions.\e[15;39HAfter\e[15;45Hthe\e[15;49Hcommand,\e[15;58Hwrite\e[15;64H32\e[15;67Hnumbered\e[15;76Hone-\e[16;3Hsentence\e[16;12Hfacts\e[16;18Habout\e[16;24Hclouds.\e[16;32HUse\e[16;36Hno\e[16;39Hother\e[16;45Htools.\e[18;1H \e[21;1H\e[1m›\e[21;3H\e[22m\e[2mAsk Codex to do anything\e[24;3H\e[22m\e[1m←\e[24;5H\e[22mfor\e[24;9Hagents\e[24;16H·\e[24;18H\e[1m?\e[24;20H\e[22mfor\e[24;24Hshortcuts\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠦ public-demo\a
+\e[?2026h\e[?25l
+\e[3;2H\e[0m\e[K\e[5;2H\e[0m\e[K\e[7;47H\e[0m\e[K\e[10;47H\e[0m\e[K\e[11;2H\e[0m\e[K\e[15;51H\e[0m\e[K\e[16;2H\e[0m\e[K\e[1;3H>_\e[1;6H\e[1mOpenAI Codex\e[22m\e[2m (v0.171.0)\e[2;3H\e[22m  \e[2;6H\e[2m/private/tmp/corta-demo.00000/public-demo\e[4;1H  To get started, describe a task or try one of these commands:\e[5;1H\e[22m \e[6;3H/init\e[2m - create an AGENTS.md file with instructions for Codex\e[7;4H\e[22msta\e[7;8Hus\e[7;11H\e[2m- show\e[7;18Hcurrent session configuration\e[8;4H\e[22mpermi\e[8;10Hsions\e[2m -\e[8;19Hhoose what C\e[8;32Hdex is allowed to do\e[9;4H\e[22mmodel\e[2m - choose what model\e[9;30Han\e[9;33H rea\e[9;38Honing \e[9;45Hffort to use\e[10;4H\e[22mreview\e[2m - revi\e[10;18Hw any\e[10;24Hchanges and find issues\e[13;1H\e[1m› \e[22mAsk\e[13;7Hme\e[13;10Hto\e[13;13Happrove\e[13;21Hrunning\e[13;29Hprintf\e[13;36Hready\e[13;42H>\e[13;44Hmarker.txt\e[13;55Hin\e[13;58Hthis\e[13;63Hscratch\e[13;71Hdirectory\e[14;1H  with \e[14;9Hscal\e[14;14Hted sandbox permissions. After the command,\e[14;58Hwr\e[14;61Hte 32 numbered one-\e[15;3Hsentence f\e[15;14Hcts\e[15;18Habout clouds
+. Use no\e[15;39Hoth\e[15;46Hools.\e[18;1H•\e[18;3H\e[2mWorking\e[18;11H(0s • \e[22m\e[1mesc\e[22m\e[2m to interrupt)\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠧ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠇ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠏ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠋ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠙ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠹ public-demo\a
+\e[?2026h\e[?25l\e[18;1H\e[2m◦\e[0m\e[21;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠸ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠼ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠴ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠦ public-demo\a
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[18;12H\e[2m1\e[0m\e[21;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[21;3H\e[?25h\e[?2026l
+\e]0;⠦ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[?25l
+\e[2;2H\e[0m\e[K\e[4;2H\e[0m\e[K\e[6;47H\e[0m\e[K\e[9;47H\e[0m\e[K\e[10;2H\e[0m\e[K\e[14;51H\e[0m\e[K\e[15;2H\e[0m\e[K\e[18;2H\e[0m\e[K\e[21;2H\e[0m\e[K\e[23;53H\e[0m\e[K\e[1;3H  \e[1;6H\e[2m/private/tmp/corta-demo.00000/public-demo\e[3;1H  To get started, describe a task or try one of these commands:\e[4;1H\e[22m \e[5;3H/init\e[2m - create an AGENTS.md file with instructions for Codex\e[6;4H\e[22msta\e[6;8Hus\e[6;11H\e[2m- show\e[6;18Hcurrent session configuration\e[7;4H\e[22mpermi\e[7;10Hsions\e[2m -\e[7;19Hhoose what C\e[7;32Hdex is allowed to do\e[8;4H\e[22mmodel\e[2m - choose what model\e[8;30Han\e[8;33H rea\e[8;38Honing \e[8;45Hffort to use\e[9;4H\e[22mreview\e[2m - revi\e[9;18Hw any\e[9;24Hchanges and find issues\e[12;1H\e[1m› \e[22mAsk\e[12;7Hme\e[12;10Hto\e[12;13Happrove\e[12;21Hrunning\e[12;29Hprintf\e[12;36Hready\e[12;42H>\e[12;44Hmarker.txt\e[12;55Hin\e[12;58Hthis\e[12;63Hscratch\e[12;71Hdirectory\e[13;1H  with \e[13;9Hscal\e[13;14Hted sandbox permissions. After the command,\e[13;58Hwr\e[13;61Hte 32 numbered one-\e[14;3Hsentence f\e[14;14Hcts\e[14;18Habout clouds. Use no\e[14;39H
+oth\e[14;46Hools.\e[17;1H\e[2m◦\e[17;3HWorking\e[17;11H(1s • \e[22m\e[1mesc\e[22m\e[2m to interrupt)\e[18;1H\e[22m \e[20;1H\e[1m›\e[20;3H\e[22m\e[2mAsk Codex to do anything\e[21;1H\e[22m \e[22;3HGPT-6.2-Sol\e[22;15Hmedium\e[22;22H·\e[22;24H/private/tmp/corta-demo.00000/public-demo\e[22;66H·\e[22;68HAsk\e[22;72Hme\e[22;75Hto\e[23;3Happrove running printf \e[23;27Heady > \e[23;35Harke\e[23;40H.txt in this…\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[?25l\e[17;1H•\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[?25l\e[17;1H\e[2m◦\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[?25l\e[17;12H\e[2m2\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[?25l\e[17;1H•\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[?25l\e[17;24H\e[0m\e[K\e[17;1H\e[2m• \e[22mI’ll request approval\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e]0;⠴ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[?25l\e[17;25Hto\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;28Hwrite\e[17;34Hmarker.txt\e[17;45Hin\e[17;48Hthe\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[?25l\e[17;52Hscratch\e[17;60Hdirectory.\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Ask me to approve running printf ready > mark... | public-demo\a
+\e]0;⠇ Ask me to approve running printf ready > mark... | public-demo\a
+\e]0;⠏ Ask me to approve running printf ready > mark... | public-demo\a
+\e]0;⠋ Ask me to approve running printf ready > mark... | public-demo\a
+\e]0;⠙ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[?25l\e[3;63H\e[0m\e[K\e[5;52H\e[0m\e[K\e[7;47H\e[0m\e[K\e[8;2H\e[0m\e[K\e[9;2H\e[0m\e[K\e[12;51H\e[0m\e[K\e[13;2H\e[0m\e[K\e[14;2H\e[0m\e[K\e[17;34H\e[0m\e[K\e[1;1H\e[2m  To get started, describe a task or try on\e[1;45H \e[1;47Hf these commands:\e[3;1H\e[22m  /init\e[2m - create an AGENTS.md file wi\e[3;39Hh instruction\e[3;53H for Codex\e[4;3H\e[22m/status\e[2m - show current session configuration\e[5;4H\e[22mpermissions\e[2m -\e[5;18Hchoose what Codex\e[5;36His allowed to do\e[6;4H\e[22mmodel\e[2m - cho\e[6;16Hse what mod\e[6;28Hl and\e[6;34Hreasoning effort to use\e[7;4H\e[22mr\e[7;6Hview\e[2m - review any changes and\e[7;36Hfind issues\e[10;1H\e[1m› \e[22mAsk\e[10;7Hme\e[10;10Hto\e[10;13Happrove\e[10;21Hrunning\e[10;29Hprintf\e[10;36Hready\e[10;42H>\e[10;44Hmarker.txt\e[10;55Hin\e[10;58Hthis\e[10;63Hscratch\e[10;71Hdirectory\e[11;3Hwith\e[11;8Hescalated\e[11;18Hsandbox\e[11;26Hpermissions.\e[11;39HAfter\e[11;45Hthe\e[11;49Hcommand,\e[11;58Hwrite\e[11;64H32\e[11;67Hnumbered\e[11;76Hone-\e[12;1H  sentence f\e[12;14Hcts about clouds. Use\e[12;36Hno other tools\e[15;1H\e[2m• \e[2
+2mI’ll\e[15;8Hrequest\e[15;16Happroval\e[15;25Hto\e[15;28Hwrite\e[15;34Hmarker.txt\e[15;45Hin\e[15;48Hthe\e[15;52Hscratch\e[15;60Hdirectory.\e[17;1H\e[2m◦\e[22m \e[2mWorking\e[22m \e[2m(3s • \e[22m\e[1mesc\e[22m\e[2m to interrupt)\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[?25l\e[17;1H•\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[?25l\e[17;12H\e[2m4\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[?25l\e[17;1H\e[2m◦\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Ask me to approve running printf ready > mark... | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;[ ! ] Action Required | Ask me to approve running printf ready > mark... | public-demo\a\e]7501;state=blocked:app=codex:kind=permission\e\\
+\e[?2026h\e[?25l
+\e[1;51H\e[0m\e[K\e[3;2H\e[0m\e[K\e[5;2H\e[0m\e[K\e[6;36H\e[0m\e[K\e[7;2H\e[0m\e[K\e[10;2H\e[0m\e[K\e[11;21H\e[0m\e[K\e[12;2H\e[0m\e[K\e[15;2H\e[0m\e[K\e[17;2H\e[0m\e[K\e[22;53H\e[0m\e[K\e[23;2H\e[0m\e[K\e[1;1H  sentence facts about clouds. Use no other tools.\e[4;1H\e[2m• \e[22mI’ll request approval to write marker.txt in\e[4;48Hthe\e[4;52Hscratch\e[4;60Hdirectory.\e[6;1H•\e[6;3H\e[1mRunning\e[22m printf ready > marker.txt\e[9;3H\e[1mWould you like to run the following command?\e[10;1H\e[22m \e[11;3HEnvironment: \e[1mlocal\e[13;3H\e[22mReason:\e[13;11H\e[3mDo you approve running `printf ready > marker.txt` in the scratch\e[14;3Hdirectory?\e[15;1H\e[23m \e[16;3H$\e[16;5Hprintf ready > marker.txt\e[17;1H \e[19;1H\e[7m\e[1m› 1. Yes, proceed (y)                                                             \e[20;1H\e[27m\e[22m \e[20;3H2. Yes, and don't ask again\e[20;31Hfor\e[20;35Hcommands\e[20;44Hthat\e[20;49Hstart\e[20;55Hwith\e[20;60H`printf\e[20;68Hready\e[20;74H>\e[21;6Hmarker.txt`\e[21;18H(\e[1mp\e[22m)\e[22;3H3. No, and tell Codex what \e[22;31Ho do differently (\e[1mesc\e[22m)\e[24;
+3H\e[2mPress \e[22m\e[1menter\e[22m\e[2m to confirm or \e[22m\e[1mesc\e[22m\e[2m to cancel                                         \e[0m\e[?2026l
+\e[?2026h\e[0m\e[?2026l
+\e]0;[ . ] Action Required | Ask me to approve running printf ready > mark... | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[?2026l
+\e[?2026h\e[0m\e[?2026l
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ . ] Action Required | Request approval for marker command | public-demo\a
+\e]0;[ ! ] Action Required | Request approval for marker command | public-demo\a
+\e]0;⠼ Request approval for marker command | public-demo\a\e]7501;state=working:app=codex\e\\
+\e[?2026h\e[4;2H\e[0m\e[K\e[9;2H\e[0m\e[K\e[11;2H\e[0m\e[K\e[13;2H\e[0m\e[K\e[19;2H\e[0m\e[K\e[20;27H\e[0m\e[K\e[21;2H\e[0m\e[K\e[24;33H\e[0m\e[K\e[1;3H/mod\e[1;8Hl\e[2m - choose what model and reasoning effort to use\e[2;3H\e[22m/review\e[2m - review any changes and find issues\e[4;1H\e[22m \e[5;1H\e[1m\e[2m› \e[22mAsk\e[5;7Hme\e[5;10Hto\e[5;13Happrove\e[5;21Hrunning\e[5;29Hprintf\e[5;36Hready\e[5;42H>\e[5;44Hmarker.txt\e[5;55Hin\e[5;58Hthis\e[5;63Hscratch\e[5;71Hdirectory\e[6;1H \e[6;3Hwith escalated sandbox permissions.\e[6;39HAfter\e[6;45Hthe\e[6;49Hcommand,\e[6;58Hwrite\e[6;64H32\e[6;67Hnumbered\e[6;76Hone-\e[7;3Hsentence\e[7;12Hfacts\e[7;18Habout\e[7;24Hclouds.\e[7;32HUse\e[7;36Hno\e[7;39Hother\e[7;45Htools.\e[10;1H\e[2m• \e[22mI’ll\e[10;8Hrequest\e[10;16Happroval\e[10;25Hto\e[10;28Hwrite\e[10;34Hmarker.txt\e[10;45Hin\e[10;48Hthe\e[10;52Hscratch\e[10;60Hdirectory.\e[12;1H✔ You\e[12;7H\e[1mapproved\e[12;16H\e[22mcodex\e[12;22Hto\e[12;25Hrun\e[12;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[14;1H\e[22m•\e[14;3H\e[1mRunning\e[22m printf ready > marker.txt\e[16;1H•\e[16;3H\e[2mW
+orking\e[22m \e[2m(4s • \e[22m\e[1mesc\e[22m\e[2m to interrupt)\e[17;1H  └ \e[22m\e[1mTip:\e[17;10H\e[22mUse\e[17;14H\e[1m/title\e[17;21H\e[22mto\e[17;24Hchoose\e[17;31Hwhat\e[17;36Happears\e[17;44Hin\e[17;47Hyour\e[17;52Hterminal’s\e[17;63Htitle.\e[19;1H \e[20;1H\e[1m›\e[20;3H\e[22m\e[2mAsk Codex to do anything\e[22;3H\e[22mGPT-6.2-Sol medium · /priva\e[22;31He/tmp/corta-demo.00000/public-demo\e[22;66H·\e[22;68HRequest\e[23;3Happroval\e[23;12Hfor\e[23;16Hmarker\e[23;23Hcommand\e[24;3H\e[1m←\e[22m for agents · \e[1m?\e[22m for shortcuts\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[1;47H\e[0m\e[K\e[2;2H\e[0m\e[K\e[6;51H\e[0m\e[K\e[7;2H\e[0m\e[K\e[10;2H\e[0m\e[K\e[12;2H\e[0m\e[K\e[14;16H\e[0m\e[K\e[1;4Hreview\e[2m - revi\e[1;18Hw any\e[1;24Hchanges and find issues\e[4;1H\e[1m› \e[22mAsk\e[4;7Hme\e[4;10Hto\e[4;13Happrove\e[4;21Hrunning\e[4;29Hprintf\e[4;36Hready\e[4;42H>\e[4;44Hmarker.txt\e[4;55Hin\e[4;58Hthis\e[4;63Hscratch\e[4;71Hdirectory\e[5;1H  with \e[5;9Hscal\e[5;14Hted sandbox permissions. After the command,\e[5;58Hwr\e[5;61Hte 32 numbered one-\e[6;3Hsentence f\e[6;14Hcts\e[6;18Habout clouds. Use no\e[6;39Hoth\e[6;46Hools.\e[9;1H\e[2m• \e[22mI’ll\e[9;8Hrequest\e[9;16Happroval\e[9;25Hto\e[9;28Hwrite\e[9;34Hmarker.txt\e[9;45Hin\e[9;48Hthe\e[9;52Hscratch\e[9;60Hdirectory.\e[10;1H \e[11;1H✔ You\e[11;7H\e[1mapproved\e[11;16H\e[22mcodex\e[11;22Hto\e[11;25Hrun\e[11;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[12;1H\e[22m \e[13;1H\e[1m•\e[13;3HRan\e[13;7H\e[22mprintf ready > marker.txt\e[14;1H\e[2m  └ (no output)\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[16;12H\e[2m5\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[16;1H\e[2m◦\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[16;1H•\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[16;12H\e[2m6\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[16;1H\e[2m◦\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[16;1H•\e[16;12H\e[2m7\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[16;1H\e[2m◦\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[16;12H\e[2m8\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[?25l\e[16;1H•\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[16;1H\e[2m◦\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[16;12H\e[2m9\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[4;2H\e[0m\e[K\e[9;2H\e[0m\e[K\e[11;2H\e[0m\e[K\e[13;2H\e[0m\e[K\e[16;2H\e[0m\e[K\e[17;4H\e[0m\e[K\e[1;4Hmodel\e[2m - choos\e[1;18H what\e[1;24Hmodel and reasoning effort to use\e[2;3H\e[22m/review\e[2m - review any changes and find issues\e[4;1H\e[22m \e[5;1H\e[1m\e[2m› \e[22mAsk m\e[5;9H to \e[5;14Hpprove running printf ready > marker.txt in\e[5;58Hth\e[5;61Hs scratch directory\e[6;3Hwith escal\e[6;14Hted\e[6;18Hsandbox permissions.\e[6;39HAft\e[6;46Hhe command,\e[6;58Hwrite\e[6;64H32\e[6;67Hnumbered\e[6;76Hone-\e[7;3Hsentence\e[7;12Hfacts\e[7;18Habout\e[7;24Hclouds.\e[7;32HUse\e[7;36Hno\e[7;39Hother\e[7;45Htools.\e[9;1H \e[10;1H\e[2m• \e[22mI’ll\e[10;8Hrequest\e[10;16Happroval\e[10;25Hto\e[10;28Hwrite\e[10;34Hmarker.txt\e[10;45Hin\e[10;48Hthe\e[10;52Hscratch\e[10;60Hdirectory.\e[11;1H \e[12;1H✔ You\e[12;7H\e[1mapproved\e[12;16H\e[22mcodex\e[12;22Hto\e[12;25Hrun\e[12;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[13;1H\e[22m \e[14;1H\e[1m•\e[22m \e[1mRan\e[22m printf ready > marker.txt\e[15;1H\e[2m  └ (no output)\e[16;1H\e[22m \e[17;1H\e[2m•\e[17;3H\e[22m1\e[0m\e[20;3H\e[?25
+h\e[?2026l
+\e[?2026h\e[?25l\e[17;3H1. Clouds\e[17;13Hconsist\e[17;21Hof\e[17;24Htiny\e[17;29Hwater\e[17;35Hdroplets,\e[17;45Hice\e[17;49Hcrystals\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[1;52H\e[0m\e[K\e[5;2H\e[0m\e[K\e[10;2H\e[0m\e[K\e[12;2H\e[0m\e[K\e[14;2H\e[0m\e[K\e[17;42H\e[0m\e[K\e[1;4Hpermissions\e[2m - choose what\e[1;30HCo\e[1;33Hex i\e[1;38H allow\e[1;45Hd to do\e[2;4H\e[22mmodel\e[2m - choos\e[2;18H what\e[2;24Hmodel and reasoning effort to use\e[3;3H\e[22m/review\e[2m - review any changes and find issues\e[5;1H\e[22m \e[6;1H\e[1m\e[2m› \e[22mAsk m\e[6;9H to \e[6;14Hpprove running printf ready > marker.txt in\e[6;58Hth\e[6;61Hs scratch directory\e[7;3Hwith escal\e[7;14Hted\e[7;18Hsandbox permissions.\e[7;39HAft\e[7;46Hhe command,\e[7;58Hwrite\e[7;64H32\e[7;67Hnumbered\e[7;76Hone-\e[8;3Hsentence\e[8;12Hfacts\e[8;18Habout\e[8;24Hclouds.\e[8;32HUse\e[8;36Hno\e[8;39Hother\e[8;45Htools.\e[10;1H \e[11;1H\e[2m• \e[22mI’ll\e[11;8Hrequest\e[11;16Happroval\e[11;25Hto\e[11;28Hwrite\e[11;34Hmarker.txt\e[11;45Hin\e[11;48Hthe\e[11;52Hscratch\e[11;60Hdirectory.\e[12;1H \e[13;1H✔ You\e[13;7H\e[1mapproved\e[13;16H\e[22mcodex\e[13;22Hto\e[13;25Hrun\e[13;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[14;1H\e[22m \e[15;1H\e[1m•\e[22m \e[1mRan\e[22m print
+f ready > marker.txt\e[16;1H\e[2m  └ (no output)\e[17;1H\e[22m  2\e[17;6HMost cloud\e[17;17H form whe\e[17;27H moist ai\e[17;37H cool\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[1;47H\e[0m\e[K\e[2;2H\e[0m\e[K\e[3;2H\e[0m\e[K\e[6;51H\e[0m\e[K\e[7;2H\e[0m\e[K\e[8;2H\e[0m\e[K\e[11;64H\e[0m\e[K\e[13;32H\e[0m\e[K\e[15;2H\e[0m\e[K\e[1;4Hr\e[1;6Hview\e[2m - review any changes and\e[1;36Hfind issues\e[4;1H\e[1m› \e[22mAsk\e[4;7Hme\e[4;10Hto\e[4;13Happrove\e[4;21Hrunning\e[4;29Hprintf\e[4;36Hready\e[4;42H>\e[4;44Hmarker.txt\e[4;55Hin\e[4;58Hthis\e[4;63Hscratch\e[4;71Hdirectory\e[5;3Hwith\e[5;8Hescalated\e[5;18Hsandbox\e[5;26Hpermissions.\e[5;39HAfter\e[5;45Hthe\e[5;49Hcommand,\e[5;58Hwrite\e[5;64H32\e[5;67Hnumbered\e[5;76Hone-\e[6;1H  sentence f\e[6;14Hcts about clouds. Use\e[6;36Hno other tools\e[9;1H\e[2m• \e[22mI’ll\e[9;8Hrequest\e[9;16Happroval\e[9;25Hto\e[9;28Hwrite\e[9;34Hmarker.txt\e[9;45Hin\e[9;48Hthe\e[9;52Hscratch\e[9;60Hdirectory.\e[11;1H✔ You \e[1mapproved\e[11;16H\e[22mcodex to\e[11;25Hrun \e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[13;1H•\e[22m \e[1mRan\e[13;7H\e[22mprintf ready > marker.txt\e[14;1H\e[2m  └ (no output)\e[15;1H\e[22m \e[16;1H\e[2m•\e[16;3H\e[22m1. Clouds consist\e[16;21Hof\e[16;24Htiny\e[16;29Hwater\e[16;35Hdroplets,\e[16;45Hice\e[16
+;49Hcrystals,\e[16;59Hor\e[16;62Hboth.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;42Hs\e[17;44Hto\e[17;47Hits\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[1;2H\e[0m\e[K\e[5;51H\e[0m\e[K\e[6;2H\e[0m\e[K\e[9;2H\e[0m\e[K\e[11;2H\e[0m\e[K\e[13;16H\e[0m\e[K\e[14;2H\e[0m\e[K\e[16;61H\e[0m\e[K\e[17;20H\e[0m\e[K\e[3;1H\e[1m\e[2m› \e[22mAsk\e[3;7Hme\e[3;10Hto\e[3;13Happrove\e[3;21Hrunning\e[3;29Hprintf\e[3;36Hready\e[3;42H>\e[3;44Hmarker.txt\e[3;55Hin\e[3;58Hthis\e[3;63Hscratch\e[3;71Hdirectory\e[4;1H  with \e[4;9Hscal\e[4;14Hted sandbox permissions. After the command,\e[4;58Hwr\e[4;61Hte 32 numbered one-\e[5;3Hsentence f\e[5;14Hcts\e[5;18Habout clouds. Use no\e[5;39Hoth\e[5;46Hools.\e[8;1H\e[2m• \e[22mI’ll\e[8;8Hrequest\e[8;16Happroval\e[8;25Hto\e[8;28Hwrite\e[8;34Hmarker.txt\e[8;45Hin\e[8;48Hthe\e[8;52Hscratch\e[8;60Hdirectory.\e[9;1H \e[10;1H✔ You\e[10;7H\e[1mapproved\e[10;16H\e[22mcodex\e[10;22Hto\e[10;25Hrun\e[10;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[11;1H\e[22m \e[12;1H\e[1m•\e[12;3HRan\e[12;7H\e[22mprintf ready > marker.txt\e[13;1H\e[2m  └ (no output)\e[14;1H\e[22m \e[15;1H\e[2m• \e[22m1. Clouds\e[15;13Hconsist\e[15;21Hof\e[15;24Htiny\e[15;29Hwater\e[15;35Hdroplets,\e[15;45Hice\e[15;49Hcrystals,\e[15;59Hor\e[15;62Hboth.\e[16;1
+H  2\e[16;6HMost cloud\e[16;17H form whe\e[16;27H moist ai\e[16;37H cool\e[16;43H to its dew point.\e[17;3H3\e[17;6HCloud droplets\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;21Hoften\e[17;27Hform\e[17;32Haround\e[17;39Hairborne\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;48Hparticles\e[17;58Hsuch\e[17;63Has\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[4;51H\e[0m\e[K\e[5;2H\e[0m\e[K\e[8;2H\e[0m\e[K\e[10;2H\e[0m\e[K\e[12;16H\e[0m\e[K\e[13;2H\e[0m\e[K\e[15;61H\e[0m\e[K\e[17;21H\e[0m\e[K\e[2;1H\e[1m\e[2m› \e[22mAsk\e[2;7Hme\e[2;10Hto\e[2;13Happrove\e[2;21Hrunning\e[2;29Hprintf\e[2;36Hready\e[2;42H>\e[2;44Hmarker.txt\e[2;55Hin\e[2;58Hthis\e[2;63Hscratch\e[2;71Hdirectory\e[3;1H  with \e[3;9Hscal\e[3;14Hted sandbox permissions. After the command,\e[3;58Hwr\e[3;61Hte 32 numbered one-\e[4;3Hsentence f\e[4;14Hcts\e[4;18Habout clouds. Use no\e[4;39Hoth\e[4;46Hools.\e[7;1H\e[2m• \e[22mI’ll\e[7;8Hrequest\e[7;16Happroval\e[7;25Hto\e[7;28Hwrite\e[7;34Hmarker.txt\e[7;45Hin\e[7;48Hthe\e[7;52Hscratch\e[7;60Hdirectory.\e[8;1H \e[9;1H✔ You\e[9;7H\e[1mapproved\e[9;16H\e[22mcodex\e[9;22Hto\e[9;25Hrun\e[9;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[10;1H\e[22m \e[11;1H\e[1m•\e[11;3HRan\e[11;7H\e[22mprintf ready > marker.txt\e[12;1H\e[2m  └ (no output)\e[13;1H\e[22m \e[14;1H\e[2m• \e[22m1. Clouds\e[14;13Hconsist\e[14;21Hof\e[14;24Htiny\e[14;29Hwater\e[14;35Hdroplets,\e[14;45Hice\e[14;49Hcrystals,\e[14;59Hor\e[14;62Hboth.\e[15;1H  2\e[15;6HMost clo
+ud\e[15;17H form whe\e[15;27H moist ai\e[15;37H cool\e[15;43H to its dew point.\e[16;3H3\e[16;6HCloud droplets often form around airborne particles such\e[16;63Has\e[16;66Hdust\e[16;71Hor\e[16;74Hsea\e[16;78Hsalt.\e[17;3H4\e[17;11Hs can look\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;22Hwhite\e[17;28Hbecause\e[17;36Htheir\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[17;42Hdroplets\e[17;51Hscatter\e[17;59Hvisible\e[17;67Hwavelengths\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;79Hof\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[2;2H\e[0m\e[K\e[7;2H\e[0m\e[K\e[9;2H\e[0m\e[K\e[11;2H\e[0m\e[K\e[14;2H\e[0m\e[K\e[16;61H\e[0m\e[K\e[2;1H \e[3;1H\e[1m\e[2m› \e[22mAsk m\e[3;9H to \e[3;14Hpprove running printf ready > marker.txt in\e[3;58Hth\e[3;61Hs scratch directory\e[4;3Hwith escal\e[4;14Hted\e[4;18Hsandbox permissions.\e[4;39HAft\e[4;46Hhe command,\e[4;58Hwrite\e[4;64H32\e[4;67Hnumbered\e[4;76Hone-\e[5;3Hsentence\e[5;12Hfacts\e[5;18Habout\e[5;24Hclouds.\e[5;32HUse\e[5;36Hno\e[5;39Hother\e[5;45Htools.\e[7;1H \e[8;1H\e[2m• \e[22mI’ll\e[8;8Hrequest\e[8;16Happroval\e[8;25Hto\e[8;28Hwrite\e[8;34Hmarker.txt\e[8;45Hin\e[8;48Hthe\e[8;52Hscratch\e[8;60Hdirectory.\e[9;1H \e[10;1H✔ You\e[10;7H\e[1mapproved\e[10;16H\e[22mcodex\e[10;22Hto\e[10;25Hrun\e[10;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[11;1H\e[22m \e[12;1H\e[1m•\e[22m \e[1mRan\e[22m printf ready > marker.txt\e[13;1H\e[2m  └ (no output)\e[14;1H\e[22m \e[15;1H\e[2m• \e[22m1\e[15;6HClouds con\e[15;17Hist of ti\e[15;27Hy water d\e[15;37Hoplet\e[15;43H, ice crystals, or\e[15;62Hboth.\e[16;3H2\e[16;6HMost clouds form when moist air cools to its dew point
+.\e[17;3H3\e[17;11H droplets often form around airborne particles such as dust or sea salt.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[3;51H\e[0m\e[K\e[4;2H\e[0m\e[K\e[5;2H\e[0m\e[K\e[8;64H\e[0m\e[K\e[10;32H\e[0m\e[K\e[12;2H\e[0m\e[K\e[17;11H\e[0m\e[K\e[1;1H\e[1m\e[2m› \e[22mAsk\e[1;7Hme\e[1;10Hto\e[1;13Happrove\e[1;21Hrunning\e[1;29Hprintf\e[1;36Hready\e[1;42H>\e[1;44Hmarker.txt\e[1;55Hin\e[1;58Hthis\e[1;63Hscratch\e[1;71Hdirectory\e[2;3Hwith\e[2;8Hescalated\e[2;18Hsandbox\e[2;26Hpermissions.\e[2;39HAfter\e[2;45Hthe\e[2;49Hcommand,\e[2;58Hwrite\e[2;64H32\e[2;67Hnumbered\e[2;76Hone-\e[3;1H  sentence f\e[3;14Hcts about clouds. Use\e[3;36Hno other tools\e[6;1H\e[2m• \e[22mI’ll\e[6;8Hrequest\e[6;16Happroval\e[6;25Hto\e[6;28Hwrite\e[6;34Hmarker.txt\e[6;45Hin\e[6;48Hthe\e[6;52Hscratch\e[6;60Hdirectory.\e[8;1H✔ You \e[1mapproved\e[8;16H\e[22mcodex to\e[8;25Hrun \e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[10;1H•\e[22m \e[1mRan\e[10;7H\e[22mprintf ready > marker.txt\e[11;1H\e[2m  └ (no output)\e[12;1H\e[22m \e[13;1H\e[2m•\e[13;3H\e[22m1. Clouds consist\e[13;21Hof\e[13;24Htiny\e[13;29Hwater\e[13;35Hdroplets,\e[13;45Hice\e[13;49Hcrystals,\e[13;59Hor\e[13;62Hboth.\e[14;3H2. Most\e[14;11Hclouds\e[14;18Hform\e[14;23Hwhen\e
+[14;28Hmoist\e[14;34Hair\e[14;38Hcools\e[14;44Hto\e[14;47Hits\e[14;51Hdew\e[14;55Hpoint.\e[15;1H  3\e[15;11H dr\e[15;15Hplets\e[15;23Hten form a\e[15;34Hound airborne pa\e[15;51Hticle\e[15;57H such as dust\e[15;71Hor\e[15;74Hsea\e[15;78Hsalt.\e[16;3H4\e[16;6HClouds can lo\e[16;20Hk white\e[16;28Hbecause their drople\e[16;51Hscatter visible\e[16;67Hwavelengths\e[16;79Hof\e[17;3H5\e[17;6HThick\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;51H\e[0m\e[K\e[3;2H\e[0m\e[K\e[6;2H\e[0m\e[K\e[8;2H\e[0m\e[K\e[10;16H\e[0m\e[K\e[11;2H\e[0m\e[K\e[13;61H\e[0m\e[K\e[15;81H\e[0m\e[K\e[16;23H\e[0m\e[K\e[1;1H  with \e[1;9Hscal\e[1;14Hted sandbox permissions. After the command,\e[1;58Hwr\e[1;61Hte 32 numbered one-\e[2;3Hsentence f\e[2;14Hcts\e[2;18Habout clouds. Use no\e[2;39Hoth\e[2;46Hools.\e[5;1H\e[2m• \e[22mI’ll\e[5;8Hrequest\e[5;16Happroval\e[5;25Hto\e[5;28Hwrite\e[5;34Hmarker.txt\e[5;45Hin\e[5;48Hthe\e[5;52Hscratch\e[5;60Hdirectory.\e[6;1H \e[7;1H✔ You\e[7;7H\e[1mapproved\e[7;16H\e[22mcodex\e[7;22Hto\e[7;25Hrun\e[7;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[8;1H\e[22m \e[9;1H\e[1m•\e[9;3HRan\e[9;7H\e[22mprintf ready > marker.txt\e[10;1H\e[2m  └ (no output)\e[11;1H\e[22m \e[12;1H\e[2m• \e[22m1. Clouds\e[12;13Hconsist\e[12;21Hof\e[12;24Htiny\e[12;29Hwater\e[12;35Hdroplets,\e[12;45Hice\e[12;49Hcrystals,\e[12;59Hor\e[12;62Hboth.\e[13;1H  2\e[13;6HMost cloud\e[13;17H form whe\e[13;27H moist ai\e[13;37H cool\e[13;43H to its dew point.\e[14;3H3\e[14;6HCloud droplets often form around airborne particles such\e[14;63Has\e[14;
+66Hdust\e[14;71Hor\e[14;74Hsea\e[14;78Hsalt.\e[15;3H4\e[15;11Hs can look white because their droplets scatter visible wavelengths of\e[16;3H   sunlight broadly.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;12Hclouds\e[17;19Hoften\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[?25l\e[17;25Hlook\e[17;30Hdark\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;35Hfrom\e[17;40Hbelow\e[17;46Hbecause\e[17;54Hless\e[17;59Hsunlight\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;4H\e[0m\e[K\e[17;3H6\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[1;51H\e[0m\e[K\e[2;2H\e[0m\e[K\e[5;2H\e[0m\e[K\e[7;2H\e[0m\e[K\e[9;16H\e[0m\e[K\e[10;2H\e[0m\e[K\e[12;61H\e[0m\e[K\e[14;81H\e[0m\e[K\e[15;23H\e[0m\e[K\e[1;3Hsentence f\e[1;14Hcts\e[1;18Habout clouds. Use no\e[1;39Hoth\e[1;46Hools.\e[4;1H\e[2m• \e[22mI’ll\e[4;8Hrequest\e[4;16Happroval\e[4;25Hto\e[4;28Hwrite\e[4;34Hmarker.txt\e[4;45Hin\e[4;48Hthe\e[4;52Hscratch\e[4;60Hdirectory.\e[5;1H \e[6;1H✔ You\e[6;7H\e[1mapproved\e[6;16H\e[22mcodex\e[6;22Hto\e[6;25Hrun\e[6;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[7;1H\e[22m \e[8;1H\e[1m•\e[8;3HRan\e[8;7H\e[22mprintf ready > marker.txt\e[9;1H\e[2m  └ (no output)\e[10;1H\e[22m \e[11;1H\e[2m• \e[22m1. Clouds\e[11;13Hconsist\e[11;21Hof\e[11;24Htiny\e[11;29Hwater\e[11;35Hdroplets,\e[11;45Hice\e[11;49Hcrystals,\e[11;59Hor\e[11;62Hboth.\e[12;1H  2\e[12;6HMost cloud\e[12;17H form whe\e[12;27H moist ai\e[12;37H cool\e[12;43H to its dew point.\e[13;3H3\e[13;6HCloud droplets often form around airborne particles such\e[13;63Has\e[13;66Hdust\e[13;71Hor\e[13;74Hsea\e[13;78Hsalt.\e[14;3H4\e[14;11Hs can look white because their droplets scatter visib
+le wavelengths of\e[15;3H   sunlight broadly.\e[16;3H5. Thick clouds often\e[16;25Hlook\e[16;30Hdark\e[16;35Hfrom\e[16;40Hbelow\e[16;46Hbecause\e[16;54Hless\e[16;59Hsunlight\e[16;68Hreaches\e[16;76Htheir\e[17;3H6. Fog\e[17;10His\e[17;13Ha\e[17;15Hcloud\e[17;21Hin\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[1;2H\e[0m\e[K\e[4;2H\e[0m\e[K\e[6;2H\e[0m\e[K\e[8;16H\e[0m\e[K\e[9;2H\e[0m\e[K\e[11;61H\e[0m\e[K\e[13;81H\e[0m\e[K\e[14;23H\e[0m\e[K\e[16;12H\e[0m\e[K\e[3;1H\e[2m• \e[22mI’ll\e[3;8Hrequest\e[3;16Happroval\e[3;25Hto\e[3;28Hwrite\e[3;34Hmarker.txt\e[3;45Hin\e[3;48Hthe\e[3;52Hscratch\e[3;60Hdirectory.\e[4;1H \e[5;1H✔ You\e[5;7H\e[1mapproved\e[5;16H\e[22mcodex\e[5;22Hto\e[5;25Hrun\e[5;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[6;1H\e[22m \e[7;1H\e[1m•\e[7;3HRan\e[7;7H\e[22mprintf ready > marker.txt\e[8;1H\e[2m  └ (no output)\e[9;1H\e[22m \e[10;1H\e[2m• \e[22m1. Clouds\e[10;13Hconsist\e[10;21Hof\e[10;24Htiny\e[10;29Hwater\e[10;35Hdroplets,\e[10;45Hice\e[10;49Hcrystals,\e[10;59Hor\e[10;62Hboth.\e[11;1H  2\e[11;6HMost cloud\e[11;17H form whe\e[11;27H moist ai\e[11;37H cool\e[11;43H to its dew point.\e[12;3H3\e[12;6HCloud droplets often form around airborne particles such\e[12;63Has\e[12;66Hdust\e[12;71Hor\e[12;74Hsea\e[12;78Hsalt.\e[13;3H4\e[13;11Hs can look white because their droplets scatter visible wavelengths of\e[14;3H   sunlight broadly.\e[15;3H5. Thick cl
+ouds often\e[15;25Hlook\e[15;30Hdark\e[15;35Hfrom\e[15;40Hbelow\e[15;46Hbecause\e[15;54Hless\e[15;59Hsunlight\e[15;68Hreaches\e[15;76Htheir\e[16;3H   bases.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;24Hcontact\e[17;32Hwith\e[17;37Hthe\e[17;41Hground\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[3;2H\e[0m\e[K\e[5;2H\e[0m\e[K\e[7;16H\e[0m\e[K\e[8;2H\e[0m\e[K\e[10;61H\e[0m\e[K\e[12;81H\e[0m\e[K\e[13;23H\e[0m\e[K\e[15;12H\e[0m\e[K\e[17;26H\e[0m\e[K\e[1;1H\e[1m\e[2m› \e[22mAsk\e[1;7Hme\e[1;10Hto\e[1;13Happrove\e[1;21Hrunning\e[1;29Hprintf\e[1;36Hready\e[1;42H>\e[1;44Hmarker.txt\e[1;55Hin\e[1;58Hthis\e[1;63Hscratch\e[1;71Hdirectory\e[1;81H…\e[2;1H\e[2m• \e[22mI’ll\e[2;8Hrequest\e[2;16Happroval\e[2;25Hto\e[2;28Hwrite\e[2;34Hmarker.txt\e[2;45Hin\e[2;48Hthe\e[2;52Hscratch\e[2;60Hdirectory.\e[3;1H \e[4;1H✔ You\e[4;7H\e[1mapproved\e[4;16H\e[22mcodex\e[4;22Hto\e[4;25Hrun\e[4;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[5;1H\e[22m \e[6;1H\e[1m•\e[6;3HRan\e[6;7H\e[22mprintf ready > marker.txt\e[7;1H\e[2m  └ (no output)\e[8;1H\e[22m \e[9;1H\e[2m• \e[22m1. Clouds\e[9;13Hconsist\e[9;21Hof\e[9;24Htiny\e[9;29Hwater\e[9;35Hdroplets,\e[9;45Hice\e[9;49Hcrystals,\e[9;59Hor\e[9;62Hboth.\e[10;1H  2\e[10;6HMost cloud\e[10;17H form whe\e[10;27H moist ai\e[10;37H cool\e[10;43H to its dew point.\e[11;3H3\e[11;6HCloud droplets often form around airborne particles such\e[11;63Has\e[11;66Hdust\e[11;7
+1Hor\e[11;74Hsea\e[11;78Hsalt.\e[12;3H4\e[12;11Hs can look white because their droplets scatter visible wavelengths of\e[13;3H   sunlight broadly.\e[14;3H5. Thick clouds often\e[14;25Hlook\e[14;30Hdark\e[14;35Hfrom\e[14;40Hbelow\e[14;46Hbecause\e[14;54Hless\e[14;59Hsunlight\e[14;68Hreaches\e[14;76Htheir\e[15;3H   bases.\e[16;3H6. Fog is\e[16;13Ha\e[16;15Hcloud\e[16;21Hin\e[16;24Hcontact\e[16;32Hwith\e[16;37Hthe\e[16;41Hground.\e[17;3H7\e[17;6HCumulus clouds\e[17;21Hoften\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;27Hhave\e[17;32Hflat\e[17;37Hbases\e[17;43Hand\e[17;47Hrounded\e[17;55Htops\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;9H\e[0m\e[K\e[17;3H8\e[17;6HStr\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[?25l
+\e[2;2H\e[0m\e[K\e[4;2H\e[0m\e[K\e[6;16H\e[0m\e[K\e[7;2H\e[0m\e[K\e[9;61H\e[0m\e[K\e[11;81H\e[0m\e[K\e[12;23H\e[0m\e[K\e[14;12H\e[0m\e[K\e[2;1H \e[3;1H✔ You\e[3;7H\e[1mapproved\e[3;16H\e[22mcodex\e[3;22Hto\e[3;25Hrun\e[3;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[4;1H\e[22m \e[5;1H\e[1m•\e[5;3HRan\e[5;7H\e[22mprintf ready > marker.txt\e[6;1H\e[2m  └ (no output)\e[7;1H\e[22m \e[8;1H\e[2m• \e[22m1. Clouds\e[8;13Hconsist\e[8;21Hof\e[8;24Htiny\e[8;29Hwater\e[8;35Hdroplets,\e[8;45Hice\e[8;49Hcrystals,\e[8;59Hor\e[8;62Hboth.\e[9;1H  2\e[9;6HMost cloud\e[9;17H form whe\e[9;27H moist ai\e[9;37H cool\e[9;43H to its dew point.\e[10;3H3\e[10;6HCloud droplets often form around airborne particles such\e[10;63Has\e[10;66Hdust\e[10;71Hor\e[10;74Hsea\e[10;78Hsalt.\e[11;3H4\e[11;11Hs can look white because their droplets scatter visible wavelengths of\e[12;3H   sunlight broadly.\e[13;3H5. Thick clouds often\e[13;25Hlook\e[13;30Hdark\e[13;35Hfrom\e[13;40Hbelow\e[13;46Hbecause\e[13;54Hless\e[13;59Hsunlight\e[13;68Hreaches\e[13;76Htheir\e[14;3H   bases.\e[15;3H6. Fog is\e[15;13Ha\e[15;15Hcloud\e
+[15;21Hin\e[15;24Hcontact\e[15;32Hwith\e[15;37Hthe\e[15;41Hground.\e[16;3H7\e[16;6HCumulus clouds\e[16;21Hoften h\e[16;29Hve\e[16;32Hflat\e[16;37Hbases and rounded\e[16;55Htops.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;9Hatus\e[17;14Hclouds\e[17;21Htypically\e[17;31Hform\e[17;36Hlow\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[3;2H\e[0m\e[K\e[5;2H\e[0m\e[K\e[8;2H\e[0m\e[K\e[10;61H\e[0m\e[K\e[13;23H\e[0m\e[K\e[15;12H\e[0m\e[K\e[16;48H\e[0m\e[K\e[2;1H\e[2m• \e[22mI’ll\e[2;8Hrequest\e[2;16Happroval\e[2;25Hto\e[2;28Hwrite\e[2;34Hmarker.txt\e[2;45Hin\e[2;48Hthe\e[2;52Hscratch\e[2;60Hdirectory.\e[3;1H \e[4;1H✔ You\e[4;7H\e[1mapproved\e[4;16H\e[22mcodex\e[4;22Hto\e[4;25Hrun\e[4;29H\e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[5;1H\e[22m \e[6;1H\e[1m•\e[22m \e[1mRan\e[22m printf ready > marker.txt\e[7;1H\e[2m  └ (no output)\e[8;1H\e[22m \e[9;1H\e[2m• \e[22m1\e[9;6HClouds con\e[9;17Hist of ti\e[9;27Hy water d\e[9;37Hoplet\e[9;43H, ice crystals, or\e[9;62Hboth.\e[10;3H2\e[10;6HMost clouds form when moist air cools to its dew point.\e[11;3H3\e[11;11H droplets often form around airborne particles such as dust or sea salt.\e[12;3H4. Clouds can look white\e[12;28Hbecause\e[12;36Htheir\e[12;42Hdroplets\e[12;51Hscatter\e[12;59Hvisible\e[12;67Hwavelengths\e[12;79Hof\e[13;3H   sunlight broadly.\e[14;3H5. Thick clouds\e[14;19Hoften\e[14;25Hlook\e[14;30Hdark\e[14;35Hfrom\e[14;40Hbelow\e[14;46Hbecause\e[14;54Hless
+\e[14;59Hsunlight\e[14;68Hreaches\e[14;76Htheir\e[15;3H   bases.\e[16;3H6\e[16;6HFog is a cloud\e[16;21Hin cont\e[16;29Hct\e[16;32Hwith\e[16;37Hthe ground.\e[17;3H7\e[17;6HCumul\e[17;21Hoften have flat bases\e[17;43Hand\e[17;47Hrounded\e[17;55Htops.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;64H\e[0m\e[K\e[4;32H\e[0m\e[K\e[6;2H\e[0m\e[K\e[11;23H\e[0m\e[K\e[13;12H\e[0m\e[K\e[14;48H\e[0m\e[K\e[17;11H\e[0m\e[K\e[2;1H✔ You \e[1mapproved\e[2;16H\e[22mcodex to\e[2;25Hrun \e[2mprintf ready > marker.txt\e[22m\e[1m this time\e[4;1H•\e[22m \e[1mRan\e[4;7H\e[22mprintf ready > marker.txt\e[5;1H\e[2m  └ (no output)\e[6;1H\e[22m \e[7;1H\e[2m•\e[7;3H\e[22m1. Clouds consist\e[7;21Hof\e[7;24Htiny\e[7;29Hwater\e[7;35Hdroplets,\e[7;45Hice\e[7;49Hcrystals,\e[7;59Hor\e[7;62Hboth.\e[8;3H2. Most\e[8;11Hclouds\e[8;18Hform\e[8;23Hwhen\e[8;28Hmoist\e[8;34Hair\e[8;38Hcools\e[8;44Hto\e[8;47Hits\e[8;51Hdew\e[8;55Hpoint.\e[9;1H  3\e[9;11H dr\e[9;15Hplets\e[9;23Hten form a\e[9;34Hound airborne pa\e[9;51Hticle\e[9;57H such as dust\e[9;71Hor\e[9;74Hsea\e[9;78Hsalt.\e[10;3H4\e[10;6HClouds can lo\e[10;20Hk white\e[10;28Hbecause their drople\e[10;51Hscatter visible\e[10;67Hwavelengths\e[10;79Hof\e[11;3H   sunlight broadly.\e[12;3H5\e[12;6HThick clouds \e[12;20Hften look d\e[12;32Hrk from below b\e[12;48Hcau\e[12;52He less\e[12;59Hsunlight reaches their\e[13;6Hbases.\e[14;3H6\e[14;6HFog is a cloud in contac
+t with the gr\e[14;44Hund.\e[15;3H7. Cumulus\e[15;14Hclouds\e[15;21Hoften\e[15;27Hhave\e[15;32Hflat\e[15;37Hbases\e[15;43Hand\e[15;47Hrounded\e[15;55Htops.\e[16;3H8\e[16;6HStratus clouds\e[16;21Htypically form low,\e[16;41Hfairly uniform\e[16;56Hlayers.\e[17;3H9\e[17;6HStrat\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;11Hocumulus\e[17;20Hclouds\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;27Hform\e[17;32Hlow\e[17;36Hlayers\e[17;43Hor\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;46Hpatches\e[17;54Hwith\e[17;59Hrounded\e[17;67Hcl\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;6H\e[0m\e[K\e[17;3H10.\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;2H\e[0m\e[K\e[4;16H\e[0m\e[K\e[5;2H\e[0m\e[K\e[7;61H\e[0m\e[K\e[9;81H\e[0m\e[K\e[10;23H\e[0m\e[K\e[12;12H\e[0m\e[K\e[2;1H \e[3;1H\e[1m•\e[3;3HRan\e[3;7H\e[22mprintf ready > marker.txt\e[4;1H\e[2m  └ (no output)\e[5;1H\e[22m \e[6;1H\e[2m• \e[22m1. Clouds\e[6;13Hconsist\e[6;21Hof\e[6;24Htiny\e[6;29Hwater\e[6;35Hdroplets,\e[6;45Hice\e[6;49Hcrystals,\e[6;59Hor\e[6;62Hboth.\e[7;1H  2\e[7;6HMost cloud\e[7;17H form whe\e[7;27H moist ai\e[7;37H cool\e[7;43H to its dew point.\e[8;3H3\e[8;6HCloud droplets often form around airborne particles such\e[8;63Has\e[8;66Hdust\e[8;71Hor\e[8;74Hsea\e[8;78Hsalt.\e[9;3H4\e[9;11Hs can look white because their droplets scatter visible wavelengths of\e[10;3H   sunlight broadly.\e[11;3H5. Thick clouds often\e[11;25Hlook\e[11;30Hdark\e[11;35Hfrom\e[11;40Hbelow\e[11;46Hbecause\e[11;54Hless\e[11;59Hsunlight\e[11;68Hreaches\e[11;76Htheir\e[12;3H   bases.\e[13;3H6. Fog is\e[13;13Ha\e[13;15Hcloud\e[13;21Hin\e[13;24Hcontact\e[13;32Hwith\e[13;37Hthe\e[13;41Hground.\e[14;3H7\e[14;6HCumulus clouds\e[14;21Hoften h\e[14;29Hve\e[14;32Hflat\e[14;37Hbases and rounded\e[14
+;55Htops.\e[15;3H8\e[15;6HStrat\e[15;21Htypically form low, fairly uniform layers.\e[16;3H9\e[16;11Hocumul\e[16;18Hs clouds form low\e[16;37Hayers o\e[16;45H patches with rounded\e[16;67Hclumps.\e[17;7HCirrus\e[17;14Hclouds\e[17;21Hare\e[17;25Hhigh,\e[17;31Hwispy\e[17;37Hclouds\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;44Hcomposed\e[17;53Hof\e[17;56Hice\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[3;16H\e[0m\e[K\e[4;2H\e[0m\e[K\e[6;61H\e[0m\e[K\e[8;81H\e[0m\e[K\e[9;23H\e[0m\e[K\e[11;12H\e[0m\e[K\e[16;69H\e[0m\e[K\e[17;5H\e[0m\e[K\e[2;1H\e[1m•\e[2;3HRan\e[2;7H\e[22mprintf ready > marker.txt\e[3;1H\e[2m  └ (no output)\e[4;1H\e[22m \e[5;1H\e[2m• \e[22m1. Clouds\e[5;13Hconsist\e[5;21Hof\e[5;24Htiny\e[5;29Hwater\e[5;35Hdroplets,\e[5;45Hice\e[5;49Hcrystals,\e[5;59Hor\e[5;62Hboth.\e[6;1H  2\e[6;6HMost cloud\e[6;17H form whe\e[6;27H moist ai\e[6;37H cool\e[6;43H to its dew point.\e[7;3H3\e[7;6HCloud droplets often form around airborne particles such\e[7;63Has\e[7;66Hdust\e[7;71Hor\e[7;74Hsea\e[7;78Hsalt.\e[8;3H4\e[8;11Hs can look white because their droplets scatter visible wavelengths of\e[9;3H   sunlight broadly.\e[10;3H5. Thick clouds often\e[10;25Hlook\e[10;30Hdark\e[10;35Hfrom\e[10;40Hbelow\e[10;46Hbecause\e[10;54Hless\e[10;59Hsunlight\e[10;68Hreaches\e[10;76Htheir\e[11;3H   bases.\e[12;3H6. Fog is\e[12;13Ha\e[12;15Hcloud\e[12;21Hin\e[12;24Hcontact\e[12;32Hwith\e[12;37Hthe\e[12;41Hground.\e[13;3H7\e[13;6HCumulus clouds\e[13;21Hoften h\e[13;29Hve\e[13;32Hflat\e[13;37Hbases and roun
+ded\e[13;55Htops.\e[14;3H8\e[14;6HStrat\e[14;21Htypically form low, fairly uniform layers.\e[15;3H9\e[15;11Hocumul\e[15;18Hs clouds form low\e[15;37Hayers o\e[15;45H patches with rounded\e[15;67Hclumps.\e[16;3H10. Cirrus clo\e[16;18Hds are high, wispy clouds composed of ice crystals.\e[17;3H11\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;3H11. Cirro\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[17;12Hstratus\e[17;20Hclouds\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;27Hcan\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;31Hproduce\e[17;39Hhalos\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;45Haround\e[17;52Hthe\e[17;56HSun\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;2H\e[0m\e[K\e[5;2H\e[0m\e[K\e[7;61H\e[0m\e[K\e[10;23H\e[0m\e[K\e[12;12H\e[0m\e[K\e[13;48H\e[0m\e[K\e[14;60H\e[0m\e[K\e[15;63H\e[0m\e[K\e[2;1H \e[3;1H\e[1m•\e[22m \e[1mRan\e[22m printf ready > marker.txt\e[4;1H\e[2m  └ (no output)\e[5;1H\e[22m \e[6;1H\e[2m• \e[22m1\e[6;6HClouds con\e[6;17Hist of ti\e[6;27Hy water d\e[6;37Hoplet\e[6;43H, ice crystals, or\e[6;62Hboth.\e[7;3H2\e[7;6HMost clouds form when moist air cools to its dew point.\e[8;3H3\e[8;11H droplets often form around airborne particles such as dust or sea salt.\e[9;3H4. Clouds can look white\e[9;28Hbecause\e[9;36Htheir\e[9;42Hdroplets\e[9;51Hscatter\e[9;59Hvisible\e[9;67Hwavelengths\e[9;79Hof\e[10;3H   sunlight broadly.\e[11;3H5. Thick clouds\e[11;19Hoften\e[11;25Hlook\e[11;30Hdark\e[11;35Hfrom\e[11;40Hbelow\e[11;46Hbecause\e[11;54Hless\e[11;59Hsunlight\e[11;68Hreaches\e[11;76Htheir\e[12;3H   bases.\e[13;3H6\e[13;6HFog is a cloud\e[13;21Hin cont\e[13;29Hct\e[13;32Hwith\e[13;37Hthe ground.\e[14;3H7\e[14;6HCumul\e[14;21Hoften have flat bases and rounded tops.\e[15;3H8\e[15;11Hus clo\e[15;18Hds typically form\e[15;37How,\x20
+fai\e[15;45Hly uniform layers.\e[16;3H9. Stratocumul\e[16;18Hs clouds form low layers or patches with rounded clumps.\e[17;4H0\e[17;11Hu\e[17;13H clo\e[17;18Hds are high,\e[17;31Hwispy clouds composed of\e[17;56Hice\e[17;60Hcrystals.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[3;16H\e[0m\e[K\e[4;2H\e[0m\e[K\e[6;61H\e[0m\e[K\e[8;81H\e[0m\e[K\e[9;23H\e[0m\e[K\e[11;12H\e[0m\e[K\e[16;69H\e[0m\e[K\e[17;47H\e[0m\e[K\e[2;1H\e[1m•\e[2;3HRan\e[2;7H\e[22mprintf ready > marker.txt\e[3;1H\e[2m  └ (no output)\e[4;1H\e[22m \e[5;1H\e[2m• \e[22m1. Clouds\e[5;13Hconsist\e[5;21Hof\e[5;24Htiny\e[5;29Hwater\e[5;35Hdroplets,\e[5;45Hice\e[5;49Hcrystals,\e[5;59Hor\e[5;62Hboth.\e[6;1H  2\e[6;6HMost cloud\e[6;17H form whe\e[6;27H moist ai\e[6;37H cool\e[6;43H to its dew point.\e[7;3H3\e[7;6HCloud droplets often form around airborne particles such\e[7;63Has\e[7;66Hdust\e[7;71Hor\e[7;74Hsea\e[7;78Hsalt.\e[8;3H4\e[8;11Hs can look white because their droplets scatter visible wavelengths of\e[9;3H   sunlight broadly.\e[10;3H5. Thick clouds often\e[10;25Hlook\e[10;30Hdark\e[10;35Hfrom\e[10;40Hbelow\e[10;46Hbecause\e[10;54Hless\e[10;59Hsunlight\e[10;68Hreaches\e[10;76Htheir\e[11;3H   bases.\e[12;3H6. Fog is\e[12;13Ha\e[12;15Hcloud\e[12;21Hin\e[12;24Hcontact\e[12;32Hwith\e[12;37Hthe\e[12;41Hground.\e[13;3H7\e[13;6HCumulus clouds\e[13;21Hoften h\e[13;29Hve\e[13;32Hflat\e[13;37Hbases and rou
+nded\e[13;55Htops.\e[14;3H8\e[14;6HStrat\e[14;21Htypically form low, fairly uniform layers.\e[15;3H9\e[15;11Hocumul\e[15;18Hs clouds form low\e[15;37Hayers o\e[15;45H patches with rounded\e[15;67Hclumps.\e[16;3H10. Cirrus clo\e[16;18Hds are high, wispy clouds composed of ice crystals.\e[17;4H2\e[17;11Hocumul\e[17;18Hs clouds often a\e[17;35Hpear as rows\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;16H\e[0m\e[K\e[3;2H\e[0m\e[K\e[5;61H\e[0m\e[K\e[7;81H\e[0m\e[K\e[8;23H\e[0m\e[K\e[10;12H\e[0m\e[K\e[15;69H\e[0m\e[K\e[16;68H\e[0m\e[K\e[2;1H\e[2m  └ (no output)\e[3;1H\e[22m \e[4;1H\e[2m• \e[22m1. Clouds\e[4;13Hconsist\e[4;21Hof\e[4;24Htiny\e[4;29Hwater\e[4;35Hdroplets,\e[4;45Hice\e[4;49Hcrystals,\e[4;59Hor\e[4;62Hboth.\e[5;1H  2\e[5;6HMost cloud\e[5;17H form whe\e[5;27H moist ai\e[5;37H cool\e[5;43H to its dew point.\e[6;3H3\e[6;6HCloud droplets often form around airborne particles such\e[6;63Has\e[6;66Hdust\e[6;71Hor\e[6;74Hsea\e[6;78Hsalt.\e[7;3H4\e[7;11Hs can look white because their droplets scatter visible wavelengths of\e[8;3H   sunlight broadly.\e[9;3H5. Thick clouds often\e[9;25Hlook\e[9;30Hdark\e[9;35Hfrom\e[9;40Hbelow\e[9;46Hbecause\e[9;54Hless\e[9;59Hsunlight\e[9;68Hreaches\e[9;76Htheir\e[10;3H   bases.\e[11;3H6. Fog is\e[11;13Ha\e[11;15Hcloud\e[11;21Hin\e[11;24Hcontact\e[11;32Hwith\e[11;37Hthe\e[11;41Hground.\e[12;3H7\e[12;6HCumulus clouds\e[12;21Hoften h\e[12;29Hve\e[12;32Hflat\e[12;37Hbases and rounded\e[12;55Htops.\e[13;3H8\e[13;6HStrat\e[13;21Htypically form low, fai
+rly uniform layers.\e[14;3H9\e[14;11Hocumul\e[14;18Hs clouds form low\e[14;37Hayers o\e[14;45H patches with rounded\e[14;67Hclumps.\e[15;3H10. Cirrus clo\e[15;18Hds are high, wispy clouds composed of ice crystals.\e[16;4H1\e[16;11Ho\e[16;13Htrat\e[16;18Hs clouds can\e[16;31Hproduce halos around the\e[16;56HSun\e[16;60Ho\e[16;62H Moon.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;48Hof\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[?25l
+\e[2;2H\e[0m\e[K\e[4;61H\e[0m\e[K\e[6;81H\e[0m\e[K\e[7;23H\e[0m\e[K\e[9;12H\e[0m\e[K\e[14;69H\e[0m\e[K\e[15;68H\e[0m\e[K\e[17;16H\e[0m\e[K\e[2;1H \e[3;1H\e[2m• \e[22m1. Clouds\e[3;13Hconsist\e[3;21Hof\e[3;24Htiny\e[3;29Hwater\e[3;35Hdroplets,\e[3;45Hice\e[3;49Hcrystals,\e[3;59Hor\e[3;62Hboth.\e[4;1H  2\e[4;6HMost cloud\e[4;17H form whe\e[4;27H moist ai\e[4;37H cool\e[4;43H to its dew point.\e[5;3H3\e[5;6HCloud droplets often form around airborne particles such\e[5;63Has\e[5;66Hdust\e[5;71Hor\e[5;74Hsea\e[5;78Hsalt.\e[6;3H4\e[6;11Hs can look white because their droplets scatter visible wavelengths of\e[7;3H   sunlight broadly.\e[8;3H5. Thick clouds often\e[8;25Hlook\e[8;30Hdark\e[8;35Hfrom\e[8;40Hbelow\e[8;46Hbecause\e[8;54Hless\e[8;59Hsunlight\e[8;68Hreaches\e[8;76Htheir\e[9;3H   bases.\e[10;3H6. Fog is\e[10;13Ha\e[10;15Hcloud\e[10;21Hin\e[10;24Hcontact\e[10;32Hwith\e[10;37Hthe\e[10;41Hground.\e[11;3H7\e[11;6HCumulus clouds\e[11;21Hoften h\e[11;29Hve\e[11;32Hflat\e[11;37Hbases and rounded\e[11;55Htops.\e[12;3H8\e[12;6HStrat\e[12;21Htypically form low, fairly uniform layers.\e[13;3H9\e[13;1
+1Hocumul\e[13;18Hs clouds form low\e[13;37Hayers o\e[13;45H patches with rounded\e[13;67Hclumps.\e[14;3H10. Cirrus clo\e[14;18Hds are high, wispy clouds composed of ice crystals.\e[15;4H1\e[15;11Ho\e[15;13Htrat\e[15;18Hs clouds can\e[15;31Hproduce halos around the\e[15;56HSun\e[15;60Ho\e[15;62H Moon.\e[16;4H2\e[16;12Hcumul\e[16;27Hoften appear \e[16;41Hs rows of small white\e[16;63Hripples.\e[17;4H3\e[17;7HAltocumul\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;16Hus\e[17;19Hclouds\e[17;26Hoften\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;32Hform\e[17;37Hpatches\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;45Hof\e[17;48Hrounded\e[17;56Hcloud\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;14H\e[0m\e[K\e[17;4H4\e[17;11Hstr\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[3;61H\e[0m\e[K\e[5;81H\e[0m\e[K\e[6;23H\e[0m\e[K\e[8;12H\e[0m\e[K\e[13;69H\e[0m\e[K\e[14;68H\e[0m\e[K\e[2;1H\e[2m• \e[22m1. Clouds\e[2;13Hconsist\e[2;21Hof\e[2;24Htiny\e[2;29Hwater\e[2;35Hdroplets,\e[2;45Hice\e[2;49Hcrystals,\e[2;59Hor\e[2;62Hboth.\e[3;1H  2\e[3;6HMost cloud\e[3;17H form whe\e[3;27H moist ai\e[3;37H cool\e[3;43H to its dew point.\e[4;3H3\e[4;6HCloud droplets often form around airborne particles such\e[4;63Has\e[4;66Hdust\e[4;71Hor\e[4;74Hsea\e[4;78Hsalt.\e[5;3H4\e[5;11Hs can look white because their droplets scatter visible wavelengths of\e[6;3H   sunlight broadly.\e[7;3H5. Thick clouds often\e[7;25Hlook\e[7;30Hdark\e[7;35Hfrom\e[7;40Hbelow\e[7;46Hbecause\e[7;54Hless\e[7;59Hsunlight\e[7;68Hreaches\e[7;76Htheir\e[8;3H   bases.\e[9;3H6. Fog is\e[9;13Ha\e[9;15Hcloud\e[9;21Hin\e[9;24Hcontact\e[9;32Hwith\e[9;37Hthe\e[9;41Hground.\e[10;3H7\e[10;6HCumulus clouds\e[10;21Hoften h\e[10;29Hve\e[10;32Hflat\e[10;37Hbases and rounded\e[10;55Htops.\e[11;3H8\e[11;6HStrat\e[11;21Htypically form low, fairly uniform layers.\e[12;3H9\e[12;11Hocumul\e[12;18Hs clouds form low\e[12;37Hay
+ers o\e[12;45H patches with rounded\e[12;67Hclumps.\e[13;3H10. Cirrus clo\e[13;18Hds are high, wispy clouds composed of ice crystals.\e[14;4H1\e[14;11Ho\e[14;13Htrat\e[14;18Hs clouds can\e[14;31Hproduce halos around the\e[14;56HSun\e[14;60Ho\e[14;62H Moon.\e[15;4H2\e[15;12Hcumul\e[15;27Hoften appear \e[15;41Hs rows of small white\e[15;63Hripples.\e[16;4H3\e[16;7HAltocumulus clouds often form patches of\e[16;48Hrounded cloud element\e[16;70H at\e[16;74Hmiddle\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;61H\e[0m\e[K\e[4;81H\e[0m\e[K\e[5;23H\e[0m\e[K\e[7;12H\e[0m\e[K\e[12;69H\e[0m\e[K\e[13;68H\e[0m\e[K\e[16;13H\e[0m\e[K\e[2;1H  2\e[2;6HMost cloud\e[2;17H form whe\e[2;27H moist ai\e[2;37H cool\e[2;43H to its dew point.\e[3;3H3\e[3;6HCloud droplets often form around airborne particles such\e[3;63Has\e[3;66Hdust\e[3;71Hor\e[3;74Hsea\e[3;78Hsalt.\e[4;3H4\e[4;11Hs can look white because their droplets scatter visible wavelengths of\e[5;3H   sunlight broadly.\e[6;3H5. Thick clouds often\e[6;25Hlook\e[6;30Hdark\e[6;35Hfrom\e[6;40Hbelow\e[6;46Hbecause\e[6;54Hless\e[6;59Hsunlight\e[6;68Hreaches\e[6;76Htheir\e[7;3H   bases.\e[8;3H6. Fog is\e[8;13Ha\e[8;15Hcloud\e[8;21Hin\e[8;24Hcontact\e[8;32Hwith\e[8;37Hthe\e[8;41Hground.\e[9;3H7\e[9;6HCumulus clouds\e[9;21Hoften h\e[9;29Hve\e[9;32Hflat\e[9;37Hbases and rounded\e[9;55Htops.\e[10;3H8\e[10;6HStrat\e[10;21Htypically form low, fairly uniform layers.\e[11;3H9\e[11;11Hocumul\e[11;18Hs clouds form low\e[11;37Hayers o\e[11;45H patches with rounded\e[11;67Hclumps.\e[12;3H10. Cirrus clo\e[12;18Hds are high, wispy clouds composed of ice crystals.
+\e[13;4H1\e[13;11Ho\e[13;13Htrat\e[13;18Hs clouds can\e[13;31Hproduce halos around the\e[13;56HSun\e[13;60Ho\e[13;62H Moon.\e[14;4H2\e[14;12Hcumul\e[14;27Hoften appear \e[14;41Hs rows of small white\e[14;63Hripples.\e[15;4H3\e[15;7HAltocumulus clouds often form patches of\e[15;48Hrounded cloud element\e[15;70H at\e[15;74Hmiddle\e[16;3H   levels.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;14Hatus\e[17;19Hclouds\e[17;26Hcan\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;30Hmake\e[17;35Hthe\e[17;39HSun\e[17;43Hlook\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[3;61H\e[0m\e[K\e[6;23H\e[0m\e[K\e[8;12H\e[0m\e[K\e[9;48H\e[0m\e[K\e[10;60H\e[0m\e[K\e[11;63H\e[0m\e[K\e[14;68H\e[0m\e[K\e[15;71H\e[0m\e[K\e[17;13H\e[0m\e[K\e[2;1H\e[2m• \e[22m1\e[2;6HClouds con\e[2;17Hist of ti\e[2;27Hy water d\e[2;37Hoplet\e[2;43H, ice crystals, or\e[2;62Hboth.\e[3;3H2\e[3;6HMost clouds form when moist air cools to its dew point.\e[4;3H3\e[4;11H droplets often form around airborne particles such as dust or sea salt.\e[5;3H4. Clouds can look white\e[5;28Hbecause\e[5;36Htheir\e[5;42Hdroplets\e[5;51Hscatter\e[5;59Hvisible\e[5;67Hwavelengths\e[5;79Hof\e[6;3H   sunlight broadly.\e[7;3H5. Thick clouds\e[7;19Hoften\e[7;25Hlook\e[7;30Hdark\e[7;35Hfrom\e[7;40Hbelow\e[7;46Hbecause\e[7;54Hless\e[7;59Hsunlight\e[7;68Hreaches\e[7;76Htheir\e[8;3H   bases.\e[9;3H6\e[9;6HFog is a cloud\e[9;21Hin cont\e[9;29Hct\e[9;32Hwith\e[9;37Hthe ground.\e[10;3H7\e[10;6HCumul\e[10;21Hoften have flat bases and rounded tops.\e[11;3H8\e[11;11Hus clo\e[11;18Hds typically form\e[11;37How, fai\e[11;45Hly uniform layers.\e[12;3H9. Stratocumul\e[12;18Hs clouds form low layers or patches with rounded
+ clumps.\e[13;4H0\e[13;11Hu\e[13;13H clo\e[13;18Hds are high,\e[13;31Hwispy clouds composed of\e[13;56Hice\e[13;60Hc\e[13;62Hystals.\e[14;4H1\e[14;12Hstrat\e[14;27Hcan produce h\e[14;41Hlos around the Sun or\e[14;63HMoon.\e[15;4H2\e[15;7HCirrocumulus clouds often appear as rows\e[15;48Hof small white ripple\e[15;70H.\e[16;3H13. Altocumulus\e[16;19Hclouds\e[16;26Hoften\e[16;32Hform\e[16;37Hpatches\e[16;45Hof\e[16;48Hrounded\e[16;56Hcloud\e[16;62Helements\e[16;71Hat\e[16;74Hmiddle\e[17;3H   level\e[17;12H.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[4;23H\e[0m\e[K\e[6;12H\e[0m\e[K\e[7;48H\e[0m\e[K\e[12;68H\e[0m\e[K\e[15;13H\e[0m\e[K\e[16;68H\e[0m\e[K\e[2;1H  3\e[2;11H dr\e[2;15Hplets\e[2;23Hten form a\e[2;34Hound airborne pa\e[2;51Hticle\e[2;57H such as dust\e[2;71Hor\e[2;74Hsea\e[2;78Hsalt.\e[3;3H4\e[3;6HClouds can lo\e[3;20Hk white\e[3;28Hbecause their drople\e[3;51Hscatter visible\e[3;67Hwavelengths\e[3;79Hof\e[4;3H   sunlight broadly.\e[5;3H5\e[5;6HThick clouds \e[5;20Hften look d\e[5;32Hrk from below b\e[5;48Hcau\e[5;52He less\e[5;59Hsunlight reaches their\e[6;6Hbases.\e[7;3H6\e[7;6HFog is a cloud in contact with the gr\e[7;44Hund.\e[8;3H7. Cumulus\e[8;14Hclouds\e[8;21Hoften\e[8;27Hhave\e[8;32Hflat\e[8;37Hbases\e[8;43Hand\e[8;47Hrounded\e[8;55Htops.\e[9;3H8\e[9;6HStratus clouds\e[9;21Htypically form low,\e[9;41Hfairly uniform\e[9;56Hlayers.\e[10;3H9\e[10;6HStratocumul\e[10;18Hs clouds\e[10;27Hform\e[10;32Hlow layer\e[10;43Hor patches with rounded\e[10;67Hclumps.\e[11;3H10. Cirr\e[11;21Hare high,\e[11;31Hwispy clouds composed of\e[11;56Hice crystals.\e[12;3H11. Cirr\e[12;12Hstrat\e[12;27Hcan pr\e[12;34Hduce halos around t
+he Sun \e[12;61Hr Moon.\e[13;4H2\e[13;11Hocumul\e[13;18Hs clouds often a\e[13;35Hpear as rows \e[13;49Hf small white ripples.\e[14;4H3\e[14;7HAltocumulus clouds often f\e[14;34Hrm patche\e[14;45Hof rounded\e[14;56Hcloud elements\e[14;71Hat\e[14;74Hmiddle\e[15;3H   levels.\e[16;4H4\e[16;11Hstrat\e[16;26Hcan make the Sun lo\e[16;46Hk\e[16;48Hlike a blurred disk.\e[17;3H15. Nimbostr\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;15Hatus\e[17;20Hclouds\e[17;27Hcommonly\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;36Hbring\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[?25l\e[17;42Hwidespread\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[17;52H,\e[17;54Hsteady\e[17;61Hrain\e[17;66Hor\e[17;69Hsnow\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;81H\e[0m\e[K\e[3;23H\e[0m\e[K\e[5;12H\e[0m\e[K\e[10;69H\e[0m\e[K\e[11;68H\e[0m\e[K\e[14;13H\e[0m\e[K\e[17;8H\e[0m\e[K\e[2;3H4\e[2;11Hs can look white because their droplets scatter visible wavelengths of\e[3;3H   sunlight broadly.\e[4;3H5. Thick clouds often\e[4;25Hlook\e[4;30Hdark\e[4;35Hfrom\e[4;40Hbelow\e[4;46Hbecause\e[4;54Hless\e[4;59Hsunlight\e[4;68Hreaches\e[4;76Htheir\e[5;3H   bases.\e[6;3H6. Fog is\e[6;13Ha\e[6;15Hcloud\e[6;21Hin\e[6;24Hcontact\e[6;32Hwith\e[6;37Hthe\e[6;41Hground.\e[7;3H7\e[7;6HCumulus clouds\e[7;21Hoften h\e[7;29Hve\e[7;32Hflat\e[7;37Hbases and rounded\e[7;55Htops.\e[8;3H8\e[8;6HStrat\e[8;21Htypically form low, fairly uniform layers.\e[9;3H9\e[9;11Hocumul\e[9;18Hs clouds form low\e[9;37Hayers o\e[9;45H patches with rounded\e[9;67Hclumps.\e[10;3H10. Cirrus clo\e[10;18Hds are high, wispy clouds composed of ice crystals.\e[11;4H1\e[11;11Ho\e[11;13Htrat\e[11;18Hs clouds can\e[11;31Hproduce halos around the\e[11;56HSun\e[11;60Ho\e[11;62H Moon.\e[12;4H2\e[12;12Hcumul\e[12;27Hoften appear \e[12;41Hs rows of small white\e[12;63Hripples.\e[13;4H3\e[13;7HAltocu
+mulus clouds often form patches of\e[13;48Hrounded cloud element\e[13;70H at\e[13;74Hmiddle\e[14;3H   levels.\e[15;3H14. Alto\e[15;12Htratus\e[15;19Hclouds\e[15;26Hcan\e[15;30Hmake\e[15;35Hthe\e[15;39HSun\e[15;43Hlook\e[15;48Hlike\e[15;53Ha\e[15;55Hblurred\e[15;63Hdisk.\e[16;4H5\e[16;7HNimbostratus clouds com\e[16;31Honly bring widespread, steady rain or\e[16;69Hsnow.\e[17;4H6\e[17;7HC\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;8Humul\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;12Honimbus\e[17;20Hclouds\e[17;27Hcan\e[17;31Hproduce\e[17;39Hlightning\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;48H,\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;15H\e[0m\e[K\e[17;4H7\e[17;7HA \e[17;10Hature\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;23H\e[0m\e[K\e[4;12H\e[0m\e[K\e[9;69H\e[0m\e[K\e[10;68H\e[0m\e[K\e[13;13H\e[0m\e[K\e[16;71H\e[0m\e[K\e[2;3H   sunlight broadly.\e[3;3H5. Thick clouds often\e[3;25Hlook\e[3;30Hdark\e[3;35Hfrom\e[3;40Hbelow\e[3;46Hbecause\e[3;54Hless\e[3;59Hsunlight\e[3;68Hreaches\e[3;76Htheir\e[4;3H   bases.\e[5;3H6. Fog is\e[5;13Ha\e[5;15Hcloud\e[5;21Hin\e[5;24Hcontact\e[5;32Hwith\e[5;37Hthe\e[5;41Hground.\e[6;3H7\e[6;6HCumulus clouds\e[6;21Hoften h\e[6;29Hve\e[6;32Hflat\e[6;37Hbases and rounded\e[6;55Htops.\e[7;3H8\e[7;6HStrat\e[7;21Htypically form low, fairly uniform layers.\e[8;3H9\e[8;11Hocumul\e[8;18Hs clouds form low\e[8;37Hayers o\e[8;45H patches with rounded\e[8;67Hclumps.\e[9;3H10. Cirrus clo\e[9;18Hds are high, wispy clouds composed of ice crystals.\e[10;4H1\e[10;11Ho\e[10;13Htrat\e[10;18Hs clouds can\e[10;31Hproduce halos around the\e[10;56HSun\e[10;60Ho\e[10;62H Moon.\e[11;4H2\e[11;12Hcumul\e[11;27Hoften appear \e[11;41Hs rows of small white\e[11;63Hripples.\e[12;4H3\e[12;7HAltocumulus clouds often form patches of\e[12;48Hrounded cloud element\e[12;70H at\e[12;74Hmiddle\e[13;3H   le
+vels.\e[14;3H14. Alto\e[14;12Htratus\e[14;19Hclouds\e[14;26Hcan\e[14;30Hmake\e[14;35Hthe\e[14;39HSun\e[14;43Hlook\e[14;48Hlike\e[14;53Ha\e[14;55Hblurred\e[14;63Hdisk.\e[15;4H5\e[15;7HNimbostratus clouds com\e[15;31Honly bring widespread, steady rain or\e[15;69Hsnow.\e[16;4H6\e[16;7HCu\e[16;10Hulonimb\e[16;28Han produce lightning, hail, an\e[16;59H he\e[16;63Hvy\e[16;66Hrain.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;16Hthunderstorm\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[17;29Hcan\e[17;33Hdevelop\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[17;41Han\e[17;44Hanvil-shaped\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;57Htop\e[17;61Has\e[17;64Hits\e[17;68Hup\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[3;23H\e[0m\e[K\e[5;12H\e[0m\e[K\e[6;48H\e[0m\e[K\e[7;60H\e[0m\e[K\e[8;63H\e[0m\e[K\e[11;68H\e[0m\e[K\e[12;71H\e[0m\e[K\e[14;13H\e[0m\e[K\e[15;68H\e[0m\e[K\e[2;3H4. Clouds can look white\e[2;28Hbecause\e[2;36Htheir\e[2;42Hdroplets\e[2;51Hscatter\e[2;59Hvisible\e[2;67Hwavelengths\e[2;79Hof\e[3;3H   sunlight broadly.\e[4;3H5. Thick clouds\e[4;19Hoften\e[4;25Hlook\e[4;30Hdark\e[4;35Hfrom\e[4;40Hbelow\e[4;46Hbecause\e[4;54Hless\e[4;59Hsunlight\e[4;68Hreaches\e[4;76Htheir\e[5;3H   bases.\e[6;3H6\e[6;6HFog is a cloud\e[6;21Hin cont\e[6;29Hct\e[6;32Hwith\e[6;37Hthe ground.\e[7;3H7\e[7;6HCumul\e[7;21Hoften have flat bases and rounded tops.\e[8;3H8\e[8;11Hus clo\e[8;18Hds typically form\e[8;37How, fai\e[8;45Hly uniform layers.\e[9;3H9. Stratocumul\e[9;18Hs clouds form low layers or patches with rounded clumps.\e[10;4H0\e[10;11Hu\e[10;13H clo\e[10;18Hds are high,\e[10;31Hwispy clouds composed of\e[10;56Hice\e[10;60Hc\e[10;62Hystals.\e[11;4H1\e[11;12Hstrat\e[11;27Hcan produce h\e[11;41Hlos around the Sun or\e[11;63HMoon.\e[12;4H2\e[12;7HCirrocumulus clouds often appear as rows\e[12;48Hof small wh
+ite ripple\e[12;70H.\e[13;3H13. Altocumulus\e[13;19Hclouds\e[13;26Hoften\e[13;32Hform\e[13;37Hpatches\e[13;45Hof\e[13;48Hrounded\e[13;56Hcloud\e[13;62Helements\e[13;71Hat\e[13;74Hmiddle\e[14;3H   level\e[14;12H.\e[15;4H4\e[15;7HAltostratus clouds can \e[15;31Hake the Sun look like a blurred disk.\e[16;4H5\e[16;7HNi\e[16;10Hbostrat\e[16;28Hommonly bring widespread, stea\e[16;59Hy r\e[16;63Hin\e[16;66Hor snow.\e[17;4H6\e[17;7HCu\e[17;10Hulonimbus clouds can produce lightning, hail, and heavy rain.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[3;12H\e[0m\e[K\e[4;48H\e[0m\e[K\e[9;68H\e[0m\e[K\e[12;13H\e[0m\e[K\e[13;68H\e[0m\e[K\e[17;38H\e[0m\e[K\e[2;3H5\e[2;6HThick clouds \e[2;20Hften look d\e[2;32Hrk from below b\e[2;48Hcau\e[2;52He less\e[2;59Hsunlight reaches their\e[3;6Hbases.\e[4;3H6\e[4;6HFog is a cloud in contact with the gr\e[4;44Hund.\e[5;3H7. Cumulus\e[5;14Hclouds\e[5;21Hoften\e[5;27Hhave\e[5;32Hflat\e[5;37Hbases\e[5;43Hand\e[5;47Hrounded\e[5;55Htops.\e[6;3H8\e[6;6HStratus clouds\e[6;21Htypically form low,\e[6;41Hfairly uniform\e[6;56Hlayers.\e[7;3H9\e[7;6HStratocumul\e[7;18Hs clouds\e[7;27Hform\e[7;32Hlow layer\e[7;43Hor patches with rounded\e[7;67Hclumps.\e[8;3H10. Cirr\e[8;21Hare high,\e[8;31Hwispy clouds composed of\e[8;56Hice crystals.\e[9;3H11. Cirr\e[9;12Hstrat\e[9;27Hcan pr\e[9;34Hduce halos around the Sun \e[9;61Hr Moon.\e[10;4H2\e[10;11Hocumul\e[10;18Hs clouds often a\e[10;35Hpear as rows \e[10;49Hf small white ripples.\e[11;4H3\e[11;7HAltocumulus clouds often f\e[11;34Hrm patche\e[11;45Hof rounded\e[11;56Hcloud elements\e[11;71Hat\e[11;74Hmiddle\e[12;3H   levels.\e[13;4H4\e[13;11Hstrat\e[13;26Hcan m
+ake the Sun lo\e[13;46Hk\e[13;48Hlike a blurred disk.\e[14;3H15. Nimbostratus\e[14;20Hclouds\e[14;27Hcommonly\e[14;36Hbring\e[14;42Hwidespread,\e[14;54Hsteady\e[14;61Hrain\e[14;66Hor\e[14;69Hsnow.\e[15;4H6\e[15;7HCumulonimbus clouds can produc\e[15;39Hlightning, hail, and heavy rain.\e[16;4H7\e[16;7HA \e[16;10Hature \e[16;17Hhunderstorm can develop an anvil-shaped top\e[16;61Has its updraft\e[16;76Hspreads\e[17;4H8\e[17;7HLenticular clouds ofte\e[17;31Hform in\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;39Hatmospheric\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;12H\e[0m\e[K\e[7;69H\e[0m\e[K\e[8;68H\e[0m\e[K\e[11;13H\e[0m\e[K\e[14;71H\e[0m\e[K\e[16;14H\e[0m\e[K\e[2;3H   bases.\e[3;3H6. Fog is\e[3;13Ha\e[3;15Hcloud\e[3;21Hin\e[3;24Hcontact\e[3;32Hwith\e[3;37Hthe\e[3;41Hground.\e[4;3H7\e[4;6HCumulus clouds\e[4;21Hoften h\e[4;29Hve\e[4;32Hflat\e[4;37Hbases and rounded\e[4;55Htops.\e[5;3H8\e[5;6HStrat\e[5;21Htypically form low, fairly uniform layers.\e[6;3H9\e[6;11Hocumul\e[6;18Hs clouds form low\e[6;37Hayers o\e[6;45H patches with rounded\e[6;67Hclumps.\e[7;3H10. Cirrus clo\e[7;18Hds are high, wispy clouds composed of ice crystals.\e[8;4H1\e[8;11Ho\e[8;13Htrat\e[8;18Hs clouds can\e[8;31Hproduce halos around the\e[8;56HSun\e[8;60Ho\e[8;62H Moon.\e[9;4H2\e[9;12Hcumul\e[9;27Hoften appear \e[9;41Hs rows of small white\e[9;63Hripples.\e[10;4H3\e[10;7HAltocumulus clouds often form patches of\e[10;48Hrounded cloud element\e[10;70H at\e[10;74Hmiddle\e[11;3H   levels.\e[12;3H14. Alto\e[12;12Htratus\e[12;19Hclouds\e[12;26Hcan\e[12;30Hmake\e[12;35Hthe\e[12;39HSun\e[12;43Hlook\e[12;48Hlike\e[12;53Ha\e[12;55Hblurred\e[12;63Hdisk.\e[13;4H5\e[13;7HNimbostr
+atus clouds com\e[13;31Honly bring widespread, steady rain or\e[13;69Hsnow.\e[14;4H6\e[14;7HCu\e[14;10Hulonimb\e[14;28Han produce lightning, hail, an\e[14;59H he\e[14;63Hvy\e[14;66Hrain.\e[15;4H7\e[15;7HA \e[15;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[15;76Hspreads\e[16;3H   outw\e[16;11Hrd.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;51Hwaves\e[17;57Hdownwind\e[17;66Hof\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[?25l\e[6;69H\e[0m\e[K\e[7;68H\e[0m\e[K\e[10;13H\e[0m\e[K\e[13;71H\e[0m\e[K\e[15;14H\e[0m\e[K\e[17;15H\e[0m\e[K\e[2;3H6. Fog is\e[2;13Ha\e[2;15Hcloud\e[2;21Hin\e[2;24Hcontact\e[2;32Hwith\e[2;37Hthe\e[2;41Hground.\e[3;3H7\e[3;6HCumulus clouds\e[3;21Hoften h\e[3;29Hve\e[3;32Hflat\e[3;37Hbases and rounded\e[3;55Htops.\e[4;3H8\e[4;6HStrat\e[4;21Htypically form low, fairly uniform layers.\e[5;3H9\e[5;11Hocumul\e[5;18Hs clouds form low\e[5;37Hayers o\e[5;45H patches with rounded\e[5;67Hclumps.\e[6;3H10. Cirrus clo\e[6;18Hds are high, wispy clouds composed of ice crystals.\e[7;4H1\e[7;11Ho\e[7;13Htrat\e[7;18Hs clouds can\e[7;31Hproduce halos around the\e[7;56HSun\e[7;60Ho\e[7;62H Moon.\e[8;4H2\e[8;12Hcumul\e[8;27Hoften appear \e[8;41Hs rows of small white\e[8;63Hripples.\e[9;4H3\e[9;7HAltocumulus clouds often form patches of\e[9;48Hrounded cloud element\e[9;70H at\e[9;74Hmiddle\e[10;3H   levels.\e[11;3H14. Alto\e[11;12Htratus\e[11;19Hclouds\e[11;26Hcan\e[11;30Hmake\e[11;35Hthe\e[11;39HSun\e[11;43Hlook\e[11;48Hlike\e[11;53Ha\e[11;55Hblurred\e[11;63Hdisk.\e[12;4H5\e[12;7HNimbostratus\x20
+clouds com\e[12;31Honly bring widespread, steady rain or\e[12;69Hsnow.\e[13;4H6\e[13;7HCu\e[13;10Hulonimb\e[13;28Han produce lightning, hail, an\e[13;59H he\e[13;63Hvy\e[13;66Hrain.\e[14;4H7\e[14;7HA \e[14;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[14;76Hspreads\e[15;3H   outw\e[15;11Hrd.\e[16;3H18. Lenticular\e[16;18Hclouds\e[16;25Hoften\e[16;31Hform\e[16;36Hin\e[16;39Hatmospheric\e[16;51Hwaves\e[16;57Hdownwind\e[16;66Hof\e[16;69Hmountains.\e[17;4H9\e[17;7HMammat\e[17;14Hs\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[17;16Hclouds\e[17;23Hhave\e[17;28Hpouchlike\e[17;38Hfeatures\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;47Hthat\e[17;52Hhang\e[17;57Hbeneath\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;65Ha\e[17;67Hcloud\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[5;69H\e[0m\e[K\e[6;68H\e[0m\e[K\e[9;13H\e[0m\e[K\e[12;71H\e[0m\e[K\e[14;14H\e[0m\e[K\e[16;78H\e[0m\e[K\e[17;20H\e[0m\e[K\e[2;3H7\e[2;6HCumulus clouds\e[2;21Hoften h\e[2;29Hve\e[2;32Hflat\e[2;37Hbases and rounded\e[2;55Htops.\e[3;3H8\e[3;6HStrat\e[3;21Htypically form low, fairly uniform layers.\e[4;3H9\e[4;11Hocumul\e[4;18Hs clouds form low\e[4;37Hayers o\e[4;45H patches with rounded\e[4;67Hclumps.\e[5;3H10. Cirrus clo\e[5;18Hds are high, wispy clouds composed of ice crystals.\e[6;4H1\e[6;11Ho\e[6;13Htrat\e[6;18Hs clouds can\e[6;31Hproduce halos around the\e[6;56HSun\e[6;60Ho\e[6;62H Moon.\e[7;4H2\e[7;12Hcumul\e[7;27Hoften appear \e[7;41Hs rows of small white\e[7;63Hripples.\e[8;4H3\e[8;7HAltocumulus clouds often form patches of\e[8;48Hrounded cloud element\e[8;70H at\e[8;74Hmiddle\e[9;3H   levels.\e[10;3H14. Alto\e[10;12Htratus\e[10;19Hclouds\e[10;26Hcan\e[10;30Hmake\e[10;35Hthe\e[10;39HSun\e[10;43Hlook\e[10;48Hlike\e[10;53Ha\e[10;55Hblurred\e[10;63Hdisk.\e[11;4H5\e[11;7HNimbostratus clouds com\e[11;31Honly bring widespread, steady rain or\e[11;69Hsnow.\e[12;4H6\e[12;7HCu\e[12;10Hu
+lonimb\e[12;28Han produce lightning, hail, an\e[12;59H he\e[12;63Hvy\e[12;66Hrain.\e[13;4H7\e[13;7HA \e[13;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[13;76Hspreads\e[14;3H   outw\e[14;11Hrd.\e[15;3H18. Lenticular\e[15;18Hclouds\e[15;25Hoften\e[15;31Hform\e[15;36Hin\e[15;39Hatmospheric\e[15;51Hwaves\e[15;57Hdownwind\e[15;66Hof\e[15;69Hmountains.\e[16;4H9\e[16;7HMammat\e[16;14Hs clouds have pouchlike features that hang\e[16;57Hbeneath a cloud b\e[16;75Hse.\e[17;3H20\e[17;7HA shelf cloud\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;21Hcan\e[17;25Hform\e[17;30Halong\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;36Hthe\e[17;40Hleading\e[17;48Hedge\e[17;53Hof\e[17;56Ha\e[17;58Hthunderstorm’s\e[17;73Houtflow\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;24H\e[0m\e[K\e[17;4H1\e[17;7HVirga consists of\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[4;69H\e[0m\e[K\e[5;68H\e[0m\e[K\e[8;13H\e[0m\e[K\e[11;71H\e[0m\e[K\e[13;14H\e[0m\e[K\e[15;78H\e[0m\e[K\e[2;3H8\e[2;6HStrat\e[2;21Htypically form low, fairly uniform layers.\e[3;3H9\e[3;11Hocumul\e[3;18Hs clouds form low\e[3;37Hayers o\e[3;45H patches with rounded\e[3;67Hclumps.\e[4;3H10. Cirrus clo\e[4;18Hds are high, wispy clouds composed of ice crystals.\e[5;4H1\e[5;11Ho\e[5;13Htrat\e[5;18Hs clouds can\e[5;31Hproduce halos around the\e[5;56HSun\e[5;60Ho\e[5;62H Moon.\e[6;4H2\e[6;12Hcumul\e[6;27Hoften appear \e[6;41Hs rows of small white\e[6;63Hripples.\e[7;4H3\e[7;7HAltocumulus clouds often form patches of\e[7;48Hrounded cloud element\e[7;70H at\e[7;74Hmiddle\e[8;3H   levels.\e[9;3H14. Alto\e[9;12Htratus\e[9;19Hclouds\e[9;26Hcan\e[9;30Hmake\e[9;35Hthe\e[9;39HSun\e[9;43Hlook\e[9;48Hlike\e[9;53Ha\e[9;55Hblurred\e[9;63Hdisk.\e[10;4H5\e[10;7HNimbostratus clouds com\e[10;31Honly bring widespread, steady rain or\e[10;69Hsnow.\e[11;4H6\e[11;7HCu\e[11;10Hulonimb\e[11;28Han produce lightning, hail, an\e[11;59H he\e[11;63Hvy\e[11;66Hrain.\e[12;4H7\e[12;7HA \e[12;10Hature thunderstorm ca
+n develop an anvil-shaped top as its updraft\e[12;76Hspreads\e[13;3H   outw\e[13;11Hrd.\e[14;3H18. Lenticular\e[14;18Hclouds\e[14;25Hoften\e[14;31Hform\e[14;36Hin\e[14;39Hatmospheric\e[14;51Hwaves\e[14;57Hdownwind\e[14;66Hof\e[14;69Hmountains.\e[15;4H9\e[15;7HMammat\e[15;14Hs clouds have pouchlike features that hang\e[15;57Hbeneath a cloud b\e[15;75Hse.\e[16;3H20\e[16;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[16;73Houtflow.\e[17;25Hprecipitation\e[17;39Hthat\e[17;44Hevaporates\e[17;55Hor\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;58Hsublim\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;64Hates\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[3;69H\e[0m\e[K\e[4;68H\e[0m\e[K\e[7;13H\e[0m\e[K\e[10;71H\e[0m\e[K\e[12;14H\e[0m\e[K\e[14;78H\e[0m\e[K\e[16;75H\e[0m\e[K\e[17;12H\e[0m\e[K\e[2;3H9\e[2;11Hocumul\e[2;18Hs clouds form low\e[2;37Hayers o\e[2;45H patches with rounded\e[2;67Hclumps.\e[3;3H10. Cirrus clo\e[3;18Hds are high, wispy clouds composed of ice crystals.\e[4;4H1\e[4;11Ho\e[4;13Htrat\e[4;18Hs clouds can\e[4;31Hproduce halos around the\e[4;56HSun\e[4;60Ho\e[4;62H Moon.\e[5;4H2\e[5;12Hcumul\e[5;27Hoften appear \e[5;41Hs rows of small white\e[5;63Hripples.\e[6;4H3\e[6;7HAltocumulus clouds often form patches of\e[6;48Hrounded cloud element\e[6;70H at\e[6;74Hmiddle\e[7;3H   levels.\e[8;3H14. Alto\e[8;12Htratus\e[8;19Hclouds\e[8;26Hcan\e[8;30Hmake\e[8;35Hthe\e[8;39HSun\e[8;43Hlook\e[8;48Hlike\e[8;53Ha\e[8;55Hblurred\e[8;63Hdisk.\e[9;4H5\e[9;7HNimbostratus clouds com\e[9;31Honly bring widespread, steady rain or\e[9;69Hsnow.\e[10;4H6\e[10;7HCu\e[10;10Hulonimb\e[10;28Han produce lightning, hail, an\e[10;59H he\e[10;63Hvy\e[10;66Hrain.\e[11;4H7\e[11;7HA \e[11;10Hature thunderstorm can develop an anvil-shaped t
+op as its updraft\e[11;76Hspreads\e[12;3H   outw\e[12;11Hrd.\e[13;3H18. Lenticular\e[13;18Hclouds\e[13;25Hoften\e[13;31Hform\e[13;36Hin\e[13;39Hatmospheric\e[13;51Hwaves\e[13;57Hdownwind\e[13;66Hof\e[13;69Hmountains.\e[14;4H9\e[14;7HMammat\e[14;14Hs clouds have pouchlike features that hang\e[14;57Hbeneath a cloud b\e[14;75Hse.\e[15;3H20\e[15;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[15;73Houtflow.\e[16;4H1\e[16;7HVirga consists of\e[16;25Hprecipitation that evaporates or\e[16;58Hsublimates before\e[17;4H2\e[17;7HContr\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;69H\e[0m\e[K\e[3;68H\e[0m\e[K\e[6;13H\e[0m\e[K\e[9;71H\e[0m\e[K\e[11;14H\e[0m\e[K\e[13;78H\e[0m\e[K\e[15;75H\e[0m\e[K\e[16;26H\e[0m\e[K\e[2;3H10. Cirrus clo\e[2;18Hds are high, wispy clouds composed of ice crystals.\e[3;4H1\e[3;11Ho\e[3;13Htrat\e[3;18Hs clouds can\e[3;31Hproduce halos around the\e[3;56HSun\e[3;60Ho\e[3;62H Moon.\e[4;4H2\e[4;12Hcumul\e[4;27Hoften appear \e[4;41Hs rows of small white\e[4;63Hripples.\e[5;4H3\e[5;7HAltocumulus clouds often form patches of\e[5;48Hrounded cloud element\e[5;70H at\e[5;74Hmiddle\e[6;3H   levels.\e[7;3H14. Alto\e[7;12Htratus\e[7;19Hclouds\e[7;26Hcan\e[7;30Hmake\e[7;35Hthe\e[7;39HSun\e[7;43Hlook\e[7;48Hlike\e[7;53Ha\e[7;55Hblurred\e[7;63Hdisk.\e[8;4H5\e[8;7HNimbostratus clouds com\e[8;31Honly bring widespread, steady rain or\e[8;69Hsnow.\e[9;4H6\e[9;7HCu\e[9;10Hulonimb\e[9;28Han produce lightning, hail, an\e[9;59H he\e[9;63Hvy\e[9;66Hrain.\e[10;4H7\e[10;7HA \e[10;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[10;76Hspreads\e[11;3H   outw\e[11;11Hrd.\e[12;3H18. Lenticular\e[12;18Hclouds\e[12;25Hoften\e[12;31Hform\e[12;
+36Hin\e[12;39Hatmospheric\e[12;51Hwaves\e[12;57Hdownwind\e[12;66Hof\e[12;69Hmountains.\e[13;4H9\e[13;7HMammat\e[13;14Hs clouds have pouchlike features that hang\e[13;57Hbeneath a cloud b\e[13;75Hse.\e[14;3H20\e[14;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[14;73Houtflow.\e[15;4H1\e[15;7HVirga consists of\e[15;25Hprecipitation that evaporates or\e[15;58Hsublimates before\e[16;3H   reaching the ground.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;12Hails\e[17;17Hform\e[17;22Hwhen\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;27Hwater\e[17;33Hvapor\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;39Hcondenses\e[17;49Hand\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;53Hfreezes\e[17;61Hin\e[17;64Hthe\e[17;68Hcold\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;73Hair\e[17;77Hbehind\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;68H\e[0m\e[K\e[5;13H\e[0m\e[K\e[8;71H\e[0m\e[K\e[10;14H\e[0m\e[K\e[12;78H\e[0m\e[K\e[14;75H\e[0m\e[K\e[15;26H\e[0m\e[K\e[17;15H\e[0m\e[K\e[2;4H1\e[2;11Ho\e[2;13Htrat\e[2;18Hs clouds can\e[2;31Hproduce halos around the\e[2;56HSun\e[2;60Ho\e[2;62H Moon.\e[3;4H2\e[3;12Hcumul\e[3;27Hoften appear \e[3;41Hs rows of small white\e[3;63Hripples.\e[4;4H3\e[4;7HAltocumulus clouds often form patches of\e[4;48Hrounded cloud element\e[4;70H at\e[4;74Hmiddle\e[5;3H   levels.\e[6;3H14. Alto\e[6;12Htratus\e[6;19Hclouds\e[6;26Hcan\e[6;30Hmake\e[6;35Hthe\e[6;39HSun\e[6;43Hlook\e[6;48Hlike\e[6;53Ha\e[6;55Hblurred\e[6;63Hdisk.\e[7;4H5\e[7;7HNimbostratus clouds com\e[7;31Honly bring widespread, steady rain or\e[7;69Hsnow.\e[8;4H6\e[8;7HCu\e[8;10Hulonimb\e[8;28Han produce lightning, hail, an\e[8;59H he\e[8;63Hvy\e[8;66Hrain.\e[9;4H7\e[9;7HA \e[9;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[9;76Hspreads\e[10;3H   outw\e[10;11Hrd.\e[11;3H18. Lenticular\e[11;18Hclouds\e[11;25Hoften\e[11;31Hform\e[11;36Hin\e[11;39Hatmospheric\e[11;51Hwaves\e[11;57Hdownwind\e[11;66Hof\e[11;69Hmountains.
+\e[12;4H9\e[12;7HMammat\e[12;14Hs clouds have pouchlike features that hang\e[12;57Hbeneath a cloud b\e[12;75Hse.\e[13;3H20\e[13;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[13;73Houtflow.\e[14;4H1\e[14;7HVirga consists of\e[14;25Hprecipitation that evaporates or\e[14;58Hsublimates before\e[15;3H   reaching the ground.\e[16;3H22. Contrails form when\e[16;27Hwater\e[16;33Hvapor\e[16;39Hcondenses\e[16;49Hand\e[16;53Hfreezes\e[16;61Hin\e[16;64Hthe\e[16;68Hcold\e[16;73Hair\e[16;77Hbehind\e[17;3H   aircraft.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[4;13H\e[0m\e[K\e[7;71H\e[0m\e[K\e[9;14H\e[0m\e[K\e[11;78H\e[0m\e[K\e[13;75H\e[0m\e[K\e[14;26H\e[0m\e[K\e[16;15H\e[0m\e[K\e[17;13H\e[0m\e[K\e[2;4H2\e[2;12Hcumul\e[2;27Hoften appear \e[2;41Hs rows of small white\e[2;63Hripples.\e[3;4H3\e[3;7HAltocumulus clouds often form patches of\e[3;48Hrounded cloud element\e[3;70H at\e[3;74Hmiddle\e[4;3H   levels.\e[5;3H14. Alto\e[5;12Htratus\e[5;19Hclouds\e[5;26Hcan\e[5;30Hmake\e[5;35Hthe\e[5;39HSun\e[5;43Hlook\e[5;48Hlike\e[5;53Ha\e[5;55Hblurred\e[5;63Hdisk.\e[6;4H5\e[6;7HNimbostratus clouds com\e[6;31Honly bring widespread, steady rain or\e[6;69Hsnow.\e[7;4H6\e[7;7HCu\e[7;10Hulonimb\e[7;28Han produce lightning, hail, an\e[7;59H he\e[7;63Hvy\e[7;66Hrain.\e[8;4H7\e[8;7HA \e[8;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[8;76Hspreads\e[9;3H   outw\e[9;11Hrd.\e[10;3H18. Lenticular\e[10;18Hclouds\e[10;25Hoften\e[10;31Hform\e[10;36Hin\e[10;39Hatmospheric\e[10;51Hwaves\e[10;57Hdownwind\e[10;66Hof\e[10;69Hmountains.\e[11;4H9\e[11;7HMammat\e[11;14Hs clouds have pouchlike features that hang\e[11;57Hbeneath a cloud b\e[11;75Hse.\e[
+12;3H20\e[12;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[12;73Houtflow.\e[13;4H1\e[13;7HVirga consists of\e[13;25Hprecipitation that evaporates or\e[13;58Hsublimates before\e[14;3H   reaching the ground.\e[15;3H22. Contrails form when\e[15;27Hwater\e[15;33Hvapor\e[15;39Hcondenses\e[15;49Hand\e[15;53Hfreezes\e[15;61Hin\e[15;64Hthe\e[15;68Hcold\e[15;73Hair\e[15;77Hbehind\e[16;3H   aircraft.\e[17;3H23. No\e[17;10Htil\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[17;13Hucent\e[17;19Hclouds\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;26Hform\e[17;31Hhigh\e[17;36Hin\e[17;39Hthe\e[17;43Hmes\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;46Hosphere\e[17;54Hand\e[17;58Hcan\e[17;62Hremain\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[2;68H\e[0m\e[K\e[3;71H\e[0m\e[K\e[5;13H\e[0m\e[K\e[6;68H\e[0m\e[K\e[8;71H\e[0m\e[K\e[10;14H\e[0m\e[K\e[12;78H\e[0m\e[K\e[15;26H\e[0m\e[K\e[17;15H\e[0m\e[K\e[2;4H1\e[2;12Hstrat\e[2;27Hcan produce h\e[2;41Hlos around the Sun or\e[2;63HMoon.\e[3;4H2\e[3;7HCirrocumulus clouds often appear as rows\e[3;48Hof small white ripple\e[3;70H.\e[4;3H13. Altocumulus\e[4;19Hclouds\e[4;26Hoften\e[4;32Hform\e[4;37Hpatches\e[4;45Hof\e[4;48Hrounded\e[4;56Hcloud\e[4;62Helements\e[4;71Hat\e[4;74Hmiddle\e[5;3H   level\e[5;12H.\e[6;4H4\e[6;7HAltostratus clouds can \e[6;31Hake the Sun look like a blurred disk.\e[7;4H5\e[7;7HNi\e[7;10Hbostrat\e[7;28Hommonly bring widespread, stea\e[7;59Hy r\e[7;63Hin\e[7;66Hor snow.\e[8;4H6\e[8;7HCu\e[8;10Hulonimbus clouds can produce lightning, hail, and heavy rain.\e[9;3H17. A m\e[9;11Hture\e[9;16Hthunderstorm\e[9;29Hcan\e[9;33Hdevelop\e[9;41Han\e[9;44Hanvil-shaped\e[9;57Htop\e[9;61Has\e[9;64Hits\e[9;68Hupdraft\e[9;76Hspreads\e[10;3H   outward.\e[11;4H8\e[11;7HLentic\e[11;14Hlar clouds often form in atmospheric waves\e[11;57Hdownwind of mount\e[11;75Hins.\e[12;3H19\e[12;7HMamm
+atus clouds have pouchlike features that hang beneath a cloud\e[12;73Hbase.\e[13;4H0\e[13;7HA shelf cloud can\e[13;25Hform along the leading edge of a\e[13;58Hthunderstorm’s outflow.\e[14;3H21. Virga consists of precipitation\e[14;39Hthat\e[14;44Hevaporates\e[14;55Hor\e[14;58Hsublimates\e[14;69Hbefore\e[15;3H   reaching the ground.\e[16;3H22. Contrails\e[16;17Hform\e[16;22Hwhen\e[16;27Hwater\e[16;33Hvapor\e[16;39Hcondenses\e[16;49Hand\e[16;53Hfreezes\e[16;61Hin\e[16;64Hthe\e[16;68Hcold\e[16;73Hair\e[16;77Hbehind\e[17;3H   air\e[17;10Hraft.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[3;13H\e[0m\e[K\e[4;68H\e[0m\e[K\e[8;14H\e[0m\e[K\e[9;79H\e[0m\e[K\e[12;75H\e[0m\e[K\e[13;26H\e[0m\e[K\e[15;15H\e[0m\e[K\e[16;81H\e[0m\e[K\e[2;4H3\e[2;7HAltocumulus clouds often f\e[2;34Hrm patche\e[2;45Hof rounded\e[2;56Hcloud elements\e[2;71Hat\e[2;74Hmiddle\e[3;3H   levels.\e[4;4H4\e[4;11Hstrat\e[4;26Hcan make the Sun lo\e[4;46Hk\e[4;48Hlike a blurred disk.\e[5;3H15. Nimbostratus\e[5;20Hclouds\e[5;27Hcommonly\e[5;36Hbring\e[5;42Hwidespread,\e[5;54Hsteady\e[5;61Hrain\e[5;66Hor\e[5;69Hsnow.\e[6;4H6\e[6;7HCumulonimbus clouds can produc\e[6;39Hlightning, hail, and heavy rain.\e[7;4H7\e[7;7HA \e[7;10Hature \e[7;17Hhunderstorm can develop an anvil-shaped top\e[7;61Has its updraft\e[7;76Hspreads\e[8;3H   outward.\e[9;4H8\e[9;7HLenticular cloud\e[9;24H \e[9;26Hften form in atmospheric w\e[9;53Hv\e[9;55Hs\e[9;57Hd\e[9;59Hwnwind of mountains.\e[10;3H19. Mammatus\e[10;16Hclouds\e[10;23Hhave\e[10;28Hpouchlike\e[10;38Hfeatures\e[10;47Hthat\e[10;52Hhang\e[10;57Hbeneath\e[10;65Ha\e[10;67Hcloud\e[10;73Hbase.\e[11;3H20\e[11;7HA shelf cloud can\e[11;25Hform al\e[11;33Hng\e[11;36Hthe leading edge of a
+ thunderstor\e[11;70H’s outflow.\e[12;3H21\e[12;7HVirg\e[12;12H consists of precipitation that \e[12;45Hvaporates or sublimates before\e[13;3H   reac\e[13;11Hing\e[13;15Hthe grou\e[13;24Hd.\e[14;4H2\e[14;7HContrails form\e[14;22Hwhen water vap\e[14;37Hr\e[14;39Hcondenses and freezes in th\e[14;67H cold air\e[14;77Hbehind\e[15;6Hair\e[15;10Hraft.\e[16;4H3\e[16;7HN\e[16;9Hc\e[16;11Hilucent clouds form high in\e[16;39Hthe me\e[16;46Ho\e[16;48Hphere and can remain sunlit after\e[17;3H24. Polar stratospheric\e[17;27Hclouds\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;13H\e[0m\e[K\e[5;71H\e[0m\e[K\e[7;14H\e[0m\e[K\e[9;78H\e[0m\e[K\e[11;75H\e[0m\e[K\e[12;26H\e[0m\e[K\e[14;15H\e[0m\e[K\e[16;13H\e[0m\e[K\e[2;3H   levels.\e[3;3H14. Alto\e[3;12Htratus\e[3;19Hclouds\e[3;26Hcan\e[3;30Hmake\e[3;35Hthe\e[3;39HSun\e[3;43Hlook\e[3;48Hlike\e[3;53Ha\e[3;55Hblurred\e[3;63Hdisk.\e[4;4H5\e[4;7HNimbostratus clouds com\e[4;31Honly bring widespread, steady rain or\e[4;69Hsnow.\e[5;4H6\e[5;7HCu\e[5;10Hulonimb\e[5;28Han produce lightning, hail, an\e[5;59H he\e[5;63Hvy\e[5;66Hrain.\e[6;4H7\e[6;7HA \e[6;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[6;76Hspreads\e[7;3H   outw\e[7;11Hrd.\e[8;3H18. Lenticular\e[8;18Hclouds\e[8;25Hoften\e[8;31Hform\e[8;36Hin\e[8;39Hatmospheric\e[8;51Hwaves\e[8;57Hdownwind\e[8;66Hof\e[8;69Hmountains.\e[9;4H9\e[9;7HMammat\e[9;14Hs clouds have pouchlike features that hang\e[9;57Hbeneath a cloud b\e[9;75Hse.\e[10;3H20\e[10;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[10;73Houtflow.\e[11;4H1\e[11;7HVirga consists of\e[11;25Hprecipitation that evaporates or\e[11;58Hsublimates before\e[12;3H\x20
+  reaching the ground.\e[13;3H22. Contrails form when\e[13;27Hwater\e[13;33Hvapor\e[13;39Hcondenses\e[13;49Hand\e[13;53Hfreezes\e[13;61Hin\e[13;64Hthe\e[13;68Hcold\e[13;73Hair\e[13;77Hbehind\e[14;3H   aircraft.\e[15;3H23. No\e[15;10Htilucent\e[15;19Hclouds\e[15;26Hform\e[15;31Hhigh\e[15;36Hin\e[15;39Hthe\e[15;43Hmesosphere\e[15;54Hand\e[15;58Hcan\e[15;62Hremain\e[15;69Hsunlit\e[15;76Hafter\e[16;3H   sunset.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;34Hcan\e[17;38Hform\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[3;13H\e[0m\e[K\e[4;68H\e[0m\e[K\e[6;71H\e[0m\e[K\e[8;14H\e[0m\e[K\e[10;78H\e[0m\e[K\e[13;26H\e[0m\e[K\e[15;15H\e[0m\e[K\e[17;13H\e[0m\e[K\e[2;3H13. Altocumulus\e[2;19Hclouds\e[2;26Hoften\e[2;32Hform\e[2;37Hpatches\e[2;45Hof\e[2;48Hrounded\e[2;56Hcloud\e[2;62Helements\e[2;71Hat\e[2;74Hmiddle\e[3;3H   level\e[3;12H.\e[4;4H4\e[4;7HAltostratus clouds can \e[4;31Hake the Sun look like a blurred disk.\e[5;4H5\e[5;7HNi\e[5;10Hbostrat\e[5;28Hommonly bring widespread, stea\e[5;59Hy r\e[5;63Hin\e[5;66Hor snow.\e[6;4H6\e[6;7HCu\e[6;10Hulonimbus clouds can produce lightning, hail, and heavy rain.\e[7;3H17. A m\e[7;11Hture\e[7;16Hthunderstorm\e[7;29Hcan\e[7;33Hdevelop\e[7;41Han\e[7;44Hanvil-shaped\e[7;57Htop\e[7;61Has\e[7;64Hits\e[7;68Hupdraft\e[7;76Hspreads\e[8;3H   outward.\e[9;4H8\e[9;7HLentic\e[9;14Hlar clouds often form in atmospheric waves\e[9;57Hdownwind of mount\e[9;75Hins.\e[10;3H19\e[10;7HMammatus clouds have pouchlike features that hang beneath a cloud\e[10;73Hbase.\e[11;4H0\e[11;7HA shelf cloud can\e[11;25Hform along the leading edge of a\e[11;58Hthunderstorm’s outflow.\e[12;3H21
+. Virga consists of precipitation\e[12;39Hthat\e[12;44Hevaporates\e[12;55Hor\e[12;58Hsublimates\e[12;69Hbefore\e[13;3H   reaching the ground.\e[14;3H22. Contrails\e[14;17Hform\e[14;22Hwhen\e[14;27Hwater\e[14;33Hvapor\e[14;39Hcondenses\e[14;49Hand\e[14;53Hfreezes\e[14;61Hin\e[14;64Hthe\e[14;68Hcold\e[14;73Hair\e[14;77Hbehind\e[15;3H   air\e[15;10Hraft.\e[16;3H23. Noctilucent\e[16;19Hclouds\e[16;26Hform\e[16;31Hhigh\e[16;36Hin\e[16;39Hthe\e[16;43Hmesosphere\e[16;54Hand\e[16;58Hcan\e[16;62Hremain\e[16;69Hsunlit\e[16;76Hafter\e[17;3H   sunset.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;68H\e[0m\e[K\e[6;14H\e[0m\e[K\e[7;79H\e[0m\e[K\e[10;75H\e[0m\e[K\e[11;26H\e[0m\e[K\e[13;15H\e[0m\e[K\e[14;81H\e[0m\e[K\e[15;13H\e[0m\e[K\e[2;4H4\e[2;11Hstrat\e[2;26Hcan make the Sun lo\e[2;46Hk\e[2;48Hlike a blurred disk.\e[3;3H15. Nimbostratus\e[3;20Hclouds\e[3;27Hcommonly\e[3;36Hbring\e[3;42Hwidespread,\e[3;54Hsteady\e[3;61Hrain\e[3;66Hor\e[3;69Hsnow.\e[4;4H6\e[4;7HCumulonimbus clouds can produc\e[4;39Hlightning, hail, and heavy rain.\e[5;4H7\e[5;7HA \e[5;10Hature \e[5;17Hhunderstorm can develop an anvil-shaped top\e[5;61Has its updraft\e[5;76Hspreads\e[6;3H   outward.\e[7;4H8\e[7;7HLenticular cloud\e[7;24H \e[7;26Hften form in atmospheric w\e[7;53Hv\e[7;55Hs\e[7;57Hd\e[7;59Hwnwind of mountains.\e[8;3H19. Mammatus\e[8;16Hclouds\e[8;23Hhave\e[8;28Hpouchlike\e[8;38Hfeatures\e[8;47Hthat\e[8;52Hhang\e[8;57Hbeneath\e[8;65Ha\e[8;67Hcloud\e[8;73Hbase.\e[9;3H20\e[9;7HA shelf cloud can\e[9;25Hform al\e[9;33Hng\e[9;36Hthe leading edge of a thunderstor\e[9;70H’s outflow.\e[10;3H21\e[10;7HVirg\e[10;12H consists of precipitation that \e[10;45Hvaporates or sublimates before\e[11;3H   reac\e[
+11;11Hing\e[11;15Hthe grou\e[11;24Hd.\e[12;4H2\e[12;7HContrails form\e[12;22Hwhen water vap\e[12;37Hr\e[12;39Hcondenses and freezes in th\e[12;67H cold air\e[12;77Hbehind\e[13;6Hair\e[13;10Hraft.\e[14;4H3\e[14;7HN\e[14;9Hc\e[14;11Hilucent clouds form high in\e[14;39Hthe me\e[14;46Ho\e[14;48Hphere and can remain sunlit after\e[15;6Hsunset.\e[16;4H4\e[16;7HP\e[16;9Hlar stra\e[16;18Hospheric clouds can form\e[16;43Hduring \e[16;51Hxception\e[16;60Hlly cold\e[16;69Hpolar win\e[16;81Hs.\e[17;3H25. Clouds\e[17;14Hcan\e[17;18Hcontain\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;26Hliquid\e[17;33Hwater\e[17;39Hdroplets\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;48Hat\e[17;51Htemperatures\e[17;64Hbelow\e[17;70Hfreezing\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;5H\e[0m\e[K\e[17;3H26\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;3H26. Large\e[17;13Hwildfires\e[17;23Hcan\e[17;27Hgenerate\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[3;71H\e[0m\e[K\e[5;14H\e[0m\e[K\e[7;78H\e[0m\e[K\e[9;75H\e[0m\e[K\e[10;26H\e[0m\e[K\e[12;15H\e[0m\e[K\e[14;13H\e[0m\e[K\e[16;79H\e[0m\e[K\e[2;4H5\e[2;7HNimbostratus clouds com\e[2;31Honly bring widespread, steady rain or\e[2;69Hsnow.\e[3;4H6\e[3;7HCu\e[3;10Hulonimb\e[3;28Han produce lightning, hail, an\e[3;59H he\e[3;63Hvy\e[3;66Hrain.\e[4;4H7\e[4;7HA \e[4;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[4;76Hspreads\e[5;3H   outw\e[5;11Hrd.\e[6;3H18. Lenticular\e[6;18Hclouds\e[6;25Hoften\e[6;31Hform\e[6;36Hin\e[6;39Hatmospheric\e[6;51Hwaves\e[6;57Hdownwind\e[6;66Hof\e[6;69Hmountains.\e[7;4H9\e[7;7HMammat\e[7;14Hs clouds have pouchlike features that hang\e[7;57Hbeneath a cloud b\e[7;75Hse.\e[8;3H20\e[8;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[8;73Houtflow.\e[9;4H1\e[9;7HVirga consists of\e[9;25Hprecipitation that evaporates or\e[9;58Hsublimates before\e[10;3H   reaching the ground.\e[11;3H22. Contrails form when\e[11;27Hwater\e[11;33Hvapor\e[11;39Hcondenses\e[11;49Hand\e[11;53Hfreezes\e[11;61Hin\e[11;64Hthe\e[11;68Hcold\e[11;7
+3Hair\e[11;77Hbehind\e[12;3H   aircraft.\e[13;3H23. No\e[13;10Htilucent\e[13;19Hclouds\e[13;26Hform\e[13;31Hhigh\e[13;36Hin\e[13;39Hthe\e[13;43Hmesosphere\e[13;54Hand\e[13;58Hcan\e[13;62Hremain\e[13;69Hsunlit\e[13;76Hafter\e[14;3H   sunset.\e[15;3H24. Polar stratospheric\e[15;27Hclouds\e[15;34Hcan\e[15;38Hform\e[15;43Hduring\e[15;50Hexceptionally\e[15;64Hcold\e[15;69Hpolar\e[15;75Hwinters.\e[16;4H5\e[16;7HClouds can contain liqui\e[16;32H water d\e[16;41Hoplets at tem\e[16;55Heratures\e[16;64Hbe\e[16;67How freezing.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;36Hclouds\e[17;43Hcalled\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[?25l\e[17;50Hpyroc\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[2;68H\e[0m\e[K\e[4;71H\e[0m\e[K\e[6;14H\e[0m\e[K\e[8;78H\e[0m\e[K\e[11;26H\e[0m\e[K\e[13;15H\e[0m\e[K\e[15;13H\e[0m\e[K\e[2;4H4\e[2;7HAltostratus clouds can \e[2;31Hake the Sun look like a blurred disk.\e[3;4H5\e[3;7HNi\e[3;10Hbostrat\e[3;28Hommonly bring widespread, stea\e[3;59Hy r\e[3;63Hin\e[3;66Hor snow.\e[4;4H6\e[4;7HCu\e[4;10Hulonimbus clouds can produce lightning, hail, and heavy rain.\e[5;3H17. A m\e[5;11Hture\e[5;16Hthunderstorm\e[5;29Hcan\e[5;33Hdevelop\e[5;41Han\e[5;44Hanvil-shaped\e[5;57Htop\e[5;61Has\e[5;64Hits\e[5;68Hupdraft\e[5;76Hspreads\e[6;3H   outward.\e[7;4H8\e[7;7HLentic\e[7;14Hlar clouds often form in atmospheric waves\e[7;57Hdownwind of mount\e[7;75Hins.\e[8;3H19\e[8;7HMammatus clouds have pouchlike features that hang beneath a cloud\e[8;73Hbase.\e[9;4H0\e[9;7HA shelf cloud can\e[9;25Hform along the leading edge of a\e[9;58Hthunderstorm’s outflow.\e[10;3H21. Virga consists of precipitation\e[10;39Hthat\e[10;44Hevaporates\e[10;55Hor\e[10;58Hsublimates\e[10;69Hbefore\e[11;3H   reaching the ground.\e[12;3H22. Contrails\e[12;17Hform\e[12;22Hwhen\e[12;27H
+water\e[12;33Hvapor\e[12;39Hcondenses\e[12;49Hand\e[12;53Hfreezes\e[12;61Hin\e[12;64Hthe\e[12;68Hcold\e[12;73Hair\e[12;77Hbehind\e[13;3H   air\e[13;10Hraft.\e[14;3H23. Noctilucent\e[14;19Hclouds\e[14;26Hform\e[14;31Hhigh\e[14;36Hin\e[14;39Hthe\e[14;43Hmesosphere\e[14;54Hand\e[14;58Hcan\e[14;62Hremain\e[14;69Hsunlit\e[14;76Hafter\e[15;3H   sunset.\e[16;4H4\e[16;7HPolar stratospheric clou\e[16;32Hs can fo\e[16;41Hm during exce\e[16;55Htionally\e[16;64Hco\e[16;67Hd polar winters.\e[17;4H5\e[17;7HClouds can contain liquid water droplets at temperatures\e[17;64Hbelow\e[17;70Hfreezing.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[3;71H\e[0m\e[K\e[5;14H\e[0m\e[K\e[7;78H\e[0m\e[K\e[9;75H\e[0m\e[K\e[10;26H\e[0m\e[K\e[12;15H\e[0m\e[K\e[14;13H\e[0m\e[K\e[16;79H\e[0m\e[K\e[17;30H\e[0m\e[K\e[2;4H5\e[2;7HNimbostratus clouds com\e[2;31Honly bring widespread, steady rain or\e[2;69Hsnow.\e[3;4H6\e[3;7HCu\e[3;10Hulonimb\e[3;28Han produce lightning, hail, an\e[3;59H he\e[3;63Hvy\e[3;66Hrain.\e[4;4H7\e[4;7HA \e[4;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[4;76Hspreads\e[5;3H   outw\e[5;11Hrd.\e[6;3H18. Lenticular\e[6;18Hclouds\e[6;25Hoften\e[6;31Hform\e[6;36Hin\e[6;39Hatmospheric\e[6;51Hwaves\e[6;57Hdownwind\e[6;66Hof\e[6;69Hmountains.\e[7;4H9\e[7;7HMammat\e[7;14Hs clouds have pouchlike features that hang\e[7;57Hbeneath a cloud b\e[7;75Hse.\e[8;3H20\e[8;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[8;73Houtflow.\e[9;4H1\e[9;7HVirga consists of\e[9;25Hprecipitation that evaporates or\e[9;58Hsublimates before\e[10;3H   reaching the ground.\e[11;3H22. Contrails form when\e[11;27Hwater\e[11;33Hvapor\e[11;39Hcondenses\e[11;49Hand\e[11;53Hfreezes\e[11;61Hin\e[11;64Hthe\e[1
+1;68Hcold\e[11;73Hair\e[11;77Hbehind\e[12;3H   aircraft.\e[13;3H23. No\e[13;10Htilucent\e[13;19Hclouds\e[13;26Hform\e[13;31Hhigh\e[13;36Hin\e[13;39Hthe\e[13;43Hmesosphere\e[13;54Hand\e[13;58Hcan\e[13;62Hremain\e[13;69Hsunlit\e[13;76Hafter\e[14;3H   sunset.\e[15;3H24. Polar stratospheric\e[15;27Hclouds\e[15;34Hcan\e[15;38Hform\e[15;43Hduring\e[15;50Hexceptionally\e[15;64Hcold\e[15;69Hpolar\e[15;75Hwinters.\e[16;4H5\e[16;7HClouds can contain liqui\e[16;32H water d\e[16;41Hoplets at tem\e[16;55Heratures\e[16;64Hbe\e[16;67How freezing.\e[17;4H7\e[17;20Hol Earth’s\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;71H\e[0m\e[K\e[4;14H\e[0m\e[K\e[6;78H\e[0m\e[K\e[8;75H\e[0m\e[K\e[9;26H\e[0m\e[K\e[11;15H\e[0m\e[K\e[13;13H\e[0m\e[K\e[15;79H\e[0m\e[K\e[16;62H\e[0m\e[K\e[2;4H6\e[2;7HCu\e[2;10Hulonimb\e[2;28Han produce lightning, hail, an\e[2;59H he\e[2;63Hvy\e[2;66Hrain.\e[3;4H7\e[3;7HA \e[3;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[3;76Hspreads\e[4;3H   outw\e[4;11Hrd.\e[5;3H18. Lenticular\e[5;18Hclouds\e[5;25Hoften\e[5;31Hform\e[5;36Hin\e[5;39Hatmospheric\e[5;51Hwaves\e[5;57Hdownwind\e[5;66Hof\e[5;69Hmountains.\e[6;4H9\e[6;7HMammat\e[6;14Hs clouds have pouchlike features that hang\e[6;57Hbeneath a cloud b\e[6;75Hse.\e[7;3H20\e[7;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[7;73Houtflow.\e[8;4H1\e[8;7HVirga consists of\e[8;25Hprecipitation that evaporates or\e[8;58Hsublimates before\e[9;3H   reaching the ground.\e[10;3H22. Contrails form when\e[10;27Hwater\e[10;33Hvapor\e[10;39Hcondenses\e[10;49Hand\e[10;53Hfreezes\e[10;61Hin\e[10;64Hthe\e[10;68Hcold\e[10;73Hair\e[10;77Hbehind\e[11;3H   aircraft.\e[12;3H23. No\e[12;10Htilucent\e[12;19Hclou
+ds\e[12;26Hform\e[12;31Hhigh\e[12;36Hin\e[12;39Hthe\e[12;43Hmesosphere\e[12;54Hand\e[12;58Hcan\e[12;62Hremain\e[12;69Hsunlit\e[12;76Hafter\e[13;3H   sunset.\e[14;3H24. Polar stratospheric\e[14;27Hclouds\e[14;34Hcan\e[14;38Hform\e[14;43Hduring\e[14;50Hexceptionally\e[14;64Hcold\e[14;69Hpolar\e[14;75Hwinters.\e[15;4H5\e[15;7HClouds can contain liqui\e[15;32H water d\e[15;41Hoplets at tem\e[15;55Heratures\e[15;64Hbe\e[15;67How freezing.\e[16;4H6\e[16;7HLarge wildfires can generate clouds called pyrocumul\e[16;60Hs.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[17;31Hsurface\e[17;39Hby\e[17;42Hreflecting\e[17;53Hincoming\e[17;62Hsunlight\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[3;14H\e[0m\e[K\e[5;78H\e[0m\e[K\e[7;75H\e[0m\e[K\e[8;26H\e[0m\e[K\e[10;15H\e[0m\e[K\e[12;13H\e[0m\e[K\e[14;79H\e[0m\e[K\e[15;62H\e[0m\e[K\e[17;28H\e[0m\e[K\e[2;4H7\e[2;7HA \e[2;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[2;76Hspreads\e[3;3H   outw\e[3;11Hrd.\e[4;3H18. Lenticular\e[4;18Hclouds\e[4;25Hoften\e[4;31Hform\e[4;36Hin\e[4;39Hatmospheric\e[4;51Hwaves\e[4;57Hdownwind\e[4;66Hof\e[4;69Hmountains.\e[5;4H9\e[5;7HMammat\e[5;14Hs clouds have pouchlike features that hang\e[5;57Hbeneath a cloud b\e[5;75Hse.\e[6;3H20\e[6;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[6;73Houtflow.\e[7;4H1\e[7;7HVirga consists of\e[7;25Hprecipitation that evaporates or\e[7;58Hsublimates before\e[8;3H   reaching the ground.\e[9;3H22. Contrails form when\e[9;27Hwater\e[9;33Hvapor\e[9;39Hcondenses\e[9;49Hand\e[9;53Hfreezes\e[9;61Hin\e[9;64Hthe\e[9;68Hcold\e[9;73Hair\e[9;77Hbehind\e[10;3H   aircraft.\e[11;3H23. No\e[11;10Htilucent\e[11;19Hclouds\e[11;26Hform\e[11;31Hhigh\e[11;36Hin\e[11;39Hthe\e[11;43Hmesosphere\e[11;54Hand\e[11;58Hcan\e[11;62Hremain\e[11;6
+9Hsunlit\e[11;76Hafter\e[12;3H   sunset.\e[13;3H24. Polar stratospheric\e[13;27Hclouds\e[13;34Hcan\e[13;38Hform\e[13;43Hduring\e[13;50Hexceptionally\e[13;64Hcold\e[13;69Hpolar\e[13;75Hwinters.\e[14;4H5\e[14;7HClouds can contain liqui\e[14;32H water d\e[14;41Hoplets at tem\e[14;55Heratures\e[14;64Hbe\e[14;67How freezing.\e[15;4H6\e[15;7HLarge wildfires can generate clouds called pyrocumul\e[15;60Hs.\e[16;4H7\e[16;7HClouds can cool\e[16;23HE\e[16;25Hrth’s surfa\e[16;37He by ref\e[16;46Hecting incoming sunlight.\e[17;4H8\e[17;18Hwarm\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;28H’s\e[17;31Hsurface\e[17;39Hby\e[17;42Habsorbing\e[17;52Hand\e[17;56Hre\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;58H-emitting\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;6H\e[0m\e[K\e[17;4H9\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[?25l\e[17;7HWeather\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;79H\e[0m\e[K\e[5;75H\e[0m\e[K\e[6;26H\e[0m\e[K\e[8;15H\e[0m\e[K\e[9;81H\e[0m\e[K\e[10;13H\e[0m\e[K\e[13;62H\e[0m\e[K\e[14;71H\e[0m\e[K\e[16;25H\e[0m\e[K\e[2;4H8\e[2;7HLenticular cloud\e[2;24H \e[2;26Hften form in atmospheric w\e[2;53Hv\e[2;55Hs\e[2;57Hd\e[2;59Hwnwind of mountains.\e[3;3H19. Mammatus\e[3;16Hclouds\e[3;23Hhave\e[3;28Hpouchlike\e[3;38Hfeatures\e[3;47Hthat\e[3;52Hhang\e[3;57Hbeneath\e[3;65Ha\e[3;67Hcloud\e[3;73Hbase.\e[4;3H20\e[4;7HA shelf cloud can\e[4;25Hform al\e[4;33Hng\e[4;36Hthe leading edge of a thunderstor\e[4;70H’s outflow.\e[5;3H21\e[5;7HVirg\e[5;12H consists of precipitation that \e[5;45Hvaporates or sublimates before\e[6;3H   reac\e[6;11Hing\e[6;15Hthe grou\e[6;24Hd.\e[7;4H2\e[7;7HContrails form\e[7;22Hwhen water vap\e[7;37Hr\e[7;39Hcondenses and freezes in th\e[7;67H cold air\e[7;77Hbehind\e[8;6Hair\e[8;10Hraft.\e[9;4H3\e[9;7HN\e[9;9Hc\e[9;11Hilucent clouds form high in\e[9;39Hthe me\e[9;46Ho\e[9;48Hphere and can remain sunlit after\e[10;6Hsunset.\e[11;4H4\e[11;7HP\e[11;9Hlar stra\e[11;18Hospheric clouds can form\e[11;43Hduring \e[11;51Hxception\e[11;60Hlly c
+old\e[11;69Hpolar win\e[11;81Hs.\e[12;3H25. Clouds\e[12;14Hcan\e[12;18Hcontain\e[12;26Hliquid\e[12;33Hwater\e[12;39Hdroplets\e[12;48Hat\e[12;51Htemperatures\e[12;64Hbelow\e[12;70Hfreezing.\e[13;4H6\e[13;7HLarge\e[13;13Hwildfires can\e[13;27Hgenerate clouds\e[13;43Hcalled\e[13;50Hpyrocumulus.\e[14;4H7\e[14;20Hol Earth’s surface\e[14;39Hby reflecting incoming \e[14;63Hunlight.\e[15;4H8\e[15;7HClouds can warm\e[15;23HE\e[15;25Hrth’s surfa\e[15;37He by absorbing and re-emitting\e[15;68Houtgoing\e[16;3H   infrared radiation.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[17;15Hsatellites\e[17;26Huse\e[17;30Hinfrared\e[17;39Hmeasurements\e[17;52Hto\e[17;55Hestimate\e[17;64Hcloud-top\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;6H\e[0m\e[K\e[17;3H30\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;78H\e[0m\e[K\e[4;75H\e[0m\e[K\e[5;26H\e[0m\e[K\e[7;15H\e[0m\e[K\e[9;13H\e[0m\e[K\e[11;79H\e[0m\e[K\e[12;62H\e[0m\e[K\e[15;25H\e[0m\e[K\e[2;4H9\e[2;7HMammat\e[2;14Hs clouds have pouchlike features that hang\e[2;57Hbeneath a cloud b\e[2;75Hse.\e[3;3H20\e[3;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[3;73Houtflow.\e[4;4H1\e[4;7HVirga consists of\e[4;25Hprecipitation that evaporates or\e[4;58Hsublimates before\e[5;3H   reaching the ground.\e[6;3H22. Contrails form when\e[6;27Hwater\e[6;33Hvapor\e[6;39Hcondenses\e[6;49Hand\e[6;53Hfreezes\e[6;61Hin\e[6;64Hthe\e[6;68Hcold\e[6;73Hair\e[6;77Hbehind\e[7;3H   aircraft.\e[8;3H23. No\e[8;10Htilucent\e[8;19Hclouds\e[8;26Hform\e[8;31Hhigh\e[8;36Hin\e[8;39Hthe\e[8;43Hmesosphere\e[8;54Hand\e[8;58Hcan\e[8;62Hremain\e[8;69Hsunlit\e[8;76Hafter\e[9;3H   sunset.\e[10;3H24. Polar stratospheric\e[10;27Hclouds\e[10;34Hcan\e[10;38Hform\e[10;43Hduring\e[10;50Hexceptionally\e[10;64Hcold\e[10;69Hpolar\e[10;75Hwinters.\e[11;4H5\e[11;7HClouds can contain liqui\e[11;32H water d\e[11;41Hoplets at tem\e[11;55Heratures\e[11;64Hbe\e[11;67H
+ow freezing.\e[12;4H6\e[12;7HLarge wildfires can generate clouds called pyrocumul\e[12;60Hs.\e[13;4H7\e[13;7HClouds can cool\e[13;23HE\e[13;25Hrth’s surfa\e[13;37He by ref\e[13;46Hecting incoming sunlight.\e[14;4H8\e[14;18Hwarm\e[14;42Habsorbing and re-emitting outgoing\e[15;3H   infrared radi\e[15;20Htion.\e[16;3H29. Weath\e[16;13Hr\e[16;15Hs\e[16;17Htell\e[16;22Htes\e[16;26Huse\e[16;30Hinfrared\e[16;39Hmeasurements\e[16;52Hto\e[16;55Hestimate\e[16;64Hcloud-top\e[17;7HA\e[17;9Hceilometer\e[17;20Huses\e[17;25Hlaser\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[3;75H\e[0m\e[K\e[4;26H\e[0m\e[K\e[6;15H\e[0m\e[K\e[8;13H\e[0m\e[K\e[10;79H\e[0m\e[K\e[11;62H\e[0m\e[K\e[14;25H\e[0m\e[K\e[16;19H\e[0m\e[K\e[2;3H20\e[2;7HA shelf cloud can form along the leading edge of a thunderstorm’s\e[2;73Houtflow.\e[3;4H1\e[3;7HVirga consists of\e[3;25Hprecipitation that evaporates or\e[3;58Hsublimates before\e[4;3H   reaching the ground.\e[5;3H22. Contrails form when\e[5;27Hwater\e[5;33Hvapor\e[5;39Hcondenses\e[5;49Hand\e[5;53Hfreezes\e[5;61Hin\e[5;64Hthe\e[5;68Hcold\e[5;73Hair\e[5;77Hbehind\e[6;3H   aircraft.\e[7;3H23. No\e[7;10Htilucent\e[7;19Hclouds\e[7;26Hform\e[7;31Hhigh\e[7;36Hin\e[7;39Hthe\e[7;43Hmesosphere\e[7;54Hand\e[7;58Hcan\e[7;62Hremain\e[7;69Hsunlit\e[7;76Hafter\e[8;3H   sunset.\e[9;3H24. Polar stratospheric\e[9;27Hclouds\e[9;34Hcan\e[9;38Hform\e[9;43Hduring\e[9;50Hexceptionally\e[9;64Hcold\e[9;69Hpolar\e[9;75Hwinters.\e[10;4H5\e[10;7HClouds can contain liqui\e[10;32H water d\e[10;41Hoplets at tem\e[10;55Heratures\e[10;64Hbe\e[10;67How freezing.\e[11;4H6\e[11;7HLarge wildfires can generate clouds called pyrocumul\e[11;60Hs.\e[12;4H
+7\e[12;7HClouds can cool\e[12;23HE\e[12;25Hrth’s surfa\e[12;37He by ref\e[12;46Hecting incoming sunlight.\e[13;4H8\e[13;18Hwarm\e[13;42Habsorbing and re-emitting outgoing\e[14;3H   infrared radi\e[14;20Htion.\e[15;3H29. Weath\e[15;13Hr\e[15;15Hs\e[15;17Htell\e[15;22Htes\e[15;26Huse\e[15;30Hinfrared\e[15;39Hmeasurements\e[15;52Hto\e[15;55Hestimate\e[15;64Hcloud-top\e[16;3H   temperatures.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e]0;⠙ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;31Hpulses\e[17;38Hto\e[17;41Hmeasure\e[17;49Hthe\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;6H\e[0m\e[K\e[17;4H1\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;75H\e[0m\e[K\e[3;26H\e[0m\e[K\e[5;15H\e[0m\e[K\e[7;13H\e[0m\e[K\e[9;79H\e[0m\e[K\e[10;62H\e[0m\e[K\e[13;25H\e[0m\e[K\e[15;19H\e[0m\e[K\e[2;4H1\e[2;7HVirga consists of\e[2;25Hprecipitation that evaporates or\e[2;58Hsublimates before\e[3;3H   reaching the ground.\e[4;3H22. Contrails form when\e[4;27Hwater\e[4;33Hvapor\e[4;39Hcondenses\e[4;49Hand\e[4;53Hfreezes\e[4;61Hin\e[4;64Hthe\e[4;68Hcold\e[4;73Hair\e[4;77Hbehind\e[5;3H   aircraft.\e[6;3H23. No\e[6;10Htilucent\e[6;19Hclouds\e[6;26Hform\e[6;31Hhigh\e[6;36Hin\e[6;39Hthe\e[6;43Hmesosphere\e[6;54Hand\e[6;58Hcan\e[6;62Hremain\e[6;69Hsunlit\e[6;76Hafter\e[7;3H   sunset.\e[8;3H24. Polar stratospheric\e[8;27Hclouds\e[8;34Hcan\e[8;38Hform\e[8;43Hduring\e[8;50Hexceptionally\e[8;64Hcold\e[8;69Hpolar\e[8;75Hwinters.\e[9;4H5\e[9;7HClouds can contain liqui\e[9;32H water d\e[9;41Hoplets at tem\e[9;55Heratures\e[9;64Hbe\e[9;67How freezing.\e[10;4H6\e[10;7HLarge wildfires can generate clouds called pyrocumul\e[10;60Hs.\e[11;4H7\e[11;7HClouds can cool\e[11;23HE\e[11;25Hrth’s surfa\e[11;37He by ref\e[11;46Hecting incoming sunlight.\e[12;4H8\e[12;18H
+warm\e[12;42Habsorbing and re-emitting outgoing\e[13;3H   infrared radi\e[13;20Htion.\e[14;3H29. Weath\e[14;13Hr\e[14;15Hs\e[14;17Htell\e[14;22Htes\e[14;26Huse\e[14;30Hinfrared\e[14;39Hmeasurements\e[14;52Hto\e[14;55Hestimate\e[14;64Hcloud-top\e[15;3H   temperatures.\e[16;3H30. A c\e[16;11Hilometer\e[16;20Huses\e[16;25Hlaser\e[16;31Hpulses\e[16;38Hto\e[16;41Hmeasure\e[16;49Hthe\e[16;53Hheight\e[16;60Hof\e[16;63Ha\e[16;65Hcloud\e[16;71Hbase.\e[17;7HCloud\e[17;13Hdroplets\e[17;22Hcan\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠹ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;26Hgrow\e[17;31Hinto\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠸ Request approval for marker command | public-demo\a
+\e]0;⠼ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;36Hraindrops\e[17;46Hby\e[17;49Hcoll\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;11H\e[0m\e[K\e[17;4H2\e[17;7HSn\e[17;10Hw\e[0m\e[20;3H\e[?25h
+\e[?2026l
+\e[?2026h\e[?25l
+\e[2;26H\e[0m\e[K\e[4;15H\e[0m\e[K\e[6;13H\e[0m\e[K\e[8;79H\e[0m\e[K\e[9;62H\e[0m\e[K\e[12;25H\e[0m\e[K\e[14;19H\e[0m\e[K\e[16;71H\e[0m\e[K\e[2;3H   reaching the ground.\e[3;3H22. Contrails form when\e[3;27Hwater\e[3;33Hvapor\e[3;39Hcondenses\e[3;49Hand\e[3;53Hfreezes\e[3;61Hin\e[3;64Hthe\e[3;68Hcold\e[3;73Hair\e[3;77Hbehind\e[4;3H   aircraft.\e[5;3H23. No\e[5;10Htilucent\e[5;19Hclouds\e[5;26Hform\e[5;31Hhigh\e[5;36Hin\e[5;39Hthe\e[5;43Hmesosphere\e[5;54Hand\e[5;58Hcan\e[5;62Hremain\e[5;69Hsunlit\e[5;76Hafter\e[6;3H   sunset.\e[7;3H24. Polar stratospheric\e[7;27Hclouds\e[7;34Hcan\e[7;38Hform\e[7;43Hduring\e[7;50Hexceptionally\e[7;64Hcold\e[7;69Hpolar\e[7;75Hwinters.\e[8;4H5\e[8;7HClouds can contain liqui\e[8;32H water d\e[8;41Hoplets at tem\e[8;55Heratures\e[8;64Hbe\e[8;67How freezing.\e[9;4H6\e[9;7HLarge wildfires can generate clouds called pyrocumul\e[9;60Hs.\e[10;4H7\e[10;7HClouds can cool\e[10;23HE\e[10;25Hrth’s surfa\e[10;37He by ref\e[10;46Hecting incoming sunlight.\e[11;4H8\e[11;18Hwarm\e[11;42Habsorbing and re-emitting outgoing\e[12;3H   infrared radi\e[12;20Htion.\e[13;3H29. Wea
+th\e[13;13Hr\e[13;15Hs\e[13;17Htell\e[13;22Htes\e[13;26Huse\e[13;30Hinfrared\e[13;39Hmeasurements\e[13;52Hto\e[13;55Hestimate\e[13;64Hcloud-top\e[14;3H   temperatures.\e[15;3H30. A c\e[15;11Hilometer\e[15;20Huses\e[15;25Hlaser\e[15;31Hpulses\e[15;38Hto\e[15;41Hmeasure\e[15;49Hthe\e[15;53Hheight\e[15;60Hof\e[15;63Ha\e[15;65Hcloud\e[15;71Hbase.\e[16;4H1\e[16;7HCloud droplets can grow\e[16;31Hinto raindrop\e[16;45H by\e[16;49Hcollid\e[16;56Hng and\e[16;63Hmerging.\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠴ Request approval for marker command | public-demo\a
+\e]0;⠦ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l
+\e[17;11Hflakes\e[17;18Hgrow\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠧ Request approval for marker command | public-demo\a
+\e]0;⠇ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;23Has\e[17;26Hwater\e[17;32Hvapor\e[17;38Hdeposits\e[0m\e[20;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l\e[17;47Honto\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠏ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[17;52Hice\e[17;56Hcrystals\e[17;65Hwithin\e[17;72Hclouds.\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;⠋ Request approval for marker command | public-demo\a
+\e[?2026h\e[?25l\e[2;2H\e[0m\e[K\e[3;62H\e[0m\e[K\e[4;2H\e[0m\e[K\e[5;71H\e[0m\e[K\e[6;2H\e[0m\e[K\e[7;76H\e[0m\e[K\e[8;25H\e[0m\e[K\e[9;2H\e[0m\e[K\e[11;19H\e[0m\e[K\e[12;2H\e[0m\e[K\e[14;2H\e[0m\e[K\e[15;71H\e[0m\e[K\e[16;2H\e[0m\e[K\e[3;4H6\e[3;7HLarge wild\e[3;18Hi\e[3;20Hes ca\e[3;27Hgen\e[3;32Hate clouds called pyrocumulus.\e[5;4H7\e[5;7HClouds \e[5;15Ha\e[5;17H cool Earth’s\e[5;31Hsurface\e[5;39Hby reflecting incoming\e[5;62Hsunl\e[5;67Hght.\e[7;4H8\e[7;7HClouds can warm Earth’s surf\e[7;36Hce by absorbing and re-emitting outgoing\e[8;3H   infrared radiation.\e[10;4H9\e[10;7HWeather satellites use inf\e[10;34Hared\e[10;39Hmeasurements to est\e[10;59Hmate c\e[10;66Houd-top\e[11;3H   temperatures.\e[13;3H30\e[13;7HA ceilometer uses la\e[13;29Hr pulses to measur\e[13;48H \e[13;50Hhe height of a cloud base.\e[15;4H1\e[15;7HCloud droplets can grow\e[15;31Hinto raindrop\e[15;45H by\e[15;49Hcollid\e[15;56Hng and\e[15;63Hmerging.\e[0m\e[20;3H
+\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[20;3H\e[?25h\e[?2026l
+\e]0;Request approval for marker command | public-demo\a
+\e]7501;state=done:app=codex\e\\
+\e[?2026h\e[?25l
+\e[7;2H\e[0m\e[K\e[10;2H\e[0m\e[K\e[13;71H\e[0m\e[K\e[3;4H7\e[3;7HClouds can cool\e[3;23HE\e[3;25Hrth’s surfa\e[3;37He by ref\e[3;46Hecting incoming sunlight.\e[5;4H8\e[5;18Hwarm\e[5;42Habsorbing and re-emitting outgoing\e[6;6Hinfrared\e[6;15Hradiation.\e[8;3H29. Weath\e[8;13Hr\e[8;15Hs\e[8;17Htell\e[8;22Htes\e[8;26Huse\e[8;30Hinfrared\e[8;39Hmeasurements\e[8;52Hto\e[8;55Hestimate\e[8;64Hcloud-top\e[9;6Htemperatures.\e[11;3H30. A c\e[11;11Hilometer\e[11;20Huses\e[11;25Hlaser\e[11;31Hpulses\e[11;38Hto\e[11;41Hmeasure\e[11;49Hthe\e[11;53Hheight\e[11;60Hof\e[11;63Ha\e[11;65Hcloud\e[11;71Hbase.\e[13;4H1\e[13;7HCloud droplets can grow\e[13;31Hinto raindrop\e[13;45H by\e[13;49Hcollid\e[13;56Hng and\e[13;63Hmerging.\e[15;4H2\e[15;7HSn\e[15;10Hwflakes grow \e[15;24Hs\e[15;26Hwater vapo\e[15;37H deposits ont\e[15;51H ice crystals within\e[15;72Hclouds.\e[17;1H\e[2m  Worked for 56s • 10:11 PM                                                       \e[0m\e[20;3H\e[?25h\e[?2026l
+@resize 40 104
+\e[6n
+\e[?2026h\e[1;1H\e[J
+\e[?25l
+\e[1;104H\e[0m\e[K\e[2;61H\e[0m\e[K\e[3;83H\e[0m\e[K\e[4;99H\e[0m\e[K\e[5;88H\e[0m\e[K\e[6;48H\e[0m\e[K\e[7;60H\e[0m\e[K\e[8;63H\e[0m\e[K\e[9;74H\e[0m\e[K\e[10;69H\e[0m\e[K\e[11;68H\e[0m\e[K\e[12;71H\e[0m\e[K\e[13;88H\e[0m\e[K\e[14;68H\e[0m\e[K\e[15;74H\e[0m\e[K\e[16;71H\e[0m\e[K\e[17;92H\e[0m\e[K\e[18;79H\e[0m\e[K\e[19;78H\e[0m\e[K\e[1;1H\e[1m\e[2m› \e[22mAsk me to approve running printf ready > marker.txt in this scratch directory with escalated sandbox…\e[2;1H  2. Most clouds form when moist air cools to its dew point.\e[3;1H  3. Cloud droplets often form around airborne particles such as dust or sea salt.\e[4;1H  4. Clouds can look white because their droplets scatter visible wavelengths of sunlight broadly.\e[5;1H  5. Thick clouds often look dark from below because less sunlight reaches their bases.\e[6;1H  6. Fog is a cloud in contact with the ground.\e[7;1H  7. Cumulus clouds often have flat bases and rounded tops.\e[8;1H  8. Stratus clouds typically form low, fairly uniform layers.\e[9;1H  9. Stratocumulus clouds form low layers or patches with rounded clumps.\e[10;
+1H  10. Cirrus clouds are high, wispy clouds composed of ice crystals.\e[11;1H  11. Cirrostratus clouds can produce halos around the Sun or Moon.\e[12;1H  12. Cirrocumulus clouds often appear as rows of small white ripples.\e[13;1H  13. Altocumulus clouds often form patches of rounded cloud elements at middle levels.\e[14;1H  14. Altostratus clouds can make the Sun look like a blurred disk.\e[15;1H  15. Nimbostratus clouds commonly bring widespread, steady rain or snow.\e[16;1H  16. Cumulonimbus clouds can produce lightning, hail, and heavy rain.\e[17;1H  17. A mature thunderstorm can develop an anvil-shaped top as its updraft spreads outward.\e[18;1H  18. Lenticular clouds often form in atmospheric waves downwind of mountains.\e[19;1H  19. Mammatus clouds have pouchlike features that hang beneath a cloud base.\e[20;3H20. A\e[20;9Hshelf\e[20;15Hcloud\e[20;21Hcan\e[20;25Hform\e[20;30Halong\e[20;36Hthe\e[20;40Hleading\e[20;48Hedge\e[20;53Hof\e[20;56Ha\e[20;58Hthunderstorm’s\e[20;73Houtflow.\e[21;3H21. Virga\e[21;13Hconsists\e[21;22Ho
+f\e[21;25Hprecipitation\e[21;39Hthat\e[21;44Hevaporates\e[21;55Hor\e[21;58Hsublimates\e[21;69Hbefore\e[21;76Hreaching\e[21;85Hthe\e[21;89Hground.\e[22;3H22. Contrails\e[22;17Hform\e[22;22Hwhen\e[22;27Hwater\e[22;33Hvapor\e[22;39Hcondenses\e[22;49Hand\e[22;53Hfreezes\e[22;61Hin\e[22;64Hthe\e[22;68Hcold\e[22;73Hair\e[22;77Hbehind\e[22;84Haircraft.\e[23;3H23. Noctilucent\e[23;19Hclouds\e[23;26Hform\e[23;31Hhigh\e[23;36Hin\e[23;39Hthe\e[23;43Hmesosphere\e[23;54Hand\e[23;58Hcan\e[23;62Hremain\e[23;69Hsunlit\e[23;76Hafter\e[23;82Hsunset.\e[24;3H24. Polar\e[24;13Hstratospheric\e[24;27Hclouds\e[24;34Hcan\e[24;38Hform\e[24;43Hduring\e[24;50Hexceptionally\e[24;64Hcold\e[24;69Hpolar\e[24;75Hwinters.\e[25;3H25. Clouds\e[25;14Hcan\e[25;18Hcontain\e[25;26Hliquid\e[25;33Hwater\e[25;39Hdroplets\e[25;48Hat\e[25;51Htemperatures\e[25;64Hbelow\e[25;70Hfreezing.\e[26;3H26. Large\e[26;13Hwildfires\e[26;23Hcan\e[26;27Hgenerate\e[26;36Hclouds\e[26;43Hcalled\e[26;50Hpyrocumulus.\e[27;3H27. Clouds\e[27;14Hcan\e[27;18Hcool\e[27;23HEarth’s\e[27;31Hsurface\e[27;39Hby\e[27;42Hreflecting\e[27;53Hincoming\e[2
+7;62Hsunlight.\e[28;3H28. Clouds\e[28;14Hcan\e[28;18Hwarm\e[28;23HEarth’s\e[28;31Hsurface\e[28;39Hby\e[28;42Habsorbing\e[28;52Hand\e[28;56Hre-emitting\e[28;68Houtgoing\e[28;77Hinfrared\e[28;86Hradiation.\e[29;3H29. Weather\e[29;15Hsatellites\e[29;26Huse\e[29;30Hinfrared\e[29;39Hmeasurements\e[29;52Hto\e[29;55Hestimate\e[29;64Hcloud-top\e[29;74Htemperatures.\e[30;3H30. A\e[30;9Hceilometer\e[30;20Huses\e[30;25Hlaser\e[30;31Hpulses\e[30;38Hto\e[30;41Hmeasure\e[30;49Hthe\e[30;53Hheight\e[30;60Hof\e[30;63Ha\e[30;65Hcloud\e[30;71Hbase.\e[31;3H31. Cloud\e[31;13Hdroplets\e[31;22Hcan\e[31;26Hgrow\e[31;31Hinto\e[31;36Hraindrops\e[31;46Hby\e[31;49Hcolliding\e[31;59Hand\e[31;63Hmerging.\e[32;3H32. Snowflakes\e[32;18Hgrow\e[32;23Has\e[32;26Hwater\e[32;32Hvapor\e[32;38Hdeposits\e[32;47Honto\e[32;52Hice\e[32;56Hcrystals\e[32;65Hwithin\e[32;72Hclouds.\e[34;1H\e[2m  Worked for 56s • 10:11 PM                                                                             \e[37;1H\e[22m\e[1m›\e[37;3H\e[22m\e[2mAsk Codex to do anything\e[39;3H\e[22mGPT-6.2-Sol\e[39;15Hmedium\e[39;22H·\e[39;24
+H/private/tmp/corta-demo.00000/public-demo\e[39;66H·\e[39;68HRequest\e[39;76Happroval\e[39;85Hfor\e[39;89Hmarker\e[39;96Hcommand\e[40;3H\e[1m←\e[40;5H\e[22mfor\e[40;9Hagents\e[40;16H·\e[40;18H\e[1m?\e[40;20H\e[22mfor\e[40;24Hshortcuts\e[0m\e[1;1H\e[0 q\e[1;1H\e[1m\e[2m›\e[0m\e[37;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[37;3H\e[?25h\e[?2026l
+# Grid checkpoint
+\e[?2026h\e[0m\e[37;3H\e[?25h\e[?2026l
+\e]7501;state=idle:app=codex\e\\
+\e[?2026h\e[?25l
+\e[4;88H\e[0m\e[K\e[5;48H\e[0m\e[K\e[9;69H\e[0m\e[K\e[10;68H\e[0m\e[K\e[13;68H\e[0m\e[K\e[15;71H\e[0m\e[K\e[17;79H\e[0m\e[K\e[18;78H\e[0m\e[K\e[21;93H\e[0m\e[K\e[22;89H\e[0m\e[K\e[23;83H\e[0m\e[K\e[24;79H\e[0m\e[K\e[25;62H\e[0m\e[K\e[28;87H\e[0m\e[K\e[29;76H\e[0m\e[K\e[30;71H\e[0m\e[K\e[32;2H\e[0m\e[K\e[34;2H\e[0m\e[K\e[37;2H\e[0m\e[K\e[40;2H\e[0m\e[K\e[2;3H3\e[2;6HCloud droplets often form around airborne particles such\e[2;63Has\e[2;66Hdust\e[2;71Hor\e[2;74Hsea\e[2;78Hsalt.\e[3;3H4\e[3;11Hs can look white because their droplets scatter visible wavelengths of sunlight\e[3;91Hbroadly.\e[4;3H5\e[4;6HThick clouds \e[4;20Hften look d\e[4;32Hrk from below b\e[4;48Hcau\e[4;52He less\e[4;59Hsunlight reaches their\e[4;82Hbases.\e[5;3H6\e[5;6HFog is a cloud in contact with the gr\e[5;44Hund.\e[6;3H7\e[6;6HCumulus clouds\e[6;21Hoften h\e[6;29Hve\e[6;32Hflat\e[6;37Hbases and rounded\e[6;55Htops.\e[7;3H8\e[7;6HStrat\e[7;21Htypically form low, fairly uniform layers.\e[8;3H9\e[8;11Hocumul\e[8;18Hs clouds form low\e[8;37Hayers o\e[8;45H patches with rounded\e[8;67Hclumps.\e[9;3H10. Cirrus clo\e[9;18Hds are high, wispy c
+louds composed of ice crystals.\e[10;4H1\e[10;11Ho\e[10;13Htrat\e[10;18Hs clouds can\e[10;31Hproduce halos around the\e[10;56HSun\e[10;60Ho\e[10;62H Moon.\e[11;4H2\e[11;12Hcumul\e[11;27Hoften appear \e[11;41Hs rows of small white\e[11;63Hripples.\e[12;4H3\e[12;7HAltocumulus clouds often form patches of\e[12;48Hrounded cloud element\e[12;70H at\e[12;74Hmiddle\e[12;81Hlevels.\e[13;4H4\e[13;11Hstrat\e[13;26Hcan make the Sun lo\e[13;46Hk\e[13;48Hlike a blurred disk.\e[14;4H5\e[14;7HNimbostratus clouds com\e[14;31Honly bring widespread, steady rain or\e[14;69Hsnow.\e[15;4H6\e[15;7HCu\e[15;10Hulonimb\e[15;28Han produce lightning, hail, an\e[15;59H he\e[15;63Hvy\e[15;66Hrain.\e[16;4H7\e[16;7HA \e[16;10Hature thunderstorm can develop an anvil-shaped top as its updraft\e[16;76Hspreads\e[16;84Houtward.\e[17;4H8\e[17;7HLenticular cloud\e[17;24H \e[17;26Hften form in atmospheric w\e[17;53Hv\e[17;55Hs\e[17;57Hd\e[17;59Hwnwind of mountains.\e[18;4H9\e[18;7HMammat\e[18;14Hs clouds have pouchlike features that hang\e[18;57Hbeneath a cloud b\e[18;75Hse.\e[19;3H20\e[19;7HA shelf c
+loud can form along the leading edge of a thunderstorm’s\e[19;73Houtflow.\e[20;4H1\e[20;7HVirga consists of\e[20;25Hprecipitation that evaporates or\e[20;58Hsublimates before reaching\e[20;85Hthe\e[20;89Hground.\e[21;4H2\e[21;7HContrails form\e[21;22Hwhen water vap\e[21;37Hr\e[21;39Hcondenses and freezes in th\e[21;67H cold air behind aircraft.\e[22;4H3\e[22;7HN\e[22;9Hc\e[22;11Hilucent clouds form high in\e[22;39Hthe me\e[22;46Ho\e[22;48Hphere and can remain sunlit after sunset.\e[23;4H4\e[23;7HP\e[23;9Hlar stra\e[23;18Hospheric clouds can form\e[23;43Hduring \e[23;51Hxception\e[23;60Hlly cold\e[23;69Hpolar win\e[23;81Hs.\e[24;4H5\e[24;7HClouds can contain liqui\e[24;32H water d\e[24;41Hoplets at tem\e[24;55Heratures\e[24;64Hbe\e[24;67How freezing.\e[25;4H6\e[25;7HLarge wildfires can generate clouds called pyrocumul\e[25;60Hs.\e[26;4H7\e[26;7HClouds can cool\e[26;23HE\e[26;25Hrth’s surfa\e[26;37He by ref\e[26;46Hecting incoming sunlight.\e[27;4H8\e[27;18Hwarm\e[27;42Habsorbing and re-emitting outgoing\e[27;77Hinfrared\e[27;86Hradiation.\e[28;4H9\e[28;7HWe
+ather satellites use inf\e[28;34Hared\e[28;39Hmeasurements\e[28;52Hto estimate cloud-\e[28;71Hop temperatures.\e[29;3H30\e[29;7HA ceilometer uses la\e[29;29Hr pulses to measur\e[29;48H \e[29;50Hhe height of a cloud base.\e[30;4H1\e[30;7HCloud droplets can grow\e[30;31Hinto raindrop\e[30;45H by\e[30;49Hcollid\e[30;56Hng and\e[30;63Hmerging.\e[31;4H2\e[31;7HSn\e[31;10Hwflakes grow \e[31;24Hs\e[31;26Hwater vapo\e[31;37H deposits ont\e[31;51H ice crystals within\e[31;72Hclouds.\e[33;1H\e[2m  Worked for 56s • 10:11 PM                                                                             \e[34;1H\e[22m \e[36;1H\e[1m›\e[36;3H\e[22m/exit\e[37;1H \e[0m\e[37;3H\e[?25h\e[?2026l
+\e[?2026h\e[0m\e[37;3H\e[?25h\e[?2026l
+\e[?2026h\e[?25l
+\e[2;67H\e[0m\e[K\e[3;61H\e[0m\e[K\e[4;83H\e[0m\e[K\e[7;48H\e[0m\e[K\e[8;60H\e[0m\e[K\e[9;63H\e[0m\e[K\e[11;69H\e[0m\e[K\e[12;68H\e[0m\e[K\e[15;68H\e[0m\e[K\e[16;74H\e[0m\e[K\e[17;71H\e[0m\e[K\e[19;79H\e[0m\e[K\e[20;78H\e[0m\e[K\e[21;81H\e[0m\e[K\e[27;62H\e[0m\e[K\e[28;71H\e[0m\e[K\e[31;76H\e[0m\e[K\e[33;79H\e[0m\e[K\e[36;2H\e[0m\e[K\e[39;2H\e[0m\e[K\e[2;1H\e[2m• \e[22m1\e[2;11Hs c\e[2;15Hnsist\e[2;23H tiny wate\e[2;34H droplets, ice c\e[2;51Hystal\e[2;57H, or both.\e[3;3H2\e[3;6HMost clouds f\e[3;20Hrm when\e[3;28Hmoist air cools to i\e[3;51Hdew point.\e[4;3H3\e[4;6HCloud\e[4;12Hdr\e[4;15Hplets often form around airb\e[4;44Hrne p\e[4;50Hrtic\e[4;57H such as dust or \e[4;75Hea salt.\e[5;3H4\e[5;6HCloud\e[5;13Hcan look white because their droplets\e[5;51Hscatter\e[5;59Hvisible\e[5;67Hwavelengths\e[5;79Hof\e[5;82Hsunlight\e[5;91Hbroadly.\e[6;3H5\e[6;6HThick clouds often look dark from below becaus\e[6;53H less sunlight\e[6;68Hreaches\e[6;76Htheir\e[6;82Hbases.\e[7;3H6\e[7;6HFog is a cloud\e[7;21Hin contact with the\e[7;41Hground.\e[8;3H7\e[8;6HCumulus clo\e[8;18Hds often\e[8;27Hhave\e[8;32Hflat base\e[8;43Hand rou
+nded tops.\e[9;3H8. Strat\e[9;21Htypically\e[9;31Hform low, fairly uniform\e[9;56Hlayers.\e[10;3H9. Strat\e[10;12Hcumul\e[10;27Hform l\e[10;34Hw layers or patches with r\e[10;61Hunded clumps.\e[11;4H0\e[11;11Hus clo\e[11;18Hds are high, wis\e[11;35Hy clouds comp\e[11;49Hsed of ice crystals.\e[12;4H1\e[12;7HCirrostratus clouds can pr\e[12;34Hduce halo\e[12;45Haround the\e[12;56HSun or Moon.\e[13;4H2\e[13;7HCirrocumulus clouds often appear as\e[13;43Hr\e[13;45Hws\e[13;48Hof sm\e[13;54Hll white\e[13;63Hr\e[13;65Hpples.\e[14;4H3\e[14;7HAltocumulus clouds often form patches of \e[14;49Hounded cloud element\e[14;70H at middle\e[14;81Hlevels.\e[15;4H4\e[15;7HAltostratus clouds can make th\e[15;39HSun look like a blurred disk.\e[16;4H5\e[16;7HNi\e[16;10Hbostra\e[16;17Hus clouds commonly bring widespread, steady\e[16;61Hrain or snow.\e[17;4H6\e[17;7HCumulonimbus clouds ca\e[17;31Hproduce\e[17;39Hlightning, hail, and heavy\e[17;66Hrain.\e[18;4H7\e[18;7HA \e[18;10Hature\e[18;16Hthun\e[18;21Herstorm can dev\e[18;37Hlop an anvil-shaped\e[18;57Htop \e[18;62Hs its updraft spr
+eads\e[18;84Houtward.\e[19;3H18\e[19;7HLenticular clouds\e[19;25Hoften f\e[19;33Hrm\e[19;36Hin atmospheric waves downwind of \e[19;70Hountains.\e[20;3H19\e[20;7HMamm\e[20;12Htus clouds have pouchlike featur\e[20;45Hs that hang beneath a cloud base.\e[21;4H0\e[21;7HA shelf cloud can form along the leading edge\e[21;53Hof a thunderstorm’s\e[21;73Houtflow.\e[22;4H1\e[22;7HVirga consists of precipitatio\e[22;41Hat \e[22;45Hvaporat\e[22;53Hs or\e[22;58Hsublimates\e[22;69Hbefore\e[22;76Hreaching the ground.\e[23;4H2\e[23;7HC\e[23;9Hnt\e[23;12Hails f\e[23;19Hrm when\e[23;27Hwater vapor condenses and freezes in\e[23;64Hthe cold air behind\e[23;84Haircraft.\e[24;4H3\e[24;7HNoctilu\e[24;15He\e[24;17Ht clouds\e[24;26Hform high in\e[24;39Hthe m\e[24;45Hsospher\e[24;53H and can remain sunlit after\e[24;82Hsunset.\e[25;4H4\e[25;7HPolar\e[25;13Hstratospheric\e[25;27Hclouds can form\e[25;43Hduring\e[25;50Hexceptionally\e[25;64Hcold\e[25;69Hpolar\e[25;75Hwinters.\e[26;4H5\e[26;20Hntain liquid water\e[26;39Hdroplets at temperature\e[26;63H below freezing.\e[27;4H6\e[27;7HLarge w
+ildfires\e[27;23Hc\e[27;25Hn generate \e[27;37Hlouds called pyrocumulus.\e[28;4H7\e[28;7HClouds can cool Earth’s su\e[28;34Hface\e[28;39Hby reflecting incom\e[28;59Hng sun\e[28;66Hight.\e[29;3H28\e[29;7HClouds can warm Earth’s\e[29;31Hs\e[29;33Hrface by ab\e[29;45Ho\e[29;47Hbing and re-emitting outgoing\e[29;77Hinfrared\e[29;86Hradiation.\e[30;3H29\e[30;7HWeather sat\e[30;19Hllites\e[30;26Huse infrared measurements to estimate cloud-top\e[30;74Htemperatures.\e[31;4H0\e[31;7HA cei\e[31;13Hom\e[31;16Hter uses laser pulses\e[31;38Hto measure \e[31;50Hhe h\e[31;55Hight of a\e[31;65Hcloud base.\e[32;3H31. Cloud\e[32;13Hdroplets\e[32;22Hcan\e[32;26Hgrow\e[32;31Hinto\e[32;36Hraindrops\e[32;46Hby\e[32;49Hcolliding\e[32;59Hand\e[32;63Hmerging.\e[33;1H  32. Snowflakes grow as water vapor deposits onto ice crystals within clouds.\e[35;1H\e[2m  Worked for 56s • 10:11 PM                                                                             \e[36;1H\e[22m \e[38;1H\e[2m›\e[38;3HShutting down...\e[40;3H\e[22mGPT-6.2-Sol\e[40;15Hmedium\e[40;22H·\e[40;24H/private/
+tmp/corta-demo.00000/public-demo\e[40;66H·\e[40;68HRequest\e[40;76Happroval\e[40;85Hfor\e[40;89Hmarker\e[40;96Hcommand\e[0m\e[?2026l
+\e[1;1H\e[J
+\e]0;\a
+\e[?1006l\e[?1015l\e[?1003l\e[?1002l\e[?1000l\e[<1u\e[?1007h\e[?1049l\e[<1u\e[<u\e[>4;0m\e[?2004l\e[?1004l\e[c
+\e[0 q\e[?25h\e]7501;state=clear\e\\
+\e[0 q\e[?25h
+Token usage: total=16,080 input=15,448 (+ 52,096 cached) output=632\r\n
+To continue this session, run:\r\n
+  codex resume xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\n
+Or run codex resume and select Request approval for marker command.\r\n

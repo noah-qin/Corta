@@ -1,0 +1,43 @@
+rows: 40 columns: 104
+cursor: row 4 column 0
+scrollback: 0 lines
+   0 |Token usage: total=16,080 input=15,448 (+ 52,096 cached) output=632                                     |
+   1 |To continue this session, run:                                                                          |
+   2 |  codex resume xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx                                                     |
+   3 |Or run codex resume and select Request approval for marker command.                                     |
+   4 |                                                                                                        |
+   5 |                                                                                                        |
+   6 |                                                                                                        |
+   7 |                                                                                                        |
+   8 |                                                                                                        |
+   9 |                                                                                                        |
+  10 |                                                                                                        |
+  11 |                                                                                                        |
+  12 |                                                                                                        |
+  13 |                                                                                                        |
+  14 |                                                                                                        |
+  15 |                                                                                                        |
+  16 |                                                                                                        |
+  17 |                                                                                                        |
+  18 |                                                                                                        |
+  19 |                                                                                                        |
+  20 |                                                                                                        |
+  21 |                                                                                                        |
+  22 |                                                                                                        |
+  23 |                                                                                                        |
+  24 |                                                                                                        |
+  25 |                                                                                                        |
+  26 |                                                                                                        |
+  27 |                                                                                                        |
+  28 |                                                                                                        |
+  29 |                                                                                                        |
+  30 |                                                                                                        |
+  31 |                                                                                                        |
+  32 |                                                                                                        |
+  33 |                                                                                                        |
+  34 |                                                                                                        |
+  35 |                                                                                                        |
+  36 |                                                                                                        |
+  37 |                                                                                                        |
+  38 |                                                                                                        |
+  39 |                                                                                                        |
