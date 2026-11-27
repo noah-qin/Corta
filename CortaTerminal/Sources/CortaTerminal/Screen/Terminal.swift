@@ -78,7 +78,10 @@ public struct Terminal: Sendable {
     /// does: records must never wait in the old coordinates while marks
     /// arrive in the new.
     public var grid: Grid {
-        get { performer.grid }
+        // Swift 6.4.2 can eliminate a snapshot copy across later mutations
+        // of this terminal when the getter is inlined. Keep the value return
+        // out of line so the grid's copy-on-write storage stays independent.
+        @inline(never) get { performer.grid }
         set {
             gridGeneration &+= 1
             performer.grid = newValue
