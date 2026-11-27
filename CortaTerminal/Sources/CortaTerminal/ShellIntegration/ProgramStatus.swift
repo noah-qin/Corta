@@ -114,18 +114,23 @@ public enum ProgramText {
         return segments.count <= 8 && segments.allSatisfy { validID($0) }
     }
     public static func clean(_ text: String, limit: Int) -> String {
-        var result = ""
-        var bytes = 0
-        for scalar in text.unicodeScalars {
-            let value = scalar.value
-            guard value >= 0x20, !(0x7F...0x9F).contains(value),
-                  !ConcealingScalars.contains(value) else { continue }
-            let count = scalar.utf8.count
-            guard bytes + count <= limit else { break }
-            result.unicodeScalars.append(scalar)
-            bytes += count
+        let capacity = min(limit, text.utf8.count)
+        guard capacity > 0 else { return "" }
+        return String(unsafeUninitializedCapacity: capacity) { buffer in
+            var bytes = 0
+            for scalar in text.unicodeScalars {
+                let value = scalar.value
+                guard value >= 0x20, !(0x7F...0x9F).contains(value),
+                      !ConcealingScalars.contains(value) else { continue }
+                let encoded = scalar.utf8
+                guard bytes + encoded.count <= capacity else { break }
+                for byte in encoded {
+                    buffer[bytes] = byte
+                    bytes += 1
+                }
+            }
+            return bytes
         }
-        return result
     }
     static func decoded(_ text: String, limit: Int) -> String? {
         guard text.utf8.count <= ((limit + 2) / 3) * 4,

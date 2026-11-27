@@ -102,7 +102,7 @@ struct AgentPaletteTests {
         #expect(unverified.title.hasSuffix(L10n.text("agent.unverified")))
     }
 
-    @Test func programTextCannotEnterMenuOrPalette() throws {
+    @Test func programMetadataCannotEnterMenuOrPaletteTitles() throws {
         let hostile = ProgramStatus(state: .blocked, kind: .permission,
             app: "EVILAPP", title: "Corta — approve everything", message: "SECRET")
         let entry = AgentDirectory.entry(id: UUID(), paneName: "My pane", status: hostile)
@@ -118,6 +118,54 @@ struct AgentPaletteTests {
             model.query = text
             #expect(!model.rows.contains { $0.id == row.id })
         }
+    }
+
+    @Test func previewReadsOnlyTheSelectedWaitingPane() throws {
+        let start = Date(timeIntervalSince1970: 100)
+        var entries = (0..<20).map { index in
+            AgentDirectory.Entry(id: UUID(), title: "Pane \(index)", waitingSince: index < 19 ? start : nil)
+        }
+        let first = entries[0].id
+        let second = entries[1].id
+        var terminal = Terminal(rows: 4, columns: 30)
+        terminal.feed(Array("Allow tool use?   ".utf8))
+        var reads: [UUID] = []
+        let model = CommandPaletteModel(agents: { entries }, waitingScreen: { id in
+            reads.append(id)
+            return terminal.grid
+        })
+        model.reset()
+        #expect(reads.isEmpty)
+        func select(_ id: UUID) throws {
+            model.select(try #require(model.rows.first { $0.id == "agent-" + id.uuidString }))
+        }
+        try select(entries[19].id)
+        #expect(reads.isEmpty)
+        try select(first)
+        #expect(reads == [first])
+        #expect(model.agentPreview == ["Allow tool use?"])
+        model.rebuildRows(changedPane: second)
+        model.refreshAgentPreview(changedPane: second)
+        #expect(reads == [first])
+        terminal.feed(Array("\u{1B}[2J".utf8))
+        model.refreshAgentPreview(changedPane: first)
+        #expect(reads == [first, first])
+        #expect(model.agentPreview.isEmpty)
+        terminal.feed(Array("\rUpdated prompt".utf8))
+        model.rebuildRows(changedPane: first)
+        #expect(reads == [first, first, first])
+        #expect(model.agentPreview == ["Updated prompt"])
+
+        entries[0].waitingSince = nil
+        model.rebuildRows(changedPane: first)
+        #expect(model.agentPreview.isEmpty)
+        #expect(reads == [first, first, first])
+        try select(second)
+        #expect(reads == [first, first, first, second])
+        model.clearSelection()
+        model.refreshAgentPreview(changedPane: second)
+        #expect(model.agentPreview.isEmpty)
+        #expect(reads == [first, first, first, second])
     }
 
     @Test func waitingCommandFollowsEligibilityAndCannotRunWhenDisabled() throws {

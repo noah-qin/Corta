@@ -51,6 +51,10 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         super.init(window: panel)
         panel.delegate = self
         panel.contentView = Self.buildContentView(model: model)
+        NotificationCenter.default.addObserver(self, selector: #selector(agentsDidChange(_:)),
+            name: AgentDirectory.didChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(waitingScreenDidChange(_:)),
+            name: AgentDirectory.waitingScreenDidChange, object: nil)
         model.isCommandAvailable = { [weak self] command in
             Self.isAvailable(command.action, in: self?.invokingWindow ?? NSApp.mainWindow)
         }
@@ -133,6 +137,7 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         returnTo?.makeKeyAndOrderFront(nil)
         invokingWindow = nil
         model.clearAgentPanePicker()
+        model.clearSelection()
     }
 
     /// Something else took the keyboard — a click in another window, another
@@ -142,6 +147,17 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
         window?.orderOut(nil)
         invokingWindow = nil
         model.clearAgentPanePicker()
+        model.clearSelection()
+    }
+
+    @objc private func agentsDidChange(_ notification: Notification) {
+        guard window?.isVisible == true else { return }
+        model.rebuildRows(changedPane: notification.object as? UUID)
+    }
+
+    @objc private func waitingScreenDidChange(_ notification: Notification) {
+        guard window?.isVisible == true, let paneID = notification.object as? UUID else { return }
+        model.refreshAgentPreview(changedPane: paneID)
     }
 
     // MARK: - Availability

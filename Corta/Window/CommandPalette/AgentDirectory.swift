@@ -30,10 +30,12 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
     private var drawnDockPercent: Int?
     static let didChange = Notification.Name("dev.noahqin.Corta.agentsDidChange")
 
+    static let waitingScreenDidChange = Notification.Name("dev.noahqin.Corta.waitingScreenDidChange")
+
     struct Entry: Equatable {
         var id: UUID
         var title: String
-        var waitingSince: Date? = nil
+        var waitingSince: Date?
     }
 
     static var panes: [TerminalPaneViewController] {
@@ -106,6 +108,12 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         return L10n.format("agent.waitingDuration", duration)
     }
 
+    static func waitingScreen(for id: UUID) -> Grid? {
+        guard ConfigurationStore.shared.configuration.agentStatus,
+              shared.waiting.startedAt(for: id) != nil else { return nil }
+        return panes.first { $0.taskNotifier.paneID == id }?.session?.snapshot()
+    }
+
     static func focus(_ id: UUID) {
         guard let pane = panes.first(where: { $0.taskNotifier.paneID == id }) else { return }
         focus(pane)
@@ -141,7 +149,7 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         }
     }
 
-    static func refresh() {
+    static func refresh(changedPane: UUID? = nil) {
         let directory = shared
         if directory.configurationObserver == nil {
             directory.configurationObserver = NotificationCenter.default.addObserver(
@@ -156,7 +164,7 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         let enabled = ConfigurationStore.shared.configuration.agentStatus
         refreshTabs(enabled: enabled)
         refreshDock(enabled: enabled, directory: directory)
-        NotificationCenter.default.post(name: didChange, object: nil)
+        NotificationCenter.default.post(name: didChange, object: changedPane)
     }
 
     /// Each tab shows its most urgent pane status, or its progress, in the

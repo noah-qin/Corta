@@ -14,8 +14,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import Observation
+import CortaTerminal
 import Foundation
+import Observation
 
 /// The command palette's state and filtering, as `CommandPaletteView`
 /// binds to it.
@@ -112,6 +113,8 @@ final class CommandPaletteModel {
     private(set) var rows: [Row] = []
     /// The selected row's `id`, not its command, for the reason `Row` gives.
     private(set) var selectedRowID: String?
+    private var previewPaneID: UUID?
+    private(set) var agentPreview: [String] = []
     var onRun: ((TerminalCommand) -> Void)?
     var onAgent: ((UUID) -> Void)?
     var onMovePane: ((String) -> Void)?
@@ -132,6 +135,7 @@ final class CommandPaletteModel {
 
     private static let recentLimit = 5
     private let agentEntries: () -> [AgentDirectory.Entry]
+    private let waitingScreen: (UUID) -> Grid?
     private let canJumpToNextWaitingPane: () -> Bool
     private let paneMoveTargets: () -> [PaneMoveTarget]
     /// Whether a command would do anything where it would be sent — the
@@ -142,19 +146,26 @@ final class CommandPaletteModel {
     init(
         agents: @escaping () -> [AgentDirectory.Entry] = { AgentDirectory.entries },
         canJumpToNextWaitingPane: @escaping () -> Bool = { AgentDirectory.canJumpToNextWaitingPane },
-        paneMoveTargets: @escaping () -> [PaneMoveTarget] = { AppDelegate.paneMoveTargets() }
+        paneMoveTargets: @escaping () -> [PaneMoveTarget] = { AppDelegate.paneMoveTargets() },
+        waitingScreen: @escaping (UUID) -> Grid? = { AgentDirectory.waitingScreen(for: $0) }
     ) {
         agentEntries = agents
+        self.waitingScreen = waitingScreen
         self.canJumpToNextWaitingPane = canJumpToNextWaitingPane
         self.paneMoveTargets = paneMoveTargets
         rebuildRows()
+    }
+
+    func clearSelection() {
+        selectedRowID = nil
+        refreshAgentPreview()
     }
 
     /// Re-opened with a clean query and the top row selected — a palette
     /// remembered from last time it closed would show a stale filter. Also
     /// where a rebind made since the last opening reaches the shortcuts.
     func reset() {
-        selectedRowID = nil
+        clearSelection()
         if query.isEmpty { rebuildRows() } else { query = "" }
     }
 
@@ -171,13 +182,14 @@ final class CommandPaletteModel {
     /// Subsequence matching, which is what people mean by "fuzzy" here:
     /// `spr` finds "Split Pane Right". Ranked so that a match on consecutive
     /// characters, or one starting at a word boundary, beats a scattered one.
-    func rebuildRows() {
+    func rebuildRows(changedPane: UUID? = nil) {
         if let agentPaneTargets {
             let matches = agentPaneTargets.filter {
                 query.isEmpty || Self.score($0.title.lowercased(), query: query.lowercased()) != nil
             }
             rows = [.header(L10n.text("commandPalette.chooseAgentPane"))] + matches.map { .agentPaneTarget($0) }
             selectFirstIfNeeded()
+            refreshAgentPreview()
             return
         }
         let shortcuts = ConfigurationStore.shared.configuration.keybindings
@@ -200,6 +212,21 @@ final class CommandPaletteModel {
         }
         rows += paneMoveRows()
         selectFirstIfNeeded()
+        refreshAgentPreview(changedPane: changedPane)
+    }
+
+    func refreshAgentPreview(changedPane: UUID? = nil) {
+        let paneID: UUID?
+        if case .agent(let entry) = rows.first(where: { $0.id == selectedRowID }),
+           entry.waitingSince != nil {
+            paneID = entry.id
+        } else {
+            paneID = nil
+        }
+        guard paneID != previewPaneID || (paneID != nil && paneID == changedPane) else { return }
+        previewPaneID = paneID
+        let lines = paneID.flatMap(waitingScreen).map(AgentScreenPreview.lines(in:)) ?? []
+        if agentPreview != lines { agentPreview = lines }
     }
 
     /// The other tabs, last, under Move Pane to Tab: choosing one is a command
@@ -318,11 +345,13 @@ final class CommandPaletteModel {
         }
         guard index >= 0, index < rows.count, rows[index].selectable else { return }
         selectedRowID = rows[index].id
+        refreshAgentPreview()
     }
 
     func select(_ row: Row) {
         guard row.selectable else { return }
         selectedRowID = row.id
+        refreshAgentPreview()
     }
 
     func runSelected() {

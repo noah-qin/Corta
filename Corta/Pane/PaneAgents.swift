@@ -117,8 +117,12 @@ final class PaneAgents {
                 focused: NSApp.isActive && host.view.window?.isKeyWindow == true && host.holdsWindowFocus,
                 in: host.view.window)
         }
+        let paneID = host.taskNotifier.paneID
         if queueChanged || oldStatus != status || oldProgress != progress || oldUnverified != statusIsUnverified {
-            AgentDirectory.refresh()
+            AgentDirectory.refresh(changedPane: paneID)
+        } else if isBlocked, configuration.agentStatus {
+            // A prompt can redraw or clear while the reported state stays the same.
+            NotificationCenter.default.post(name: AgentDirectory.waitingScreenDidChange, object: paneID)
         }
     }
 

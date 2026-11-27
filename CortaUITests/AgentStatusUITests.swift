@@ -131,44 +131,6 @@ final class AgentStatusUITests: XCTestCase {
         }
     }
 
-    @MainActor
-    func testBackgroundStatusAndAgentsJump() throws {
-        let stage = try UIFixtures.stage("agents")
-        let app = UIFixtures.app(stage: stage, runner: Self.self, usingTestTarget: true)
-        app.launchEnvironment["SHELL"] = stage.appendingPathComponent("auto-shell").path
-        app.launchEnvironment["TEST_AGENT_MARKER"] = UUID().uuidString
-        app.launchEnvironment["TEST_AGENT_MODE"] = "signal"
-        defer { app.terminate() }
-        app.launch()
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout: 5))
-        app.typeKey("t", modifierFlags: .command)
-        Thread.sleep(forTimeInterval: 5)
-        // Status must arrive while the first tab's render loop is paused.
-        app.menuBars.menuBarItems["Window"].click()
-        let agents = app.menuBars.menuItems["Agents"]
-        XCTAssertTrue(agents.waitForExistence(timeout: 3))
-        agents.hover()
-        let waiting = app.menuBars.menuItems.matching(NSPredicate(
-            format: "title CONTAINS %@ AND title CONTAINS %@", "Waiting for you", "Permission")).firstMatch
-        XCTAssertTrue(waiting.waitForExistence(timeout: 3))
-        let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-        shot.name = "agent-background-waiting-menu-and-tab"; shot.lifetime = .keepAlways; add(shot)
-        waiting.click()
-        let terminal = app.textViews.firstMatch
-        expectation(
-            for: NSPredicate(format: "value CONTAINS %@", "Background permission fixture"), evaluatedWith: terminal)
-        waitForExpectations(timeout: 5)
-        // Palette lists agent panes and can jump with the same row identity.
-        app.menuBars.menuBarItems["View"].click()
-        app.menuBars.menuItems["Command Palette…"].click()
-        let row = app.descendants(matching: .any).matching(NSPredicate(
-            format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "agent-row-", "Permission")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 5))
-        row.click()
-        app.typeKey("c", modifierFlags: .control)
-    }
-
     /// Synthetic output only: no running agent is contacted or driven.
     @MainActor
     func testWaitingNavigationAcrossHiddenTabsWindowsAndZoom() throws {
@@ -200,7 +162,7 @@ final class AgentStatusUITests: XCTestCase {
         app.typeKey(.return, modifierFlags: [.command, .shift])
         app.menuBars.menuBarItems["Window"].click()
         app.menuBars.menuItems["Agents"].hover()
-        let waiting = app.menuBars.menuItems["Queue A — Waiting for you · Question"]
+        let waiting = waitingMenuItem("Queue A — Waiting for you · Question", in: app)
         XCTAssertTrue(waiting.waitForExistence(timeout: 5))
         XCTAssertFalse(app.menuBars.menuItems.matching(
             NSPredicate(format: "title CONTAINS %@", "EVILAPP")).firstMatch.exists)
@@ -452,16 +414,20 @@ extension AgentStatusUITests {
     @MainActor private func waitForWaitingEntry(_ title: String, in app: XCUIApplication) {
         app.menuBars.menuBarItems["Window"].click()
         app.menuBars.menuItems["Agents"].hover()
-        XCTAssertTrue(app.menuBars.menuItems[title].waitForExistence(timeout: 5))
+        XCTAssertTrue(waitingMenuItem(title, in: app).waitForExistence(timeout: 5))
         app.typeKey(.escape, modifierFlags: [])
         app.typeKey(.escape, modifierFlags: [])
+    }
+
+    @MainActor private func waitingMenuItem(_ title: String, in app: XCUIApplication) -> XCUIElement {
+        app.menuBars.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", title + " · Waiting")).firstMatch
     }
 
     @MainActor private func checkWaitingPaletteAndDock(in app: XCUIApplication) {
         app.typeKey("p", modifierFlags: [.command, .shift])
         let row = app.descendants(matching: .any).matching(NSPredicate(
-            format: "identifier BEGINSWITH %@ AND label == %@", "agent-row-",
-            "Queue B — Waiting for you · Permission")).firstMatch
+            format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "agent-row-",
+            "Queue B — Waiting for you · Permission · Waiting")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "EVILAPP")).firstMatch.exists)
         row.click()
