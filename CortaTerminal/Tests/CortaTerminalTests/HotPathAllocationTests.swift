@@ -78,9 +78,10 @@ struct HotPathAllocationTests {
         #expect(measure(scrollback: 0, warm: frame, stream: frame) == 0)
     }
 
-    @Test func scrollWithoutHistory() {
+    @Test(arguments: ["", "\u{1B}[2;20r"])
+    func scrollWithoutHistory(setup: String) {
         let text = Self.lines(400, Self.ascii)
-        #expect(measure(scrollback: 0, warm: text, stream: text) == 0)
+        #expect(measure(scrollback: 0, warm: Array(setup.utf8) + text, stream: text) == 0)
     }
 
     @Test func scrollIntoHistory() {
