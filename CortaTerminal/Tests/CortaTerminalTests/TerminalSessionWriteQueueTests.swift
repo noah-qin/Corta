@@ -269,18 +269,15 @@ import Testing
         }
 
         gateOpen.withLock { $0 = true }
-        // Accepted: one chunk in flight inside the sink plus five queued —
-        // the sixth queued write arrives when the backlog is 5 MB, already
-        // past the 4 MB cap, so the seventh chunk is the one dropped. It can
-        // never drain, so waiting for six is the hang-ceiling check and the
-        // recorded content is the assertion. Compare by marker byte, not by
-        // value equality — a failure should not dump megabytes of payload.
-        let acceptedDrained = awaitRecording(recorded, count: 6)
+        // One chunk is in the sink and does not count. Four more fill the
+        // 4 MB queue exactly; the sixth and seventh writes do not fit and
+        // are dropped whole. Compare by marker byte, not by value equality.
+        let acceptedDrained = awaitRecording(recorded, count: 5)
         #expect(acceptedDrained, "expected the accepted writes to drain")
         let markers = recorded.withLock { $0.map { $0.first ?? 0xFF } }
         #expect(
-            markers == [0, 1, 2, 3, 4, 5],
-            "the seventh chunk arrives with a 6 MB backlog and must be dropped; drained markers: \(markers)")
+            markers == [0, 1, 2, 3, 4],
+            "a write that would pass 4 MB is dropped; drained markers: \(markers)")
     }
 
     /// The queueing decision itself must be observable, not just its
@@ -307,13 +304,9 @@ import Testing
             awaitCondition { sinkEntered.withLock { $0 } },
             "precondition: the drain should be parked inside the gated sink")
 
-        // Five more megabyte chunks are each accepted while the backlog is
-        // still at-or-under the 4 MB cap when the check runs (the first
-        // chunk is already out of the queue, in the sink) — same accounting
-        // as `backlogBeyondTheCapIsDropped`, which this mirrors from the
-        // return-value side. The backlog now sits at 5 MB, already past the
-        // cap, so the sixth is the one dropped.
-        for _ in 0..<5 {
+        // The in-flight chunk does not count. Four more megabytes fill the
+        // queue; the next megabyte would pass the cap and is refused whole.
+        for _ in 0..<4 {
             #expect(session.write([UInt8](repeating: 1, count: megabyte)) == .accepted)
         }
         #expect(session.write([UInt8](repeating: 2, count: megabyte)) == .backpressured)
@@ -348,17 +341,18 @@ extension TerminalSessionWriteQueueTests {
             awaitCondition { sinkEntered.withLock { $0 } },
             "precondition: the drain should be parked inside the gated sink")
 
-        // Six 1 MB chunks: piecewise, the backlog crossed the cap part-way.
-        let paste = (1...6).map { [UInt8](repeating: UInt8($0), count: megabyte) }
-        #expect(session.write(chunks: paste) == .accepted)
-        // Now over the cap: the next paste is refused entire.
-        #expect(session.write(chunks: [[9], [9]]) == .backpressured)
+        // Four megabytes fit beside the in-flight chunk. Two more do not,
+        // and none of that second paste is queued.
+        let fitting = (1...4).map { [UInt8](repeating: UInt8($0), count: megabyte) }
+        #expect(session.write(chunks: fitting) == .accepted)
+        let oversized = (5...6).map { [UInt8](repeating: UInt8($0), count: megabyte) }
+        #expect(session.write(chunks: oversized) == .backpressured)
 
         gateOpen.withLock { $0 = true }
-        let drained = awaitRecording(recorded, count: 7)
-        #expect(drained, "expected the whole paste to drain")
+        let drained = awaitRecording(recorded, count: 5)
+        #expect(drained, "expected the fitting paste to drain")
         let markers = recorded.withLock { $0.map { $0.first ?? 0xFF } }
-        #expect(markers == [0, 1, 2, 3, 4, 5, 6])
+        #expect(markers == [0, 1, 2, 3, 4])
     }
 
     /// End to end, with the real pty as the sink: queued writes reach the

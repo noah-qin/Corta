@@ -202,9 +202,13 @@ nonisolated extension Paste {
         shouldStop: () -> Bool = { false }
     ) -> [PasteRisk] {
         guard policy != .off else { return [] }
-        var result = risks(in: text, bracketedPasteEnabled: bracketedPasteEnabled, shouldStop: shouldStop)
+        // ?2004 is the child's claim. It does not prove the reader treats the
+        // enclosed newlines as data, so a newline warns either way.
+        var result = risks(in: text, bracketedPasteEnabled: false, shouldStop: shouldStop)
         if policy == .always, needsWarning(text: text, bracketedPasteEnabled: false),
-            !result.contains(.multiline) { result.append(.multiline) }
+            !result.contains(.multiline)
+        { result.append(.multiline) }
+        _ = bracketedPasteEnabled
         return result
     }
 }

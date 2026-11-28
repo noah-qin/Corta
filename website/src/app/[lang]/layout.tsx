@@ -16,7 +16,7 @@
 
 import { notFound } from "next/navigation";
 import { languages } from "@/lib/i18n";
-import { asset } from "@/lib/site";
+import { asset, contentSecurityPolicy } from "@/lib/site";
 import "../globals.css";
 export function generateStaticParams() {
   return languages.map((l) => ({ lang: l.code }));
@@ -34,6 +34,10 @@ export default async function Layout({
   if (!languages.some((l) => l.code === lang)) notFound();
   return (
     <html lang={lang}>
+      <head>
+        <meta httpEquiv="Content-Security-Policy" content={contentSecurityPolicy} />
+        <meta name="referrer" content="strict-origin" />
+      </head>
       <body>{children}</body>
     </html>
   );

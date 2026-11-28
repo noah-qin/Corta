@@ -158,7 +158,7 @@ struct SettingsModelTests {
         #expect(model.fontFamily == Configuration.systemFontFamily)
     }
 
-    @Test("a scrollback value outside 0...1,000,000 is clamped and reported")
+    @Test("a scrollback value outside 0...100,000 is clamped and reported")
     func scrollbackIsClamped() {
         let model = SettingsModel()
         let original = model.scrollbackLines
@@ -169,7 +169,7 @@ struct SettingsModelTests {
         #expect(model.saveStatus.kind == .adjusted)
 
         model.setScrollbackLines(2_000_000)
-        #expect(model.scrollbackLines == 1_000_000)
+        #expect(model.scrollbackLines == 100_000)
         #expect(model.saveStatus.kind == .adjusted)
     }
 

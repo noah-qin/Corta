@@ -123,6 +123,11 @@ public struct CommandRecordStore: Sendable, Equatable {
         storage[last].promptEndColumn = nil
     }
 
+    mutating func confirmDirectory(_ directory: String, for id: Int) {
+        guard let last, last.id == id, last.host == nil else { return }
+        storage[storage.count - 1].workingDirectory = directory
+    }
+
     mutating func markOutputStart(_ row: Int) {
         guard head < storage.count else { return }
         storage[storage.count - 1].outputStartRow = row

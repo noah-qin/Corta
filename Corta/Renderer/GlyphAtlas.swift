@@ -173,7 +173,7 @@ nonisolated final class GlyphAtlas {
     /// when comparing a bitmap to the cell box.
     static let bitmapPadding: Float = 1
 
-    static let atlasSize = 2048
+    static let atlasSize = 1536
 
     /// The smallest edge `init` falls back to; still dozens of glyphs.
     static let minimumAtlasPixelSize = 64

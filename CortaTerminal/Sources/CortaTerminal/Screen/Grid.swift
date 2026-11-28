@@ -195,6 +195,21 @@ public struct Grid: Sendable {
 
     // MARK: - Reading
 
+    /// Visible rows and their graphemes, without histories or image resources.
+    public struct VisibleScreen: Sendable {
+        let lines: ScreenLines
+        public let columns: Int
+        public let graphemes: GraphemeTable
+
+        public var rows: Int { lines.count }
+        public func line(_ row: Int) -> Line { lines.indices.contains(row) ? lines[row] : Line() }
+    }
+
+    @inline(never)
+    public var visibleScreen: VisibleScreen {
+        VisibleScreen(lines: lines, columns: columns, graphemes: graphemes)
+    }
+
     public subscript(row: Int, column: Int) -> Cell {
         @inline(__always)
         get {

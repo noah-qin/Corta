@@ -16,7 +16,7 @@
 
 import "./globals.css";
 import { languages } from "@/lib/i18n";
-import { asset, href } from "@/lib/site";
+import { asset, contentSecurityPolicy, href } from "@/lib/site";
 
 export const metadata = {
   title: "Page not found — Corta",
@@ -27,6 +27,10 @@ export const metadata = {
 export default function GlobalNotFound() {
   return (
     <html lang="en">
+      <head>
+        <meta httpEquiv="Content-Security-Policy" content={contentSecurityPolicy} />
+        <meta name="referrer" content="strict-origin" />
+      </head>
       <body>
         <main id="main" className="not-found wrap">
           <img

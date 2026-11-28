@@ -108,10 +108,10 @@ final class AgentDirectory: NSObject, NSMenuDelegate {
         return L10n.format("agent.waitingDuration", duration)
     }
 
-    static func waitingScreen(for id: UUID) -> Grid? {
+    static func waitingScreen(for id: UUID) -> Grid.VisibleScreen? {
         guard ConfigurationStore.shared.configuration.agentStatus,
               shared.waiting.startedAt(for: id) != nil else { return nil }
-        return panes.first { $0.taskNotifier.paneID == id }?.session?.snapshot()
+        return panes.first { $0.taskNotifier.paneID == id }?.session?.visibleScreenSnapshot()
     }
 
     static func focus(_ id: UUID) {

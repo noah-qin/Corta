@@ -417,9 +417,9 @@ own error text is under **Details**.
   (`mouse-override-modifier`).
 - **Paste.** ⌘V. Pasted text is marked as a paste (bracketed paste), so a
   shell that supports it — zsh, fish, bash 5.1 or later — inserts a pasted
-  command without running it until you press Return. When the program has
-  not turned bracketed paste on (macOS's own `/bin/bash` 3.2 never does),
-  Corta warns before pasting text that contains a line break. It also warns
+  command without running it until you press Return. A program can claim
+  that mode without anything behind it treating the markers as data, so Corta
+  warns before pasting text that contains a line break either way. It also warns
   for a pipe into a shell (or `bash <(curl …)` and its kin), sudo, recursive forced deletion, a backslash
   continuation, or invisible/bidirectional characters, even with bracketed
   paste enabled. Review the risk sentences and text preview before choosing
@@ -433,10 +433,8 @@ own error text is under **Details**.
   paste the shell is still working through can be cancelled with ⌃C: the
   part not yet sent is dropped and the interrupt goes straight through. A
   paste over 64 KiB is checked in the background, so the window stays usable;
-  paste again and the new text replaces it. Over 64 MiB, nothing is pasted and
-  Corta says so. A program can turn bracketed paste on without anything behind
-  it understanding it; if you paste into remote or old programs and want the
-  line-break warning every time, use `paste-warning = always`.
+  paste again and the new text replaces it. Over 4 MiB, nothing is pasted and
+  Corta says so.
 - **Composing a prompt.** **Edit ▸ Compose Text…** (⇧⌘E, or the command
   palette) opens a text field over the focused pane — for a long prompt to a
   coding agent, or anything typed with an input method such as Pinyin. It is

@@ -290,7 +290,7 @@ oferecidos para ele. Aumente `scrollback-lines` se isso acontecer com frequênci
 
 `scrollback-lines` (10.000 por padrão) é um limite por sessão, e conta linhas *físicas* — uma linha de 200 colunas quebrada
 em 100 colunas conta como duas. A saída mais antiga que o limite é descartada conforme chega; a pílula no topo diz até onde
-a visualização voltou. Aumente o limite (até 1.000.000; quanta memória o histórico antigo comprimido ocupa depende do texto
+a visualização voltou. Aumente o limite (até 100.000; quanta memória o histórico antigo comprimido ocupa depende do texto
 e da carga). Uma célula armazenada tem 16 bytes antes da compressão, o que não é uma estimativa de memória residente. Uma
 carga medida de 100.000 linhas de 120 colunas acrescentou cerca de 11 MiB de memória residente; veja
 [Performance](../../PERFORMANCE.md#56-numbers-by-release) (em inglês). Exporte a saída que você precisa guardar além do limite
@@ -333,7 +333,7 @@ grande num link lento também pode atingir o limite: copie-o com o navegador SFT
 
 ### Um link não abre ou a colagem passa do limite
 
-Se a saída mudou o destino da dica, o clique apenas a atualiza. Confira e clique novamente. Um aviso de mais de 64 MiB significa que nada foi enviado. Cole em partes ou salve o texto em um arquivo para o programa ler. Esse limite é fixo.
+Se a saída mudou o destino da dica, o clique apenas a atualiza. Confira e clique novamente. Um aviso de mais de 4 MiB significa que nada foi enviado. Cole em partes ou salve o texto em um arquivo para o programa ler. Esse limite é fixo.
 
 <a id="an-ssh-pane-stopped-responding-and-reconnect-is-greyed-out"></a>
 <a id="browse-remote-files-stays-on-connecting-then-says-it-could-not-reach-the-host"></a>

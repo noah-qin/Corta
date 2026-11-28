@@ -441,7 +441,7 @@ extension PaneWindowTitle {
     /// Wider than the tab strip's 100 ms (`TerminalWindowController.stripRefreshInterval`):
     /// each title costs the titlebar a layout and a commit, and at 100 ms ten a
     /// second still landed (`PERFORMANCE.md` §5.30).
-    static let windowTitleInterval: TimeInterval = 0.25
+    static let windowTitleInterval: TimeInterval = 0.5
 
     /// Shows the grid size in the title for a moment after a resize, then
     /// takes it away again.

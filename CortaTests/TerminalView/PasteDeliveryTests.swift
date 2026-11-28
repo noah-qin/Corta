@@ -69,17 +69,17 @@ struct PasteDeliveryTests {
         #expect(!session.hasPendingInput)
     }
 
-    /// Larger than the cap the write queue pushes back with, which refuses a
-    /// backlog and not one paste: what is under `maximumBytes` still goes.
-    @Test("a paste past the write queue's cap still goes through whole")
-    func pastePastTheQueueCapIsSent() async throws {
+    /// One paste has to fit an empty write queue. A larger one is refused
+    /// before any of it is queued, rather than sitting behind a slow child.
+    @Test("a paste past the write queue's cap is refused whole")
+    func pastePastTheQueueCapIsRefused() throws {
         let (host, session) = try live()
         defer { session.stop() }
         let log = Log()
-        let text = String(repeating: "x", count: 5 * 1024 * 1024)
-        paste(text, into: host, log: log)
-        await settle { log.sent + log.discarded > 0 }
-        #expect(log.sent == 1)
+        paste(String(repeating: "x", count: TerminalSession.maxPendingWriteBytes), into: host, log: log)
+        #expect(log.discarded == 1)
+        #expect(log.sent == 0)
+        #expect(!session.hasPendingInput)
     }
 
     @Test("a small paste is judged and sent where it was asked for")

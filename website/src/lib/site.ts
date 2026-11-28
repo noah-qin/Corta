@@ -20,6 +20,22 @@ import { homepageTitles, label } from "@/lib/i18n";
 import { basePath, getSiteOrigin } from "../../scripts/site-config.mjs";
 
 export { basePath };
+
+/// What a static export can attach itself. GitHub Pages does not let the site
+/// set HSTS, `X-Content-Type-Options` or `frame-ancestors` as response headers;
+/// `frame-ancestors` in this policy is kept for a host that does.
+export const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "connect-src 'self'",
+].join("; ");
 export type PageInfo = {
   file: string;
   contentLang: string;

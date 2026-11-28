@@ -34,6 +34,7 @@ extension SettingsView.Category {
         case .general:
             [
                 "settings.section.window", "settings.label.newWindow", "settings.label.restoreWindows",
+                "settings.label.restoreSSHDestinations",
                 "settings.label.confirmClose", "settings.section.panes",
                 "settings.label.autoBalancePanes", "settings.label.bestFitSplit",
                 "settings.section.notificationsAndAgents",

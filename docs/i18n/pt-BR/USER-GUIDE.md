@@ -323,9 +323,8 @@ ou, para uma conexão, **Reconectar**; o texto de erro do sistema fica em **Deta
   vista. Dentro de um programa que usa o mouse — `vim`, `htop` —,
   segure ⌥ ao começar a arrastar para selecionar texto mesmo assim (`mouse-override-modifier`).
 - **Colar.** ⌘V. O texto colado é marcado como colagem (bracketed paste), então um shell que entende isso — zsh, fish,
-  bash 5.1 ou posterior — insere um comando colado sem executá-lo até você pressionar Return. Quando o programa não ativou o
-  bracketed paste (o `/bin/bash` 3.2 do próprio macOS nunca ativa), o Corta avisa antes de colar texto que contém uma
-  quebra de linha. Mesmo com bracketed paste ativado, ele também avisa diante de um pipe para um shell (ou `bash <(curl …)`
+  bash 5.1 ou posterior — insere um comando colado sem executá-lo até você pressionar Return. Um programa pode ativar o bracketed paste sem realmente entendê-lo, então o Corta avisa antes de colar texto que contém uma
+  quebra de linha nos dois casos. Ele também avisa diante de um pipe para um shell (ou `bash <(curl …)`
   e semelhantes), sudo, exclusão recursiva forçada, continuação com barra invertida ou caracteres invisíveis /
   bidirecionais. Leia as frases de risco e a pré-visualização do texto antes de escolher **Colar** ou **Cancelar**; caracteres
   ocultos aparecem como códigos do tipo `⟦U+202E⟧`. **Não avisar novamente neste painel** vale até esse painel ser fechado.
@@ -333,7 +332,7 @@ ou, para uma conexão, **Reconectar**; o texto de erro do sistema fica em **Deta
   padrões cautelosos, não um analisador de shell nem uma garantia de que o resto do texto é seguro. Uma colagem grande que o
   shell ainda está processando pode ser cancelada com ⌃C: a parte ainda não enviada é descartada e a interrupção passa direto.
 
-  Colagens acima de 64 KiB são verificadas em segundo plano e a janela continua utilizável. Colar novamente substitui o texto ainda em verificação. Acima de 64 MiB, nada é enviado e o Corta avisa. Um programa pode ativar a colagem delimitada sem realmente entendê-la. Para sempre avisar ao colar várias linhas em programas remotos ou antigos, use `paste-warning = always`.
+  Colagens acima de 64 KiB são verificadas em segundo plano e a janela continua utilizável. Colar novamente substitui o texto ainda em verificação. Acima de 4 MiB, nada é enviado e o Corta avisa. Um programa pode ativar a colagem delimitada sem realmente entendê-la. Por isso, uma colagem com quebra de linha avisa antes, esteja o modo ativo ou não.
 - **Soltar arquivos.** Solte arquivos, ou arquivos fornecidos por outro app, em um painel para inserir seus caminhos entre aspas pelo canal de colagem, sem Return. Passar por cima não inicia nenhum download. O recebimento é assíncrono e para de esperar após 120 segundos; falhas aparecem no painel. Se a sessão ou o grupo de processos em primeiro plano mudar nesse meio-tempo, o Corta descarta a operação.
 
   **Um arquivo do Finder é usado onde está, e o Corta nunca o remove. Um arquivo que só outro app pode fornecer, como uma foto ou um anexo do Mail, chega como cópia temporária:** salve-o em outro lugar se quiser mantê-lo. A cópia é removida quando seu painel fecha, também junto com a aba ou janela, ou quando o Corta encerra. Um programa ainda em execução não poderá mais lê-la, e um caminho copiado para outro lugar deixa de valer. O mesmo vale para caminhos antigos no histórico de rolagem e do shell, e ⇧⌘T traz um painel de volta sem suas cópias. Mover o painel para outra aba ou janela as mantém. Se outro programa mantiver um arquivo aberto ou houver um instantâneo do sistema, o espaço pode demorar a voltar. **Ajustes ▸ Privacidade e segurança ▸ Dados locais** mostra o espaço e oferece **Limpar agora…**.

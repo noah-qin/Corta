@@ -66,6 +66,7 @@ extension Performer {
         // designators — is still ignored cleanly.
         if intermediates.count == 1, intermediates[0] == 0x23, final == 0x38 {
             grid.alignmentDisplay()
+            endSliceAfterLargeDisplayChange()
             return
         }
         guard intermediates.count == 0 else { return }
@@ -90,7 +91,9 @@ extension Performer {
         // must not have: a client that identifies the terminal this way waits
         // for a reply that never arrives rather than falling back.
         case 0x5A: reportPrimaryDeviceAttributes()
-        case 0x63: resetToInitialState() // RIS
+        case 0x63: // RIS
+            resetToInitialState()
+            endSliceAfterLargeDisplayChange()
         default: break
         }
     }

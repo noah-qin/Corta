@@ -1992,12 +1992,12 @@ that changes it, and the titlebar's layout and layer commit are most of the cost
 The tab strip's own refresh is already held to once in 100 ms
 (`TerminalWindowController.refreshTabStripSoon`); the window's title is not.
 
-**The image caps add up to about 2 GB.** *Unchanged, by decision: the two 1 GB
-ceilings are the design until `DECISIONS.md` says otherwise.* Twelve panes each sent twenty
-1024 × 1024 RGBA images (960 MiB of pixels in all): physical footprint 1,952 MB.
-The pixel budget (`ImageMemoryBudget`, 1 GB) and the texture budget
-(`GlobalTextureBudget`, 1 GB) are separate ceilings and both were reached. That is
-the caps working as written; it is recorded because the sum is what a user sees.
+**The image caps were about 2 GB, and are now 1 GB.** Twelve panes each sent twenty
+1024 × 1024 RGBA images (960 MiB of pixels in all) under the previous ceilings:
+physical footprint 1,952 MB. The pixel budget (`ImageMemoryBudget`) and the
+texture budget (`GlobalTextureBudget`) are separate ceilings and both were
+reached at 1 GB. Each is now 512 MB. That measurement is the old caps working
+as written; it is recorded because the sum is what a user sees.
 
 **Checked and sound.** In the app, one 50 × 200 window, 60 Hz in front:
 
@@ -2051,6 +2051,6 @@ F13 and the keys above it sent U+F710 and the others as UTF-8 text. That is a
 correctness fix, #609, measured as bytes rather than time: F13 now sends
 `CSI 25 ~`, or `CSI 57376 u` under kitty's flags.
 
-The 1 GB pixel and texture budgets and the 15 fps of a window in the background are
-unchanged.
+The pixel and texture budgets are 512 MB each. The 15 fps of a window in the
+background is unchanged.
 

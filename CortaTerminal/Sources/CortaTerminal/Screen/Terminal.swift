@@ -136,6 +136,20 @@ public struct Terminal: Sendable {
     /// many bytes it consumed. The caller takes the transmission
     /// (`takeDeferredImage`), decodes it without holding whatever guards
     /// this terminal, completes it, and feeds the rest.
+    var verifiesCommandDirectories: Bool {
+        get { performer.verifiesCommandDirectories }
+        set { performer.verifiesCommandDirectories = newValue }
+    }
+
+    mutating func takePendingCommandDirectory() -> (recordID: Int, path: String)? {
+        defer { performer.pendingCommandDirectory = nil }
+        return performer.pendingCommandDirectory
+    }
+
+    mutating func confirmCommandDirectory(_ directory: String, for recordID: Int) {
+        performer.state.commandRecords.confirmDirectory(directory, for: recordID)
+    }
+
     mutating func feedDeferringImageDecode(_ bytes: ArraySlice<UInt8>) -> Int {
         gridGeneration &+= 1
         performer.defersLargeImageDecoding = true
@@ -143,6 +157,7 @@ public struct Terminal: Sendable {
         defer {
             performer.defersLargeImageDecoding = false
             performer.defersAlternateScreenReflow = false
+            performer.endsDisplaySlice = false
         }
         return parser.parse(bytes, performer: &performer, stoppingAfterAPC: true)
     }

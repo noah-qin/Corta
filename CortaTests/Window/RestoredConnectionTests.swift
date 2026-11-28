@@ -46,7 +46,7 @@ struct RestoredConnectionTests {
     func remoteTargetRoundTrips() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("corta-restore-\(UUID().uuidString)")
-        let store = SessionRestore(directory: directory)
+        let store = SessionRestore(directory: directory, storesSSHDestinations: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let target = try #require(SSHTarget(key: "user@build-box:2222 -i /Users/example/.ssh/id_build"))
         let state = WindowState(
@@ -62,6 +62,14 @@ struct RestoredConnectionTests {
         let raw = try String(contentsOf: store.fileURL, encoding: .utf8)
         #expect(raw.contains("id_build"), "the target is saved as the sheet made it")
         #expect(raw.contains("\"launcher\":true"))
+
+        // The default store handles pre-upgrade files and future saves.
+        let privateStore = SessionRestore(directory: directory)
+        #expect(privateStore.load().first?.layout.firstRemote == .launcher)
+        privateStore.save([state])
+        let privateRaw = try String(contentsOf: privateStore.fileURL, encoding: .utf8)
+        #expect(!privateRaw.contains("id_build"))
+        #expect(privateStore.load().first?.layout.firstRemote == .launcher)
     }
 
     @Test("state written by 1.6.2 still restores, with no remote side")

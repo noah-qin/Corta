@@ -266,7 +266,7 @@ public nonisolated final class TerminalRenderer: @unchecked Sendable {
         // The atlas is per pane, unlike the pipelines: it is mutable and its
         // eviction forces full rebuilds, so sharing would couple every pane's
         // damage tracking to other panes' glyph churn. Lazy allocation makes
-        // a prompt's atlas small; the ceiling is still about 20 MiB per pane.
+        // a prompt's atlas small; the ceiling is still about 12 MiB per pane.
         // A shared read-only ASCII layer would be a new design, not a lookup.
         self.glyphAtlas = try GlyphAtlas(
             device: device, font: atlasFont, atlasPixelSize: atlasPixelSize ?? GlyphAtlas.atlasSize,

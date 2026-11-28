@@ -45,18 +45,12 @@ extension Grid {
         switch mode {
         case .toEnd:
             eraseLine(.toEnd)
-            for row in (cursor.row + 1)..<rows {
-                eraseWholeLine(row, with: template)
-            }
+            eraseWholeLines((cursor.row + 1)..<rows, with: template)
         case .toStart:
-            for row in 0..<cursor.row {
-                eraseWholeLine(row, with: template)
-            }
+            eraseWholeLines(0..<cursor.row, with: template)
             eraseLine(.toStart)
         case .all:
-            for row in 0..<rows {
-                eraseWholeLine(row, with: template)
-            }
+            eraseWholeLines(0..<rows, with: template)
             // The images go with the text they sat among (kitty's `ED 2`).
             imagePlacements.removePlacementsReachingScreen(
                 scrollbackTotal: scrollback.totalPushed, cellPixelHeight: cellPixelHeight)
@@ -65,13 +59,15 @@ extension Grid {
 
     /// The mark goes with the prompt it sat beside: after `clear` a kept one
     /// was a coloured rule down an empty row (#165).
-    private mutating func eraseWholeLine(_ row: Int, with template: Cell) {
-        lines[row].mark = .none
+    private mutating func eraseWholeLines(_ range: Range<Int>, with template: Cell) {
+        guard !range.isEmpty else { return }
         if template.isBlank {
-            lines[row].clear()
+            for row in range { lines[row].recycle() }
         } else {
-            lines[row].erase(0..<columns, with: template)
-            lines[row].wrapped = false
+            // Identical full rows share their new allocation until edited.
+            var erased = Line()
+            erased.fill(template, in: 0..<columns)
+            for row in range { lines[row] = erased }
         }
     }
 

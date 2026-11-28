@@ -20,6 +20,10 @@ import { basePath, getSiteOrigin } from "./scripts/site-config.mjs";
 
 getSiteOrigin();
 const config: NextConfig = {
+  // A static export has no response headers. Content-Security-Policy and the
+  // referrer policy are meta tags in the layouts. GitHub Pages cannot add
+  // HSTS, nosniff or frame-ancestors; https is already enforced on the Pages
+  // site. A meta policy cannot enforce frame-ancestors.
   output: "export",
   trailingSlash: true,
   basePath,

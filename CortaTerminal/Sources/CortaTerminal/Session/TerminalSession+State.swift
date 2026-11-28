@@ -165,24 +165,30 @@ extension TerminalSession {
     public var programProgress: ProgramProgress? {
         registerStateWaiter { state.withLock { $0.terminal.programProgress } }
     }
-    /// One lock for a pane's whole agent-state read; drains its edges.
-    public func takeProgramSignals() -> ProgramSignalSnapshot {
-        readStampedSignals { $0.takeProgramSignals() }
+    /// Drains a pane's signals once the reader has verified who began a wait.
+    /// A pending stamp leaves every edge queued. The main thread uses this
+    /// and reads again on the next output, instead of spinning until the stamp.
+    public func takeProgramSignalsIfReady() -> ProgramSignalSnapshot? {
+        registerStateWaiter {
+            state.withLock { current in
+                guard !current.waitsAwaitingStamp else { return nil }
+                return current.terminal.takeProgramSignals()
+            }
+        }
     }
 
     /// Program signals once the reader has stamped the waits its last slice
-    /// began. It stamps them as soon as the foreground group's reading
-    /// returns, so this waits about that long, and only right after a wait
-    /// began. A reader preempted in that gap on a loaded machine can take
-    /// tens of milliseconds, so the bound is a second, a backstop rather than
-    /// a timeout: past it the signals are read anyway, and an unstamped wait
-    /// reads as unverified, which raises nothing.
+    /// began. Callers that can wait use this. The pane's main-thread read does
+    /// not: `takeProgramSignalsIfReady` returns and tries on the next output.
+    /// Past a second the signals are read anyway, and an unstamped wait reads
+    /// as unverified, which raises nothing.
     private func readStampedSignals<T>(_ read: (inout Terminal) -> T) -> T {
         let deadline = clock_gettime_nsec_np(CLOCK_UPTIME_RAW) + 1_000_000_000
         while true {
             let value: T? = registerStateWaiter {
                 state.withLock { current in
-                    guard !current.waitsAwaitingStamp || clock_gettime_nsec_np(CLOCK_UPTIME_RAW) >= deadline
+                    guard !current.waitsAwaitingStamp
+                        || clock_gettime_nsec_np(CLOCK_UPTIME_RAW) >= deadline
                     else { return nil }
                     return read(&current.terminal)
                 }
@@ -232,6 +238,10 @@ extension TerminalSession {
     /// One flag, without copying the grid the way `snapshot()` would.
     public var isAlternateScreenActive: Bool {
         registerStateWaiter { state.withLock { $0.terminal.grid.isAlternateScreenActive } }
+    }
+
+    public func visibleScreenSnapshot() -> Grid.VisibleScreen {
+        registerStateWaiter { state.withLock { $0.terminal.grid.visibleScreen } }
     }
 
     public var isCommandRunning: Bool {

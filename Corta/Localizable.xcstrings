@@ -952,55 +952,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Not pasted — that’s more than 64 MiB of text."
+            "value": "Not pasted — that’s more than 4 MiB of text."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "未粘贴——文本超过 64 MiB。"
+            "value": "未粘贴——文本超过 4 MiB。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "未貼上——文字超過 64 MiB。"
+            "value": "未貼上——文字超過 4 MiB。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "貼り付けませんでした—テキストが 64 MiB を超えています。"
+            "value": "貼り付けませんでした—テキストが 4 MiB を超えています。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "붙여넣지 않았습니다 — 텍스트가 64MiB를 초과합니다."
+            "value": "붙여넣지 않았습니다 — 텍스트가 4MiB를 초과합니다."
           }
         },
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Nicht eingefügt – der Text ist größer als 64 MiB."
+            "value": "Nicht eingefügt – der Text ist größer als 4 MiB."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Non collé — le texte dépasse 64 Mio."
+            "value": "Non collé — le texte dépasse 4 Mio."
           }
         },
         "es": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "No se pegó: el texto supera los 64 MiB."
+            "value": "No se pegó: el texto supera los 4 MiB."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Não colado — o texto tem mais de 64 MiB."
+            "value": "Não colado — o texto tem mais de 4 MiB."
           }
         }
       }
@@ -9910,6 +9910,79 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Abrir links com"
+          }
+        }
+      }
+    },
+    "settings.label.restoreSSHDestinations": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Restore SSH destinations" } },
+        "zh-Hans": { "stringUnit": { "state": "needs_review", "value": "恢复 SSH 目的地" } },
+        "zh-Hant": { "stringUnit": { "state": "needs_review", "value": "還原 SSH 目的地" } },
+        "ja": { "stringUnit": { "state": "needs_review", "value": "SSH の宛先を復元" } },
+        "ko": { "stringUnit": { "state": "needs_review", "value": "SSH 대상 복원" } },
+        "de": { "stringUnit": { "state": "needs_review", "value": "SSH-Ziele wiederherstellen" } },
+        "fr": { "stringUnit": { "state": "needs_review", "value": "Restaurer les destinations SSH" } },
+        "es": { "stringUnit": { "state": "needs_review", "value": "Restaurar destinos SSH" } },
+        "pt-BR": { "stringUnit": { "state": "needs_review", "value": "Restaurar destinos SSH" } }
+      }
+    },
+    "settings.help.restoreSSHDestinations": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save the host, user, port and identity-file path of connections opened from the connect sheet. Private keys are not saved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "保存从连接表单打开的主机、用户、端口和身份文件路径。不保存私钥。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "儲存從連線表單開啟的主機、使用者、連接埠和身分檔案路徑。不儲存私鑰。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "接続シートから開いた接続のホスト、ユーザー、ポート、識別ファイルのパスを保存します。秘密鍵は保存しません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "연결 시트에서 연 연결의 호스트, 사용자, 포트, 신원 파일 경로를 저장합니다. 개인 키는 저장하지 않습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Speichert Host, Benutzer, Port und Pfad der Identitätsdatei von Verbindungen aus dem Verbindungsdialog. Private Schlüssel werden nicht gespeichert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Enregistre l’hôte, l’utilisateur, le port et le chemin du fichier d’identité des connexions ouvertes depuis la feuille de connexion. Les clés privées ne sont pas enregistrées."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Guarda el host, el usuario, el puerto y la ruta del archivo de identidad de las conexiones abiertas desde la hoja de conexión. No guarda las claves privadas."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Salva o host, o usuário, a porta e o caminho do arquivo de identidade das conexões abertas pela folha de conexão. Chaves privadas não são salvas."
           }
         }
       }

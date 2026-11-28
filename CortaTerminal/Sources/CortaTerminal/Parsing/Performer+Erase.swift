@@ -33,6 +33,7 @@ extension Performer {
             case 3: grid.clearScrollback()
             default: break
             }
+            endSliceAfterLargeDisplayChange()
         case 0x4B:  // EL
             switch parameters[0] {
             case 0: grid.eraseLine(.toEnd)

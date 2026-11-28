@@ -117,8 +117,11 @@ import Testing
         let sink = GatedSink()
         let session = try makeSession(sink)
         defer { session.stop() }
+        let lead = [UInt8](repeating: 0x01, count: 64 * 1024)
+        #expect(session.write(lead) == .accepted)
+        #expect(wait { sink.chunks.count == 1 })
         let chunk = [UInt8](repeating: 0x61, count: 64 * 1024)
-        let paste = Array(repeating: chunk, count: 80)  // 5 MiB, over the 4 MiB cap
+        let paste = Array(repeating: chunk, count: 64)  // exactly the 4 MiB cap
         #expect(session.write(paste: paste, closing: nil) == .accepted)
         #expect(wait { sink.chunks.count == 1 })
         #expect(session.write([0x03]) == .backpressured)

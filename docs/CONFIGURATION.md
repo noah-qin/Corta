@@ -87,7 +87,8 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 | --- | --- | --- | --- |
 | `columns` | 20–500 | `120` | The grid a **new** window opens with, in cells. |
 | `rows` | 5–300 | `30` | As above. The window's size in pixels is this grid times the font's cell metrics plus the pane insets — so two terminals showing the same `columns × rows` are still different sizes on screen if their fonts differ. |
-| `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. A pane the connect sheet opened over SSH comes back as an ended connection naming the host — no connection is made until **Reconnect** — and a hand-typed `ssh` pane comes back as a local shell that says it was remote. Off clears the saved arrangement instead. |
+| `restore-windows` | boolean | `true` | Reopen window frames, tabs, splits, divider proportions and working directories on the next launch. Starts fresh child processes; terminal text and running jobs are not restored. A pane the connect sheet opened over SSH comes back as an ended connection naming the host — no connection is made until **Reconnect** — only when `restore-ssh-destinations` is on. A hand-typed `ssh` pane comes back as a local shell that says it was remote. Off clears the saved arrangement instead. |
+| `restore-ssh-destinations` | boolean | `false` | With `restore-windows`, also save the host, user, port and identity-file path of a connection opened from the connect sheet. The private key is not saved. Off, that pane is restored as a local shell and the destination is not written. |
 | `confirm-close` | boolean | `true` | Ask before closing or replacing a session with a foreground job or a live SSH connection. Closing a tab, window or the app checks every affected pane. |
 | `auto-balance-panes` | boolean | `false` | Share the room equally as panes open and close. A divider you dragged or moved from the keyboard stays where you put it until Equalize Panes; a restored divider away from its balanced place counts as yours. Off, a new pane halves the focused one and a closed pane's room goes to its neighbours, as ever. |
 | `focus-follows-mouse` | boolean | `false` | The pointer entering a pane focuses it. Not while the window is inactive, a button is held, a menu, sheet or modal window is up, a search field or tab rename holds the keyboard, or an input method is composing inline. An input method that composes only in its own panel cannot be seen, so a pointer entering a pane can still end that composition. |
@@ -97,7 +98,7 @@ dotted prefix so the flat format needs no nesting: `theme.<name>.…`
 
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
-| `scrollback-lines` | 0–1000000 | `10000` | Lines of history per session. **Applies to sessions opened afterwards**: a running child's history cannot be re-limited without discarding lines. |
+| `scrollback-lines` | 0–100000 | `10000` | Lines of history per session. **Applies to sessions opened afterwards**: a running child's history cannot be re-limited without discarding lines. |
 | `ambiguous-width` | `narrow`, `wide` | `narrow` | East Asian Ambiguous characters (Unicode UAX #11, version 17.0) — `±`, `§`, `é`, Greek, Cyrillic, box drawing among them — take one cell or two; wide box drawing spans both cells. **Applies to output written after the change**; what is already on screen keeps its width. Programs that measure text themselves (shells, editors) count by their own rules, so `wide` can misalign them. |
 | `command-history-limit` | 0–10000 | `512` | How many completed/running commands a session's structured command history (jumping, copy/export by identity, Command History search) keeps at once — separate from `scrollback-lines`, which bounds visible text, not command records. **Applies to sessions opened afterwards**, same reason as `scrollback-lines`. |
 | `bell` | `visual`, `audible`, `muted` | `visual` | `visual` flashes the pane; `audible` is `NSSound.beep()`. |
@@ -227,7 +228,7 @@ of integration uses `TaskNotifier`'s typing-and-idle heuristic.
 
 | Key | Values | Default | Notes |
 | --- | --- | --- | --- |
-| `notify-from-programs` | boolean | `true` | Allow bounded program notifications and agent attention notices. Notification Center may retain their message text. |
+| `notify-from-programs` | boolean | `false` | Allow bounded program notifications and agent attention notices. Notification Center may retain their message text, including on the lock screen once the system has authorised notifications. |
 | `agent-status` | boolean | `true` | Show state on tabs, the Dock and the Agents list. Any program's OSC 7501 report shows, but a wait (Waiting for you, the Dock count, the queue, the notice) counts only from a built-in or `agent-processes` agent in front; any other shows as State unknown, Unverified. Developed against Claude Code, and observed from Codex 0.166.0 through the same parser. Process-only detections show State unknown. |
 | `agent-processes` | comma-separated names | *(empty)* | Additional foreground executable names, up to 32 names of 80 bytes each; macOS reports at most the first 32 bytes of a process name, so a longer name never matches. Built-ins: claude, claude-code, codex, gemini, aider, opencode. Names enable process detection only, not task-state integration or hook installation; they also decide whose OSC 7501 wait raises Waiting for you, which only an agent's does. No polling timer. |
 | `notify-on-long-task` | boolean | `false` | Post a notification when a long command finishes. |
@@ -336,6 +337,7 @@ status-network-interface = auto
 columns = 120
 rows = 30
 restore-windows = true
+restore-ssh-destinations = false
 confirm-close = true
 auto-balance-panes = false
 focus-follows-mouse = false
@@ -363,7 +365,7 @@ allow-clipboard-write = false
 secure-keyboard-entry = false
 
 # Notifications
-notify-from-programs = true
+notify-from-programs = false
 agent-status = true
 agent-processes =
 notify-on-long-task = true         # default false

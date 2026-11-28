@@ -195,6 +195,7 @@ public final class TerminalSession: @unchecked Sendable {
         mutating func pop() -> [UInt8]? {
             guard head < chunks.count else { return nil }
             let chunk = chunks[head]
+            chunks[head].bytes = []
             head += 1
             bytes -= chunk.bytes.count
             if let id = chunk.paste, var paste = pastes[id] {
@@ -250,11 +251,8 @@ public final class TerminalSession: @unchecked Sendable {
     /// Serial: chunks reach the PTY in enqueue order.
     let writerQueue = DispatchQueue(label: "dev.corta.terminal-session.writer")
 
-    /// A backlog past this means the child stopped reading (the PTY alone
-    /// absorbs ~100 MB), so more input is dropped rather than buffered without
-    /// bound. A chunk larger than the cap is accepted while the backlog is under
-    /// it, so a paste goes through while the pipe drains at all.
-    static let maxPendingWriteBytes = 4 * 1024 * 1024
+    /// Maximum queued bytes, in addition to the single in-flight chunk.
+    public static let maxPendingWriteBytes = 4 * 1024 * 1024
 
     /// The most one lock acquisition feeds; `FeedSliceSizer` takes less
     /// while slices run slow.
@@ -322,6 +320,7 @@ public final class TerminalSession: @unchecked Sendable {
         terminal.grid.cellPixelHeight = size.cellPixelHeight
         terminal.grid.cellPixelWidth = size.cellPixelWidth
         terminal.directoryCompletionToken = directoryCompletionToken
+        terminal.verifiesCommandDirectories = true
         self.state = Mutex(State(terminal: terminal))
         if let imageBudget {
             state.withLock { current in
