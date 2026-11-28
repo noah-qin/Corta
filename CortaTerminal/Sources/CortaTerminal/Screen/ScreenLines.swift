@@ -190,18 +190,31 @@ struct ScreenLines: RandomAccessCollection, MutableCollection, Sendable {
     /// changes nothing.
     private mutating func rotateLeft(_ first: Int, _ last: Int, by amount: Int) {
         guard amount > 0, amount < last - first + 1 else { return }
-        func reverse(_ first: Int, _ last: Int) {
-            var a = first, b = last
-            while a < b {
-                let i = physicalIndex(a), j = physicalIndex(b)
-                storage.swapAt(i, j)
-                revisions.swapAt(i, j)
-                a += 1; b -= 1
+        // Open each array for mutation once. Swapping through the arrays
+        // directly checks both for unique storage at every pair of rows.
+        let head = head
+        storage.withUnsafeMutableBufferPointer { lines in
+            revisions.withUnsafeMutableBufferPointer { revisions in
+                let rows = lines.count
+                func reverse(_ first: Int, _ last: Int) {
+                    var a = head + first
+                    var b = head + last
+                    if a >= rows { a -= rows }
+                    if b >= rows { b -= rows }
+                    for _ in 0..<((last - first + 1) / 2) {
+                        lines.swapAt(a, b)
+                        revisions.swapAt(a, b)
+                        a += 1
+                        if a == rows { a = 0 }
+                        if b == 0 { b = rows }
+                        b -= 1
+                    }
+                }
+                reverse(first, first + amount - 1)
+                reverse(first + amount, last)
+                reverse(first, last)
             }
         }
-        reverse(first, first + amount - 1)
-        reverse(first + amount, last)
-        reverse(first, last)
     }
 
     mutating func append<S: Sequence>(contentsOf newElements: S) where S.Element == Line {
