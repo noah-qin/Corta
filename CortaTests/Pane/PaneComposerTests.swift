@@ -94,7 +94,8 @@ struct PaneComposerTests {
     /// The child turns `?2004` on and writes what it reads, raw, to a file:
     /// the text arrives once, between the paste markers, its control
     /// character stripped, and with no Return after it — submitting is the
-    /// user's, in the program.
+    /// user's, in the program. A newline still asks first; this test answers
+    /// yes, which is what keeps the sheet from waiting on a click.
     @Test("a send arrives as one bracketed paste, sanitised, with nothing appended")
     func sendIsABracketedPaste() throws {
         let capture = FileManager.default.temporaryDirectory
@@ -109,6 +110,7 @@ struct PaneComposerTests {
                 && fixture.session.snapshot().logicalLines().contains { $0.text.contains("READY") }
         }
 
+        fixture.host.commands.pasteWarningAnswer = { _ in true }
         fixture.composer.show()
         let textView = try #require(fixture.composer.textView)
         #expect(fixture.composer.isOpen)
