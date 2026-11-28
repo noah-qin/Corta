@@ -23,298 +23,6 @@ public enum Search {
     /// A megabyte line of one repeated character would otherwise build a
     /// highlight list no renderer can use.
     public static let defaultMatchLimit = 5_000
-
-    /// Bounds an ordinary pattern's per-line cost (`cat` of a binary yields
-    /// megabyte lines). Catastrophic patterns have an early shape check and
-    /// progress-callback cancellation. Skipped lines are counted so the UI
-    /// says the search was incomplete.
-    public static let regexLineLimit = 64_000
-
-    /// `shouldStop` catches a superseded query, not a pattern slow on every
-    /// line; this does. Tripping it means the pattern, not the document.
-    public static let regexTimeBudget: Duration = .milliseconds(500)
-
-    public struct RegexResult: Sendable {
-        public var matches: [SelectionRange]
-        /// Lines the sweep did not search: past `regexLineLimit`, or a line
-        /// whose matches could not be found within one whole time budget.
-        public var unsearchedLines: Int
-        /// The count is then a floor.
-        public var timedOut: Bool
-        /// Where an older sweep resumes: the last row of the next logical
-        /// line to read, in the swept grid's coordinates. Nil when nothing
-        /// older remains, or the sweep was superseded. Pass it back as
-        /// `findRegex(_:in:from:)`'s `resumeRow`.
-        public var resumeRow: Int?
-
-        public init(
-            matches: [SelectionRange] = [], unsearchedLines: Int = 0, timedOut: Bool = false,
-            resumeRow: Int? = nil
-        ) {
-            self.matches = matches
-            self.unsearchedLines = unsearchedLines
-            self.timedOut = timedOut
-            self.resumeRow = resumeRow
-        }
-
-        public var isIncomplete: Bool { unsearchedLines > 0 || timedOut }
-    }
-
-    /// Not "no matches": a half-typed regex is the normal state of typing one.
-    public static func isValidRegex(_ pattern: String, caseSensitive: Bool) -> Bool {
-        compileRegex(pattern, caseSensitive: caseSensitive) != nil
-    }
-
-    /// Unbounded repetition of a group whose iterations can split the same
-    /// text more than one way — the shapes that backtrack exponentially. Two
-    /// are refused:
-    ///
-    /// - an unbounded repeat inside the group that nothing required in the
-    ///   iteration separates from the next one: `(a+)+`, `(.*)*`,
-    ///   `(\w+\s?)+`. `(\d+\.)+` passes: each iteration must end on a `.`,
-    ///   which `\d+` cannot take.
-    /// - alternatives that can start on the same character, or match nothing:
-    ///   `(a|a)+`, `(a|ab)+`. `(a|b)+` and `(foo|bar)*` pass.
-    ///
-    /// Conservative where it cannot tell (`.`, a negated class, a
-    /// backreference count as any character), and an early rejection only:
-    /// progress callbacks still enforce cancellation and the time budget for
-    /// shapes it misses. A refusal is reported as too slow, not as a typo.
-    public static func isCatastrophic(_ pattern: String) -> Bool {
-        let characters = Array(pattern)
-        var index = 0
-        while index < characters.count {
-            let character = characters[index]
-            if skipLiteral(characters, at: &index) { continue }
-            guard character == "(", let close = groupEnd(characters, from: index) else {
-                index += 1
-                continue
-            }
-            let body = Array(characters[(index + 1)..<close])
-            guard let quantified = unboundedQuantifierEnd(characters, after: close) else {
-                index += 1
-                continue
-            }
-            if RepeatShape.isAmbiguous(body) { return true }
-            index = quantified
-        }
-        return false
-    }
-
-    /// Steps over an escape (`\\x`) or a whole character class (`[...]`) at
-    /// `index`, which hold no group to find; `false` leaves `index` alone.
-    private static func skipLiteral(_ characters: [Character], at index: inout Int) -> Bool {
-        switch characters[index] {
-        case "\\":
-            index += 2
-        case "[":
-            index += 1
-            while index < characters.count, characters[index] != "]" {
-                index += characters[index] == "\\" ? 2 : 1
-            }
-            index += 1
-        default:
-            return false
-        }
-        return true
-    }
-
-    private static func groupEnd(_ characters: [Character], from start: Int) -> Int? {
-        var depth = 0
-        var index = start
-        while index < characters.count {
-            let character = characters[index]
-            if skipLiteral(characters, at: &index) { continue }
-            if character == "(" { depth += 1 }
-            if character == ")" {
-                depth -= 1
-                if depth == 0 { return index }
-            }
-            index += 1
-        }
-        return nil
-    }
-
-    private static func unboundedQuantifierEnd(_ characters: [Character], after close: Int)
-        -> Int?
-    {
-        var index = close + 1
-        guard index < characters.count else { return nil }
-        switch characters[index] {
-        case "*", "+":
-            index += 1
-        case "{":
-            guard let brace = characters[index...].firstIndex(of: "}") else { return nil }
-            let inside = String(characters[(index + 1)..<brace])
-            // `{2,}` is unbounded; `{2,4}` and `{2}` are not.
-            guard inside.hasSuffix(",") else { return nil }
-            index = brace + 1
-        default:
-            return nil
-        }
-        // A lazy or possessive marker does not change the shape.
-        if index < characters.count, characters[index] == "?" || characters[index] == "+" {
-            index += 1
-        }
-        return index
-    }
-
-    private static func compileRegex(_ pattern: String, caseSensitive: Bool)
-        -> NSRegularExpression?
-    {
-        guard !pattern.isEmpty else { return nil }
-        var options: NSRegularExpression.Options = []
-        if !caseSensitive { options.insert(.caseInsensitive) }
-        return try? NSRegularExpression(pattern: pattern, options: options)
-    }
-
-    /// Oldest first, with the substring path's cap and cancellation; the line
-    /// bound is what makes cancellation reachable on one enormous line.
-    /// Zero-length matches advance one character instead of spinning.
-    ///
-    /// `resumeRow` continues a sweep that ran out of time: the last row of the
-    /// next logical line to read, from an earlier result's `resumeRow`. It
-    /// must be a logical line's last row (the earlier result guarantees it),
-    /// and nil starts from the newest line.
-    public static func findRegex(
-        _ pattern: String, in grid: Grid, caseSensitive: Bool = false,
-        maxMatches: Int = .max, timeBudget: Duration = regexTimeBudget,
-        from resumeRow: Int? = nil, downToRow: Int? = nil, shouldStop: () -> Bool = { false }
-    ) -> RegexResult {
-        guard maxMatches > 0, !isCatastrophic(pattern),
-            let regex = compileRegex(pattern, caseSensitive: caseSensitive)
-        else { return RegexResult() }
-        var result = RegexResult()
-        let sweep = RegexSweep(regex: regex, maxMatches: maxMatches, deadline: SuspendingClock.now + timeBudget)
-        let lines =
-            resumeRow.map { grid.reversedLogicalLines(startingAtLastRow: $0) }
-            ?? grid.reversedLogicalLines()
-        // Lines fully read in this call. A line that cannot be finished in one
-        // whole budget is left unsearched and the sweep moves on; retrying it
-        // from its start would spend the next budget the same way, forever.
-        var linesRead = 0
-        for logicalLine in lines {
-            // Lines at or below `downToRow` were searched by an earlier slice.
-            if let downToRow, logicalLine.lastRow <= downToRow { break }
-            if shouldStop() { break }
-            let text = logicalLine.text
-            guard !text.isEmpty else { continue }
-            // Here too: a line with no match never calls the block.
-            if sweep.isExpired {
-                result.timedOut = true
-                result.resumeRow = logicalLine.lastRow
-                break
-            }
-            guard text.utf16.count <= regexLineLimit else {
-                result.unsearchedLines += 1
-                linesRead += 1
-                continue
-            }
-            let found = sweep.matches(in: logicalLine, result: &result, shouldStop: shouldStop)
-            if result.timedOut {
-                resumeAfterLineTimeout(in: logicalLine, grid: grid, linesRead: linesRead, result: &result)
-                break
-            }
-            result.matches.append(contentsOf: found.reversed())
-            linesRead += 1
-            if result.matches.count >= maxMatches || shouldStop() { break }
-            if sweep.isExpired {
-                // Older than this line is unread.
-                if logicalLine.firstRow > grid.documentRowRange.lowerBound {
-                    result.timedOut = true
-                    result.resumeRow = logicalLine.firstRow - 1
-                }
-                break
-            }
-        }
-        result.matches.reverse()
-        return result
-    }
-
-    /// Where the sweep resumes when the budget ended inside a logical line.
-    /// A line reached after others were read gets a fresh budget; one that a
-    /// whole budget could not finish (nothing read before it) never would, so
-    /// it is left unsearched and counted rather than retried forever.
-    private static func resumeAfterLineTimeout(
-        in logicalLine: LogicalLine, grid: Grid, linesRead: Int, result: inout RegexResult
-    ) {
-        guard linesRead == 0 else {
-            result.resumeRow = logicalLine.lastRow
-            return
-        }
-        result.unsearchedLines += 1
-        guard logicalLine.firstRow > grid.documentRowRange.lowerBound else {
-            result.resumeRow = nil
-            return
-        }
-        result.resumeRow = logicalLine.firstRow - 1
-    }
-
-    /// One regex sweep's fixed inputs: the expression, the cap and the deadline.
-    private struct RegexSweep {
-        let regex: NSRegularExpression
-        let maxMatches: Int
-        let deadline: SuspendingClock.Instant
-
-        var isExpired: Bool { SuspendingClock.now >= deadline }
-
-        /// The line's matches in text order. Sets `result.timedOut` when the
-        /// budget runs out inside the line.
-        func matches(
-            in logicalLine: LogicalLine, result: inout RegexResult, shouldStop: () -> Bool
-        ) -> [SelectionRange] {
-            let text = logicalLine.text
-            let nsText = text as NSString
-            var found: [SelectionRange] = []
-            let already = result.matches.count
-            var timedOut = false
-            var character = text.startIndex
-            var characterOffset = 0
-            var nextUTF16Offset = 0
-            func position(containingUTF16Offset offset: Int) -> Int {
-                while nextUTF16Offset <= offset, character < text.endIndex {
-                    let next = text.index(after: character)
-                    nextUTF16Offset += text[character..<next].utf16.count
-                    character = next
-                    characterOffset += 1
-                }
-                return characterOffset - 1
-            }
-            regex.enumerateMatches(
-                in: text, options: [.reportProgress], range: NSRange(location: 0, length: nsText.length)
-            ) { match, _, stop in
-                // Progress callbacks have no match. Check them before the
-                // match guard so a failing backtracking attempt can stop too.
-                if shouldStop() {
-                    stop.pointee = true
-                    return
-                }
-                if isExpired {
-                    timedOut = true
-                    stop.pointee = true
-                    return
-                }
-                guard let match, match.range.length > 0 else { return }
-                // Regex reports disjoint ranges in text order. Walk each
-                // grapheme once, including matches inside a grapheme cluster.
-                let startOffset = position(containingUTF16Offset: match.range.location)
-                let endOffset = position(containingUTF16Offset: NSMaxRange(match.range) - 1)
-                if let startPosition = logicalLine.position(at: startOffset),
-                    let endPosition = logicalLine.position(at: endOffset)
-                {
-                    found.append(
-                        SelectionRange(
-                            start: SelectionPoint(row: startPosition.row, column: startPosition.column),
-                            end: SelectionPoint(row: endPosition.row, column: endPosition.column)))
-                }
-                if already + found.count >= maxMatches || shouldStop() || isExpired {
-                    stop.pointee = true
-                }
-            }
-            if timedOut { result.timedOut = true }
-            return found
-        }
-    }
 }
 
 // MARK: - Plain text
@@ -388,24 +96,7 @@ extension Search {
         var historyReader = Scrollback.ASCIIReader()
         var haystack = Grid.ASCIILine()
 
-        // Cache per scalar, rather than shaping the entire mixed-text line
-        // after an ASCII walk has already visited it. Combining/format scalars
-        // and scalars folding into ASCII retain the full String implementation.
-        var opaqueScalars: [UInt32: Bool] = [:]
-        func nonASCIIIsOpaque(_ value: UInt32) -> Bool {
-            if let cached = opaqueScalars[value] { return cached }
-            guard let scalar = Unicode.Scalar(value) else { return false }
-            let opaque: Bool
-            switch scalar.properties.generalCategory {
-            case .nonspacingMark, .spacingMark, .enclosingMark, .format:
-                opaque = false
-            default:
-                opaque = !String(scalar).folding(options: .caseInsensitive, locale: nil)
-                    .utf8.contains { $0 < 0x80 }
-            }
-            opaqueScalars[value] = opaque
-            return opaque
-        }
+        var scalarOpacity = ScalarOpacity()
         // A query with a scalar that stays non-ASCII under case folding and
         // canonical decomposition cannot equal any text made only of ASCII, so a
         // line of ASCII cells is skipped without building a `String` for it.
@@ -415,12 +106,7 @@ extension Search {
         // equivalence that reaches one, from a compatibility ideograph, is
         // checked per row): a history line without them is skipped from its
         // row index, without building its text.
-        var requiredIdeographs: [UInt32] = []
-        if cannotMatchASCIIOnlyLine {
-            for scalar in query.unicodeScalars where isUnifiedIdeograph(scalar.value) {
-                if !requiredIdeographs.contains(scalar.value) { requiredIdeographs.append(scalar.value) }
-            }
-        }
+        let requiredIdeographs = cannotMatchASCIIOnlyLine ? unifiedIdeographs(in: query) : []
         for span in grid.reversedLogicalLineSpans() {
             let stopped: Bool
             if cannotMatchASCIIOnlyLine,
@@ -441,22 +127,50 @@ extension Search {
             } else if let matcher,
                 grid.fillWithASCIILogicalLine(
                     firstRow: span.firstRow, lastRow: span.lastRow, into: &haystack,
-                    historyReader: &historyReader, nonASCIIIsOpaque: nonASCIIIsOpaque)
+                    historyReader: &historyReader, nonASCIIIsOpaque: { scalarOpacity.isOpaque($0) })
             {
                 guard !haystack.text.isEmpty else { continue }
-                if shouldStop() { break }
-                stopped = matcher.scan(haystack, into: &matches, shouldStop: shouldStop)
+                stopped = shouldStop() || matcher.scan(haystack, into: &matches, shouldStop: shouldStop)
             } else {
                 let line = grid.logicalLine(firstRow: span.firstRow, lastRow: span.lastRow)
                 guard !line.text.isEmpty else { continue }
-                if shouldStop() { break }
-                stopped = scanText(of: line, for: query, options: options, into: &matches, shouldStop: shouldStop)
+                stopped = shouldStop() || scanText(
+                    of: line, for: query, options: options, into: &matches, shouldStop: shouldStop)
             }
             if stopped { break }
         }
         var results = matches.ranges
         results.reverse()
         return results
+    }
+
+    private struct ScalarOpacity {
+        // Cache per scalar, rather than shaping the entire mixed-text line
+        // after an ASCII walk has already visited it. Combining/format scalars
+        // and scalars folding into ASCII retain the full String implementation.
+        private var opaqueScalars: [UInt32: Bool] = [:]
+        mutating func isOpaque(_ value: UInt32) -> Bool {
+            if let cached = opaqueScalars[value] { return cached }
+            guard let scalar = Unicode.Scalar(value) else { return false }
+            let opaque: Bool
+            switch scalar.properties.generalCategory {
+            case .nonspacingMark, .spacingMark, .enclosingMark, .format:
+                opaque = false
+            default:
+                opaque = !String(scalar).folding(options: .caseInsensitive, locale: nil)
+                    .utf8.contains { $0 < 0x80 }
+            }
+            opaqueScalars[value] = opaque
+            return opaque
+        }
+    }
+
+    private static func unifiedIdeographs(in query: String) -> [UInt32] {
+        var required: [UInt32] = []
+        for scalar in query.unicodeScalars where isUnifiedIdeograph(scalar.value) {
+            if !required.contains(scalar.value) { required.append(scalar.value) }
+        }
+        return required
     }
 
     /// CJK Unified Ideographs and extensions A to H, not the compatibility blocks.

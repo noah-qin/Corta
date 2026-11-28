@@ -96,6 +96,56 @@ func diagnoseScrollbackFootprint() {
     )
 }
 
+private struct MemoryFlood {
+    let name: String
+    let megabytes: Int
+    /// Each call returns about a megabyte of lines. Its argument numbers the chunk.
+    let make: (Int) -> [UInt8]
+
+    static var workloads: [Self] {
+        [
+            Self(name: "64 MiB ASCII log", megabytes: 64) { _ in
+                var bytes: [UInt8] = []
+                for index in 0..<8_900 {
+                    let line = "2026-11-12T08:\(10 + index % 8):01Z INFO request \(index % 8 * 7919) "
+                        + "served in \(index % 8 + 3) ms path=/api/v1/items/\(index % 8 * 31) status=200\r\n"
+                    bytes += Array(line.utf8)
+                }
+                return bytes
+            },
+            Self(name: "64 MiB CJK log", megabytes: 64) { _ in
+                var bytes: [UInt8] = []
+                let line = Array("终端性能测试日志:状态正常，请求已处理，耗时三毫秒，路径 /接口/列表/项目 结果成功。日本語の文章も含まれます\r\n".utf8)
+                for _ in 0..<9_500 { bytes += line }
+                return bytes
+            },
+            Self(name: "29 MiB dense SGR, 400,000 lines", megabytes: 29) { chunk in
+                var bytes: [UInt8] = []
+                for offset in 0..<13_800 {
+                    let index = chunk * 13_800 + offset
+                    let line = "\u{1B}[1;4;38;5;\(index % 256)mbold\u{1B}[0m "
+                        + "\u{1B}[38;2;\(index % 256);\((index / 3) % 256);128mtruecolour\u{1B}[0m "
+                        + "\u{1B}[48;5;\((index / 7) % 256)mfill\u{1B}[0m line \(index)\r\n"
+                    bytes += Array(line.utf8)
+                }
+                return bytes
+            },
+        ]
+    }
+}
+
+private func feedFloodChunk(_ bytes: [UInt8], into terminal: inout Terminal, compressEvery: Int) {
+    var offset = 0
+    var slice = 0
+    while offset < bytes.count {
+        let end = min(offset + 16 * 1024, bytes.count)
+        terminal.feed(bytes[offset..<end])
+        offset = end
+        slice += 1
+        if slice.isMultiple(of: compressEvery) { terminal.compressColdScrollback() }
+    }
+}
+
 /// `--flood-memory` (#526): the core's share of a pane's memory after the
 /// three floods the issue names, each twice, with history compressed as the
 /// session's idle maintenance does it. Input is generated a megabyte at a time,
@@ -105,34 +155,6 @@ func diagnoseScrollbackFootprint() {
 /// has reserved. The app adds the glyph atlas, GPU buffers and the window on top;
 /// that part is read from `footprint` and `vmmap` on the running application.
 func benchmarkFloodMemory() {
-    /// Each call returns about a megabyte of lines; `chunk` numbers them.
-    let floods: [(name: String, megabytes: Int, make: (Int) -> [UInt8])] = [
-        ("64 MiB ASCII log", 64, { _ in
-            var bytes: [UInt8] = []
-            for index in 0..<8_900 {
-                bytes += Array(
-                    "2026-11-12T08:\(10 + index % 8):01Z INFO request \(index % 8 * 7919) served in \(index % 8 + 3) ms path=/api/v1/items/\(index % 8 * 31) status=200\r\n"
-                        .utf8)
-            }
-            return bytes
-        }),
-        ("64 MiB CJK log", 64, { _ in
-            var bytes: [UInt8] = []
-            let line = Array("终端性能测试日志:状态正常，请求已处理，耗时三毫秒，路径 /接口/列表/项目 结果成功。日本語の文章も含まれます\r\n".utf8)
-            for _ in 0..<9_500 { bytes += line }
-            return bytes
-        }),
-        ("29 MiB dense SGR, 400,000 lines", 29, { chunk in
-            var bytes: [UInt8] = []
-            for offset in 0..<13_800 {
-                let index = chunk * 13_800 + offset
-                bytes += Array(
-                    "\u{1B}[1;4;38;5;\(index % 256)mbold\u{1B}[0m \u{1B}[38;2;\(index % 256);\((index / 3) % 256);128mtruecolour\u{1B}[0m \u{1B}[48;5;\((index / 7) % 256)mfill\u{1B}[0m line \(index)\r\n"
-                        .utf8)
-            }
-            return bytes
-        }),
-    ]
     // Compress after every this many 16 KiB reads: the session does it as each
     // batch of rows seals, so the default is a read in four, not a megabyte.
     // The allocator keeps what a burst of uncompressed history frees, so the
@@ -150,45 +172,47 @@ func benchmarkFloodMemory() {
         var stats = malloc_statistics_t()
         malloc_zone_statistics(nil, &stats)
         let scrollback = terminal.grid.scrollback
+        let footprint = megabytes(currentFootprintBytes() &- baselineFootprint)
+        let resident = megabytes(currentResidentBytes() &- baselineResident)
         print(
-            "flood \(step): footprint +\(String(format: "%.1f", megabytes(currentFootprintBytes() &- baselineFootprint))) MB, "
-                + "resident +\(String(format: "%.1f", megabytes(currentResidentBytes() &- baselineResident))) MB, "
+            "flood \(step): footprint +\(String(format: "%.1f", footprint)) MB, "
+                + "resident +\(String(format: "%.1f", resident)) MB, "
                 + "malloc in use \(String(format: "%.1f", Double(stats.size_in_use) / 1_048_576)) MB of "
                 + "\(String(format: "%.1f", Double(stats.size_allocated) / 1_048_576)) MB allocated, "
                 + "history holds \(String(format: "%.1f", Double(scrollback.storedCellBytes) / 1_048_576)) MB "
                 + "reserves \(String(format: "%.1f", Double(scrollback.retainedCellCapacityBytes) / 1_048_576)) MB")
     }
     report("start, empty")
-    for flood in floods {
+    for flood in MemoryFlood.workloads {
         for pass in 1...2 {
             for chunk in 0..<(flood.megabytes) {
-                if CommandLine.arguments.contains("--trace"), pass == 1, chunk < 20 { report("  \(flood.name) MiB \(chunk)") }
-                let bytes = flood.make(flood.name.hasPrefix("29") ? chunk % 29 : chunk)
-                var offset = 0
-                var slice = 0
-                while offset < bytes.count {
-                    let end = min(offset + 16 * 1024, bytes.count)
-                    terminal.feed(bytes[offset..<end])
-                    offset = end
-                    slice += 1
-                    if slice.isMultiple(of: compressEvery) { terminal.compressColdScrollback() }
+                if CommandLine.arguments.contains("--trace"), pass == 1, chunk < 20 {
+                    report("  \(flood.name) MiB \(chunk)")
                 }
+                let bytes = flood.make(flood.name.hasPrefix("29") ? chunk % 29 : chunk)
+                feedFloodChunk(bytes, into: &terminal, compressEvery: compressEvery)
             }
             terminal.compressColdScrollback()
             report("\(flood.name), pass \(pass)")
         }
     }
-    if CommandLine.arguments.contains("--relief") {
-        for (label, zone, goal) in [("default zone, goal 0", malloc_default_zone(), 0), ("all zones, goal 1 GiB", nil, 1 << 30)] {
-            let released = malloc_zone_pressure_relief(zone, goal)
-            report("pressure relief \(label): returned \(released / 1024) KiB")
-        }
-        sleep(5)
-        report("5 s later")
-    }
+    if CommandLine.arguments.contains("--relief") { reportFloodPressureRelief(using: report) }
     if CommandLine.arguments.contains("--hold") {
         print("holding pid \(getpid())")
         fflush(stdout)
         sleep(40)
     }
+}
+
+private func reportFloodPressureRelief(using report: (String) -> Void) {
+    let requests = [
+        ("default zone, goal 0", malloc_default_zone(), 0),
+        ("all zones, goal 1 GiB", nil, 1 << 30),
+    ]
+    for (label, zone, goal) in requests {
+        let released = malloc_zone_pressure_relief(zone, goal)
+        report("pressure relief \(label): returned \(released / 1024) KiB")
+    }
+    sleep(5)
+    report("5 s later")
 }

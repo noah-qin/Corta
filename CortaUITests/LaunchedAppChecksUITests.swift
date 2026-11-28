@@ -38,25 +38,11 @@ final class LaunchedAppChecksUITests: XCTestCase {
         app.launchEnvironment.removeValue(forKey: "CORTA_RESTORE_WINDOWS")
         app.launch()
         defer { app.terminate() }
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
-        for _ in 0..<12 {
-            let strip = app.windows.firstMatch.tabGroups["tab-strip"]
-            let tabCount = strip.exists ? strip.radioButtons.count : 1
-            let panes = app.windows.firstMatch.buttons.matching(identifier: "pane.close").count
-            if app.windows.count == 1, tabCount <= 1, panes <= 1 { break }
-            app.typeKey("w", modifierFlags: .command)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.7))
-            if app.windows.count == 0 {
-                app.typeKey("n", modifierFlags: .command)
-                XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
-            }
-        }
-        UIFixtures.requireFixturePrompt(in: app)
+        resetToSinglePane(in: app)
         let window = app.windows.firstMatch
-        XCTAssertEqual(app.windows.count, 1, "could not close back to one window")
-
         app.typeKey("d", modifierFlags: .command)
-        expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: window.buttons.matching(identifier: "pane.close"))
+        expectation(
+            for: NSPredicate(format: "count == 2"), evaluatedWith: window.buttons.matching(identifier: "pane.close"))
         waitForExpectations(timeout: 5)
         app.typeKey("t", modifierFlags: .command)
         app.typeKey("t", modifierFlags: .command)
@@ -96,6 +82,28 @@ final class LaunchedAppChecksUITests: XCTestCase {
         XCTAssertTrue(app.wait(for: .notRunning, timeout: 10), "⌘Q did not quit")
 
         app.launch()
+        assertRestoredTabs(in: app, named: names)
+    }
+
+    @MainActor private func resetToSinglePane(in app: XCUIApplication) {
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        for _ in 0..<12 {
+            let strip = app.windows.firstMatch.tabGroups["tab-strip"]
+            let tabCount = strip.exists ? strip.radioButtons.count : 1
+            let panes = app.windows.firstMatch.buttons.matching(identifier: "pane.close").count
+            if app.windows.count == 1, tabCount <= 1, panes <= 1 { break }
+            app.typeKey("w", modifierFlags: .command)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.7))
+            if app.windows.count == 0 {
+                app.typeKey("n", modifierFlags: .command)
+                XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
+            }
+        }
+        UIFixtures.requireFixturePrompt(in: app)
+        XCTAssertEqual(app.windows.count, 1, "could not close back to one window")
+    }
+
+    @MainActor private func assertRestoredTabs(in app: XCUIApplication, named names: [String]) {
         let restored = app.windows.firstMatch
         XCTAssertTrue(restored.waitForExistence(timeout: 10))
         let restoredTabs = restored.tabGroups["tab-strip"].radioButtons
@@ -112,7 +120,8 @@ final class LaunchedAppChecksUITests: XCTestCase {
         XCTAssertEqual(restored.buttons.matching(identifier: "pane.close").count, 0, "the selected tab is not split")
 
         restoredTabs.element(boundBy: 0).click()
-        expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: restored.buttons.matching(identifier: "pane.close"))
+        expectation(
+            for: NSPredicate(format: "count == 2"), evaluatedWith: restored.buttons.matching(identifier: "pane.close"))
         waitForExpectations(timeout: 5)
         attach(restored.screenshot(), name: "restored-background-split")
     }

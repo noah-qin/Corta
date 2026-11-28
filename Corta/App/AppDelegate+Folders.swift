@@ -29,10 +29,10 @@ extension AppDelegate {
         openFolders(urls)
     }
 
-    /// The **New Corta Window Here** service (`NSServices` in the
-    /// Info.plist; **New Corta Dev Window Here** in the development build):
-    /// the folders Finder put on the pasteboard. Its selector is the
-    /// service's `NSMessage`.
+    // The **New Corta Window Here** service (`NSServices` in the
+    // Info.plist; **New Corta Dev Window Here** in the development build):
+    // the folders Finder put on the pasteboard. Its selector is the
+    // service's `NSMessage`.
     // periphery:ignore - reached by selector, the Info.plist's NSMessage
     @objc func openFolderService(
         _ pasteboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>

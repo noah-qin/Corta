@@ -160,7 +160,9 @@ struct SearchNonASCIIQueryTests {
     @Test("a compatibility ideograph in history is equivalent to its unified one, both ways")
     func compatibilityIdeographs() {
         var lines: [String] = []
-        for index in 0..<40 { lines.append(index % 3 == 0 ? "豈 \(index) 更" : (index % 3 == 1 ? "豈 \(index)" : "其他 \(index)")) }
+        for index in 0..<40 {
+            lines.append(index % 3 == 0 ? "豈 \(index) 更" : (index % 3 == 1 ? "豈 \(index)" : "其他 \(index)"))
+        }
         for query in ["\u{F900}", "\u{8C48}", "\u{F900}\u{66F4}", "\u{8C48}\u{66F4}", "\u{66F4}", "\u{F901}"] {
             expectSame(query, lines, columns: 20)
         }
