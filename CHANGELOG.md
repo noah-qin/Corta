@@ -10,6 +10,8 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-28
+
 ### Changed
 
 - A paste that contains a line break asks first even when the program claims
@@ -2997,7 +2999,8 @@ M1–M10.
   same-conditions end-to-end re-measurement against the 45.5 ms baseline
   is still open.
 
-[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.7.0...main
+[Unreleased]: https://github.com/noah-qin/Corta/compare/v1.8.0...main
+[1.8.0]: https://github.com/noah-qin/Corta/releases/tag/v1.8.0
 [1.7.0]: https://github.com/noah-qin/Corta/releases/tag/v1.7.0
 [1.6.5]: https://github.com/noah-qin/Corta/releases/tag/v1.6.5
 [1.6.4]: https://github.com/noah-qin/Corta/releases/tag/v1.6.4
