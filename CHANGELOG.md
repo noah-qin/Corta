@@ -20,6 +20,13 @@ Versioning for compatibility changes.
   agent in the command palette to preview the pane’s latest screen text
   before jumping to it (#541).
 
+### Changed
+
+- Corta drains heavy terminal output faster. Ready PTY output takes one
+  fewer system call per read, and scrolling a short region moves rows
+  through buffers acquired once per rotation.
+  [Window throughput results](docs/PERFORMANCE.md#window-throughput).
+
 ## [1.7.0] - 2026-11-19
 
 Two themes. **Performance and security:** output that does heavy work per

@@ -154,7 +154,7 @@ which release it was measured on.
 | Keypress to glass, in a window, Typometer, 60 Hz | **21.0 ms** p50, 48.6 ms p99; Ghostty 1.4.0 20.9 / 45.5, iTerm2 3.7.8 22.2 / 55.6 | **1.7.0** vs Ghostty and iTerm2 | [Performance §5.5](docs/PERFORMANCE.md#55-cross-terminal-comparison) |
 | Memory with 100,000 lines of history, whole app | **98 MB**; Ghostty 133 MB, iTerm2 265 MB | **1.7.0** vs Ghostty and iTerm2 | same |
 | Idle, one window, 60 seconds | **0.0%** CPU, 19 wakeups; Ghostty 0.3% / 384, iTerm2 0.9% / 365 | **1.7.0** vs Ghostty and iTerm2 | same |
-| Output throughput in a window, 100 MiB `cat` | **114 MiB/s**; Ghostty 175, iTerm2 11.7. Behind Ghostty on every `vtebench` case ([#627](https://github.com/noah-qin/Corta/issues/627)) | **1.7.0** vs Ghostty and iTerm2 | same |
+| Output throughput in a window, 100 MiB `cat` | **114 MiB/s**. Ghostty 175, iTerm2 11.7 | **1.7.0** vs Ghostty and iTerm2 | [§5.5](docs/PERFORMANCE.md#55-cross-terminal-comparison) |
 | Scrollback memory, 100k × 120 lines, core | **4.4 MB**, down from 185 in 1.1 | **1.7.0** (`corta-bench`, one run) | [Performance §5.6](docs/PERFORMANCE.md#56-numbers-by-release) |
 | Longest a hostile stream holds a pane's lock, 120 × 400, one 16 KiB slice | **0.16 ms**, down from 1,761 (`ESC # 8`); coloured erase **≤ 7 ms**, down from 57 | 1.7 vs 1.6.5 | [Performance §5.30](docs/PERFORMANCE.md#530-where-the-session-lock-a-title-change-and-the-image-caps-stand-2026-11-18) |
 | Malformed UTF-8 throughput (`0xFF` / `0x80`) | **245 / 473 MiB/s**, up from 26 / 33 | 1.7 vs 1.6.5 | same |
