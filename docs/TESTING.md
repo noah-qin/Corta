@@ -729,6 +729,30 @@ AppleScript; and a window running a program asks before closing, so the
 temporary dynamic profile sets `"Prompt Before Closing 2": 0` (it applies
 only to that profile, removed after the run).
 
+For the #627 throughput comparison, generate the workload files once
+for all three terminals. Use the [pinned vtebench source](https://github.com/alacritty/vtebench/tree/ead80032e57dee2e75f0b51f2ea67528647d9944).
+In a scratch copy of its benchmark recipes, use the measured window
+dimensions (120 columns and 30 rows) in place of the `tput` calls and
+remove the `ps`-derived TTY assignments. On macOS, BSD `ps` pads the TTY
+field, and `tput` can return terminfo's 24 rows when its output is
+captured. Those results can silently change the payload or scroll
+margins. Run each recipe with its original working files and check
+that it emits nonempty bytes with no errors. Wrap each captured
+`setup` or `benchmark` in an executable script that cats its bytes and
+point `vtebench --benchmarks` at that directory. The 120 × 30
+`dense_cells` payload is 2,527,278 bytes including its SGR and print
+sequences. The `scrolling_top_region` setup ends in `CSI 2;30 r`.
+
+Before each session, check `stty size` and enable `opost onlcr` on the
+benchmark PTY so newline output undergoes the same translation in all
+three terminals. Use the one-pane 18 pt throughput profiles described
+in [#628](https://github.com/noah-qin/Corta/pull/628), with the test
+window frontmost, and record the session order. Pass `--silent --dat`
+to save the individual write times. Run `cat` on the 100 MiB corpus three
+times through the same window and divide bytes by elapsed time. Repeat
+in three sessions and report the pooled median and the range of session
+medians.
+
 ### Which environments can run the render tests
 
 Measured 2026-09-25 (issue #107). `scripts/metal-capability.swift` is the

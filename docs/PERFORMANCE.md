@@ -533,9 +533,10 @@ absolute numbers should not be cross-cited against that table.)
 
 ### 5.5 Cross-terminal comparison
 
-Corta 1.7.0 (the signed release, launched by path with a scratch stage),
-Ghostty 1.4.0 and iTerm2 3.7.8, on one MacBook Air M5 at 60 Hz, on AC,
-Low Power Mode off, on 2026-11-20 (#549). Each terminal ran with its own
+The latency, memory, idle and launch results below are from Corta 1.7.0
+(the signed release, launched by path with a scratch stage), Ghostty
+1.4.0 and iTerm2 3.7.8, on one MacBook Air M5 at 60 Hz, on AC, Low
+Power Mode off, on 2026-11-20 (#549). Each terminal ran with its own
 defaults apart from a test profile: the font and grid below, a test shell,
 no restored windows. Every run alternated the three, in the order
 Corta–Ghostty–iTerm2, then reversed, then the first order again. The
@@ -560,29 +561,151 @@ above Ghostty's, and the per-run p99s overlap (43.8–49.6 against
 2026-10-09 Corta 1.1.9 trailed Ghostty by 26 ms at p50; #337's on-demand
 frame driver closed it (§5.7).
 
-Throughput, `vtebench` at `ead80032e57d` in a 120 × 30 window, median ms per
-1 MiB sample over three sessions, the sessions' medians in brackets; lower is
-faster. `cat` is the 100 MiB corpus, three times per session, median MiB/s:
+#### Window throughput
 
-| Case | Corta 1.7.0 | Ghostty 1.4.0 | iTerm2 3.7.8 | Corta |
-| ---- | ----------- | ------------- | ------------ | ----- |
-| `dense_cells` | 9 (9–9) | 5 (4–5) | 128 (126–131) | trails Ghostty 1.8×, [#627](https://github.com/noah-qin/Corta/issues/627) |
-| `medium_cells` | 8 (8–9) | 5 (4–5) | 400 (392–413) | trails Ghostty 1.6×, #627 |
-| `sync_medium_cells` | 11 (10–11) | 5 (4–5) | 351 (345–355) | trails Ghostty 2.2×, #627 |
-| `unicode` | 10 (9–10) | 3 (3–4) | 109 (105–116) | trails Ghostty 3.3×, #627 |
-| `scrolling` | 26 (24–31) | 15 (11–15) | 23 (22–24) | trails Ghostty 1.7× and iTerm2 by 3 ms, #627 |
-| `scrolling_fullscreen` | 31 (30–32) | 19 (15–19) | 42 (41–45) | trails Ghostty 1.6×, #627 |
-| `scrolling_bottom_region` | 26.5 (24–30) | 15 (13–17) | 555 (531–564) | trails Ghostty 1.8×, #627 |
-| `scrolling_bottom_small_region` | 28 (25–32) | 15 (13–17) | 575 (565–589) | trails Ghostty 1.9×, #627 |
-| `scrolling_top_region` | 61 (52–66) | 15 (13–16) | 2,994 (2,929–3,103) | trails Ghostty 4.1×, #627 |
-| `scrolling_top_small_region` | 27 (25–30) | 15 (13–17) | 578 (565–590) | trails Ghostty 1.8×, #627 |
-| `cat` 100 MiB, MiB/s | 114 (109–121) | 175 (129–216) | 11.7 (11–12) | trails Ghostty 1.5×, #627 |
+The #627 rerun used the same MacBook Air M5 on 2026-11-28, with macOS
+27.2 (26B123), the built-in 60 Hz panel at 2× backing scale, AC power
+and Low Power Mode off. Corta was an arm64 Benchmark build based on
+`0d7d385` plus the region rotation and PTY read changes, built with
+Xcode 27.2 (27B52) and Swift 6.4.2. Ghostty was 1.4.0 and iTerm2 was
+3.7.8. The benchmark window was frontmost, one pane, 120 × 30,
+with the system monospaced font at 18 pt. Corta used the default
+frame-rate range and recorded a 16.67 ms median frame interval in the
+profiling runs.
 
-**Trails Ghostty on every throughput case**, by more than the spread;
-[#627](https://github.com/noah-qin/Corta/issues/627) owns the gap.
-#547 (region scroll) and #548 (narrow non-ASCII) fixed the core's side of
-`scrolling_top_region` and `unicode`, which are still the widest gaps in a
-window. **Leads iTerm2** on every case but plain `scrolling`, by 1.4× (`scrolling_fullscreen`) to 49× (`scrolling_top_region`).
+All three used the same captured inputs from `vtebench` at
+`ead80032e57d` with 120 × 30 geometry substituted in the recipes.
+With BSD `ps` padding the TTY name, the old `dense_cells` recipe
+generated only 78 bytes of cursor-home commands. The old
+`scrolling_top_region` recipe used a 24-row terminfo fallback.
+The new inputs also recover `cursor_motion` and `light_cells`. The
+original figures are in [#628](https://github.com/noah-qin/Corta/pull/628).
+See [the workload preparation recipe](TESTING.md#against-other-terminals).
+
+Medians in ms per `vtebench` sample, pooled across three sessions, with
+the range of session medians in parentheses. Each case used one warm-up
+and a three-second sampling window, with the default 1 MiB minimum
+payload. The suite measures how long the child takes to write its
+payload including PTY backpressure. The `cat` row measures throughput
+in MiB/s from three copies of the 100 MiB corpus in each session.
+Overlapping session-median ranges count as within spread.
+The rates varied substantially across sessions, including on Ghostty.
+The table links Corta's costs wherever its pooled result trails.
+The iTerm2 test window opened in front of its default startup window.
+Timed-out and foreground-lost sessions were repeated.
+
+| Case | Corta (Benchmark) | Ghostty 1.4.0 | iTerm2 3.7.8 | Corta vs Ghostty |
+| ---- | ----------------: | ------------: | -----------: | --------------- |
+| `cursor_motion` | 13 (10–21) | 9 (6–13) | 168 (164–193) | Within spread ([Cursor addressing](#escape-heavy-output)) |
+| `dense_cells` | 18 (14–28) | 16 (9–19) | 122 (87.5–130) | Within spread ([SGR and cell writes](#escape-heavy-output)) |
+| `light_cells` | 4 (3–7) | 5 (3–7) | 32 (32–32) | Within spread |
+| `medium_cells` | 9 (7–13) | 7 (4–10) | 412.5 (398.5–414.5) | Within spread ([Mixed CSI dispatch](#escape-heavy-output)) |
+| `scrolling` | 26 (21–39) | 21 (12–22) | 31 (24–39.5) | Within spread ([Per-line history work](#scrolling-and-history)) |
+| `scrolling_bottom_region` | 30 (24–37) | 21 (13–23) | 4597 (4123–4884) | [Margin rotation and recycling](#scrolling-and-history) |
+| `scrolling_bottom_small_region` | 37 (32–40.5) | 21 (13–22) | 2684.5 (2449.5–2782.5) | [Small-band rotation](#scrolling-and-history) |
+| `scrolling_fullscreen` | 5 (4–6) | 6 (4–8) | 11 (11–12) | Within spread |
+| `scrolling_top_region` | 29 (25–31) | 21 (14–23) | 4542 (4204–4566) | [Margin rotation and recycling](#scrolling-and-history) |
+| `scrolling_top_small_region` | 38 (34–43) | 22 (13–23) | 2789.5 (2709–2836.5) | [Small-band rotation](#scrolling-and-history) |
+| `sync_medium_cells` | 12 (11–14) | 8 (5–9) | 376 (359–378.5) | [CSI and synchronized output](#escape-heavy-output) |
+| `unicode` | 12 (12–14) | 7 (5–9) | 201 (181–214) | [Wide-cell writes and glyph rasterization](#throughput-attribution) |
+| `cat` 100 MiB (MiB/s) | 118.3 (109.2–122.7) | 92.5 (91.2–146.5) | 8.2 (8.1–8.3) | Within spread |
+
+Corta was within the observed spread on seven of thirteen measurements.
+The remaining gaps were the four margin-scroll cases, synchronized
+medium cells and Unicode. The slowest iTerm2 margin cases each had
+one or two timed writes per session.
+
+#### Throughput attribution
+
+The initial profile used a Benchmark build of `d332805` with temporary
+signposts on the reader and the corrected 120 × 30 workloads.
+`readBatch` included the PTY read, readiness checks and copying bytes
+into the batch. Separate intervals marked lock acquisition, lock hold
+and the parser's grid writes. The default on-demand frame driver reported
+CPU frame time through `CORTA_RENDER_METRICS`. The table divides captured
+interval totals and complete frame-metric buckets by the number of
+timed writes. The stages can overlap across threads and lock hold
+includes parse and grid work. Instrumentation, setup and warm-up affect
+these totals, so use the uninstrumented table for comparisons.
+
+| Case | Writes | PTY batch | Of which `read` / `poll` | Parse + grid | Lock wait | Lock hold | CPU frame |
+| ---- | -----: | --------: | ------------------------: | -----------: | --------: | --------: | --------: |
+| `scrolling_top_region` | 47 | 5.59 | 1.94 / 2.60 | 26.40 | 0.31 | 27.12 | 0.73 |
+| `unicode` | 111 | 3.55 | 1.04 / 1.98 | 4.04 | 0.11 | 4.36 | 9.14 |
+| `dense_cells` | 55 | 8.25 | 2.46 / 4.59 | 6.57 | 0.27 | 7.35 | 1.21 |
+
+Times are milliseconds per timed write. Time Profiler also put 585 of
+1,960 reader samples for `scrolling_top_region` inside
+`ScreenLines.rotate`. The reader held the lock while doing that work,
+and spent little time waiting to acquire it. Smaller regions have more
+rows to swap within the region, so acquiring both mutable arrays once
+per rotation made the largest difference there. The bottom and top
+small-region medians fell from 158 to 63 ms and 168.5 to 61 ms,
+respectively.
+[Region rotation before/after](https://github.com/noah-qin/Corta/pull/638).
+
+In `dense_cells`, 609 of 1,644 reader samples were in the read batch.
+The ready PTY used to take a poll and a read. The read can now handle a
+ready PTY directly and park on the close-aware poll when it returns
+`EAGAIN`. The remaining parser work includes SGR dispatch and cell
+writes. The direct read took the pooled `dense_cells` median from 24
+to 18 ms and the corpus from 87.6 to 118.3 MiB/s with the rotation
+change already applied.
+[Direct PTY read before/after](https://github.com/noah-qin/Corta/pull/639).
+
+In `unicode`, the reader spent time decoding and writing wide
+cells. Glyph atlas lookups and rasterization also dominated frame
+preparation. The frame CPU medians of the four 30-frame buckets were
+8.42–8.67 ms. In the combined build, wide-cell writing accounted for
+222 of 907 reader samples, and glyph lookup accounted for 447 of 506
+main-thread samples, including 260 inside rasterization. The renderer
+paces new glyph work to bound the cost of a redraw (§5.21).
+
+#### Escape-heavy output
+
+`cursor_motion` addresses the cursor before each of its 93,600 cell
+writes. The parser dispatches each CUP and the grid moves the cursor
+before handling the single printable character. Parsing accounted for
+622 of 966 reader samples in the combined build. `dense_cells`
+sets indexed foreground and background colours and attributes before
+every cell. Its SGR semantics and short printable runs account for the
+remaining parser and grid work after removing the ready-PTY poll.
+[Parser and dispatch](../CortaTerminal/Sources/CortaTerminal/Parsing/Parser.swift).
+
+`medium_cells` and `sync_medium_cells` both replay 9,759 cursor
+addresses and 5,930 SGR commands per source payload, along with line
+erases and margin changes. `sync_medium_cells` adds 462 synchronized
+output pairs. These commands still go through CSI dispatch even when a
+synchronized frame is deferred. Parsing accounted for 524 of 985
+reader samples in the combined `sync_medium_cells` run. `light_cells`
+mainly writes long printable runs that go straight to the ASCII run writer.
+[CSI handling](../CortaTerminal/Sources/CortaTerminal/Parsing/Performer.swift).
+
+#### Scrolling and history
+
+`scrolling_top_region` and `scrolling_bottom_region` leave one row
+outside the region. Both still recycle a line and record a scroll event
+for every line feed. The two small-region cases leave more rows outside
+the margins, so the cheaper path is to move rows within the band. The
+buffer change removes repeated uniqueness checks in those moves.
+In the combined build, `ScreenLines.rotate` accounted for 27–28% of
+reader samples in the wider regions and 43–46% in the smaller ones.
+The warmed small-region allocation test measured zero allocations.
+[Region rotation](../CortaTerminal/Sources/CortaTerminal/Screen/ScreenLines.swift).
+
+Plain `scrolling` processes a one-character line at a time and copies its
+visible cells and row metadata into history. `Scrollback.push` accounted
+for 238 of 1,006 reader samples in the combined build.
+`scrolling_fullscreen` writes a full ASCII line before each line feed,
+so the run writer amortizes dispatch across more text. The colourized
+`cat` corpus combines SGR
+dispatch and longer ASCII runs with the full-screen history work.
+[Scrollback storage](../CortaTerminal/Sources/CortaTerminal/Screen/Scrollback.swift).
+
+The Release D17 suite passed all seven checks on the main baseline
+and on the combined build. The 120 × 40 full rebuild was 0.274 ms p50
+and 0.656 ms p95 before, and 0.330 ms p50 and 0.946 ms p95 after.
+The large-grid and per-frame allocation tests passed on both.
 
 Memory, idle and launch, three runs each (five for launch), medians:
 

@@ -177,7 +177,9 @@ import Testing
         var history = Scrollback(limit: 20_000)
         for _ in 0..<20_000 {
             var line = Line()
-            for column in 0..<119 { line[column] = Cell(scalar: 0x78, foreground: .default, background: .default, attributes: []) }
+            for column in 0..<119 {
+                line[column] = Cell(scalar: 0x78, foreground: .default, background: .default, attributes: [])
+            }
             history.push(line)
         }
         history.compressColdBatches()
@@ -228,7 +230,10 @@ import Testing
         func fill(_ history: inout Scrollback, _ base: UInt32) {
             for row in 0..<2048 {
                 var line = Line()
-                for column in 0..<100 { line[column] = Cell(scalar: base + UInt32((row + column) % 50), foreground: .default, background: .default, attributes: []) }
+                for column in 0..<100 {
+                    let scalar = base + UInt32((row + column) % 50)
+                    line[column] = Cell(scalar: scalar, foreground: .default, background: .default, attributes: [])
+                }
                 history.push(line)
             }
         }
@@ -239,10 +244,13 @@ import Testing
         fill(&second, 0x800)
         first.compressColdBatches()
         second.compressColdBatches()
-        for row in stride(from: 0, to: first.count, by: 131) { #expect(first[row][5].scalar & 0xF00 == (row < 2048 ? 0x100 : 0x400), "first \(row)") }
-        for row in stride(from: 0, to: second.count, by: 131) { #expect(second[row][5].scalar & 0xF00 == (row < 2048 ? 0x100 : 0x800), "second \(row)") }
+        for row in stride(from: 0, to: first.count, by: 131) {
+            #expect(first[row][5].scalar & 0xF00 == (row < 2048 ? 0x100 : 0x400), "first \(row)")
+        }
+        for row in stride(from: 0, to: second.count, by: 131) {
+            #expect(second[row][5].scalar & 0xF00 == (row < 2048 ? 0x100 : 0x800), "second \(row)")
+        }
     }
-
 
     /// Encoders running at once each get a scratch mapping of their own from the
     /// pool, so every result decodes back to the cells it was given.
@@ -250,7 +258,8 @@ import Testing
         let works: [Scrollback.CompressionWork] = (0..<64).map { index in
             var cells = ContiguousArray<Cell>()
             for offset in 0..<(256 * (40 + index % 50)) {
-                cells.append(Cell(scalar: UInt32(0x41 + (offset &* (index + 3)) % 26), foreground: .default, background: .default, attributes: []))
+                let scalar = UInt32(0x41 + (offset &* (index + 3)) % 26)
+                cells.append(Cell(scalar: scalar, foreground: .default, background: .default, attributes: []))
             }
             let rows = ContiguousArray([Scrollback.RowSpan(start: 0, length: Int32(cells.count), wrapped: false)])
             return Scrollback.CompressionWork(id: index, namespace: UUID(), cells: cells, rows: rows)

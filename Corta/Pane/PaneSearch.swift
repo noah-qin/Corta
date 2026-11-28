@@ -447,61 +447,6 @@ extension PaneSearch {
         }
     }
 
-    /// Output-triggered refresh from the output-batch stage. Never scrolls, so the
-    /// viewport stays on the match the user is reading.
-    ///
-    /// One sweep at most in flight. Output arriving meanwhile sets
-    /// `needsRefresh`, which `applyResults` honours; otherwise
-    /// the last output could leave results stale once the grid goes quiet.
-    func scheduleBackgroundRefresh() {
-        guard bar != nil, let searchField = field, !continuedSweep else { return }
-        // Composing: the preedit is not the query, so output arriving now
-        // starts no sweep. The change that commits the text sweeps for it.
-        guard !isComposingText else { return }
-        guard task == nil else {
-            needsRefresh = true
-            return
-        }
-        if let landed = lastSweepLanded {
-            let elapsed = landed.duration(to: .now)
-            if elapsed < Self.refreshPacing {
-                needsRefresh = true
-                guard pacingWake == nil else { return }
-                pacingWake = Task { @MainActor [weak self] in
-                    try? await Task.sleep(for: Self.refreshPacing - elapsed)
-                    guard let self, !Task.isCancelled else { return }
-                    self.pacingWake = nil
-                    guard self.needsRefresh else { return }
-                    self.needsRefresh = false
-                    self.scheduleBackgroundRefresh()
-                }
-                return
-            }
-        }
-        // Taken only for a sweep that will run: an output batch that merely
-        // marks one owed, or waits out the pacing, needs no grid.
-        guard let grid = host?.snapshot() else { return }
-        generation &+= 1
-        let generation = self.generation
-        let query = searchField.stringValue
-        let totalPushed = grid.scrollback.totalPushed
-        let caseSensitive = self.caseSensitive
-        let regex = self.regex
-        let timeBudget = regexTimeBudget
-        let gate = sweepGate
-        task = Task.detached(priority: .utility) { [weak self] in
-            gate?()
-            let outcome = Self.sweep(
-                query, in: grid, caseSensitive: caseSensitive, regex: regex,
-                timeBudget: timeBudget)
-            await MainActor.run {
-                self?.applyResults(
-                    outcome, generation: generation, scrollsToMatch: false,
-                    totalPushed: totalPushed)
-            }
-        }
-    }
-
     /// Applies a sweep only if it is still current; a newer query or a
     /// closed bar may have made the grid or `field` stale.
     func applyResults(

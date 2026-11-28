@@ -28,28 +28,7 @@ extension Scrollback {
         let cells: ContiguousArray<Cell>
         let rows: ContiguousArray<RowSpan>
         public func compress() -> CompressionResult {
-            let rawCount = cells.count * MemoryLayout<Cell>.stride
-            // Kept only under half the raw size, so the encoder gets no more
-            // room than that: past it LZ4 returns 0, the same refusal, and
-            // nothing is zero-filled or copied twice.
-            let capacity = max(0, rawCount / 2 - 1)
-            // Encoded into pages outside malloc and copied out at its real size:
-            // a 245 KiB `malloc` block per batch, freed a moment later, left
-            // holes among the live small blocks that stayed resident (#526). The
-            // mapping is only touched where the encoder writes, about 3 to 30 KiB.
-            var bytes = ContiguousArray<UInt8>()
-            if capacity > 0 {
-                bytes = EncodeScratch.with(capacity: capacity) { scratch in
-                    let written = cells.withUnsafeBytes { src -> Int in
-                        guard let base = src.baseAddress, !src.isEmpty else { return 0 }
-                        return compression_encode_buffer(
-                            scratch.assumingMemoryBound(to: UInt8.self), capacity,
-                            base.assumingMemoryBound(to: UInt8.self), src.count, nil, COMPRESSION_LZ4)
-                    }
-                    return ContiguousArray(
-                        UnsafeBufferPointer(start: scratch.assumingMemoryBound(to: UInt8.self), count: written))
-                }
-            }
+            let bytes = encodeCells()
             var rowHyperlinks: [Int: Set<HyperlinkID>] = [:], rowGraphemes: [Int: Set<GraphemeID>] = [:]
             var rowUnderlineColors: [Int: Set<UInt16>] = [:]
             if !bytes.isEmpty {
@@ -68,6 +47,29 @@ extension Scrollback {
             }
             return CompressionResult(id: id, namespace: namespace, bytes: bytes, cellCount: cells.count,
                 rowHyperlinks: rowHyperlinks, rowGraphemes: rowGraphemes, rowUnderlineColors: rowUnderlineColors)
+        }
+
+        private func encodeCells() -> ContiguousArray<UInt8> {
+            let rawCount = cells.count * MemoryLayout<Cell>.stride
+            // Kept only under half the raw size, so the encoder gets no more
+            // room than that: past it LZ4 returns 0, the same refusal, and
+            // nothing is zero-filled or copied twice.
+            let capacity = max(0, rawCount / 2 - 1)
+            // Encoded into pages outside malloc and copied out at its real size:
+            // a 245 KiB `malloc` block per batch, freed a moment later, left
+            // holes among the live small blocks that stayed resident (#526). The
+            // mapping is only touched where the encoder writes, about 3 to 30 KiB.
+            guard capacity > 0 else { return [] }
+            return EncodeScratch.with(capacity: capacity) { scratch in
+                let written = cells.withUnsafeBytes { src -> Int in
+                    guard let base = src.baseAddress, !src.isEmpty else { return 0 }
+                    return compression_encode_buffer(
+                        scratch.assumingMemoryBound(to: UInt8.self), capacity,
+                        base.assumingMemoryBound(to: UInt8.self), src.count, nil, COMPRESSION_LZ4)
+                }
+                return ContiguousArray(
+                    UnsafeBufferPointer(start: scratch.assumingMemoryBound(to: UInt8.self), count: written))
+            }
         }
     }
     public struct CompressionResult: Sendable {

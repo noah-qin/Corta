@@ -132,7 +132,8 @@ struct CharacterWidthTests {
             if (0x20..<0x7F).contains(value) {
                 expected = 1
             } else {
-                expected = characterWidthRanges.first { value >= $0.lower && value <= $0.upper }.map { Int($0.width) } ?? 1
+                let range = characterWidthRanges.first { value >= $0.lower && value <= $0.upper }
+                expected = range.map { Int($0.width) } ?? 1
             }
             #expect(displayWidth(of: scalar) == expected, "U+\(String(value, radix: 16, uppercase: true))")
         }
