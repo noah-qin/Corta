@@ -288,13 +288,9 @@ extension TerminalSession {
     private var liveReaderSource: ReaderSource {
         ReaderSource(
             read: { [pty] buffer in
-                // close() explicitly wakes this wait, even for a silent child
-                // that ignores hangup. No timer wakes an idle reader.
-                while true {
-                    if try pty.waitUntilReadable(timeoutMilliseconds: -1) {
-                        return try pty.read(into: buffer)
-                    }
-                }
+                // The nonblocking read waits on the close pipe only on
+                // EAGAIN. Ready output needs no separate readiness syscall.
+                try pty.read(into: buffer)
             },
             isReadable: { [pty] in
                 // Any revents count; the read observes end of file.
