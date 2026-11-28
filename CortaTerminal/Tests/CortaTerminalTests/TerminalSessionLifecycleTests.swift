@@ -91,15 +91,24 @@ import Testing
         let session = try TerminalSession(
             executable: "/bin/sh", arguments: ["-c", "printf 'CORTA-EARLY'; sleep 30"])
         defer { session.stop() }
-        let fired = Mutex(false)
-        session.onOutput = { fired.withLock { $0 = true } }
+        let pty = session.pty
+        let ready = try pty.waitUntilReadable(timeoutMilliseconds: 5_000)
+        try #require(ready)
+        let initialPolls = pty.readinessPollCount
+        let output = DispatchSemaphore(value: 0)
+        let pollsAtOutput = Mutex<Int?>(nil)
+        session.onOutput = {
+            pollsAtOutput.withLock { $0 = pty.readinessPollCount }
+            output.signal()
+        }
         session.start()
 
-        let text = waitForGrid(session) { $0.contains("CORTA-EARLY") }
+        try #require(output.wait(timeout: .now() + 5) == .success)
+        let text = session.snapshot().dump()
         #expect(
             text.contains("CORTA-EARLY"),
             "output buffered before start() should still be read; grid held:\n\(text)")
-        #expect(fired.withLock { $0 })
+        #expect(pollsAtOutput.withLock { $0 } == initialPolls)
     }
 
     /// #228: real input must still reach a live child after repeated quiet
