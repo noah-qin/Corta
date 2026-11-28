@@ -33,6 +33,7 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
     let model = CommandPaletteModel()
     /// The window it opened over; the palette is key while up.
     private weak var invokingWindow: NSWindow?
+    private var waitingPreviewRefresh: DispatchWorkItem?
 
     private init() {
         let panel = NSPanel(
@@ -156,8 +157,17 @@ final class CommandPaletteController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func waitingScreenDidChange(_ notification: Notification) {
-        guard window?.isVisible == true, let paneID = notification.object as? UUID else { return }
-        model.refreshAgentPreview(changedPane: paneID)
+        guard window?.isVisible == true, let paneID = notification.object as? UUID,
+            paneID == model.previewPaneID, waitingPreviewRefresh == nil
+        else { return }
+        let refresh = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.waitingPreviewRefresh = nil
+            guard self.window?.isVisible == true, let selected = self.model.previewPaneID else { return }
+            self.model.refreshAgentPreview(changedPane: selected)
+        }
+        waitingPreviewRefresh = refresh
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(125), execute: refresh)
     }
 
     // MARK: - Availability

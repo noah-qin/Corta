@@ -299,7 +299,7 @@ Der Text eines Befehls wird aus dem Raster wiederhergestellt, nicht gespeichert:
 
 `scrollback-lines` (Standard 10.000) ist eine Obergrenze pro Sitzung und zählt *physische* Zeilen – eine Zeile mit 200
 Spalten, bei 100 Spalten umbrochen, sind zwei. Ausgabe, die älter als die Grenze ist, wird beim Eintreffen verworfen;
-die Pille oben zeigt, wie weit die Ansicht zurückliegt. Erhöhe die Grenze (bis 1.000.000; wie viel Speicher der
+die Pille oben zeigt, wie weit die Ansicht zurückliegt. Erhöhe die Grenze (bis 100.000; wie viel Speicher der
 komprimierte ältere Verlauf belegt, hängt von Text und Arbeitslast ab). Eine gespeicherte Zelle hat vor der Kompression
 16 Byte; das ist keine Schätzung des belegten Arbeitsspeichers. Eine gemessene Arbeitslast mit 100.000 Zeilen und 120
 Spalten belegte etwa 11 MiB zusätzlichen Arbeitsspeicher; siehe
@@ -346,7 +346,7 @@ dem SFTP-Browser.
 
 ### Ein Link öffnet sich nicht oder der eingefügte Text ist zu groß
 
-Ändert die Ausgabe das angezeigte Ziel, aktualisiert ein Klick nur den Tooltip. Prüfe ihn und klicke erneut. Bei der Meldung, dass der Text größer als 64 MiB ist, wurde nichts gesendet. Füge kleinere Teile ein oder speichere den Text in einer Datei, die das Programm liest. Diese Grenze ist fest.
+Ändert die Ausgabe das angezeigte Ziel, aktualisiert ein Klick nur den Tooltip. Prüfe ihn und klicke erneut. Bei der Meldung, dass der Text größer als 4 MiB ist, wurde nichts gesendet. Füge kleinere Teile ein oder speichere den Text in einer Datei, die das Programm liest. Diese Grenze ist fest.
 
 <a id="an-ssh-pane-stopped-responding-and-reconnect-is-greyed-out"></a>
 <a id="browse-remote-files-stays-on-connecting-then-says-it-could-not-reach-the-host"></a>

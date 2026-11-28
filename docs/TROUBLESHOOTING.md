@@ -308,7 +308,7 @@ Output changed the text under the pointer after the tooltip appeared. A click
 opens only what the tooltip names, so the tooltip was brought up to date
 instead. Read it and click again.
 
-### A paste says "Not pasted — that's more than 64 MiB"
+### A paste says "Not pasted — that's more than 4 MiB"
 
 The limit is fixed, and nothing was sent. Write the text to a file and have the
 program read that, or paste it in parts. A paste this size through a terminal
@@ -406,7 +406,7 @@ not offered for it. Raise `scrollback-lines` if that happens often.
 `scrollback-lines` (default 10,000) is a per-session cap, and it counts
 *physical* rows — a 200-column line wrapped at 100 columns is two. Output
 older than the cap is discarded as it arrives; the pill at the top says
-how far back the viewport is. Raise the cap (up to 1,000,000; memory is
+how far back the viewport is. Raise the cap (up to 100,000; memory is
 compressed cold history depends on the text and workload). A stored cell
 is 16 bytes before compression, not a resident-memory estimate. A measured
 100,000-line, 120-column workload added about 11 MiB of resident memory;

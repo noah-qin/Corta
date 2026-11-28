@@ -354,12 +354,13 @@ struct RemotePaneIsolationTests {
 @Suite(.serialized, .enabled(if: MetalRenderTarget.supportsMetal4, MetalRenderTarget.metal4Requirement))
 struct CommandHistoryHostScopeTests {
     /// What a shell with integration emits across one remote command and
-    /// one local one: the remote OSC 7, the first command's marks, a local
-    /// OSC 7 (the pane is local again), the second command's marks, then a
-    /// `sleep` keeping the session alive for the assertions.
+    /// one local one: the remote OSC 7, the first command's marks, a real
+    /// `cd /tmp` so the kernel agrees with the local OSC 7, the second
+    /// command's marks, then a `sleep` keeping the session alive.
     private static let script = """
         printf '\\033]7;file://build-box/srv/app\\007'
         printf '\\033]133;A\\007$ \\033]133;B\\007make\\r\\n\\033]133;C\\007built\\r\\n\\033]133;D;0\\007'
+        cd /tmp
         printf '\\033]7;file://localhost/tmp\\007'
         printf '\\033]133;A\\007$ \\033]133;B\\007ls\\r\\n\\033]133;C\\007listed\\r\\n\\033]133;D;0\\007'
         sleep 60

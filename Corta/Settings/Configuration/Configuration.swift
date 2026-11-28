@@ -148,7 +148,7 @@ nonisolated struct Configuration: Equatable, Sendable {
     var rows: Int = 30
     var bell: BellMode = .visual
     var notifyOnLongTask: Bool = false
-    var notifyFromPrograms = true
+    var notifyFromPrograms = false
     var agentStatus = true
     /// Additional comma-separated foreground executable names.
     var agentProcesses = ""
@@ -233,6 +233,7 @@ nonisolated struct Configuration: Equatable, Sendable {
     var commandStatusMarks: Bool = true
     /// Reopen last run's windows, splits and directories.
     var restoreWindows: Bool = true
+    var restoreSSHDestinations = false
     /// Ask before closing a pane with a running child process.
     var confirmClose: Bool = true
     /// Share the room equally as panes open and close, keeping placed dividers.

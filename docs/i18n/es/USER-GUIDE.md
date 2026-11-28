@@ -331,9 +331,8 @@ o, para una conexión, **Reconectar**; el texto de error del sistema está en **
   de la vista. Dentro de un programa que usa el ratón — `vim`,
   `htop` —, mantén ⌥ al empezar a arrastrar para seleccionar texto de todos modos (`mouse-override-modifier`).
 - **Pegar.** ⌘V. El texto pegado se marca como pegado (bracketed paste), así que un shell que lo admite — zsh, fish,
-  bash 5.1 o posterior — inserta un comando pegado sin ejecutarlo hasta que pulses Retorno. Cuando el programa no ha
-  activado el bracketed paste (el `/bin/bash` 3.2 de macOS nunca lo hace), Corta avisa antes de pegar un texto que
-  contiene un salto de línea. Incluso con el bracketed paste activado, también avisa ante una tubería hacia un shell (o
+  bash 5.1 o posterior — inserta un comando pegado sin ejecutarlo hasta que pulses Retorno. Un programa puede activar el bracketed paste sin entenderlo realmente, así que Corta avisa antes de pegar un texto que
+  contiene un salto de línea en ambos casos. También avisa ante una tubería hacia un shell (o
   `bash <(curl …)` y similares), sudo, un borrado recursivo forzado, una continuación con barra invertida o caracteres
   invisibles / bidireccionales. Revisa las frases de riesgo y la vista previa del texto antes de elegir **Pegar** o
   **Cancelar**; los caracteres ocultos aparecen como códigos del tipo `⟦U+202E⟧`. **No volver a advertir en este panel** dura
@@ -342,7 +341,7 @@ o, para una conexión, **Reconectar**; el texto de error del sistema está en **
   seguro. Un pegado grande que el shell todavía está procesando se puede cancelar con ⌃C: la parte aún no enviada se
   descarta y la interrupción pasa directamente.
 
-  Los pegados de más de 64 KiB se comprueban en segundo plano y la ventana sigue respondiendo. Volver a pegar sustituye el texto que se estaba comprobando. Por encima de 64 MiB no se envía nada y Corta lo indica. Un programa puede activar el pegado delimitado sin entenderlo realmente. Para avisar siempre al pegar varias líneas en programas remotos o antiguos, usa `paste-warning = always`.
+  Los pegados de más de 64 KiB se comprueban en segundo plano y la ventana sigue respondiendo. Volver a pegar sustituye el texto que se estaba comprobando. Por encima de 4 MiB no se envía nada y Corta lo indica. Un programa puede activar el pegado delimitado sin entenderlo realmente. Por eso, un pegado con un salto de línea avisa antes, esté el modo activo o no.
 - **Soltar archivos.** Suelta archivos, o archivos que proporciona otra app, sobre un panel para escribir sus rutas entre comillas por el canal de pegado, sin Retorno. Pasar por encima no inicia ninguna descarga. La recepción es asíncrona y deja de esperar a los 120 segundos; los fallos se muestran en el panel. Si mientras tanto cambia la sesión o el grupo de procesos en primer plano, Corta descarta la operación.
 
   **Un archivo del Finder se usa donde está, y Corta nunca lo elimina. Un archivo que solo otra app puede proporcionar, como una foto o un adjunto de Mail, llega como copia temporal:** guárdalo en otro lugar si quieres conservarlo. La copia se elimina al cerrar su panel, también con su pestaña o ventana, o al salir de Corta. Un programa que siga en marcha ya no podrá leerla, y una ruta copiada a otro sitio dejará de valer. Lo mismo ocurre con las rutas antiguas en el historial de desplazamiento y del shell, y ⇧⌘T recupera un panel sin sus copias. Mover el panel a otra pestaña o ventana las conserva. Si otro programa mantiene un archivo abierto o hay una instantánea del sistema, el espacio puede tardar en liberarse. **Ajustes ▸ Privacidad y seguridad ▸ Datos locales** muestra el espacio y ofrece **Limpiar ahora…**.

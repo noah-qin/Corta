@@ -41,12 +41,26 @@ struct Performer: ParserPerformer, Sendable {
     /// (`DeferredImageTransmission`); set only for the session's feed.
     var defersLargeImageDecoding = false
     var defersAlternateScreenReflow = false
+    var endsDisplaySlice = false
+
+    // A live session verifies local command directories before publishing them.
+    var verifiesCommandDirectories = false
+    var pendingCommandDirectory: (recordID: Int, path: String)?
 
     /// Bumped by RIS, so a decode finished after a reset is dropped rather
     /// than placed on the screen the reset cleared.
     var resetCount = 0
 
-    var requestsStopAfterAPC: Bool { state.deferredImage != nil || state.deferredAlternateScreenExit }
+    var requestsStopAfterAPC: Bool {
+        state.deferredImage != nil || state.deferredAlternateScreenExit
+            || endsDisplaySlice || pendingCommandDirectory != nil
+    }
+
+    mutating func endSliceAfterLargeDisplayChange() {
+        if defersAlternateScreenReflow, grid.rows * grid.columns >= 32_000 {
+            endsDisplaySlice = true
+        }
+    }
 
     init(grid: Grid) {
         self.grid = grid

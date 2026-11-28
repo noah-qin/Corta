@@ -86,4 +86,23 @@ import Testing
         #expect(directory.hasSuffix(start.lastPathComponent))
         #expect(session.currentDirectory?.hasSuffix(start.lastPathComponent) == true)
     }
+
+    @Test("a forged directory is not stored on the command that follows")
+    func forgedDirectoryIsNotACommandRecord() throws {
+        let start = try directory()
+        let elsewhere = try directory()
+        defer {
+            try? FileManager.default.removeItem(at: start)
+            try? FileManager.default.removeItem(at: elsewhere)
+        }
+        let session = try TerminalSession(
+            executable: "/bin/sh",
+            arguments: ["-c", "printf '\\033]7;file://\(elsewhere.path)\\007\\033]133;A\\007READY\\n'; sleep 30"],
+            workingDirectory: start.path)
+        defer { session.stop() }
+        session.start()
+        #expect(waitForReady(session))
+        let record = try #require(session.commandRecords.last)
+        #expect(record.workingDirectory != elsewhere.path)
+    }
 }

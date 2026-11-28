@@ -81,14 +81,20 @@ extension Performer {
         // Until this prompt's own 'B', a `cd` must not read the last one's.
         state.promptEndColumn = nil
         grid.setMark(.prompt, atAbsoluteRow: row)
+        let directory = verifiesCommandDirectories ? nil : state.workingDirectory
         if nothingRan {
             state.commandRecords.movePrompt(
-                to: row, workingDirectory: state.workingDirectory,
+                to: row, workingDirectory: directory,
                 host: state.remoteContext?.host, at: Date())
         } else {
             state.commandRecords.begin(
-                promptRow: row, workingDirectory: state.workingDirectory,
+                promptRow: row, workingDirectory: directory,
                 host: state.remoteContext?.host, at: Date())
+        }
+        if verifiesCommandDirectories, state.remoteContext == nil,
+            let path = state.workingDirectory, let record = state.commandRecords.last
+        {
+            pendingCommandDirectory = (record.id, path)
         }
     }
 
@@ -196,9 +202,10 @@ extension Performer {
         state.promptRow = row
         state.promptAwaitsRepaint = false
         grid.setMark(.prompt, atAbsoluteRow: row)
+        let prior = state.commandRecords.last
         state.commandRecords.movePrompt(
-            to: row, workingDirectory: state.workingDirectory,
-            host: state.remoteContext?.host, at: Date())
+            to: row, workingDirectory: verifiesCommandDirectories ? prior?.workingDirectory : state.workingDirectory,
+            host: verifiesCommandDirectories ? prior?.host : state.remoteContext?.host, at: Date())
         if let column { state.commandRecords.markPromptEnd(column: column) }
     }
 
@@ -207,9 +214,10 @@ extension Performer {
         state.promptRow = row
         state.promptEndColumn = nil
         grid.setMark(.prompt, atAbsoluteRow: row)
+        let prior = state.commandRecords.last
         state.commandRecords.movePrompt(
-            to: row, workingDirectory: state.workingDirectory,
-            host: state.remoteContext?.host, at: Date())
+            to: row, workingDirectory: verifiesCommandDirectories ? prior?.workingDirectory : state.workingDirectory,
+            host: verifiesCommandDirectories ? prior?.host : state.remoteContext?.host, at: Date())
     }
 
     /// A missing status is 0: "finished", not "failed".

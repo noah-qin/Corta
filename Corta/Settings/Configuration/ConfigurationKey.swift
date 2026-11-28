@@ -117,7 +117,7 @@ nonisolated extension Configuration {
     }
     static let columnsRange = 20...500
     static let rowsRange = 5...300
-    static let scrollbackLinesRange = 0...1_000_000
+    static let scrollbackLinesRange = 0...100_000
     static let commandHistoryLimitRange = 0...10_000
     /// The settings page's bound. The file itself takes any value from 1.
     static let notificationThresholdRange: ClosedRange<Double> = 1...86_400
@@ -237,6 +237,7 @@ nonisolated extension Configuration {
             .flag("history-suggestions", \.historySuggestions),
             .flag("command-status-marks", \.commandStatusMarks),
             .flag("restore-windows", \.restoreWindows),
+            .flag("restore-ssh-destinations", \.restoreSSHDestinations),
             .flag("confirm-close", \.confirmClose),
             .flag("auto-balance-panes", \.autoBalancePanes),
             .flag("focus-follows-mouse", \.focusFollowsMouse),

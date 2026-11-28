@@ -43,8 +43,9 @@ final class CompressedChunk: @unchecked Sendable {
     /// Its own mapping, not a `malloc` block: a megabyte from `malloc` came out of
     /// the same zone as the small blocks beside it, and the holes its neighbours
     /// left stayed resident. Unmapping gives every page back at once.
-    init() {
-        storage = VirtualMemory.map(Self.capacity)
+    init?() {
+        guard let storage = VirtualMemory.map(Self.capacity) else { return nil }
+        self.storage = storage
     }
 
     deinit { VirtualMemory.unmap(storage, Self.capacity) }
@@ -81,13 +82,9 @@ struct CompressedBlock: Sendable {
 /// Anonymous pages straight from the kernel, for blocks big enough that
 /// `malloc` would place them among small, long-lived neighbours.
 enum VirtualMemory {
-    static func map(_ byteCount: Int) -> UnsafeMutableRawPointer {
+    static func map(_ byteCount: Int) -> UnsafeMutableRawPointer? {
         let address = mmap(nil, byteCount, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0)
-        guard let address, address != MAP_FAILED else {
-            // Out of address space: the process cannot go on anyway, as when `malloc` fails.
-            fatalError("cannot map \(byteCount) bytes")
-        }
-        return address
+        return address == MAP_FAILED ? nil : address
     }
 
     static func unmap(_ pointer: UnsafeMutableRawPointer, _ byteCount: Int) {
@@ -110,12 +107,14 @@ enum EncodeScratch {
     private static let pool = Mutex<[Mapping]>([])
     private static let pooled = 4
 
-    static func with<R>(capacity: Int, _ body: (UnsafeMutableRawPointer) -> R) -> R {
+    static func with<R>(capacity: Int, _ body: (UnsafeMutableRawPointer) -> R) -> R? {
         let taken: Mapping? = pool.withLock { pool in
             guard let index = pool.firstIndex(where: { $0.capacity >= capacity }) else { return nil }
             return pool.remove(at: index)
         }
-        let scratch = taken ?? Mapping(pointer: VirtualMemory.map(capacity), capacity: capacity)
+        guard let scratch = taken ?? VirtualMemory.map(capacity).map({
+            Mapping(pointer: $0, capacity: capacity)
+        }) else { return nil }
         let result = body(scratch.pointer)
         let kept = pool.withLock { pool -> Bool in
             guard pool.count < pooled else { return false }

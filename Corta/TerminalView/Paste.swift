@@ -26,11 +26,8 @@ nonisolated enum Paste {
     static let bracketStart: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E]
     static let bracketEnd: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
 
-    /// The most a paste may be, in UTF-8 bytes, checked before any of it is
-    /// walked: the write queue admits one whole paste however large
-    /// (`TerminalSession.maxPendingWriteBytes` pushes back on a child that
-    /// stopped reading, not on size), so this is what bounds the pasteboard.
-    static let maximumBytes = 64 * 1024 * 1024
+    /// A whole paste, including possible framing, fits an empty write queue.
+    static let maximumBytes = TerminalSession.maxPendingWriteBytes - bracketStart.count - bracketEnd.count
 
     /// Below this a paste is scanned where it was asked for, so it keeps its
     /// place among the keystrokes around it; above, off the main thread.
@@ -152,7 +149,19 @@ nonisolated enum Paste {
         maxChunkSize: Int = defaultChunkSize
     ) -> [[UInt8]] {
         var text = text
-        var chunks = text.withUTF8 { chunked($0, maxChunkSize: maxChunkSize) }
+        let chunks = text.withUTF8 { chunked($0, maxChunkSize: maxChunkSize) }
+        return framed(chunks, bracketedPasteEnabled: bracketedPasteEnabled, trailer: trailer)
+    }
+
+    /// `chunks(for:bracketedPasteEnabled:)` of a large paste, cut off the
+    /// main thread, with the encoding it was cut for.
+    struct PreparedChunks: Sendable {
+        let bracketed: Bool
+        let chunks: [[UInt8]]
+    }
+
+    static func framed(_ payload: [[UInt8]], bracketedPasteEnabled: Bool, trailer: [UInt8] = []) -> [[UInt8]] {
+        var chunks = payload
         if bracketedPasteEnabled {
             if chunks.isEmpty { chunks = [bracketStart] } else { chunks[0] = bracketStart + chunks[0] }
             chunks.append(bracketEnd + trailer)
@@ -160,14 +169,6 @@ nonisolated enum Paste {
             chunks.append(trailer)
         }
         return chunks
-    }
-
-    /// `chunks(for:bracketedPasteEnabled:)` of a large paste, cut off the
-    /// main thread, with the encoding it was cut for: one cut for the other
-    /// encoding would send the markers wrongly.
-    struct PreparedChunks: Sendable {
-        let bracketed: Bool
-        let chunks: [[UInt8]]
     }
 
     /// Wrapped in the ?2004 markers when bracketed, so it reads as data.

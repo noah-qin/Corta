@@ -339,8 +339,8 @@ ou, pour une connexion, **Reconnecter** ; le texte d’erreur du système est so
   (`mouse-override-modifier`).
 - **Coller.** ⌘V. Le texte collé est marqué comme collage (bracketed paste), si bien qu’un shell qui le prend en charge —
   zsh, fish, bash 5.1 ou ultérieur — insère une commande collée sans l’exécuter avant que vous appuyiez sur Retour.
-  Quand le programme n’a pas activé le bracketed paste (le `/bin/bash` 3.2 de macOS ne le fait jamais), Corta avertit
-  avant de coller un texte contenant un saut de ligne. Même avec le bracketed paste activé, il avertit aussi pour un tube
+  Un programme peut activer le bracketed paste sans le comprendre réellement, donc Corta avertit
+  avant de coller un texte contenant un saut de ligne dans les deux cas. Il avertit aussi pour un tube
   vers un shell (ou `bash <(curl …)` et ses variantes), sudo, une suppression récursive forcée, une continuation par
   barre oblique inverse, ou des caractères invisibles / bidirectionnels. Lisez les phrases de risque et l’aperçu du texte
   avant de choisir **Coller** ou **Annuler** ; les caractères cachés apparaissent sous forme de codes comme `⟦U+202E⟧`.
@@ -349,7 +349,7 @@ ou, pour une connexion, **Reconnecter** ; le texte d’erreur du système est so
   analyseur de shell ni une garantie que le reste du texte est sûr. Un gros collage que le shell traite encore peut être
   annulé avec ⌃C : la partie pas encore envoyée est abandonnée et l’interruption passe directement.
 
-  Au-delà de 64 KiB, le collage est vérifié en arrière-plan et la fenêtre reste utilisable. Un nouveau collage remplace le texte en cours de vérification. Au-delà de 64 MiB, rien n’est envoyé et Corta le signale. Un programme peut activer le collage encadré sans le comprendre réellement. Pour toujours afficher un avertissement lors d’un collage multiligne dans des programmes distants ou anciens, utilisez `paste-warning = always`.
+  Au-delà de 64 KiB, le collage est vérifié en arrière-plan et la fenêtre reste utilisable. Un nouveau collage remplace le texte en cours de vérification. Au-delà de 4 MiB, rien n’est envoyé et Corta le signale. Un programme peut activer le collage encadré sans le comprendre réellement. Un collage qui contient un saut de ligne est donc annoncé avant l’envoi, que le mode soit actif ou non.
 - **Déposer des fichiers.** Déposez des fichiers, ou des fichiers fournis par une autre app, sur un panneau pour saisir leurs chemins entre guillemets par le canal de collage, sans Retour. Le survol ne lance aucun téléchargement. La réception est asynchrone et cesse d'attendre après 120 secondes ; les échecs s'affichent dans le panneau. Si la session ou le groupe de processus au premier plan change entre-temps, Corta abandonne le dépôt.
 
   **Un fichier du Finder est utilisé là où il se trouve, et Corta ne le supprime jamais. Un fichier que seule une autre app peut fournir, comme une photo ou une pièce jointe de Mail, arrive sous forme de copie temporaire :** enregistrez-le ailleurs pour le conserver. La copie disparaît à la fermeture de son panneau, y compris avec son onglet ou sa fenêtre, ou quand Corta quitte. Un programme encore en cours ne peut plus la lire, et un chemin copié ailleurs ne vaut plus. Il en va de même des anciens chemins dans l'historique de défilement et celui du shell, et ⇧⌘T rouvre un panneau sans ses copies. Déplacer le panneau vers un autre onglet ou une autre fenêtre les conserve. Si un autre programme garde un fichier ouvert ou qu'un instantané système existe, l'espace peut ne pas revenir tout de suite. **Réglages ▸ Confidentialité et sécurité ▸ Données locales** indique l'espace et propose **Nettoyer maintenant…**.

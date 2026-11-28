@@ -79,7 +79,9 @@ struct PasteTests {
         #expect(Paste.warningRisks(in: "sudo ls\n", bracketedPasteEnabled: false, policy: .off).isEmpty)
         #expect(
             Paste.warningRisks(in: "echo one\necho two", bracketedPasteEnabled: true, policy: .always) == [.multiline])
-        #expect(Paste.warningRisks(in: "echo one\necho two", bracketedPasteEnabled: true, policy: .dangerous).isEmpty)
+        #expect(
+            Paste.warningRisks(in: "echo one\necho two", bracketedPasteEnabled: true, policy: .dangerous)
+                == [.multiline])
         #expect(
             Paste.warningRisks(in: "echo one\r\necho two", bracketedPasteEnabled: false, policy: .dangerous)
                 == [.multiline])

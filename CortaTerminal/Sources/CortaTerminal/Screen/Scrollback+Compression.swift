@@ -69,7 +69,7 @@ extension Scrollback {
                 }
                 return ContiguousArray(
                     UnsafeBufferPointer(start: scratch.assumingMemoryBound(to: UInt8.self), count: written))
-            }
+            } ?? []
         }
     }
     public struct CompressionResult: Sendable {
@@ -119,7 +119,7 @@ extension Scrollback {
     private mutating func pack(_ bytes: ContiguousArray<UInt8>) -> CompressedBlock? {
         bytes.withUnsafeBufferPointer { buffer in
             if let block = openChunk?.append(buffer) { return block }
-            let chunk = CompressedChunk()
+            guard let chunk = CompressedChunk() else { return nil }
             openChunk = chunk
             return chunk.append(buffer)
         }

@@ -294,7 +294,7 @@ Ejecutar no se ofrecen para él. Aumenta `scrollback-lines` si te pasa a menudo.
 
 `scrollback-lines` (10.000 por defecto) es un límite por sesión, y cuenta filas *físicas* — una línea de 200 columnas
 partida a 100 columnas son dos. La salida más antigua que el límite se descarta a medida que llega; la pastilla de arriba
-indica cuánto ha retrocedido la vista. Sube el límite (hasta 1.000.000; la memoria que ocupa el historial antiguo
+indica cuánto ha retrocedido la vista. Sube el límite (hasta 100.000; la memoria que ocupa el historial antiguo
 comprimido depende del texto y de la carga). Una celda guardada ocupa 16 bytes antes de la compresión, lo cual no es una
 estimación de la memoria residente. Una carga medida de 100.000 líneas de 120 columnas añadió unos 11 MiB de memoria
 residente; consulta [Performance](../../PERFORMANCE.md#56-numbers-by-release) (en inglés). Exporta la salida que necesites
@@ -337,7 +337,7 @@ grande en un enlace lento también puede alcanzar el límite: cópialo con el na
 
 ### Un enlace no se abre o el pegado supera el límite
 
-Si la salida cambió el destino de la ayuda emergente, el clic solo la actualiza. Compruébala y vuelve a hacer clic. Un aviso de más de 64 MiB significa que no se envió nada. Pega por partes o guarda el texto en un archivo para que el programa lo lea. El límite es fijo.
+Si la salida cambió el destino de la ayuda emergente, el clic solo la actualiza. Compruébala y vuelve a hacer clic. Un aviso de más de 4 MiB significa que no se envió nada. Pega por partes o guarda el texto en un archivo para que el programa lo lea. El límite es fijo.
 
 <a id="an-ssh-pane-stopped-responding-and-reconnect-is-greyed-out"></a>
 <a id="browse-remote-files-stays-on-connecting-then-says-it-could-not-reach-the-host"></a>

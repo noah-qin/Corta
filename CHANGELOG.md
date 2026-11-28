@@ -10,6 +10,26 @@ Versioning for compatibility changes.
 
 ## [Unreleased]
 
+### Changed
+
+- A paste that contains a line break asks first even when the program claims
+  bracketed paste. The pane can still suppress warnings, and
+  `paste-warning = off` still turns the dialog off.
+- A paste is limited to 4 MiB, the size of an empty write queue. A larger one
+  is refused before it is scanned, and a write is queued only when all of it
+  fits what is already waiting.
+- Program notifications are off until `notify-from-programs` is turned on.
+  Session restore no longer writes an SSH destination unless
+  `restore-ssh-destinations` is on. Scrollback is capped at 100,000 lines.
+- Image pixels and textures are each capped at 512 MB.
+- The website pages send a Content-Security-Policy and a strict referrer.
+  GitHub Pages still cannot set HSTS, `nosniff` or `frame-ancestors` as
+  response headers.
+- Corta drains heavy terminal output faster. Ready PTY output takes one
+  fewer system call per read, and scrolling a short region moves rows
+  through buffers acquired once per rotation.
+  [Window throughput results](docs/PERFORMANCE.md#window-throughput).
+
 ### Added
 
 - Send a terminal selection or a command’s output to the compose draft of a
@@ -19,13 +39,6 @@ Versioning for compatibility changes.
 - The Agents list shows how long each agent has waited. Select a waiting
   agent in the command palette to preview the pane’s latest screen text
   before jumping to it (#541).
-
-### Changed
-
-- Corta drains heavy terminal output faster. Ready PTY output takes one
-  fewer system call per read, and scrolling a short region moves rows
-  through buffers acquired once per rotation.
-  [Window throughput results](docs/PERFORMANCE.md#window-throughput).
 
 ## [1.7.0] - 2026-11-19
 

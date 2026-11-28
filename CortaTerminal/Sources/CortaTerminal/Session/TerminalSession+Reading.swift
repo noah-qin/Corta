@@ -91,6 +91,7 @@ extension TerminalSession {
         var heldNanoseconds: UInt64 = 0
         /// The slice began a wait, to be stamped before the next slice.
         var stampWaits = false
+        var commandDirectory: (recordID: Int, path: String)?
     }
 
     private func apply(_ batch: [UInt8], sizer: inout FeedSliceSizer) {
@@ -155,6 +156,11 @@ extension TerminalSession {
             return outcome
         }
         if outcome?.stampWaits == true { stampWaits() }
+        if let command = outcome?.commandDirectory,
+            pty.confirmedWorkingDirectory(command.path) == command.path
+        {
+            state.withLock { $0.terminal.confirmCommandDirectory(command.path, for: command.recordID) }
+        }
         return outcome
     }
 
@@ -166,6 +172,7 @@ extension TerminalSession {
         let waitsBefore = current.terminal.programBlockedEdges
         if let finished { current.terminal.completeDeferredImage(finished) }
         let consumed = current.terminal.feedDeferringImageDecode(slice)
+        let commandDirectory = current.terminal.takePendingCommandDirectory()
         // A new wait: who holds the terminal now, read once the lock is let
         // go (`stampWaits`); until then nothing reads the program signals.
         let beganWait = current.terminal.programBlockedEdges != waitsBefore
@@ -183,13 +190,13 @@ extension TerminalSession {
             return SliceOutcome(
                 responses: sliceResponses, episode: nil, compress: compress, consumed: consumed,
                 deferred: deferred, deferredScreenExit: current.terminal.hasDeferredAlternateScreenExit,
-                stampWaits: beganWait)
+                stampWaits: beganWait, commandDirectory: commandDirectory)
         }
         current.synchronizedOutputEpisode = episodeAfter
         return SliceOutcome(
             responses: sliceResponses, episode: episodeAfter, compress: compress, consumed: consumed,
             deferred: deferred, deferredScreenExit: current.terminal.hasDeferredAlternateScreenExit,
-            stampWaits: beganWait)
+            stampWaits: beganWait, commandDirectory: commandDirectory)
     }
 
     /// Stamps the waits the last slice began with the foreground group

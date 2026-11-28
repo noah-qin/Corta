@@ -298,7 +298,7 @@ ne sont pas proposés pour elle. Augmentez `scrollback-lines` si cela arrive sou
 
 `scrollback-lines` (10 000 par défaut) est un plafond par session, et il compte les lignes *physiques* — une ligne de
 200 colonnes repliée à 100 colonnes en compte deux. La sortie plus ancienne que le plafond est supprimée à mesure qu’elle
-arrive ; la pastille en haut indique jusqu’où remonte la vue. Augmentez le plafond (jusqu’à 1 000 000 ; la mémoire
+arrive ; la pastille en haut indique jusqu’où remonte la vue. Augmentez le plafond (jusqu’à 100 000 ; la mémoire
 occupée par l’historique ancien compressé dépend du texte et de la charge). Une cellule stockée fait 16 octets avant
 compression, ce qui n’est pas une estimation de la mémoire résidente. Une charge mesurée de 100 000 lignes de 120 colonnes
 a ajouté environ 11 Mio de mémoire résidente ; voir
@@ -342,7 +342,7 @@ fichier sur un lien lent peut aussi atteindre la limite : copiez-le plutôt avec
 
 ### Un lien ne s’ouvre pas ou le collage est trop volumineux
 
-Si la sortie a changé la cible de l’infobulle, le clic ne fait que l’actualiser. Vérifiez puis cliquez de nouveau. Un message indiquant plus de 64 MiB signifie que rien n’a été envoyé. Collez par morceaux ou enregistrez le texte dans un fichier que le programme pourra lire. Cette limite est fixe.
+Si la sortie a changé la cible de l’infobulle, le clic ne fait que l’actualiser. Vérifiez puis cliquez de nouveau. Un message indiquant plus de 4 MiB signifie que rien n’a été envoyé. Collez par morceaux ou enregistrez le texte dans un fichier que le programme pourra lire. Cette limite est fixe.
 
 <a id="an-ssh-pane-stopped-responding-and-reconnect-is-greyed-out"></a>
 <a id="browse-remote-files-stays-on-connecting-then-says-it-could-not-reach-the-host"></a>

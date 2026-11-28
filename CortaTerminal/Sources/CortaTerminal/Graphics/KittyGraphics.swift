@@ -249,10 +249,10 @@ public enum KittyGraphics {
 
     /// Image bytes across every terminal sharing an `ImageMemoryBudget` —
     /// the app's one budget. Three panes' worth of the pane cap.
-    public static let maximumProcessImageBytes = 1024 * 1024 * 1024
+    public static let maximumProcessImageBytes = 512 * 1024 * 1024
 
     /// Texture bytes across every pane: VRAM is shared system-wide.
-    public static let maximumGlobalTextureBytes = 1024 * 1024 * 1024
+    public static let maximumGlobalTextureBytes = 512 * 1024 * 1024
 
     /// Images and placements per session; past either, a new one is refused
     /// rather than evicting one still on screen.

@@ -305,6 +305,9 @@ extension Parser {
             break  // DEL is ignored inside a sequence.
         default:
             performer.escapeDispatch(intermediates: intermediates, final: byte)
+            if byte == 0x63 || (byte == 0x38 && intermediates.count == 1 && intermediates[0] == 0x23) {
+                dispatchedAPC = true
+            }
             state = .ground
         }
     }
@@ -321,6 +324,9 @@ extension Parser {
             break
         default:
             performer.escapeDispatch(intermediates: intermediates, final: byte)
+            if byte == 0x63 || (byte == 0x38 && intermediates.count == 1 && intermediates[0] == 0x23) {
+                dispatchedAPC = true
+            }
             state = .ground
         }
     }
@@ -527,9 +533,10 @@ extension Parser {
                 final: final
             )
         )
-        // DECRST can leave the alternate screen and reflow the parked
-        // document. Give a session's reader the same stop point as an image.
-        if privateMarker == 0x3F, final == 0x6C { dispatchedAPC = true }
+        // DECRST can reflow the parked screen and ED can erase the display.
+        if (privateMarker == 0x3F && final == 0x6C) || (privateMarker == 0 && final == 0x4A) {
+            dispatchedAPC = true
+        }
         state = .ground
         clear()
     }

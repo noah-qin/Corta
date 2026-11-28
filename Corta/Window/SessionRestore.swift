@@ -235,6 +235,19 @@ nonisolated indirect enum PaneLayout: Equatable, Sendable {
     ///   on another display or window size.
     case split(vertical: Bool, position: Double, first: PaneLayout, second: PaneLayout)
 
+    func omittingSSHDestinations() -> PaneLayout {
+        switch self {
+        case .pane(let directory, let preset, let focused, .target):
+            return .pane(directory: directory, presetName: preset, isFocused: focused, remote: .launcher)
+        case .pane:
+            return self
+        case .split(let vertical, let position, let first, let second):
+            return .split(
+                vertical: vertical, position: position,
+                first: first.omittingSSHDestinations(), second: second.omittingSSHDestinations())
+        }
+    }
+
     /// The first pane in tree order: the root pane, created before the layout
     /// is applied.
     var firstDirectory: String? {
@@ -381,9 +394,14 @@ nonisolated struct SessionRestore: Sendable {
     /// Where the state lives: Application Support for the app, a temporary
     /// directory for a test.
     let directory: URL
+    var storesSSHDestinations = false
 
-    /// The app's own store.
-    static let standard = SessionRestore(directory: AppPaths.applicationSupportDirectory)
+    /// Capture the privacy choice before sending the store to a worker queue.
+    @MainActor static var standard: SessionRestore {
+        SessionRestore(
+            directory: AppPaths.applicationSupportDirectory,
+            storesSSHDestinations: ConfigurationStore.shared.configuration.restoreSSHDestinations)
+    }
 
     var fileURL: URL { directory.appendingPathComponent("state.json") }
     var failedRestoreURL: URL { directory.appendingPathComponent("state.failed-restore.json") }
@@ -419,7 +437,16 @@ nonisolated struct SessionRestore: Sendable {
         }
         guard let states = try? JSONDecoder().decode([WindowState].self, from: data) else { return [] }
         // Skip windows from a newer format rather than guess.
-        return states.filter { $0.version <= WindowState.currentVersion }
+        return forPersistence(states.filter { $0.version <= WindowState.currentVersion })
+    }
+
+    private func forPersistence(_ states: [WindowState]) -> [WindowState] {
+        guard !storesSSHDestinations else { return states }
+        return states.map { saved in
+            var state = saved
+            state.layout = saved.layout.omittingSSHDestinations()
+            return state
+        }
     }
 
     /// Each window with what `existing` did not confirm replaced by home.
@@ -481,7 +508,7 @@ nonisolated struct SessionRestore: Sendable {
         // they would be gone when the newer build runs again.
         guard !holdsNewerState() else { return }
         do {
-            let data = try JSONEncoder().encode(states)
+            let data = try JSONEncoder().encode(forPersistence(states))
             // Owner-only, as `recent-hosts.json`: directories say where you work.
             try PrivateFile.write(data, to: url)
         } catch {

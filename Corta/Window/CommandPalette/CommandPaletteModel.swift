@@ -113,7 +113,7 @@ final class CommandPaletteModel {
     private(set) var rows: [Row] = []
     /// The selected row's `id`, not its command, for the reason `Row` gives.
     private(set) var selectedRowID: String?
-    private var previewPaneID: UUID?
+    private(set) var previewPaneID: UUID?
     private(set) var agentPreview: [String] = []
     var onRun: ((TerminalCommand) -> Void)?
     var onAgent: ((UUID) -> Void)?
@@ -135,7 +135,7 @@ final class CommandPaletteModel {
 
     private static let recentLimit = 5
     private let agentEntries: () -> [AgentDirectory.Entry]
-    private let waitingScreen: (UUID) -> Grid?
+    private let waitingScreen: (UUID) -> Grid.VisibleScreen?
     private let canJumpToNextWaitingPane: () -> Bool
     private let paneMoveTargets: () -> [PaneMoveTarget]
     /// Whether a command would do anything where it would be sent — the
@@ -147,7 +147,7 @@ final class CommandPaletteModel {
         agents: @escaping () -> [AgentDirectory.Entry] = { AgentDirectory.entries },
         canJumpToNextWaitingPane: @escaping () -> Bool = { AgentDirectory.canJumpToNextWaitingPane },
         paneMoveTargets: @escaping () -> [PaneMoveTarget] = { AppDelegate.paneMoveTargets() },
-        waitingScreen: @escaping (UUID) -> Grid? = { AgentDirectory.waitingScreen(for: $0) }
+        waitingScreen: @escaping (UUID) -> Grid.VisibleScreen? = { AgentDirectory.waitingScreen(for: $0) }
     ) {
         agentEntries = agents
         self.waitingScreen = waitingScreen

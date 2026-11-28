@@ -76,7 +76,7 @@ final class PaneAgents {
     func readOutput() {
         guard !sessionHasExited, let host, !host.didTeardown, let session = host.session else { return }
         let configuration = ConfigurationStore.shared.configuration
-        let signals = session.takeProgramSignals()
+        guard let signals = session.takeProgramSignalsIfReady() else { return }
         let reported = signals.statuses
         sawSignals = sawSignals || !reported.isEmpty
         let notice = signals.notification

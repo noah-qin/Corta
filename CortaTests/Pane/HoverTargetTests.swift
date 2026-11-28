@@ -43,8 +43,9 @@ struct HoverTargetTests {
         #expect(!PanePointer.clickOpens(.reference("/b:1"), pending: true, shown: .shown(.reference("/a:1"))))
     }
 
-    @Test("no hover at all has shown nothing to differ from")
+    @Test("a URL needs a preview even when no hover has run")
     func noHover() {
-        #expect(PanePointer.clickOpens(.url("https://a.example/"), shown: .none))
+        #expect(!PanePointer.clickOpens(.url("https://a.example/"), shown: .none))
+        #expect(PanePointer.clickOpens(.reference("/a:1"), shown: .none))
     }
 }

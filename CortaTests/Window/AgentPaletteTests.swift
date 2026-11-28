@@ -132,7 +132,7 @@ struct AgentPaletteTests {
         var reads: [UUID] = []
         let model = CommandPaletteModel(agents: { entries }, waitingScreen: { id in
             reads.append(id)
-            return terminal.grid
+            return terminal.grid.visibleScreen
         })
         model.reset()
         #expect(reads.isEmpty)

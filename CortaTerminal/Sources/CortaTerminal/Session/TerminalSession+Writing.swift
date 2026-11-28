@@ -25,7 +25,7 @@ extension TerminalSession {
     public enum WriteOutcome: Sendable, Equatable {
         /// Queued (or empty — nothing to queue).
         case accepted
-        /// Dropped: the backlog was already over the cap.
+        /// Dropped: the entire write would exceed the backlog cap.
         case backpressured
         case stopped
         case failed
@@ -48,8 +48,7 @@ extension TerminalSession {
     }
 
     /// Every chunk or none, under one backlog check. Admitted while the
-    /// backlog is under the cap, however large — the cap pushes back on a
-    /// child that stopped reading. A paste goes through `write(paste:closing:)`
+    /// entire write fits the cap. A paste goes through `write(paste:closing:)`
     /// instead, whose cut is closed rather than left in paste mode.
     @discardableResult
     public func write(chunks: [[UInt8]]) -> WriteOutcome {
@@ -130,7 +129,11 @@ extension TerminalSession {
         var shouldSchedule = false
         let outcome = pendingWrites.withLock { pending -> WriteOutcome in
             guard !pending.hungUp else { return .stopped }
-            guard pending.bytes <= Self.maxPendingWriteBytes else { return .backpressured }
+            var remaining = Self.maxPendingWriteBytes - pending.bytes
+            for chunk in chunks {
+                guard chunk.count <= remaining else { return .backpressured }
+                remaining -= chunk.count
+            }
             var pasteID: UInt64?
             if case .paste(let closing) = kind {
                 pending.nextPasteID &+= 1

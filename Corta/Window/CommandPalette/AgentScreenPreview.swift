@@ -18,7 +18,7 @@ import CortaTerminal
 
 /// Plain text from the visible part of one terminal snapshot.
 enum AgentScreenPreview {
-    nonisolated static func lines(in grid: Grid) -> [String] {
+    nonisolated static func lines(in grid: Grid.VisibleScreen) -> [String] {
         let rowLimit = 10
         let columnLimit = min(100, grid.columns)
         var lines: [String] = []
@@ -32,7 +32,7 @@ enum AgentScreenPreview {
         return lines.reversed()
     }
 
-    nonisolated private static func lineText(_ line: Line, in grid: Grid, columns: Int) -> String {
+    nonisolated private static func lineText(_ line: Line, in grid: Grid.VisibleScreen, columns: Int) -> String {
         let count = min(columns, line.count)
         var bytes: [UInt8] = []
         bytes.reserveCapacity(count)

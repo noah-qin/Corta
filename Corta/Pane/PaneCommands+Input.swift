@@ -155,12 +155,11 @@ extension PaneCommands {
         return String(quoted)
     }
 
-    /// One paste on its way from the pasteboard to a session: which session it
-    /// was asked for, and what `?2004` said when it was judged.
+    /// One paste on its way from the pasteboard to its original session.
     struct PasteDelivery {
         let session: TerminalSession
-        /// Read once. The risks were judged by it and the bytes are encoded by
-        /// it, so output cannot change one without the other.
+        /// Read once, with the risks. Output can change the mode before the
+        /// bytes go; `deliver` asks again rather than sending unmarked newlines.
         let bracketed: Bool
         let warns: Bool
         let validate: (() -> Bool)?
@@ -182,7 +181,8 @@ extension PaneCommands {
         guard validate?() != false, let session = host?.session, !session.isStopped else { onDiscard?(); return }
         // UTF-16 first: O(1) on the pasteboard's bridged string, and never more
         // than the UTF-8 count it stands in for.
-        guard text.utf16.count <= Paste.maximumBytes, text.utf8.count <= Paste.maximumBytes else {
+        let utf16Count = text.utf16.count
+        guard utf16Count <= Paste.maximumBytes else {
             host?.terminalView?.showToast(L10n.text("toast.pasteTooLarge"), kind: .warning)
             onDiscard?()
             return
@@ -192,7 +192,10 @@ extension PaneCommands {
             session: session, bracketed: session.isBracketedPasteEnabled,
             warns: !suppressPasteWarnings && policy != .off,
             validate: validate, onDiscard: onDiscard, onSent: onSent)
-        guard text.utf8.count >= Paste.synchronousScanLimit else {
+        // UTF-8 is at most three bytes per UTF-16 unit, so this bound keeps
+        // the synchronous walk under the scan limit. A larger paste counts
+        // its UTF-8 off the main thread.
+        if utf16Count <= Paste.synchronousScanLimit / 3 {
             let risks =
                 delivery.warns
                 ? Paste.warningRisks(in: text, bracketedPasteEnabled: delivery.bracketed, policy: policy) : []
@@ -209,6 +212,11 @@ extension PaneCommands {
         let id = nextPasteScanID
         let (warns, bracketed) = (delivery.warns, delivery.bracketed)
         let task = Task.detached(priority: .userInitiated) { [weak self] in
+            guard text.utf8.count <= Paste.maximumBytes else {
+                await self?.rejectOversizedPasteScan(id, delivery: delivery)
+                return
+            }
+            guard !Task.isCancelled else { return }
             let sanitized = Paste.sanitized(text)
             let risks =
                 warns
@@ -216,11 +224,9 @@ extension PaneCommands {
                     in: text, bracketedPasteEnabled: bracketed, policy: policy,
                     shouldStop: { Task.isCancelled }) : []
             guard !Task.isCancelled else { return }
-            // Cut here too: chunking megabytes is a copy of all of them, and on
-            // the main thread it stalled the paste it was sending. Encoded for
-            // ?2004 as it is now; `deliver` recuts if that changes meanwhile.
             let chunks = Paste.PreparedChunks(
-                bracketed: bracketed, chunks: Paste.chunks(for: sanitized, bracketedPasteEnabled: bracketed))
+                bracketed: bracketed,
+                chunks: Paste.chunks(for: sanitized, bracketedPasteEnabled: bracketed))
             await self?.finishPasteScan(id, sanitized: sanitized, risks: risks, delivery: delivery, chunks: chunks)
         }
         pasteScan = PasteScan(id: id, task: task, onDiscard: delivery.onDiscard)
@@ -230,6 +236,15 @@ extension PaneCommands {
             guard let self, self.pasteScan?.id == id else { return }
             self.host?.terminalView?.showToast(L10n.text("toast.pasteChecking"))
         }
+    }
+
+    private func rejectOversizedPasteScan(_ id: Int, delivery: PasteDelivery) {
+        guard pasteScan?.id == id else { return }
+        pasteScan = nil
+        if host?.session === delivery.session {
+            host?.terminalView?.showToast(L10n.text("toast.pasteTooLarge"), kind: .warning)
+        }
+        delivery.onDiscard?()
     }
 
     private func finishPasteScan(
@@ -252,7 +267,8 @@ extension PaneCommands {
 
     /// Sends the text, or asks first when it has risks to name.
     private func decide(
-        _ sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery, chunks: Paste.PreparedChunks? = nil
+        _ sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery,
+        chunks: Paste.PreparedChunks? = nil
     ) {
         guard !sanitized.isEmpty else { delivery.onDiscard?(); return }
         guard !risks.isEmpty, let host else {
@@ -280,13 +296,13 @@ extension PaneCommands {
         }
     }
 
-    /// The last check before the bytes go: the sheet or the scan took time, and
-    /// any of it may have changed. The pane may have closed, or been rebuilt
-    /// with a new session this text was never meant for. And `?2004` is the
-    /// child's to change: text judged safe because it would arrive marked must
-    /// not go unmarked, its newlines then Returns, so it is asked about again.
+    /// The last check before the bytes go. The pane may have closed, or been
+    /// rebuilt with a new session. And `?2004` is the child's to change: text
+    /// judged while it was on must not go unmarked, so a newline is asked
+    /// about again.
     func deliver(
-        _ sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery, chunks: Paste.PreparedChunks? = nil
+        _ sanitized: String, risks: [Paste.PasteRisk], delivery: PasteDelivery,
+        chunks: Paste.PreparedChunks? = nil
     ) {
         guard let host, host.session === delivery.session, !delivery.session.isStopped,
             delivery.validate?() != false
@@ -301,12 +317,10 @@ extension PaneCommands {
                 chunks: chunks)
             return
         }
-        // Nothing warns here, by choice: nothing was judged, so nothing to keep to.
         let bracketed = delivery.warns ? delivery.bracketed : live
         delivery.onSent?()
         (host as? TerminalPaneViewController)?.updateReaderPriority(input: true)
         host.pointer.returnToBottomOnInput()
-        // The scan's cut when it was made for this encoding, else cut now.
         let prepared = chunks?.bracketed == bracketed ? chunks?.chunks : nil
         sendPaste(sanitized, bracketed: bracketed, chunks: prepared, to: delivery.session)
     }
@@ -420,10 +434,8 @@ extension PaneCommands {
         case .accepted:
             host?.terminalView?.noteUserInput()
         case .backpressured:
-            // The child stopped reading; nothing was sent. Say why.
             host?.terminalView?.showToast(L10n.text("toast.pasteStopped"), kind: .warning)
         case .stopped, .failed:
-            // The session is gone; nobody would read the toast.
             break
         }
     }

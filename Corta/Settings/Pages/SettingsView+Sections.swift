@@ -91,6 +91,11 @@ extension SettingsView {
             Toggle(
                 L10n.text("settings.label.restoreWindows"),
                 isOn: bind(\.restoreWindows))
+            Toggle(
+                L10n.text("settings.label.restoreSSHDestinations"),
+                isOn: bind(\.restoreSSHDestinations))
+            .help(L10n.text("settings.help.restoreSSHDestinations"))
+            .disabled(!model.restoreWindows)
         }
     }
 

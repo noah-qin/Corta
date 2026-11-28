@@ -337,9 +337,8 @@ oder, bei einer Verbindung, **Neu verbinden**; der Fehlertext des Systems steht 
   aus dem Blick gescrollt ist. In einem Programm, das die Maus verwendet – `vim`, `htop` –,
   halte ⌥ beim Beginn des Ziehens gedrückt, um trotzdem Text auszuwählen (`mouse-override-modifier`).
 - **Einfügen.** ⌘V. Eingefügter Text wird als Einfügung markiert (Bracketed Paste), sodass eine Shell, die das unterstützt –
-  zsh, fish, bash 5.1 oder neuer –, einen eingefügten Befehl einsetzt, ohne ihn auszuführen, bis du Return drückst. Hat
-  das Programm Bracketed Paste nicht aktiviert (macOS’ eigenes `/bin/bash` 3.2 tut das nie), warnt Corta vor dem Einfügen
-  von Text, der einen Zeilenumbruch enthält. Auch bei aktivem Bracketed Paste warnt Corta vor einer Pipe in eine Shell
+  zsh, fish, bash 5.1 oder neuer –, einen eingefügten Befehl einsetzt, ohne ihn auszuführen, bis du Return drückst. Ein Programm kann Bracketed Paste einschalten, ohne es zu verstehen. Corta warnt vor dem Einfügen
+  von Text, der einen Zeilenumbruch enthält, ob der Modus an ist oder nicht. Corta warnt außerdem vor einer Pipe in eine Shell
   (oder `bash <(curl …)` und Verwandten), sudo, erzwungenem rekursivem Löschen, einer Fortsetzung mit Backslash oder
   unsichtbaren / bidirektionalen Zeichen. Prüfe die Risikohinweise und die Textvorschau, bevor du **Einfügen** oder
   **Abbrechen** wählst; versteckte Zeichen erscheinen als Codes wie `⟦U+202E⟧`. **Für diesen Bereich nicht mehr warnen**
@@ -348,7 +347,7 @@ oder, bei einer Verbindung, **Neu verbinden**; der Fehlertext des Systems steht 
   Eine große Einfügung, die die Shell noch abarbeitet, lässt sich mit ⌃C abbrechen: Der noch nicht gesendete Teil wird
   verworfen, und der Interrupt geht direkt durch.
 
-  Einfügevorgänge über 64 KiB werden im Hintergrund geprüft; das Fenster bleibt bedienbar. Erneutes Einfügen ersetzt den noch geprüften Text. Über 64 MiB wird nichts gesendet und Corta meldet dies. Ein Programm kann Bracketed Paste einschalten, ohne es tatsächlich zu verstehen. Für eine Warnung bei jedem mehrzeiligen Einfügen in entfernte oder ältere Programme verwende `paste-warning = always`.
+  Einfügevorgänge über 64 KiB werden im Hintergrund geprüft; das Fenster bleibt bedienbar. Erneutes Einfügen ersetzt den noch geprüften Text. Über 4 MiB wird nichts gesendet und Corta meldet dies. Ein Programm kann Bracketed Paste einschalten, ohne es tatsächlich zu verstehen. Ein Zeilenumbruch wird deshalb vorher angekündigt, ob der Modus an ist oder nicht.
 - **Dateien ablegen.** Lege Dateien oder von anderen Apps bereitgestellte Dateien auf einem Bereich ab, um ihre Pfade in Anführungszeichen über den Einfügekanal einzutragen, ohne Return. Beim Überfahren beginnt kein Download. Der Empfang läuft asynchron und wartet höchstens 120 Sekunden; Fehler erscheinen im Bereich. Ändert sich währenddessen die Sitzung oder die Vordergrund-Prozessgruppe, verwirft Corta das Ablegen.
 
   **Eine Datei aus dem Finder wird dort verwendet, wo sie liegt, und Corta entfernt sie nie. Eine Datei, die nur eine andere App liefern kann, etwa aus Fotos oder ein Mail-Anhang, kommt als temporäre Kopie an:** Sichere sie an anderer Stelle, wenn du sie behalten willst. Die Kopie verschwindet, wenn ihr Bereich geschlossen wird, auch mit seinem Tab oder Fenster, oder wenn Corta endet. Ein danach noch laufendes Programm kann sie nicht mehr lesen, und ein anderswohin kopierter Pfad gilt nicht mehr. Das gilt auch für alte Pfade im Verlauf und in der Shell-Historie, und ⇧⌘T bringt einen Bereich ohne seine Kopien zurück. Beim Verschieben des Bereichs in einen anderen Tab oder ein anderes Fenster bleiben sie erhalten. Hält ein anderes Programm eine Datei offen oder gibt es einen System-Snapshot, wird der Platz eventuell erst später frei. **Einstellungen ▸ Datenschutz & Sicherheit ▸ Lokale Daten** zeigt den Platz und bietet **Jetzt entfernen …**.

@@ -27,7 +27,7 @@ extension PanePointer {
     }
 
     nonisolated enum HoverState: Equatable {
-        /// No hover since the pointer came in: nothing has been shown to differ.
+        /// No target has been shown since the pointer came in.
         case none
         /// Shown by the last hover; nil when it found nothing to open.
         case shown(HoverTarget?)
@@ -50,7 +50,9 @@ extension PanePointer {
 
     nonisolated static func clickOpens(_ target: HoverTarget, pending: Bool = false, shown: HoverState) -> Bool {
         switch shown {
-        case .none: return true
+        case .none:
+            if case .reference = target { return true }
+            return false
         case .shown(let shown?): return shown == target
         case .shown(nil): return pending
         }

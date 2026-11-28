@@ -26,21 +26,21 @@ struct AgentScreenPreviewTests {
         }
         terminal.feed(Array((String(repeating: "x", count: 100) + "over the edge").utf8))
         let expected = (3..<12).map { "row \($0)" } + [String(repeating: "x", count: 100)]
-        #expect(AgentScreenPreview.lines(in: terminal.grid) == expected)
+        #expect(AgentScreenPreview.lines(in: terminal.grid.visibleScreen) == expected)
     }
 
     @Test func dropsAPartialWideCellAndKeepsAWholePair() {
         var terminal = Terminal(rows: 3, columns: 120)
         let prefix = String(repeating: "x", count: 98)
         terminal.feed(Array((prefix + "界!\r\n" + prefix + "x界!").utf8))
-        #expect(AgentScreenPreview.lines(in: terminal.grid) == [prefix + "界", prefix + "x"])
+        #expect(AgentScreenPreview.lines(in: terminal.grid.visibleScreen) == [prefix + "界", prefix + "x"])
     }
 
     @Test func cleansControlsAndConcealingScalarsAndSkipsInvisibleCells() throws {
         var terminal = Terminal(rows: 2, columns: 30)
         terminal.feed(Array("A\u{1B}[8mX\u{1B}[0mB e\u{301}".utf8))
         var grid = terminal.grid
-        #expect(AgentScreenPreview.lines(in: grid) == ["A B e\u{301}"])
+        #expect(AgentScreenPreview.lines(in: grid.visibleScreen) == ["A B e\u{301}"])
 
         // Inject raw scalars into the interned cell, after the parser's own cleaning.
         var graphemes = GraphemeTable()
@@ -48,17 +48,17 @@ struct AgentScreenPreviewTests {
         let id = try #require(injectedID)
         #expect(grid[0, 4].grapheme == id)
         grid.graphemes = graphemes
-        #expect(AgentScreenPreview.lines(in: grid) == ["A B e\u{301}"])
+        #expect(AgentScreenPreview.lines(in: grid.visibleScreen) == ["A B e\u{301}"])
     }
 
     @Test func readsOnlyTheActiveScreenAndReturnsNothingAfterClear() {
         var terminal = Terminal(rows: 5, columns: 30)
-        #expect(AgentScreenPreview.lines(in: terminal.grid).isEmpty)
+        #expect(AgentScreenPreview.lines(in: terminal.grid.visibleScreen).isEmpty)
         terminal.feed(Array("Main screen\u{1B}[?1049hAllow tool use?\r\n  1. Yes\r\n  2. No".utf8))
-        #expect(AgentScreenPreview.lines(in: terminal.grid) == ["Allow tool use?", "  1. Yes", "  2. No"])
+        #expect(AgentScreenPreview.lines(in: terminal.grid.visibleScreen) == ["Allow tool use?", "  1. Yes", "  2. No"])
         terminal.feed(Array("\u{1B}[2J".utf8))
-        #expect(AgentScreenPreview.lines(in: terminal.grid).isEmpty)
+        #expect(AgentScreenPreview.lines(in: terminal.grid.visibleScreen).isEmpty)
         terminal.feed(Array("\u{1B}[?1049l".utf8))
-        #expect(AgentScreenPreview.lines(in: terminal.grid) == ["Main screen"])
+        #expect(AgentScreenPreview.lines(in: terminal.grid.visibleScreen) == ["Main screen"])
     }
 }
