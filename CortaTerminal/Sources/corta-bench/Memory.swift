@@ -155,6 +155,7 @@ private func feedFloodChunk(_ bytes: [UInt8], into terminal: inout Terminal, com
 /// has reserved. The app adds the glyph atlas, GPU buffers and the window on top;
 /// that part is read from `footprint` and `vmmap` on the running application.
 func benchmarkFloodMemory() {
+    let floods = MemoryFlood.workloads
     // Compress after every this many 16 KiB reads: the session does it as each
     // batch of rows seals, so the default is a read in four, not a megabyte.
     // The allocator keeps what a burst of uncompressed history frees, so the
@@ -183,7 +184,7 @@ func benchmarkFloodMemory() {
                 + "reserves \(String(format: "%.1f", Double(scrollback.retainedCellCapacityBytes) / 1_048_576)) MB")
     }
     report("start, empty")
-    for flood in MemoryFlood.workloads {
+    for flood in floods {
         for pass in 1...2 {
             for chunk in 0..<(flood.megabytes) {
                 if CommandLine.arguments.contains("--trace"), pass == 1, chunk < 20 {
